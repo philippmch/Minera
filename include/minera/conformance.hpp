@@ -65,6 +65,12 @@ struct TokenReplayOptions {
   // "concept:name" and "activity" use Event::activity; other names resolve
   // through Event::attribute.
   std::string activity_attribute = "concept:name";
+  // These policy controls default to the long-standing generic conformance
+  // behavior. Evaluators override them when their metric defines a stricter
+  // replay contract.
+  bool consider_remaining_in_fitness = true;
+  bool try_to_reach_final_marking_through_hidden = true;
+  bool consider_activities_not_in_model_in_fitness = true;
 };
 
 // Per-place token accounting for a replayed log.  The four counters use the

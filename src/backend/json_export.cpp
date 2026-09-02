@@ -1131,7 +1131,14 @@ void write_conformance(std::ostream& out,
     for (std::size_t j = 0; j < variants[i].activities.size(); ++j) {
       // Resolve names to the activity ids used elsewhere in the document.
       const auto id = graph.activity_id(variants[i].activities[j]);
-      out << (id ? *id : 0) << (j + 1 < variants[i].activities.size() ? ", " : "");
+      if (id) out << *id;
+      else out << "null";
+      out << (j + 1 < variants[i].activities.size() ? ", " : "");
+    }
+    out << "], \"activity_names\": [";
+    for (std::size_t j = 0; j < variants[i].activities.size(); ++j) {
+      write_json_string(out, variants[i].activities[j]);
+      out << (j + 1 < variants[i].activities.size() ? ", " : "");
     }
     out << "], \"count\": " << variants[i].count
         << ", \"fitness\": " << variants[i].fitness << '}'
@@ -1161,7 +1168,7 @@ void write_alignments(std::ostream& out,
       case AlignmentVariant::kGeneratorDijkstraNoHeuristics: return "generator_dijkstra_no_heuristics";
       case AlignmentVariant::kGeneratorDijkstraLessMemory: return "generator_dijkstra_less_memory";
     }
-    return "state_equation_a_star";
+    return "dijkstra_less_memory";
   };
   const auto write_move = [&](const AlignmentMove& move) {
     const auto id = graph.activity_id(move.activity);
@@ -1169,7 +1176,12 @@ void write_alignments(std::ostream& out,
     if (move.activity.empty()) {
       out << ", \"activity\": null, \"silent\": true";
     } else {
-      out << ", \"activity\": " << (id ? *id : 0);
+      out << ", \"activity\": ";
+      if (id) out << *id;
+      else out << "null";
+      out << ", \"activity_name\": ";
+      write_json_string(out, move.activity);
+      out << ", \"silent\": false";
     }
     out << '}';
   };
@@ -1208,7 +1220,14 @@ void write_alignments(std::ostream& out,
     out << "{\"activities\": [";
     for (std::size_t j = 0; j < variant.activities.size(); ++j) {
       const auto id = graph.activity_id(variant.activities[j]);
-      out << (id ? *id : 0) << (j + 1 < variant.activities.size() ? ", " : "");
+      if (id) out << *id;
+      else out << "null";
+      out << (j + 1 < variant.activities.size() ? ", " : "");
+    }
+    out << "], \"activity_names\": [";
+    for (std::size_t j = 0; j < variant.activities.size(); ++j) {
+      write_json_string(out, variant.activities[j]);
+      out << (j + 1 < variant.activities.size() ? ", " : "");
     }
     out << "], \"count\": " << variant.count << ", \"cost\": " << variant.cost
         << ", \"fitness\": " << variant.fitness
@@ -1235,8 +1254,12 @@ void write_alignments(std::ostream& out,
   for (std::size_t i = 0; i < deviations.size(); ++i) {
     const auto& entry = deviations[i];
     const auto id = graph.activity_id(entry.activity);
-    out << "{\"activity\": " << (id ? *id : 0)
-        << ", \"synchronous\": " << entry.synchronous
+    out << "{\"activity\": ";
+    if (id) out << *id;
+    else out << "null";
+    out << ", \"activity_name\": ";
+    write_json_string(out, entry.activity);
+    out << ", \"synchronous\": " << entry.synchronous
         << ", \"log_moves\": " << entry.log_moves
         << ", \"model_moves\": " << entry.model_moves << '}'
         << (i + 1 < deviations.size() ? ", " : "");
@@ -1642,7 +1665,12 @@ void write_replay_fitness(std::ostream& out, const ReplayFitnessResult& result,
       << ", \"trace_count\": " << result.trace_count
       << ", \"total_cost\": ";
   write_finite_or_null(out, result.total_cost);
-  if (graph != nullptr && result.variant == ReplayFitnessVariant::TOKEN_BASED) {
+  if (result.variant == ReplayFitnessVariant::ALIGNMENT_BASED &&
+      result.decomposed_alignment_result) {
+    out << ", \"alignments\": "
+        << decomposed_alignment_json(*result.decomposed_alignment_result);
+  } else if (graph != nullptr &&
+             result.variant == ReplayFitnessVariant::TOKEN_BASED) {
     out << ", \"token_replay\": ";
     write_conformance(out, result.token_result, *graph);
   } else if (graph != nullptr &&

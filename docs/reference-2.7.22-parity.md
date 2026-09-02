@@ -120,7 +120,7 @@ are reconciled.
 | Clustering | `SKLEARN_PROFILES` profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — the explicit `SKLEARN_PROFILES` selector and deterministic seeded profile clustering have bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering, independently match DMM activity and succession components, omit missing grouping attributes, and preserve linkage child order across the same adapters; broader differential review remains |
 | Comparison | Petri-net element-usage comparison | **Partial (implemented core; proof pending)** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters, including explicit initial/final markings, every ordinary/reset/inhibitor arc, a selectable event activity attribute, element labels, and signed-direction colors |
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Partial (implemented core; proof pending)** — the explicit `BOSE` selector covers relation-count features, seeded permutation windows, ranked/capped drift boundaries, boundary-partitioned result logs, optional timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters |
-| Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Partial (implemented core; proof pending)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior, with named event activity fields available at replay time |
+| Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Partial (implemented core; proof pending)** — all six variants are explicitly selectable; less-memory Dijkstra with legacy unit costs is the generic default, with named event activity fields available at replay time |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters |
 | Conformance: replay | forward token replay and backwards token replay | **Partial (implemented core; proof pending)** — forward replay remains the default; the backwards variation, reverse silent routing, weak firing, duplicate-label behavior, immediate-stop option, and named event activity selector are selectable |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Partial overall; footprints conformance complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance remain proof-pending |
@@ -1670,6 +1670,16 @@ bound, and explicit initial/final markings. Distance comparison accepts an
 external CSV or XES log and independently controls mass normalization and
 strict equal-mass validation.
 
+Replay fitness and precision share a selectable activity field and forward or
+backwards token replay. Forward token fitness can choose whether unknown activities
+affect fitness. Alignment fitness defaults to less-memory Dijkstra with
+standard evaluator costs and exposes all six ordinary search variations plus
+decomposed recomposition, state/time bounds, dependent generator and discounted
+controls, move costs, and decomposed cache and merge settings. Token precision
+uses its metric-specific prefix-stop and final-marking policies internally;
+alignment precision intentionally does not advertise an independent alignment
+engine selector.
+
 The shared request parser rejects empty, malformed, non-finite, negative, and
 out-of-range settings before evaluation. Results have standalone and embedded
 JSON forms, active-variation replay details, explicit completion/exhaustion
@@ -2380,7 +2390,7 @@ frontier under fractional custom costs.
 
 Cost semantics are selectable rather than silently changed: the legacy profile
 keeps unit visible log/model deviations and free silent routing, while the
-The reference profile charges 10,000 for visible log/model moves, 1 for silent moves,
+reference profile charges 10,000 for visible log/model moves, 1 for silent moves,
 and 0 for synchronous moves.
 Per-activity, per-position, and per-transition overrides are supported, as are
 API callbacks for trace, model, and synchronous moves. Callback values are
@@ -2393,7 +2403,7 @@ Discounted A* honors both the `exponent` and request-layer `theta` spelling
 over the same compact product representation: only successor scheduling differs
 from the explicit order, so both schedules retain equal optima. The native API,
 request parser, CLI, and frontend expose these controls and preserve the
-legacy state-equation/unit-cost defaults when no explicit options are supplied.
+less-memory Dijkstra/unit-cost defaults when no explicit options are supplied.
 Like the pinned 2.7.22 reference implementation, discounted search closes a state
 by `(marking, trace position)` rather than treating the same product state at
 every path depth as distinct. Its optimum is therefore over simple

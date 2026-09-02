@@ -8,6 +8,7 @@
 #include <queue>
 #include <set>
 #include <stdexcept>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -98,24 +99,41 @@ ReplayFitnessResult evaluate_replay_fitness(const EventLog& log, const PetriNet&
 
 namespace {
 
-EventLog filter_unknown_activities(const EventLog& log, const PetriNet& net) {
-  std::unordered_set<std::string> model_activities;
-  for (const auto& transition : net.transitions()) {
-    if (transition.activity &&
-        *transition.activity < net.activities().size()) {
-      model_activities.insert(net.activities()[*transition.activity]);
+std::string selected_evaluation_activity(
+    const Event& event, std::string_view activity_attribute) {
+  if (activity_attribute.empty() || activity_attribute == "concept:name" ||
+      activity_attribute == "activity") {
+    return event.activity;
+  }
+  if (const auto* value = event.attribute(activity_attribute)) return *value;
+  throw std::invalid_argument(
+      "evaluation: event is missing activity attribute '" +
+      std::string(activity_attribute) + "'");
+}
+
+EventLog project_evaluation_activity(
+    const EventLog& log, std::string_view activity_attribute) {
+  EventLog projected = log;
+  for (std::size_t trace = 0; trace < log.traces.size(); ++trace) {
+    for (std::size_t event = 0; event < log.traces[trace].events.size();
+         ++event) {
+      const auto& source = log.traces[trace].events[event];
+      auto& target = projected.traces[trace].events[event];
+      set_event_activity_context(
+          source, selected_evaluation_activity(source, activity_attribute),
+          target);
     }
   }
-  EventLog filtered = log;
-  for (auto& trace : filtered.traces) {
-    trace.events.erase(
-        std::remove_if(trace.events.begin(), trace.events.end(),
-                       [&](const Event& event) {
-                         return !model_activities.contains(event.activity);
-                       }),
-        trace.events.end());
-  }
-  return filtered;
+  return projected;
+}
+
+bool has_reachable_final_marking(const PetriNet& net) {
+  EventLog probe;
+  probe.traces.push_back(Trace{});
+  const AlignmentOptions options{
+      AlignmentVariant::kDijkstraLessMemory,
+      AlignmentCostProfile::kStandard};
+  return check_alignment(probe, net, options).computed;
 }
 
 }  // namespace
@@ -123,73 +141,104 @@ EventLog filter_unknown_activities(const EventLog& log, const PetriNet& net) {
 ReplayFitnessResult evaluate_replay_fitness(
     const EventLog& log, const PetriNet& net, ReplayFitnessVariant variant,
     const ReplayFitnessOptions& options) {
-  ReplayFitnessResult out; out.trace_count=log.trace_count();
+  ReplayFitnessResult out;
+  out.trace_count = log.trace_count();
+  AlignmentOptions alignment_options = options.alignment_options;
+  alignment_options.activity_attribute = options.activity_attribute.empty()
+                                             ? "concept:name"
+                                             : options.activity_attribute;
+  if (variant == ReplayFitnessVariant::AUTO) {
+    variant = has_reachable_final_marking(net)
+                  ? ReplayFitnessVariant::ALIGNMENT_BASED
+                  : ReplayFitnessVariant::TOKEN_BASED;
+  }
+  out.variant = variant;
   if (log.trace_count() == 0) {
-    if (variant == ReplayFitnessVariant::AUTO) {
-      EventLog probe;
-      probe.traces.push_back(Trace{});
-      AlignmentOptions pm;
-      pm.cost_profile = AlignmentCostProfile::kStandard;
-      variant = check_alignment(probe, net, pm).computed
-                    ? ReplayFitnessVariant::ALIGNMENT_BASED
-                    : ReplayFitnessVariant::TOKEN_BASED;
-    }
-    out.variant = variant;
     // Evaluators have no observations from which to compute a score;
-    // unlike the legacy conformance API, their empty-log metrics are zero.
+    // unlike the generic conformance API, their empty-log metrics are zero.
+    // Retain the selected detail engine so serialization does not substitute
+    // an unrelated default payload for an otherwise valid empty evaluation.
+    if (variant == ReplayFitnessVariant::TOKEN_BASED) {
+      out.token_result.activity_attribute = alignment_options.activity_attribute;
+    } else if (options.decomposed_alignment_options) {
+      out.decomposed_alignment_result = DecomposedAlignmentResult{};
+    } else {
+      out.alignment_result.variant = alignment_options.variant;
+      out.alignment_result.activity_attribute =
+          alignment_options.activity_attribute;
+    }
     return out;
   }
-  if (variant == ReplayFitnessVariant::AUTO) {
-    AlignmentOptions alignment_options;
-    alignment_options.cost_profile = AlignmentCostProfile::kStandard;
-    const auto alignment = check_alignment(log, net, alignment_options);
-    if (alignment.computed) {
-      out.variant = ReplayFitnessVariant::ALIGNMENT_BASED;
-      out.alignment_result = alignment;
-      out.computed = true;
-      out.fitness = alignment.fitness;
-      out.log_fitness = alignment.fitness;
-      out.total_cost = alignment.total_cost;
-      out.fitting_traces = alignment.fitting_traces;
-      double average = 0.0;
-      for (const auto& v : alignment.variants) average += v.fitness * v.count;
-      out.average_trace_fitness = log.trace_count() == 0
-                                      ? 0.0
-                                      : average / double(log.trace_count());
-      out.percentage_fit_traces = log.trace_count()
-                                      ? 100.0 * double(out.fitting_traces) /
-                                            double(log.trace_count())
-                                      : 0.0;
-      return out;
+
+  if (variant == ReplayFitnessVariant::TOKEN_BASED) {
+    TokenReplayOptions replay_options;
+    replay_options.variant = options.token_replay_variant;
+    replay_options.stop_immediately_unfit = false;
+    replay_options.consider_remaining_in_fitness = true;
+    replay_options.try_to_reach_final_marking_through_hidden = true;
+    replay_options.consider_activities_not_in_model_in_fitness =
+        options.consider_activities_not_in_model_in_fitness;
+    replay_options.activity_attribute = alignment_options.activity_attribute;
+    out.token_result = check_conformance(log, net, replay_options);
+    out.fitness = out.token_result.fitness;
+    out.log_fitness = out.fitness;
+    out.fitting_traces = out.token_result.fitting_traces;
+    double average = 0.0;
+    for (const auto& replay_variant : out.token_result.variants) {
+      average += replay_variant.fitness * double(replay_variant.count);
     }
-    variant = ReplayFitnessVariant::TOKEN_BASED;
-  }
-  out.variant=variant;
-  if (log.trace_count()==0) return out;
-  if (variant==ReplayFitnessVariant::TOKEN_BASED) {
-    const EventLog fitness_log =
-        options.consider_activities_not_in_model_in_fitness
-            ? log
-            : filter_unknown_activities(log, net);
-    out.token_result=check_conformance(fitness_log,net);
-    // The evaluator still describes the original log, including traces whose
-    // unknown events were ignored for token accounting.
-    out.token_result.trace_count = out.trace_count;
-    out.fitness=out.token_result.fitness;
-    out.log_fitness=out.fitness; out.fitting_traces=out.token_result.fitting_traces;
-    double av=0; for (const auto& v : out.token_result.variants) av += v.fitness*double(v.count);
-    out.average_trace_fitness = av/double(out.trace_count);
-    if (out.token_result.produced==0 || out.token_result.consumed==0) out.fitness=out.log_fitness=out.average_trace_fitness=0.0;
+    out.average_trace_fitness = average / double(out.trace_count);
+    if (out.token_result.produced == 0 || out.token_result.consumed == 0) {
+      out.fitness = 0.0;
+      out.log_fitness = 0.0;
+      out.average_trace_fitness = 0.0;
+    }
+  } else if (options.decomposed_alignment_options) {
+    auto decomposed_options = *options.decomposed_alignment_options;
+    const auto projected = project_evaluation_activity(
+        log, alignment_options.activity_attribute);
+    auto decomposed = align_decomposed(projected, net, decomposed_options);
+    out.computed = decomposed.complete;
+    out.exhausted = decomposed.exhausted || decomposed.timed_out;
+    out.fitness = out.computed ? decomposed.fitness : 0.0;
+    out.log_fitness = out.fitness;
+    out.total_cost = decomposed.total_cost;
+    double average = 0.0;
+    for (const auto& trace : decomposed.traces) {
+      average += trace.fitness * double(trace.count);
+      if (trace.complete && std::abs(trace.fitness - 1.0) <= 1e-12) {
+        out.fitting_traces += trace.count;
+      }
+    }
+    out.average_trace_fitness = average / double(out.trace_count);
+    if (!out.computed) {
+      out.error = decomposed.timed_out
+                      ? "decomposed alignment timed out"
+                      : decomposed.exhausted
+                            ? "decomposed alignment search exhausted"
+                            : "decomposed alignment failed";
+    }
+    out.decomposed_alignment_result = std::move(decomposed);
   } else {
-    AlignmentOptions pm_options; pm_options.cost_profile = AlignmentCostProfile::kStandard;
-    out.alignment_result=check_alignment(log,net,pm_options); out.computed=out.alignment_result.computed;
-    out.exhausted=out.alignment_result.exhausted; out.fitness=out.computed?out.alignment_result.fitness:0.0;
-    out.log_fitness=out.fitness; out.fitting_traces=out.alignment_result.fitting_traces; out.total_cost=out.alignment_result.total_cost;
-    double av=0; for (const auto& v : out.alignment_result.variants) av += v.fitness*double(v.count);
-    out.average_trace_fitness = av/double(out.trace_count);
-    if (!out.computed) out.error=out.exhausted?"alignment search exhausted":"final marking is unreachable";
+    out.alignment_result = check_alignment(log, net, alignment_options);
+    out.computed = out.alignment_result.computed;
+    out.exhausted = out.alignment_result.exhausted;
+    out.fitness = out.computed ? out.alignment_result.fitness : 0.0;
+    out.log_fitness = out.fitness;
+    out.fitting_traces = out.alignment_result.fitting_traces;
+    out.total_cost = out.alignment_result.total_cost;
+    double average = 0.0;
+    for (const auto& alignment_variant : out.alignment_result.variants) {
+      average += alignment_variant.fitness * double(alignment_variant.count);
+    }
+    out.average_trace_fitness = average / double(out.trace_count);
+    if (!out.computed) {
+      out.error = out.exhausted ? "alignment search exhausted"
+                                : "final marking is unreachable";
+    }
   }
-  out.percentage_fit_traces = out.trace_count ? 100.0*double(out.fitting_traces)/double(out.trace_count) : 0.0;
+  out.percentage_fit_traces =
+      100.0 * double(out.fitting_traces) / double(out.trace_count);
   return out;
 }
 ReplayFitnessResult evaluate_replay_fitness(const EventLog& l,const ProcessTree& t,ReplayFitnessVariant v) { return evaluate_replay_fitness(l,to_petri_net(t),v); }
@@ -207,11 +256,14 @@ struct PrefixInfo {
 };
 
 std::map<std::vector<std::string>, PrefixInfo> collect_prefixes(
-    const EventLog& log) {
+    const EventLog& log, std::string_view activity_attribute) {
   std::map<std::vector<std::string>, PrefixInfo> prefixes;
   for (const auto& trace : log.traces) {
     std::vector<std::string> activities;
-    for (const auto& event : trace.events) activities.push_back(event.activity);
+    for (const auto& event : trace.events) {
+      activities.push_back(
+          selected_evaluation_activity(event, activity_attribute));
+    }
     auto& root = prefixes[{}];
     root.frequency += 1;
     if (!activities.empty()) root.observed.insert(activities.front());
@@ -337,6 +389,13 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
                                          const PrecisionOptions& options) {
   PrecisionResult out;
   out.variant = variant;
+  const std::string activity_attribute = options.activity_attribute.empty()
+                                             ? "concept:name"
+                                             : options.activity_attribute;
+  AlignmentOptions alignment_options{
+      AlignmentVariant::kDijkstraLessMemory,
+      AlignmentCostProfile::kStandard};
+  alignment_options.activity_attribute = activity_attribute;
   if (options.max_states == 0) {
     out.computed = false;
     out.exhausted = true;
@@ -344,29 +403,30 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
     return out;
   }
   if (variant == PrecisionVariant::AUTO) {
-    AlignmentOptions pm;
-      pm.cost_profile = AlignmentCostProfile::kStandard;
-    EventLog probe;
-    probe.traces.push_back(Trace{});
-    const auto soundness = check_alignment(probe, net, pm);
-    variant = soundness.computed ? PrecisionVariant::ALIGN_ETCONFORMANCE
-                                 : PrecisionVariant::ETCONFORMANCE_TOKEN;
+    variant = has_reachable_final_marking(net)
+                  ? PrecisionVariant::ALIGN_ETCONFORMANCE
+                  : PrecisionVariant::ETCONFORMANCE_TOKEN;
   }
   out.variant = variant;
   if (variant == PrecisionVariant::ETCONFORMANCE_TOKEN) {
-    out.token_result = check_conformance(log, net);
+    TokenReplayOptions replay_options;
+    replay_options.variant = options.token_replay_variant;
+    replay_options.stop_immediately_unfit = true;
+    replay_options.consider_remaining_in_fitness = false;
+    replay_options.try_to_reach_final_marking_through_hidden = false;
+    replay_options.consider_activities_not_in_model_in_fitness = false;
+    replay_options.activity_attribute = activity_attribute;
+    out.token_result = check_conformance(log, net, replay_options);
     out.precision = out.token_result.precision;
     return out;
   }
 
-  AlignmentOptions pm;
-  pm.cost_profile = AlignmentCostProfile::kStandard;
   // Check model easy-soundness independently of the input log.  The legacy
   // alignment API intentionally treats an empty log as trivially computable,
   // which would otherwise mask an unreachable final marking here.
   EventLog probe;
   probe.traces.push_back(Trace{});
-  const auto soundness = check_alignment(probe, net, pm);
+  const auto soundness = check_alignment(probe, net, alignment_options);
   if (!soundness.computed) {
     out.computed = false;
     out.exhausted = soundness.exhausted;
@@ -375,7 +435,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
   }
 
   if (variant == PrecisionVariant::ALIGN_ETCONFORMANCE) {
-    const auto prefixes = collect_prefixes(log);
+    const auto prefixes = collect_prefixes(log, activity_attribute);
     double enabled_total = 0.0;
     double escaping_total = 0.0;
     for (const auto& [prefix, info] : prefixes) {
@@ -416,7 +476,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
     return out;
   }
 
-  out.alignment_result = check_alignment(log, net, pm);
+  out.alignment_result = check_alignment(log, net, alignment_options);
   if (!out.alignment_result.computed) {
     out.computed = false;
     out.exhausted = out.alignment_result.exhausted;
@@ -505,7 +565,14 @@ PrecisionResult evaluate_precision(const EventLog& l, const PetriNet& n,
   return evaluate_precision_impl(l, n, v, o);
 }
 
-GeneralizationResult evaluate_generalization(const EventLog& log,const PetriNet& net,GeneralizationVariant v) {
+GeneralizationResult evaluate_generalization(
+    const EventLog& log, const PetriNet& net, GeneralizationVariant variant) {
+  return evaluate_generalization(log, net, variant, {});
+}
+
+GeneralizationResult evaluate_generalization(
+    const EventLog& log, const PetriNet& net, GeneralizationVariant v,
+    const GeneralizationOptions& options) {
   GeneralizationResult out;
   out.variant = v;
   out.transition_count = net.transitions().size();
@@ -514,7 +581,12 @@ GeneralizationResult evaluate_generalization(const EventLog& log,const PetriNet&
     out.generalization = net.transitions().empty() ? 1.0 : 0.0;
     return out;
   }
-  const auto replay = check_conformance(log, net);
+  TokenReplayOptions replay_options;
+  replay_options.consider_activities_not_in_model_in_fitness = false;
+  replay_options.activity_attribute = options.activity_attribute.empty()
+                                          ? "concept:name"
+                                          : options.activity_attribute;
+  const auto replay = check_conformance(log, net, replay_options);
   out.transition_frequencies = replay.transition_frequencies;
   if (out.transition_frequencies.size() < net.transitions().size())
     out.transition_frequencies.resize(net.transitions().size(), 0);
@@ -528,7 +600,17 @@ GeneralizationResult evaluate_generalization(const EventLog& log,const PetriNet&
                            : 1.0 - rarity / double(out.transition_frequencies.size());
   return out;
 }
-GeneralizationResult evaluate_generalization(const EventLog& l,const ProcessTree& t,GeneralizationVariant v) { return evaluate_generalization(l,to_petri_net(t),v); }
+GeneralizationResult evaluate_generalization(
+    const EventLog& log, const ProcessTree& tree,
+    GeneralizationVariant variant) {
+  return evaluate_generalization(log, to_petri_net(tree), variant, {});
+}
+
+GeneralizationResult evaluate_generalization(
+    const EventLog& log, const ProcessTree& tree,
+    GeneralizationVariant variant, const GeneralizationOptions& options) {
+  return evaluate_generalization(log, to_petri_net(tree), variant, options);
+}
 
 SimplicityResult evaluate_simplicity(const PetriNet& net,
                                      SimplicityVariant variant,
@@ -728,12 +810,22 @@ CompositeEvaluationResult evaluate_composite(
   out.simplicity_weight = options.simplicity_weight / total;
   out.generalization_weight = options.generalization_weight / total;
 
+  const std::string activity_attribute = options.activity_attribute.empty()
+                                             ? "concept:name"
+                                             : options.activity_attribute;
+  ReplayFitnessOptions fitness_options;
+  fitness_options.activity_attribute = activity_attribute;
+  PrecisionOptions precision_options;
+  precision_options.activity_attribute = activity_attribute;
+  GeneralizationOptions generalization_options;
+  generalization_options.activity_attribute = activity_attribute;
   const auto fitness = evaluate_replay_fitness(
-      log, net, ReplayFitnessVariant::TOKEN_BASED);
+      log, net, ReplayFitnessVariant::TOKEN_BASED, fitness_options);
   const auto precision = evaluate_precision(
-      log, net, PrecisionVariant::ETCONFORMANCE_TOKEN);
+      log, net, PrecisionVariant::ETCONFORMANCE_TOKEN, precision_options);
   const auto generalization = evaluate_generalization(
-      log, net, GeneralizationVariant::GENERALIZATION_TOKEN);
+      log, net, GeneralizationVariant::GENERALIZATION_TOKEN,
+      generalization_options);
   const auto simplicity = evaluate_simplicity(
       net, SimplicityVariant::ARC_DEGREE);
   out.fitness = fitness.log_fitness;

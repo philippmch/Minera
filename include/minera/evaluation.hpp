@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "minera/conformance.hpp"
+#include "minera/decomposed_alignment.hpp"
 
 namespace minera {
 
@@ -52,14 +53,22 @@ struct ReplayFitnessResult {
   std::string error;
   ConformanceResult token_result;
   AlignmentResult alignment_result;
+  std::optional<DecomposedAlignmentResult> decomposed_alignment_result;
 };
 
-// Evaluator-only replay controls. The generic conformance API reports every
-// unknown log activity as a deviation. Token-based fitness evaluation keeps
-// the evaluator's default of ignoring activities absent from the model; set
-// this flag to include them in the fitness calculation.
+// Evaluator-only replay controls. Alignment evaluation uses standard move
+// costs and the less-memory Dijkstra engine unless explicitly configured.
 struct ReplayFitnessOptions {
+  // Forward replay can count labels absent from the model as deviations. The
+  // legacy backwards variation always ignores them.
   bool consider_activities_not_in_model_in_fitness = false;
+  std::string activity_attribute = "concept:name";
+  TokenReplayVariant token_replay_variant = TokenReplayVariant::kForward;
+  AlignmentOptions alignment_options{
+      AlignmentVariant::kDijkstraLessMemory, AlignmentCostProfile::kStandard};
+  // Engaging this option selects decomposed recomposition instead of the
+  // ordinary Petri-net alignment engine.
+  std::optional<DecomposedAlignmentOptions> decomposed_alignment_options;
 };
 
 struct PrecisionResult {
@@ -76,6 +85,12 @@ struct PrecisionOptions {
   // Maximum number of markings/product states explored by exact precision
   // searches.  Zero is invalid and reports an exhausted computation.
   std::size_t max_states = 100000;
+  std::string activity_attribute = "concept:name";
+  TokenReplayVariant token_replay_variant = TokenReplayVariant::kForward;
+};
+
+struct GeneralizationOptions {
+  std::string activity_attribute = "concept:name";
 };
 
 struct GeneralizationResult {
@@ -115,6 +130,7 @@ struct CompositeEvaluationOptions {
   double precision_weight = 0.25;
   double simplicity_weight = 0.25;
   double generalization_weight = 0.25;
+  std::string activity_attribute = "concept:name";
 };
 
 struct CompositeEvaluationResult {
@@ -204,6 +220,12 @@ struct ModelEvaluation {
     const EventLog&, const PetriNet&, GeneralizationVariant = GeneralizationVariant::GENERALIZATION_TOKEN);
 [[nodiscard]] GeneralizationResult evaluate_generalization(
     const EventLog&, const ProcessTree&, GeneralizationVariant = GeneralizationVariant::GENERALIZATION_TOKEN);
+[[nodiscard]] GeneralizationResult evaluate_generalization(
+    const EventLog&, const PetriNet&, GeneralizationVariant,
+    const GeneralizationOptions&);
+[[nodiscard]] GeneralizationResult evaluate_generalization(
+    const EventLog&, const ProcessTree&, GeneralizationVariant,
+    const GeneralizationOptions&);
 [[nodiscard]] SimplicityResult evaluate_simplicity(
     const PetriNet&, SimplicityVariant = SimplicityVariant::ARC_DEGREE,
     const SimplicityOptions& = {});
@@ -230,13 +252,28 @@ inline ReplayFitnessResult replay_fitness(const EventLog& l, const PetriNet& n,
                                           ReplayFitnessVariant v = ReplayFitnessVariant::AUTO) {
   return evaluate_replay_fitness(l, n, v);
 }
+inline ReplayFitnessResult replay_fitness(const EventLog& l, const PetriNet& n,
+                                          ReplayFitnessVariant v,
+                                          const ReplayFitnessOptions& o) {
+  return evaluate_replay_fitness(l, n, v, o);
+}
 inline PrecisionResult precision(const EventLog& l, const PetriNet& n,
                                  PrecisionVariant v = PrecisionVariant::AUTO) {
   return evaluate_precision(l, n, v);
 }
+inline PrecisionResult precision(const EventLog& l, const PetriNet& n,
+                                 PrecisionVariant v,
+                                 const PrecisionOptions& o) {
+  return evaluate_precision(l, n, v, o);
+}
 inline GeneralizationResult generalization(const EventLog& l, const PetriNet& n,
                                            GeneralizationVariant v = GeneralizationVariant::GENERALIZATION_TOKEN) {
   return evaluate_generalization(l, n, v);
+}
+inline GeneralizationResult generalization(const EventLog& l, const PetriNet& n,
+                                           GeneralizationVariant v,
+                                           const GeneralizationOptions& o) {
+  return evaluate_generalization(l, n, v, o);
 }
 inline SimplicityResult simplicity(const PetriNet& n,
                                   SimplicityVariant v = SimplicityVariant::ARC_DEGREE,

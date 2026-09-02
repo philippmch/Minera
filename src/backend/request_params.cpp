@@ -852,6 +852,166 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
     }
   }
 
+  if (supplied("evaluation_activity_attribute")) {
+    const auto value = trim_text(require("evaluation_activity_attribute"));
+    if (value.empty()) {
+      throw std::invalid_argument(
+          "evaluation_activity_attribute: expected a non-empty name");
+    }
+    params.replay_fitness_options.activity_attribute = value;
+    params.precision_options.activity_attribute = value;
+    params.generalization_options.activity_attribute = value;
+    params.composite_options.activity_attribute = value;
+  }
+  if (supplied("evaluation_token_replay_variant")) {
+    const auto value = require("evaluation_token_replay_variant");
+    TokenReplayVariant variant;
+    if (value == "forward" || value == "token_replay" ||
+        value == "TOKEN_REPLAY") {
+      variant = TokenReplayVariant::kForward;
+    } else if (value == "backwards" || value == "BACKWARDS") {
+      variant = TokenReplayVariant::kBackwards;
+    } else {
+      throw std::invalid_argument(
+          "evaluation_token_replay_variant: expected forward or backwards, "
+          "got '" + value + "'");
+    }
+    params.replay_fitness_options.token_replay_variant = variant;
+    params.precision_options.token_replay_variant = variant;
+  }
+  if (supplied("fitness_consider_unknown_activities")) {
+    params.replay_fitness_options
+        .consider_activities_not_in_model_in_fitness =
+        parse_boolean(require("fitness_consider_unknown_activities"),
+                      "fitness_consider_unknown_activities");
+  }
+
+  const auto alignment_wire_name = [](std::string_view name) {
+    if (name == "alignment_activity_attribute")
+      return std::string_view{"evaluation_activity_attribute"};
+    if (name == "alignment_variant")
+      return std::string_view{"evaluation_alignment_variant"};
+    if (name == "max_states")
+      return std::string_view{"evaluation_alignment_max_states"};
+    if (name == "max_alignments")
+      return std::string_view{"evaluation_alignment_max_alignments"};
+    if (name == "max_align_time")
+      return std::string_view{"evaluation_alignment_max_time"};
+    if (name == "max_align_time_trace")
+      return std::string_view{"evaluation_alignment_max_time_trace"};
+    if (name == "exponent")
+      return std::string_view{"evaluation_alignment_exponent"};
+    if (name == "theta")
+      return std::string_view{"evaluation_alignment_theta"};
+    if (name == "synchronous_dijkstra")
+      return std::string_view{"evaluation_alignment_synchronous_dijkstra"};
+    if (name == "cost_profile")
+      return std::string_view{"evaluation_alignment_cost_profile"};
+    if (name == "trace_cost")
+      return std::string_view{"evaluation_alignment_trace_cost"};
+    if (name == "model_cost")
+      return std::string_view{"evaluation_alignment_model_cost"};
+    if (name == "silent_model_cost")
+      return std::string_view{"evaluation_alignment_silent_model_cost"};
+    if (name == "sync_cost")
+      return std::string_view{"evaluation_alignment_sync_cost"};
+    return std::string_view{};
+  };
+  const auto alignment_lookup = [&](std::string_view name) {
+    const auto wire = alignment_wire_name(name);
+    return wire.empty() ? std::string{} : field(wire);
+  };
+  const auto alignment_present = [&](std::string_view name) {
+    const auto wire = alignment_wire_name(name);
+    return !wire.empty() && supplied(wire);
+  };
+  const bool decomposed_alignment =
+      supplied("evaluation_alignment_variant") &&
+      (require("evaluation_alignment_variant") == "recompos_maximal" ||
+       field("evaluation_alignment_variant") == "RECOMPOS_MAXIMAL" ||
+       field("evaluation_alignment_variant") ==
+           "Variants.RECOMPOS_MAXIMAL");
+  if (decomposed_alignment) {
+    for (const auto name : {"evaluation_alignment_max_alignments",
+                            "evaluation_alignment_exponent",
+                            "evaluation_alignment_theta",
+                            "evaluation_alignment_synchronous_dijkstra"}) {
+      if (supplied(name)) {
+        throw std::invalid_argument(
+            std::string(name) +
+            ": is not supported by recompos_maximal");
+      }
+    }
+    if (supplied("evaluation_alignment_cost_profile") &&
+        require("evaluation_alignment_cost_profile") != "standard") {
+      throw std::invalid_argument(
+          "evaluation_alignment_cost_profile: recompos_maximal requires "
+          "standard costs");
+    }
+    const auto decomposed_wire_name = [](std::string_view name) {
+      if (name == "variant")
+        return std::string_view{"evaluation_alignment_variant"};
+      if (name == "threshold_border_agreement")
+        return std::string_view{
+            "evaluation_alignment_threshold_border_agreement"};
+      if (name == "max_time_trace")
+        return std::string_view{"evaluation_alignment_max_time_trace"};
+      if (name == "max_time_total")
+        return std::string_view{"evaluation_alignment_max_time"};
+      if (name == "max_states")
+        return std::string_view{"evaluation_alignment_max_states"};
+      if (name == "max_total_states")
+        return std::string_view{"evaluation_alignment_max_total_states"};
+      if (name == "use_cache")
+        return std::string_view{"evaluation_alignment_use_cache"};
+      if (name == "clear_cache")
+        return std::string_view{"evaluation_alignment_clear_cache"};
+      if (name == "log_move_cost")
+        return std::string_view{"evaluation_alignment_trace_cost"};
+      if (name == "model_move_cost")
+        return std::string_view{"evaluation_alignment_model_cost"};
+      if (name == "tau_model_cost")
+        return std::string_view{"evaluation_alignment_silent_model_cost"};
+      if (name == "sync_cost")
+        return std::string_view{"evaluation_alignment_sync_cost"};
+      return std::string_view{};
+    };
+    const auto decomposed_lookup = [&](std::string_view name) {
+      const auto wire = decomposed_wire_name(name);
+      return wire.empty() ? std::string{} : field(wire);
+    };
+    const auto decomposed_present = [&](std::string_view name) {
+      const auto wire = decomposed_wire_name(name);
+      return !wire.empty() && supplied(wire);
+    };
+    params.replay_fitness_options.decomposed_alignment_options =
+        parse_decomposed_alignment_params(decomposed_lookup,
+                                          decomposed_present);
+    if (params.family == EvaluationFamily::kPrecision) {
+      throw std::invalid_argument(
+          "evaluation_alignment_variant: recompos_maximal is only available "
+          "for replay fitness");
+    }
+  } else {
+    for (const auto name : {
+             "evaluation_alignment_threshold_border_agreement",
+             "evaluation_alignment_max_total_states",
+             "evaluation_alignment_use_cache",
+             "evaluation_alignment_clear_cache"}) {
+      if (supplied(name)) {
+        throw std::invalid_argument(
+            std::string(name) + ": requires recompos_maximal");
+      }
+    }
+    auto alignment_options =
+        parse_alignment_params(alignment_lookup, alignment_present);
+    if (!supplied("evaluation_alignment_cost_profile")) {
+      alignment_options.cost_profile = AlignmentCostProfile::kStandard;
+    }
+    params.replay_fitness_options.alignment_options =
+        std::move(alignment_options);
+  }
+
   if (supplied("fitness_variant")) {
     const auto value = require("fitness_variant");
     if (value == "auto") {
@@ -903,6 +1063,20 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
           value + "'");
     }
     params.generalization_variant = GeneralizationVariant::GENERALIZATION_TOKEN;
+  }
+
+  if (params.replay_fitness_options.token_replay_variant ==
+          TokenReplayVariant::kBackwards &&
+      params.replay_fitness_options
+          .consider_activities_not_in_model_in_fitness) {
+    throw std::invalid_argument(
+        "fitness_consider_unknown_activities: requires forward replay");
+  }
+  if (params.precision_options.use_task_ids &&
+      params.precision_variant !=
+          PrecisionVariant::AUTOMATON_AFTER_ALIGN) {
+    throw std::invalid_argument(
+        "precision_use_task_ids: requires automaton_after_align");
   }
 
   if (supplied("simplicity_variant")) {

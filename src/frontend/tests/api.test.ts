@@ -452,10 +452,11 @@ describe("POWL export and deferred API routes", () => {
     const paths: string[] = [];
     const evaluationPayload = {
       miner: "powl",
-      generalization: {
-        variant: "generalization_token", computed: true, error: null,
-        score: 0.5, executed_transitions: 1, transition_count: 2,
-        transition_frequencies: [1, 0],
+      replay_fitness: {
+        variant: "token_based", computed: true, exhausted: false, error: null,
+        fitness: 1, log_fitness: 1, average_trace_fitness: 1,
+        percentage_of_fitting_traces: 100, fitting_traces: 1,
+        trace_count: 1, total_cost: 0,
       },
     };
     vi.stubGlobal("fetch", vi.fn(async (path: string) => {
@@ -465,15 +466,18 @@ describe("POWL export and deferred API routes", () => {
       return { ok: true, json: async () => ({ computed: true }) };
     }));
     await expect(evaluateModel("powl", {
-      evaluation_family: "generalization",
-      generalization_variant: "generalization_token",
+      evaluation_family: "replay_fitness",
+      fitness_variant: "token_based",
+      evaluation_activity_attribute: " phase ",
+      evaluation_token_replay_variant: "forward",
+      fitness_consider_unknown_activities: true,
     })).resolves.toEqual(evaluationPayload);
     await expect(alignModel("powl", {
       variant: "dijkstra_less_memory", max_states: 9,
       activity_attribute: " label ",
     })).resolves.toMatchObject({ computed: true });
     expect(paths).toEqual([
-      "/api/evaluate?evaluation_family=generalization&generalization_variant=generalization_token&miner=powl",
+      "/api/evaluate?evaluation_family=replay_fitness&fitness_variant=token_based&evaluation_activity_attribute=phase&evaluation_token_replay_variant=forward&fitness_consider_unknown_activities=true&miner=powl",
       "/api/align?miner=powl&alignment_variant=dijkstra_less_memory&max_states=9&alignment_activity_attribute=label",
     ]);
     vi.unstubAllGlobals();

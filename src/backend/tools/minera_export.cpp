@@ -966,6 +966,25 @@ int usage(const char* program) {
                "                            precision, generalization, simplicity,\n"
                "                            or composite\n"
                "  --fitness-variant <id>   auto, token_based, or alignment_based\n"
+               "  --evaluation-activity-attribute <name> Evaluator activity selector\n"
+               "  --evaluation-token-replay-variant <id> forward or backwards\n"
+               "  --fitness-consider-unknown-activities <bool> Include unknown labels in forward fitness\n"
+               "  --evaluation-alignment-variant <id> Petri alignment variant or recompos_maximal\n"
+               "  --evaluation-alignment-max-states <n> Positive alignment state limit\n"
+               "  --evaluation-alignment-max-total-states <n> Decomposed total-state limit\n"
+               "  --evaluation-alignment-max-time <f> Whole-log seconds (0 = unlimited)\n"
+               "  --evaluation-alignment-max-time-trace <f> Per-trace seconds\n"
+               "  --evaluation-alignment-max-alignments <n> Generator result limit\n"
+               "  --evaluation-alignment-exponent <f> Discounted A* exponent\n"
+               "  --evaluation-alignment-synchronous-dijkstra <bool> Discounted scheduling\n"
+               "  --evaluation-alignment-cost-profile <id> standard or legacy\n"
+               "  --evaluation-alignment-trace-cost <f> Default log-move cost\n"
+               "  --evaluation-alignment-model-cost <f> Default model-move cost\n"
+               "  --evaluation-alignment-silent-model-cost <f> Silent model cost\n"
+               "  --evaluation-alignment-sync-cost <f> Synchronous move cost\n"
+               "  --evaluation-alignment-threshold-border-agreement <f> Decomposed merge threshold\n"
+               "  --evaluation-alignment-use-cache <bool> Cache decomposed components\n"
+               "  --evaluation-alignment-clear-cache <bool> Clear decomposed call cache\n"
                "  --precision-variant <id> auto, etconformance_token,\n"
                "                            align_etconformance, or automaton_after_align\n"
                "  --precision-use-task-ids <bool> Distinguish duplicate task labels\n"
@@ -1026,7 +1045,7 @@ int usage(const char* program) {
                "  --pt-alignment-max-process-tree-height <n> Approximation threshold\n"
                "  --pt-alignment-max-trace-time-ms <n> Approximation trace time\n"
                "  --pt-alignment-max-per-trace-time-ms <n> Approximation per-trace time\n"
-               "  --alignment-variant <id> state_equation_a_star (default),\n"
+               "  --alignment-variant <id> dijkstra_less_memory (default),\n"
                "                            dijkstra_no_heuristics,\n"
                "                            dijkstra_less_memory, discounted_a_star,\n"
                "                            generator_dijkstra_no_heuristics, or\n"
@@ -3328,6 +3347,26 @@ int main(int argc, char** argv) {
     }
 
     if (arg == "--evaluation-family" || arg == "--fitness-variant" ||
+        arg == "--evaluation-activity-attribute" ||
+        arg == "--evaluation-token-replay-variant" ||
+        arg == "--fitness-consider-unknown-activities" ||
+        arg == "--evaluation-alignment-variant" ||
+        arg == "--evaluation-alignment-max-states" ||
+        arg == "--evaluation-alignment-max-total-states" ||
+        arg == "--evaluation-alignment-max-time" ||
+        arg == "--evaluation-alignment-max-time-trace" ||
+        arg == "--evaluation-alignment-max-alignments" ||
+        arg == "--evaluation-alignment-exponent" ||
+        arg == "--evaluation-alignment-theta" ||
+        arg == "--evaluation-alignment-synchronous-dijkstra" ||
+        arg == "--evaluation-alignment-cost-profile" ||
+        arg == "--evaluation-alignment-trace-cost" ||
+        arg == "--evaluation-alignment-model-cost" ||
+        arg == "--evaluation-alignment-silent-model-cost" ||
+        arg == "--evaluation-alignment-sync-cost" ||
+        arg == "--evaluation-alignment-threshold-border-agreement" ||
+        arg == "--evaluation-alignment-use-cache" ||
+        arg == "--evaluation-alignment-clear-cache" ||
         arg == "--precision-variant" ||
         arg == "--precision-use-task-ids" ||
         arg == "--precision-max-states" ||
@@ -6805,7 +6844,8 @@ int main(int argc, char** argv) {
           case minera::EvaluationFamily::kReplayFitness:
             result.replay_fitness = minera::evaluate_replay_fitness(
                 evaluation_log, *petri,
-                evaluation_params->replay_fitness_variant);
+                evaluation_params->replay_fitness_variant,
+                evaluation_params->replay_fitness_options);
             break;
           case minera::EvaluationFamily::kPrecision:
             result.precision = minera::evaluate_precision(
@@ -6815,7 +6855,8 @@ int main(int argc, char** argv) {
           case minera::EvaluationFamily::kGeneralization:
             result.generalization = minera::evaluate_generalization(
                 evaluation_log, *petri,
-                evaluation_params->generalization_variant);
+                evaluation_params->generalization_variant,
+                evaluation_params->generalization_options);
             break;
           case minera::EvaluationFamily::kSimplicity:
             result.simplicity = minera::evaluate_simplicity(

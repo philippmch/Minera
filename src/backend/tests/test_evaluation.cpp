@@ -12,6 +12,19 @@ static PetriNet sequence_net() {
 }
 static EventLog log(std::initializer_list<std::initializer_list<const char*>> xs) { EventLog l; for(auto tr:xs){Trace t;for(auto a:tr)t.events.push_back(Event{"",a});l.traces.push_back(std::move(t));}return l; }
 
+static EventLog attributed_sequence_log() {
+  EventLog result;
+  Trace trace;
+  Event first{"", "raw-a"};
+  first.attributes.push_back({"phase", "A", AttributeKind::kString});
+  Event second{"", "raw-b"};
+  second.attributes.push_back({"phase", "B", AttributeKind::kString});
+  trace.events.push_back(std::move(first));
+  trace.events.push_back(std::move(second));
+  result.traces.push_back(std::move(trace));
+  return result;
+}
+
 void weighted_input_enablement() {
   PetriNet n; auto p=n.add_place(), q=n.add_place(); n.set_source(p); n.set_sink(q); n.set_activities({"A"}); n.add_transition(0,{p,p},{q});
   auto r=evaluate_precision(log({{"A"}}),n,PrecisionVariant::ETCONFORMANCE_TOKEN);
@@ -163,7 +176,17 @@ void default_variant_dispatch_follows_soundness() {
   auto fit=evaluate_replay_fitness(log({{"A","B"}}),sound);
   auto prec=evaluate_precision(log({{"A","B"}}),sound);
   assert(fit.variant==ReplayFitnessVariant::ALIGNMENT_BASED);
+  assert(fit.alignment_result.variant ==
+         AlignmentVariant::kDijkstraLessMemory);
+  assert(fit.alignment_result.diagnostics.lp_solved == 0);
   assert(prec.variant==PrecisionVariant::ALIGN_ETCONFORMANCE);
+
+  ReplayFitnessOptions capped;
+  capped.alignment_options.max_states = 1;
+  const auto bounded_auto = evaluate_replay_fitness(
+      log({{"A", "B"}}), sound, ReplayFitnessVariant::AUTO, capped);
+  assert(bounded_auto.variant == ReplayFitnessVariant::ALIGNMENT_BASED);
+  assert(!bounded_auto.computed && bounded_auto.exhausted);
 
   PetriNet unsound; auto p0=unsound.add_place(), dead=unsound.add_place(), sink=unsound.add_place();
   unsound.set_source(p0); unsound.set_sink(sink); unsound.set_activities({"A"});
@@ -172,6 +195,149 @@ void default_variant_dispatch_follows_soundness() {
   auto up=evaluate_precision(log({{"A"}}),unsound);
   assert(uf.variant==ReplayFitnessVariant::TOKEN_BASED);
   assert(up.variant==PrecisionVariant::ETCONFORMANCE_TOKEN);
+}
+
+void evaluator_selectors_reach_every_native_engine() {
+  const auto n = sequence_net();
+  const auto l = attributed_sequence_log();
+
+  ReplayFitnessOptions token;
+  token.activity_attribute = "phase";
+  const auto token_result = evaluate_replay_fitness(
+      l, n, ReplayFitnessVariant::TOKEN_BASED, token);
+  assert(token_result.fitness == 1.0);
+  assert(token_result.token_result.activity_attribute == "phase");
+  const auto raw_graph = discover_directly_follows_graph(l);
+  const auto token_json = replay_fitness_json(token_result, &raw_graph);
+  assert(token_json.find("\"activities\": [null, null]") !=
+         std::string::npos);
+  assert(token_json.find("\"activity_names\": [\"A\", \"B\"]") !=
+         std::string::npos);
+  assert(token_json.find("\"activities\": [0, 0]") ==
+         std::string::npos);
+
+  ReplayFitnessOptions alignment;
+  alignment.activity_attribute = "phase";
+  alignment.alignment_options.variant =
+      AlignmentVariant::kDijkstraNoHeuristics;
+  const auto alignment_result = evaluate_replay_fitness(
+      l, n, ReplayFitnessVariant::ALIGNMENT_BASED, alignment);
+  assert(alignment_result.computed && alignment_result.fitness == 1.0);
+  assert(alignment_result.alignment_result.variant ==
+         AlignmentVariant::kDijkstraNoHeuristics);
+  assert(alignment_result.alignment_result.activity_attribute == "phase");
+  const auto alignment_json = replay_fitness_json(
+      alignment_result, &raw_graph);
+  assert(alignment_json.find(
+             "\"activity\": null, \"activity_name\": \"A\", "
+             "\"silent\": false") != std::string::npos);
+
+  ReplayFitnessOptions decomposed;
+  decomposed.activity_attribute = "phase";
+  decomposed.decomposed_alignment_options = DecomposedAlignmentOptions{};
+  const auto decomposed_result = evaluate_replay_fitness(
+      l, n, ReplayFitnessVariant::ALIGNMENT_BASED, decomposed);
+  assert(decomposed_result.computed && decomposed_result.fitness == 1.0);
+  assert(decomposed_result.decomposed_alignment_result.has_value());
+  assert(decomposed_result.decomposed_alignment_result->trace_count == 1);
+  const auto decomposed_json = replay_fitness_json(decomposed_result);
+  assert(decomposed_json.find("\"variant\":\"recompos_maximal\"") !=
+         std::string::npos);
+
+  PrecisionOptions precision;
+  precision.activity_attribute = "phase";
+  const auto precision_result = evaluate_precision(
+      l, n, PrecisionVariant::AUTOMATON_AFTER_ALIGN, precision);
+  assert(precision_result.computed && precision_result.precision == 1.0);
+  assert(precision_result.alignment_result.activity_attribute == "phase");
+
+  GeneralizationOptions generalization;
+  generalization.activity_attribute = "phase";
+  const auto generalization_result = evaluate_generalization(
+      l, n, GeneralizationVariant::GENERALIZATION_TOKEN, generalization);
+  assert(generalization_result.transition_frequencies ==
+         std::vector<std::uint64_t>({1, 1}));
+
+  CompositeEvaluationOptions composite;
+  composite.activity_attribute = "phase";
+  const auto composite_result = evaluate_composite(l, n, composite);
+  assert(composite_result.computed && composite_result.fitness == 1.0);
+}
+
+void empty_replay_fitness_preserves_the_selected_engine() {
+  const auto n = sequence_net();
+  const EventLog empty_log;
+  const DirectlyFollowsGraph empty_graph;
+
+  ReplayFitnessOptions ordinary;
+  ordinary.activity_attribute = "phase";
+  ordinary.alignment_options.variant =
+      AlignmentVariant::kDijkstraNoHeuristics;
+  const auto ordinary_result = evaluate_replay_fitness(
+      empty_log, n, ReplayFitnessVariant::ALIGNMENT_BASED, ordinary);
+  assert(ordinary_result.fitness == 0.0);
+  assert(ordinary_result.alignment_result.variant ==
+         AlignmentVariant::kDijkstraNoHeuristics);
+  assert(ordinary_result.alignment_result.activity_attribute == "phase");
+  const auto ordinary_json = replay_fitness_json(ordinary_result, &empty_graph);
+  assert(ordinary_json.find("\"variant\": \"dijkstra_no_heuristics\"") !=
+         std::string::npos);
+  assert(ordinary_json.find("\"activity_attribute\": \"phase\"") !=
+         std::string::npos);
+
+  ReplayFitnessOptions decomposed;
+  decomposed.decomposed_alignment_options = DecomposedAlignmentOptions{};
+  const auto decomposed_result = evaluate_replay_fitness(
+      empty_log, n, ReplayFitnessVariant::ALIGNMENT_BASED, decomposed);
+  assert(decomposed_result.fitness == 0.0);
+  assert(decomposed_result.decomposed_alignment_result.has_value());
+  assert(decomposed_result.decomposed_alignment_result->trace_count == 0);
+  const auto decomposed_json = replay_fitness_json(decomposed_result);
+  assert(decomposed_json.find("\"variant\":\"recompos_maximal\"") !=
+         std::string::npos);
+  assert(decomposed_json.find("dijkstra_less_memory") == std::string::npos);
+}
+
+void replay_fitness_selects_backwards_token_replay() {
+  PetriNet n;
+  const auto source = n.add_place();
+  const auto middle = n.add_place();
+  const auto sink = n.add_place();
+  n.set_source(source);
+  n.set_sink(sink);
+  n.set_activities({"A"});
+  n.add_transition(0, {source}, {middle});
+  n.add_transition(0, {middle}, {sink});
+
+  ReplayFitnessOptions forward;
+  const auto forward_result = evaluate_replay_fitness(
+      log({{"A"}}), n, ReplayFitnessVariant::TOKEN_BASED, forward);
+  ReplayFitnessOptions backwards;
+  backwards.token_replay_variant = TokenReplayVariant::kBackwards;
+  const auto backwards_result = evaluate_replay_fitness(
+      log({{"A"}}), n, ReplayFitnessVariant::TOKEN_BASED, backwards);
+  assert(forward_result.fitting_traces == 0);
+  assert(backwards_result.fitting_traces == 1);
+}
+
+void token_precision_stops_at_an_unfit_prefix() {
+  PetriNet n;
+  const auto source = n.add_place();
+  const auto disconnected = n.add_place();
+  const auto sink = n.add_place();
+  n.set_source(source);
+  n.set_sink(sink);
+  n.set_activities({"A", "X", "B"});
+  n.add_transition(0, {source}, {sink});
+  n.add_transition(1, {disconnected}, {disconnected});
+  n.add_transition(2, {disconnected}, {sink});
+
+  const auto result = evaluate_precision(
+      log({{"A"}, {"X", "B"}}), n,
+      PrecisionVariant::ETCONFORMANCE_TOKEN);
+  assert(result.computed && std::abs(result.precision - 1.0) < 1e-12);
+  assert(result.token_result.transition_frequencies[1] == 0);
+  assert(result.token_result.transition_frequencies[2] == 0);
 }
 
 void precision_option_errors_preserve_variant_and_convert_trees() {
@@ -389,6 +555,10 @@ int main() {
   cyclomatic_default_multiple_empty_preset_places(); default_variant_dispatch_follows_soundness();
   precision_option_errors_preserve_variant_and_convert_trees();
   replay_fitness_excludes_unknown_activities_by_default();
+  evaluator_selectors_reach_every_native_engine();
+  empty_replay_fitness_preserves_the_selected_engine();
+  replay_fitness_selects_backwards_token_replay();
+  token_precision_stops_at_an_unfit_prefix();
   composite_evaluation_uses_equal_and_custom_weights();
   composite_evaluation_serializes_as_a_model_family();
   emd_pyemd_variant_is_deterministic_and_strict();

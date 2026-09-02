@@ -218,10 +218,12 @@ enum class EvaluationFamily {
 struct EvaluationParams {
   EvaluationFamily family = EvaluationFamily::kReplayFitness;
   ReplayFitnessVariant replay_fitness_variant = ReplayFitnessVariant::AUTO;
+  ReplayFitnessOptions replay_fitness_options;
   PrecisionVariant precision_variant = PrecisionVariant::AUTO;
   PrecisionOptions precision_options;
   GeneralizationVariant generalization_variant =
       GeneralizationVariant::GENERALIZATION_TOKEN;
+  GeneralizationOptions generalization_options;
   SimplicityVariant simplicity_variant = SimplicityVariant::ARC_DEGREE;
   SimplicityOptions simplicity_options;
   CompositeEvaluationOptions composite_options;

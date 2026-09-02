@@ -4527,13 +4527,14 @@ void alignment_summary_tallies_moves_per_activity() {
   assert(summary[3].synchronous == 6);
   assert(summary[2].log_moves + summary[2].model_moves == 0);
 
-  // The aggregate rides inside the alignments JSON as activity ids.
+  // The aggregate retains both document activity ids and lossless labels.
   const auto graph = minera::discover_directly_follows_graph(log);
   const auto json = minera::alignment_json(alignment, graph);
   assert(json.find("\"activity_deviations\": [") != std::string::npos);
   const std::string b_entry =
       "{\"activity\": " + std::to_string(*graph.activity_id("b")) +
-      ", \"synchronous\": 4, \"log_moves\": 0, \"model_moves\": 2}";
+      ", \"activity_name\": \"b\", \"synchronous\": 4, \"log_moves\": 0, "
+      "\"model_moves\": 2}";
   assert(json.find(b_entry) != std::string::npos);
 
   // An uncomputable alignment aggregates to nothing.

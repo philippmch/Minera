@@ -767,6 +767,19 @@ function embeddedEvaluation(data: MineraExport, miner: string, family: Evaluatio
   return null;
 }
 
+const EVALUATION_ALIGNMENT_VARIANTS: Array<{
+  value: NonNullable<EvaluationOptions["evaluation_alignment_variant"]>;
+  label: string;
+}> = [
+  { value: "state_equation_a_star", label: "State-equation A*" },
+  { value: "dijkstra_no_heuristics", label: "Dijkstra (no heuristics)" },
+  { value: "dijkstra_less_memory", label: "Dijkstra (less memory)" },
+  { value: "discounted_a_star", label: "Discounted A*" },
+  { value: "generator_dijkstra_no_heuristics", label: "Generator Dijkstra (all optima)" },
+  { value: "generator_dijkstra_less_memory", label: "Generator Dijkstra (less memory)" },
+  { value: "recompos_maximal", label: "Decomposed recomposition" },
+];
+
 function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: {
   data: MineraExport;
   importedAvailable: boolean;
@@ -821,6 +834,14 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
   const family = options.evaluation_family ?? "replay_fitness";
   const updateFamily = (next: EvaluationFamily) => {
     const nextOptions = { ...options, evaluation_family: next };
+    if (next === "precision" &&
+        nextOptions.evaluation_alignment_variant === "recompos_maximal") {
+      nextOptions.evaluation_alignment_variant = "dijkstra_less_memory";
+      nextOptions.evaluation_alignment_max_total_states = undefined;
+      nextOptions.evaluation_alignment_threshold_border_agreement = undefined;
+      nextOptions.evaluation_alignment_use_cache = undefined;
+      nextOptions.evaluation_alignment_clear_cache = undefined;
+    }
     setOptions(nextOptions);
     const embedded = embeddedEvaluation(data, miner, next);
     setResult(embedded);
@@ -853,8 +874,69 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
     }
   };
 
-  const numberOption = (name: "precision_max_states" | "simplicity_arc_degree_k" | "simplicity_max_states" | "fitness_weight" | "precision_weight" | "simplicity_weight" | "generalization_weight", value: string) =>
+  const numberOption = (name:
+    | "precision_max_states"
+    | "simplicity_arc_degree_k"
+    | "simplicity_max_states"
+    | "fitness_weight"
+    | "precision_weight"
+    | "simplicity_weight"
+    | "generalization_weight"
+    | "evaluation_alignment_max_states"
+    | "evaluation_alignment_max_total_states"
+    | "evaluation_alignment_max_time"
+    | "evaluation_alignment_max_time_trace"
+    | "evaluation_alignment_max_alignments"
+    | "evaluation_alignment_exponent"
+    | "evaluation_alignment_trace_cost"
+    | "evaluation_alignment_model_cost"
+    | "evaluation_alignment_silent_model_cost"
+    | "evaluation_alignment_sync_cost"
+    | "evaluation_alignment_threshold_border_agreement", value: string) =>
     setOptions((current) => ({ ...current, [name]: value === "" ? undefined : Number(value) }));
+  const fitnessVariant = options.fitness_variant ?? "auto";
+  const precisionVariant = options.precision_variant ?? "auto";
+  const usesTokenReplay =
+    (family === "replay_fitness" && fitnessVariant !== "alignment_based") ||
+    (family === "precision" && precisionVariant !== "align_etconformance" &&
+      precisionVariant !== "automaton_after_align");
+  const usesAlignment = family === "replay_fitness" &&
+    fitnessVariant !== "token_based";
+  const alignmentVariant = options.evaluation_alignment_variant ??
+    "dijkstra_less_memory";
+  const generatorAlignment = alignmentVariant.startsWith("generator_");
+  const discountedAlignment = alignmentVariant === "discounted_a_star";
+  const decomposedAlignment = alignmentVariant === "recompos_maximal";
+  const updateAlignmentVariant = (
+    next: NonNullable<EvaluationOptions["evaluation_alignment_variant"]>,
+  ) => setOptions((current) => ({
+    ...current,
+    evaluation_alignment_variant: next,
+    evaluation_alignment_max_alignments: next.startsWith("generator_")
+      ? current.evaluation_alignment_max_alignments : undefined,
+    evaluation_alignment_exponent: next === "discounted_a_star"
+      ? current.evaluation_alignment_exponent : undefined,
+    evaluation_alignment_synchronous_dijkstra: next === "discounted_a_star"
+      ? current.evaluation_alignment_synchronous_dijkstra : undefined,
+    evaluation_alignment_max_total_states: next === "recompos_maximal"
+      ? current.evaluation_alignment_max_total_states : undefined,
+    evaluation_alignment_threshold_border_agreement: next === "recompos_maximal"
+      ? current.evaluation_alignment_threshold_border_agreement : undefined,
+    evaluation_alignment_use_cache: next === "recompos_maximal"
+      ? current.evaluation_alignment_use_cache : undefined,
+    evaluation_alignment_clear_cache: next === "recompos_maximal"
+      ? current.evaluation_alignment_clear_cache : undefined,
+    evaluation_alignment_cost_profile: next === "recompos_maximal"
+      ? "standard" : current.evaluation_alignment_cost_profile,
+  }));
+  const updateTokenReplayVariant = (
+    next: NonNullable<EvaluationOptions["evaluation_token_replay_variant"]>,
+  ) => setOptions((current) => ({
+    ...current,
+    evaluation_token_replay_variant: next,
+    fitness_consider_unknown_activities: next === "backwards"
+      ? undefined : current.fitness_consider_unknown_activities,
+  }));
 
   return <section className="panel conf-panel other-alignments">
     <div className="panel-head"><h2>Model quality evaluation</h2><span className="panel-meta">Fitness · precision · generalization · simplicity · composite</span></div>
@@ -863,11 +945,34 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
       <label>Family<select value={family} onChange={(event) => updateFamily(event.target.value as EvaluationFamily)}><option value="replay_fitness">Replay fitness</option><option value="precision">Precision</option><option value="generalization">Generalization</option><option value="simplicity">Simplicity</option><option value="composite">Composite</option></select></label>
       {family === "replay_fitness" && <label>Variant<select value={options.fitness_variant ?? "auto"} onChange={(event) => setOptions({ ...options, fitness_variant: event.target.value as EvaluationOptions["fitness_variant"] })}><option value="auto">Automatic</option><option value="token_based">Token based</option><option value="alignment_based">Alignment based</option></select></label>}
       {family === "precision" && <>
-        <label>Variant<select value={options.precision_variant ?? "auto"} onChange={(event) => setOptions({ ...options, precision_variant: event.target.value as EvaluationOptions["precision_variant"] })}><option value="auto">Automatic</option><option value="etconformance_token">Token escaping edges</option><option value="align_etconformance">Alignment escaping edges</option><option value="automaton_after_align">Automaton after alignment</option></select></label>
+        <label>Variant<select value={options.precision_variant ?? "auto"} onChange={(event) => { const next = event.target.value as NonNullable<EvaluationOptions["precision_variant"]>; setOptions({ ...options, precision_variant: next, precision_use_task_ids: next === "automaton_after_align" ? options.precision_use_task_ids : false }); }}><option value="auto">Automatic</option><option value="etconformance_token">Token escaping edges</option><option value="align_etconformance">Alignment escaping edges</option><option value="automaton_after_align">Automaton after alignment</option></select></label>
         <label>State limit<input type="number" min={1} step={1} value={options.precision_max_states ?? ""} placeholder="100000" onChange={(event) => numberOption("precision_max_states", event.target.value)} /></label>
-        <label className="checkbox-label"><input type="checkbox" checked={options.precision_use_task_ids ?? false} onChange={(event) => setOptions({ ...options, precision_use_task_ids: event.target.checked })} /> Use task identities</label>
+        <label className={`checkbox-label ${precisionVariant === "automaton_after_align" ? "" : "disabled"}`}><input type="checkbox" disabled={precisionVariant !== "automaton_after_align"} checked={options.precision_use_task_ids ?? false} onChange={(event) => setOptions({ ...options, precision_use_task_ids: event.target.checked })} /> Use task identities (automaton)</label>
       </>}
       {family === "generalization" && <label>Variant<select value="generalization_token" disabled><option value="generalization_token">Transition-frequency token</option></select></label>}
+      {family !== "simplicity" && <label>Activity field<input value={options.evaluation_activity_attribute ?? ""} placeholder="concept:name" onChange={(event) => setOptions({ ...options, evaluation_activity_attribute: event.target.value || undefined })} /></label>}
+      {usesTokenReplay && <>
+        <label>Replay direction<select value={options.evaluation_token_replay_variant ?? "forward"} onChange={(event) => updateTokenReplayVariant(event.target.value as NonNullable<EvaluationOptions["evaluation_token_replay_variant"]>)}><option value="forward">Forward</option><option value="backwards">Backwards</option></select></label>
+        {family === "replay_fitness" && <label className={`checkbox-label ${options.evaluation_token_replay_variant === "backwards" ? "disabled" : ""}`}><input type="checkbox" disabled={options.evaluation_token_replay_variant === "backwards"} checked={options.fitness_consider_unknown_activities ?? false} onChange={(event) => setOptions({ ...options, fitness_consider_unknown_activities: event.target.checked })} /> Penalize unknown activities (forward)</label>}
+      </>}
+      {usesAlignment && <>
+        <label>Alignment variant<select value={alignmentVariant} onChange={(event) => updateAlignmentVariant(event.target.value as NonNullable<EvaluationOptions["evaluation_alignment_variant"]>)}>{EVALUATION_ALIGNMENT_VARIANTS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+        <label>Cost profile<select disabled={decomposedAlignment} value={decomposedAlignment ? "standard" : (options.evaluation_alignment_cost_profile ?? "standard")} onChange={(event) => setOptions({ ...options, evaluation_alignment_cost_profile: event.target.value as AlignmentCostProfile })}><option value="standard">Standard costs</option><option value="legacy">Legacy unit costs</option></select></label>
+        <label>State limit<input type="number" min={1} step={1} value={options.evaluation_alignment_max_states ?? ""} placeholder="default" onChange={(event) => numberOption("evaluation_alignment_max_states", event.target.value)} /></label>
+        <label>Global timeout (s)<input type="number" min={0} step={0.1} value={options.evaluation_alignment_max_time ?? ""} placeholder="none" onChange={(event) => numberOption("evaluation_alignment_max_time", event.target.value)} /></label>
+        <label>Per-trace timeout (s)<input type="number" min={0} step={0.1} value={options.evaluation_alignment_max_time_trace ?? ""} placeholder="none" onChange={(event) => numberOption("evaluation_alignment_max_time_trace", event.target.value)} /></label>
+        {generatorAlignment && <label>Maximum alternatives<input type="number" min={1} step={1} value={options.evaluation_alignment_max_alignments ?? ""} placeholder="default" onChange={(event) => numberOption("evaluation_alignment_max_alignments", event.target.value)} /></label>}
+        {discountedAlignment && <>
+          <label>Discount exponent<input type="number" min={1.01} step={0.1} value={options.evaluation_alignment_exponent ?? ""} placeholder="2" onChange={(event) => numberOption("evaluation_alignment_exponent", event.target.value)} /></label>
+          <label className="checkbox-label"><input type="checkbox" checked={options.evaluation_alignment_synchronous_dijkstra ?? true} onChange={(event) => setOptions({ ...options, evaluation_alignment_synchronous_dijkstra: event.target.checked })} /> Synchronous Dijkstra</label>
+        </>}
+        {decomposedAlignment && <>
+          <label>Total state limit<input type="number" min={1} step={1} value={options.evaluation_alignment_max_total_states ?? ""} placeholder="default" onChange={(event) => numberOption("evaluation_alignment_max_total_states", event.target.value)} /></label>
+          <label>Border agreement<input type="number" min={0} step={0.1} value={options.evaluation_alignment_threshold_border_agreement ?? ""} placeholder="default" onChange={(event) => numberOption("evaluation_alignment_threshold_border_agreement", event.target.value)} /></label>
+          <label className="checkbox-label"><input type="checkbox" checked={options.evaluation_alignment_use_cache ?? true} onChange={(event) => setOptions({ ...options, evaluation_alignment_use_cache: event.target.checked })} /> Reuse component cache</label>
+          <label className="checkbox-label"><input type="checkbox" checked={options.evaluation_alignment_clear_cache ?? false} onChange={(event) => setOptions({ ...options, evaluation_alignment_clear_cache: event.target.checked })} /> Clear cache first</label>
+        </>}
+      </>}
       {family === "simplicity" && <>
         <label>Variant<select value={options.simplicity_variant ?? "arc_degree"} onChange={(event) => setOptions({ ...options, simplicity_variant: event.target.value as EvaluationOptions["simplicity_variant"] })}><option value="arc_degree">Arc degree</option><option value="extended_cardoso">Extended Cardoso</option><option value="extended_cyclomatic">Extended cyclomatic</option></select></label>
         {options.simplicity_variant === "arc_degree" && <label>Arc-degree k<input type="number" min={0} step={0.1} value={options.simplicity_arc_degree_k ?? ""} placeholder="2" onChange={(event) => numberOption("simplicity_arc_degree_k", event.target.value)} /></label>}
@@ -882,6 +987,12 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
         <label>Simplicity weight<input type="number" min={0} step={0.05} value={options.simplicity_weight ?? ""} onChange={(event) => numberOption("simplicity_weight", event.target.value)} /></label>
       </>}
     </div>
+    {usesAlignment && <div className="align-costs">
+      <span className="align-settings-caption">Alignment move costs (optional overrides)</span>
+      {([ ["evaluation_alignment_trace_cost", "Trace/log"], ["evaluation_alignment_model_cost", "Visible model"], ["evaluation_alignment_silent_model_cost", "Silent model"], ["evaluation_alignment_sync_cost", "Synchronous"] ] as const).map(([key, label]) => (
+        <label key={key}>{label}<input type="number" min={0} step={1} value={options[key] ?? ""} onChange={(event) => numberOption(key, event.target.value)} placeholder="default" /></label>
+      ))}
+    </div>}
     {modelIds.length === 0 && <p className="conf-inline-note">No evaluable Petri model is available in this analysis.</p>}
     <div className="align-settings-actions"><button type="button" className="button" disabled={!onRequestEvaluation || !miner || loading} onClick={() => void run()}>{loading ? "Evaluating…" : "Evaluate model"}</button></div>
     {error?.key === selectionKey && <div className="conf-notice"><span className="conf-notice-mark">⚠</span><p>{error.message}</p></div>}
@@ -1208,7 +1319,8 @@ function TokenReplay({
                   </div>
                   <div className="variant-steps">
                     {variant.activities.map((activityId, i) => {
-                      const name = data.activities[activityId]?.name ?? "?";
+                      const name = variant.activity_names?.[i] ??
+                        (activityId === null ? "?" : data.activities[activityId]?.name ?? "?");
                       return (
                         <Fragment key={i}>
                           {i > 0 && <span className="variant-arrow">→</span>}
@@ -1838,9 +1950,13 @@ export function alignmentMoveLabel(
   move: AlignmentMove,
   activities: MineraExport["activities"],
 ): string {
-  if (move.silent || move.activity === null) return "τ";
-  return activities[move.activity]?.name ?? "?";
+  if (move.silent || (move.activity === null && !move.activity_name)) return "τ";
+  if (move.activity_name) return move.activity_name;
+  return move.activity === null ? "?" : activities[move.activity]?.name ?? "?";
 }
+
+const alignmentMoveIsSilent = (move: AlignmentMove) =>
+  move.silent === true || (move.activity === null && !move.activity_name);
 
 function alignmentDiagnosticItems(diagnostics?: AlignmentDiagnostics) {
   if (!diagnostics) return [];
@@ -1962,8 +2078,8 @@ function AlignmentResultView({
             </thead>
             <tbody>
               {deviationRows.map((row) => (
-                <tr key={row.activity}>
-                  <td>{data.activities[row.activity]?.name ?? "?"}</td>
+                <tr key={row.activity_name ?? row.activity ?? "unknown"}>
+                  <td>{row.activity_name ?? (row.activity === null ? "?" : data.activities[row.activity]?.name ?? "?")}</td>
                   <td className="num">
                     {row.synchronous > 0
                       ? numberFormat.format(row.synchronous)
@@ -2036,8 +2152,8 @@ function AlignmentResultView({
                       return (
                         <span
                           key={i}
-                          className={`align-move ${move.type}${move.silent || move.activity === null ? " silent" : ""}`}
-                          title={move.silent || move.activity === null ? "model (silent): τ" : `${move.type}: ${name}`}
+                          className={`align-move ${move.type}${alignmentMoveIsSilent(move) ? " silent" : ""}`}
+                          title={alignmentMoveIsSilent(move) ? "model (silent): τ" : `${move.type}: ${name}`}
                         >
                           {name}
                         </span>
@@ -2060,7 +2176,7 @@ function AlignmentResultView({
                           <div className="align-moves" key={altIndex}>
                             {moves.map((move, i) => {
                               const name = alignmentMoveLabel(move, data.activities);
-                              const silent = move.silent || move.activity === null;
+                              const silent = alignmentMoveIsSilent(move);
                               return <span key={i} className={`align-move ${move.type}${silent ? " silent" : ""}`} title={silent ? "model (silent): τ" : `${move.type}: ${name}`}>{name}</span>;
                             })}
                           </div>

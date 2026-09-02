@@ -1643,6 +1643,35 @@ describe("model-quality result guards", () => {
       ...common, variant: "extended_cyclomatic", exhausted: false, simplicity: null,
       complexity: null, value: null, vertices: 3, edges: 2, strongly_connected_components: 1,
     } })).toBe(true);
+    const decomposed = {
+      algorithm: "decomposed_alignment", variant: "recompos_maximal",
+      complete: true, timed_out: false, exhausted: false, fitness: 1,
+      best_worst_cost: 2, trace_count: 1, total_cost: 0,
+      diagnostics: {
+        decompositions: 1, components: 1, merges: 0, cache_hits: 0,
+        cache_misses: 1, border_disagreements: 0, agreement_iterations: 1,
+        visited_states: 2, queued_states: 2, traversed_arcs: 1,
+        whole_net_fallback: false, note: "",
+      },
+      traces: [{
+        activities: ["A"], count: 1, complete: true, timed_out: false,
+        exhausted: false, cost: 0, fitness: 1, best_worst_cost: 2,
+        moves: [{ log: "A", model: "A", transition: 0 }],
+      }],
+    };
+    expect(isModelEvaluation({ miner: "powl", replay_fitness: {
+      ...common, variant: "alignment_based", exhausted: false, fitness: 1,
+      log_fitness: 1, average_trace_fitness: 1,
+      percentage_of_fitting_traces: 100, fitting_traces: 1,
+      trace_count: 1, total_cost: 0, alignments: decomposed,
+    } })).toBe(true);
+    expect(isModelEvaluation({ miner: "powl", replay_fitness: {
+      ...common, variant: "alignment_based", exhausted: false, fitness: 1,
+      log_fitness: 1, average_trace_fitness: 1,
+      percentage_of_fitting_traces: 100, fitting_traces: 1,
+      trace_count: 1, total_cost: 0,
+      alignments: { ...decomposed, traces: [{ ...decomposed.traces[0], cost: NaN }] },
+    } })).toBe(false);
   });
 
   it("rejects missing, multiple, or malformed evaluator families", () => {

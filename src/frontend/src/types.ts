@@ -2922,7 +2922,9 @@ export interface HeuristicsNet {
 }
 
 export interface VariantConformance {
-  activities: number[];
+  activities: Array<number | null>;
+  /** Lossless activity labels, including values outside the session DFG. */
+  activity_names?: string[];
   count: number;
   fitness: number;
 }
@@ -2983,7 +2985,7 @@ export interface AlignmentOptions {
 }
 
 export const DEFAULT_ALIGNMENT_OPTIONS: Required<Pick<AlignmentOptions, "variant" | "cost_profile">> = {
-  variant: "state_equation_a_star",
+  variant: "dijkstra_less_memory",
   cost_profile: "legacy",
 };
 
@@ -2991,12 +2993,16 @@ export interface AlignmentMove {
   type: AlignmentMoveType;
   /** Activity id of the move; null for a silent model (tau) transition. */
   activity: number | null;
+  /** Lossless label when the selected activity field differs from the session DFG. */
+  activity_name?: string;
   /** Explicit marker for a silent model move; absent on older exports. */
   silent?: boolean;
 }
 
 export interface VariantAlignment {
-  activities: number[];
+  activities: Array<number | null>;
+  /** Lossless activity labels, including values outside the session DFG. */
+  activity_names?: string[];
   count: number;
   /** Optimal alignment, in execution order. */
   moves: AlignmentMove[];
@@ -3621,12 +3627,17 @@ const optionalRecord = (value: unknown): boolean => value === undefined || isRec
 const evaluationNonNegativeInt = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0;
 
 function isReplayFitnessEvaluation(value: unknown): value is ReplayFitnessEvaluation {
+  const alignmentsValid = isRecord(value) &&
+    (value.alignments === undefined ||
+      (isRecord(value.alignments) &&
+       (value.alignments.algorithm === undefined ||
+        isDecomposedAlignmentResult(value.alignments))));
   return isRecord(value) && ["token_based", "alignment_based"].includes(value.variant as string) &&
     typeof value.computed === "boolean" && typeof value.exhausted === "boolean" && nullableString(value.error) &&
     metric(value.fitness) && metric(value.log_fitness) && metric(value.average_trace_fitness) &&
     metric(value.percentage_of_fitting_traces) && evaluationNonNegativeInt(value.fitting_traces) &&
     evaluationNonNegativeInt(value.trace_count) && metric(value.total_cost) && optionalRecord(value.token_replay) &&
-    optionalRecord(value.alignments);
+    alignmentsValid;
 }
 
 function isPrecisionEvaluation(value: unknown): value is PrecisionEvaluation {
@@ -4493,6 +4504,10 @@ export type EvaluationFamily =
   | "simplicity"
   | "composite";
 export type ReplayFitnessVariant = "auto" | "token_based" | "alignment_based";
+export type EvaluationTokenReplayVariant = "forward" | "backwards";
+export type EvaluationAlignmentVariant =
+  | AlignmentVariant
+  | DecomposedAlignmentVariant;
 export type PrecisionVariant =
   | "auto"
   | "etconformance_token"
@@ -4510,6 +4525,26 @@ export interface EvaluationOptions {
   process_tree_variant?: ProcessTreePetriNetVariant;
   evaluation_family?: EvaluationFamily;
   fitness_variant?: ReplayFitnessVariant;
+  evaluation_activity_attribute?: string;
+  evaluation_token_replay_variant?: EvaluationTokenReplayVariant;
+  /** Applies to forward token replay; the backwards variation ignores unknown labels. */
+  fitness_consider_unknown_activities?: boolean;
+  evaluation_alignment_variant?: EvaluationAlignmentVariant;
+  evaluation_alignment_max_states?: number;
+  evaluation_alignment_max_total_states?: number;
+  evaluation_alignment_max_time?: number;
+  evaluation_alignment_max_time_trace?: number;
+  evaluation_alignment_max_alignments?: number;
+  evaluation_alignment_exponent?: number;
+  evaluation_alignment_synchronous_dijkstra?: boolean;
+  evaluation_alignment_cost_profile?: AlignmentCostProfile;
+  evaluation_alignment_trace_cost?: number;
+  evaluation_alignment_model_cost?: number;
+  evaluation_alignment_silent_model_cost?: number;
+  evaluation_alignment_sync_cost?: number;
+  evaluation_alignment_threshold_border_agreement?: number;
+  evaluation_alignment_use_cache?: boolean;
+  evaluation_alignment_clear_cache?: boolean;
   precision_variant?: PrecisionVariant;
   precision_use_task_ids?: boolean;
   precision_max_states?: number;
@@ -5397,7 +5432,7 @@ export interface ReplayFitnessEvaluation {
   trace_count: number;
   total_cost: EvaluationMetric;
   token_replay?: Conformance;
-  alignments?: Alignments;
+  alignments?: Alignments | DecomposedAlignmentResult;
 }
 export interface PrecisionEvaluation {
   variant: Exclude<PrecisionVariant, "auto">;
@@ -6126,7 +6161,9 @@ export interface Trace {
  */
 export interface ActivityDeviation {
   /** Index into MineraExport.activities. */
-  activity: number;
+  activity: number | null;
+  /** Lossless label when no session activity id exists. */
+  activity_name?: string;
   synchronous: number;
   log_moves: number;
   model_moves: number;
