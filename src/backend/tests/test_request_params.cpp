@@ -2699,6 +2699,14 @@ void parse_evaluation_params_defaults_and_variants() {
   const auto defaults = minera::parse_evaluation_params(fields({}));
   assert(defaults.family == minera::EvaluationFamily::kReplayFitness);
   assert(defaults.replay_fitness_variant == minera::ReplayFitnessVariant::AUTO);
+  assert(defaults.replay_fitness_options.activity_attribute == "concept:name");
+  assert(defaults.replay_fitness_options.token_replay_variant ==
+         minera::TokenReplayVariant::kForward);
+  assert(defaults.replay_fitness_options.alignment_options.variant ==
+         minera::AlignmentVariant::kDijkstraLessMemory);
+  assert(defaults.replay_fitness_options.alignment_options.cost_profile ==
+         minera::AlignmentCostProfile::kStandard);
+  assert(!defaults.replay_fitness_options.decomposed_alignment_options);
   assert(defaults.precision_variant == minera::PrecisionVariant::AUTO);
   assert(!defaults.precision_options.use_task_ids);
   assert(defaults.precision_options.max_states == 100000);
@@ -2766,6 +2774,20 @@ void parse_evaluation_params_defaults_and_variants() {
   const auto all = minera::parse_evaluation_params(fields({
       {"evaluation_family", "simplicity"},
       {"fitness_variant", "alignment_based"},
+      {"evaluation_activity_attribute", " phase "},
+      {"evaluation_token_replay_variant", "forward"},
+      {"fitness_consider_unknown_activities", "true"},
+      {"evaluation_alignment_variant", "discounted_a_star"},
+      {"evaluation_alignment_max_states", "23"},
+      {"evaluation_alignment_max_time", "1.5"},
+      {"evaluation_alignment_max_time_trace", "0.25"},
+      {"evaluation_alignment_exponent", "3"},
+      {"evaluation_alignment_synchronous_dijkstra", "false"},
+      {"evaluation_alignment_cost_profile", "legacy"},
+      {"evaluation_alignment_trace_cost", "4"},
+      {"evaluation_alignment_model_cost", "5"},
+      {"evaluation_alignment_silent_model_cost", "0.5"},
+      {"evaluation_alignment_sync_cost", "0"},
       {"precision_variant", "automaton_after_align"},
       {"precision_use_task_ids", "true"},
       {"precision_max_states", "1"},
@@ -2778,6 +2800,28 @@ void parse_evaluation_params_defaults_and_variants() {
       {"fitness_weight", "2"}, {"precision_weight", "1"},
       {"simplicity_weight", "0"}, {"generalization_weight", "0"}}));
   assert(all.precision_options.use_task_ids && all.precision_options.max_states == 1);
+  assert(all.replay_fitness_options.activity_attribute == "phase" &&
+         all.precision_options.activity_attribute == "phase" &&
+         all.generalization_options.activity_attribute == "phase" &&
+         all.composite_options.activity_attribute == "phase");
+  assert(all.replay_fitness_options.token_replay_variant ==
+             minera::TokenReplayVariant::kForward &&
+         all.precision_options.token_replay_variant ==
+             minera::TokenReplayVariant::kForward);
+  assert(all.replay_fitness_options
+             .consider_activities_not_in_model_in_fitness);
+  const auto& alignment = all.replay_fitness_options.alignment_options;
+  assert(alignment.variant == minera::AlignmentVariant::kDiscountedAStar &&
+         alignment.max_states == 23 &&
+         alignment.max_total_time_seconds == 1.5 &&
+         alignment.max_time_seconds == 0.25 && alignment.exponent == 3.0 &&
+         !alignment.synchronous_dijkstra &&
+         alignment.cost_profile ==
+             minera::AlignmentCostProfile::kLegacyUnit);
+  assert(alignment.default_trace_cost == 4.0 &&
+         alignment.default_model_cost == 5.0 &&
+         alignment.default_silent_cost == 0.5 &&
+         alignment.default_sync_cost == 0.0);
   assert(all.simplicity_options.arc_degree_k == 0.0 &&
          all.simplicity_options.max_states == 7);
   assert((all.simplicity_options.initial_marking == std::vector<int>{0, 1, 2}));
@@ -2786,12 +2830,61 @@ void parse_evaluation_params_defaults_and_variants() {
          all.composite_options.precision_weight == 1.0 &&
          all.composite_options.simplicity_weight == 0.0 &&
          all.composite_options.generalization_weight == 0.0);
+
+  const auto generator = minera::parse_evaluation_params(fields({
+      {"evaluation_alignment_variant", "generator_dijkstra_less_memory"},
+      {"evaluation_alignment_max_alignments", "7"}}));
+  assert(generator.replay_fitness_options.alignment_options.variant ==
+             minera::AlignmentVariant::kGeneratorDijkstraLessMemory &&
+         generator.replay_fitness_options.alignment_options.max_alignments ==
+             7);
+
+  const auto backwards = minera::parse_evaluation_params(fields({
+      {"evaluation_token_replay_variant", "backwards"}}));
+  assert(backwards.replay_fitness_options.token_replay_variant ==
+             minera::TokenReplayVariant::kBackwards &&
+         backwards.precision_options.token_replay_variant ==
+             minera::TokenReplayVariant::kBackwards);
+
+  const auto decomposed = minera::parse_evaluation_params(fields({
+      {"fitness_variant", "alignment_based"},
+      {"evaluation_alignment_variant", "recompos_maximal"},
+      {"evaluation_alignment_max_states", "17"},
+      {"evaluation_alignment_max_total_states", "31"},
+      {"evaluation_alignment_max_time", "2"},
+      {"evaluation_alignment_max_time_trace", "0.5"},
+      {"evaluation_alignment_threshold_border_agreement", "9"},
+      {"evaluation_alignment_use_cache", "false"},
+      {"evaluation_alignment_clear_cache", "true"},
+      {"evaluation_alignment_trace_cost", "11"},
+      {"evaluation_alignment_model_cost", "12"},
+      {"evaluation_alignment_silent_model_cost", "1"},
+      {"evaluation_alignment_sync_cost", "0"}}));
+  assert(decomposed.replay_fitness_options.decomposed_alignment_options);
+  const auto& recomposition =
+      *decomposed.replay_fitness_options.decomposed_alignment_options;
+  assert(recomposition.max_states == 17 &&
+         recomposition.max_total_states == 31 &&
+         recomposition.max_time_total == 2.0 &&
+         recomposition.max_time_trace == 0.5 &&
+         recomposition.threshold_border_agreement == 9.0 &&
+         !recomposition.use_cache && recomposition.clear_cache &&
+         recomposition.log_move_cost == 11.0 &&
+         recomposition.model_move_cost == 12.0 &&
+         recomposition.tau_model_cost == 1.0 &&
+         recomposition.sync_cost == 0.0);
 }
 
 void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
   for (const auto& item : {
            std::pair{"evaluation_family", "unknown"},
            std::pair{"fitness_variant", "token"},
+           std::pair{"evaluation_token_replay_variant", "reverse"},
+           std::pair{"fitness_consider_unknown_activities", "yes"},
+           std::pair{"evaluation_alignment_variant", "unknown"},
+           std::pair{"evaluation_alignment_max_states", "0"},
+           std::pair{"evaluation_alignment_max_time", "-1"},
+           std::pair{"evaluation_alignment_cost_profile", "other"},
            std::pair{"precision_variant", "align"},
            std::pair{"precision_use_task_ids", "yes"},
            std::pair{"precision_max_states", "0"},
@@ -2838,7 +2931,10 @@ void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
   }
   assert(zero_weights_threw);
 
-  for (const auto& field_name : {"evaluation_family", "precision_use_task_ids",
+  for (const auto& field_name : {"evaluation_family",
+                                 "evaluation_activity_attribute",
+                                 "evaluation_token_replay_variant",
+                                 "precision_use_task_ids",
                                  "simplicity_initial_marking"}) {
     const std::map<std::string, std::string> explicit_empty = {
         {field_name, ""}};
@@ -2868,6 +2964,44 @@ void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
     threw = true;
   }
   assert(threw);
+
+  for (const auto& invalid : {
+           std::map<std::string, std::string>{
+               {"evaluation_alignment_variant", "dijkstra_less_memory"},
+               {"evaluation_alignment_max_alignments", "2"}},
+           std::map<std::string, std::string>{
+               {"evaluation_alignment_variant", "recompos_maximal"},
+               {"evaluation_alignment_exponent", "2"}},
+           std::map<std::string, std::string>{
+               {"evaluation_alignment_variant", "dijkstra_less_memory"},
+               {"evaluation_alignment_max_total_states", "10"}},
+           std::map<std::string, std::string>{
+               {"evaluation_family", "precision"},
+               {"evaluation_alignment_variant", "recompos_maximal"}},
+           std::map<std::string, std::string>{
+               {"evaluation_token_replay_variant", "backwards"},
+               {"fitness_consider_unknown_activities", "true"}},
+           std::map<std::string, std::string>{
+               {"precision_variant", "auto"},
+               {"precision_use_task_ids", "true"}},
+           std::map<std::string, std::string>{
+               {"precision_variant", "align_etconformance"},
+               {"precision_use_task_ids", "true"}}}) {
+    bool invalid_combination_threw = false;
+    try {
+      (void)minera::parse_evaluation_params(
+          [&invalid](std::string_view name) {
+            const auto it = invalid.find(std::string(name));
+            return it == invalid.end() ? std::string{} : it->second;
+          },
+          [&invalid](std::string_view name) {
+            return invalid.contains(std::string(name));
+          });
+    } catch (const std::invalid_argument&) {
+      invalid_combination_threw = true;
+    }
+    assert(invalid_combination_threw);
+  }
 }
 
 void native_json_contracts() {

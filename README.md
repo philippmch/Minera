@@ -476,8 +476,8 @@ note when that risk applies. The frontend's Alignments view then computes
 them on demand against a running server, exactly as it does for server-mined
 logs.
 
-Alignment search remains backward-compatible by default (state-equation A*
-with legacy unit costs), but can be selected explicitly: `--alignment-variant`
+Alignment search defaults to less-memory Dijkstra with legacy unit costs, but
+can be selected explicitly: `--alignment-variant`
 accepts `state_equation_a_star`, `dijkstra_no_heuristics`,
 `dijkstra_less_memory`, `discounted_a_star`,
 `generator_dijkstra_no_heuristics`, or `generator_dijkstra_less_memory`.

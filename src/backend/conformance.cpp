@@ -98,7 +98,8 @@ class Replayer {
   // included — is tallied into it, feeding generalization.
   [[nodiscard]] Counts replay(
       const std::vector<std::optional<std::size_t>>& trace,
-      std::vector<std::uint64_t>* executions = nullptr) const {
+      std::vector<std::uint64_t>* executions = nullptr,
+      const TokenReplayOptions& options = {}) const {
     Marking marking = initial_marking();
     Counts counts;
     counts.produced = 1;  // the initial token on the source place
@@ -107,13 +108,22 @@ class Replayer {
 
     for (const auto& step : trace) {
       if (!step || transitions_by_activity_[*step].empty()) {
-        // An activity the model has no transition for: an unavoidable log-move
-        // deviation. Count it once and carry on with the current marking.
-        ++counts.missing;
-        ++counts.consumed;
+        if (options.consider_activities_not_in_model_in_fitness) {
+          // An activity the model has no transition for is a log-move
+          // deviation only when the selected replay contract includes it.
+          ++counts.missing;
+          ++counts.consumed;
+          if (options.stop_immediately_unfit) break;
+        }
         continue;
       }
       const Step& result = cached_step(marking, *step);
+      if (result.missing != 0 && options.stop_immediately_unfit) {
+        // Immediate-stop replay records the first blocked known activity as a
+        // deviation without weak-firing its transition.
+        ++counts.missing;
+        break;
+      }
       marking = result.marking;
       counts.produced += result.produced;
       counts.consumed += result.consumed;
@@ -125,14 +135,16 @@ class Replayer {
     }
 
     // Route whatever is left toward the sink, then consume the final token.
-    const Step& finish = cached_finish(marking);
-    marking = finish.marking;
-    counts.produced += finish.produced;
-    counts.consumed += finish.consumed;
-    counts.missing += finish.missing;
-    add_place_counts(counts.places, finish.places);
-    if (executions) {
-      for (const std::size_t t : finish.fired) ++(*executions)[t];
+    if (options.try_to_reach_final_marking_through_hidden) {
+      const Step& finish = cached_finish(marking);
+      marking = finish.marking;
+      counts.produced += finish.produced;
+      counts.consumed += finish.consumed;
+      counts.missing += finish.missing;
+      add_place_counts(counts.places, finish.places);
+      if (executions) {
+        for (const std::size_t t : finish.fired) ++(*executions)[t];
+      }
     }
     ++counts.consumed;
     if (marking[net_.sink()] > 0) {
@@ -156,6 +168,7 @@ class Replayer {
   struct BackwardsOutcome {
     Counts counts;
     bool fitting = true;
+    Marking marking;
   };
 
   // Legacy backwards token replay. Unlike forward replay, unknown
@@ -234,6 +247,7 @@ class Replayer {
       }
     }
     if (counts.missing != 0 || counts.remaining != 0) outcome.fitting = false;
+    outcome.marking = marking;
     return outcome;
   }
 
@@ -282,9 +296,13 @@ class Replayer {
   // takes, so walking a trace with `advance` reaches exactly the markings a
   // full replay would. Lets the precision pass extend a parent prefix's
   // marking by one step instead of replaying every prefix from scratch.
-  void advance(Marking& marking, std::optional<std::size_t> activity) const {
-    if (!activity || transitions_by_activity_[*activity].empty()) return;
-    marking = cached_step(marking, *activity).marking;
+  [[nodiscard]] bool advance(
+      Marking& marking, std::optional<std::size_t> activity) const {
+    // Activities absent from the model are ignored by evaluator replay.
+    if (!activity || transitions_by_activity_[*activity].empty()) return true;
+    const auto& step = cached_step(marking, *activity);
+    marking = step.marking;
+    return step.missing == 0;
   }
 
   // Activities whose transitions can be enabled from `marking` (possibly after
@@ -818,7 +836,9 @@ std::vector<Variant> collect_variants(const EventLog& log,
 }
 
 double compute_precision(const std::vector<Variant>& variants,
-                         const Replayer& replayer) {
+                         const Replayer& replayer,
+                         TokenReplayVariant replay_variant,
+                         bool stop_immediately_unfit) {
   // Prefix automaton as a trie: each node is a distinct prefix and records how
   // many traces pass through it and which activities they go on to take.
   // Activities absent from the model all collapse onto one edge key, matching
@@ -828,6 +848,7 @@ double compute_precision(const std::vector<Variant>& variants,
     std::unordered_map<std::size_t, std::size_t> children;  // edge -> node
     std::uint64_t freq = 0;
     std::unordered_set<std::size_t> observed;  // next activities the log takes
+    std::vector<std::optional<std::size_t>> prefix;
   };
   std::vector<Node> nodes(1);
   for (const auto& variant : variants) {
@@ -836,10 +857,20 @@ double compute_precision(const std::vector<Variant>& variants,
     for (std::size_t depth = 0; depth < variant.ids.size(); ++depth) {
       const auto& id = variant.ids[depth];
       if (id) nodes[current].observed.insert(*id);
-      const auto [it, inserted] =
-          nodes[current].children.emplace(id ? *id : kAbsent, nodes.size());
-      if (inserted) nodes.emplace_back();
-      current = it->second;
+      const auto edge = id ? *id : kAbsent;
+      const auto existing = nodes[current].children.find(edge);
+      std::size_t child = 0;
+      if (existing == nodes[current].children.end()) {
+        child = nodes.size();
+        auto child_prefix = nodes[current].prefix;
+        child_prefix.push_back(id);
+        nodes[current].children.emplace(edge, child);
+        nodes.emplace_back();
+        nodes.back().prefix = std::move(child_prefix);
+      } else {
+        child = existing->second;
+      }
+      current = child;
       // The evaluator scores proper prefixes only. A node reached by the final
       // event is terminal and contributes no weight; a shorter variant that
       // shares a prefix contributes only when another event follows it.
@@ -857,23 +888,7 @@ double compute_precision(const std::vector<Variant>& variants,
   std::uint64_t enabled_total = 0;
   std::uint64_t escaping_total = 0;
 
-  // Depth-first walk carrying the marking: a child's marking is its parent's
-  // advanced by one replay step, so each trie node costs one step rather than
-  // a from-scratch replay of its whole prefix.
-  std::vector<std::pair<std::size_t, Marking>> stack;
-  stack.emplace_back(0, replayer.initial_marking());
-  while (!stack.empty()) {
-    auto [index, marking] = std::move(stack.back());
-    stack.pop_back();
-    const Node& node = nodes[index];
-
-    for (const auto& [edge, child] : node.children) {
-      Marking next = marking;
-      replayer.advance(
-          next, edge == kAbsent ? std::nullopt : std::optional<std::size_t>(edge));
-      stack.emplace_back(child, std::move(next));
-    }
-
+  const auto score = [&](const Node& node, Marking marking) {
     const auto [it, inserted] = enabled_cache.try_emplace(std::move(marking));
     if (inserted) {
       it->second = replayer.enabled_activities(it->first);
@@ -885,6 +900,44 @@ double compute_precision(const std::vector<Variant>& variants,
     }
     enabled_total += node.freq * enabled.size();
     escaping_total += node.freq * escaping;
+  };
+
+  if (replay_variant == TokenReplayVariant::kBackwards) {
+    score(nodes.front(), replayer.initial_marking());
+    for (std::size_t index = 1; index < nodes.size(); ++index) {
+      const auto outcome = replayer.replay_backwards(
+          nodes[index].prefix, nullptr, stop_immediately_unfit);
+      if (outcome.fitting) score(nodes[index], outcome.marking);
+    }
+  } else {
+    // Depth-first walk carrying the marking: a child's marking is its parent's
+    // advanced by one replay step, so each trie node costs one step rather than
+    // a from-scratch replay of its whole prefix. Evaluator precision discards
+    // a prefix as soon as replay needs a missing token.
+    struct Frame {
+      std::size_t index = 0;
+      Marking marking;
+      bool fitting = true;
+    };
+    std::vector<Frame> stack;
+    stack.push_back({0, replayer.initial_marking(), true});
+    while (!stack.empty()) {
+      auto frame = std::move(stack.back());
+      stack.pop_back();
+      const Node& node = nodes[frame.index];
+      if (!stop_immediately_unfit || frame.fitting) {
+        score(node, frame.marking);
+      }
+      if (stop_immediately_unfit && !frame.fitting) continue;
+      for (const auto& [edge, child] : node.children) {
+        Marking next = frame.marking;
+        const bool fitting = replayer.advance(
+            next, edge == kAbsent
+                      ? std::nullopt
+                      : std::optional<std::size_t>(edge));
+        stack.push_back({child, std::move(next), fitting});
+      }
+    }
   }
   return enabled_total == 0 ? 1.0
                             : 1.0 - double(escaping_total) / double(enabled_total);
@@ -2450,8 +2503,10 @@ ConformanceResult check_conformance(const EventLog& event_log,
                         replayer.replay_backwards(variant.ids, &variant_executions,
                                                   options.stop_immediately_unfit))
                   : std::nullopt;
-    const auto counts = backwards ? backwards_outcome->counts
-                                  : replayer.replay(variant.ids, &variant_executions);
+    const auto counts = backwards
+                            ? backwards_outcome->counts
+                            : replayer.replay(variant.ids, &variant_executions,
+                                              options);
     for (std::size_t t = 0; t < executions.size(); ++t) {
       executions[t] += variant_executions[t] * variant.count;
     }
@@ -2459,8 +2514,11 @@ ConformanceResult check_conformance(const EventLog& event_log,
     result.consumed += counts.consumed * variant.count;
     result.missing += counts.missing * variant.count;
     result.remaining += counts.remaining * variant.count;
-    const bool fitting = backwards ? backwards_outcome->fitting
-                                   : (counts.missing == 0 && counts.remaining == 0);
+    const bool fitting = backwards
+                             ? backwards_outcome->fitting
+                             : (counts.missing == 0 &&
+                                (!options.consider_remaining_in_fitness ||
+                                 counts.remaining == 0));
     if (fitting) {
       result.fitting_traces += variant.count;
     }
@@ -2476,7 +2534,8 @@ ConformanceResult check_conformance(const EventLog& event_log,
     result.fitness = 0.5 * (1.0 - consume_term) + 0.5 * (1.0 - produce_term);
   }
 
-  result.precision = compute_precision(variants, replayer);
+  result.precision = compute_precision(
+      variants, replayer, options.variant, options.stop_immediately_unfit);
   result.generalization = compute_generalization(executions);
   result.transition_frequencies = executions;
   result.simplicity = compute_simplicity(net);
@@ -2525,7 +2584,7 @@ TokenReplayDiagnostics replay_token_diagnostics(
             : std::nullopt;
     const auto counts = backwards
                             ? backwards_outcome->counts
-                            : replayer.replay(ids, &executions);
+                            : replayer.replay(ids, &executions, options);
     for (std::size_t place = 0; place < result.places.size(); ++place) {
       result.places[place].missing += counts.places[place].missing;
       result.places[place].remaining += counts.places[place].remaining;
@@ -2536,9 +2595,11 @@ TokenReplayDiagnostics replay_token_diagnostics(
          transition < result.transition_activations.size(); ++transition) {
       result.transition_activations[transition] += executions[transition];
     }
-    const bool fitting = backwards ? backwards_outcome->fitting
-                                   : (counts.missing == 0 &&
-                                      counts.remaining == 0);
+    const bool fitting = backwards
+                             ? backwards_outcome->fitting
+                             : (counts.missing == 0 &&
+                                (!options.consider_remaining_in_fitness ||
+                                 counts.remaining == 0));
     if (fitting) ++result.fitting_traces;
   }
   return result;

@@ -1765,8 +1765,102 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
   if (options.fitness_variant !== undefined && !["auto", "token_based", "alignment_based"].includes(options.fitness_variant)) {
     throw new Error("fitness_variant is invalid");
   }
+  if (options.evaluation_activity_attribute !== undefined &&
+      !options.evaluation_activity_attribute.trim()) {
+    throw new Error("evaluation_activity_attribute must not be empty");
+  }
+  if (options.evaluation_token_replay_variant !== undefined &&
+      !["forward", "backwards"].includes(options.evaluation_token_replay_variant)) {
+    throw new Error("evaluation_token_replay_variant is invalid");
+  }
+  const alignmentVariant = options.evaluation_alignment_variant;
+  const alignmentVariants = [
+    "state_equation_a_star", "dijkstra_no_heuristics",
+    "dijkstra_less_memory", "discounted_a_star",
+    "generator_dijkstra_no_heuristics",
+    "generator_dijkstra_less_memory", "recompos_maximal",
+  ];
+  if (alignmentVariant !== undefined &&
+      !alignmentVariants.includes(alignmentVariant)) {
+    throw new Error("evaluation_alignment_variant is invalid");
+  }
+  if (family === "precision" && alignmentVariant === "recompos_maximal") {
+    throw new Error("recompos_maximal is only available for replay fitness");
+  }
+  for (const [name, value] of [
+    ["fitness_consider_unknown_activities", options.fitness_consider_unknown_activities],
+    ["evaluation_alignment_synchronous_dijkstra", options.evaluation_alignment_synchronous_dijkstra],
+    ["evaluation_alignment_use_cache", options.evaluation_alignment_use_cache],
+    ["evaluation_alignment_clear_cache", options.evaluation_alignment_clear_cache],
+  ] as const) {
+    if (value !== undefined && typeof value !== "boolean") {
+      throw new Error(`${name} must be boolean`);
+    }
+  }
+  if (options.evaluation_alignment_cost_profile !== undefined &&
+      !["standard", "legacy"].includes(options.evaluation_alignment_cost_profile)) {
+    throw new Error("evaluation_alignment_cost_profile is invalid");
+  }
+  for (const [name, value] of [
+    ["evaluation_alignment_max_states", options.evaluation_alignment_max_states],
+    ["evaluation_alignment_max_total_states", options.evaluation_alignment_max_total_states],
+    ["evaluation_alignment_max_alignments", options.evaluation_alignment_max_alignments],
+  ] as const) {
+    if (value !== undefined && (!Number.isInteger(value) || value < 1)) {
+      throw new Error(`${name} must be a positive integer`);
+    }
+  }
+  for (const [name, value] of [
+    ["evaluation_alignment_max_time", options.evaluation_alignment_max_time],
+    ["evaluation_alignment_max_time_trace", options.evaluation_alignment_max_time_trace],
+    ["evaluation_alignment_trace_cost", options.evaluation_alignment_trace_cost],
+    ["evaluation_alignment_model_cost", options.evaluation_alignment_model_cost],
+    ["evaluation_alignment_silent_model_cost", options.evaluation_alignment_silent_model_cost],
+    ["evaluation_alignment_sync_cost", options.evaluation_alignment_sync_cost],
+    ["evaluation_alignment_threshold_border_agreement", options.evaluation_alignment_threshold_border_agreement],
+  ] as const) {
+    if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
+      throw new Error(`${name} must be a finite non-negative number`);
+    }
+  }
+  if (options.evaluation_alignment_exponent !== undefined &&
+      (!Number.isFinite(options.evaluation_alignment_exponent) ||
+       options.evaluation_alignment_exponent <= 1)) {
+    throw new Error("evaluation_alignment_exponent must be greater than 1");
+  }
+  const generatorAlignment = alignmentVariant === "generator_dijkstra_no_heuristics" ||
+    alignmentVariant === "generator_dijkstra_less_memory";
+  if (options.evaluation_alignment_max_alignments !== undefined && !generatorAlignment) {
+    throw new Error("evaluation_alignment_max_alignments requires a generator variant");
+  }
+  const discountedAlignment = alignmentVariant === "discounted_a_star";
+  if ((options.evaluation_alignment_exponent !== undefined ||
+       options.evaluation_alignment_synchronous_dijkstra !== undefined) &&
+      !discountedAlignment) {
+    throw new Error("discounted alignment controls require discounted_a_star");
+  }
+  const decomposedAlignment = alignmentVariant === "recompos_maximal";
+  if ((options.evaluation_alignment_max_total_states !== undefined ||
+       options.evaluation_alignment_threshold_border_agreement !== undefined ||
+       options.evaluation_alignment_use_cache !== undefined ||
+       options.evaluation_alignment_clear_cache !== undefined) &&
+      !decomposedAlignment) {
+    throw new Error("decomposed alignment controls require recompos_maximal");
+  }
+  if (decomposedAlignment &&
+      options.evaluation_alignment_cost_profile === "legacy") {
+    throw new Error("recompos_maximal requires standard costs");
+  }
   if (options.precision_variant !== undefined && !["auto", "etconformance_token", "align_etconformance", "automaton_after_align"].includes(options.precision_variant)) {
     throw new Error("precision_variant is invalid");
+  }
+  if (options.evaluation_token_replay_variant === "backwards" &&
+      options.fitness_consider_unknown_activities === true) {
+    throw new Error("fitness_consider_unknown_activities requires forward replay");
+  }
+  if (options.precision_use_task_ids === true &&
+      options.precision_variant !== "automaton_after_align") {
+    throw new Error("precision_use_task_ids requires automaton_after_align");
   }
   if (options.generalization_variant !== undefined && options.generalization_variant !== "generalization_token") {
     throw new Error("generalization_variant is invalid");
@@ -1818,6 +1912,28 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
   query.set("evaluation_family", family);
   const add = (name: string, value: unknown) => { if (value !== undefined) query.set(name, Array.isArray(value) ? value.join(",") : String(value)); };
   add("fitness_variant", options.fitness_variant);
+  if (options.evaluation_activity_attribute !== undefined) {
+    add("evaluation_activity_attribute",
+        options.evaluation_activity_attribute.trim());
+  }
+  add("evaluation_token_replay_variant", options.evaluation_token_replay_variant);
+  add("fitness_consider_unknown_activities", options.fitness_consider_unknown_activities);
+  add("evaluation_alignment_variant", options.evaluation_alignment_variant);
+  add("evaluation_alignment_max_states", options.evaluation_alignment_max_states);
+  add("evaluation_alignment_max_total_states", options.evaluation_alignment_max_total_states);
+  add("evaluation_alignment_max_time", options.evaluation_alignment_max_time);
+  add("evaluation_alignment_max_time_trace", options.evaluation_alignment_max_time_trace);
+  add("evaluation_alignment_max_alignments", options.evaluation_alignment_max_alignments);
+  add("evaluation_alignment_exponent", options.evaluation_alignment_exponent);
+  add("evaluation_alignment_synchronous_dijkstra", options.evaluation_alignment_synchronous_dijkstra);
+  add("evaluation_alignment_cost_profile", options.evaluation_alignment_cost_profile);
+  add("evaluation_alignment_trace_cost", options.evaluation_alignment_trace_cost);
+  add("evaluation_alignment_model_cost", options.evaluation_alignment_model_cost);
+  add("evaluation_alignment_silent_model_cost", options.evaluation_alignment_silent_model_cost);
+  add("evaluation_alignment_sync_cost", options.evaluation_alignment_sync_cost);
+  add("evaluation_alignment_threshold_border_agreement", options.evaluation_alignment_threshold_border_agreement);
+  add("evaluation_alignment_use_cache", options.evaluation_alignment_use_cache);
+  add("evaluation_alignment_clear_cache", options.evaluation_alignment_clear_cache);
   add("precision_variant", options.precision_variant);
   add("precision_use_task_ids", options.precision_use_task_ids);
   add("precision_max_states", options.precision_max_states);

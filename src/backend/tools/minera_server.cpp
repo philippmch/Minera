@@ -5100,7 +5100,8 @@ void handle_evaluate(const httplib::Request& request,
     switch (params.family) {
       case minera::EvaluationFamily::kReplayFitness:
         result.replay_fitness = minera::evaluate_replay_fitness(
-            *evaluation_log, selected, params.replay_fitness_variant);
+            *evaluation_log, selected, params.replay_fitness_variant,
+            params.replay_fitness_options);
         break;
       case minera::EvaluationFamily::kPrecision:
         result.precision = minera::evaluate_precision(
@@ -5109,7 +5110,8 @@ void handle_evaluate(const httplib::Request& request,
         break;
       case minera::EvaluationFamily::kGeneralization:
         result.generalization = minera::evaluate_generalization(
-            *evaluation_log, selected, params.generalization_variant);
+            *evaluation_log, selected, params.generalization_variant,
+            params.generalization_options);
         break;
       case minera::EvaluationFamily::kSimplicity:
         result.simplicity = minera::evaluate_simplicity(

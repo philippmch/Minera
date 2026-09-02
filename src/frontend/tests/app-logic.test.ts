@@ -298,6 +298,59 @@ describe("evaluation adapters", () => {
       evaluation_family: "composite", fitness_weight: 2, precision_weight: 1,
       simplicity_weight: 0, generalization_weight: 0,
     })).toString()).toBe("evaluation_family=composite&fitness_weight=2&precision_weight=1&simplicity_weight=0&generalization_weight=0");
+
+    const alignment = new URLSearchParams(evaluationQuery({
+      evaluation_family: "replay_fitness",
+      fitness_variant: "alignment_based",
+      evaluation_activity_attribute: " phase ",
+      evaluation_token_replay_variant: "forward",
+      fitness_consider_unknown_activities: true,
+      evaluation_alignment_variant: "discounted_a_star",
+      evaluation_alignment_max_states: 23,
+      evaluation_alignment_max_time: 1.5,
+      evaluation_alignment_max_time_trace: 0.25,
+      evaluation_alignment_exponent: 3,
+      evaluation_alignment_synchronous_dijkstra: false,
+      evaluation_alignment_cost_profile: "legacy",
+      evaluation_alignment_trace_cost: 4,
+      evaluation_alignment_model_cost: 5,
+      evaluation_alignment_silent_model_cost: 0.5,
+      evaluation_alignment_sync_cost: 0,
+    }));
+    expect(Object.fromEntries(alignment)).toMatchObject({
+      evaluation_activity_attribute: "phase",
+      evaluation_token_replay_variant: "forward",
+      fitness_consider_unknown_activities: "true",
+      evaluation_alignment_variant: "discounted_a_star",
+      evaluation_alignment_max_states: "23",
+      evaluation_alignment_max_time: "1.5",
+      evaluation_alignment_max_time_trace: "0.25",
+      evaluation_alignment_exponent: "3",
+      evaluation_alignment_synchronous_dijkstra: "false",
+      evaluation_alignment_cost_profile: "legacy",
+      evaluation_alignment_trace_cost: "4",
+      evaluation_alignment_model_cost: "5",
+      evaluation_alignment_silent_model_cost: "0.5",
+      evaluation_alignment_sync_cost: "0",
+    });
+
+    const decomposed = new URLSearchParams(evaluationQuery({
+      evaluation_alignment_variant: "recompos_maximal",
+      evaluation_alignment_max_total_states: 31,
+      evaluation_alignment_threshold_border_agreement: 9,
+      evaluation_alignment_use_cache: false,
+      evaluation_alignment_clear_cache: true,
+    }));
+    expect(Object.fromEntries(decomposed)).toMatchObject({
+      evaluation_alignment_variant: "recompos_maximal",
+      evaluation_alignment_max_total_states: "31",
+      evaluation_alignment_threshold_border_agreement: "9",
+      evaluation_alignment_use_cache: "false",
+      evaluation_alignment_clear_cache: "true",
+    });
+    expect(evaluationQuery({
+      evaluation_token_replay_variant: "backwards",
+    })).toContain("evaluation_token_replay_variant=backwards");
   });
 
   it("serializes and validates every Petri-analysis setting", () => {
@@ -340,6 +393,18 @@ describe("evaluation adapters", () => {
     expect(() => evaluationQuery({ evaluation_family: "composite", fitness_weight: 0, precision_weight: 0, simplicity_weight: 0, generalization_weight: 0 })).toThrow(/positive total/);
     expect(evaluationQuery({ evaluation_family: "composite", fitness_weight: 0 })).toContain("fitness_weight=0");
     expect(() => evaluationQuery({ fitness_weight: Number.NaN })).toThrow(/finite/);
+    expect(() => evaluationQuery({ evaluation_activity_attribute: " " })).toThrow(/empty/);
+    expect(() => evaluationQuery({ evaluation_token_replay_variant: "reverse" as "forward" })).toThrow(/invalid/);
+    expect(() => evaluationQuery({ evaluation_alignment_max_states: 0 })).toThrow(/positive integer/);
+    expect(() => evaluationQuery({ evaluation_alignment_exponent: 2 })).toThrow(/discounted/);
+    expect(() => evaluationQuery({ evaluation_alignment_variant: "discounted_a_star", evaluation_alignment_exponent: 1 })).toThrow(/greater than 1/);
+    expect(() => evaluationQuery({ evaluation_alignment_max_alignments: 2 })).toThrow(/generator/);
+    expect(() => evaluationQuery({ evaluation_alignment_max_total_states: 2 })).toThrow(/recompos/);
+    expect(() => evaluationQuery({ evaluation_family: "precision", evaluation_alignment_variant: "recompos_maximal" })).toThrow(/replay fitness/);
+    expect(() => evaluationQuery({ evaluation_alignment_variant: "recompos_maximal", evaluation_alignment_cost_profile: "legacy" })).toThrow(/standard/);
+    expect(() => evaluationQuery({ evaluation_token_replay_variant: "backwards", fitness_consider_unknown_activities: true })).toThrow(/forward/);
+    expect(() => evaluationQuery({ precision_use_task_ids: true })).toThrow(/automaton/);
+    expect(() => evaluationQuery({ precision_variant: "align_etconformance", precision_use_task_ids: true })).toThrow(/automaton/);
     const composite = { miner: "alpha", composite: {
       computed: true, error: null, fitness: 1, precision: 0.5,
       generalization: 0.75, simplicity: 0.25, metrics_average_weight: 0.625,
@@ -648,6 +713,7 @@ describe("alignmentQuery", () => {
   it("labels silent tau moves without indexing the activity catalog", () => {
     const activities = [{ name: "A", count: 1, start_count: 1, end_count: 1 }];
     expect(alignmentMoveLabel({ type: "sync", activity: 0 }, activities)).toBe("A");
+    expect(alignmentMoveLabel({ type: "sync", activity: null, activity_name: "phase-A", silent: false }, activities)).toBe("phase-A");
     expect(alignmentMoveLabel({ type: "model", activity: null, silent: true }, activities)).toBe("τ");
     expect(alignmentMoveLabel({ type: "model", activity: null }, activities)).toBe("τ");
   });
