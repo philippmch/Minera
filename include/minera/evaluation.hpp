@@ -54,6 +54,14 @@ struct ReplayFitnessResult {
   AlignmentResult alignment_result;
 };
 
+// Evaluator-only replay controls. The generic conformance API reports every
+// unknown log activity as a deviation. Token-based fitness evaluation keeps
+// the evaluator's default of ignoring activities absent from the model; set
+// this flag to include them in the fitness calculation.
+struct ReplayFitnessOptions {
+  bool consider_activities_not_in_model_in_fitness = false;
+};
+
 struct PrecisionResult {
   PrecisionVariant variant = PrecisionVariant::ETCONFORMANCE_TOKEN;
   double precision = 1.0;
@@ -178,6 +186,12 @@ struct ModelEvaluation {
     const EventLog&, const PetriNet&, ReplayFitnessVariant = ReplayFitnessVariant::AUTO);
 [[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
     const EventLog&, const ProcessTree&, ReplayFitnessVariant = ReplayFitnessVariant::AUTO);
+[[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
+    const EventLog&, const PetriNet&, ReplayFitnessVariant,
+    const ReplayFitnessOptions&);
+[[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
+    const EventLog&, const ProcessTree&, ReplayFitnessVariant,
+    const ReplayFitnessOptions&);
 [[nodiscard]] PrecisionResult evaluate_precision(
     const EventLog&, const PetriNet&, PrecisionVariant = PrecisionVariant::AUTO);
 [[nodiscard]] PrecisionResult evaluate_precision(

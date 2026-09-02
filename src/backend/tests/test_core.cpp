@@ -2755,17 +2755,22 @@ void temporal_behavioral_json_validates_and_serializes_batches() {
   rejects_before_output(bad_tie, false);
 }
 
-// Counts alignment moves of a given type in a variant.
+// Counts activity-bearing alignment moves of a given type. Silent model moves
+// are routing steps rather than activity deviations.
 std::size_t count_moves(const minera::VariantAlignment& variant,
                         minera::AlignmentMoveType type) {
   return static_cast<std::size_t>(std::count_if(
       variant.moves.begin(), variant.moves.end(),
-      [&](const minera::AlignmentMove& move) { return move.type == type; }));
+      [&](const minera::AlignmentMove& move) {
+        return move.type == type &&
+               (type != minera::AlignmentMoveType::kModel ||
+                !move.activity.empty());
+      }));
 }
 
 void alignment_is_perfect_for_every_operator() {
   // The inductive miner yields a perfectly fitting model, so every trace must
-  // align at cost 0 — only synchronous (and dropped silent) moves. This walks
+  // align at cost 0 — only synchronous and silent-routing moves. This walks
   // the AND-join and loop-redo routing the same way the token-replay test does.
   const std::vector<std::vector<std::vector<std::string>>> logs = {
       {{"a", "b", "c"}},                                    // sequence
@@ -2942,7 +2947,10 @@ void alignment_prunes_an_unbounded_net_with_dead_growth() {
   net.add_transition(std::nullopt, {source}, {sink});          // reaches the sink
 
   const auto log = log_from_variants({{"x"}});
-  const auto alignment = minera::check_alignment(log, net);
+  minera::AlignmentOptions options;
+  options.variant = minera::AlignmentVariant::kStateEquationAStar;
+  options.max_states = 1000;
+  const auto alignment = minera::check_alignment(log, net, options);
   assert(alignment.computed);
   assert(!alignment.exhausted);
   // The best alignment is one log move for the unknown "x" plus the silent
@@ -2977,7 +2985,10 @@ void alignment_flags_an_exhausted_search_on_an_unbounded_net() {
   net.add_transition(0, {gate}, {sink});  // "x": never actually enabled
 
   const auto log = log_from_variants({{"x"}});
-  const auto alignment = minera::check_alignment(log, net);
+  minera::AlignmentOptions options;
+  options.variant = minera::AlignmentVariant::kStateEquationAStar;
+  options.max_states = 1000;
+  const auto alignment = minera::check_alignment(log, net, options);
   assert(!alignment.computed);
   assert(alignment.exhausted);  // search bound hit, distinct from an unsound net
   assert(alignment.variants.empty());

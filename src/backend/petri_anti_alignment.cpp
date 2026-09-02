@@ -77,9 +77,12 @@ double ordinary_insert_delete(const std::vector<std::string>& a,
   for (std::size_t j = 0; j <= b.size(); ++j) p[j] = j;
   for (std::size_t i = 1; i <= a.size(); ++i) {
     c[0] = p[0] + (silent_run_label(a[i - 1]) ? 0u : 1u);
-    for (std::size_t j = 1; j <= b.size(); ++j)
+    for (std::size_t j = 1; j <= b.size(); ++j) {
+      const auto substitution =
+          a[i - 1] == b[j - 1] && !silent_run_label(a[i - 1]) ? 0u : 2u;
       c[j] = std::min({p[j] + (silent_run_label(a[i - 1]) ? 0u : 1u), c[j - 1] + 1,
-                       p[j - 1] + (a[i - 1] == b[j - 1] ? 0u : 2u)});
+                       p[j - 1] + substitution});
+    }
     p.swap(c);
   }
   return static_cast<double>(p[b.size()]);

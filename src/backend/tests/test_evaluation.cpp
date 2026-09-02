@@ -23,9 +23,11 @@ void cardoso_deduplicates_weighted_outputs() {
   PetriNet n; auto p=n.add_place(),a=n.add_place(),b=n.add_place(); n.set_source(p); n.set_sink(b); n.set_activities({"A","B"}); n.add_transition(0,{p},{a,a,b}); n.add_transition(1,{p},{a,b});
   auto s=evaluate_simplicity(n,SimplicityVariant::EXTENDED_CARDOSO); assert(s.value==1.0);
 }
-void cyclomatic_retains_parallel_transition_edges() {
+void cyclomatic_collapses_parallel_transition_edges() {
   PetriNet n; auto p=n.add_place(),q=n.add_place(); n.set_source(p); n.set_sink(q); n.set_activities({"A","B"}); n.add_transition(0,{p},{q}); n.add_transition(1,{p},{q});
-  auto s=evaluate_simplicity(n,SimplicityVariant::EXTENDED_CYCLOMATIC); assert(s.edges==2);
+  auto s=evaluate_simplicity(n,SimplicityVariant::EXTENDED_CYCLOMATIC);
+  assert(s.computed && s.vertices==2 && s.edges==1);
+  assert(s.strongly_connected_components==2 && s.value==1.0);
 }
 void unexecuted_transition_penalty() {
   auto n=sequence_net(); auto r=evaluate_generalization(log({{"A"}}),n);
@@ -33,6 +35,28 @@ void unexecuted_transition_penalty() {
   assert(r.transition_frequencies[0]==1 && r.transition_frequencies[1]==0);
   // One seen and one unseen transition each contribute a unit rarity penalty.
   assert(std::abs(r.generalization-0.0)<1e-12);
+}
+void generalization_counts_silent_routing_and_unseen_branches() {
+  PetriNet n;
+  const auto source = n.add_place();
+  const auto routed = n.add_place();
+  const auto choice = n.add_place();
+  const auto sink = n.add_place();
+  n.set_source(source);
+  n.set_sink(sink);
+  n.set_activities({"A", "B", "C"});
+  n.add_transition(0, {source}, {routed});
+  n.add_transition(std::nullopt, {routed}, {choice});
+  n.add_transition(1, {choice}, {sink});
+  n.add_transition(2, {choice}, {sink});
+
+  const auto result = evaluate_generalization(
+      log({{"A", "B"}, {"A", "B"}}), n);
+  assert(result.transition_frequencies ==
+         std::vector<std::uint64_t>({2, 2, 2, 0}));
+  assert(result.executed_transitions == 3 && result.transition_count == 4);
+  const double expected = 1.0 - (3.0 / std::sqrt(2.0) + 1.0) / 4.0;
+  assert(std::abs(result.generalization - expected) < 1e-12);
 }
 void projection_records_have_place_markings() {
   auto n=sequence_net(); auto a=check_alignment(log({{"A","B"}}),n); assert(a.computed && !a.variants.empty());
@@ -166,6 +190,34 @@ void precision_option_errors_preserve_variant_and_convert_trees() {
   assert(tree_result.variant==PrecisionVariant::ALIGN_ETCONFORMANCE);
 }
 
+void replay_fitness_excludes_unknown_activities_by_default() {
+  auto n = sequence_net();
+  // A declared activity without an attached visible transition is still
+  // unknown to replay and must not be mistaken for model behavior.
+  n.set_activities({"A", "B", "UNUSED"});
+  const auto l = log({{"A", "B", "UNUSED", "X"}, {"A", "B"}});
+
+  // The evaluator's default matches token-replay fitness semantics: unknown
+  // activities do not make an otherwise fitting trace unfit.
+  const auto excluded = evaluate_replay_fitness(
+      l, n, ReplayFitnessVariant::TOKEN_BASED);
+  assert(excluded.computed && excluded.trace_count == 2);
+  assert(excluded.fitness == 1.0 && excluded.fitting_traces == 2);
+
+  ReplayFitnessOptions include_unknown;
+  include_unknown.consider_activities_not_in_model_in_fitness = true;
+  const auto included = evaluate_replay_fitness(
+      l, n, ReplayFitnessVariant::TOKEN_BASED, include_unknown);
+  assert(included.computed && included.trace_count == 2);
+  assert(included.fitness < excluded.fitness);
+  assert(included.fitting_traces == 1);
+
+  // The lower-level conformance API intentionally retains its deviation
+  // accounting and therefore still penalizes the unknown events.
+  const auto generic = check_conformance(l, n);
+  assert(generic.fitness < excluded.fitness && generic.fitting_traces == 1);
+}
+
 void composite_evaluation_uses_equal_and_custom_weights() {
   const auto n = sequence_net();
   const auto l = log({{"A", "B"}, {"A"}});
@@ -235,15 +287,22 @@ void emd_pyemd_variant_is_deterministic_and_strict() {
 
   EmdOptions pyemd;
   pyemd.variant = EmdVariant::PYEMD;
-  // The explicit selector owns its normalized trace costs and does not
-  // silently switch to a caller's unrelated distance function.
+  // A caller-supplied native distance function is honored by the explicit
+  // selector.
   pyemd.distance = [](const auto&, const auto&) { return 0.0; };
   const auto first = evaluate_emd(left, right, pyemd);
   const auto second = evaluate_emd(left, right, pyemd);
   assert(first.computed && first.variant == EmdVariant::PYEMD);
   assert(first.use_fast_emd);
-  assert(std::abs(first.distance - 0.5) < 1e-12);
+  assert(first.distance == 0.0);
   assert(first.distance == second.distance);
+
+  EmdOptions default_distance = pyemd;
+  default_distance.distance = {};
+  const auto default_distance_result = evaluate_emd(
+      left, right, default_distance);
+  assert(default_distance_result.computed);
+  assert(std::abs(default_distance_result.distance - 0.5) < 1e-12);
 
   // Both backend selections remain deterministic when the optional fast
   // runtime is unavailable, and selecting the fallback does not alter the
@@ -268,6 +327,15 @@ void emd_pyemd_variant_is_deterministic_and_strict() {
   strict.normalize_masses = true;
   const auto normalized = evaluate_emd(unequal, right, strict);
   assert(normalized.computed && normalized.normalized);
+
+  // The fallback implementation has the equal-total precondition of the
+  // reference solver; the accelerated path performs the normalization above.
+  EmdOptions fallback_unequal = pyemd;
+  fallback_unequal.use_fast_emd = false;
+  const auto fallback_rejected = evaluate_emd(
+      unequal, right, fallback_unequal);
+  assert(!fallback_rejected.computed &&
+         fallback_rejected.error == "masses must be equal");
 
   StochasticLanguage negative_duplicate{{{{"A"}, -1.0}, {{"A"}, 1.0}}, 0.0};
   const auto invalid_weight = evaluate_emd(negative_duplicate, right, pyemd);
@@ -311,13 +379,16 @@ int main() {
   EmdOptions strict; strict.strict_equal_mass=true; StochasticLanguage unequal{{{{"x"},2.0}},2.0};
   auto bad=evaluate_emd(unequal,a,strict); assert(!bad.computed);
   auto card=evaluate_simplicity(n,SimplicityVariant::EXTENDED_CARDOSO); assert(card.computed&&card.complexity>0);
-  weighted_input_enablement(); cardoso_deduplicates_weighted_outputs(); cyclomatic_retains_parallel_transition_edges();
-  unexecuted_transition_penalty(); projection_records_have_place_markings();
+  weighted_input_enablement(); cardoso_deduplicates_weighted_outputs(); cyclomatic_collapses_parallel_transition_edges();
+  unexecuted_transition_penalty();
+  generalization_counts_silent_routing_and_unseen_branches();
+  projection_records_have_place_markings();
   automaton_model_only_projection(); automaton_ignores_log_only_moves();
   automaton_unions_shared_prefix_observations(); automaton_excludes_short_terminal_prefix_frequency();
   automaton_task_ids_disambiguate_duplicate_labels(); automaton_differs_from_alignment_precision_on_deviation();
   cyclomatic_default_multiple_empty_preset_places(); default_variant_dispatch_follows_soundness();
   precision_option_errors_preserve_variant_and_convert_trees();
+  replay_fitness_excludes_unknown_activities_by_default();
   composite_evaluation_uses_equal_and_custom_weights();
   composite_evaluation_serializes_as_a_model_family();
   emd_pyemd_variant_is_deterministic_and_strict();

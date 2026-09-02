@@ -100,6 +100,24 @@ int main() {
   auto cycle = align_trace_on_dfg(std::vector<std::string>{"a", "b", "a"}, cyc, s, s);
   assert(cycle.cost == 0 && cycle.alignment.size() == 3);
 
+  // Revisiting a graph node at a later trace position must remain a distinct
+  // search state.  The exact cyclic run is free, while the repeated log-only
+  // event in the second trace has one deviation and then rejoins the cycle.
+  DfgFrequency revisiting{{{"a", "b"}, 1},
+                          {{"b", "a"}, 1},
+                          {{"a", "c"}, 1}};
+  std::map<std::string, std::uint64_t> revisit_start{{"a", 1}};
+  std::map<std::string, std::uint64_t> revisit_end{{"c", 1}};
+  const auto exact_revisit = align_trace_on_dfg(
+      std::vector<std::string>{"a", "b", "a", "c"}, revisiting,
+      revisit_start, revisit_end);
+  assert(exact_revisit.cost == 0.0 && exact_revisit.alignment.size() == 4);
+  const auto deviating_revisit = align_trace_on_dfg(
+      std::vector<std::string>{"a", "b", "b", "a", "c"}, revisiting,
+      revisit_start, revisit_end);
+  assert(deviating_revisit.cost == 10000.0);
+  assert(deviating_revisit.alignment.size() == 5);
+
   DfgAlignmentOptions custom; custom.log_move_cost["x"]=2; custom.internal_log_move_cost["x"]=0.5;
   auto c=align_trace_on_dfg(std::vector<std::string>{"x"},d,s,e,custom); assert(c.cost==20002 && c.internal_cost< c.cost);
   bool threw=false; try { custom.log_move_cost["x"]=-1; (void)align_trace_on_dfg(std::vector<std::string>{"x"},d,s,e,custom); } catch(const std::invalid_argument&) { threw=true; } assert(threw);

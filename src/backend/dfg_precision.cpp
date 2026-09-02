@@ -78,14 +78,18 @@ DfgPrecisionResult evaluate_dfg_precision(
   for (const auto& [edge, count] : model.graph) {
     if (edge.first.empty() || edge.second.empty())
       throw std::invalid_argument("DFG precision: model labels must not be empty");
-    if (count == 0) continue;
+    // The graph maps describe the model relation; their frequencies are not
+    // used by escaping-edge precision. Keep zero-frequency entries visible so
+    // imported sparse graphs retain their declared edges.
     exiting[edge.first].insert(edge.second);
   }
   ActivitySet starts;
   for (const auto& [activity, count] : model.start_activities) {
     if (activity.empty())
       throw std::invalid_argument("DFG precision: model labels must not be empty");
-    if (count != 0) starts.insert(activity);
+    // As with graph edges, a declared start key is a model start relation even
+    // when its optional frequency is zero.
+    starts.insert(activity);
   }
 
   struct PrefixObservation {

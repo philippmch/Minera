@@ -41,6 +41,20 @@ minera::EventLog log_with_activity_attribute() {
 int main() {
   const auto model = chain();
   const auto exact = log_of({"a", "b"});
+  const minera::AlignmentOptions default_options;
+  const minera::AlignmentResult default_result;
+  assert(default_options.variant ==
+         minera::AlignmentVariant::kDijkstraLessMemory);
+  assert(default_result.variant ==
+         minera::AlignmentVariant::kDijkstraLessMemory);
+  const auto default_alignment = minera::check_alignment(exact, model);
+  assert(default_alignment.computed);
+  assert(default_alignment.variant ==
+         minera::AlignmentVariant::kDijkstraLessMemory);
+  assert(default_alignment.diagnostics.visited_states > 0);
+  assert(default_alignment.diagnostics.queued_states > 0);
+  assert(default_alignment.diagnostics.lp_solved == 0);
+
   const auto attributed = log_with_activity_attribute();
   minera::AlignmentOptions attributed_options;
   attributed_options.variant = minera::AlignmentVariant::kDijkstraNoHeuristics;

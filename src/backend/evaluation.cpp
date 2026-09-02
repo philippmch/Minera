@@ -93,6 +93,36 @@ double normalized_levenshtein_distance(const std::vector<std::string>& a,const s
 }
 
 ReplayFitnessResult evaluate_replay_fitness(const EventLog& log, const PetriNet& net, ReplayFitnessVariant variant) {
+  return evaluate_replay_fitness(log, net, variant, {});
+}
+
+namespace {
+
+EventLog filter_unknown_activities(const EventLog& log, const PetriNet& net) {
+  std::unordered_set<std::string> model_activities;
+  for (const auto& transition : net.transitions()) {
+    if (transition.activity &&
+        *transition.activity < net.activities().size()) {
+      model_activities.insert(net.activities()[*transition.activity]);
+    }
+  }
+  EventLog filtered = log;
+  for (auto& trace : filtered.traces) {
+    trace.events.erase(
+        std::remove_if(trace.events.begin(), trace.events.end(),
+                       [&](const Event& event) {
+                         return !model_activities.contains(event.activity);
+                       }),
+        trace.events.end());
+  }
+  return filtered;
+}
+
+}  // namespace
+
+ReplayFitnessResult evaluate_replay_fitness(
+    const EventLog& log, const PetriNet& net, ReplayFitnessVariant variant,
+    const ReplayFitnessOptions& options) {
   ReplayFitnessResult out; out.trace_count=log.trace_count();
   if (log.trace_count() == 0) {
     if (variant == ReplayFitnessVariant::AUTO) {
@@ -110,9 +140,9 @@ ReplayFitnessResult evaluate_replay_fitness(const EventLog& log, const PetriNet&
     return out;
   }
   if (variant == ReplayFitnessVariant::AUTO) {
-    AlignmentOptions options;
-    options.cost_profile = AlignmentCostProfile::kStandard;
-    const auto alignment = check_alignment(log, net, options);
+    AlignmentOptions alignment_options;
+    alignment_options.cost_profile = AlignmentCostProfile::kStandard;
+    const auto alignment = check_alignment(log, net, alignment_options);
     if (alignment.computed) {
       out.variant = ReplayFitnessVariant::ALIGNMENT_BASED;
       out.alignment_result = alignment;
@@ -137,7 +167,15 @@ ReplayFitnessResult evaluate_replay_fitness(const EventLog& log, const PetriNet&
   out.variant=variant;
   if (log.trace_count()==0) return out;
   if (variant==ReplayFitnessVariant::TOKEN_BASED) {
-    out.token_result=check_conformance(log,net); out.fitness=out.token_result.fitness;
+    const EventLog fitness_log =
+        options.consider_activities_not_in_model_in_fitness
+            ? log
+            : filter_unknown_activities(log, net);
+    out.token_result=check_conformance(fitness_log,net);
+    // The evaluator still describes the original log, including traces whose
+    // unknown events were ignored for token accounting.
+    out.token_result.trace_count = out.trace_count;
+    out.fitness=out.token_result.fitness;
     out.log_fitness=out.fitness; out.fitting_traces=out.token_result.fitting_traces;
     double av=0; for (const auto& v : out.token_result.variants) av += v.fitness*double(v.count);
     out.average_trace_fitness = av/double(out.trace_count);
@@ -155,6 +193,11 @@ ReplayFitnessResult evaluate_replay_fitness(const EventLog& log, const PetriNet&
   return out;
 }
 ReplayFitnessResult evaluate_replay_fitness(const EventLog& l,const ProcessTree& t,ReplayFitnessVariant v) { return evaluate_replay_fitness(l,to_petri_net(t),v); }
+ReplayFitnessResult evaluate_replay_fitness(
+    const EventLog& l, const ProcessTree& t, ReplayFitnessVariant v,
+    const ReplayFitnessOptions& o) {
+  return evaluate_replay_fitness(l, to_petri_net(t), v, o);
+}
 
 namespace {
 
@@ -595,9 +638,12 @@ SimplicityResult evaluate_simplicity(const PetriNet& net,
         adjacency.emplace_back();
         queue.push(it->second);
       }
-      // The pinned reachability graph retains transition-labelled parallel
-      // edges, even when two firings reach the same marking.
-      adjacency[source].push_back(it->second);
+      // The reachability graph is directed-simple: transition labels do not
+      // create parallel edges when they lead to the same marking.
+      if (std::find(adjacency[source].begin(), adjacency[source].end(),
+                    it->second) == adjacency[source].end()) {
+        adjacency[source].push_back(it->second);
+      }
     }
   }
 
@@ -771,15 +817,19 @@ EmdResult evaluate_emd(const StochasticLanguage& aa,const StochasticLanguage& bb
     // normalization: callers opting into it asked to detect unequal mass,
     // not to silently rescale it away.
     if(opt.strict_equal_mass){out.computed=false;out.error="masses must be equal";return out;}
+    // The accelerated implementation normalizes unequal histograms before
+    // solving. Its fallback requires equal totals, even when the caller's
+    // normalization extension is enabled.
+    if(opt.variant == EmdVariant::PYEMD && !opt.use_fast_emd){
+      out.computed=false;out.error="masses must be equal";return out;
+    }
     if(opt.normalize_masses){for(auto&t:a.traces)t.weight/=ma;for(auto&t:b.traces)t.weight/=mb;ma=mb=1;out.normalized=true;}
     else {out.computed=false;out.error="masses must be equal";return out;}
   }
-  // The explicit PYEMD selector has fixed normalized Levenshtein costs. The
-  // historical selector continues to honor a caller-supplied distance.
-  const auto dist = opt.variant == EmdVariant::PYEMD
-                        ? DistanceFunction(normalized_levenshtein_distance)
-                        : (opt.distance ? opt.distance
-                                        : DistanceFunction(normalized_levenshtein_distance));
+  // Both selectors use normalized Levenshtein by default. A native distance
+  // callback is authoritative for either selector when supplied.
+  const auto dist = opt.distance ? opt.distance
+                                 : DistanceFunction(normalized_levenshtein_distance);
   const std::size_t n=a.traces.size(),m=b.traces.size();
   std::vector<std::vector<double>> cost(n,std::vector<double>(m)); for(std::size_t i=0;i<n;++i)for(std::size_t j=0;j<m;++j){cost[i][j]=dist(a.traces[i].activities,b.traces[j].activities);if(!std::isfinite(cost[i][j])||cost[i][j]<0){out.computed=false;out.error="invalid distance";return out;}}
   struct Edge{int to,rev;double cap,cost;}; const int S=0,I=1,J=int(1+n),T=J+int(m),N=T+1; std::vector<std::vector<Edge>> g(N);

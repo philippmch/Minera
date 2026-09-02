@@ -114,7 +114,23 @@ PetriMultiAlignmentResult multi_align_petri(const PetriNet& net, const EventLog&
   }
   if (!have) throw std::runtime_error(d.exhausted ? "petri multi-alignment state limit reached before final marking" : "petri net final marking is unreachable");
   PetriMultiAlignmentResult r; r.transitions = best.path; for (auto t : best.path) if (net.transitions()[t].activity) r.activities.push_back(net.activities()[*net.transitions()[t].activity]); r.cost = r.objective = best_score;
-  r.max_distance_to_log = 0.0; auto ordinary = [](const std::vector<std::string>& a, const std::vector<std::string>& b) { std::vector<std::size_t> p(b.size() + 1), c(b.size() + 1); for (std::size_t j = 0; j <= b.size(); ++j) p[j] = j; for (std::size_t i = 1; i <= a.size(); ++i) { c[0] = p[0] + (silent_run_label(a[i - 1]) ? 0u : 1u); for (std::size_t j = 1; j <= b.size(); ++j) c[j] = std::min({p[j] + (silent_run_label(a[i - 1]) ? 0u : 1u), c[j - 1] + 1, p[j - 1] + (a[i - 1] == b[j - 1] ? 0u : 2u)}); p.swap(c); } return p[b.size()]; };
+  r.max_distance_to_log = 0.0;
+  auto ordinary = [](const std::vector<std::string>& a,
+                     const std::vector<std::string>& b) {
+    std::vector<std::size_t> p(b.size() + 1), c(b.size() + 1);
+    for (std::size_t j = 0; j <= b.size(); ++j) p[j] = j;
+    for (std::size_t i = 1; i <= a.size(); ++i) {
+      c[0] = p[0] + (silent_run_label(a[i - 1]) ? 0u : 1u);
+      for (std::size_t j = 1; j <= b.size(); ++j) {
+        const auto substitution =
+            a[i - 1] == b[j - 1] && !silent_run_label(a[i - 1]) ? 0u : 2u;
+        c[j] = std::min({p[j] + (silent_run_label(a[i - 1]) ? 0u : 1u),
+                         c[j - 1] + 1, p[j - 1] + substitution});
+      }
+      p.swap(c);
+    }
+    return p[b.size()];
+  };
   for (const auto& v : variants) r.max_distance_to_log = std::max(r.max_distance_to_log, static_cast<double>(ordinary(r.activities, v))); r.diagnostics = d; return r;
 }
 }  // namespace minera
