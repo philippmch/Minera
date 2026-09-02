@@ -105,6 +105,15 @@ int main() {
     assert(std::abs(labeled_anti.precision - 1.0 / 3.0) < 1e-12);
     const auto labeled_multi = multi_align_petri(labeled, label_log, mo);
     assert(std::abs(labeled_multi.max_distance_to_log - 2.0) < 1e-12);
+
+    // A model-side label that follows a silent convention is still not a
+    // free synchronous substitution.  Its cheapest ordinary edit is a free
+    // model deletion followed by one log insertion.
+    const auto matching_log = log_of({{visible_labels[i]}});
+    const auto matching_anti = anti_align_petri(labeled, matching_log, ao);
+    assert(std::abs(matching_anti.precision - 0.5) < 1e-12);
+    const auto matching_multi = multi_align_petri(labeled, matching_log, mo);
+    assert(std::abs(matching_multi.max_distance_to_log - 1.0) < 1e-12);
   }
   return 0;
 }

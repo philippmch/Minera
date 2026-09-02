@@ -149,8 +149,8 @@ enum class AlignmentMoveType {
   kModel,        // the model must fire a visible transition the log skips (cost 1)
 };
 
-// A single step of an alignment. Silent (tau) model moves are routing only and
-// are never emitted, so every move carries a non-empty activity name.
+// A single step of an alignment. Silent model moves are retained as routing
+// steps with an empty activity; all other moves carry an activity name.
 struct AlignmentMove {
   AlignmentMoveType type;
   std::string activity;  // the activity name involved in the move
@@ -171,7 +171,7 @@ enum class AlignmentVariant {
 enum class AlignmentCostProfile { kLegacyUnit, kStandard };
 
 struct AlignmentOptions {
-  AlignmentVariant variant = AlignmentVariant::kStateEquationAStar;
+  AlignmentVariant variant = AlignmentVariant::kDijkstraLessMemory;
   AlignmentCostProfile cost_profile = AlignmentCostProfile::kLegacyUnit;
   std::size_t max_states = 200000;
   double max_time_seconds = 0.0;  // per trace; zero means unlimited
@@ -220,7 +220,7 @@ struct ProjectedAlignmentMove {
 struct VariantAlignment {
   std::vector<std::string> activities;  // activity names, in trace order
   std::uint64_t count = 0;              // traces collapsing to this variant
-  std::vector<AlignmentMove> moves;     // the alignment, in execution order
+  std::vector<AlignmentMove> moves;     // alignment, including silent routing
   double cost = 0.0;                    // total cost (log + visible model moves)
   double fitness = 1.0;                 // 1 - cost / worst-case cost, in [0, 1]
   std::vector<std::vector<AlignmentMove>> optimal_alignments;
@@ -230,10 +230,9 @@ struct VariantAlignment {
   // log-only moves are omitted. Transition ids remain available for duplicate
   // labels in evaluator variants that opt into task identities.
   std::vector<ProjectedAlignmentMove> projected_model_moves;
-  // Full optimal path retained for decision mining. Unlike `moves`, this also
-  // contains silent model transitions with empty activity names, so a hidden
-  // branch at a decision place remains observable without changing the public
-  // alignment display contract.
+  // Full optimal path retained explicitly for decision mining. Silent model
+  // transitions use empty activity names, so hidden decision routing remains
+  // observable without reconstructing the search path.
   std::vector<AlignmentMove> complete_moves;
 };
 
@@ -259,7 +258,7 @@ struct AlignmentResult {
   std::uint64_t fitting_traces = 0;  // traces with a perfect (cost-0) alignment
   std::uint64_t trace_count = 0;
   double total_cost = 0.0;           // summed optimal cost over all traces
-  AlignmentVariant variant = AlignmentVariant::kStateEquationAStar;
+  AlignmentVariant variant = AlignmentVariant::kDijkstraLessMemory;
   AlignmentDiagnostics diagnostics;
   std::vector<VariantAlignment> variants;  // worst-fitting first
   // Event field used to form alignment variants.

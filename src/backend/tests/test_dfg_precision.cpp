@@ -70,6 +70,19 @@ int main() {
       DfgPrecisionOptions{"label"});
   assert(custom_result.precision == 1.0);
 
+  // Imported graph maps may retain declared relations with a zero frequency.
+  // Precision is relation-based, so those entries still define the model's
+  // enabled edges and starts.
+  DfgCleanAnalysis zero_frequency;
+  zero_frequency.graph[{"A", "B"}] = 0;
+  zero_frequency.start_activities["A"] = 0;
+  const auto zero_frequency_result = evaluate_dfg_precision(
+      log({{"A", "B"}}), zero_frequency);
+  assert(zero_frequency_result.computed);
+  assert(zero_frequency_result.precision == 1.0);
+  assert(zero_frequency_result.activated_transitions == 2);
+  assert(zero_frequency_result.escaping_transitions == 0);
+
   bool threw = false;
   try {
     (void)evaluate_dfg_precision(log({{"A"}}), precise,

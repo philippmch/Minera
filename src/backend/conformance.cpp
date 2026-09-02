@@ -1955,7 +1955,8 @@ class Aligner {
       }
       ++lp_solved;
       auto lp = solve_lp(std::move(a), std::move(b), c);
-      if (!lp.feasible || lp.aborted) return 0.0;
+      if (lp.aborted) return 0.0;
+      if (!lp.feasible) return std::numeric_limits<double>::infinity();
       return std::max(0.0, lp.objective);
     };
     frontier.push(Node{0.0, lp_heuristic(start), 0, 0, discounted, start, {}, {}, {start}});
@@ -2034,6 +2035,7 @@ class Aligner {
         child.seq = seq++;
         child.cost = node.cost + edge_cost * factor;
         child.priority = child.cost + lp_heuristic(child.state);
+        if (!std::isfinite(child.priority)) return;
         if (consume) {
           child.prefixes.push_back(Marking(node.state.begin(), node.state.end() - 1));
         }
@@ -2544,82 +2546,7 @@ TokenReplayDiagnostics replay_token_diagnostics(
 
 AlignmentResult check_alignment(const EventLog& event_log,
                                 const PetriNet& net) {
-  AlignmentResult result;
-  result.trace_count = event_log.trace_count();
-
-  // No traces: there is nothing to align, so the result is trivially perfect.
-  // Guard this before the soundness check so an empty log against an Alpha or
-  // heuristic net (whose sink is unreachable) is not misreported as unsound.
-  if (result.trace_count == 0) {
-    return result;
-  }
-
-  const Aligner aligner(net);
-  if (!aligner.reachable()) {
-    // Not a sound workflow net (e.g. an Alpha net whose sink is unreachable):
-    // report that alignments could not be computed rather than fake numbers.
-    result.computed = false;
-    result.exhausted = aligner.reachability_exhausted();
-    return result;
-  }
-
-  const auto variants = collect_variants(event_log, aligner);
-  std::vector<std::vector<Marking>> variant_markings;
-  variant_markings.reserve(variants.size());
-  std::uint64_t total_worst = 0;
-  for (const auto& variant : variants) {
-    auto outcome = aligner.align(variant.ids, variant.names);
-    if (outcome.capped) {
-      // The search could not align a trace within its bound — the net is
-      // reachable but unbounded or simply too large, so the results are not
-      // trustworthy. Flag it as exhausted (distinct from an unsound net).
-      result.computed = false;
-      result.exhausted = true;
-      result.variants.clear();
-      result.fitting_traces = 0;
-      result.total_cost = 0;
-      result.fitness = 1.0;
-      return result;
-    }
-    // Worst case: every event as a log move plus the cheapest complete model
-    // run. A perfectly fitting trace has cost 0 and fitness 1.
-    const std::uint64_t worst =
-        static_cast<std::uint64_t>(variant.names.size()) +
-        aligner.empty_run_cost();
-    const double fitness =
-        worst == 0 ? 1.0 : 1.0 - double(outcome.cost) / double(worst);
-
-    result.total_cost += outcome.cost * variant.count;
-    total_worst += worst * variant.count;
-    if (outcome.cost == 0) result.fitting_traces += variant.count;
-
-    result.variants.push_back(VariantAlignment{
-      variant.names, variant.count, std::move(outcome.moves), outcome.cost,
-      fitness});
-    result.variants.back().worst_cost = static_cast<double>(worst);
-    result.variants.back().projected_model_moves = outcome.projected_model_moves;
-    result.variants.back().complete_moves = std::move(outcome.complete_moves);
-    variant_markings.push_back(std::move(outcome.prefix_markings));
-  }
-
-  result.fitness =
-      total_worst == 0 ? 1.0 : 1.0 - double(result.total_cost) / double(total_worst);
-
-  // Precision over the aligned states. The Replayer supplies the same
-  // enabled-activities closure token-replay precision uses, so the two
-  // precision numbers differ only in where the markings come from.
-  const Replayer replayer(net);
-  result.precision =
-      compute_alignment_precision(variants, variant_markings, replayer);
-
-  // Surface the costliest variants first; break ties by frequency so the most
-  // impactful deviations lead.
-  std::stable_sort(result.variants.begin(), result.variants.end(),
-                   [](const VariantAlignment& a, const VariantAlignment& b) {
-                     if (a.fitness != b.fitness) return a.fitness < b.fitness;
-                     return a.count > b.count;
-                   });
-  return result;
+  return check_alignment(event_log, net, AlignmentOptions{});
 }
 
 AlignmentResult check_alignment(const EventLog& event_log,
