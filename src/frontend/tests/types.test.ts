@@ -1245,9 +1245,49 @@ describe("isMineraExport", () => {
     expect(isPowlNode({ kind: "strict_partial_order", children: [], order: [] })).toBe(true);
     expect(isPowlNode({ kind: "strict_partial_order", children: [], order: [{ source: 0, target: 0 }] })).toBe(false);
     expect(isPowlNode({ kind: "strict_partial_order", children: [{ kind: "silent" }, { kind: "silent" }], order: [{ source: 0, target: 1 }, { source: 1, target: 0 }] })).toBe(false);
+    expect(isPowlNode({ kind: "strict_partial_order", children: [{ kind: "silent" }, { kind: "silent" }], order: [{ source: 0, target: 1 }, { source: 0, target: 1 }] })).toBe(false);
     expect(isPowlNode({ kind: "xor", children: [{ kind: "silent" }] })).toBe(false);
     expect(isPowlNode({ kind: "loop", children: [{ kind: "silent" }] })).toBe(false);
     expect(isPowlNode({ kind: "loop", children: [{ kind: "silent" }, { kind: "silent" }, { kind: "silent" }] })).toBe(false);
+  });
+
+  it("validates the POWL workflow net and replay decoration shape", () => {
+    const net = {
+      place_count: 2,
+      source: 0,
+      sink: 1,
+      transitions: [{
+        activity: 0,
+        inputs: [0],
+        outputs: [1],
+        reset_inputs: [],
+        inhibitor_inputs: [],
+      }],
+    };
+    const wait = { count: 0, total: 0, mean: 0, median: 0, min: 0, max: 0 };
+    const decoration = {
+      decorated_traces: 1,
+      trace_count: 1,
+      transitions: [1],
+      places: [{ count: 1, wait }, { count: 0, wait }],
+    };
+    const base = { ...valid, activities: [{}], powl_petri_net: net,
+      powl_petri_net_decoration: decoration };
+    expect(isMineraExport(base)).toBe(true);
+    expect(isMineraExport({ ...base,
+      powl_petri_net: { ...net, source: 2 } })).toBe(false);
+    expect(isMineraExport({ ...base,
+      powl_petri_net: { ...net, transitions: [{ ...net.transitions[0], inputs: [2] }] } })).toBe(false);
+    expect(isMineraExport({ ...base,
+      powl_petri_net: { ...net, transitions: [{ ...net.transitions[0], activity: 1 }] } })).toBe(false);
+    expect(isMineraExport({ ...base,
+      powl_petri_net_decoration: { ...decoration, transitions: [] } })).toBe(false);
+    expect(isMineraExport({ ...base,
+      powl_petri_net_decoration: { ...decoration, places: [{ count: 1, wait }] } })).toBe(false);
+    expect(isMineraExport({ ...base,
+      powl_petri_net_decoration: { ...decoration, places: [{ count: 1, wait: { ...wait, mean: Number.NaN } }, { count: 0, wait }] } })).toBe(false);
+    expect(isMineraExport({ ...valid,
+      activities: [{}], powl_petri_net_decoration: decoration })).toBe(false);
   });
 
   it("enforces native transition frequencies and recursion depth", () => {

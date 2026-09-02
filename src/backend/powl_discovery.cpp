@@ -16,49 +16,15 @@
 #include <utility>
 #include <vector>
 
+#include "powl/semantics.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
 namespace {
 
-using Sequence = std::vector<std::string>;
-
-struct SequenceHash {
-  std::size_t operator()(const Sequence& sequence) const noexcept {
-    std::size_t hash = 1469598103934665603ull;
-    for (const auto& activity : sequence) {
-      for (const unsigned char byte : activity) {
-        hash ^= static_cast<std::size_t>(byte);
-        hash *= 1099511628211ull;
-      }
-      hash ^= 0xffu;
-      hash *= 1099511628211ull;
-    }
-    return hash;
-  }
-};
-
-struct UVCL {
-  using Entry = std::pair<Sequence, std::uint64_t>;
-  std::vector<Entry> entries;
-  std::unordered_map<Sequence, std::size_t, SequenceHash> index;
-
-  [[nodiscard]] bool empty() const noexcept { return entries.empty(); }
-  [[nodiscard]] std::size_t size() const noexcept { return entries.size(); }
-  [[nodiscard]] auto begin() const noexcept { return entries.begin(); }
-  [[nodiscard]] auto end() const noexcept { return entries.end(); }
-
-  friend bool operator==(const UVCL& left, const UVCL& right) noexcept {
-    if (left.entries.size() != right.entries.size()) return false;
-    for (const auto& [sequence, count] : left.entries) {
-      const auto found = right.index.find(sequence);
-      if (found == right.index.end() ||
-          right.entries[found->second].second != count)
-        return false;
-    }
-    return true;
-  }
-};
+using powl_detail::Sequence;
+using powl_detail::State;
+using powl_detail::UVCL;
 
 void add_checked(std::uint64_t& dst, std::uint64_t value) {
   if (std::numeric_limits<std::uint64_t>::max() - dst < value)
@@ -593,11 +559,6 @@ PowlNode simplify_powl(PowlNode node) {
   return PowlNode::strict_partial_order(std::move(output_children), order);
 }
 
-struct State {
-  PowlDiscoveryOptions opts;
-  std::size_t depth = 0;
-  bool probe_only = false;
-};
 PowlNode discover_rec(const UVCL&, State&);
 
 PowlNode recurse(const UVCL& log, State& s) {
@@ -1471,7 +1432,7 @@ std::optional<DynamicOrderResult> dynamic_cluster_order(
   return generate(std::move(initial));
 }
 
-std::optional<PowlNode> make_po(const UVCL& log, State& s) {
+std::optional<PowlNode> make_po_impl(const UVCL& log, State& s) {
   const auto r = compute_relations(log);
   const auto n = r.acts.size();
   if (n < 2) return std::nullopt;
@@ -1687,53 +1648,310 @@ std::optional<UVCL> filtered_log(const UVCL& log,
   return filtered;
 }
 
+}  // namespace
+
+namespace powl_detail {
+
+namespace {
+
+class VariantOverride {
+ public:
+  VariantOverride(State& state, PowlDiscoveryVariant variant)
+      : state_(state), original_(state.opts.variant) {
+    state_.opts.variant = variant;
+  }
+
+  VariantOverride(const VariantOverride&) = delete;
+  VariantOverride& operator=(const VariantOverride&) = delete;
+
+  ~VariantOverride() { state_.opts.variant = original_; }
+
+ private:
+  State& state_;
+  PowlDiscoveryVariant original_;
+};
+
+}  // namespace
+
+bool EmptyLogBaseCase::detects(const VariantLog& log) {
+  return std::all_of(log.begin(), log.end(),
+                     [](const auto& entry) { return entry.first.empty(); });
+}
+
+BaseCaseResult BaseCase::inspect(const VariantLog& log) {
+  BaseCaseResult result;
+  for (const auto& [sequence, count] : log) {
+    (sequence.empty() ? result.empty_weight : result.nonempty_weight) += count;
+  }
+  return result;
+}
+
+PowlNode BaseCaseFactory::empty() { return PowlNode::silent(); }
+
+PowlNode BaseCaseFactory::single(const std::string& activity, bool repeated) {
+  if (!repeated) return PowlNode::transition(activity);
+  return PowlNode::loop(PowlNode::transition(activity), PowlNode::silent());
+}
+
+std::optional<PowlNode> SingleActivityBaseCase::resolve(
+    const VariantLog& log) {
+  if (log.size() != 1) return std::nullopt;
+  const auto& sequence = log.begin()->first;
+  if (sequence.size() > 1) return std::nullopt;
+  if (sequence.empty()) return std::nullopt;
+  return BaseCaseFactory::single(sequence.front(), false);
+}
+
+std::optional<PowlNode> ExclusiveChoiceCut::detect(const VariantLog& log,
+                                                    State& state) {
+  return make_xor(log, state);
+}
+
+std::optional<PowlNode> SequenceCut::detect(const VariantLog& log,
+                                            State& state) {
+  return make_sequence(log, state);
+}
+
+std::optional<PowlNode> ConcurrencyCut::detect(const VariantLog& log,
+                                               State& state) {
+  return make_concurrency(log, state);
+}
+
+std::optional<PowlNode> LoopCut::detect(const VariantLog& log, State& state) {
+  return make_loop(log, state);
+}
+
+std::optional<PowlNode> BruteForcePartialOrderCut::detect(
+    const VariantLog& log, State& state) {
+  const VariantOverride override(state, PowlDiscoveryVariant::kBruteForce);
+  return make_po_impl(log, state);
+}
+
+std::optional<PowlNode> BruteForceCutFactory::find(const VariantLog& log,
+                                                   State& state) {
+  return BruteForcePartialOrderCut::detect(log, state);
+}
+
+std::optional<PowlNode> DynamicClusteringFrequencyPartialOrderCut::detect(
+    const VariantLog& log, State& state) {
+  const VariantOverride override(state, PowlDiscoveryVariant::kDynamicClustering);
+  return make_po_impl(log, state);
+}
+
+std::optional<PowlNode> DynamicClusteringFrequencyCutFactory::find(
+    const VariantLog& log, State& state) {
+  return DynamicClusteringFrequencyPartialOrderCut::detect(log, state);
+}
+
+std::optional<PowlNode> DynamicClusteringPartialOrderCut::detect(
+    const VariantLog& log, State& state) {
+  const VariantOverride override(state,
+                                 PowlDiscoveryVariant::kDynamicClusteringPlain);
+  return make_po_impl(log, state);
+}
+
+std::optional<PowlNode> DynamicClusteringCutFactory::find(
+    const VariantLog& log, State& state) {
+  return DynamicClusteringPartialOrderCut::detect(log, state);
+}
+
+std::optional<PowlNode> MaximalPartialOrderCut::detect(const VariantLog& log,
+                                                       State& state) {
+  const VariantOverride override(state, PowlDiscoveryVariant::kMaximal);
+  return make_po_impl(log, state);
+}
+
+std::optional<PowlNode> MaximalCutFactory::find(const VariantLog& log,
+                                                State& state) {
+  return MaximalPartialOrderCut::detect(log, state);
+}
+
+std::optional<PowlNode> CutFactory::find(const VariantLog& log, State& state) {
+  std::optional<PowlNode> cut;
+  switch (state.opts.variant) {
+    case PowlDiscoveryVariant::kTree:
+    case PowlDiscoveryVariant::kBruteForce:
+    case PowlDiscoveryVariant::kMaximal:
+      cut = ExclusiveChoiceCut::detect(log, state);
+      if (!cut) cut = SequenceCut::detect(log, state);
+      if (!cut) cut = ConcurrencyCut::detect(log, state);
+      if (!cut) cut = LoopCut::detect(log, state);
+      break;
+    case PowlDiscoveryVariant::kDynamicClustering:
+    case PowlDiscoveryVariant::kDynamicClusteringPlain:
+      cut = ExclusiveChoiceCut::detect(log, state);
+      if (!cut) cut = LoopCut::detect(log, state);
+      break;
+  }
+  if (cut) return cut;
+
+  switch (state.opts.variant) {
+    case PowlDiscoveryVariant::kBruteForce:
+      return BruteForceCutFactory::find(log, state);
+    case PowlDiscoveryVariant::kMaximal:
+      return MaximalCutFactory::find(log, state);
+    case PowlDiscoveryVariant::kDynamicClustering:
+      return DynamicClusteringFrequencyCutFactory::find(log, state);
+    case PowlDiscoveryVariant::kDynamicClusteringPlain:
+      return DynamicClusteringCutFactory::find(log, state);
+    case PowlDiscoveryVariant::kTree:
+      return std::nullopt;
+  }
+  return std::nullopt;
+}
+
+EmptyTraceSplitResult EmptyTraceFallThrough::split(const VariantLog& log) {
+  const auto counts = BaseCase::inspect(log);
+  EmptyTraceSplitResult result;
+  result.empty_weight = counts.empty_weight;
+  result.nonempty_weight = counts.nonempty_weight;
+  if (!counts.all_empty()) result.nonempty = without_empty(log);
+  return result;
+}
+
+std::optional<PowlNode> ActivityOncePerTraceFallThrough::apply(
+    const VariantLog& log, State& state) {
+  return activity_once_fall_through(log, state);
+}
+
+std::optional<PowlNode> ActivityConcurrentFallThrough::apply(
+    const VariantLog& log, State& state) {
+  return activity_concurrent_fall_through(log, state);
+}
+
+PowlNode FlowerFallThrough::build(
+    const std::vector<std::string>& activity_names) {
+  return flower(activity_names);
+}
+
+VariantLog StrictTauLoopFallThrough::project(const VariantLog& log) {
+  return split_tau_loop(log, true);
+}
+
+VariantLog TauLoopFallThrough::project(const VariantLog& log) {
+  return split_tau_loop(log, false);
+}
+
+FallThrough FallThroughFactory::apply(const VariantLog& log, State& state) {
+  if (auto node = ActivityOncePerTraceFallThrough::apply(log, state))
+    return FallThrough{std::move(node)};
+  if (auto node = ActivityConcurrentFallThrough::apply(log, state))
+    return FallThrough{std::move(node)};
+  const auto strict = StrictTauLoopFallThrough::project(log);
+  if (weighted_cardinality(strict) > weighted_cardinality(log)) {
+    return FallThrough{PowlNode::loop(recurse(strict, state),
+                                      PowlNode::silent())};
+  }
+  const auto relaxed = TauLoopFallThrough::project(log);
+  if (weighted_cardinality(relaxed) > weighted_cardinality(log)) {
+    return FallThrough{PowlNode::loop(recurse(relaxed, state),
+                                      PowlNode::silent())};
+  }
+  return {};
+}
+
+std::optional<VariantLog> PowlFiltering::apply(
+    const VariantLog& log, const PowlDiscoveryOptions& options) {
+  return filtered_log(log, options);
+}
+
+PowlNode PowlTreeVariant::discover(const VariantLog& log, State& state) {
+  const VariantOverride override(state, PowlDiscoveryVariant::kTree);
+  return discover_rec(log, state);
+}
+
+PowlNode PowlBruteForceVariant::discover(const VariantLog& log, State& state) {
+  const VariantOverride override(state, PowlDiscoveryVariant::kBruteForce);
+  return discover_rec(log, state);
+}
+
+PowlNode PowlMaximalVariant::discover(const VariantLog& log, State& state) {
+  const VariantOverride override(state, PowlDiscoveryVariant::kMaximal);
+  return discover_rec(log, state);
+}
+
+PowlNode PowlDynamicClusteringVariant::discover(const VariantLog& log,
+                                                State& state) {
+  const VariantOverride override(state,
+                                 PowlDiscoveryVariant::kDynamicClusteringPlain);
+  return discover_rec(log, state);
+}
+
+PowlNode PowlDynamicClusteringFrequencyVariant::discover(
+    const VariantLog& log, State& state) {
+  const VariantOverride override(state, PowlDiscoveryVariant::kDynamicClustering);
+  return discover_rec(log, state);
+}
+
+const std::vector<PowlVariantDescriptor>& PowlSelectorRegistry::all() {
+  static const std::vector<PowlVariantDescriptor> descriptors = {
+      {PowlDiscoveryVariant::kTree, "TREE"},
+      {PowlDiscoveryVariant::kBruteForce, "BRUTE_FORCE"},
+      {PowlDiscoveryVariant::kMaximal, "MAXIMAL"},
+      {PowlDiscoveryVariant::kDynamicClustering, "DYNAMIC_CLUSTERING"},
+  };
+  return descriptors;
+}
+
+bool PowlSelectorRegistry::supports(PowlDiscoveryVariant variant) noexcept {
+  switch (variant) {
+    case PowlDiscoveryVariant::kTree:
+    case PowlDiscoveryVariant::kBruteForce:
+    case PowlDiscoveryVariant::kMaximal:
+    case PowlDiscoveryVariant::kDynamicClustering:
+    case PowlDiscoveryVariant::kDynamicClusteringPlain:
+      return true;
+  }
+  return false;
+}
+
+PowlNode PowlSelectorRegistry::discover(const VariantLog& log, State& state) {
+  switch (state.opts.variant) {
+    case PowlDiscoveryVariant::kTree:
+      return PowlTreeVariant::discover(log, state);
+    case PowlDiscoveryVariant::kBruteForce:
+      return PowlBruteForceVariant::discover(log, state);
+    case PowlDiscoveryVariant::kMaximal:
+      return PowlMaximalVariant::discover(log, state);
+    case PowlDiscoveryVariant::kDynamicClustering:
+      return PowlDynamicClusteringFrequencyVariant::discover(log, state);
+    case PowlDiscoveryVariant::kDynamicClusteringPlain:
+      return PowlDynamicClusteringVariant::discover(log, state);
+  }
+  return PowlNode::silent();
+}
+
+}  // namespace powl_detail
+
+namespace {
+
 PowlNode discover_rec(const UVCL& raw, State& s) {
   if (++s.depth > 512) throw std::runtime_error("POWL recursion did not terminate");
   auto finish = [&](PowlNode n) { --s.depth; return n; };
-  if (raw.empty()) return finish(PowlNode::silent());
+  if (raw.empty()) return finish(powl_detail::BaseCaseFactory::empty());
   UVCL log = raw;
+  if (powl_detail::EmptyLogBaseCase::detects(log))
+    return finish(powl_detail::BaseCaseFactory::empty());
   const auto acts0 = activities(log);
-  if (acts0.empty()) return finish(PowlNode::silent());
-  if (log.size() == 1) {
-    const auto& seq = log.begin()->first;
-    if (seq.empty()) return finish(PowlNode::silent());
-    if (seq.size() == 1) return finish(PowlNode::transition(seq.front()));
+  if (acts0.empty()) return finish(powl_detail::BaseCaseFactory::empty());
+  const auto empty_split = powl_detail::EmptyTraceFallThrough::split(log);
+  if (empty_split.has_empty() && !empty_split.nonempty.empty()) {
+    return finish(PowlNode::xor_node(
+        {PowlNode::silent(), recurse(empty_split.nonempty, s)}));
   }
-  const bool has_empty = std::any_of(
-      log.begin(), log.end(), [](const auto& entry) {
-        return entry.first.empty();
-      });
-  if (has_empty) {
-    auto nonempty = without_empty(log);
-    if (!nonempty.empty()) return finish(PowlNode::xor_node({PowlNode::silent(), recurse(nonempty, s)}));
-  }
-  std::optional<PowlNode> cut;
-  if (s.opts.variant == PowlDiscoveryVariant::kTree ||
-      s.opts.variant == PowlDiscoveryVariant::kBruteForce ||
-      s.opts.variant == PowlDiscoveryVariant::kMaximal) {
-    cut = make_xor(log, s); if (!cut) cut = make_sequence(log, s); if (!cut) cut = make_concurrency(log, s); if (!cut) cut = make_loop(log, s);
-    if (!cut && s.opts.variant != PowlDiscoveryVariant::kTree)
-      cut = make_po(log, s);
-  } else {
-    cut = make_xor(log, s); if (!cut) cut = make_loop(log, s); if (!cut) cut = make_po(log, s);
-  }
+  if (const auto base = powl_detail::SingleActivityBaseCase::resolve(log))
+    return finish(std::move(*base));
+
+  auto cut = powl_detail::CutFactory::find(log, s);
   if (cut) return finish(std::move(*cut));
 
-  if (const auto filtered = filtered_log(log, s.opts))
+  if (const auto filtered = powl_detail::PowlFiltering::apply(log, s.opts))
     return finish(recurse(*filtered, s));
 
-  // Ordered POWL fall-through factory: EmptyTraces is handled above before
-  // cuts, followed here by the four decomposition/loop fall-throughs and the
-  // flower fallback.
-  if (auto node = activity_once_fall_through(log, s))
-    return finish(std::move(*node));
-  if (auto node = activity_concurrent_fall_through(log, s))
-    return finish(std::move(*node));
-  if (auto node = tau_loop_fall_through(log, s, true))
-    return finish(std::move(*node));
-  if (auto node = tau_loop_fall_through(log, s, false))
-    return finish(std::move(*node));
-  return finish(flower(activities(log)));
+  if (auto fall_through = powl_detail::FallThroughFactory::apply(log, s);
+      fall_through.handled())
+    return finish(std::move(*fall_through.node));
+  return finish(powl_detail::FlowerFallThrough::build(activities(log)));
 }
 
 void validate_options(const PowlDiscoveryOptions& o) {
@@ -1768,7 +1986,7 @@ PowlNode discover_powl(const EventLog& event_log, const PowlDiscoveryOptions& op
       activities(log).size() > options.brute_force_activity_limit) {
     throw std::runtime_error("POWL brute-force activity limit exceeded");
   }
-  return simplify_powl(discover_rec(log, state));
+  return simplify_powl(powl_detail::PowlSelectorRegistry::discover(log, state));
 }
 
 EventLog normalize_powl_event_log(const EventLog& event_log,

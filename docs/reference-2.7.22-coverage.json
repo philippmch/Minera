@@ -2037,8 +2037,136 @@
           "symbol": "DYNAMIC_CLUSTERING"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "TREE": {
+          "selector": "TREE",
+          "binding": {
+            "selector": "TREE",
+            "modules": [
+              "algo.discovery.powl.inductive.variants.powl_discovery_varaints"
+            ],
+            "kind": "imported-enum",
+            "class": "POWLDiscoveryVariant",
+            "symbol": "TREE"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/powl/semantics.hpp",
+              "symbol": "PowlSelectorRegistry"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+              "executable": "minera_powl_parity_contracts_tests",
+              "case": "tree_selector_contract"
+            }
+          ]
+        },
+        "BRUTE_FORCE": {
+          "selector": "BRUTE_FORCE",
+          "binding": {
+            "selector": "BRUTE_FORCE",
+            "modules": [
+              "algo.discovery.powl.inductive.variants.powl_discovery_varaints"
+            ],
+            "kind": "imported-enum",
+            "class": "POWLDiscoveryVariant",
+            "symbol": "BRUTE_FORCE"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/powl/semantics.hpp",
+              "symbol": "PowlSelectorRegistry"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+              "executable": "minera_powl_parity_contracts_tests",
+              "case": "brute_force_selector_contract"
+            }
+          ]
+        },
+        "MAXIMAL": {
+          "selector": "MAXIMAL",
+          "binding": {
+            "selector": "MAXIMAL",
+            "modules": [
+              "algo.discovery.powl.inductive.variants.powl_discovery_varaints"
+            ],
+            "kind": "imported-enum",
+            "class": "POWLDiscoveryVariant",
+            "symbol": "MAXIMAL"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/powl/semantics.hpp",
+              "symbol": "PowlSelectorRegistry"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+              "executable": "minera_powl_parity_contracts_tests",
+              "case": "maximal_selector_contract"
+            }
+          ]
+        },
+        "DYNAMIC_CLUSTERING": {
+          "selector": "DYNAMIC_CLUSTERING",
+          "binding": {
+            "selector": "DYNAMIC_CLUSTERING",
+            "modules": [
+              "algo.discovery.powl.inductive.variants.powl_discovery_varaints"
+            ],
+            "kind": "imported-enum",
+            "class": "POWLDiscoveryVariant",
+            "symbol": "DYNAMIC_CLUSTERING"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/powl/semantics.hpp",
+              "symbol": "PowlSelectorRegistry"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+              "executable": "minera_powl_parity_contracts_tests",
+              "case": "dynamic_clustering_selector_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/powl.hpp",
+        "include/minera/powl_discovery.hpp",
+        "include/minera/powl_conversion.hpp",
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl.cpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/powl_conversion.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_powl.cpp",
+        "src/backend/tests/test_powl_discovery.cpp",
+        "src/backend/tests/test_powl_conversion.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/app-logic.ts",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/api.test.ts",
+        "src/frontend/tests/app-logic.test.ts",
+        "src/frontend/tests/components/Filters.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.discovery.temporal_profile",
@@ -7333,8 +7461,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.base_case.abc",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "BaseCase"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "base_case_abc_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.base_case.empty_log",
@@ -7342,8 +7491,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.base_case.empty_log",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "EmptyLogBaseCase"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "base_case_empty_log_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.base_case.factory",
@@ -7351,8 +7521,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.base_case.factory",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "BaseCaseFactory"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "base_case_factory_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.base_case.single_activity",
@@ -7360,8 +7551,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.base_case.single_activity",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "SingleActivityBaseCase"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "base_case_single_activity_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.cuts.concurrency",
@@ -7369,8 +7581,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.cuts.concurrency",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "ConcurrencyCut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "cuts_concurrency_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.cuts.factory",
@@ -7378,8 +7611,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.cuts.factory",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "CutFactory"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "cuts_factory_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.cuts.loop",
@@ -7387,8 +7641,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.cuts.loop",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "LoopCut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "cuts_loop_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.cuts.sequence",
@@ -7396,8 +7671,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.cuts.sequence",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "SequenceCut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "cuts_sequence_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.cuts.xor",
@@ -7405,8 +7701,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.cuts.xor",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "ExclusiveChoiceCut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "cuts_xor_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.fall_through.activity_concurrent",
@@ -7414,8 +7731,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.fall_through.activity_concurrent",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "ActivityConcurrentFallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "fall_through_activity_concurrent_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.fall_through.activity_once_per_trace",
@@ -7423,8 +7761,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.fall_through.activity_once_per_trace",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "ActivityOncePerTraceFallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "fall_through_activity_once_per_trace_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.fall_through.empty_traces",
@@ -7432,8 +7791,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.fall_through.empty_traces",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "EmptyTraceFallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "fall_through_empty_traces_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.fall_through.factory",
@@ -7441,8 +7821,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.fall_through.factory",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "FallThroughFactory"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "fall_through_factory_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.fall_through.flower",
@@ -7450,8 +7851,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.fall_through.flower",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "FlowerFallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "fall_through_flower_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.fall_through.strict_tau_loop",
@@ -7459,8 +7881,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.fall_through.strict_tau_loop",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "StrictTauLoopFallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "fall_through_strict_tau_loop_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.fall_through.tau_loop",
@@ -7468,8 +7911,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.fall_through.tau_loop",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "TauLoopFallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "fall_through_tau_loop_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.utils.filtering",
@@ -7477,8 +7941,29 @@
       "owner": "algo.discovery.powl",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.utils.filtering",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "PowlFiltering"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "filtering_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.brute_force.bf_partial_order_cut",
@@ -7486,8 +7971,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.brute_force.bf_partial_order_cut",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "BruteForcePartialOrderCut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_brute_force_partial_order_cut_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.brute_force.factory",
@@ -7495,8 +8001,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.brute_force.factory",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "BruteForceCutFactory"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_brute_force_factory_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.dynamic_clustering_frequency.dynamic_clustering_frequency_partial_order_cut",
@@ -7504,8 +8031,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.dynamic_clustering_frequency.dynamic_clustering_frequency_partial_order_cut",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "DynamicClusteringFrequencyPartialOrderCut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_dynamic_clustering_frequency_partial_order_cut_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.dynamic_clustering_frequency.factory",
@@ -7513,8 +8061,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.dynamic_clustering_frequency.factory",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "DynamicClusteringFrequencyCutFactory"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_dynamic_clustering_frequency_factory_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.dynamic_clustering.dynamic_clustering_partial_order_cut",
@@ -7522,8 +8091,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.dynamic_clustering.dynamic_clustering_partial_order_cut",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "DynamicClusteringPartialOrderCut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_dynamic_clustering_partial_order_cut_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.dynamic_clustering.factory",
@@ -7531,8 +8121,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.dynamic_clustering.factory",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "DynamicClusteringCutFactory"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_dynamic_clustering_factory_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.im_brute_force",
@@ -7540,8 +8151,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.im_brute_force",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "PowlBruteForceVariant"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_im_brute_force_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.im_dynamic_clustering",
@@ -7549,8 +8181,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.im_dynamic_clustering",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "PowlDynamicClusteringVariant"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_im_dynamic_clustering_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.im_dynamic_clustering_frequencies",
@@ -7558,8 +8211,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.im_dynamic_clustering_frequencies",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "PowlDynamicClusteringFrequencyVariant"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_im_dynamic_clustering_frequencies_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.im_maximal",
@@ -7567,8 +8241,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.im_maximal",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "PowlMaximalVariant"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_im_maximal_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.im_tree",
@@ -7576,8 +8271,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.im_tree",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "PowlTreeVariant"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_im_tree_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.maximal.factory",
@@ -7585,8 +8301,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.maximal.factory",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "MaximalCutFactory"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_maximal_factory_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.maximal.maximal_partial_order_cut",
@@ -7594,8 +8331,29 @@
       "owner": "algo.discovery.powl",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.maximal.maximal_partial_order_cut",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "MaximalPartialOrderCut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_maximal_partial_order_cut_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.variants.powl_discovery_varaints",
@@ -7620,8 +8378,29 @@
           "selector": "TREE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/powl/semantics.hpp",
+        "src/backend/powl_discovery.cpp",
+        "src/backend/tests/test_powl_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.powl.inductive.variants.powl_discovery_varaints",
+        "implementation": [
+          {
+            "path": "src/backend/powl/semantics.hpp",
+            "symbol": "PowlSelectorRegistry"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_powl_parity_contracts.cpp",
+            "executable": "minera_powl_parity_contracts_tests",
+            "case": "variants_powl_discovery_varaints_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.temporal_profile.variants.dataframe",

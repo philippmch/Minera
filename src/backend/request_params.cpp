@@ -1895,7 +1895,16 @@ MineParams parse_mine_params(const FieldLookup& field,
           value + "'");
   }
 
-  if (const auto value = field("powl_variant"); !value.empty()) {
+  const auto required_powl_scalar = [&](std::string_view name) {
+    const auto value = trim_text(field(name));
+    if (value.empty()) {
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected a non-empty value");
+    }
+    return value;
+  };
+  if (supplied("powl_variant")) {
+    const auto value = required_powl_scalar("powl_variant");
     if (value == "tree")
       params.powl.variant = PowlDiscoveryVariant::kTree;
     else if (value == "brute_force")
@@ -1912,7 +1921,8 @@ MineParams parse_mine_params(const FieldLookup& field,
           "dynamic_clustering, or dynamic_clustering_plain, got '" +
           value + "'");
   }
-  if (const auto value = field("powl_filtering_type"); !value.empty()) {
+  if (supplied("powl_filtering_type")) {
+    const auto value = required_powl_scalar("powl_filtering_type");
     if (value == "decreasing_factor")
       params.powl.filtering_type = PowlFilteringType::kDecreasingFactor;
     else if (value == "dynamic")
@@ -1922,7 +1932,8 @@ MineParams parse_mine_params(const FieldLookup& field,
           "powl_filtering_type: expected decreasing_factor or dynamic, got '" +
           value + "'");
   }
-  if (const auto value = field("powl_filtering_threshold"); !value.empty()) {
+  if (supplied("powl_filtering_threshold")) {
+    const auto value = required_powl_scalar("powl_filtering_threshold");
     params.powl.filtering_threshold =
         parse_finite_double(value, "powl_filtering_threshold");
     if (params.powl.filtering_threshold < 0.0 ||
@@ -1931,7 +1942,8 @@ MineParams parse_mine_params(const FieldLookup& field,
           "powl_filtering_threshold: expected 0 <= value < 1");
     }
   }
-  if (const auto value = field("powl_order_frequency_ratio"); !value.empty()) {
+  if (supplied("powl_order_frequency_ratio")) {
+    const auto value = required_powl_scalar("powl_order_frequency_ratio");
     params.powl.order_frequency_ratio =
         parse_finite_double(value, "powl_order_frequency_ratio");
     if (params.powl.order_frequency_ratio <= 0.5 ||
@@ -1940,8 +1952,9 @@ MineParams parse_mine_params(const FieldLookup& field,
           "powl_order_frequency_ratio: expected 0.5 < value <= 1");
     }
   }
-  if (const auto value = field("powl_brute_force_activity_limit");
-      !value.empty()) {
+  if (supplied("powl_brute_force_activity_limit")) {
+    const auto value =
+        required_powl_scalar("powl_brute_force_activity_limit");
     params.powl.brute_force_activity_limit =
         parse_nonnegative_size(value, "powl_brute_force_activity_limit");
   }

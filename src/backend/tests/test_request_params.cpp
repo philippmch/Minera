@@ -1730,6 +1730,28 @@ void parse_mine_params_rejects_invalid_powl_fields() {
   }
 }
 
+void parse_mine_params_rejects_explicit_blank_powl_scalars() {
+  const std::vector<std::string> blank_values{"", " \t\r\n"};
+  const std::vector<std::string> names{
+      "powl_variant", "powl_filtering_type", "powl_filtering_threshold",
+      "powl_order_frequency_ratio", "powl_brute_force_activity_limit"};
+  for (const auto& name : names) {
+    for (const auto& value : blank_values) {
+      const std::map<std::string, std::string> values{{name, value}};
+      bool threw = false;
+      try {
+        (void)minera::parse_mine_params(
+            fields(values), [&](std::string_view requested) {
+              return requested == name;
+            });
+      } catch (const std::invalid_argument&) {
+        threw = true;
+      }
+      assert(threw);
+    }
+  }
+}
+
 void parse_mine_params_rejects_invalid_transition_fields() {
   for (const auto& item : {std::pair{"transition_view", "bad"},
                            std::pair{"transition_direction", "bad"},
@@ -4025,6 +4047,7 @@ int main() {
   parse_mine_params_rejects_invalid_transition_fields();
   parse_mine_params_maps_powl_options();
   parse_mine_params_rejects_invalid_powl_fields();
+  parse_mine_params_rejects_explicit_blank_powl_scalars();
   parse_mine_params_maps_token_replay_options();
   parse_mine_params_rejects_invalid_token_replay_fields();
   parse_mine_params_maps_log_skeleton_options();
