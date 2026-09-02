@@ -911,8 +911,51 @@
           "symbol": null
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "default": {
+          "selector": "default",
+          "binding": {
+            "selector": "default",
+            "modules": [
+              "algo.conformance.temporal_profile.algorithm"
+            ],
+            "kind": "default",
+            "class": null,
+            "symbol": null
+          },
+          "implementation": [
+            {
+              "path": "include/minera/temporal_profile.hpp",
+              "symbol": "conform_temporal_profile"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_temporal_profile_parity_contracts.cpp",
+              "executable": "minera_temporal_profile_parity_contracts_tests",
+              "case": "temporal_profile_conformance_dispatch_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/temporal_profile.hpp",
+        "include/minera/json_export.hpp",
+        "src/backend/temporal_profile.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_temporal_profile_parity_contracts.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/api.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.conformance.tokenreplay",
@@ -1127,8 +1170,103 @@
           "symbol": "POLARS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "LOG": {
+          "selector": "LOG",
+          "binding": {
+            "selector": "LOG",
+            "modules": [
+              "algo.discovery.batches.variants.log"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "LOG"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/batches.hpp",
+              "symbol": "BatchLogDiscovery"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_batches_parity_contracts.cpp",
+              "executable": "minera_batches_parity_contracts_tests",
+              "case": "custom_log_case_ids_are_resolved_per_event"
+            }
+          ]
+        },
+        "PANDAS": {
+          "selector": "PANDAS",
+          "binding": {
+            "selector": "PANDAS",
+            "modules": [
+              "algo.discovery.batches.variants.pandas"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PANDAS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/batches.hpp",
+              "symbol": "BatchPandasDiscovery"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_batches_parity_contracts.cpp",
+              "executable": "minera_batches_parity_contracts_tests",
+              "case": "merging_and_event_identity_match_contract"
+            }
+          ]
+        },
+        "POLARS": {
+          "selector": "POLARS",
+          "binding": {
+            "selector": "POLARS",
+            "modules": [
+              "algo.discovery.batches.variants.polars",
+              "algo.discovery.batches.variants.log"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "POLARS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/batches.hpp",
+              "symbol": "BatchPolarsDiscovery"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_batches_parity_contracts.cpp",
+              "executable": "minera_batches_parity_contracts_tests",
+              "case": "selector_components_cover_all_input_adapters"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/batches.hpp",
+        "src/backend/batches.cpp",
+        "src/backend/batches/discovery_registry.hpp",
+        "src/backend/batches/discovery_registry.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_batches_parity_contracts.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/app-logic.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.discovery.causal",
@@ -2108,8 +2246,99 @@
           "symbol": "POLARS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "LOG": {
+          "selector": "LOG",
+          "binding": {
+            "selector": "LOG",
+            "modules": [
+              "algo.discovery.minimum_self_distance.variants.log"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "LOG"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/minimum_self_distance.hpp",
+              "symbol": "MinimumSelfDistanceLogDiscovery"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/minimum_self_distance_parity_contracts.cpp",
+              "executable": "minera_minimum_self_distance_parity_contracts_tests",
+              "case": "minimum_self_distance_log_boundary_contract"
+            }
+          ]
+        },
+        "PANDAS": {
+          "selector": "PANDAS",
+          "binding": {
+            "selector": "PANDAS",
+            "modules": [
+              "algo.discovery.minimum_self_distance.variants.pandas"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PANDAS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/minimum_self_distance.hpp",
+              "symbol": "MinimumSelfDistancePandasDiscovery"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/minimum_self_distance_parity_contracts.cpp",
+              "executable": "minera_minimum_self_distance_parity_contracts_tests",
+              "case": "minimum_self_distance_flat_adapter_contract"
+            }
+          ]
+        },
+        "POLARS": {
+          "selector": "POLARS",
+          "binding": {
+            "selector": "POLARS",
+            "modules": [
+              "algo.discovery.minimum_self_distance.variants.polars",
+              "algo.discovery.minimum_self_distance.variants.log"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "POLARS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/minimum_self_distance.hpp",
+              "symbol": "MinimumSelfDistancePolarsDiscovery"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/minimum_self_distance_parity_contracts.cpp",
+              "executable": "minera_minimum_self_distance_parity_contracts_tests",
+              "case": "minimum_self_distance_polars_adapter_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/minimum_self_distance.hpp",
+        "src/backend/minimum_self_distance.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/minimum_self_distance_parity_contracts.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/src/types.ts"
+      ]
     },
     {
       "package": "algo.discovery.ocel.etot",
@@ -2320,8 +2549,178 @@
           "symbol": "LAZYFRAME_DISCONNECTED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "DATAFRAME": {
+          "selector": "DATAFRAME",
+          "binding": {
+            "selector": "DATAFRAME",
+            "modules": [
+              "algo.discovery.performance_spectrum.variants.dataframe"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "DATAFRAME"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/performance_spectrum.hpp",
+              "symbol": "discover_performance_spectrum_dataframe"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+              "executable": "minera_performance_spectrum_parity_contracts_tests",
+              "case": "performance_spectrum_dataframe_variant_contract"
+            }
+          ]
+        },
+        "LOG": {
+          "selector": "LOG",
+          "binding": {
+            "selector": "LOG",
+            "modules": [
+              "algo.discovery.performance_spectrum.variants.log"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "LOG"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/performance_spectrum.hpp",
+              "symbol": "discover_performance_spectrum_log"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+              "executable": "minera_performance_spectrum_parity_contracts_tests",
+              "case": "performance_spectrum_log_variant_contract"
+            }
+          ]
+        },
+        "DATAFRAME_DISCONNECTED": {
+          "selector": "DATAFRAME_DISCONNECTED",
+          "binding": {
+            "selector": "DATAFRAME_DISCONNECTED",
+            "modules": [
+              "algo.discovery.performance_spectrum.variants.dataframe_disconnected"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "DATAFRAME_DISCONNECTED"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/performance_spectrum.hpp",
+              "symbol": "discover_performance_spectrum_dataframe_disconnected"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+              "executable": "minera_performance_spectrum_parity_contracts_tests",
+              "case": "performance_spectrum_dataframe_disconnected_variant_contract"
+            }
+          ]
+        },
+        "LOG_DISCONNECTED": {
+          "selector": "LOG_DISCONNECTED",
+          "binding": {
+            "selector": "LOG_DISCONNECTED",
+            "modules": [
+              "algo.discovery.performance_spectrum.variants.log_disconnected"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "LOG_DISCONNECTED"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/performance_spectrum.hpp",
+              "symbol": "discover_performance_spectrum_log_disconnected"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+              "executable": "minera_performance_spectrum_parity_contracts_tests",
+              "case": "performance_spectrum_log_disconnected_variant_contract"
+            }
+          ]
+        },
+        "LAZYFRAME": {
+          "selector": "LAZYFRAME",
+          "binding": {
+            "selector": "LAZYFRAME",
+            "modules": [
+              "algo.discovery.performance_spectrum.variants.lazyframe"
+            ],
+            "kind": "dynamic",
+            "class": "Variants",
+            "symbol": "LAZYFRAME"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/performance_spectrum.hpp",
+              "symbol": "discover_performance_spectrum_lazyframe"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+              "executable": "minera_performance_spectrum_parity_contracts_tests",
+              "case": "performance_spectrum_lazyframe_variant_contract"
+            }
+          ]
+        },
+        "LAZYFRAME_DISCONNECTED": {
+          "selector": "LAZYFRAME_DISCONNECTED",
+          "binding": {
+            "selector": "LAZYFRAME_DISCONNECTED",
+            "modules": [
+              "algo.discovery.performance_spectrum.variants.lazyframe_disconnected"
+            ],
+            "kind": "dynamic",
+            "class": "Variants",
+            "symbol": "LAZYFRAME_DISCONNECTED"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/performance_spectrum.hpp",
+              "symbol": "discover_performance_spectrum_lazyframe_disconnected"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+              "executable": "minera_performance_spectrum_parity_contracts_tests",
+              "case": "performance_spectrum_lazyframe_disconnected_variant_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/performance_spectrum.hpp",
+        "src/backend/performance_spectrum.cpp",
+        "src/backend/performance_spectrum/components.hpp",
+        "src/backend/performance_spectrum/components.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/src/performance-spectrum.ts",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/app-logic.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.discovery.powl",
@@ -2516,8 +2915,48 @@
           "symbol": null
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "default": {
+          "selector": "default",
+          "binding": {
+            "selector": "default",
+            "modules": [
+              "algo.discovery.temporal_profile.algorithm"
+            ],
+            "kind": "default",
+            "class": null,
+            "symbol": null
+          },
+          "implementation": [
+            {
+              "path": "include/minera/temporal_profile.hpp",
+              "symbol": "discover_temporal_profile"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_temporal_profile_parity_contracts.cpp",
+              "executable": "minera_temporal_profile_parity_contracts_tests",
+              "case": "temporal_profile_discovery_dispatch_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/temporal_profile.hpp",
+        "src/backend/temporal_profile.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_temporal_profile_parity_contracts.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/src/types.ts"
+      ]
     },
     {
       "package": "algo.discovery.transition_system",
@@ -2535,8 +2974,48 @@
           "symbol": "VIEW_BASED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "VIEW_BASED": {
+          "selector": "VIEW_BASED",
+          "binding": {
+            "selector": "VIEW_BASED",
+            "modules": [
+              "algo.discovery.transition_system.variants.view_based"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "VIEW_BASED"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/transition_system.hpp",
+              "symbol": "ViewBasedTransitionSystemDiscovery"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/transition_system_parity_contracts.cpp",
+              "executable": "minera_transition_system_parity_contracts_tests",
+              "case": "transition_system_view_based_selector_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/transition_system.hpp",
+        "src/backend/transition_system.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/transition_system_parity_contracts.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/src/types.ts"
+      ]
     },
     {
       "package": "algo.evaluation",
@@ -5813,8 +6292,29 @@
       "owner": "algo.conformance.temporal_profile",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/temporal_profile.hpp",
+        "src/backend/temporal_profile.cpp",
+        "src/backend/tests/test_temporal_profile_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.temporal_profile.variants.dataframe",
+        "implementation": [
+          {
+            "path": "include/minera/temporal_profile.hpp",
+            "symbol": "conform_temporal_profile_dataframe"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_temporal_profile_parity_contracts.cpp",
+            "executable": "minera_temporal_profile_parity_contracts_tests",
+            "case": "temporal_profile_conformance_dataframe_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.temporal_profile.variants.log",
@@ -5822,8 +6322,29 @@
       "owner": "algo.conformance.temporal_profile",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/temporal_profile.hpp",
+        "src/backend/temporal_profile.cpp",
+        "src/backend/tests/test_temporal_profile_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.temporal_profile.variants.log",
+        "implementation": [
+          {
+            "path": "include/minera/temporal_profile.hpp",
+            "symbol": "conform_temporal_profile_log"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_temporal_profile_parity_contracts.cpp",
+            "executable": "minera_temporal_profile_parity_contracts_tests",
+            "case": "temporal_profile_conformance_log_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.tokenreplay.diagnostics.duration_diagnostics",
@@ -6058,8 +6579,29 @@
       "owner": "algo.discovery.batches",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/batches.hpp",
+        "src/backend/batches.cpp",
+        "src/backend/tests/test_batches_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.batches.utils.detection",
+        "implementation": [
+          {
+            "path": "include/minera/batches.hpp",
+            "symbol": "BatchType"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_batches_parity_contracts.cpp",
+            "executable": "minera_batches_parity_contracts_tests",
+            "case": "all_five_classifications_are_stable"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.batches.variants.log",
@@ -6076,8 +6618,29 @@
           "selector": "POLARS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/batches.hpp",
+        "src/backend/batches.cpp",
+        "src/backend/tests/test_batches_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.batches.variants.log",
+        "implementation": [
+          {
+            "path": "include/minera/batches.hpp",
+            "symbol": "BatchLogDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_batches_parity_contracts.cpp",
+            "executable": "minera_batches_parity_contracts_tests",
+            "case": "custom_log_case_ids_are_resolved_per_event"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.batches.variants.pandas",
@@ -6090,8 +6653,29 @@
           "selector": "PANDAS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/batches.hpp",
+        "src/backend/batches.cpp",
+        "src/backend/tests/test_batches_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.batches.variants.pandas",
+        "implementation": [
+          {
+            "path": "include/minera/batches.hpp",
+            "symbol": "BatchPandasDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_batches_parity_contracts.cpp",
+            "executable": "minera_batches_parity_contracts_tests",
+            "case": "merging_and_event_identity_match_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.batches.variants.polars",
@@ -6104,8 +6688,31 @@
           "selector": "POLARS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/batches.hpp",
+        "src/backend/batches.cpp",
+        "src/backend/batches/discovery_registry.hpp",
+        "src/backend/batches/discovery_registry.cpp",
+        "src/backend/tests/test_batches_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.batches.variants.polars",
+        "implementation": [
+          {
+            "path": "include/minera/batches.hpp",
+            "symbol": "BatchPolarsDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_batches_parity_contracts.cpp",
+            "executable": "minera_batches_parity_contracts_tests",
+            "case": "selector_components_cover_all_input_adapters"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.causal.variants.alpha",
@@ -7807,8 +8414,29 @@
       "owner": "algo.discovery.minimum_self_distance",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/minimum_self_distance.hpp",
+        "src/backend/minimum_self_distance.cpp",
+        "src/backend/tests/minimum_self_distance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.minimum_self_distance.utils",
+        "implementation": [
+          {
+            "path": "include/minera/minimum_self_distance.hpp",
+            "symbol": "derive_msd_witnesses"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/minimum_self_distance_parity_contracts.cpp",
+            "executable": "minera_minimum_self_distance_parity_contracts_tests",
+            "case": "minimum_self_distance_witness_utility_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.minimum_self_distance.variants.log",
@@ -7825,8 +8453,29 @@
           "selector": "POLARS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/minimum_self_distance.hpp",
+        "src/backend/minimum_self_distance.cpp",
+        "src/backend/tests/minimum_self_distance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.minimum_self_distance.variants.log",
+        "implementation": [
+          {
+            "path": "include/minera/minimum_self_distance.hpp",
+            "symbol": "MinimumSelfDistanceLogDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/minimum_self_distance_parity_contracts.cpp",
+            "executable": "minera_minimum_self_distance_parity_contracts_tests",
+            "case": "minimum_self_distance_log_boundary_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.minimum_self_distance.variants.pandas",
@@ -7839,8 +8488,29 @@
           "selector": "PANDAS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/minimum_self_distance.hpp",
+        "src/backend/minimum_self_distance.cpp",
+        "src/backend/tests/minimum_self_distance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.minimum_self_distance.variants.pandas",
+        "implementation": [
+          {
+            "path": "include/minera/minimum_self_distance.hpp",
+            "symbol": "MinimumSelfDistancePandasDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/minimum_self_distance_parity_contracts.cpp",
+            "executable": "minera_minimum_self_distance_parity_contracts_tests",
+            "case": "minimum_self_distance_flat_adapter_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.minimum_self_distance.variants.polars",
@@ -7853,8 +8523,29 @@
           "selector": "POLARS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/minimum_self_distance.hpp",
+        "src/backend/minimum_self_distance.cpp",
+        "src/backend/tests/minimum_self_distance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.minimum_self_distance.variants.polars",
+        "implementation": [
+          {
+            "path": "include/minera/minimum_self_distance.hpp",
+            "symbol": "MinimumSelfDistancePolarsDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/minimum_self_distance_parity_contracts.cpp",
+            "executable": "minera_minimum_self_distance_parity_contracts_tests",
+            "case": "minimum_self_distance_polars_adapter_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.ocel.etot.variants.classic",
@@ -7987,8 +8678,30 @@
           "selector": "DATAFRAME"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/performance_spectrum.hpp",
+        "src/backend/performance_spectrum.cpp",
+        "src/backend/performance_spectrum/components.cpp",
+        "src/backend/tests/test_performance_spectrum_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.performance_spectrum.variants.dataframe",
+        "implementation": [
+          {
+            "path": "include/minera/performance_spectrum.hpp",
+            "symbol": "discover_performance_spectrum_dataframe"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+            "executable": "minera_performance_spectrum_parity_contracts_tests",
+            "case": "performance_spectrum_dataframe_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.performance_spectrum.variants.dataframe_disconnected",
@@ -8001,8 +8714,30 @@
           "selector": "DATAFRAME_DISCONNECTED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/performance_spectrum.hpp",
+        "src/backend/performance_spectrum.cpp",
+        "src/backend/performance_spectrum/components.cpp",
+        "src/backend/tests/test_performance_spectrum_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.performance_spectrum.variants.dataframe_disconnected",
+        "implementation": [
+          {
+            "path": "include/minera/performance_spectrum.hpp",
+            "symbol": "discover_performance_spectrum_dataframe_disconnected"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+            "executable": "minera_performance_spectrum_parity_contracts_tests",
+            "case": "performance_spectrum_dataframe_disconnected_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.performance_spectrum.variants.lazyframe",
@@ -8015,8 +8750,30 @@
           "selector": "LAZYFRAME"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/performance_spectrum.hpp",
+        "src/backend/performance_spectrum.cpp",
+        "src/backend/performance_spectrum/components.cpp",
+        "src/backend/tests/test_performance_spectrum_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.performance_spectrum.variants.lazyframe",
+        "implementation": [
+          {
+            "path": "include/minera/performance_spectrum.hpp",
+            "symbol": "discover_performance_spectrum_lazyframe"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+            "executable": "minera_performance_spectrum_parity_contracts_tests",
+            "case": "performance_spectrum_lazyframe_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.performance_spectrum.variants.lazyframe_disconnected",
@@ -8029,8 +8786,30 @@
           "selector": "LAZYFRAME_DISCONNECTED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/performance_spectrum.hpp",
+        "src/backend/performance_spectrum.cpp",
+        "src/backend/performance_spectrum/components.cpp",
+        "src/backend/tests/test_performance_spectrum_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.performance_spectrum.variants.lazyframe_disconnected",
+        "implementation": [
+          {
+            "path": "include/minera/performance_spectrum.hpp",
+            "symbol": "discover_performance_spectrum_lazyframe_disconnected"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+            "executable": "minera_performance_spectrum_parity_contracts_tests",
+            "case": "performance_spectrum_lazyframe_disconnected_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.performance_spectrum.variants.log",
@@ -8043,8 +8822,30 @@
           "selector": "LOG"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/performance_spectrum.hpp",
+        "src/backend/performance_spectrum.cpp",
+        "src/backend/performance_spectrum/components.cpp",
+        "src/backend/tests/test_performance_spectrum_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.performance_spectrum.variants.log",
+        "implementation": [
+          {
+            "path": "include/minera/performance_spectrum.hpp",
+            "symbol": "discover_performance_spectrum_log"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+            "executable": "minera_performance_spectrum_parity_contracts_tests",
+            "case": "performance_spectrum_log_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.performance_spectrum.variants.log_disconnected",
@@ -8057,8 +8858,30 @@
           "selector": "LOG_DISCONNECTED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/performance_spectrum.hpp",
+        "src/backend/performance_spectrum.cpp",
+        "src/backend/performance_spectrum/components.cpp",
+        "src/backend/tests/test_performance_spectrum_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.performance_spectrum.variants.log_disconnected",
+        "implementation": [
+          {
+            "path": "include/minera/performance_spectrum.hpp",
+            "symbol": "discover_performance_spectrum_log_disconnected"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_performance_spectrum_parity_contracts.cpp",
+            "executable": "minera_performance_spectrum_parity_contracts_tests",
+            "case": "performance_spectrum_log_disconnected_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.powl.inductive.base_case.abc",
@@ -9013,8 +9836,29 @@
       "owner": "algo.discovery.temporal_profile",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/temporal_profile.hpp",
+        "src/backend/temporal_profile.cpp",
+        "src/backend/tests/test_temporal_profile_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.temporal_profile.variants.dataframe",
+        "implementation": [
+          {
+            "path": "include/minera/temporal_profile.hpp",
+            "symbol": "discover_temporal_profile_dataframe"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_temporal_profile_parity_contracts.cpp",
+            "executable": "minera_temporal_profile_parity_contracts_tests",
+            "case": "temporal_profile_dataframe_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.temporal_profile.variants.log",
@@ -9022,8 +9866,29 @@
       "owner": "algo.discovery.temporal_profile",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/temporal_profile.hpp",
+        "src/backend/temporal_profile.cpp",
+        "src/backend/tests/test_temporal_profile_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.temporal_profile.variants.log",
+        "implementation": [
+          {
+            "path": "include/minera/temporal_profile.hpp",
+            "symbol": "discover_temporal_profile_log"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_temporal_profile_parity_contracts.cpp",
+            "executable": "minera_temporal_profile_parity_contracts_tests",
+            "case": "temporal_profile_log_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.transition_system.variants.view_based",
@@ -9036,8 +9901,29 @@
           "selector": "VIEW_BASED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/transition_system.hpp",
+        "src/backend/transition_system.cpp",
+        "src/backend/tests/transition_system_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.transition_system.variants.view_based",
+        "implementation": [
+          {
+            "path": "include/minera/transition_system.hpp",
+            "symbol": "ViewBasedTransitionSystemDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/transition_system_parity_contracts.cpp",
+            "executable": "minera_transition_system_parity_contracts_tests",
+            "case": "transition_system_view_based_selector_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.evaluation.earth_mover_distance.variants.pyemd",

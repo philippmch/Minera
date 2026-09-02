@@ -195,28 +195,31 @@ int main() {
   for (std::size_t i = 0; i < sampled_ids.size(); ++i)
     assert(sampled_result.observations[i].case_id == sampled_ids[i]);
   sampled.sample_size = 0;
-  assert(throws([&] {
-    (void)minera::compute_performance_spectrum(many, {"a", "b"}, sampled);
-  }));
+  const auto zero_sample =
+      minera::compute_performance_spectrum(many, {"a", "b"}, sampled);
+  assert(zero_sample.observations.size() == 2);
+  assert(zero_sample.observations.front().case_id == "0");
+  assert(zero_sample.observations.back().case_id == "10");
   auto batches = minera::discover_batches(log);
   assert(batches.groups.empty());
 
   minera::EventLog batch_log;
-  minera::Trace bt;
-  bt.case_id = "batch";
+  std::size_t batch_case = 0;
   auto add = [&](const char* activity, const char* time) {
+    minera::Trace trace;
+    trace.case_id = "batch-" + std::to_string(batch_case++);
     minera::Event event;
-    event.case_id = "batch";
+    event.case_id = trace.case_id;
     event.activity = activity;
     event.timestamp = time;
-    bt.events.push_back(std::move(event));
+    trace.events.push_back(std::move(event));
+    batch_log.traces.push_back(std::move(trace));
   };
   add("a", "2024-01-01T00:00:00Z");
   add("a", "2024-01-01T00:00:00Z");
   add("a", "2024-01-01T02:00:00Z");
   add("a", "2024-01-01T02:00:00Z");
   for (int i = 0; i < 5; ++i) add("b", "2024-01-01T05:00:00Z");
-  batch_log.traces.push_back(std::move(bt));
   minera::BatchDiscoveryOptions batch_options;
   batch_options.merge_distance_seconds = 0.0;
   auto discovered = minera::discover_batches(batch_log, batch_options);
@@ -245,16 +248,18 @@ int main() {
 
   // Classification covers each public batch type.
   minera::EventLog typed;
-  minera::Trace tt;
-  tt.case_id = "typed";
+  std::size_t typed_case = 0;
   auto add_interval = [&](const char* activity, const char* start,
                           const char* complete) {
+    minera::Trace trace;
+    trace.case_id = "typed-" + std::to_string(typed_case++);
     minera::Event event;
-    event.case_id = "typed";
+    event.case_id = trace.case_id;
     event.activity = activity;
     event.timestamp = complete;
     event.attributes.push_back({"st", start, minera::AttributeKind::kDate});
-    tt.events.push_back(std::move(event));
+    trace.events.push_back(std::move(event));
+    typed.traces.push_back(std::move(trace));
   };
   add_interval("sim", "2024-01-01T00:00:00Z", "2024-01-01T00:01:00Z");
   add_interval("sim", "2024-01-01T00:00:00Z", "2024-01-01T00:01:00Z");
@@ -266,7 +271,6 @@ int main() {
   add_interval("seq", "2024-01-01T00:01:00Z", "2024-01-01T00:02:00Z");
   add_interval("con", "2024-01-01T00:00:00Z", "2024-01-01T00:03:00Z");
   add_interval("con", "2024-01-01T00:01:00Z", "2024-01-01T00:02:00Z");
-  typed.traces.push_back(std::move(tt));
   minera::BatchDiscoveryOptions typed_options;
   typed_options.start_timestamp_attribute = "st";
   typed_options.merge_distance_seconds = 0.0;
@@ -289,6 +293,7 @@ int main() {
   selected_trace.case_id = "source-case";
   selected_trace.attributes.push_back(
       {"case_ref", "selected-case", minera::AttributeKind::kString});
+  std::size_t selected_case = 0;
   auto add_selected = [&](const char* phase, const char* team,
                           const char* start, const char* finish) {
     minera::Event event;
@@ -304,6 +309,9 @@ int main() {
         {"started_at", start, minera::AttributeKind::kDate});
     event.attributes.push_back(
         {"finished_at", finish, minera::AttributeKind::kDate});
+    event.attributes.push_back(
+        {"case_ref", "selected-case-" + std::to_string(selected_case++),
+         minera::AttributeKind::kString});
     selected_trace.events.push_back(std::move(event));
   };
   add_selected("phase-A", "team-1", "1970-01-01T00:00:00Z",
@@ -324,7 +332,7 @@ int main() {
   assert(selected_result.groups.front().activity == "phase-A");
   assert(selected_result.groups.front().resource == "team-1");
   assert(selected_result.groups.front().batches.front().events.front().case_id ==
-         "selected-case");
+         "selected-case-0");
   assert(selected_result.groups.front().batches.front().complete == 60.0);
   assert(throws([&] {
     auto bad = selected_options;

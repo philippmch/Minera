@@ -10,6 +10,7 @@
 #include "minera/directly_follows_graph.hpp"
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <set>
@@ -104,6 +105,7 @@ void parse_mine_params_defaults_when_empty() {
   assert(params.spectrum.variant == minera::PerformanceSpectrumVariant::kConnected);
   assert(params.spectrum.sample_size == 10000);
   assert(params.spectrum.sort_log);
+  assert(!params.temporal_profile.strict_attributes);
   assert(!params.batches);
   assert(params.batch_options.merge_distance_seconds == 900.0);
   assert(params.batch_options.min_batch_size == 2);
@@ -1677,11 +1679,15 @@ void parse_mine_params_maps_transition_system_options() {
       {"transition_direction", "backward"},
       {"transition_window", "0"},
       {"transition_include_data", "1"},
+      {"transition_activity_attribute", " phase "},
+      {"transition_case_id_attribute", " case_ref "},
   }));
   assert(params.transition_system.view == minera::TransitionView::kMultiset);
   assert(params.transition_system.direction == minera::TransitionDirection::kBackward);
   assert(params.transition_system.window == 0);
   assert(params.transition_system.include_data);
+  assert(params.transition_system.activity_attribute == "phase");
+  assert(params.transition_system.case_id_attribute == "case_ref");
 }
 
 void parse_mine_params_maps_powl_options() {
@@ -1766,6 +1772,20 @@ void parse_mine_params_rejects_invalid_transition_fields() {
     bool threw = false;
     try { (void)minera::parse_mine_params(fields({item})); }
     catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+  for (const auto name : {"transition_activity_attribute",
+                          "transition_case_id_attribute"}) {
+    const std::map<std::string, std::string> values{{name, ""}};
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(
+          fields(values), [&](std::string_view key) {
+            return key == name;
+          });
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
     assert(threw);
   }
 }
@@ -2949,6 +2969,14 @@ void parse_mine_params_rejects_unknown_heuristic_settings() {
 
 void parse_mine_params_maps_spectrum_and_batch_options() {
   const auto params = minera::parse_mine_params(fields({
+      {"temporal_activity_attribute", "phase"},
+      {"temporal_case_id_attribute", "case_ref"},
+      {"temporal_source_timestamp_attribute", "completed_at"},
+      {"temporal_target_timestamp_attribute", "started_at"},
+      {"temporal_business_hours", "true"},
+      {"temporal_business_hour_slots", "0-3600,7200-10800"},
+      {"temporal_strict_attributes", "false"},
+      {"temporal_zeta", "-1"},
       {"spectrum_activities", " A, B "},
       {"spectrum_variant", "disconnected"},
       {"spectrum_sample_size", "17"},
@@ -2965,10 +2993,20 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
       {"batch_timestamp_attribute", "finished_at"},
       {"batch_case_id_attribute", "case_ref"},
       {"batch_start_timestamp_attribute", "started_at"},
+      {"batch_event_id_attribute", "event_ref"},
       {"minimum_self_distance_variant", "polars"},
       {"minimum_self_distance_activity_key", "phase"},
       {"minimum_self_distance_case_id_key", "case_ref"},
   }));
+  assert(params.temporal_profile.activity_attribute == "phase");
+  assert(params.temporal_profile.case_id_attribute == "case_ref");
+  assert(params.temporal_profile.source_timestamp_attribute == "completed_at");
+  assert(params.temporal_profile.target_timestamp_attribute == "started_at");
+  assert(params.temporal_profile.use_business_hours);
+  assert(params.temporal_profile.business_hour_slots_explicit);
+  assert(params.temporal_profile.business_hour_slots.size() == 2);
+  assert(!params.temporal_profile.strict_attributes);
+  assert(params.temporal_profile.zeta == -1.0);
   assert((params.spectrum_activities == std::vector<std::string>{"A", "B"}));
   assert(params.spectrum.variant == minera::PerformanceSpectrumVariant::kDisconnected);
   assert(params.spectrum.sample_size == 17);
@@ -2985,10 +3023,48 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
   assert(params.batch_options.timestamp_attribute == "finished_at");
   assert(params.batch_options.case_id_attribute == "case_ref");
   assert(params.batch_options.start_timestamp_attribute == "started_at");
+  assert(params.batch_options.event_id_attribute == "event_ref");
   assert(params.minimum_self_distance.variant ==
          minera::MinimumSelfDistanceVariant::kPolars);
   assert(params.minimum_self_distance.activity_key == "phase");
   assert(params.minimum_self_distance.case_id_key == "case_ref");
+}
+
+void parse_mine_params_preserves_empty_temporal_schedule() {
+  const std::map<std::string, std::string> values = {
+      {"temporal_business_hours", "true"},
+      {"temporal_business_hour_slots", "none"}};
+  const auto lookup = [&values](std::string_view key) {
+    const auto found = values.find(std::string(key));
+    return found == values.end() ? std::string{} : found->second;
+  };
+  const auto present = [&values](std::string_view key) {
+    return values.contains(std::string(key));
+  };
+  const auto params = minera::parse_mine_params(lookup, present);
+  assert(params.temporal_profile.use_business_hours);
+  assert(params.temporal_profile.business_hour_slots_explicit);
+  assert(params.temporal_profile.business_hour_slots.empty());
+}
+
+void parse_mine_params_accepts_unbounded_temporal_zeta() {
+  const auto positive = minera::parse_mine_params(
+      fields({{"temporal_zeta", "Infinity"}}));
+  assert(std::isinf(positive.temporal_profile.zeta));
+  assert(positive.temporal_profile.zeta > 0.0);
+
+  const auto negative = minera::parse_mine_params(
+      fields({{"temporal_zeta", "-Infinity"}}));
+  assert(std::isinf(negative.temporal_profile.zeta));
+  assert(negative.temporal_profile.zeta < 0.0);
+
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({{"temporal_zeta", "NaN"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void parse_mine_params_maps_overlap_options() {
@@ -3023,7 +3099,8 @@ void parse_mine_params_rejects_invalid_spectrum_and_batch_options() {
   for (const auto& item : {
            std::pair{"spectrum_variant", "other"},
            std::pair{"spectrum_activities", "only_one"},
-           std::pair{"spectrum_sample_size", "0"},
+           std::pair{"spectrum_activities", "A,,B"},
+           std::pair{"spectrum_sample_size", "-1"},
            std::pair{"spectrum_sort_log", "yes"},
            std::pair{"batches", "on"},
            std::pair{"batch_variant", "other"},
@@ -3045,7 +3122,8 @@ void parse_mine_params_rejects_invalid_spectrum_and_batch_options() {
                            std::string("batch_activity_attribute"),
                            std::string("batch_resource_attribute"),
                            std::string("batch_timestamp_attribute"),
-                           std::string("batch_case_id_attribute")}) {
+                           std::string("batch_case_id_attribute"),
+                           std::string("batch_event_id_attribute")}) {
     const std::map<std::string, std::string> empty_value = {{name, ""}};
     const auto lookup = [&empty_value](std::string_view key) -> std::string {
       const auto it = empty_value.find(std::string(key));
@@ -3077,6 +3155,27 @@ void parse_mine_params_rejects_invalid_spectrum_and_batch_options() {
     threw = true;
   }
   assert(threw);
+
+  const auto zero_sample = minera::parse_mine_params(fields({
+      {"spectrum_activities", "A,B"},
+      {"spectrum_variant", "lazyframe_disconnected"},
+      {"spectrum_sample_size", "0"},
+  }));
+  assert(zero_sample.spectrum.variant ==
+         minera::PerformanceSpectrumVariant::kLazyframeDisconnected);
+  assert(zero_sample.spectrum.sample_size == 0);
+
+  threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"batches", "true"},
+        {"batch_variant", "log"},
+        {"batch_event_id_attribute", "event_ref"},
+    }));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void parse_mine_params_rejects_dependent_options_without_opt_in() {
@@ -3091,7 +3190,8 @@ void parse_mine_params_rejects_dependent_options_without_opt_in() {
            std::pair{"batch_activity_attribute", "phase"},
            std::pair{"batch_resource_attribute", "team"},
            std::pair{"batch_timestamp_attribute", "finished_at"},
-           std::pair{"batch_case_id_attribute", "case_ref"}}) {
+           std::pair{"batch_case_id_attribute", "case_ref"},
+           std::pair{"batch_event_id_attribute", "event_ref"}}) {
     bool threw = false;
     try {
       (void)minera::parse_mine_params(fields({item}));
@@ -4238,6 +4338,8 @@ int main() {
   parse_mine_params_accepts_infrequent_inductive_variant();
   parse_mine_params_rejects_unknown_heuristic_settings();
   parse_mine_params_maps_spectrum_and_batch_options();
+  parse_mine_params_preserves_empty_temporal_schedule();
+  parse_mine_params_accepts_unbounded_temporal_zeta();
   parse_mine_params_maps_overlap_options();
   parse_mine_params_rejects_invalid_overlap_epsilon();
   parse_mine_params_rejects_invalid_spectrum_and_batch_options();

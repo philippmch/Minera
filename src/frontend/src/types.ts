@@ -2193,6 +2193,43 @@ export function isStreamingTemporalResult(value: unknown): value is StreamingTem
       item.elapsed_seconds >= 0 && item.standard_deviation_distance >= 0));
 }
 
+/** One grouped temporal-profile conformance observation. */
+export interface TemporalConformanceDeviation {
+  case_id: string;
+  source: string;
+  target: string;
+  elapsed_seconds: number;
+  standard_deviation_distance: number;
+}
+export interface TemporalConformanceResult {
+  family: "TEMPORAL_PROFILE_CONFORMANCE";
+  trace_count: number;
+  deviation_count: number;
+  /** One array per input trace, including traces without deviations. */
+  traces: TemporalConformanceDeviation[][];
+}
+export function isTemporalConformanceResult(
+  value: unknown,
+): value is TemporalConformanceResult {
+  if (!isOcelRecord(value) || value.family !== "TEMPORAL_PROFILE_CONFORMANCE" ||
+      !Number.isSafeInteger(value.trace_count) || (value.trace_count as number) < 0 ||
+      !Number.isSafeInteger(value.deviation_count) || (value.deviation_count as number) < 0 ||
+      !Array.isArray(value.traces) || value.trace_count !== value.traces.length) return false;
+  let deviations = 0;
+  for (const trace of value.traces) {
+    if (!Array.isArray(trace)) return false;
+    deviations += trace.length;
+    if (!trace.every((item) => isOcelRecord(item) &&
+        typeof item.case_id === "string" && typeof item.source === "string" &&
+        typeof item.target === "string" && typeof item.elapsed_seconds === "number" &&
+        Number.isFinite(item.elapsed_seconds) && item.elapsed_seconds >= 0 &&
+        typeof item.standard_deviation_distance === "number" &&
+        Number.isFinite(item.standard_deviation_distance) &&
+        item.standard_deviation_distance >= 0)) return false;
+  }
+  return deviations === value.deviation_count;
+}
+
 export interface StreamingTbrCase {
   events: number;
   missing: number;
@@ -5471,7 +5508,8 @@ export interface PerformanceSpectrumObservation {
 export interface PerformanceSpectrumExport {
   variant:
     | "connected" | "disconnected" | "dataframe" | "log"
-    | "dataframe_disconnected" | "log_disconnected";
+    | "dataframe_disconnected" | "log_disconnected"
+    | "lazyframe" | "lazyframe_disconnected";
   activities: string[];
   activity_attribute?: string;
   timestamp_attribute?: string;
@@ -5491,6 +5529,8 @@ export interface BatchEvent {
   case_id: string;
   trace_index: number;
   event_index: number;
+  /** Optional table event-id projection used to preserve duplicate rows. */
+  event_id?: string;
 }
 export interface BatchInstance {
   type: BatchType;
@@ -5513,6 +5553,7 @@ export interface BatchDiscoveryExport {
   timestamp_attribute?: string;
   case_id_attribute?: string;
   start_timestamp_attribute?: string;
+  event_id_attribute?: string;
   groups: BatchGroup[];
 }
 
@@ -6432,6 +6473,49 @@ function isMineraTrace(value: unknown, activityCount?: number): value is Trace {
     (trace.case_id_source_key === undefined || typeof trace.case_id_source_key === "string");
 }
 
+function isPerformanceSpectrumExport(
+  value: unknown,
+): value is PerformanceSpectrumExport {
+  if (!isRecord(value) || Array.isArray(value) ||
+      !(["connected", "disconnected", "dataframe", "log",
+        "dataframe_disconnected", "log_disconnected", "lazyframe",
+        "lazyframe_disconnected"] as const).includes(
+        value.variant as PerformanceSpectrumExport["variant"])) {
+    return false;
+  }
+  if (!Array.isArray(value.activities) ||
+      !value.activities.every((activity) => typeof activity === "string") ||
+      !Array.isArray(value.observations)) return false;
+  const attributes = [value.activity_attribute, value.timestamp_attribute,
+    value.case_id_attribute];
+  if (!attributes.every((attribute) =>
+    attribute === undefined || typeof attribute === "string")) return false;
+  return value.observations.every((observation) =>
+    isRecord(observation) && !Array.isArray(observation) &&
+    typeof observation.case_id === "string" &&
+    Number.isSafeInteger(observation.pattern_offset) &&
+    (observation.pattern_offset as number) >= 0 &&
+    Array.isArray(observation.instants) &&
+    observation.instants.every((instant) =>
+      typeof instant === "number" && Number.isFinite(instant)) &&
+    Array.isArray(observation.activities) &&
+    observation.activities.every((activity) => typeof activity === "string") &&
+    observation.instants.length === observation.activities.length);
+}
+
+function isBatchEvent(value: unknown): value is BatchEvent {
+  return isRecord(value) && !Array.isArray(value) &&
+    typeof value.start === "number" && Number.isFinite(value.start) &&
+    typeof value.complete === "number" && Number.isFinite(value.complete) &&
+    value.start <= value.complete &&
+    typeof value.case_id === "string" &&
+    Number.isSafeInteger(value.trace_index) &&
+    (value.trace_index as number) >= 0 &&
+    Number.isSafeInteger(value.event_index) &&
+    (value.event_index as number) >= 0 &&
+    (value.event_id === undefined || typeof value.event_id === "string");
+}
+
 export function isMineraExport(value: unknown): value is MineraExport {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const data = value as MineraExport;
@@ -6458,7 +6542,7 @@ export function isMineraExport(value: unknown): value is MineraExport {
       batches.variant === "polars") &&
     [batches.activity_attribute, batches.resource_attribute,
       batches.timestamp_attribute, batches.case_id_attribute,
-      batches.start_timestamp_attribute].every((attribute) =>
+      batches.start_timestamp_attribute, batches.event_id_attribute].every((attribute) =>
         attribute === undefined || typeof attribute === "string") &&
     batches.groups.every((group) => {
       if (typeof group !== "object" || group === null ||
@@ -6479,7 +6563,8 @@ export function isMineraExport(value: unknown): value is MineraExport {
           batch.type === "concurrent") &&
         typeof batch.start === "number" && Number.isFinite(batch.start) &&
         typeof batch.complete === "number" && Number.isFinite(batch.complete) &&
-        Array.isArray(batch.events));
+        batch.start <= batch.complete &&
+        Array.isArray(batch.events) && batch.events.every(isBatchEvent));
       }));
   if (data.traces !== undefined) {
     if (!Array.isArray(data.traces) || data.traces.length !== traceCount ||
@@ -6519,6 +6604,8 @@ export function isMineraExport(value: unknown): value is MineraExport {
       )) &&
     (data.decision_tables === undefined || isDecisionTablesResult(data.decision_tables)) &&
     validBatches &&
+    (data.performance_spectrum === undefined ||
+      isPerformanceSpectrumExport(data.performance_spectrum)) &&
     (overlap === undefined || (
       typeof overlap === "object" && overlap !== null &&
       Array.isArray(overlap.interval_events) &&

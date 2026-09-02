@@ -78,6 +78,7 @@ import {
   type StreamingDfgResult,
   type StreamingFootprintsResult,
   type StreamingTemporalResult,
+  type TemporalConformanceResult,
   type StreamingTbrResult,
   type TriePetriConversionResult,
   type ProcessTreePetriNetVariant,
@@ -126,6 +127,7 @@ import {
   isStreamingDfgResult,
   isStreamingFootprintsResult,
   isStreamingTemporalResult,
+  isTemporalConformanceResult,
   isStreamingTbrResult,
   isDataPetriNetResult,
   isDecisionTablesResult,
@@ -487,6 +489,10 @@ export interface MinerOptions {
   transitionDirection?: "forward" | "backward";
   transitionWindow?: number;
   transitionIncludeData?: boolean;
+  /** Event/table activity attribute used by view-based transition systems. */
+  transitionActivityKey?: string;
+  /** Event/table case-id attribute used by view-based transition systems. */
+  transitionCaseIdKey?: string;
   /** POWL discovery algorithm variant (maximal is the default). */
   powlVariant?: "tree" | "brute_force" | "maximal" | "dynamic_clustering" | "dynamic_clustering_plain";
   powlFilteringType?: "decreasing_factor" | "dynamic";
@@ -553,11 +559,21 @@ export interface MinerOptions {
   correlationStartTimestampAttribute?: string;
   correlationExactTimeMatching?: boolean;
   correlationSampleSize?: number;
+  /** Temporal-profile discovery settings (profile discovery is always included). */
+  temporalActivityAttribute?: string;
+  temporalCaseIdAttribute?: string;
+  temporalSourceTimestampAttribute?: string;
+  temporalTargetTimestampAttribute?: string;
+  temporalBusinessHours?: boolean;
+  /** `none` selects an explicitly empty schedule. */
+  temporalBusinessHourSlots?: string;
+  temporalStrictAttributes?: boolean;
   /** Performance spectrum (opt-in when activities are supplied). */
   spectrumActivities?: string[];
   spectrumVariant?:
     | "connected" | "disconnected" | "dataframe" | "log"
-    | "dataframe_disconnected" | "log_disconnected";
+    | "dataframe_disconnected" | "log_disconnected"
+    | "lazyframe" | "lazyframe_disconnected";
   spectrumSampleSize?: number;
   spectrumSortLog?: boolean;
   spectrumActivityKey?: string;
@@ -573,6 +589,8 @@ export interface MinerOptions {
   batchTimestampAttribute?: string;
   batchCaseIdAttribute?: string;
   batchStartTimestampAttribute?: string;
+  /** Optional event-id attribute for table batch discovery (pandas/polars). */
+  batchEventIdAttribute?: string;
   /** Minimum self-distance adapter selector included in the analysis export. */
   minimumSelfDistanceVariant?: "log" | "pandas" | "polars";
   minimumSelfDistanceActivityKey?: string;
@@ -973,6 +991,33 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.transitionWindow !== undefined && options.transitionWindow !== 2)
     add("transition_window", String(options.transitionWindow));
   if (options.transitionIncludeData) add("transition_include_data", "true");
+  const transitionViews = ["sequence", "set", "multiset"];
+  if (options.transitionView !== undefined &&
+      !transitionViews.includes(options.transitionView))
+    throw new Error("transitionView is not a supported transition-system view");
+  const transitionDirections = ["forward", "backward"];
+  if (options.transitionDirection !== undefined &&
+      !transitionDirections.includes(options.transitionDirection))
+    throw new Error("transitionDirection is not a supported transition-system direction");
+  if (options.transitionWindow !== undefined &&
+      (!Number.isSafeInteger(options.transitionWindow) || options.transitionWindow < 0))
+    throw new Error("transitionWindow must be a non-negative safe integer");
+  const addTransitionSelector = (
+    name: string,
+    value: string | undefined,
+    defaultValue: string,
+  ) => {
+    if (value === undefined) return;
+    const normalized = value.trim();
+    if (!normalized) throw new Error(`${name} must not be empty`);
+    if (normalized !== defaultValue) add(name, normalized);
+  };
+  addTransitionSelector(
+    "transition_activity_attribute", options.transitionActivityKey, "concept:name",
+  );
+  addTransitionSelector(
+    "transition_case_id_attribute", options.transitionCaseIdKey, "case:concept:name",
+  );
 
   // Validate every explicitly supplied POWL setting before serializing it.
   // Omitting an invalid value would silently select the backend default and
@@ -1363,15 +1408,72 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     }
   }
 
-  // Temporal/behavioural analyses are opt-in. Dependent settings are sent
-  // only while their analysis is active, and defaults stay on the backend.
-  const spectrumActivities = options.spectrumActivities?.map((name) => name.trim()).filter(Boolean);
-  if (spectrumActivities && spectrumActivities.length >= 2) {
+  const temporalTextOptions: Array<[string, string | undefined, string]> = [
+    ["temporal_activity_attribute", options.temporalActivityAttribute, "concept:name"],
+    ["temporal_case_id_attribute", options.temporalCaseIdAttribute, "case:concept:name"],
+    ["temporal_source_timestamp_attribute", options.temporalSourceTimestampAttribute, ""],
+    ["temporal_target_timestamp_attribute", options.temporalTargetTimestampAttribute, ""],
+  ];
+  for (const [name, raw, defaultValue] of temporalTextOptions) {
+    if (raw === undefined) continue;
+    const value = raw.trim();
+    if (!value) throw new Error(`${name} must not be empty`);
+    if (value !== defaultValue) add(name, value);
+  }
+  if (options.temporalBusinessHours) add("temporal_business_hours", "true");
+  if (options.temporalStrictAttributes === true)
+    add("temporal_strict_attributes", "true");
+  if (options.temporalBusinessHourSlots !== undefined) {
+    const value = options.temporalBusinessHourSlots.trim();
+    if (value === "" || value.toLowerCase() === "none") {
+      add("temporal_business_hour_slots", "none");
+    } else {
+      const valid = value.split(",").every((slot) => {
+        const match = slot.trim().match(/^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/);
+        if (!match) return false;
+        const start = Number(match[1]);
+        const end = Number(match[2]);
+        return Number.isFinite(start) && Number.isFinite(end) &&
+          start >= 0 && start < end && end <= 604800;
+      });
+      if (!valid) {
+        throw new Error(
+          "temporalBusinessHourSlots must be `none` or start-end pairs within one week",
+        );
+      }
+      add("temporal_business_hour_slots", value);
+    }
+  }
+
+  // Optional temporal/behavioural analyses keep dependent settings scoped to
+  // the selected analysis while defaults stay on the backend.
+  if (options.spectrumActivities !== undefined) {
+    const spectrumActivities = options.spectrumActivities
+      .map((name) => name.trim());
+    if (spectrumActivities.some((name) => !name))
+      throw new Error("spectrumActivities must not contain empty activities");
+    if (spectrumActivities.length < 2)
+      throw new Error(
+        "spectrumActivities must contain at least two non-empty activities",
+      );
     add("spectrum_activities", spectrumActivities.join(","));
+    const spectrumVariants = [
+      "connected", "disconnected", "dataframe", "log",
+      "dataframe_disconnected", "log_disconnected", "lazyframe",
+      "lazyframe_disconnected",
+    ];
+    if (options.spectrumVariant !== undefined &&
+        !spectrumVariants.includes(options.spectrumVariant))
+      throw new Error("spectrumVariant is not a supported performance-spectrum variant");
     if (options.spectrumVariant && options.spectrumVariant !== "connected")
       add("spectrum_variant", options.spectrumVariant);
-    if (options.spectrumSampleSize !== undefined && Number.isInteger(options.spectrumSampleSize) && options.spectrumSampleSize > 0 && options.spectrumSampleSize !== 10000)
-      add("spectrum_sample_size", String(options.spectrumSampleSize));
+    if (options.spectrumSampleSize !== undefined) {
+      if (!Number.isSafeInteger(options.spectrumSampleSize) ||
+          options.spectrumSampleSize < 0)
+        throw new Error("spectrumSampleSize must be a non-negative safe integer");
+      if (options.spectrumSampleSize !== 10000)
+        add("spectrum_sample_size", String(options.spectrumSampleSize));
+    }
     if (options.spectrumSortLog === false) add("spectrum_sort_log", "false");
     if (options.spectrumActivityKey?.trim())
       add("spectrum_activity_key", options.spectrumActivityKey.trim());
@@ -1398,6 +1500,17 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
       add("batch_case_id_attribute", options.batchCaseIdAttribute.trim());
     if (options.batchStartTimestampAttribute?.trim())
       add("batch_start_timestamp_attribute", options.batchStartTimestampAttribute.trim());
+    // Event ids are only projected by the table adapters. A caller that
+    // supplies one for the default LOG adapter likely has stale UI state, but
+    // the typed API must surface that contract violation instead of silently
+    // dropping the value.
+    if (options.batchEventIdAttribute !== undefined) {
+      if (options.batchVariant === undefined || options.batchVariant === "log")
+        throw new Error("batchEventIdAttribute is only supported for table batches");
+      const eventId = options.batchEventIdAttribute.trim();
+      if (!eventId) throw new Error("batchEventIdAttribute must not be empty");
+      add("batch_event_id_attribute", eventId);
+    }
   }
   if (options.minimumSelfDistanceVariant &&
       options.minimumSelfDistanceVariant !== "log") {
@@ -3671,22 +3784,29 @@ export interface StreamingTemporalOptions {
   streaming_temporal_zeta?: number;
 }
 
+function serializeTemporalProfile(
+  values: Array<[string, string, number, number]>, name: string,
+): string {
+  if (!Array.isArray(values) || values.length === 0)
+    throw new Error(`${name} must be a non-empty list`);
+  return values.map((entry) => {
+    if (!Array.isArray(entry) || entry.length !== 4 ||
+        !Number.isFinite(entry[2]) || entry[2] < 0 ||
+        !Number.isFinite(entry[3]) || entry[3] < 0) {
+      throw new Error(`${name} entries must be source/target/mean/stddev`);
+    }
+    const source = validateStreamingFootprintActivity(entry[0]);
+    const target = validateStreamingFootprintActivity(entry[1]);
+    if (source.includes(":") || target.includes(":"))
+      throw new Error(`${name} entries must be source/target/mean/stddev`);
+    return `${source}->${target}:${entry[2]}:${entry[3]}`;
+  }).join(",");
+}
+
 function serializeStreamingTemporalProfile(
   values: Array<[string, string, number, number]>,
 ): string {
-  if (!Array.isArray(values) || values.length === 0)
-    throw new Error("streaming_temporal_profile must be a non-empty list");
-  return values.map((entry) => {
-    const source = validateStreamingFootprintActivity(entry[0]);
-    const target = validateStreamingFootprintActivity(entry[1]);
-    if (!Array.isArray(entry) || entry.length !== 4 ||
-        !Number.isFinite(entry[2]) || entry[2] < 0 ||
-        !Number.isFinite(entry[3]) || entry[3] < 0 ||
-        source.includes(":") || target.includes(":")) {
-      throw new Error("streaming temporal profile entries must be source/target/mean/stddev");
-    }
-    return `${source}->${target}:${entry[2]}:${entry[3]}`;
-  }).join(",");
+  return serializeTemporalProfile(values, "streaming_temporal_profile");
 }
 
 export function streamingTemporalQuery(options: StreamingTemporalOptions): string {
@@ -3736,6 +3856,71 @@ export async function requestStreamingTemporal(
     throw new Error("the Minera backend returned invalid streaming temporal conformance");
   return payload;
 }
+
+export interface TemporalConformanceOptions {
+  temporal_profile: Array<[string, string, number, number]>;
+  temporal_variant?: "log" | "dataframe";
+  temporal_activity_attribute?: string;
+  temporal_case_id_attribute?: string;
+  temporal_source_timestamp_attribute?: string;
+  temporal_target_timestamp_attribute?: string;
+  temporal_business_hours?: boolean;
+  temporal_business_hour_slots?: string;
+  temporal_strict_attributes?: boolean;
+  temporal_zeta?: number;
+}
+
+/** Query string for conformance against a profile using the cached session log. */
+export function temporalConformanceQuery(
+  options: TemporalConformanceOptions,
+): string {
+  const query = new URLSearchParams();
+  query.set("temporal_profile", serializeTemporalProfile(
+    options.temporal_profile, "temporal_profile",
+  ));
+  if (options.temporal_variant !== undefined) {
+    if (options.temporal_variant !== "log" && options.temporal_variant !== "dataframe")
+      throw new Error("temporal_variant must be log or dataframe");
+    if (options.temporal_variant !== "log")
+      query.set("temporal_variant", options.temporal_variant);
+  }
+  for (const name of [
+    "temporal_activity_attribute",
+    "temporal_case_id_attribute",
+    "temporal_source_timestamp_attribute",
+    "temporal_target_timestamp_attribute",
+    "temporal_business_hour_slots",
+  ] as const) {
+    const value = options[name];
+    if (value !== undefined) {
+      if (!value.trim()) throw new Error(`${name} must not be empty`);
+      query.set(name, value.trim());
+    }
+  }
+  if (options.temporal_business_hours !== undefined)
+    query.set("temporal_business_hours", options.temporal_business_hours ? "true" : "false");
+  if (options.temporal_strict_attributes !== undefined)
+    query.set("temporal_strict_attributes", options.temporal_strict_attributes ? "true" : "false");
+  if (options.temporal_zeta !== undefined) {
+    if (Number.isNaN(options.temporal_zeta))
+      throw new Error("temporal_zeta must not be NaN");
+    query.set("temporal_zeta", String(options.temporal_zeta));
+  }
+  return query.toString();
+}
+
+/** Checks a supplied temporal profile against the latest cached event log. */
+export function requestTemporalConformance(
+  options: TemporalConformanceOptions,
+): Promise<TemporalConformanceResult> {
+  const query = temporalConformanceQuery(options);
+  return postChecked(
+    `/api/temporal-conformance?${query}`,
+    isTemporalConformanceResult,
+    "temporal profile conformance",
+  );
+}
+export const conformTemporalProfile = requestTemporalConformance;
 
 export interface StreamingTbrOptions {
   streaming_tbr_variant?: "forward" | "backwards";

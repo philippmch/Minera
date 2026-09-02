@@ -37,20 +37,30 @@ interface FiltersProps {
 export function temporalValidationMessage(input: {
   spectrumConfigured: boolean;
   spectrumActivityCount: number;
+  spectrumHasEmptyActivity?: boolean;
   spectrumSampleSize: string;
   batches: boolean;
+  batchVariant?: "log" | "pandas" | "polars";
   batchMergeDistanceSeconds: string;
   batchMinSize: string;
+  transitionActivityKey?: string;
+  transitionCaseIdKey?: string;
+  transitionView?: "sequence" | "set" | "multiset";
+  transitionDirection?: "forward" | "backward";
+  transitionWindow?: string;
+  batchEventIdAttribute?: string;
   overlap?: boolean;
   overlapEpsilon?: string;
 }): string | null {
+  if (input.spectrumHasEmptyActivity)
+    return "Performance spectrum activities must not contain empty entries.";
   if (input.spectrumActivityCount === 1)
     return "Spectrum needs at least two activities.";
   if (input.spectrumConfigured) {
     const raw = input.spectrumSampleSize.trim();
     const value = Number(raw);
-    if (!raw || !Number.isFinite(value) || !Number.isInteger(value) || value <= 0)
-      return "Spectrum sample size must be a positive integer.";
+    if (!raw || !Number.isFinite(value) || !Number.isSafeInteger(value) || value < 0)
+      return "Spectrum sample size must be a non-negative integer.";
   }
   if (input.batches) {
     const mergeRaw = input.batchMergeDistanceSeconds.trim();
@@ -62,6 +72,28 @@ export function temporalValidationMessage(input: {
     if (!minRaw || !Number.isFinite(min) || !Number.isInteger(min) || min < 2)
       return "Batch minimum size must be an integer of at least 2.";
   }
+  if (input.transitionActivityKey !== undefined &&
+      !input.transitionActivityKey.trim())
+    return "Transition-system activity selector must not be empty.";
+  if (input.transitionCaseIdKey !== undefined &&
+      !input.transitionCaseIdKey.trim())
+    return "Transition-system case-id selector must not be empty.";
+  if (input.transitionView !== undefined &&
+      !["sequence", "set", "multiset"].includes(input.transitionView))
+    return "Transition-system view is not supported.";
+  if (input.transitionDirection !== undefined &&
+      !["forward", "backward"].includes(input.transitionDirection))
+    return "Transition-system direction is not supported.";
+  if (input.transitionWindow !== undefined) {
+    const raw = input.transitionWindow.trim();
+    const value = Number(raw);
+    if (!raw || !Number.isSafeInteger(value) || value < 0)
+      return "Transition-system window must be a non-negative integer.";
+  }
+  if (input.batches && input.batchVariant !== undefined && input.batchVariant !== "log" &&
+      input.batchEventIdAttribute !== undefined &&
+      !input.batchEventIdAttribute.trim())
+    return "Batch event-id selector must not be empty.";
   if (input.overlap) {
     const rawEpsilon = input.overlapEpsilon?.trim() ?? "";
     const epsilon = Number(rawEpsilon);
@@ -663,10 +695,36 @@ export function Filters({
     correlationVariants.has("classic_split");
   const correlationSplitOptionsActive =
     correlationVariants.has("classic_split");
+  const [temporalActivityAttribute, setTemporalActivityAttribute] =
+    useState("concept:name");
+  const [temporalCaseIdAttribute, setTemporalCaseIdAttribute] =
+    useState("case:concept:name");
+  const [temporalSourceTimestampAttribute,
+    setTemporalSourceTimestampAttribute] = useState("");
+  const [temporalTargetTimestampAttribute,
+    setTemporalTargetTimestampAttribute] = useState("");
+  const [temporalBusinessHours, setTemporalBusinessHours] = useState(false);
+  const [temporalBusinessHourSlots, setTemporalBusinessHourSlots] =
+    useState("");
+  const [temporalStrictAttributes, setTemporalStrictAttributes] =
+    useState(false);
+  const [transitionActivityKey, setTransitionActivityKey] =
+    useState("concept:name");
+  const [transitionCaseIdKey, setTransitionCaseIdKey] =
+    useState("case:concept:name");
+  const [transitionView, setTransitionView] = useState<
+    "sequence" | "set" | "multiset"
+  >("sequence");
+  const [transitionDirection, setTransitionDirection] = useState<
+    "forward" | "backward"
+  >("forward");
+  const [transitionWindow, setTransitionWindow] = useState("2");
+  const [transitionIncludeData, setTransitionIncludeData] = useState(false);
   const [spectrumActivities, setSpectrumActivities] = useState("");
   const [spectrumVariant, setSpectrumVariant] = useState<
     "connected" | "disconnected" | "dataframe" | "log" |
-    "dataframe_disconnected" | "log_disconnected"
+    "dataframe_disconnected" | "log_disconnected" | "lazyframe" |
+    "lazyframe_disconnected"
   >("connected");
   const [spectrumSampleSize, setSpectrumSampleSize] = useState("10000");
   const [spectrumSortLog, setSpectrumSortLog] = useState(true);
@@ -682,6 +740,7 @@ export function Filters({
   const [batchTimestampAttribute, setBatchTimestampAttribute] = useState("");
   const [batchCaseIdAttribute, setBatchCaseIdAttribute] = useState("");
   const [batchStartTimestampAttribute, setBatchStartTimestampAttribute] = useState("");
+  const [batchEventIdAttribute, setBatchEventIdAttribute] = useState("");
   const [minimumSelfDistanceVariant, setMinimumSelfDistanceVariant] =
     useState<"log" | "pandas" | "polars">("log");
   const [minimumSelfDistanceActivityKey, setMinimumSelfDistanceActivityKey] =
@@ -783,6 +842,11 @@ export function Filters({
     const n = Number.parseInt(value, 10);
     return Number.isFinite(n) && n > 0 ? n : undefined;
   };
+  const toNonnegativeInt = (value: string) => {
+    if (!value.trim()) return undefined;
+    const n = Number(value);
+    return Number.isSafeInteger(n) && n >= 0 ? n : undefined;
+  };
   const toFloat = (value: string) => {
     const n = Number.parseFloat(value);
     return Number.isFinite(n) ? n : undefined;
@@ -827,15 +891,26 @@ export function Filters({
     return result.length ? result : undefined;
   };
 
-  const spectrumNames = spectrumActivities.split(",").map((name) => name.trim()).filter(Boolean);
+  const spectrumTokens = spectrumActivities.split(",").map((name) => name.trim());
+  const spectrumHasEmptyActivity = spectrumActivities.trim() !== "" &&
+    spectrumTokens.some((name) => !name);
+  const spectrumNames = spectrumTokens.filter(Boolean);
   const spectrumConfigured = spectrumNames.length >= 2;
   const temporalValidationError = temporalValidationMessage({
     spectrumConfigured,
     spectrumActivityCount: spectrumNames.length,
+    spectrumHasEmptyActivity,
     spectrumSampleSize,
     batches,
+    batchVariant,
     batchMergeDistanceSeconds,
     batchMinSize,
+    transitionActivityKey,
+    transitionCaseIdKey,
+    transitionView,
+    transitionDirection,
+    transitionWindow,
+    batchEventIdAttribute: batches ? batchEventIdAttribute : undefined,
     overlap,
     overlapEpsilon,
   });
@@ -1244,11 +1319,37 @@ export function Filters({
           ? true : undefined,
       correlationSampleSize: correlationSplitOptionsActive
         ? toInt(correlationSampleSize) : undefined,
+      temporalActivityAttribute:
+        temporalActivityAttribute.trim() !== "concept:name"
+          ? temporalActivityAttribute.trim() || undefined : undefined,
+      temporalCaseIdAttribute:
+        temporalCaseIdAttribute.trim() !== "case:concept:name"
+          ? temporalCaseIdAttribute.trim() || undefined : undefined,
+      temporalSourceTimestampAttribute:
+        temporalSourceTimestampAttribute.trim() || undefined,
+      temporalTargetTimestampAttribute:
+        temporalTargetTimestampAttribute.trim() || undefined,
+      temporalBusinessHours: temporalBusinessHours || undefined,
+      temporalBusinessHourSlots:
+        temporalBusinessHourSlots.trim() || undefined,
+      temporalStrictAttributes: temporalStrictAttributes ? true : undefined,
+      transitionActivityKey:
+        transitionActivityKey.trim() !== "concept:name"
+          ? transitionActivityKey.trim() || undefined : undefined,
+      transitionCaseIdKey:
+        transitionCaseIdKey.trim() !== "case:concept:name"
+          ? transitionCaseIdKey.trim() || undefined : undefined,
+      transitionView: transitionView !== "sequence" ? transitionView : undefined,
+      transitionDirection: transitionDirection !== "forward"
+        ? transitionDirection : undefined,
+      transitionWindow: transitionWindow.trim() !== "2"
+        ? Number(transitionWindow) : undefined,
+      transitionIncludeData: transitionIncludeData ? true : undefined,
       spectrumActivities: spectrumConfigured ? spectrumNames : undefined,
       spectrumVariant: spectrumConfigured && spectrumVariant !== "connected"
         ? spectrumVariant : undefined,
       spectrumSampleSize: spectrumConfigured
-        ? (() => { const n = Number(spectrumSampleSize); return Number.isInteger(n) && n > 0 ? n : undefined; })()
+        ? toNonnegativeInt(spectrumSampleSize)
         : undefined,
       spectrumSortLog: spectrumConfigured && !spectrumSortLog
         ? false : undefined,
@@ -1271,6 +1372,8 @@ export function Filters({
       batchTimestampAttribute: batches ? batchTimestampAttribute.trim() || undefined : undefined,
       batchCaseIdAttribute: batches ? batchCaseIdAttribute.trim() || undefined : undefined,
       batchStartTimestampAttribute: batches ? batchStartTimestampAttribute.trim() || undefined : undefined,
+      batchEventIdAttribute: batches && batchVariant !== "log"
+        ? batchEventIdAttribute.trim() || undefined : undefined,
       minimumSelfDistanceVariant: minimumSelfDistanceVariant !== "log"
         ? minimumSelfDistanceVariant : undefined,
       minimumSelfDistanceActivityKey:
@@ -1423,6 +1526,19 @@ export function Filters({
     setCorrelationStartTimestampAttribute("");
     setCorrelationExactTimeMatching(false);
     setCorrelationSampleSize("100000");
+    setTemporalActivityAttribute("concept:name");
+    setTemporalCaseIdAttribute("case:concept:name");
+    setTemporalSourceTimestampAttribute("");
+    setTemporalTargetTimestampAttribute("");
+    setTemporalBusinessHours(false);
+    setTemporalBusinessHourSlots("");
+    setTemporalStrictAttributes(false);
+    setTransitionActivityKey("concept:name");
+    setTransitionCaseIdKey("case:concept:name");
+    setTransitionView("sequence");
+    setTransitionDirection("forward");
+    setTransitionWindow("2");
+    setTransitionIncludeData(false);
     setSpectrumActivities("");
     setSpectrumVariant("connected");
     setSpectrumSampleSize("10000");
@@ -1439,6 +1555,7 @@ export function Filters({
     setBatchTimestampAttribute("");
     setBatchCaseIdAttribute("");
     setBatchStartTimestampAttribute("");
+    setBatchEventIdAttribute("");
     setMinimumSelfDistanceVariant("log");
     setMinimumSelfDistanceActivityKey("");
     setMinimumSelfDistanceCaseIdKey("");
@@ -1607,8 +1724,20 @@ export function Filters({
   const spectrumActive = spectrumActivities.trim() !== "";
   const temporalDirty =
     spectrumActive || batches || minimumSelfDistanceVariant !== "log" ||
+    temporalActivityAttribute.trim() !== "concept:name" ||
+    temporalCaseIdAttribute.trim() !== "case:concept:name" ||
+    temporalSourceTimestampAttribute.trim() !== "" ||
+    temporalTargetTimestampAttribute.trim() !== "" || temporalBusinessHours ||
+    temporalBusinessHourSlots.trim() !== "" || temporalStrictAttributes ||
+    transitionActivityKey.trim() !== "concept:name" ||
+    transitionCaseIdKey.trim() !== "case:concept:name" ||
+    transitionView !== "sequence" ||
+    transitionDirection !== "forward" ||
+    transitionWindow.trim() !== "2" ||
+    transitionIncludeData ||
     minimumSelfDistanceActivityKey.trim() !== "" ||
-    minimumSelfDistanceCaseIdKey.trim() !== "" || overlap;
+    minimumSelfDistanceCaseIdKey.trim() !== "" ||
+    batchVariant !== "log" && batchEventIdAttribute.trim() !== "" || overlap;
   const formDirty = dirty || powlDirty || tokenReplayDirty || logSkeletonDirty ||
     declareDirty || footprintsDirty || dfgDirty || correlationDirty || temporalDirty || ltlDirty;
 
@@ -3468,6 +3597,108 @@ export function Filters({
           <div className="filters-subhead">Temporal &amp; behavioral discovery</div>
           <div className="filters-row">
             <label className="filters-field">
+              <span>Temporal activity attribute</span>
+              <input type="text" placeholder="concept:name"
+                value={temporalActivityAttribute}
+                onChange={(e) => setTemporalActivityAttribute(e.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Temporal flat case-id attribute</span>
+              <input type="text" placeholder="case:concept:name"
+                value={temporalCaseIdAttribute}
+                onChange={(e) => setTemporalCaseIdAttribute(e.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Temporal source completion attribute</span>
+              <input type="text" placeholder="time:timestamp (default)"
+                value={temporalSourceTimestampAttribute}
+                onChange={(e) => setTemporalSourceTimestampAttribute(e.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Temporal target start attribute</span>
+              <input type="text" placeholder="completion time (default)"
+                value={temporalTargetTimestampAttribute}
+                onChange={(e) => setTemporalTargetTimestampAttribute(e.target.value)} />
+            </label>
+            <label className="filters-field filters-check">
+              <input type="checkbox" checked={temporalBusinessHours}
+                onChange={(e) => setTemporalBusinessHours(e.target.checked)} />
+              <span>Use temporal business hours</span>
+            </label>
+            <label className="filters-field">
+              <span>Temporal business-hour slots</span>
+              <input type="text" placeholder="none or 25200-61200,..."
+                value={temporalBusinessHourSlots}
+                disabled={!temporalBusinessHours}
+                onChange={(e) => setTemporalBusinessHourSlots(e.target.value)} />
+            </label>
+            <label className="filters-field filters-check">
+              <input type="checkbox" checked={temporalStrictAttributes}
+                onChange={(e) => setTemporalStrictAttributes(e.target.checked)} />
+              <span>Strict temporal attributes</span>
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Transition-system activity attribute</span>
+              <input
+                type="text"
+                placeholder="concept:name"
+                value={transitionActivityKey}
+                onChange={(e) => setTransitionActivityKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Transition-system case-id attribute</span>
+              <input
+                type="text"
+                placeholder="case:concept:name"
+                value={transitionCaseIdKey}
+                onChange={(e) => setTransitionCaseIdKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Transition-system view</span>
+              <select
+                value={transitionView}
+                onChange={(e) => setTransitionView(e.target.value as typeof transitionView)}
+              >
+                <option value="sequence">sequence (default)</option>
+                <option value="set">set</option>
+                <option value="multiset">multiset</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Transition-system direction</span>
+              <select
+                value={transitionDirection}
+                onChange={(e) => setTransitionDirection(e.target.value as typeof transitionDirection)}
+              >
+                <option value="forward">forward (default)</option>
+                <option value="backward">backward</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Transition-system window</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={transitionWindow}
+                onChange={(e) => setTransitionWindow(e.target.value)}
+              />
+            </label>
+            <label className="filters-field filters-check">
+              <input
+                type="checkbox"
+                checked={transitionIncludeData}
+                onChange={(e) => setTransitionIncludeData(e.target.checked)}
+              />
+              <span>Include transition occurrence data</span>
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
               <span>Performance spectrum activities</span>
               <input
                 type="text"
@@ -3489,13 +3720,15 @@ export function Filters({
                 <option value="dataframe">dataframe</option>
                 <option value="log_disconnected">log disconnected</option>
                 <option value="dataframe_disconnected">dataframe disconnected</option>
+                <option value="lazyframe">lazyframe</option>
+                <option value="lazyframe_disconnected">lazyframe disconnected</option>
               </select>
             </label>
             <label className="filters-field">
               <span>Spectrum sample size</span>
               <input
                 type="number"
-                min={1}
+                min={0}
                 step={1}
                 value={spectrumSampleSize}
                 disabled={spectrumActivities.split(",").map((name) => name.trim()).filter(Boolean).length < 2}
@@ -3658,6 +3891,16 @@ export function Filters({
                 value={batchStartTimestampAttribute}
                 disabled={!batches}
                 onChange={(e) => setBatchStartTimestampAttribute(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Batch event-id attribute <small>(pandas/polars only)</small></span>
+              <input
+                type="text"
+                placeholder="event_id (optional)"
+                value={batchEventIdAttribute}
+                disabled={!batches || batchVariant === "log"}
+                onChange={(e) => setBatchEventIdAttribute(e.target.value)}
               />
             </label>
           </div>

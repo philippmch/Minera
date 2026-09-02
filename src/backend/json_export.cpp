@@ -1537,6 +1537,10 @@ void write_performance_spectrum(std::ostream& out,
         return "dataframe_disconnected";
       case PerformanceSpectrumVariant::kLogDisconnected:
         return "log_disconnected";
+      case PerformanceSpectrumVariant::kLazyframe:
+        return "lazyframe";
+      case PerformanceSpectrumVariant::kLazyframeDisconnected:
+        return "lazyframe_disconnected";
     }
     throw std::invalid_argument("performance spectrum has unknown variant");
   }();
@@ -1845,14 +1849,17 @@ void validate_performance_spectrum(const PerformanceSpectrum& spectrum,
   const auto is_disconnected = [](PerformanceSpectrumVariant variant) {
     return variant == PerformanceSpectrumVariant::kDisconnected ||
            variant == PerformanceSpectrumVariant::kDataframeDisconnected ||
-           variant == PerformanceSpectrumVariant::kLogDisconnected;
+           variant == PerformanceSpectrumVariant::kLogDisconnected ||
+           variant == PerformanceSpectrumVariant::kLazyframeDisconnected;
   };
   if (spectrum.variant != PerformanceSpectrumVariant::kConnected &&
       spectrum.variant != PerformanceSpectrumVariant::kDisconnected &&
       spectrum.variant != PerformanceSpectrumVariant::kDataframe &&
       spectrum.variant != PerformanceSpectrumVariant::kLog &&
       spectrum.variant != PerformanceSpectrumVariant::kDataframeDisconnected &&
-      spectrum.variant != PerformanceSpectrumVariant::kLogDisconnected) {
+      spectrum.variant != PerformanceSpectrumVariant::kLogDisconnected &&
+      spectrum.variant != PerformanceSpectrumVariant::kLazyframe &&
+      spectrum.variant != PerformanceSpectrumVariant::kLazyframeDisconnected) {
     throw std::invalid_argument("performance spectrum has unknown variant");
   }
   for (const auto& observation : spectrum.observations) {
@@ -1933,27 +1940,40 @@ std::string_view batch_variant_name(BatchDiscoveryVariant variant) {
 const std::string* batch_event_value(const Event& event, std::string_view key,
                                      std::string_view kind) {
   if (kind == "activity" &&
-      (key.empty() || key == "activity" || key == "concept:name")) {
+      (key.empty() || key == "activity" || key == "concept:name" ||
+       key == event.activity_source_key)) {
     return &event.activity;
   }
   if (kind == "resource" &&
-      (key.empty() || key == "resource" || key == "org:resource")) {
+      (key.empty() || key == "resource" || key == "org:resource" ||
+       key == event.resource_source_key)) {
     return &event.resource;
   }
   if (kind == "timestamp" &&
-      (key.empty() || key == "timestamp" || key == "time:timestamp")) {
+      (key.empty() || key == "timestamp" || key == "time:timestamp" ||
+       key == event.timestamp_source_key)) {
     return &event.timestamp;
+  }
+  if (kind == "case" &&
+      (key.empty() || key == "case" || key == "case_id" ||
+       key == "case:id" || key == "case:concept:name" ||
+       key == "concept:name" || key == event.case_id_source_key)) {
+    return &event.case_id;
   }
   return event.attribute(key);
 }
 
-const std::string* batch_trace_value(const Trace& trace, std::string_view key) {
+const std::string* batch_case_value(const Trace& trace, const Event& event,
+                                    std::string_view key) {
   if (key.empty() || key == "case_id" || key == "case:id" ||
-      key == "case:concept:name" || key == "concept:name") {
+      key == "case:concept:name" || key == "concept:name" || key == "case") {
     return &trace.case_id;
   }
+  // A non-standard case selector is resolved against the exact source event,
+  // with trace metadata as a fallback.  This mirrors LOG discovery and is
+  // important when events in one trace carry different case labels.
+  if (const auto* value = batch_event_value(event, key, "case")) return value;
   if (const auto* value = trace.attribute(key)) return value;
-  if (!trace.events.empty()) return trace.events.front().attribute(key);
   return nullptr;
 }
 
@@ -2048,24 +2068,31 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
             event.complete > batch.complete) {
           throw std::invalid_argument("batch discovery has invalid event range");
         }
-        if (event.trace_index >= log.traces.size() ||
-            event.event_index >= log.traces[event.trace_index].events.size()) {
-          throw std::invalid_argument("batch discovery event index is out of range");
-        }
-        const auto& source = log.traces[event.trace_index].events[event.event_index];
-        const auto* source_activity = batch_event_value(
-            source, discovery.options.activity_attribute, "activity");
-        const auto* source_resource = batch_event_value(
-            source, discovery.options.resource_attribute, "resource");
-        if (source_activity == nullptr || source_resource == nullptr ||
-            *source_activity != group.activity ||
-            *source_resource != group.resource) {
-          throw std::invalid_argument("batch discovery event does not match its group");
-        }
-        const auto* source_case = batch_trace_value(
-            log.traces[event.trace_index], discovery.options.case_id_attribute);
-        if (source_case == nullptr || event.case_id != *source_case) {
-          throw std::invalid_argument("batch discovery event case_id does not match trace");
+        if (discovery.variant == BatchDiscoveryVariant::kLog) {
+          if (event.trace_index >= log.traces.size() ||
+              event.event_index >= log.traces[event.trace_index].events.size()) {
+            throw std::invalid_argument(
+                "batch discovery event index is out of range");
+          }
+          const auto& source =
+              log.traces[event.trace_index].events[event.event_index];
+          const auto* source_activity = batch_event_value(
+              source, discovery.options.activity_attribute, "activity");
+          const auto* source_resource = batch_event_value(
+              source, discovery.options.resource_attribute, "resource");
+          if (source_activity == nullptr || source_resource == nullptr ||
+              *source_activity != group.activity ||
+              *source_resource != group.resource) {
+            throw std::invalid_argument(
+                "batch discovery event does not match its group");
+          }
+          const auto* source_case = batch_case_value(
+              log.traces[event.trace_index], source,
+              discovery.options.case_id_attribute);
+          if (source_case == nullptr || event.case_id != *source_case) {
+            throw std::invalid_argument(
+                "batch discovery event case_id does not match source event");
+          }
         }
         if (event.start < previous_event_start) {
           throw std::invalid_argument("batch discovery events are not ordered");
@@ -2112,8 +2139,12 @@ void write_batch_discovery(std::ostream& out, const BatchDiscovery& discovery,
             << event.complete << ", \"case_id\": ";
         write_json_string(out, event.case_id);
         out << ", \"trace_index\": " << event.trace_index
-            << ", \"event_index\": " << event.event_index << "}"
-            << (k + 1 < batch.events.size() ? ", " : "");
+            << ", \"event_index\": " << event.event_index;
+        if (!event.event_id.empty()) {
+          out << ", \"event_id\": ";
+          write_json_string(out, event.event_id);
+        }
+        out << "}" << (k + 1 < batch.events.size() ? ", " : "");
       }
       out << "]}" << (j + 1 < group.batches.size() ? ", " : "");
     }
@@ -2131,6 +2162,8 @@ void write_batch_discovery(std::ostream& out, const BatchDiscovery& discovery,
   write_json_string(out, discovery.options.case_id_attribute);
   out << ", \"start_timestamp_attribute\": ";
   write_json_string(out, discovery.options.start_timestamp_attribute);
+  out << ", \"event_id_attribute\": ";
+  write_json_string(out, discovery.options.event_id_attribute);
   out << "}";
 }
 
@@ -5511,6 +5544,50 @@ std::string role_discovery_json(const RoleDiscoveryResult& result) {
       << ",\"activity_count\":" << d.activity_count << ",\"resource_count\":" << d.resource_count
       << ",\"role_count\":" << d.role_count << ",\"message\":";
   write_json_string(out, d.message); out << "}}";
+  return out.str();
+}
+
+std::string temporal_conformance_json(
+    const TemporalConformanceResult& result) {
+  std::size_t deviation_count = 0;
+  for (const auto& trace : result) {
+    for (const auto& deviation : trace) {
+      if (!std::isfinite(deviation.elapsed_seconds) ||
+          !std::isfinite(deviation.standard_deviation_distance) ||
+          deviation.elapsed_seconds < 0.0 ||
+          deviation.standard_deviation_distance < 0.0) {
+        throw std::invalid_argument(
+            "temporal conformance contains an invalid deviation");
+      }
+      ++deviation_count;
+    }
+  }
+  std::ostringstream out;
+  out << "{\"family\":\"TEMPORAL_PROFILE_CONFORMANCE\",\"trace_count\":"
+      << result.size() << ",\"deviation_count\":" << deviation_count
+      << ",\"traces\":[";
+  for (std::size_t trace_index = 0; trace_index < result.size();
+       ++trace_index) {
+    if (trace_index) out << ',';
+    out << '[';
+    const auto& trace = result[trace_index];
+    for (std::size_t index = 0; index < trace.size(); ++index) {
+      if (index) out << ',';
+      const auto& deviation = trace[index];
+      out << "{\"case_id\":";
+      write_json_string(out, deviation.case_id);
+      out << ",\"source\":";
+      write_json_string(out, deviation.source);
+      out << ",\"target\":";
+      write_json_string(out, deviation.target);
+      out << ",\"elapsed_seconds\":" << std::setprecision(17)
+          << deviation.elapsed_seconds
+          << ",\"standard_deviation_distance\":" << std::setprecision(17)
+          << deviation.standard_deviation_distance << '}';
+    }
+    out << ']';
+  }
+  out << "]}";
   return out.str();
 }
 

@@ -6,6 +6,7 @@ const valid = {
   spectrumActivityCount: 2,
   spectrumSampleSize: "10000",
   batches: true,
+  batchVariant: "pandas" as const,
   batchMergeDistanceSeconds: "900",
   batchMinSize: "2",
   overlap: false,
@@ -20,11 +21,17 @@ describe("temporal filter validation", () => {
 
   it("rejects exactly one nonblank spectrum activity", () => {
     expect(temporalValidationMessage({ ...valid, spectrumConfigured: false, spectrumActivityCount: 1 })).toContain("at least two activities");
+    expect(temporalValidationMessage({
+      ...valid,
+      spectrumHasEmptyActivity: true,
+    })).toContain("empty entries");
   });
 
   it("rejects invalid active spectrum and batch numbers", () => {
-    expect(temporalValidationMessage({ ...valid, spectrumSampleSize: "0" })).toContain("Spectrum sample size");
+    expect(temporalValidationMessage({ ...valid, spectrumSampleSize: "0" })).toBeNull();
     expect(temporalValidationMessage({ ...valid, spectrumSampleSize: "2.5" })).toContain("Spectrum sample size");
+    expect(temporalValidationMessage({ ...valid, spectrumSampleSize: "-1" })).toContain("Spectrum sample size");
+    expect(temporalValidationMessage({ ...valid, spectrumSampleSize: "9007199254740992" })).toContain("Spectrum sample size");
     expect(temporalValidationMessage({ ...valid, batchMergeDistanceSeconds: "-1" })).toContain("merge distance");
     expect(temporalValidationMessage({ ...valid, batchMergeDistanceSeconds: "Infinity" })).toContain("merge distance");
     expect(temporalValidationMessage({ ...valid, batchMinSize: "1" })).toContain("minimum size");
@@ -35,6 +42,44 @@ describe("temporal filter validation", () => {
     expect(temporalValidationMessage({ ...valid, overlap: true, overlapEpsilon: "-1" })).toContain("Overlap epsilon");
     expect(temporalValidationMessage({ ...valid, overlap: true, overlapEpsilon: "Infinity" })).toContain("Overlap epsilon");
     expect(temporalValidationMessage({ ...valid, overlap: true, overlapEpsilon: "0" })).toBeNull();
+  });
+
+  it("requires nonblank behavioral selectors when supplied", () => {
+    expect(temporalValidationMessage({ ...valid, transitionActivityKey: " " }))
+      .toContain("activity selector");
+    expect(temporalValidationMessage({ ...valid, transitionCaseIdKey: "\t" }))
+      .toContain("case-id selector");
+    expect(temporalValidationMessage({ ...valid, batches: false, batchEventIdAttribute: " " }))
+      .toBeNull();
+    expect(temporalValidationMessage({ ...valid, batchVariant: "log", batchEventIdAttribute: " " , batches: true }))
+      .toBeNull();
+    expect(temporalValidationMessage({ ...valid, batchVariant: "pandas", batchEventIdAttribute: " " , batches: true }))
+      .toContain("event-id selector");
+  });
+
+  it("validates transition-system controls against their backend defaults", () => {
+    expect(temporalValidationMessage({
+      ...valid,
+      transitionView: "sequence",
+      transitionDirection: "forward",
+      transitionWindow: "2",
+    })).toBeNull();
+    expect(temporalValidationMessage({
+      ...valid,
+      transitionView: "unknown" as never,
+    })).toContain("view");
+    expect(temporalValidationMessage({
+      ...valid,
+      transitionDirection: "reverse" as never,
+    })).toContain("direction");
+    expect(temporalValidationMessage({
+      ...valid,
+      transitionWindow: "-1",
+    })).toContain("window");
+    expect(temporalValidationMessage({
+      ...valid,
+      transitionWindow: "2.5",
+    })).toContain("window");
   });
 });
 

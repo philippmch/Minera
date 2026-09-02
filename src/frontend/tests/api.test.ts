@@ -9,7 +9,7 @@ import { requestWorkflowHistory } from "../src/api";
 import { requestEnterpriseHistory } from "../src/api";
 import { requestCommunicationHistory } from "../src/api";
 import { knowledgeInjectionQuery, requestKnowledgeInjection } from "../src/api";
-import { mineFormEntries } from "../src/api";
+import { mineFormEntries, requestTemporalConformance, temporalConformanceQuery } from "../src/api";
 import { alignModel, alignmentQuery, decideModel, decisionMiningQuery,
   decisionTablesQuery, evaluateModel, evaluationQuery,
   requestDecisionTables } from "../src/api";
@@ -1061,6 +1061,67 @@ describe("streaming temporal API", () => {
     }));
     await expect(requestStreamingTemporal(new Blob(["case_id,activity,timestamp\nc1,A,2024-01-01T00:00:00Z\nc1,B,2024-01-01T00:00:20Z\n"]), options))
       .resolves.toMatchObject({ family: "STREAMING_TEMPORAL", total_deviations: 1 });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("cached temporal conformance API", () => {
+  const options = {
+    temporal_profile: [["A", "B", 10, 2]] as Array<[string, string, number, number]>,
+    temporal_variant: "dataframe" as const,
+    temporal_activity_attribute: " phase ",
+    temporal_case_id_attribute: " case_ref ",
+    temporal_source_timestamp_attribute: " finished_at ",
+    temporal_target_timestamp_attribute: " started_at ",
+    temporal_business_hours: true,
+    temporal_business_hour_slots: " 0-3600 ",
+    temporal_strict_attributes: true,
+    temporal_zeta: 0,
+  };
+
+  it("serializes the profile and all temporal options", () => {
+    expect(temporalConformanceQuery(options)).toBe(
+      "temporal_profile=A-%3EB%3A10%3A2&temporal_variant=dataframe&temporal_activity_attribute=phase&" +
+      "temporal_case_id_attribute=case_ref&temporal_source_timestamp_attribute=finished_at&" +
+      "temporal_target_timestamp_attribute=started_at&temporal_business_hour_slots=0-3600&" +
+      "temporal_business_hours=true&temporal_strict_attributes=true&temporal_zeta=0",
+    );
+    expect(() => temporalConformanceQuery({
+      temporal_profile: [["A", "B", -1, 0]],
+    })).toThrow(/source\/target\/mean\/stddev/);
+    expect(() => temporalConformanceQuery({
+      temporal_profile: options.temporal_profile, temporal_zeta: Number.NaN,
+    })).toThrow(/temporal_zeta must not be NaN/);
+    expect(temporalConformanceQuery({
+      temporal_profile: options.temporal_profile, temporal_zeta: Number.POSITIVE_INFINITY,
+    })).toBe("temporal_profile=A-%3EB%3A10%3A2&temporal_zeta=Infinity");
+    expect(temporalConformanceQuery({
+      temporal_profile: options.temporal_profile, temporal_zeta: Number.NEGATIVE_INFINITY,
+    })).toBe("temporal_profile=A-%3EB%3A10%3A2&temporal_zeta=-Infinity");
+    expect(temporalConformanceQuery({
+      temporal_profile: options.temporal_profile, temporal_variant: "log",
+    })).toBe("temporal_profile=A-%3EB%3A10%3A2");
+    expect(() => temporalConformanceQuery({
+      temporal_profile: options.temporal_profile, temporal_variant: "other" as never,
+    })).toThrow(/temporal_variant must be log or dataframe/);
+  });
+
+  it("requests and validates grouped cached-session conformance", async () => {
+    const payload = {
+      family: "TEMPORAL_PROFILE_CONFORMANCE", trace_count: 2,
+      deviation_count: 1,
+      traces: [[{ case_id: "c1", source: "A", target: "B", elapsed_seconds: 19,
+        standard_deviation_distance: 4.5 }], []],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toContain("/api/temporal-conformance?");
+      expect(init?.method).toBe("POST");
+      expect(init?.body).toBeUndefined();
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(requestTemporalConformance(options)).resolves.toMatchObject({
+      family: "TEMPORAL_PROFILE_CONFORMANCE", trace_count: 2, deviation_count: 1,
+    });
     vi.unstubAllGlobals();
   });
 });
