@@ -89,9 +89,9 @@ using InductiveMinerVariantLog =
 // Inductive Miner. The algorithm recursively detects exclusive-choice,
 // sequence, parallel and loop cuts on the directly-follows graph of the
 // (sub)log, splits the log accordingly, and recurses; logs without a cut fall
-// through to a flower model so the result always fits the log. With a non-zero
-// noise threshold it runs the infrequent variant (IMf), filtering rare
-// behaviour so noisy logs still yield a structured model. The kDfg variant
+// through to a flower model so the result always fits the log. The explicit
+// kImf variant applies the configured noise threshold, filtering rare behaviour
+// so noisy logs still yield a structured model. The kDfg variant
 // (IMd) recurses on projections of the directly-follows graph instead of
 // sublogs, scaling to huge logs at some model-quality cost.
 [[nodiscard]] ProcessTree discover_process_tree(

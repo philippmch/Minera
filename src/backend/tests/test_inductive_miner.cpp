@@ -132,6 +132,52 @@ void graph_self_loop_keeps_unknown_skip_behavior() {
   assert(render(direct, direct.root()) == "*(tau,a)");
 }
 
+void graph_registry_only_activities_do_not_create_behavior() {
+  auto graph = discover_directly_follows_graph(log_from_variants({{"a"}}));
+  graph.ensure_activity("unused");
+  const auto tree = discover_process_tree(graph);
+  assert(render(tree, tree.root()) == "a");
+}
+
+void graph_projection_preserves_boundaries_and_skips() {
+  InductiveMinerOptions options;
+  options.variant = InductiveMinerVariant::IMD;
+
+  const auto start_skip = discover_process_tree(
+      InductiveMinerVariantLog{{{"a", "b"}, 1}, {{"b"}, 1}}, options);
+  assert(render(start_skip, start_skip.root()) == "->(X(tau,a),b)");
+
+  const auto end_skip = discover_process_tree(
+      InductiveMinerVariantLog{{{"a", "b"}, 1}, {{"a"}, 1}}, options);
+  assert(render(end_skip, end_skip.root()) == "->(a,X(tau,b))");
+
+  const auto jump_skip = discover_process_tree(
+      InductiveMinerVariantLog{{{"a", "c"}, 1}, {{"a", "b", "c"}, 1}},
+      options);
+  assert(render(jump_skip, jump_skip.root()) == "->(a,X(tau,b),c)");
+
+  const auto loop_skip = discover_process_tree(
+      InductiveMinerVariantLog{{{"a", "b", "a"}, 1}, {{"a", "a"}, 1}},
+      options);
+  assert(render(loop_skip, loop_skip.root()) == "*(*(tau,a),X(tau,b))");
+}
+
+void graph_parallel_cut_repairs_invalid_boundary_groups() {
+  InductiveMinerOptions options;
+  options.variant = InductiveMinerVariant::IMD;
+  const InductiveMinerVariantLog variants = {
+      {{"a", "b", "c", "a"}, 1}, {{"b", "a", "c", "b"}, 1}};
+  const auto tree = discover_process_tree(variants, options);
+  assert(render(tree, tree.root()) == "+(a,*(b,c))");
+}
+
+void loop_projection_retains_a_terminal_redo_skip() {
+  const InductiveMinerVariantLog variants = {
+      {{"a"}, 1}, {{"a", "b", "a"}, 1}, {{"a", "b"}, 1}};
+  const auto tree = discover_process_tree(variants);
+  assert(render(tree, tree.root()) == "*(->(a,X(tau,b)),tau)");
+}
+
 void strict_sequence_toggle_is_observable() {
   const auto log = log_from_variants({{"a"}, {"a", "b", "c"}});
   const auto strict = discover_process_tree(log);
@@ -186,6 +232,9 @@ void specialized_fallthroughs_and_disabled_policy() {
   const auto dfg_tree = discover_process_tree(general_loop, dfg);
   assert(dfg_tree.root().op == ProcessTreeOperator::kLoop);
   assert(dfg_tree.root().children.front().op == ProcessTreeOperator::kTau);
+  assert(dfg_tree.root().children.size() == 2);
+  assert(dfg_tree.root().children.back().op ==
+         ProcessTreeOperator::kExclusive);
 }
 
 void event_log_custom_selectors_and_ordering() {
@@ -408,11 +457,30 @@ void filtered_exclusive_ties_route_to_highest_group() {
   assert(render(tie_tree, tie_tree.root()) == "X(c,->(a,b))");
 }
 
+void filtered_cut_drops_activities_outside_the_filtered_alphabet() {
+  const InductiveMinerVariantLog variants = {
+      {{"a", "d", "d", "d", "b", "a", "b"}, 1}};
+  InductiveMinerOptions options;
+  options.variant = InductiveMinerVariant::IMF;
+  options.noise_threshold = 1.0;
+  const auto tree = discover_process_tree(variants, options);
+
+  // Every edge incident to d is below the strict maximum threshold, and d is
+  // neither a retained start nor an end. It therefore cannot survive as a
+  // filtered exclusive branch. The tied a/b projection deterministically
+  // keeps the higher-index b group, including both b occurrences.
+  assert(render(tree, tree.root()) == "X(tau,*(b,tau))");
+}
+
 }  // namespace
 
 int main() {
   ordinary_variants_and_graph_input();
   graph_self_loop_keeps_unknown_skip_behavior();
+  graph_registry_only_activities_do_not_create_behavior();
+  graph_projection_preserves_boundaries_and_skips();
+  graph_parallel_cut_repairs_invalid_boundary_groups();
+  loop_projection_retains_a_terminal_redo_skip();
   strict_sequence_toggle_is_observable();
   specialized_fallthroughs_and_disabled_policy();
   event_log_custom_selectors_and_ordering();
@@ -423,5 +491,6 @@ int main() {
   variant_selector_contract();
   sequence_projection_uses_ordered_min_cost_windows();
   filtered_exclusive_ties_route_to_highest_group();
+  filtered_cut_drops_activities_outside_the_filtered_alphabet();
   return 0;
 }

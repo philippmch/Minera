@@ -51,6 +51,7 @@ struct LocalDfg {
   std::vector<std::vector<std::uint64_t>> edge_count;
   std::vector<std::uint64_t> start_count;
   std::vector<std::uint64_t> end_count;
+  bool skip = false;
 
   [[nodiscard]] std::size_t size() const { return to_global.size(); }
 };
@@ -104,16 +105,65 @@ void apply_noise_filter(LocalDfg& dfg, double f) {
     // edge baseline above, so stray departures from an end remain removable.
     if (dfg.end_count[a] > 0) dfg.is_end[a] = 1;
   }
+
+  if (f <= 0.0) return;
+
+  // Filtering also changes the graph alphabet. An activity whose incident
+  // edges and boundary memberships were all removed must not participate in
+  // a cut merely because it occurred in the unfiltered trace. The eventual
+  // cut projection drops those invisible events from the original log.
+  std::vector<char> visible(n, 0);
+  for (std::size_t a = 0; a < n; ++a) {
+    visible[a] = dfg.is_start[a] || dfg.is_end[a];
+    for (std::size_t b = 0; b < n; ++b) {
+      if (dfg.follows[a][b] || dfg.follows[b][a]) visible[a] = 1;
+    }
+  }
+  if (std::all_of(visible.begin(), visible.end(),
+                  [](char value) { return value != 0; })) {
+    return;
+  }
+
+  constexpr std::size_t kMissing = static_cast<std::size_t>(-1);
+  std::vector<std::size_t> remap(n, kMissing);
+  LocalDfg compact;
+  compact.skip = dfg.skip;
+  for (std::size_t a = 0; a < n; ++a) {
+    if (!visible[a]) continue;
+    remap[a] = compact.to_global.size();
+    compact.to_local.emplace(dfg.to_global[a], compact.to_global.size());
+    compact.to_global.push_back(dfg.to_global[a]);
+  }
+  compact.edge_count.assign(
+      compact.size(), std::vector<std::uint64_t>(compact.size(), 0));
+  compact.start_count.assign(compact.size(), 0);
+  compact.end_count.assign(compact.size(), 0);
+  for (std::size_t a = 0; a < n; ++a) {
+    if (remap[a] == kMissing) continue;
+    const std::size_t mapped_a = remap[a];
+    if (dfg.is_start[a]) compact.start_count[mapped_a] = dfg.start_count[a];
+    if (dfg.is_end[a]) compact.end_count[mapped_a] = dfg.end_count[a];
+    for (std::size_t b = 0; b < n; ++b) {
+      if (remap[b] != kMissing && dfg.follows[a][b]) {
+        compact.edge_count[mapped_a][remap[b]] = dfg.edge_count[a][b];
+      }
+    }
+  }
+  dfg = std::move(compact);
+  apply_noise_filter(dfg, 0.0);
 }
 
 LocalDfg build_local_dfg(const Sublog& log) {
   LocalDfg dfg;
+  std::set<ActId> activities;
   for (const auto& wt : log) {
     for (const ActId act : wt.activities) {
-      if (dfg.to_local.emplace(act, dfg.to_global.size()).second) {
-        dfg.to_global.push_back(act);
-      }
+      activities.insert(act);
     }
+  }
+  for (const ActId act : activities) {
+    dfg.to_local.emplace(act, dfg.to_global.size());
+    dfg.to_global.push_back(act);
   }
 
   const std::size_t n = dfg.size();
@@ -459,8 +509,9 @@ std::optional<std::vector<std::vector<ActId>>> strict_sequence_cut(
 }
 
 // Parallel: activities that are not concurrent (not connected in both
-// directions) must share a branch. Each resulting branch must be able to both
-// start and end the trace.
+// directions) must share a branch. Candidate groups without both a trace start
+// and a trace end are folded into a neighbouring group, smallest groups first;
+// this preserves a valid coarser cut instead of rejecting it outright.
 std::optional<std::vector<std::vector<ActId>>> parallel_cut(
     const LocalDfg& dfg) {
   const std::size_t n = dfg.size();
@@ -478,17 +529,31 @@ std::optional<std::vector<std::vector<ActId>>> parallel_cut(
   if (local_groups.size() < 2) {
     return std::nullopt;
   }
-  for (const auto& group : local_groups) {
+  std::stable_sort(local_groups.begin(), local_groups.end(),
+                   [](const auto& left, const auto& right) {
+                     return left.size() < right.size();
+                   });
+  std::size_t group = 0;
+  while (group < local_groups.size() && local_groups.size() > 1) {
     bool has_start = false;
     bool has_end = false;
-    for (const std::size_t loc : group) {
+    for (const std::size_t loc : local_groups[group]) {
       has_start = has_start || dfg.is_start[loc];
       has_end = has_end || dfg.is_end[loc];
     }
-    if (!has_start || !has_end) {
-      return std::nullopt;
+    if (has_start && has_end) {
+      ++group;
+      continue;
     }
+
+    auto rejected = std::move(local_groups[group]);
+    local_groups.erase(local_groups.begin() +
+                       static_cast<std::ptrdiff_t>(group));
+    const std::size_t target = group == 0 ? 0 : group - 1;
+    local_groups[target].insert(local_groups[target].end(), rejected.begin(),
+                                rejected.end());
   }
+  if (local_groups.size() < 2) return std::nullopt;
   return to_global(dfg, local_groups);
 }
 
@@ -698,7 +763,8 @@ std::vector<Sublog> split_exclusive(const Sublog& log,
   for (const auto& wt : log) {
     hits.assign(groups, 0);
     for (const ActId act : wt.activities) {
-      ++hits[group_of.at(act)];
+      const auto group = group_of.find(act);
+      if (group != group_of.end()) ++hits[group->second];
     }
     // Sorting the reference candidates by (hit count, group index) descending
     // means ties are deliberately routed to the highest-index group.  Keeping
@@ -711,7 +777,8 @@ std::vector<Sublog> split_exclusive(const Sublog& log,
     std::vector<ActId> kept;
     kept.reserve(wt.activities.size());
     for (const ActId act : wt.activities) {
-      if (group_of.at(act) == target) {
+      const auto group = group_of.find(act);
+      if (group != group_of.end() && group->second == target) {
         kept.push_back(act);
       }
     }
@@ -734,7 +801,8 @@ std::vector<Sublog> split_parallel_projection(const Sublog& log,
   for (const auto& wt : log) {
     std::vector<std::vector<ActId>> parts(groups);
     for (const ActId act : wt.activities) {
-      parts[group_of.at(act)].push_back(act);
+      const auto group = group_of.find(act);
+      if (group != group_of.end()) parts[group->second].push_back(act);
     }
     for (std::size_t i = 0; i < groups; ++i) {
       out[i].push_back(WeightedTrace{std::move(parts[i]), wt.count});
@@ -768,7 +836,9 @@ std::vector<Sublog> split_sequence_projection(
       int cost = 0;
       for (std::size_t position = split_point; position < wt.activities.size();
            ++position) {
-        const std::size_t activity_group = group_of.at(wt.activities[position]);
+        const auto mapped = group_of.find(wt.activities[position]);
+        if (mapped == group_of.end()) continue;
+        const std::size_t activity_group = mapped->second;
         if (activity_group == group) {
           --cost;
         } else if (!ignored[activity_group]) {
@@ -785,7 +855,10 @@ std::vector<Sublog> split_sequence_projection(
       for (std::size_t position = split_point; position < new_split_point;
            ++position) {
         const ActId activity = wt.activities[position];
-        if (group_of.at(activity) == group) projected.push_back(activity);
+        const auto mapped = group_of.find(activity);
+        if (mapped != group_of.end() && mapped->second == group) {
+          projected.push_back(activity);
+        }
       }
       out[group].push_back(WeightedTrace{std::move(projected), wt.count});
       split_point = new_split_point;
@@ -805,13 +878,18 @@ std::vector<Sublog> split_loop(const Sublog& log,
                                const GroupOf& group_of) {
   std::vector<Sublog> out(groups);
   for (const auto& wt : log) {
-    if (wt.activities.empty()) {
+    std::vector<ActId> visible;
+    visible.reserve(wt.activities.size());
+    for (const ActId act : wt.activities) {
+      if (group_of.find(act) != group_of.end()) visible.push_back(act);
+    }
+    if (visible.empty()) {
       out[0].push_back(WeightedTrace{{}, wt.count});
       continue;
     }
-    std::size_t current = group_of.at(wt.activities.front());
+    std::size_t current = group_of.at(visible.front());
     std::vector<ActId> run;
-    for (const ActId act : wt.activities) {
+    for (const ActId act : visible) {
       const std::size_t group = group_of.at(act);
       if (group != current) {
         out[current].push_back(WeightedTrace{std::move(run), wt.count});
@@ -821,6 +899,9 @@ std::vector<Sublog> split_loop(const Sublog& log,
       run.push_back(act);
     }
     out[current].push_back(WeightedTrace{std::move(run), wt.count});
+    if (current != 0) {
+      out[0].push_back(WeightedTrace{{}, wt.count});
+    }
   }
   for (auto& sublog : out) {
     sublog = compress(std::move(sublog));
@@ -841,6 +922,11 @@ ProcessTreeNode make_node(ProcessTreeOperator op,
     std::vector<ProcessTreeNode> flat;
     bool kept_tau = false;
     for (auto& child : children) {
+      if ((op == ProcessTreeOperator::kSequence ||
+           op == ProcessTreeOperator::kParallel) &&
+          child.op == ProcessTreeOperator::kTau) {
+        continue;
+      }
       if (child.op == op) {
         for (auto& grandchild : child.children) {
           flat.push_back(std::move(grandchild));
@@ -864,6 +950,8 @@ ProcessTreeNode make_node(ProcessTreeOperator op,
     }
     children = std::move(flat);
   }
+
+  if (children.empty()) return ProcessTreeNode::tau();
 
   if (children.size() == 1) {
     return std::move(children.front());
@@ -924,15 +1012,18 @@ ProcessTreeNode flower(const std::vector<ActId>& activities,
     }
     return left < right;
   });
-  std::vector<ProcessTreeNode> children;
-  children.reserve(ordered.size() + 1);
-  children.push_back(ProcessTreeNode::tau());
+  if (ordered.empty()) return ProcessTreeNode::tau();
+
+  std::vector<ProcessTreeNode> choices;
+  choices.reserve(ordered.size());
   for (const ActId act : ordered) {
-    children.push_back(ProcessTreeNode::leaf(act));
+    choices.push_back(ProcessTreeNode::leaf(act));
   }
   ProcessTreeNode node;
   node.op = ProcessTreeOperator::kLoop;
-  node.children = std::move(children);
+  node.children = {
+      ProcessTreeNode::tau(),
+      make_node(ProcessTreeOperator::kExclusive, std::move(choices))};
   return node;
 }
 
@@ -1195,17 +1286,9 @@ ProcessTreeNode mine(const Sublog& log, double f,
 // each cut projects the *graph* onto its groups instead of splitting traces,
 // so recursion cost depends on the number of activities, not events.
 
-// Projects the parent graph onto one group of a cut. Internal edges keep their
-// counts and the group inherits its members' start/end counts. With
-// `crossing_edges` set (sequence, parallel, and loop cuts), an edge entering
-// the group from outside makes its target a start of the sub-graph and an edge
-// leaving makes its source an end — the sub-behaviour begins and ends at the
-// crossing points. An exclusive cut has no meaningful crossing edges (its
-// groups are components; anything across is filtered noise), so they are
-// dropped there.
-LocalDfg project_dfg(const LocalDfg& parent,
+LocalDfg induced_dfg(const LocalDfg& parent,
                      const std::vector<ActId>& group,
-                     bool crossing_edges) {
+                     bool retain_boundaries) {
   LocalDfg sub;
   for (const ActId act : group) {
     sub.to_local.emplace(act, sub.to_global.size());
@@ -1223,7 +1306,7 @@ LocalDfg project_dfg(const LocalDfg& parent,
   }
 
   for (std::size_t a = 0; a < parent.size(); ++a) {
-    if (to_sub[a] != kOutside) {
+    if (retain_boundaries && to_sub[a] != kOutside) {
       sub.start_count[to_sub[a]] += parent.start_count[a];
       sub.end_count[to_sub[a]] += parent.end_count[a];
     }
@@ -1236,23 +1319,203 @@ LocalDfg project_dfg(const LocalDfg& parent,
       const bool b_in = to_sub[b] != kOutside;
       if (a_in && b_in) {
         sub.edge_count[to_sub[a]][to_sub[b]] += weight;
-      } else if (crossing_edges && !a_in && b_in) {
-        sub.start_count[to_sub[b]] += weight;
-      } else if (crossing_edges && a_in && !b_in) {
-        sub.end_count[to_sub[a]] += weight;
       }
     }
   }
 
-  apply_noise_filter(sub, 0.0);
   return sub;
+}
+
+void finalize_projected_dfg(LocalDfg& dfg) {
+  std::vector<char> visible(dfg.size(), 0);
+  for (std::size_t activity = 0; activity < dfg.size(); ++activity) {
+    visible[activity] = dfg.start_count[activity] > 0 ||
+                        dfg.end_count[activity] > 0;
+    for (std::size_t other = 0; other < dfg.size(); ++other) {
+      if (dfg.edge_count[activity][other] > 0 ||
+          dfg.edge_count[other][activity] > 0) {
+        visible[activity] = 1;
+      }
+    }
+  }
+
+  constexpr std::size_t kMissing = static_cast<std::size_t>(-1);
+  std::vector<std::size_t> remap(dfg.size(), kMissing);
+  LocalDfg compact;
+  compact.skip = dfg.skip;
+  for (std::size_t activity = 0; activity < dfg.size(); ++activity) {
+    if (!visible[activity]) continue;
+    remap[activity] = compact.to_global.size();
+    compact.to_local.emplace(dfg.to_global[activity], compact.to_global.size());
+    compact.to_global.push_back(dfg.to_global[activity]);
+  }
+  compact.edge_count.assign(
+      compact.size(), std::vector<std::uint64_t>(compact.size(), 0));
+  compact.start_count.assign(compact.size(), 0);
+  compact.end_count.assign(compact.size(), 0);
+  for (std::size_t activity = 0; activity < dfg.size(); ++activity) {
+    if (remap[activity] == kMissing) continue;
+    const std::size_t mapped = remap[activity];
+    compact.start_count[mapped] = dfg.start_count[activity];
+    compact.end_count[mapped] = dfg.end_count[activity];
+    for (std::size_t other = 0; other < dfg.size(); ++other) {
+      if (remap[other] != kMissing) {
+        compact.edge_count[mapped][remap[other]] =
+            dfg.edge_count[activity][other];
+      }
+    }
+  }
+  dfg = std::move(compact);
+  apply_noise_filter(dfg, 0.0);
+}
+
+std::vector<LocalDfg> project_sequence_dfg(
+    const LocalDfg& parent,
+    const std::vector<std::vector<ActId>>& groups) {
+  std::vector<std::size_t> group_of(parent.size(), 0);
+  for (std::size_t group = 0; group < groups.size(); ++group) {
+    for (const ActId activity : groups[group]) {
+      group_of[parent.to_local.at(activity)] = group;
+    }
+  }
+
+  std::vector<char> skippable(groups.size(), 0);
+  for (std::size_t activity = 0; activity < parent.size(); ++activity) {
+    if (parent.start_count[activity] > 0) {
+      for (std::size_t group = 0; group < group_of[activity]; ++group) {
+        skippable[group] = 1;
+      }
+    }
+    if (parent.end_count[activity] > 0) {
+      for (std::size_t group = group_of[activity] + 1; group < groups.size();
+           ++group) {
+        skippable[group] = 1;
+      }
+    }
+    for (std::size_t target = 0; target < parent.size(); ++target) {
+      if (parent.edge_count[activity][target] == 0) continue;
+      for (std::size_t group = group_of[activity] + 1;
+           group < group_of[target]; ++group) {
+        skippable[group] = 1;
+      }
+    }
+  }
+
+  std::vector<LocalDfg> projected;
+  projected.reserve(groups.size());
+  for (std::size_t group = 0; group < groups.size(); ++group) {
+    LocalDfg sub = induced_dfg(parent, groups[group], false);
+    if (group == 0) {
+      for (std::size_t activity = 0; activity < parent.size(); ++activity) {
+        const auto target = sub.to_local.find(parent.to_global[activity]);
+        if (target != sub.to_local.end()) {
+          sub.start_count[target->second] += parent.start_count[activity];
+        }
+      }
+    } else {
+      for (const ActId source_global : groups[group - 1]) {
+        const std::size_t source = parent.to_local.at(source_global);
+        for (const ActId target_global : groups[group]) {
+          const std::size_t target = parent.to_local.at(target_global);
+          sub.start_count[sub.to_local.at(target_global)] +=
+              parent.edge_count[source][target];
+        }
+      }
+    }
+
+    if (group + 1 == groups.size()) {
+      for (std::size_t activity = 0; activity < parent.size(); ++activity) {
+        const auto source = sub.to_local.find(parent.to_global[activity]);
+        if (source != sub.to_local.end()) {
+          sub.end_count[source->second] += parent.end_count[activity];
+        }
+      }
+    } else {
+      for (const ActId source_global : groups[group]) {
+        const std::size_t source = parent.to_local.at(source_global);
+        for (const ActId target_global : groups[group + 1]) {
+          const std::size_t target = parent.to_local.at(target_global);
+          sub.end_count[sub.to_local.at(source_global)] +=
+              parent.edge_count[source][target];
+        }
+      }
+    }
+    sub.skip = skippable[group];
+    finalize_projected_dfg(sub);
+    projected.push_back(std::move(sub));
+  }
+  return projected;
+}
+
+std::vector<LocalDfg> project_loop_dfg(
+    const LocalDfg& parent,
+    const std::vector<std::vector<ActId>>& groups) {
+  std::vector<LocalDfg> projected;
+  projected.reserve(groups.size());
+  bool redo_is_skippable = false;
+  for (std::size_t source = 0; source < parent.size(); ++source) {
+    if (parent.end_count[source] == 0) continue;
+    for (std::size_t target = 0; target < parent.size(); ++target) {
+      if (parent.start_count[target] > 0 &&
+          parent.edge_count[source][target] > 0) {
+        redo_is_skippable = true;
+      }
+    }
+  }
+
+  for (std::size_t group = 0; group < groups.size(); ++group) {
+    LocalDfg sub = induced_dfg(parent, groups[group], false);
+    if (group == 0) {
+      for (std::size_t activity = 0; activity < parent.size(); ++activity) {
+        const auto local = sub.to_local.find(parent.to_global[activity]);
+        if (local != sub.to_local.end()) {
+          sub.start_count[local->second] += parent.start_count[activity];
+          sub.end_count[local->second] += parent.end_count[activity];
+        } else if (parent.start_count[activity] > 0 ||
+                   parent.end_count[activity] > 0) {
+          sub.skip = true;
+        }
+      }
+    } else {
+      for (std::size_t activity = 0; activity < sub.size(); ++activity) {
+        sub.start_count[activity] = 1;
+        sub.end_count[activity] = 1;
+      }
+      sub.skip = redo_is_skippable;
+    }
+    finalize_projected_dfg(sub);
+    projected.push_back(std::move(sub));
+  }
+  return projected;
 }
 
 ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
                          const InductiveMinerOptions& options,
                          const ActivityLabels& labels) {
-  if (dfg.size() == 0) {
+  // Imported graphs may register activities that have no occurrence, edge, or
+  // boundary count. Keep those registry entries available to the surrounding
+  // model while excluding them from the behavior being mined.
+  finalize_projected_dfg(dfg);
+  const bool has_graph_content =
+      std::any_of(dfg.start_count.begin(), dfg.start_count.end(),
+                  [](std::uint64_t count) { return count > 0; }) ||
+      std::any_of(dfg.end_count.begin(), dfg.end_count.end(),
+                  [](std::uint64_t count) { return count > 0; }) ||
+      std::any_of(dfg.edge_count.begin(), dfg.edge_count.end(),
+                  [](const auto& row) {
+                    return std::any_of(
+                        row.begin(), row.end(),
+                        [](std::uint64_t count) { return count > 0; });
+                  });
+  if (dfg.size() == 0 || !has_graph_content) {
     return ProcessTreeNode::tau();
+  }
+
+  if (dfg.skip) {
+    dfg.skip = false;
+    return make_node(
+        ProcessTreeOperator::kExclusive,
+        {ProcessTreeNode::tau(), mine_dfg(std::move(dfg), f, options, labels)});
   }
 
   // A graph-recursive single activity is a leaf only when it has no self-edge.
@@ -1267,51 +1530,25 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
 
   const auto build = [&](ProcessTreeOperator op,
                          const std::vector<std::vector<ActId>>& groups) {
-    const bool crossing_edges = op != ProcessTreeOperator::kExclusive;
-
-    // A sequence group is skippable when some trace evidently jumps over it:
-    // an edge from an earlier group straight to a later one, a trace starting
-    // in a later group, or one ending in an earlier group. The log recursion
-    // sees such skips as empty projected traces; a graph projection never
-    // receives that evidence, so it must be read off the parent graph here
-    // and modelled as an explicit optional child.
-    std::vector<char> skippable(groups.size(), 0);
+    std::vector<LocalDfg> subgraphs;
     if (op == ProcessTreeOperator::kSequence) {
-      std::vector<std::size_t> group_of(dfg.size(), 0);
-      for (std::size_t i = 0; i < groups.size(); ++i) {
-        for (const ActId act : groups[i]) {
-          group_of[dfg.to_local.at(act)] = i;
-        }
-      }
-      for (std::size_t a = 0; a < dfg.size(); ++a) {
-        if (dfg.is_start[a]) {
-          for (std::size_t i = 0; i < group_of[a]; ++i) {
-            skippable[i] = 1;
-          }
-        }
-        if (dfg.is_end[a]) {
-          for (std::size_t i = group_of[a] + 1; i < groups.size(); ++i) {
-            skippable[i] = 1;
-          }
-        }
-        for (const std::size_t b : dfg.succ[a]) {
-          for (std::size_t i = group_of[a] + 1; i < group_of[b]; ++i) {
-            skippable[i] = 1;
-          }
-        }
+      subgraphs = project_sequence_dfg(dfg, groups);
+    } else if (op == ProcessTreeOperator::kLoop) {
+      subgraphs = project_loop_dfg(dfg, groups);
+    } else {
+      subgraphs.reserve(groups.size());
+      for (const auto& group : groups) {
+        LocalDfg subgraph = induced_dfg(dfg, group, true);
+        finalize_projected_dfg(subgraph);
+        subgraphs.push_back(std::move(subgraph));
       }
     }
 
     std::vector<ProcessTreeNode> children;
-    children.reserve(groups.size());
-    for (std::size_t i = 0; i < groups.size(); ++i) {
-      auto child = mine_dfg(project_dfg(dfg, groups[i], crossing_edges), f,
-                            options, labels);
-      if (skippable[i]) {
-        child = make_node(ProcessTreeOperator::kExclusive,
-                          {ProcessTreeNode::tau(), std::move(child)});
-      }
-      children.push_back(std::move(child));
+    children.reserve(subgraphs.size());
+    for (auto& subgraph : subgraphs) {
+      children.push_back(
+          mine_dfg(std::move(subgraph), f, options, labels));
     }
     return make_node(op, std::move(children));
   };
@@ -1367,15 +1604,11 @@ ProcessTreeNode mine_dfg_root(const Sublog& log, double f,
     return ProcessTreeNode::tau();
   }
 
-  ProcessTreeNode root = mine_dfg(build_local_dfg(log), f, options, labels);
-  // The graph-backed variant carries the UVCL skip flag independently of the
-  // infrequent threshold: if an empty trace was observed, retain it as the
-  // optional tau branch.
-  if (empty_weight > 0) {
-    return make_node(ProcessTreeOperator::kExclusive,
-                     {ProcessTreeNode::tau(), std::move(root)});
-  }
-  return root;
+  LocalDfg dfg = build_local_dfg(log);
+  // The graph-backed variant carries observed emptiness into the same
+  // recursive skip channel used by projected sequence and loop children.
+  dfg.skip = empty_weight > 0;
+  return mine_dfg(std::move(dfg), f, options, labels);
 }
 
 void validate_options(const InductiveMinerOptions& options) {
