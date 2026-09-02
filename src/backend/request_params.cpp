@@ -278,6 +278,39 @@ std::vector<std::size_t> parse_marking(std::string_view value,
   return result;
 }
 
+std::vector<std::uint64_t> parse_uint64_marking(std::string_view value,
+                                                std::string_view name) {
+  if (value.empty())
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a non-empty marking");
+  std::vector<std::uint64_t> result;
+  std::size_t begin = 0;
+  for (std::size_t i = 0; i <= value.size(); ++i) {
+    if (i != value.size() && value[i] != ',') continue;
+    auto token = value.substr(begin, i - begin);
+    const auto first = token.find_first_not_of(" \t\r\n");
+    if (first == std::string_view::npos)
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected non-negative marking entries");
+    const auto last = token.find_last_not_of(" \t\r\n");
+    token = token.substr(first, last - first + 1);
+    std::uint64_t parsed = 0;
+    const auto conversion = std::from_chars(
+        token.data(), token.data() + token.size(), parsed);
+    if (conversion.ec != std::errc{} ||
+        conversion.ptr != token.data() + token.size()) {
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected non-negative uint64 entries");
+    }
+    result.push_back(parsed);
+    begin = i + 1;
+  }
+  if (result.empty())
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a non-empty marking");
+  return result;
+}
+
 Marking parse_signed_marking(std::string_view value, std::string_view name) {
   const auto parsed = parse_marking(value, name);
   Marking result;
@@ -2152,6 +2185,41 @@ MineParams parse_mine_params(const FieldLookup& field,
               : !value.empty()) {
     params.footprints.enable_act_always_executed = parse_boolean(
         value, "footprints_enable_act_always_executed");
+  }
+  const auto parse_footprints_selector = [&](std::string_view field_name,
+                                             std::string& destination) {
+    if (!supplied(field_name)) return;
+    destination = trim_text(field(field_name));
+    if (destination.empty()) {
+      throw std::invalid_argument(std::string(field_name) +
+                                  ": expected a non-empty selector");
+    }
+  };
+  parse_footprints_selector("footprints_activity_attribute",
+                            params.footprints.activity_attribute);
+  parse_footprints_selector("footprints_case_id_attribute",
+                            params.footprints.case_id_attribute);
+  parse_footprints_selector("footprints_timestamp_attribute",
+                            params.footprints.timestamp_attribute);
+  if (supplied("footprints_index_attribute")) {
+    params.footprints.index_attribute =
+        trim_text(field("footprints_index_attribute"));
+  }
+  if (supplied("footprints_start_timestamp_attribute")) {
+    const auto value = trim_text(field("footprints_start_timestamp_attribute"));
+    if (value.empty()) {
+      params.footprints.start_timestamp_attribute.reset();
+    } else {
+      params.footprints.start_timestamp_attribute = value;
+    }
+  }
+  if (supplied("footprints_sort_required")) {
+    params.footprints.sort_required = parse_boolean(
+        field("footprints_sort_required"), "footprints_sort_required");
+  }
+  if (supplied("footprints_initial_marking")) {
+    params.footprints.initial_marking = parse_uint64_marking(
+        field("footprints_initial_marking"), "footprints_initial_marking");
   }
   if (params.footprints.model == "dfg" &&
       params.footprints.discovery_variants.contains("petri_reach_graph")) {

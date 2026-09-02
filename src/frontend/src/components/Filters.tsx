@@ -11,6 +11,8 @@ import {
   FOOTPRINTS_CONFORMANCE_VARIANTS,
   FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS,
   FOOTPRINTS_DISCOVERY_VARIANTS,
+  type FootprintsConformanceVariant,
+  type FootprintsDiscoveryVariant,
 } from "../types";
 import { type CaseAttributeStat, type EventAttributeStat } from "../types";
 
@@ -289,6 +291,34 @@ export function powlValidationMessage(input: {
   if (!input.activityKey.trim()) return "POWL activity field must not be blank.";
   if (!input.timestampKey.trim()) return "POWL timestamp field must not be blank.";
   if (!input.caseIdKey.trim()) return "POWL case-id field must not be blank.";
+  return null;
+}
+
+/** Footprint selectors are shared by log and table adapters. */
+export function footprintsValidationMessage(input: {
+  activityAttribute: string;
+  caseIdAttribute: string;
+  timestampAttribute: string;
+  startTimestampAttribute: string;
+  indexAttribute: string;
+  initialMarking: string;
+}): string | null {
+  if (!input.activityAttribute.trim())
+    return "Footprints activity field must not be blank.";
+  if (!input.caseIdAttribute.trim())
+    return "Footprints case-id field must not be blank.";
+  if (!input.timestampAttribute.trim())
+    return "Footprints completion field must not be blank.";
+  const marking = input.initialMarking.trim();
+  if (!marking) return null;
+  const maximum = 18446744073709551615n;
+  for (const raw of marking.split(",")) {
+    const token = raw.trim();
+    if (!/^\d+$/.test(token))
+      return "Footprints initial marking needs non-negative uint64 entries.";
+    if (BigInt(token) > maximum)
+      return "Footprints initial marking entries must fit uint64.";
+  }
   return null;
 }
 
@@ -575,6 +605,13 @@ export function Filters({
   );
   const [footprintsStrict, setFootprintsStrict] = useState(false);
   const [footprintsEnableActAlwaysExecuted, setFootprintsEnableActAlwaysExecuted] = useState(true);
+  const [footprintsActivityAttribute, setFootprintsActivityAttribute] = useState("concept:name");
+  const [footprintsCaseIdAttribute, setFootprintsCaseIdAttribute] = useState("case:concept:name");
+  const [footprintsStartTimestampAttribute, setFootprintsStartTimestampAttribute] = useState("");
+  const [footprintsTimestampAttribute, setFootprintsTimestampAttribute] = useState("time:timestamp");
+  const [footprintsIndexAttribute, setFootprintsIndexAttribute] = useState("@@index");
+  const [footprintsSortRequired, setFootprintsSortRequired] = useState(true);
+  const [footprintsInitialMarking, setFootprintsInitialMarking] = useState("");
   const dfgStatisticalNames = [
     "native", "frequency", "frequency_greedy", "frequency_triples", "performance",
     "performance_greedy", "case_attributes", "clean", "clean_polars", "clean_time",
@@ -883,6 +920,14 @@ export function Filters({
     timestampKey: powlTimestampKey,
     caseIdKey: powlCaseIdKey,
   });
+  const footprintsValidationError = footprintsValidationMessage({
+    activityAttribute: footprintsActivityAttribute,
+    caseIdAttribute: footprintsCaseIdAttribute,
+    timestampAttribute: footprintsTimestampAttribute,
+    startTimestampAttribute: footprintsStartTimestampAttribute,
+    indexAttribute: footprintsIndexAttribute,
+    initialMarking: footprintsInitialMarking,
+  });
 
   const apply = () => {
     if (temporalValidationError || ltlValidationError || segmentValidationError ||
@@ -891,7 +936,8 @@ export function Filters({
         numericAttributeValidationError || topActivitiesValidationError ||
         relativeAttributeValidationError || attributeOccurrenceValidationError ||
         variantCoverageValidationError || repetitionValidationError ||
-        caseGroupingValidationError || powlValidationError) return;
+        caseGroupingValidationError || powlValidationError ||
+        footprintsValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
     const removeLifecycleList = lifecycles.filter((l) =>
@@ -1134,13 +1180,34 @@ export function Filters({
       footprintsDiscoveryVariants:
         footprintsDiscoveryVariants.size === FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.length &&
         FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.every((name) => footprintsDiscoveryVariants.has(name))
-          ? undefined : [...footprintsDiscoveryVariants],
+          ? undefined : [...footprintsDiscoveryVariants] as FootprintsDiscoveryVariant[],
       footprintsModel: footprintsModel !== "process_tree" ? footprintsModel : undefined,
       footprintsConformanceVariants:
         footprintsConformanceVariants.size === 1 && footprintsConformanceVariants.has("log_model")
-          ? undefined : [...footprintsConformanceVariants],
+          ? undefined : [...footprintsConformanceVariants] as FootprintsConformanceVariant[],
       footprintsStrict: footprintsStrict || undefined,
       footprintsEnableActAlwaysExecuted: footprintsEnableActAlwaysExecuted ? undefined : false,
+      footprintsActivityAttribute:
+        footprintsActivityAttribute.trim() !== "concept:name"
+          ? footprintsActivityAttribute.trim() || undefined
+          : undefined,
+      footprintsCaseIdAttribute:
+        footprintsCaseIdAttribute.trim() !== "case:concept:name"
+          ? footprintsCaseIdAttribute.trim() || undefined
+          : undefined,
+      footprintsStartTimestampAttribute:
+        footprintsStartTimestampAttribute.trim() || undefined,
+      footprintsTimestampAttribute:
+        footprintsTimestampAttribute.trim() !== "time:timestamp"
+          ? footprintsTimestampAttribute.trim() || undefined
+          : undefined,
+      footprintsIndexAttribute:
+        footprintsIndexAttribute.trim() !== "@@index"
+          ? footprintsIndexAttribute.trim()
+          : undefined,
+      footprintsSortRequired: footprintsSortRequired ? undefined : false,
+      footprintsInitialMarking:
+        footprintsInitialMarking.trim() || undefined,
       dfgStatisticalVariants: dfgStatisticalVariants.size ? [...dfgStatisticalVariants] : undefined,
       dfgCausalVariants: dfgCausalVariants.size ? [...dfgCausalVariants] : undefined,
       dfgWindow: dfgFrequencyOptionsActive
@@ -1335,6 +1402,13 @@ export function Filters({
     setFootprintsConformanceVariants(new Set(["log_model"]));
     setFootprintsStrict(false);
     setFootprintsEnableActAlwaysExecuted(true);
+    setFootprintsActivityAttribute("concept:name");
+    setFootprintsCaseIdAttribute("case:concept:name");
+    setFootprintsStartTimestampAttribute("");
+    setFootprintsTimestampAttribute("time:timestamp");
+    setFootprintsIndexAttribute("@@index");
+    setFootprintsSortRequired(true);
+    setFootprintsInitialMarking("");
     setDfgStatisticalVariants(new Set());
     setDfgCausalVariants(new Set());
     setDfgWindow("1");
@@ -1518,7 +1592,13 @@ export function Filters({
     footprintsModel !== "process_tree" || footprintsStrict || !footprintsEnableActAlwaysExecuted ||
     footprintsDiscoveryVariants.size !== FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.length ||
     FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.some((name) => !footprintsDiscoveryVariants.has(name)) ||
-    footprintsConformanceVariants.size !== 1 || !footprintsConformanceVariants.has("log_model");
+    footprintsConformanceVariants.size !== 1 || !footprintsConformanceVariants.has("log_model") ||
+    footprintsActivityAttribute.trim() !== "concept:name" ||
+    footprintsCaseIdAttribute.trim() !== "case:concept:name" ||
+    footprintsStartTimestampAttribute.trim() !== "" ||
+    footprintsTimestampAttribute.trim() !== "time:timestamp" ||
+    footprintsIndexAttribute.trim() !== "@@index" ||
+    !footprintsSortRequired || footprintsInitialMarking.trim() !== "";
   const dfgDirty =
     dfgStatisticalVariants.size > 0 || dfgCausalVariants.size > 0 ||
     dfgActivityAttribute.trim() !== "concept:name" ||
@@ -2066,6 +2146,69 @@ export function Filters({
               <label className="checkbox-field">
                 <input type="checkbox" checked={footprintsEnableActAlwaysExecuted} onChange={(event) => setFootprintsEnableActAlwaysExecuted(event.target.checked)} /> activity-always-executed checks
               </label>
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Footprints activity field</span>
+              <input
+                value={footprintsActivityAttribute}
+                placeholder="concept:name"
+                onChange={(event) => setFootprintsActivityAttribute(event.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Footprints case-id field</span>
+              <input
+                value={footprintsCaseIdAttribute}
+                placeholder="case:concept:name"
+                onChange={(event) => setFootprintsCaseIdAttribute(event.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Footprints completion field</span>
+              <input
+                value={footprintsTimestampAttribute}
+                placeholder="time:timestamp"
+                onChange={(event) => setFootprintsTimestampAttribute(event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Footprints start field <small>(optional)</small></span>
+              <input
+                value={footprintsStartTimestampAttribute}
+                placeholder="none"
+                onChange={(event) => setFootprintsStartTimestampAttribute(event.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Footprints index field <small>(compatibility)</small></span>
+              <input
+                value={footprintsIndexAttribute}
+                placeholder="@@index"
+                onChange={(event) => setFootprintsIndexAttribute(event.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Footprints table ordering</span>
+              <label className="checkbox-field">
+                <input
+                  type="checkbox"
+                  checked={footprintsSortRequired}
+                  onChange={(event) => setFootprintsSortRequired(event.target.checked)}
+                /> sort rows by case and timestamp
+              </label>
+            </label>
+            <label className="filters-field">
+              <span>Footprints initial marking <small>(optional)</small></span>
+              <input
+                value={footprintsInitialMarking}
+                placeholder="p0,p1,…"
+                inputMode="numeric"
+                onChange={(event) => setFootprintsInitialMarking(event.target.value)}
+              />
             </label>
           </div>
           <div className="filters-activities">
@@ -3550,11 +3693,12 @@ export function Filters({
             numericAttributeValidationError || topActivitiesValidationError ||
             relativeAttributeValidationError || attributeOccurrenceValidationError ||
             variantCoverageValidationError || repetitionValidationError ||
-            caseGroupingValidationError || powlValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError}</p>
+            caseGroupingValidationError || powlValidationError ||
+            footprintsValidationError) && (
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError || footprintsValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError || footprintsValidationError)}>
               Apply
             </button>
             <button

@@ -3762,7 +3762,8 @@ export interface AggregateFootprint {
   activities?: number[];
   skippable?: boolean;
   activities_always_happening?: number[];
-  min_trace_length?: number;
+  /** Explicit null means this variant does not define a minimum length. */
+  min_trace_length?: number | null;
   max_trace_length_without_loops?: number;
   trace?: number[];
 }
@@ -3814,6 +3815,297 @@ export interface AggregateFootprints {
   discovery?: AggregateFootprintsDiscovery;
   conformance?: AggregateFootprintsConformance;
   metrics?: AggregateFootprintsMetrics;
+  activity_attribute?: string;
+  case_id_attribute?: string;
+}
+
+function isFootprintActivityId(value: unknown, activityCount: number): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0 &&
+    (value as number) < activityCount;
+}
+
+function isUniqueFootprintActivityIds(
+  value: unknown,
+  activityCount: number,
+): value is number[] {
+  if (!Array.isArray(value)) return false;
+  const seen = new Set<number>();
+  return value.every((entry) => {
+    if (!isFootprintActivityId(entry, activityCount) || seen.has(entry)) {
+      return false;
+    }
+    seen.add(entry);
+    return true;
+  });
+}
+
+function isFootprintActivityTrace(
+  value: unknown,
+  activityCount: number,
+): value is number[] {
+  return Array.isArray(value) && value.every((entry) =>
+    isFootprintActivityId(entry, activityCount));
+}
+
+function footprintRelationKey(source: number, target: number): string {
+  return `${source}:${target}`;
+}
+
+function isUniqueFootprintRelations(
+  value: unknown,
+  activityCount: number,
+): value is FootprintRelation[] {
+  if (!Array.isArray(value)) return false;
+  const seen = new Set<string>();
+  return value.every((rawRelation) => {
+    if (!isOcelRecord(rawRelation) ||
+        !isFootprintActivityId(rawRelation.source, activityCount) ||
+        !isFootprintActivityId(rawRelation.target, activityCount)) return false;
+    const key = footprintRelationKey(
+      rawRelation.source as number,
+      rawRelation.target as number,
+    );
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function isFootprintDfg(
+  value: unknown,
+  activityCount: number,
+): value is EdgeStat[] {
+  if (!Array.isArray(value)) return false;
+  const seen = new Set<string>();
+  return value.every((rawEdge) => {
+    if (!isOcelRecord(rawEdge) ||
+        !isFootprintActivityId(rawEdge.source, activityCount) ||
+        !isFootprintActivityId(rawEdge.target, activityCount) ||
+        !Number.isSafeInteger(rawEdge.count) ||
+        (rawEdge.count as number) < 0) return false;
+    const key = footprintRelationKey(
+      rawEdge.source as number,
+      rawEdge.target as number,
+    );
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function isAggregateFootprint(
+  value: unknown,
+  activityCount: number,
+): value is AggregateFootprint {
+  if (!isOcelRecord(value) ||
+      !isUniqueFootprintRelations(value.sequence, activityCount) ||
+      !isUniqueFootprintRelations(value.parallel, activityCount) ||
+      !isUniqueFootprintActivityIds(value.activities, activityCount)) {
+    return false;
+  }
+  // A relation cannot be classified as both sequence and parallel.  Atomic
+  // interleaving is intentionally allowed to overlap either classification.
+  const sequenceKeys = new Set(value.sequence.map((relation) =>
+    footprintRelationKey(relation.source, relation.target)));
+  if (value.parallel.some((relation) => sequenceKeys.has(
+      footprintRelationKey(relation.source, relation.target)))) return false;
+  if (value.atomic_interleaving !== undefined &&
+      !isUniqueFootprintRelations(value.atomic_interleaving, activityCount)) {
+    return false;
+  }
+  if (value.dfg !== undefined && !isFootprintDfg(value.dfg, activityCount)) {
+    return false;
+  }
+  if (value.start_activities !== undefined &&
+      !isUniqueFootprintActivityIds(value.start_activities, activityCount)) {
+    return false;
+  }
+  if (value.end_activities !== undefined &&
+      !isUniqueFootprintActivityIds(value.end_activities, activityCount)) {
+    return false;
+  }
+  if (value.activities_always_happening !== undefined &&
+      !isUniqueFootprintActivityIds(
+        value.activities_always_happening,
+        activityCount,
+      )) return false;
+  if (value.skippable !== undefined && typeof value.skippable !== "boolean") {
+    return false;
+  }
+  const minimum = value.min_trace_length as number | null | undefined;
+  if (minimum !== undefined && minimum !== null &&
+      (!Number.isSafeInteger(minimum) || minimum < 0)) return false;
+  const maximum = value.max_trace_length_without_loops as number | undefined;
+  if (maximum !== undefined &&
+      (!Number.isSafeInteger(maximum) || maximum < 0)) return false;
+  if (minimum !== undefined && minimum !== null && maximum !== undefined &&
+      maximum < minimum) return false;
+  if (value.trace !== undefined &&
+      !isFootprintActivityTrace(value.trace, activityCount)) return false;
+  if (value.trace !== undefined && minimum !== undefined && minimum !== null &&
+      value.trace.length !== minimum) return false;
+  return true;
+}
+
+function isFootprintsLogModelConformance(
+  value: unknown,
+  activityCount: number,
+): value is FootprintsLogModelConformance {
+  if (!isOcelRecord(value) || typeof value.strict !== "boolean" ||
+      !isUniqueFootprintRelations(value.violations, activityCount) ||
+      typeof value.is_fit !== "boolean") return false;
+  return value.is_fit === (value.violations.length === 0);
+}
+
+function isFootprintsExtensiveConformance(
+  value: unknown,
+  activityCount: number,
+): value is FootprintsExtensiveConformance {
+  if (!isOcelRecord(value) ||
+      !isUniqueFootprintRelations(value.footprints, activityCount) ||
+      !isUniqueFootprintActivityIds(value.start_activities, activityCount) ||
+      !isUniqueFootprintActivityIds(value.end_activities, activityCount) ||
+      !isUniqueFootprintActivityIds(
+        value.activities_always_happening,
+        activityCount,
+      ) || typeof value.min_length_fit !== "boolean" ||
+      typeof value.is_footprints_fit !== "boolean" ||
+      typeof value.is_fit !== "boolean") return false;
+  const fits = value.footprints.length === 0 &&
+    value.start_activities.length === 0 &&
+    value.end_activities.length === 0 &&
+    value.activities_always_happening.length === 0 &&
+    value.min_length_fit;
+  return value.is_footprints_fit === fits && value.is_fit === fits;
+}
+
+function isFootprintsDiscovery(
+  value: unknown,
+  activityCount: number,
+  traceCount: number,
+  traces: Trace[] | undefined,
+  activityAttribute: string | undefined,
+  caseIdAttribute: string | undefined,
+): value is AggregateFootprintsDiscovery {
+  if (!isOcelRecord(value)) return false;
+  const names = new Set<string>([
+    "entire_event_log", "entire_dataframe", "polars_lazyframes",
+    "trace_by_trace", "dfg", "petri_reach_graph", "process_tree", "powl",
+  ]);
+  if (Object.keys(value).some((name) => !names.has(name))) return false;
+  for (const [name, raw] of Object.entries(value)) {
+    if (name !== "trace_by_trace") {
+      if (!isAggregateFootprint(raw, activityCount)) return false;
+      continue;
+    }
+    if (!Array.isArray(raw) || raw.length !== traceCount) return false;
+    for (let index = 0; index < raw.length; index++) {
+      const entry = raw[index];
+      if (!isOcelRecord(entry) || entry.trace_index !== index ||
+          typeof entry.case_id !== "string" ||
+          !isAggregateFootprint(entry.footprint, activityCount)) return false;
+      const usesIntrinsicCaseId = caseIdAttribute === undefined ||
+        ["case:concept:name", "concept:name", "case_id", "case:id"]
+          .includes(caseIdAttribute);
+      if (traces !== undefined && usesIntrinsicCaseId &&
+          entry.case_id !== traces[index].case_id) {
+        return false;
+      }
+      const trace = entry.footprint.trace;
+      if (traces !== undefined && trace !== undefined) {
+        const expected = traces[index].events.map((event) => event.activity);
+        const usesIntrinsicActivity = activityAttribute === undefined ||
+          ["concept:name", "activity"].includes(activityAttribute);
+        if (trace.length !== expected.length || (usesIntrinsicActivity &&
+            trace.some((activity, eventIndex) => activity !== expected[eventIndex]))) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+function isFootprintsConformance(
+  value: unknown,
+  activityCount: number,
+  traceCount: number,
+  traces: Trace[] | undefined,
+  caseIdAttribute: string | undefined,
+): value is AggregateFootprintsConformance {
+  if (!isOcelRecord(value) ||
+      !["process_tree", "powl", "inductive", "alpha", "heuristic", "dfg"]
+        .includes(value.model as string)) return false;
+  const names = new Set(["model", "log_model", "log_extensive", "trace_extensive"]);
+  if (Object.keys(value).some((name) => !names.has(name))) return false;
+  if (value.log_model !== undefined &&
+      !isFootprintsLogModelConformance(value.log_model, activityCount)) return false;
+  if (value.log_extensive !== undefined &&
+      !isFootprintsExtensiveConformance(value.log_extensive, activityCount)) return false;
+  if (value.trace_extensive === undefined) return true;
+  if (!Array.isArray(value.trace_extensive) ||
+      value.trace_extensive.length !== traceCount) return false;
+  for (let index = 0; index < value.trace_extensive.length; index++) {
+    const entry = value.trace_extensive[index];
+    if (!isOcelRecord(entry) || entry.trace_index !== index ||
+        typeof entry.case_id !== "string" ||
+        !isFootprintsExtensiveConformance(entry, activityCount)) return false;
+    const usesIntrinsicCaseId = caseIdAttribute === undefined ||
+      ["case:concept:name", "concept:name", "case_id", "case:id"]
+        .includes(caseIdAttribute);
+    if (traces !== undefined && usesIntrinsicCaseId &&
+        entry.case_id !== traces[index].case_id) return false;
+  }
+  return true;
+}
+
+function isAggregateFootprints(
+  value: unknown,
+  activityCount: number,
+  traceCount: number,
+  traces: Trace[] | undefined,
+): value is AggregateFootprints {
+  if (!isOcelRecord(value)) return false;
+  const names = new Set([
+    "discovery", "conformance", "metrics", "activity_attribute",
+    "case_id_attribute",
+  ]);
+  if (Object.keys(value).some((name) => !names.has(name))) return false;
+  if (value.activity_attribute !== undefined &&
+      (typeof value.activity_attribute !== "string" ||
+        value.activity_attribute.length === 0)) return false;
+  if (value.case_id_attribute !== undefined &&
+      (typeof value.case_id_attribute !== "string" ||
+        value.case_id_attribute.length === 0)) return false;
+  if (value.discovery !== undefined &&
+      !isFootprintsDiscovery(
+        value.discovery,
+        activityCount,
+        traceCount,
+        traces,
+        value.activity_attribute as string | undefined,
+        value.case_id_attribute as string | undefined,
+      )) {
+    return false;
+  }
+  if (value.conformance !== undefined &&
+      !isFootprintsConformance(
+        value.conformance,
+        activityCount,
+        traceCount,
+        traces,
+        value.case_id_attribute as string | undefined,
+      )) return false;
+  if (value.metrics === undefined) return true;
+  if (!isOcelRecord(value.metrics)) return false;
+  const metrics = value.metrics;
+  return [metrics.precision, metrics.log_fitness].every((metric) =>
+    metric === undefined || (typeof metric === "number" &&
+      Number.isFinite(metric) && metric >= 0 && metric <= 1)) &&
+    (metrics.perc_fit_traces === undefined ||
+      (typeof metrics.perc_fit_traces === "number" &&
+        Number.isFinite(metrics.perc_fit_traces) &&
+        metrics.perc_fit_traces >= 0 && metrics.perc_fit_traces <= 100));
 }
 
 export type DfgStatisticalVariant =
@@ -6092,10 +6384,12 @@ function isMineraMetadata(value: unknown): value is MineraLogMetadata {
       global.attributes.every(isMineraAttributeDetail)));
 }
 
-function isMineraTraceEvent(value: unknown): value is TraceEvent {
+function isMineraTraceEvent(value: unknown, activityCount?: number): value is TraceEvent {
   if (!value || typeof value !== "object" ||
       !Number.isSafeInteger((value as TraceEvent).activity) ||
       (value as TraceEvent).activity < 0 ||
+      (activityCount !== undefined &&
+        (value as TraceEvent).activity >= activityCount) ||
       typeof (value as TraceEvent).timestamp !== "string") return false;
   const event = value as TraceEvent;
   if (event.resource !== undefined && typeof event.resource !== "string") return false;
@@ -6120,10 +6414,11 @@ function isMineraTraceEvent(value: unknown): value is TraceEvent {
       (Array.isArray(event.attribute_details) && event.attribute_details.every(isMineraAttributeDetail)));
 }
 
-function isMineraTrace(value: unknown): value is Trace {
+function isMineraTrace(value: unknown, activityCount?: number): value is Trace {
   if (!value || typeof value !== "object" || typeof (value as Trace).case_id !== "string" ||
       !Array.isArray((value as Trace).events) ||
-      !(value as Trace).events.every(isMineraTraceEvent)) return false;
+      !(value as Trace).events.every((event) =>
+        isMineraTraceEvent(event, activityCount))) return false;
   const trace = value as Trace;
   if (trace.case_id_attribute !== undefined &&
       !isMineraAttributeDetail(trace.case_id_attribute)) return false;
@@ -6138,11 +6433,16 @@ function isMineraTrace(value: unknown): value is Trace {
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {
-  if (typeof value !== "object" || value === null) return false;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const data = value as MineraExport;
-  const activityCount = Array.isArray(data.activities)
-    ? data.activities.length
-    : undefined;
+  if (!Array.isArray(data.activities) || !Array.isArray(data.edges) ||
+      !Array.isArray(data.variants) ||
+      !Number.isSafeInteger(data.trace_count) || data.trace_count < 0 ||
+      !Number.isSafeInteger(data.event_count) || data.event_count < 0) {
+    return false;
+  }
+  const activityCount = data.activities.length;
+  const traceCount = data.trace_count;
   const validPetriProjection = (net: unknown, decoration: unknown): boolean => {
     if (net === undefined && decoration === undefined) return true;
     if (!isPetriNetModel(net, activityCount)) return false;
@@ -6181,18 +6481,23 @@ export function isMineraExport(value: unknown): value is MineraExport {
         typeof batch.complete === "number" && Number.isFinite(batch.complete) &&
         Array.isArray(batch.events));
       }));
-  if (data.traces !== undefined &&
-      (!Array.isArray(data.traces) || !data.traces.every(isMineraTrace))) return false;
+  if (data.traces !== undefined) {
+    if (!Array.isArray(data.traces) || data.traces.length !== traceCount ||
+        !data.traces.every((trace) => isMineraTrace(trace, activityCount))) {
+      return false;
+    }
+    const eventCount = data.traces.reduce(
+      (count, trace) => count + trace.events.length,
+      0,
+    );
+    if (eventCount !== data.event_count) return false;
+  }
   if (data.log_attributes !== undefined && !isNullableStringRecord(data.log_attributes)) return false;
   if (data.log_attribute_details !== undefined &&
       (!Array.isArray(data.log_attribute_details) ||
        !data.log_attribute_details.every(isMineraAttributeDetail))) return false;
   if (data.log_metadata !== undefined && !isMineraMetadata(data.log_metadata)) return false;
-  return Array.isArray(data.activities) &&
-    Array.isArray(data.edges) &&
-    Array.isArray(data.variants) &&
-    Number.isFinite(data.trace_count) &&
-    (data.minimum_self_distance_variant === undefined ||
+  return (data.minimum_self_distance_variant === undefined ||
       data.minimum_self_distance_variant === "log" ||
       data.minimum_self_distance_variant === "pandas" ||
       data.minimum_self_distance_variant === "polars") &&
@@ -6205,6 +6510,13 @@ export function isMineraExport(value: unknown): value is MineraExport {
                          data.heuristic_petri_net_decoration) &&
     validPetriProjection(data.powl_petri_net,
                          data.powl_petri_net_decoration) &&
+    (data.footprints === undefined ||
+      isAggregateFootprints(
+        data.footprints,
+        activityCount,
+        traceCount,
+        data.traces,
+      )) &&
     (data.decision_tables === undefined || isDecisionTablesResult(data.decision_tables)) &&
     validBatches &&
     (overlap === undefined || (

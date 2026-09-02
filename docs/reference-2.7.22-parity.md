@@ -47,12 +47,13 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 26
-complete and 60 partial dispatcher rows, plus 144 complete and 243 partial
+adapter, integration, or missing are complete. The current manifest records 28
+complete and 58 partial dispatcher rows, plus 157 complete and 230 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
-DFG, 26-module Inductive discovery, and 31-module POWL discovery stacks with
-distinct registered tests; 303 coverage units still require exact proof.
+DFG, 26-module Inductive discovery, 31-module POWL discovery, and 13-module
+footprints discovery/conformance stacks with distinct registered tests; 288
+coverage units still require exact proof.
 A release may
 additionally run the strict gate:
 
@@ -121,7 +122,7 @@ are reconciled.
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Partial (implemented core; proof pending)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior, with named event activity fields available at replay time |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters |
 | Conformance: replay | forward token replay and backwards token replay | **Partial (implemented core; proof pending)** — forward replay remains the default; the backwards variation, reverse silent routing, weak firing, duplicate-label behavior, immediate-stop option, and named event activity selector are selectable |
-| Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Partial (implemented core; proof pending)** — all three footprint checks, classic log-skeleton conformance, and classic Declare conformance are available with per-trace diagnostics |
+| Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Partial overall; footprints conformance complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance remain proof-pending |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Partial (implemented core; proof pending)** |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Partial (implemented core; proof pending)** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, and JSON/CLI/server/frontend adapters are implemented |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, and cross-family envelope rejection; broader OCEL schema coverage remains |
@@ -131,7 +132,7 @@ are reconciled.
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
 | Discovery: declarative | Declare classic and log skeleton classic | **Partial (implemented core; proof pending)** |
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Partial overall; the DFG dispatcher and thirteen modules are complete** — all eight statistical DFG routes, eager and lazy table adapters, performance behavior, replacement helpers, and graph utilities have focused native contracts plus JSON/CLI/server/frontend integration; both causal variants, all three correlation-miner variants, eventually-follows, and minimum self-distance with witnesses remain implemented but proof-pending in their separately tracked packages |
-| Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Partial (implemented core; proof pending)** — dataframe and lazyframe forms are adapters over the same native semantics |
+| Discovery: footprints | log entire/trace-by-trace, eager dataframe, lazy dataframe, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete** — all eight selectors have distinct registered contracts and production dispatch; eager/lazy ordering differences, activity/case/time/index selectors, explicit Petri markings, and inclusive-choice bottom-up behavior are covered |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Partial overall; POWL discovery complete** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data but remain proof-pending; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and the additional DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings, backed by exact selector and module contracts |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected plus log/dataframe projections; batches | **Partial (implemented core; proof pending)** — temporal profiles, all six named performance-spectrum projections, and all five batch classifications are available; batch activity/resource/timestamp/case-id selectors and columnar/lazyframe adapters share the native contract |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis (including the configurable generated index-column contract), OCDFG metrics (explicit total-object associations plus separate event-couple and total-object performance projections), annotated and unannotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics and custom scalar activity/object-type selectors, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; SAW weight distributions retain per-event transition multiplicity (including final routing) and merged-net arc ownership decorations; broader object-centric schema and visualization coverage remains |
@@ -2243,28 +2244,43 @@ frontend rendering.
 ## Footprints parity evidence
 
 Footprint discovery covers the entire event log, trace-by-trace log behavior,
-raw DFGs, Petri reachability graphs, process trees, and POWL. The Petri variant
-retains transition identity until relation classification, follows silent
-routing when determining eventually enabled activities, and rejects provably
-unbounded reachability instead of returning a truncated model. Process-tree
-and POWL bottom-up discovery preserve skippability, start/end activities,
-always-happening activities, minimum length, the process-tree maximum length
-without loops, optional-path bridging, and partial-order concurrency.
+eager dataframes, restartable lazy dataframes, raw DFGs, Petri reachability
+graphs, process trees, and POWL. Eager unsorted discovery retains physical-row
+adjacency, while lazy unsorted discovery retains each case's row subsequence;
+their sorted paths preserve the completion-time and optional start-time rules
+of their respective adapters. Activity, case, completion-time, optional
+start-time, index, and sorting parameters are explicit native options. The
+compatibility index selector is accepted but intentionally does not affect
+ordering. The Petri variant accepts an exact initial marking, retains transition
+identity until relation classification, follows silent routing when determining
+eventually enabled activities, and rejects provably unbounded reachability
+instead of returning a truncated model. Process-tree and POWL bottom-up
+discovery preserve skippability, start/end activities, always-happening
+activities, minimum length, the process-tree maximum length without loops,
+optional-path bridging, and partial-order concurrency. Inclusive choice uses
+the pinned footprint algebra's mandatory concurrent-child summary, including
+silent and nested children.
 
 Conformance exposes LOG_MODEL in strict and non-strict modes, LOG_EXTENSIVE,
 and TRACE_EXTENSIVE with the always-executed-activity toggle. Precision,
-log fitness, and percentage-fit metrics use the same footprint artifacts.
-Focused regressions cover empty and repeated traces, zero-weight DFG edges,
-singleton DFGs, sequence/XOR/parallel/loop models, silent prefixes, duplicate
-Petri labels, optional POWL boundaries, transitive partial orders, weighted
-fitness, missing optional model fields, unbounded visible and silent growth,
-and duplicate case identifiers.
+log fitness, percentage-fit, footprint/conformance flattening, and sparse blue
+process-tree boundary decoration use the same footprint artifacts. Explicit
+case selectors are retained in trace diagnostics and fail clearly when a
+requested attribute is unavailable.
+Focused regressions cover empty and repeated traces, eager/lazy interleaving,
+timestamp ties and invalid values, zero-weight DFG edges, singleton DFGs,
+sequence/XOR/inclusive/parallel/loop models, silent prefixes, duplicate Petri
+labels, custom and concurrent initial markings, optional POWL boundaries,
+transitive partial orders, weighted fitness, missing optional model fields,
+unbounded visible and silent growth, tree-node decorations, and duplicate case
+identifiers.
 
-All six discovery variants, all three conformance variants, model selection,
-strictness, and the always-executed toggle are available through strict request
-parsing, CLI, local server, deterministic prevalidated JSON, and the frontend.
-The dataframe and Polars lazyframe variants are classified as adapters over
-these native semantics.
+All eight discovery selectors, all three conformance selectors, model
+selection, strictness, the always-executed toggle, table selectors and sorting,
+and explicit markings are available through the public native API and the
+applicable strict request, CLI, local-server, deterministic prevalidated JSON,
+and frontend surfaces. The dispatcher selectors and all thirteen owned modules
+have distinct implementation identities and registered Release contracts.
 
 ## Declare parity evidence
 

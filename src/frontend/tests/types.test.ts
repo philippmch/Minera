@@ -1290,6 +1290,213 @@ describe("isMineraExport", () => {
       activities: [{}], powl_petri_net_decoration: decoration })).toBe(false);
   });
 
+  it("accepts the complete footprint discovery and conformance envelope", () => {
+    const traces = [
+      { case_id: "c1", events: [
+        { activity: 0, timestamp: "2025-01-01T00:00:00Z" },
+        { activity: 1, timestamp: "2025-01-01T00:00:01Z" },
+      ] },
+      { case_id: "c2", events: [
+        { activity: 1, timestamp: "2025-01-01T00:00:00Z" },
+        { activity: 0, timestamp: "2025-01-01T00:00:01Z" },
+      ] },
+    ];
+    const eventFootprint = {
+      dfg: [
+        { source: 0, target: 1, count: 1 },
+        { source: 1, target: 0, count: 1 },
+      ],
+      sequence: [],
+      parallel: [{ source: 0, target: 1 }, { source: 1, target: 0 }],
+      atomic_interleaving: [],
+      start_activities: [0, 1],
+      end_activities: [0, 1],
+      activities: [0, 1],
+      min_trace_length: 2,
+    };
+    const traceFootprint = (activities: [number, number]) => ({
+      dfg: [{ source: activities[0], target: activities[1], count: 1 }],
+      sequence: [{ source: activities[0], target: activities[1] }],
+      parallel: [],
+      atomic_interleaving: [],
+      start_activities: [activities[0]],
+      end_activities: [activities[1]],
+      activities: [activities[0], activities[1]],
+      min_trace_length: 2,
+      trace: activities,
+    });
+    const extensiveFit = {
+      footprints: [], start_activities: [], end_activities: [],
+      activities_always_happening: [], min_length_fit: true,
+      is_footprints_fit: true, is_fit: true,
+    };
+    const extensiveUnfit = {
+      ...extensiveFit,
+      footprints: [{ source: 0, target: 1 }],
+      is_footprints_fit: false,
+      is_fit: false,
+    };
+    const exportValue = {
+      ...valid,
+      trace_count: 2,
+      event_count: 4,
+      activities: [{}, {}],
+      traces,
+      footprints: {
+        discovery: {
+          entire_event_log: eventFootprint,
+          entire_dataframe: eventFootprint,
+          polars_lazyframes: eventFootprint,
+          dfg: { ...eventFootprint, dfg: undefined, min_trace_length: undefined },
+          process_tree: { ...eventFootprint, skippable: false,
+            activities_always_happening: [0, 1], max_trace_length_without_loops: 2 },
+          powl: { ...eventFootprint, dfg: undefined, max_trace_length_without_loops: undefined },
+          petri_reach_graph: { ...eventFootprint, dfg: undefined,
+            start_activities: undefined, end_activities: undefined,
+            skippable: undefined, activities_always_happening: undefined,
+            min_trace_length: undefined },
+          trace_by_trace: [
+            { trace_index: 0, case_id: "c1", footprint: traceFootprint([0, 1]) },
+            { trace_index: 1, case_id: "c2", footprint: traceFootprint([1, 0]) },
+          ],
+        },
+        conformance: {
+          model: "process_tree",
+          log_model: { strict: true, violations: [], is_fit: true },
+          log_extensive: extensiveFit,
+          trace_extensive: [
+            { trace_index: 0, case_id: "c1", ...extensiveFit },
+            { trace_index: 1, case_id: "c2", ...extensiveUnfit },
+          ],
+        },
+        metrics: { precision: 1, log_fitness: 0.5, perc_fit_traces: 50 },
+      },
+    };
+    expect(isMineraExport(exportValue)).toBe(true);
+  });
+
+  it("rejects malformed footprint relations, diagnostics, and metrics", () => {
+    const base = {
+      ...valid,
+      trace_count: 1,
+      event_count: 1,
+      activities: [{}],
+      footprints: {
+        discovery: {
+          entire_event_log: {
+            sequence: [{ source: 0, target: 0 }], parallel: [],
+            atomic_interleaving: [], activities: [0],
+            start_activities: [0], end_activities: [0],
+            min_trace_length: 1,
+          },
+        },
+        conformance: {
+          model: "process_tree",
+          log_model: { strict: false, violations: [], is_fit: true },
+        },
+        metrics: { precision: 1, log_fitness: 1, perc_fit_traces: 100 },
+      },
+    };
+    expect(isMineraExport(base)).toBe(true);
+    expect(isMineraExport({ ...base,
+      footprints: { ...base.footprints, discovery: {
+        entire_event_log: { ...base.footprints.discovery.entire_event_log,
+          sequence: [{ source: 0, target: 0 }, { source: 0, target: 0 }] },
+      } },
+    })).toBe(false);
+    expect(isMineraExport({ ...base,
+      footprints: { ...base.footprints, discovery: {
+        entire_event_log: { ...base.footprints.discovery.entire_event_log,
+          parallel: [{ source: 1, target: 0 }] },
+      } },
+    })).toBe(false);
+    expect(isMineraExport({ ...base,
+      footprints: { ...base.footprints, discovery: {
+        entire_event_log: { ...base.footprints.discovery.entire_event_log,
+          min_trace_length: 2, max_trace_length_without_loops: 1 },
+      } },
+    })).toBe(false);
+    expect(isMineraExport({ ...base,
+      footprints: { ...base.footprints, conformance: {
+        model: "process_tree",
+        log_model: { strict: false, violations: [{ source: 0, target: 0 }], is_fit: true },
+      } },
+    })).toBe(false);
+    expect(isMineraExport({ ...base,
+      footprints: { ...base.footprints, metrics: { precision: Number.NaN } },
+    })).toBe(false);
+    expect(isMineraExport({ ...base,
+      footprints: { ...base.footprints, conformance: { model: "unknown" } },
+    })).toBe(false);
+  });
+
+  it("cross-checks footprint trace diagnostics against the exported log", () => {
+    const trace = { case_id: "c1", events: [
+      { activity: 0, timestamp: "2025-01-01T00:00:00Z" },
+    ] };
+    const footprint = {
+      sequence: [], parallel: [], atomic_interleaving: [], activities: [0],
+      start_activities: [0], end_activities: [0], min_trace_length: 1,
+      trace: [0],
+    };
+    const base = {
+      ...valid, trace_count: 1, event_count: 1, activities: [{}], traces: [trace],
+      footprints: {
+        discovery: { trace_by_trace: [{ trace_index: 0, case_id: "c1", footprint }] },
+        conformance: { model: "dfg", trace_extensive: [{
+          trace_index: 0, case_id: "c1", footprints: [], start_activities: [],
+          end_activities: [], activities_always_happening: [], min_length_fit: true,
+          is_footprints_fit: true, is_fit: true,
+        }] },
+      },
+    };
+    expect(isMineraExport(base)).toBe(true);
+    expect(isMineraExport({ ...base, footprints: {
+      ...base.footprints, discovery: { trace_by_trace: [{
+        trace_index: 1, case_id: "c1", footprint,
+      }] },
+    } })).toBe(false);
+    expect(isMineraExport({ ...base, footprints: {
+      ...base.footprints, discovery: { trace_by_trace: [{
+        trace_index: 0, case_id: "other", footprint,
+      }] },
+    } })).toBe(false);
+    expect(isMineraExport({ ...base, footprints: {
+      ...base.footprints, discovery: { trace_by_trace: [{
+        trace_index: 0, case_id: "c1", footprint: { ...footprint, trace: [1] },
+      }] },
+    } })).toBe(false);
+
+    const customFootprint = {
+      ...footprint,
+      activities: [1],
+      start_activities: [1],
+      end_activities: [1],
+      trace: [1],
+    };
+    expect(isMineraExport({
+      ...base,
+      activities: [{}, {}],
+      footprints: {
+        ...base.footprints,
+        activity_attribute: "phase",
+        case_id_attribute: "case_ref",
+        discovery: { trace_by_trace: [{
+          trace_index: 0, case_id: "group-1", footprint: customFootprint,
+        }] },
+        conformance: { model: "dfg", trace_extensive: [{
+          trace_index: 0, case_id: "group-1", footprints: [],
+          start_activities: [], end_activities: [],
+          activities_always_happening: [], min_length_fit: true,
+          is_footprints_fit: true, is_fit: true,
+        }] },
+      },
+    })).toBe(true);
+    expect(isMineraExport({ ...base, footprints: {
+      ...base.footprints, activity_attribute: "",
+    } })).toBe(false);
+  });
+
   it("enforces native transition frequencies and recursion depth", () => {
     const transition = (frequency: { minimum: number; maximum: number | null }) => ({ kind: "transition", activity: 0, frequency });
     expect(isPowlNode(transition({ minimum: 0, maximum: 1 }))).toBe(true);

@@ -326,6 +326,19 @@ minera::CorrelationVariantsAnalysis analyze_correlation_variants(
   return result;
 }
 
+minera::FootprintsDiscoveryOptions footprints_discovery_options(
+    const minera::FootprintsOptions& options) {
+  minera::FootprintsDiscoveryOptions result;
+  result.activity_attribute = options.activity_attribute;
+  result.case_id_attribute = options.case_id_attribute;
+  result.timestamp_attribute = options.timestamp_attribute;
+  result.start_timestamp_attribute = options.start_timestamp_attribute;
+  result.index_attribute = options.index_attribute;
+  result.sort_required = options.sort_required;
+  result.initial_marking = options.initial_marking;
+  return result;
+}
+
 minera::FootprintsAnalysis analyze_footprints(
     const minera::EventLog& log, const minera::DirectlyFollowsGraph& graph,
     const minera::ProcessTree& tree, const minera::PowlNode& powl,
@@ -335,24 +348,38 @@ minera::FootprintsAnalysis analyze_footprints(
   minera::FootprintsAnalysis analysis;
   analysis.model = options.model;
   analysis.strict = options.strict;
+  const auto discovery_options = footprints_discovery_options(options);
+  analysis.activity_attribute = discovery_options.activity_attribute;
+  analysis.case_id_attribute = discovery_options.case_id_attribute;
+  analysis.trace_case_ids = minera::resolve_footprints_case_ids(
+      log, discovery_options.case_id_attribute);
+  const auto projected_log =
+      minera::prepare_footprints_event_log(log, discovery_options);
+  const auto projected_graph =
+      minera::discover_directly_follows_graph(projected_log);
   std::optional<minera::Footprint> log_footprint;
   std::optional<std::vector<minera::Footprint>> trace_footprints;
   std::optional<minera::Footprint> dfg_footprint;
   std::optional<minera::Footprint> tree_footprint;
   std::optional<minera::Footprint> powl_footprint;
+  std::optional<minera::EventTable> dataframe;
+  std::optional<minera::LazyEventTable> lazy_dataframe;
   const auto& log_fp = [&]() -> const minera::Footprint& {
-    if (!log_footprint) log_footprint = minera::discover_footprints(log);
+    if (!log_footprint)
+      log_footprint =
+          minera::discover_footprints(projected_log, discovery_options);
     return *log_footprint;
   }();
   const auto traces = [&]() -> const std::vector<minera::Footprint>& {
     if (!trace_footprints) {
-      trace_footprints = minera::discover_trace_footprints(log);
+      trace_footprints =
+          minera::discover_trace_footprints(projected_log, discovery_options);
     }
     return *trace_footprints;
   };
   const auto dfg_fp = [&]() -> const minera::Footprint& {
     if (!dfg_footprint) {
-      dfg_footprint = minera::discover_dfg_footprints(graph);
+      dfg_footprint = minera::discover_dfg_footprints(projected_graph);
     }
     return *dfg_footprint;
   };
@@ -369,10 +396,20 @@ minera::FootprintsAnalysis analyze_footprints(
     analysis.entire_event_log = log_fp;
   }
   if (options.discovery_variants.contains("entire_dataframe")) {
-    analysis.entire_dataframe = log_fp;
+    if (!dataframe) {
+      dataframe =
+          minera::prepare_footprints_event_table(log, discovery_options);
+    }
+    analysis.entire_dataframe = minera::discover_footprints(
+        *dataframe, discovery_options);
   }
   if (options.discovery_variants.contains("polars_lazyframes")) {
-    analysis.polars_lazyframes = log_fp;
+    if (!lazy_dataframe) {
+      lazy_dataframe =
+          minera::prepare_footprints_lazy_table(log, discovery_options);
+    }
+    analysis.polars_lazyframes = minera::discover_footprints(
+        *lazy_dataframe, discovery_options);
   }
   if (options.discovery_variants.contains("trace_by_trace")) {
     analysis.trace_by_trace = traces();
@@ -400,29 +437,35 @@ minera::FootprintsAnalysis analyze_footprints(
   } else if (options.model == "dfg") {
     analysis.model_footprint = dfg_fp();
   } else {
-    analysis.model_footprint =
-        minera::discover_footprints(*selected_petri);
+    analysis.model_footprint = minera::discover_footprints(
+        *selected_petri, discovery_options);
   }
   if (options.discovery_variants.contains("petri_reach_graph")) {
     if (selected_petri == nullptr) {
       throw std::invalid_argument(
           "petri_reach_graph requires a Petri-capable footprints model");
     }
-    analysis.petri_reach_graph =
-        minera::discover_footprints(*selected_petri);
+    analysis.petri_reach_graph = minera::discover_footprints(
+        *selected_petri, discovery_options);
   }
 
   if (options.conformance_variants.contains("log_model")) {
+    minera::FootprintsLogModelOptions conformance_options;
+    conformance_options.strict = options.strict;
+    conformance_options.case_id_attribute = options.case_id_attribute;
     analysis.log_model = minera::check_footprints_log_model(
-        log_fp, analysis.model_footprint, {options.strict});
+        log_fp, analysis.model_footprint, conformance_options);
   }
   if (options.conformance_variants.contains("log_extensive")) {
     analysis.log_extensive = minera::check_footprints_log_extensive(
         log_fp, analysis.model_footprint);
   }
+  minera::FootprintsTraceExtensiveOptions trace_options;
+  trace_options.enable_act_always_executed =
+      options.enable_act_always_executed;
+  trace_options.case_id_attribute = options.case_id_attribute;
   const auto trace_results = minera::check_footprints_trace_extensive(
-      traces(), analysis.model_footprint,
-      {options.enable_act_always_executed});
+      traces(), analysis.model_footprint, trace_options);
   if (options.conformance_variants.contains("trace_extensive")) {
     analysis.trace_extensive = trace_results;
   }
@@ -1041,6 +1084,13 @@ int usage(const char* program) {
                "                            process_tree, powl, petri_reach_graph\n"
                "  --footprints-model <id>  process_tree (default), powl,\n"
                "                            inductive, alpha, heuristic, or dfg\n"
+               "  --footprints-activity-attribute <name> Activity selector\n"
+               "  --footprints-case-id-attribute <name> Case-id selector\n"
+               "  --footprints-start-timestamp-attribute <name> Optional start timestamp\n"
+               "  --footprints-timestamp-attribute <name> Completion timestamp\n"
+               "  --footprints-index-attribute <name> Compatibility row-index selector\n"
+               "  --footprints-sort-required <bool> Sort table rows (default true)\n"
+               "  --footprints-initial-marking <n,...> Explicit Petri initial marking\n"
                "  --footprints-conformance-variants <a,b,...> Footprint checks:\n"
                "                            log_model, log_extensive, trace_extensive\n"
                "  --footprints-strict <bool> Strict log-model footprint checking\n"
@@ -1438,6 +1488,88 @@ PowlCliParseStatus parse_powl_cli_option(
   else
     options.case_id_key = name;
   return PowlCliParseStatus::kParsed;
+}
+
+// Parse the footprint table/Petri selectors outside the large command-line
+// dispatch function. Keeping this small option family in a helper avoids
+// pushing the MSVC parser's nesting limit as more CLI surfaces are added.
+bool parse_footprints_extra_option(std::string_view arg, const char* value,
+                                   minera::FootprintsOptions& options,
+                                   std::string& error) {
+  const auto selector_error = [&] {
+    error = std::string(arg) + " expects a non-empty selector";
+    return true;
+  };
+  if (arg == "--footprints-activity-attribute" ||
+      arg == "--footprints-case-id-attribute" ||
+      arg == "--footprints-timestamp-attribute") {
+    const auto selector = trim_text(value);
+    if (selector.empty()) return selector_error();
+    if (arg == "--footprints-activity-attribute")
+      options.activity_attribute = selector;
+    else if (arg == "--footprints-case-id-attribute")
+      options.case_id_attribute = selector;
+    else
+      options.timestamp_attribute = selector;
+    return true;
+  }
+
+  if (arg == "--footprints-index-attribute") {
+    options.index_attribute = trim_text(value);
+    return true;
+  }
+
+  if (arg == "--footprints-start-timestamp-attribute") {
+    const auto selector = trim_text(value);
+    if (selector.empty())
+      options.start_timestamp_attribute.reset();
+    else
+      options.start_timestamp_attribute = selector;
+    return true;
+  }
+
+  if (arg == "--footprints-sort-required") {
+    const std::string_view boolean = value;
+    if (boolean == "true" || boolean == "1") {
+      options.sort_required = true;
+    } else if (boolean == "false" || boolean == "0") {
+      options.sort_required = false;
+    } else {
+      error = std::string(arg) + " expects true, false, 1, or 0";
+    }
+    return true;
+  }
+
+  if (arg == "--footprints-initial-marking") {
+    const std::string text = value;
+    if (text.empty()) {
+      error = std::string(arg) + " expects a non-empty marking";
+      return true;
+    }
+    std::vector<std::uint64_t> marking;
+    std::size_t begin = 0;
+    for (std::size_t index = 0; index <= text.size(); ++index) {
+      if (index != text.size() && text[index] != ',') continue;
+      const auto token = trim_text(text.substr(begin, index - begin));
+      if (token.empty()) {
+        error = std::string(arg) + " expects non-empty uint64 entries";
+        return true;
+      }
+      std::uint64_t parsed = 0;
+      const auto conversion = std::from_chars(
+          token.data(), token.data() + token.size(), parsed);
+      if (conversion.ec != std::errc{} ||
+          conversion.ptr != token.data() + token.size()) {
+        error = std::string(arg) + " expects non-negative uint64 entries";
+        return true;
+      }
+      marking.push_back(parsed);
+      begin = index + 1;
+    }
+    options.initial_marking = std::move(marking);
+    return true;
+  }
+  return false;
 }
 
 }  // namespace
@@ -4048,6 +4180,22 @@ int main(int argc, char** argv) {
       } else {
         footprints_options.enable_act_always_executed = parsed;
       }
+    } else if (arg == "--footprints-activity-attribute" ||
+               arg == "--footprints-case-id-attribute" ||
+               arg == "--footprints-start-timestamp-attribute" ||
+               arg == "--footprints-timestamp-attribute" ||
+               arg == "--footprints-index-attribute" ||
+               arg == "--footprints-sort-required" ||
+               arg == "--footprints-initial-marking") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string error;
+      (void)parse_footprints_extra_option(arg, value, footprints_options,
+                                          error);
+      if (!error.empty()) {
+        std::cerr << "error: " << error << '\n';
+        return 2;
+      }
     } else if (arg == "--dfg-statistical-variants" ||
                arg == "--dfg-causal-variants") {
       const auto* value = next();
@@ -6244,22 +6392,10 @@ int main(int argc, char** argv) {
       }
       file << stochastic_map_json.str() << '\n';
     }
-    const auto& footprints_log =
-        footprints_options.model == "powl"
-            ? powl_log
-            : footprints_options.model == "inductive" ||
-                      footprints_options.model == "process_tree"
-                  ? inductive_log
-                  : log;
-    const auto& footprints_graph =
-        footprints_options.model == "powl"
-            ? powl_graph
-            : footprints_options.model == "inductive" ||
-                      footprints_options.model == "process_tree"
-                  ? inductive_graph
-                  : graph;
+    register_activity_selector_values(
+        graph, log, footprints_options.activity_attribute);
     const auto footprints =
-        analyze_footprints(footprints_log, footprints_graph, tree, powl,
+        analyze_footprints(log, graph, tree, powl,
                            inductive_net, net,
                            heuristic_net, powl_net, footprints_options);
     if (!no_alignments && log.traces.size() > 1000) {

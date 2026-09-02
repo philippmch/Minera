@@ -812,6 +812,14 @@ describe("hasActiveMinerOptions", () => {
       footprintsConformanceVariants: ["log_model"],
       footprintsEnableActAlwaysExecuted: true,
     })).toBe(false);
+    expect(hasActiveMinerOptions({
+      footprintsActivityAttribute: "concept:name",
+      footprintsCaseIdAttribute: "case:concept:name",
+      footprintsTimestampAttribute: "time:timestamp",
+      footprintsIndexAttribute: "@@index",
+      footprintsStartTimestampAttribute: "",
+      footprintsSortRequired: true,
+    })).toBe(false);
   });
 
   it("is true when any setting deviates", () => {
@@ -877,6 +885,13 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ footprintsConformanceVariants: ["trace_extensive"] })).toBe(true);
     expect(hasActiveMinerOptions({ footprintsStrict: true })).toBe(true);
     expect(hasActiveMinerOptions({ footprintsEnableActAlwaysExecuted: false })).toBe(true);
+    expect(hasActiveMinerOptions({ footprintsActivityAttribute: "phase" })).toBe(true);
+    expect(hasActiveMinerOptions({ footprintsCaseIdAttribute: "case_ref" })).toBe(true);
+    expect(hasActiveMinerOptions({ footprintsTimestampAttribute: "finished_at" })).toBe(true);
+    expect(hasActiveMinerOptions({ footprintsIndexAttribute: "row_number" })).toBe(true);
+    expect(hasActiveMinerOptions({ footprintsStartTimestampAttribute: "started_at" })).toBe(true);
+    expect(hasActiveMinerOptions({ footprintsSortRequired: false })).toBe(true);
+    expect(hasActiveMinerOptions({ footprintsInitialMarking: "1,0" })).toBe(true);
     expect(hasActiveMinerOptions({ dfgStatisticalVariants: ["frequency_triples"] })).toBe(true);
     expect(hasActiveMinerOptions({ dfgCausalVariants: ["heuristic"] })).toBe(true);
     expect(hasActiveMinerOptions({ correlationVariants: ["trace_based"] })).toBe(true);
@@ -1146,33 +1161,24 @@ describe("mineFormEntries", () => {
     })).toEqual([["declare_min_confidence_ratio", "0.7"]]);
   });
 
-  it("maps aggregate footprints variants in canonical order and omits defaults", () => {
-    expect(mineFormEntries({
-      footprintsDiscoveryVariants: ["powl", "trace_by_trace", "bogus"],
+  it("maps aggregate footprints variants in canonical order and rejects invalid selectors", () => {
+    expect(() => mineFormEntries({
+      footprintsDiscoveryVariants: ["powl", "trace_by_trace", "bogus" as never],
       footprintsModel: "dfg",
-      footprintsConformanceVariants: ["trace_extensive", "log_model", "unknown"],
+      footprintsConformanceVariants: ["trace_extensive", "log_model", "unknown" as never],
       footprintsStrict: true,
       footprintsEnableActAlwaysExecuted: false,
-    })).toEqual([
-      ["footprints_discovery_variants", "trace_by_trace,powl"],
-      ["footprints_model", "dfg"],
-      ["footprints_conformance_variants", "log_model,trace_extensive"],
-      ["footprints_strict", "true"],
-      ["footprints_enable_act_always_executed", "false"],
-    ]);
+    })).toThrow(/Unknown footprints discovery variant/);
     expect(mineFormEntries({
       footprintsDiscoveryVariants: ["entire_event_log", "dfg", "process_tree", "powl"],
       footprintsModel: "process_tree",
       footprintsConformanceVariants: ["log_model"],
       footprintsEnableActAlwaysExecuted: true,
     })).toEqual([]);
-    expect(mineFormEntries({
+    expect(() => mineFormEntries({
       footprintsDiscoveryVariants: ["petri_reach_graph", "dfg"],
       footprintsModel: "dfg",
-    })).toEqual([
-      ["footprints_discovery_variants", "dfg"],
-      ["footprints_model", "dfg"],
-    ]);
+    })).toThrow(/incompatible/);
   });
 
   it("maps optional statistical and causal DFG analyses in canonical order", () => {

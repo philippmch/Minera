@@ -15,6 +15,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -936,7 +937,11 @@ void parse_mine_params_rejects_invalid_correlation_options() {
            std::pair{"correlation_sample_size", "12x"}}) {
     bool threw = false;
     try {
-      (void)minera::parse_mine_params(fields({item}));
+      (void)minera::parse_mine_params(
+          [&](std::string_view name) {
+            return name == item.first ? item.second : std::string{};
+          },
+          [&](std::string_view name) { return name == item.first; });
     } catch (const std::invalid_argument&) {
       threw = true;
     }
@@ -1906,6 +1911,13 @@ void parse_mine_params_maps_footprints_options() {
        "trace_extensive,log_model,trace_extensive"},
       {"footprints_strict", "1"},
       {"footprints_enable_act_always_executed", "false"},
+      {"footprints_activity_attribute", " phase "},
+      {"footprints_case_id_attribute", " case_ref "},
+      {"footprints_start_timestamp_attribute", " started_at "},
+      {"footprints_timestamp_attribute", " finished_at "},
+      {"footprints_index_attribute", " row_number "},
+      {"footprints_sort_required", "false"},
+      {"footprints_initial_marking", "000, 18446744073709551615"},
   }));
   assert((params.footprints.discovery_variants ==
           std::set<std::string>{"dfg", "entire_dataframe",
@@ -1916,6 +1928,17 @@ void parse_mine_params_maps_footprints_options() {
           std::set<std::string>{"log_model", "trace_extensive"}));
   assert(params.footprints.strict);
   assert(!params.footprints.enable_act_always_executed);
+  assert(params.footprints.activity_attribute == "phase");
+  assert(params.footprints.case_id_attribute == "case_ref");
+  assert(params.footprints.start_timestamp_attribute &&
+         *params.footprints.start_timestamp_attribute == "started_at");
+  assert(params.footprints.timestamp_attribute == "finished_at");
+  assert(params.footprints.index_attribute == "row_number");
+  assert(!params.footprints.sort_required);
+  const std::vector<std::uint64_t> expected_marking = {
+      0, 18446744073709551615ULL};
+  assert(params.footprints.initial_marking &&
+         *params.footprints.initial_marking == expected_marking);
 
   const auto defaults = minera::parse_mine_params(fields({}));
   assert((defaults.footprints.discovery_variants ==
@@ -1926,6 +1949,193 @@ void parse_mine_params_maps_footprints_options() {
           std::set<std::string>{"log_model"}));
   assert(!defaults.footprints.strict);
   assert(defaults.footprints.enable_act_always_executed);
+  assert(defaults.footprints.activity_attribute == "concept:name");
+  assert(defaults.footprints.case_id_attribute == "case:concept:name");
+  assert(defaults.footprints.timestamp_attribute == "time:timestamp");
+  assert(!defaults.footprints.start_timestamp_attribute);
+  assert(defaults.footprints.index_attribute == "@@index");
+  assert(defaults.footprints.sort_required);
+  assert(!defaults.footprints.initial_marking);
+  const std::map<std::string, std::string> empty_start = {
+      {"footprints_start_timestamp_attribute", ""}};
+  const auto explicit_empty = minera::parse_mine_params(
+      [&](std::string_view name) {
+        const auto it = empty_start.find(std::string(name));
+        return it == empty_start.end() ? std::string{} : it->second;
+      },
+      [&](std::string_view name) {
+        return empty_start.contains(std::string(name));
+      });
+  assert(!explicit_empty.footprints.start_timestamp_attribute);
+  const std::map<std::string, std::string> empty_index = {
+      {"footprints_index_attribute", "\t"}};
+  const auto explicit_empty_index = minera::parse_mine_params(
+      [&](std::string_view name) {
+        const auto it = empty_index.find(std::string(name));
+        return it == empty_index.end() ? std::string{} : it->second;
+      },
+      [&](std::string_view name) {
+        return empty_index.contains(std::string(name));
+      });
+  assert(explicit_empty_index.footprints.index_attribute.empty());
+}
+
+minera::Event make_footprint_event(std::string activity,
+                                   std::string timestamp,
+                                   std::size_t input_order,
+                                   std::string case_ref,
+                                   std::string phase = {}) {
+  minera::Event event;
+  event.activity = std::move(activity);
+  event.timestamp = std::move(timestamp);
+  event.input_order = input_order;
+  event.attributes.push_back(
+      {"case_ref", std::move(case_ref), minera::AttributeKind::kString});
+  if (!phase.empty())
+    event.attributes.push_back(
+        {"phase", std::move(phase), minera::AttributeKind::kString});
+  return event;
+}
+
+minera::EventLog interleaved_footprint_log() {
+  minera::EventLog log;
+  minera::Trace first;
+  first.case_id = "c1";
+  first.events.push_back(
+      make_footprint_event("A", "2024-01-01T00:00:00Z", 0, "g1"));
+  first.events.push_back(
+      make_footprint_event("B", "2024-01-01T00:00:02Z", 2, "g1"));
+  minera::Trace second;
+  second.case_id = "c2";
+  second.events.push_back(
+      make_footprint_event("X", "2024-01-01T00:00:01Z", 1, "g2"));
+  second.events.push_back(
+      make_footprint_event("Y", "2024-01-01T00:00:03Z", 3, "g2"));
+  log.traces = {std::move(first), std::move(second)};
+  return log;
+}
+
+void footprints_projection_preserves_case_and_source_order() {
+  const auto log = interleaved_footprint_log();
+  minera::FootprintsDiscoveryOptions options;
+  options.case_id_attribute = "case_ref";
+  options.sort_required = false;
+  const auto table = minera::prepare_footprints_event_table(log, options);
+  const auto eager = minera::discover_footprints(table, options);
+  assert(eager.dfg.empty());
+
+  const auto lazy_table = minera::prepare_footprints_lazy_table(log, options);
+  const auto lazy = minera::discover_footprints(lazy_table, options);
+  assert(lazy.dfg.at({"A", "B"}) == 1);
+  assert(lazy.dfg.at({"X", "Y"}) == 1);
+
+  auto collision_log = log;
+  for (auto& trace : collision_log.traces)
+    for (auto& event : trace.events)
+      event.attributes.front().value = "g1";
+  const auto collision_table =
+      minera::prepare_footprints_event_table(collision_log, options);
+  const auto collision =
+      minera::discover_footprints(collision_table, options);
+  assert(collision.dfg.at({"A", "X"}) == 1);
+  assert(collision.dfg.at({"X", "B"}) == 1);
+}
+
+void footprints_projection_supports_default_csv_and_xes_schema() {
+  auto csv_like = interleaved_footprint_log();
+  for (auto& trace : csv_like.traces) {
+    trace.case_id_source_key = "case_id";
+    trace.case_id_state = minera::FirstClassAttributeState::kPresent;
+    for (auto& event : trace.events) {
+      event.activity_source_key = "activity";
+      event.timestamp_source_key = "timestamp";
+      event.activity_state = minera::FirstClassAttributeState::kPresent;
+      event.timestamp_state = minera::FirstClassAttributeState::kPresent;
+    }
+  }
+  const auto csv_table =
+      minera::prepare_footprints_event_table(csv_like);
+  const auto csv_result = minera::discover_footprints(
+      csv_table, minera::FootprintsDiscoveryOptions{});
+  assert(csv_result.dfg.at({"A", "B"}) == 1);
+
+  auto xes_like = interleaved_footprint_log();
+  for (auto& trace : xes_like.traces) {
+    trace.case_id_source_key = "case:concept:name";
+    trace.case_id_state = minera::FirstClassAttributeState::kPresent;
+    for (auto& event : trace.events) {
+      event.activity_source_key = "concept:name";
+      event.timestamp_source_key = "time:timestamp";
+      event.activity_state = minera::FirstClassAttributeState::kPresent;
+      event.timestamp_state = minera::FirstClassAttributeState::kPresent;
+    }
+  }
+  const auto xes_table =
+      minera::prepare_footprints_event_table(xes_like);
+  const auto xes_result = minera::discover_footprints(
+      xes_table, minera::FootprintsDiscoveryOptions{});
+  assert(xes_result.dfg.at({"A", "B"}) == 1);
+}
+
+void footprints_projection_rejects_missing_or_null_case_selector() {
+  auto log = interleaved_footprint_log();
+  log.traces.front().events.front().attributes.front().is_null = true;
+  minera::FootprintsDiscoveryOptions options;
+  options.case_id_attribute = "case_ref";
+  bool threw = false;
+  try {
+    (void)minera::resolve_footprints_case_ids(log, options.case_id_attribute);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+void footprints_json_uses_selected_case_ids_and_provenance() {
+  auto log = interleaved_footprint_log();
+  minera::FootprintsDiscoveryOptions options;
+  options.activity_attribute = "phase";
+  options.case_id_attribute = "case_ref";
+  for (auto& trace : log.traces)
+    for (auto& event : trace.events)
+      {
+        auto phase = std::find_if(
+            event.attributes.begin(), event.attributes.end(),
+            [](const auto& attribute) { return attribute.key == "phase"; });
+        if (phase == event.attributes.end())
+          event.attributes.push_back(
+              {"phase", event.activity, minera::AttributeKind::kString});
+        else
+          phase->value = event.activity;
+      }
+  const auto projected = minera::prepare_footprints_event_log(log, options);
+  const auto graph = minera::discover_directly_follows_graph(projected);
+  minera::FootprintsAnalysis analysis;
+  analysis.model = "dfg";
+  analysis.activity_attribute = options.activity_attribute;
+  analysis.case_id_attribute = options.case_id_attribute;
+  analysis.trace_case_ids =
+      minera::resolve_footprints_case_ids(log, options.case_id_attribute);
+  analysis.trace_by_trace =
+      minera::discover_trace_footprints(projected, options);
+  analysis.model_footprint = minera::discover_dfg_footprints(graph);
+  const auto json = minera::analysis_json(
+      "footprints.csv", log, graph,
+      /*tree=*/nullptr, /*net=*/nullptr, /*heuristics=*/nullptr,
+      /*conformance=*/nullptr, /*performance=*/nullptr, /*resources=*/nullptr,
+      /*variant_durations=*/nullptr, /*eventually_follows=*/nullptr,
+      /*decisions=*/nullptr, /*petri_decoration=*/nullptr,
+      /*spectrum=*/nullptr, /*inductive_net=*/nullptr,
+      /*inductive_decoration=*/nullptr, /*heuristic_petri=*/nullptr,
+      /*heuristic_decoration=*/nullptr, /*temporal_profile=*/nullptr,
+      /*minimum_self_distances=*/nullptr, /*transition_system=*/nullptr,
+      /*powl=*/nullptr, /*powl_petri=*/nullptr, /*powl_decoration=*/nullptr,
+      /*log_skeleton=*/nullptr, /*log_skeleton_conformance=*/nullptr,
+      /*declare=*/nullptr, /*declare_conformance=*/nullptr,
+      /*footprints=*/&analysis);
+  assert(json.find("\"case_id\": \"g1\"") != std::string::npos);
+  assert(json.find("\"activity_attribute\": \"phase\"") !=
+         std::string::npos);
 }
 
 void parse_mine_params_rejects_invalid_footprints_options() {
@@ -1934,10 +2144,19 @@ void parse_mine_params_rejects_invalid_footprints_options() {
            std::pair{"footprints_model", "unknown"},
            std::pair{"footprints_conformance_variants", "future"},
            std::pair{"footprints_strict", "yes"},
-           std::pair{"footprints_enable_act_always_executed", "enabled"}}) {
+           std::pair{"footprints_enable_act_always_executed", "enabled"},
+           std::pair{"footprints_activity_attribute", ""},
+           std::pair{"footprints_case_id_attribute", "  "},
+           std::pair{"footprints_timestamp_attribute", ""},
+           std::pair{"footprints_sort_required", "maybe"},
+           std::pair{"footprints_initial_marking", "1,,2"},
+           std::pair{"footprints_initial_marking", "18446744073709551616"}}) {
     bool threw = false;
     try {
-      (void)minera::parse_mine_params(fields({item}));
+      (void)minera::parse_mine_params(
+          fields({item}), [&](std::string_view name) {
+            return name == item.first;
+          });
     } catch (const std::invalid_argument&) {
       threw = true;
     }
@@ -4057,6 +4276,10 @@ int main() {
   parse_mine_params_rejects_invalid_declare_fields();
   parse_mine_params_maps_footprints_options();
   parse_mine_params_rejects_invalid_footprints_options();
+  footprints_projection_preserves_case_and_source_order();
+  footprints_projection_supports_default_csv_and_xes_schema();
+  footprints_projection_rejects_missing_or_null_case_selector();
+  footprints_json_uses_selected_case_ids_and_provenance();
   parse_mine_params_maps_dfg_variant_options();
   parse_mine_params_preserves_explicit_empty_dfg_attributes();
   parse_mine_params_rejects_invalid_dfg_variant_options();

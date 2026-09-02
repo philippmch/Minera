@@ -427,6 +427,19 @@ std::string form_field(const httplib::Request& request,
                                 : std::string{};
 }
 
+minera::FootprintsDiscoveryOptions footprints_discovery_options(
+    const minera::FootprintsOptions& options) {
+  minera::FootprintsDiscoveryOptions result;
+  result.activity_attribute = options.activity_attribute;
+  result.case_id_attribute = options.case_id_attribute;
+  result.timestamp_attribute = options.timestamp_attribute;
+  result.start_timestamp_attribute = options.start_timestamp_attribute;
+  result.index_attribute = options.index_attribute;
+  result.sort_required = options.sort_required;
+  result.initial_marking = options.initial_marking;
+  return result;
+}
+
 minera::FootprintsAnalysis analyze_footprints(
     const minera::EventLog& log, const minera::DirectlyFollowsGraph& graph,
     const minera::ProcessTree& tree, const minera::PowlNode& powl,
@@ -436,24 +449,38 @@ minera::FootprintsAnalysis analyze_footprints(
   minera::FootprintsAnalysis analysis;
   analysis.model = options.model;
   analysis.strict = options.strict;
+  const auto discovery_options = footprints_discovery_options(options);
+  analysis.activity_attribute = discovery_options.activity_attribute;
+  analysis.case_id_attribute = discovery_options.case_id_attribute;
+  analysis.trace_case_ids = minera::resolve_footprints_case_ids(
+      log, discovery_options.case_id_attribute);
+  const auto projected_log =
+      minera::prepare_footprints_event_log(log, discovery_options);
+  const auto projected_graph =
+      minera::discover_directly_follows_graph(projected_log);
   std::optional<minera::Footprint> log_footprint;
   std::optional<std::vector<minera::Footprint>> trace_footprints;
   std::optional<minera::Footprint> dfg_footprint;
   std::optional<minera::Footprint> tree_footprint;
   std::optional<minera::Footprint> powl_footprint;
+  std::optional<minera::EventTable> dataframe;
+  std::optional<minera::LazyEventTable> lazy_dataframe;
   const auto& log_fp = [&]() -> const minera::Footprint& {
-    if (!log_footprint) log_footprint = minera::discover_footprints(log);
+    if (!log_footprint)
+      log_footprint =
+          minera::discover_footprints(projected_log, discovery_options);
     return *log_footprint;
   }();
   const auto traces = [&]() -> const std::vector<minera::Footprint>& {
     if (!trace_footprints) {
-      trace_footprints = minera::discover_trace_footprints(log);
+      trace_footprints =
+          minera::discover_trace_footprints(projected_log, discovery_options);
     }
     return *trace_footprints;
   };
   const auto dfg_fp = [&]() -> const minera::Footprint& {
     if (!dfg_footprint) {
-      dfg_footprint = minera::discover_dfg_footprints(graph);
+      dfg_footprint = minera::discover_dfg_footprints(projected_graph);
     }
     return *dfg_footprint;
   };
@@ -470,10 +497,20 @@ minera::FootprintsAnalysis analyze_footprints(
     analysis.entire_event_log = log_fp;
   }
   if (options.discovery_variants.contains("entire_dataframe")) {
-    analysis.entire_dataframe = log_fp;
+    if (!dataframe) {
+      dataframe =
+          minera::prepare_footprints_event_table(log, discovery_options);
+    }
+    analysis.entire_dataframe = minera::discover_footprints(
+        *dataframe, discovery_options);
   }
   if (options.discovery_variants.contains("polars_lazyframes")) {
-    analysis.polars_lazyframes = log_fp;
+    if (!lazy_dataframe) {
+      lazy_dataframe =
+          minera::prepare_footprints_lazy_table(log, discovery_options);
+    }
+    analysis.polars_lazyframes = minera::discover_footprints(
+        *lazy_dataframe, discovery_options);
   }
   if (options.discovery_variants.contains("trace_by_trace")) {
     analysis.trace_by_trace = traces();
@@ -501,28 +538,34 @@ minera::FootprintsAnalysis analyze_footprints(
   } else if (options.model == "dfg") {
     analysis.model_footprint = dfg_fp();
   } else {
-    analysis.model_footprint =
-        minera::discover_footprints(*selected_petri);
+    analysis.model_footprint = minera::discover_footprints(
+        *selected_petri, discovery_options);
   }
   if (options.discovery_variants.contains("petri_reach_graph")) {
     if (selected_petri == nullptr) {
       throw std::invalid_argument(
           "petri_reach_graph requires a Petri-capable footprints model");
     }
-    analysis.petri_reach_graph =
-        minera::discover_footprints(*selected_petri);
+    analysis.petri_reach_graph = minera::discover_footprints(
+        *selected_petri, discovery_options);
   }
   if (options.conformance_variants.contains("log_model")) {
+    minera::FootprintsLogModelOptions conformance_options;
+    conformance_options.strict = options.strict;
+    conformance_options.case_id_attribute = options.case_id_attribute;
     analysis.log_model = minera::check_footprints_log_model(
-        log_fp, analysis.model_footprint, {options.strict});
+        log_fp, analysis.model_footprint, conformance_options);
   }
   if (options.conformance_variants.contains("log_extensive")) {
     analysis.log_extensive = minera::check_footprints_log_extensive(
         log_fp, analysis.model_footprint);
   }
+  minera::FootprintsTraceExtensiveOptions trace_options;
+  trace_options.enable_act_always_executed =
+      options.enable_act_always_executed;
+  trace_options.case_id_attribute = options.case_id_attribute;
   const auto trace_results = minera::check_footprints_trace_extensive(
-      traces(), analysis.model_footprint,
-      {options.enable_act_always_executed});
+      traces(), analysis.model_footprint, trace_options);
   if (options.conformance_variants.contains("trace_extensive")) {
     analysis.trace_extensive = trace_results;
   }
@@ -704,21 +747,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto inductive_net = minera::to_petri_net(tree);
     const auto heuristic_net = minera::to_petri_net(heuristics);
     const auto powl_net = minera::to_petri_net(powl);
-    const bool footprints_use_inductive =
-        params.footprints.model == "inductive" ||
-        params.footprints.model == "process_tree";
-    const auto& footprints_log = params.footprints.model == "powl"
-                                     ? powl_log
-                                     : footprints_use_inductive
-                                           ? inductive_log
-                                           : log;
-    const auto& footprints_graph = params.footprints.model == "powl"
-                                       ? powl_graph
-                                       : footprints_use_inductive
-                                             ? inductive_graph
-                                             : graph;
+    register_activity_selector_values(
+        graph, log, params.footprints.activity_attribute);
     const auto footprints =
-        analyze_footprints(footprints_log, footprints_graph, tree, powl,
+        analyze_footprints(log, graph, tree, powl,
                            inductive_net, net,
                            heuristic_net, powl_net, params.footprints);
     const auto performance = minera::compute_performance_metrics(log, graph);

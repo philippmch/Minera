@@ -6,6 +6,9 @@ import {
   FOOTPRINTS_CONFORMANCE_VARIANTS,
   FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS,
   FOOTPRINTS_DISCOVERY_VARIANTS,
+  type FootprintsConformanceVariant,
+  type FootprintsDiscoveryVariant,
+  type FootprintsModelVariant,
   type Decisions,
   type DecisionTablesResult,
   type DataPetriNetResult,
@@ -512,11 +515,25 @@ export interface MinerOptions {
   declareMinConfidenceRatio?: number;
   declareAutoSelectionMultiplier?: number;
   /** Aggregate footprints discovery/conformance settings. */
-  footprintsDiscoveryVariants?: string[];
-  footprintsModel?: "process_tree" | "powl" | "inductive" | "alpha" | "heuristic" | "dfg";
-  footprintsConformanceVariants?: string[];
+  footprintsDiscoveryVariants?: FootprintsDiscoveryVariant[];
+  footprintsModel?: FootprintsModelVariant;
+  footprintsConformanceVariants?: FootprintsConformanceVariant[];
   footprintsStrict?: boolean;
   footprintsEnableActAlwaysExecuted?: boolean;
+  /** Event/table activity selector (concept:name by default). */
+  footprintsActivityAttribute?: string;
+  /** Event/table case-id selector (case:concept:name by default). */
+  footprintsCaseIdAttribute?: string;
+  /** Optional event/table start-time selector; empty means none. */
+  footprintsStartTimestampAttribute?: string;
+  /** Event/table completion-time selector (time:timestamp by default). */
+  footprintsTimestampAttribute?: string;
+  /** Optional event/table row-index selector (@@index by default). */
+  footprintsIndexAttribute?: string;
+  /** Sort table rows by case and completion time (true by default). */
+  footprintsSortRequired?: boolean;
+  /** Comma-separated non-negative uint64 Petri initial marking. */
+  footprintsInitialMarking?: string;
   /** Optional statistical and causal DFG analyses. */
   dfgStatisticalVariants?: string[];
   dfgCausalVariants?: string[];
@@ -1127,11 +1144,25 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   )
     add("declare_auto_selection_multiplier", multiplier);
 
-  const selectedFootprintsDiscovery = options.footprintsDiscoveryVariants
-    ? FOOTPRINTS_DISCOVERY_VARIANTS.filter(
-        (name) =>
-          options.footprintsDiscoveryVariants?.includes(name) &&
-          !(options.footprintsModel === "dfg" && name === "petri_reach_graph"),
+  const requestedFootprintsDiscovery = options.footprintsDiscoveryVariants;
+  if (requestedFootprintsDiscovery !== undefined) {
+    if (requestedFootprintsDiscovery.length === 0)
+      throw new Error("footprintsDiscoveryVariants must not be empty");
+    const unknown = requestedFootprintsDiscovery.find(
+      (name) => !(FOOTPRINTS_DISCOVERY_VARIANTS as readonly string[]).includes(name),
+    );
+    if (unknown !== undefined)
+      throw new Error(`Unknown footprints discovery variant: ${unknown}`);
+    if (options.footprintsModel === "dfg" &&
+        requestedFootprintsDiscovery.includes("petri_reach_graph")) {
+      throw new Error(
+        "petri_reach_graph is incompatible with footprintsModel=dfg",
+      );
+    }
+  }
+  const selectedFootprintsDiscovery = requestedFootprintsDiscovery
+    ? FOOTPRINTS_DISCOVERY_VARIANTS.filter((name) =>
+        requestedFootprintsDiscovery.includes(name),
       )
     : undefined;
   if (
@@ -1139,10 +1170,30 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     (selectedFootprintsDiscovery.length !== FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.length ||
       FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.some((name) => !selectedFootprintsDiscovery.includes(name)))
   ) add("footprints_discovery_variants", selectedFootprintsDiscovery.join(","));
-  if (options.footprintsModel && options.footprintsModel !== "process_tree")
-    add("footprints_model", options.footprintsModel);
-  const selectedFootprintsConformance = options.footprintsConformanceVariants
-    ? FOOTPRINTS_CONFORMANCE_VARIANTS.filter((name) => options.footprintsConformanceVariants?.includes(name))
+  if (options.footprintsModel !== undefined) {
+    const footprintModels: readonly FootprintsModelVariant[] = [
+      "process_tree", "powl", "inductive", "alpha", "heuristic", "dfg",
+    ];
+    if (!footprintModels.includes(options.footprintsModel)) {
+      throw new Error(`Unknown footprints model: ${options.footprintsModel}`);
+    }
+    if (options.footprintsModel !== "process_tree")
+      add("footprints_model", options.footprintsModel);
+  }
+  const requestedFootprintsConformance = options.footprintsConformanceVariants;
+  if (requestedFootprintsConformance !== undefined) {
+    if (requestedFootprintsConformance.length === 0)
+      throw new Error("footprintsConformanceVariants must not be empty");
+    const unknown = requestedFootprintsConformance.find(
+      (name) => !(FOOTPRINTS_CONFORMANCE_VARIANTS as readonly string[]).includes(name),
+    );
+    if (unknown !== undefined)
+      throw new Error(`Unknown footprints conformance variant: ${unknown}`);
+  }
+  const selectedFootprintsConformance = requestedFootprintsConformance
+    ? FOOTPRINTS_CONFORMANCE_VARIANTS.filter((name) =>
+        requestedFootprintsConformance.includes(name),
+      )
     : undefined;
   if (
     selectedFootprintsConformance && selectedFootprintsConformance.length > 0 &&
@@ -1151,6 +1202,68 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.footprintsStrict) add("footprints_strict", "true");
   if (options.footprintsEnableActAlwaysExecuted === false)
     add("footprints_enable_act_always_executed", "false");
+  const addFootprintsSelector = (
+    optionName: string,
+    fieldName: string,
+    value: string | undefined,
+    defaultValue: string,
+  ) => {
+    if (value === undefined) return;
+    const normalized = value.trim();
+    if (!normalized) throw new Error(`${optionName} must not be empty`);
+    if (normalized !== defaultValue) add(fieldName, normalized);
+  };
+  addFootprintsSelector(
+    "footprintsActivityAttribute", "footprints_activity_attribute",
+    options.footprintsActivityAttribute, "concept:name",
+  );
+  addFootprintsSelector(
+    "footprintsCaseIdAttribute", "footprints_case_id_attribute",
+    options.footprintsCaseIdAttribute, "case:concept:name",
+  );
+  addFootprintsSelector(
+    "footprintsTimestampAttribute", "footprints_timestamp_attribute",
+    options.footprintsTimestampAttribute, "time:timestamp",
+  );
+  if (options.footprintsIndexAttribute !== undefined) {
+    const normalized = options.footprintsIndexAttribute.trim();
+    if (normalized !== "@@index") add("footprints_index_attribute", normalized);
+  }
+  if (options.footprintsStartTimestampAttribute !== undefined) {
+    const normalized = options.footprintsStartTimestampAttribute.trim();
+    if (normalized) add("footprints_start_timestamp_attribute", normalized);
+  }
+  if (options.footprintsSortRequired !== undefined &&
+      options.footprintsSortRequired !== true) {
+    add("footprints_sort_required", "false");
+  }
+  if (options.footprintsInitialMarking !== undefined) {
+    const rawTokens = options.footprintsInitialMarking.split(",");
+    if (rawTokens.length === 0)
+      throw new Error("footprintsInitialMarking must not be empty");
+    const maxUint64 = 18446744073709551615n;
+    const tokens = rawTokens.map((raw) => {
+      const token = raw.trim();
+      if (!/^\d+$/.test(token)) {
+        throw new Error(
+          "footprintsInitialMarking must contain non-negative uint64 tokens",
+        );
+      }
+      let parsed: bigint;
+      try {
+        parsed = BigInt(token);
+      } catch {
+        throw new Error(
+          "footprintsInitialMarking must contain non-negative uint64 tokens",
+        );
+      }
+      if (parsed > maxUint64) {
+        throw new Error("footprintsInitialMarking token exceeds uint64 range");
+      }
+      return parsed.toString();
+    });
+    add("footprints_initial_marking", tokens.join(","));
+  }
 
   const dfgStatisticalNames = [
     "native", "frequency", "frequency_greedy", "frequency_triples",

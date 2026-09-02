@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attributeOccurrenceValidationMessage, caseGroupingValidationMessage, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
+import { attributeOccurrenceValidationMessage, caseGroupingValidationMessage, footprintsValidationMessage, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
 
 const valid = {
   spectrumConfigured: true,
@@ -124,6 +124,36 @@ describe("POWL option validation", () => {
       .toContain("timestamp");
     expect(powlValidationMessage({ ...validPowl, caseIdKey: "" }))
       .toContain("case-id");
+  });
+});
+
+describe("Footprints option validation", () => {
+  const defaults = {
+    activityAttribute: "concept:name",
+    caseIdAttribute: "case:concept:name",
+    timestampAttribute: "time:timestamp",
+    startTimestampAttribute: "",
+    indexAttribute: "@@index",
+    initialMarking: "",
+  };
+
+  it("accepts defaults, optional start time, and uint64 boundaries", () => {
+    expect(footprintsValidationMessage(defaults)).toBeNull();
+    expect(footprintsValidationMessage({
+      ...defaults,
+      startTimestampAttribute: "started_at",
+      indexAttribute: " ",
+      initialMarking: "000,18446744073709551615",
+    })).toBeNull();
+  });
+
+  it("rejects blank selectors and malformed marking entries", () => {
+    expect(footprintsValidationMessage({ ...defaults, activityAttribute: " " }))
+      .toContain("activity");
+    expect(footprintsValidationMessage({ ...defaults, initialMarking: "1,,2" }))
+      .toContain("non-negative");
+    expect(footprintsValidationMessage({ ...defaults, initialMarking: "18446744073709551616" }))
+      .toContain("uint64");
   });
 });
 
