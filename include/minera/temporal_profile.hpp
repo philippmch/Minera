@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
 
 namespace minera {
@@ -40,6 +41,11 @@ struct TemporalProfile {
 };
 
 struct TemporalProfileOptions {
+  // Activity and case selectors used by flat/table adapters. Event-log
+  // discovery uses trace boundaries and therefore ignores case_id_attribute.
+  std::string activity_attribute = "concept:name";
+  std::string case_id_attribute = "case:concept:name";
+
   // Empty means Event.timestamp. The aliases allow callers to describe the
   // Source-completion/target-start terminology is explicit. When both a
   // primary field and its alias are set, the primary field takes precedence.
@@ -49,8 +55,17 @@ struct TemporalProfileOptions {
   std::string target_start_timestamp_attribute;
 
   bool use_business_hours = false;
-  // Empty means the compatible Monday-Friday 07:00-17:00 schedule.
+  // Empty uses the compatible Monday-Friday 07:00-17:00 schedule unless
+  // business_hour_slots_explicit is true.
   std::vector<BusinessHourSlot> business_hour_slots;
+  // Distinguishes an omitted schedule (use the default) from an explicitly
+  // empty schedule (no active business time).
+  bool business_hour_slots_explicit = false;
+
+  // The reference adapters fail when a selected activity or timestamp is
+  // missing/malformed. Callers that intentionally process sparse data may opt
+  // into the older skip behavior.
+  bool strict_attributes = true;
 
   // Used by conformance checking; discovery ignores this value.
   double zeta = 6.0;
@@ -68,15 +83,45 @@ struct TemporalDeviation {
   }
 };
 
-// Discover all ordered (i,j), i<j, activity pairs in every trace. Invalid,
-// missing, or negative durations are ignored.
+// Discover all ordered (i,j), i<j, activity pairs in every trace. Negative
+// durations are ignored. Missing or malformed selected fields raise by
+// default; strict_attributes=false restores sparse-input skipping.
 [[nodiscard]] TemporalProfile discover_temporal_profile(
     const EventLog& log, const TemporalProfileOptions& options = {});
+
+// Input-specific components retained as distinct contracts. The table path
+// groups by case_id_attribute and stable-sorts each case by completion time.
+[[nodiscard]] TemporalProfile discover_temporal_profile_log(
+    const EventLog& log, const TemporalProfileOptions& options = {});
+[[nodiscard]] TemporalProfile discover_temporal_profile_dataframe(
+    const EventTable& table, const TemporalProfileOptions& options = {});
+[[nodiscard]] TemporalProfile discover_temporal_profile(
+    const EventStream& stream, const TemporalProfileOptions& options = {});
+[[nodiscard]] TemporalProfile discover_temporal_profile(
+    const EventTable& table, const TemporalProfileOptions& options = {});
+[[nodiscard]] TemporalProfile discover_temporal_profile(
+    const LazyEventTable& table, const TemporalProfileOptions& options = {});
+[[nodiscard]] TemporalProfile discover_temporal_profile(
+    const EventDataView& data, const TemporalProfileOptions& options = {});
 
 // Return only observations whose absolute z-score exceeds options.zeta, or
 // whose zero-variance profile disagrees with the observed duration.
 [[nodiscard]] std::vector<TemporalDeviation> check_temporal_profile_conformance(
     const EventLog& log, const TemporalProfile& profile,
+    const TemporalProfileOptions& options = {});
+
+using TemporalConformanceResult = std::vector<std::vector<TemporalDeviation>>;
+
+// Detailed conformance preserves one result bucket per input case, including
+// empty buckets. The legacy check function below remains a flattened view.
+[[nodiscard]] TemporalConformanceResult conform_temporal_profile_log(
+    const EventLog& log, const TemporalProfile& profile,
+    const TemporalProfileOptions& options = {});
+[[nodiscard]] TemporalConformanceResult conform_temporal_profile_dataframe(
+    const EventTable& table, const TemporalProfile& profile,
+    const TemporalProfileOptions& options = {});
+[[nodiscard]] TemporalConformanceResult conform_temporal_profile(
+    const EventDataView& data, const TemporalProfile& profile,
     const TemporalProfileOptions& options = {});
 
 // Convenience overload when only the zeta threshold differs from defaults.

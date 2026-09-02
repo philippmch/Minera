@@ -32,6 +32,7 @@ add_library(minera_core
   src/backend/bpmn.cpp
   src/backend/browser_history.cpp
   src/backend/batches.cpp
+  src/backend/batches/discovery_registry.cpp
   src/backend/case_relations.cpp
   src/backend/case_arrival.cpp
   src/backend/case_statistics.cpp
@@ -129,6 +130,7 @@ add_library(minera_core
   src/backend/ocel_transform.cpp
   src/backend/performance.cpp
   src/backend/performance_spectrum.cpp
+  src/backend/performance_spectrum/components.cpp
   src/backend/petri_anti_alignment.cpp
   src/backend/petri_analysis_json.cpp
   src/backend/petri_multi_alignment.cpp
@@ -1027,6 +1029,54 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_temporal_behavioral_tests PRIVATE cxx_std_20)
   target_compile_options(minera_temporal_behavioral_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_temporal_behavioral_tests COMMAND minera_temporal_behavioral_tests)
+
+  add_executable(minera_temporal_profile_parity_contracts_tests
+    src/backend/tests/test_temporal_profile_parity_contracts.cpp
+  )
+  target_link_libraries(minera_temporal_profile_parity_contracts_tests PRIVATE minera::core)
+  target_compile_features(minera_temporal_profile_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_temporal_profile_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_temporal_profile_parity_contracts_tests
+           COMMAND minera_temporal_profile_parity_contracts_tests)
+
+  add_executable(minera_transition_system_parity_contracts_tests
+    src/backend/tests/transition_system_parity_contracts.cpp
+  )
+  target_link_libraries(minera_transition_system_parity_contracts_tests PRIVATE minera::core)
+  target_compile_features(minera_transition_system_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_transition_system_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_transition_system_parity_contracts_tests
+           COMMAND minera_transition_system_parity_contracts_tests)
+
+  add_executable(minera_minimum_self_distance_parity_contracts_tests
+    src/backend/tests/minimum_self_distance_parity_contracts.cpp
+  )
+  target_link_libraries(minera_minimum_self_distance_parity_contracts_tests PRIVATE minera::core)
+  target_compile_features(minera_minimum_self_distance_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_minimum_self_distance_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_minimum_self_distance_parity_contracts_tests
+           COMMAND minera_minimum_self_distance_parity_contracts_tests)
+
+  add_executable(minera_performance_spectrum_parity_contracts_tests
+    src/backend/tests/test_performance_spectrum_parity_contracts.cpp
+  )
+  target_link_libraries(minera_performance_spectrum_parity_contracts_tests PRIVATE minera::core)
+  target_compile_features(minera_performance_spectrum_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_performance_spectrum_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_performance_spectrum_parity_contracts_tests
+           COMMAND minera_performance_spectrum_parity_contracts_tests)
+
+  add_executable(minera_batches_parity_contracts_tests
+    src/backend/tests/test_batches_parity_contracts.cpp
+  )
+  target_link_libraries(minera_batches_parity_contracts_tests PRIVATE minera::core)
+  target_include_directories(minera_batches_parity_contracts_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/backend
+  )
+  target_compile_features(minera_batches_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_batches_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_batches_parity_contracts_tests
+           COMMAND minera_batches_parity_contracts_tests)
 
   add_executable(minera_concept_drift_tests
     src/backend/tests/test_concept_drift.cpp

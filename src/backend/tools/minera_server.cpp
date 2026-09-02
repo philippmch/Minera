@@ -196,6 +196,62 @@ minera::EventLog project_powl_activity(const minera::EventLog& source,
   return minera::normalize_powl_event_log(source, options);
 }
 
+minera::MinimumSelfDistances discover_selected_minimum_self_distances(
+    const minera::EventLog& log,
+    const minera::MinimumSelfDistanceOptions& options) {
+  switch (options.variant) {
+    case minera::MinimumSelfDistanceVariant::kLog:
+      return minera::MinimumSelfDistanceLogDiscovery::apply(log, options);
+    case minera::MinimumSelfDistanceVariant::kPandas:
+      return minera::MinimumSelfDistancePandasDiscovery::apply(
+          minera::event_log_to_table(log), options);
+    case minera::MinimumSelfDistanceVariant::kPolars:
+      return minera::MinimumSelfDistancePolarsDiscovery::apply(
+          minera::event_log_to_lazy_table(log), options);
+  }
+  throw std::invalid_argument("minimum self-distance variant is invalid");
+}
+
+minera::PerformanceSpectrum discover_selected_performance_spectrum(
+    const minera::EventLog& log, const std::vector<std::string>& activities,
+    const minera::PerformanceSpectrumOptions& options) {
+  switch (options.variant) {
+    case minera::PerformanceSpectrumVariant::kDataframe:
+      return minera::discover_performance_spectrum_dataframe(
+          minera::event_log_to_table(log), activities, options);
+    case minera::PerformanceSpectrumVariant::kDataframeDisconnected:
+      return minera::discover_performance_spectrum_dataframe_disconnected(
+          minera::event_log_to_table(log), activities, options);
+    case minera::PerformanceSpectrumVariant::kLazyframe:
+      return minera::discover_performance_spectrum_lazyframe(
+          minera::event_log_to_lazy_table(log), activities, options);
+    case minera::PerformanceSpectrumVariant::kLazyframeDisconnected:
+      return minera::discover_performance_spectrum_lazyframe_disconnected(
+          minera::event_log_to_lazy_table(log), activities, options);
+    case minera::PerformanceSpectrumVariant::kConnected:
+    case minera::PerformanceSpectrumVariant::kDisconnected:
+    case minera::PerformanceSpectrumVariant::kLog:
+    case minera::PerformanceSpectrumVariant::kLogDisconnected:
+      return minera::compute_performance_spectrum(log, activities, options);
+  }
+  throw std::invalid_argument("performance spectrum variant is invalid");
+}
+
+minera::BatchDiscovery discover_selected_batches(
+    const minera::EventLog& log, const minera::BatchDiscoveryOptions& options) {
+  switch (options.variant) {
+    case minera::BatchDiscoveryVariant::kLog:
+      return minera::BatchLogDiscovery::apply(log, options);
+    case minera::BatchDiscoveryVariant::kPandas:
+      return minera::BatchPandasDiscovery::apply(
+          minera::event_log_to_table(log), options);
+    case minera::BatchDiscoveryVariant::kPolars:
+      return minera::BatchPolarsDiscovery::apply(
+          minera::event_log_to_lazy_table(log), options);
+  }
+  throw std::invalid_argument("batch discovery variant is invalid");
+}
+
 // The most recently mined log and its discovered nets, kept so the costly
 // alignment of a model can be computed on demand (POST /api/align) instead of
 // eagerly for every miner on every mine. The app is local and single-user, so
@@ -699,6 +755,13 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                                       params.token_replay.activity_attribute);
     register_activity_selector_values(graph, log,
                                       params.heuristic.activity_attribute);
+    register_activity_selector_values(
+        graph, log, params.temporal_profile.activity_attribute);
+    register_activity_selector_values(
+        graph, log,
+        params.transition_system.activity_attribute.empty()
+            ? params.transition_system.activity_key
+            : params.transition_system.activity_attribute);
     std::optional<minera::DfgVariantsAnalysis> dfg_variants_analysis;
     if (!params.dfg_statistical_variants.empty() ||
         !params.dfg_causal_variants.empty()) {
@@ -712,9 +775,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       correlation_variants_analysis = analyze_correlation_variants(
           log, params.correlation_variants, params.correlation);
     }
-    const auto temporal_profile = minera::discover_temporal_profile(log);
+    const auto temporal_profile =
+        minera::discover_temporal_profile(log, params.temporal_profile);
     const auto minimum_self_distances =
-        minera::discover_minimum_self_distances(
+        discover_selected_minimum_self_distances(
             log, params.minimum_self_distance);
     // Selected activity columns can produce labels that are absent from the
     // native activity graph; register them before the JSON adapter resolves
@@ -760,12 +824,12 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto eventually = minera::discover_eventually_follows(log, graph);
     std::optional<minera::PerformanceSpectrum> spectrum;
     if (!params.spectrum_activities.empty()) {
-      spectrum = minera::compute_performance_spectrum(
+      spectrum = discover_selected_performance_spectrum(
           log, params.spectrum_activities, params.spectrum);
     }
     std::optional<minera::BatchDiscovery> batch_discovery;
     if (params.batches) {
-      batch_discovery = minera::discover_batches(log, params.batch_options);
+      batch_discovery = discover_selected_batches(log, params.batch_options);
     }
     const auto log_skeleton =
         minera::discover_log_skeleton(log, params.log_skeleton);
@@ -6858,6 +6922,131 @@ void handle_streaming_footprints(const httplib::Request& request,
   }
 }
 
+minera::TemporalProfile parse_temporal_profile_parameter(
+    std::string_view profile_text, std::string_view parameter_name) {
+  if (profile_text.empty()) {
+    throw std::invalid_argument(std::string(parameter_name) +
+                                " must not be empty");
+  }
+  minera::TemporalProfile profile;
+  std::size_t begin = 0;
+  while (begin <= profile_text.size()) {
+    const auto end = profile_text.find(',', begin);
+    const auto item = profile_text.substr(
+        begin, end == std::string_view::npos ? std::string_view::npos
+                                             : end - begin);
+    const auto arrow = item.find("->");
+    const auto first_colon = item.find(':');
+    const auto second_colon = item.find(
+        ':', first_colon == std::string_view::npos ? 0 : first_colon + 1);
+    if (arrow == std::string_view::npos ||
+        first_colon == std::string_view::npos ||
+        second_colon == std::string_view::npos || arrow == 0 ||
+        first_colon <= arrow + 2 || second_colon <= first_colon + 1 ||
+        second_colon + 1 >= item.size()) {
+      throw std::invalid_argument(
+          std::string(parameter_name) +
+          " entries must use source->target:mean:stddev");
+    }
+    const auto mean_text = std::string(
+        item.substr(first_colon + 1, second_colon - first_colon - 1));
+    const auto stddev_text = std::string(item.substr(second_colon + 1));
+    char* mean_end = nullptr;
+    char* stddev_end = nullptr;
+    const double mean = std::strtod(mean_text.c_str(), &mean_end);
+    const double stddev = std::strtod(stddev_text.c_str(), &stddev_end);
+    if (mean_end != mean_text.c_str() + mean_text.size() ||
+        stddev_end != stddev_text.c_str() + stddev_text.size() ||
+        !std::isfinite(mean) || mean < 0.0 || !std::isfinite(stddev) ||
+        stddev < 0.0) {
+      throw std::invalid_argument(std::string(parameter_name) +
+                                  " timings must be finite and non-negative");
+    }
+    profile.entries.push_back(
+        {std::string(item.substr(0, arrow)),
+         std::string(item.substr(arrow + 2, first_colon - arrow - 2)), 1,
+         mean, stddev});
+    if (end == std::string_view::npos) break;
+    begin = end + 1;
+  }
+  return profile;
+}
+
+void handle_temporal_conformance(const httplib::Request& request,
+                                 httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "temporal_profile",
+        "temporal_variant",
+        "temporal_activity_attribute",
+        "temporal_case_id_attribute",
+        "temporal_source_timestamp_attribute",
+        "temporal_target_timestamp_attribute",
+        "temporal_business_hours",
+        "temporal_business_hour_slots",
+        "temporal_strict_attributes",
+        "temporal_zeta"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key)) {
+        throw std::invalid_argument(
+            "unknown temporal conformance parameter: " + key);
+      }
+    }
+    if (!request.has_param("temporal_profile")) {
+      throw std::invalid_argument("temporal_profile is required");
+    }
+
+    std::shared_ptr<const MinedSession> session;
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      session = g_session;
+    }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    auto options = minera::parse_mine_params(lookup, present).temporal_profile;
+    // This route is an explicit conformance request, unlike bundled discovery.
+    // Preserve the strict standalone component default unless it is overridden.
+    if (!present("temporal_strict_attributes")) {
+      options.strict_attributes = true;
+    }
+    const auto profile = parse_temporal_profile_parameter(
+        request.get_param_value("temporal_profile"), "temporal_profile");
+    const auto variant = present("temporal_variant")
+                             ? request.get_param_value("temporal_variant")
+                             : std::string{"log"};
+    minera::TemporalConformanceResult result;
+    if (variant == "log") {
+      result = minera::conform_temporal_profile_log(session->log, profile,
+                                                    options);
+    } else if (variant == "dataframe") {
+      result = minera::conform_temporal_profile_dataframe(
+          minera::event_log_to_table(session->log), profile, options);
+    } else {
+      throw std::invalid_argument(
+          "temporal_variant must be log or dataframe");
+    }
+    response.set_content(minera::temporal_conformance_json(result),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_streaming_temporal(const httplib::Request& request,
                                httplib::Response& response) {
   try {
@@ -6876,46 +7065,9 @@ void handle_streaming_temporal(const httplib::Request& request,
     }
     if (!request.has_param("streaming_temporal_profile"))
       throw std::invalid_argument("streaming temporal profile is required");
-    minera::TemporalProfile profile;
-    const auto profile_text =
-        request.get_param_value("streaming_temporal_profile");
-    std::size_t begin = 0;
-    while (begin <= profile_text.size()) {
-      const auto end = profile_text.find(',', begin);
-      const auto item = profile_text.substr(
-          begin, end == std::string::npos ? std::string::npos : end - begin);
-      const auto arrow = item.find("->");
-      const auto first_colon = item.find(':');
-      const auto second_colon = item.find(':', first_colon == std::string::npos
-                                                     ? 0
-                                                     : first_colon + 1);
-      if (arrow == std::string::npos || first_colon == std::string::npos ||
-          second_colon == std::string::npos || arrow == 0 ||
-          first_colon <= arrow + 2 || second_colon <= first_colon + 1 ||
-          second_colon + 1 >= item.size()) {
-        throw std::invalid_argument(
-            "streaming temporal profile entries must use source->target:mean:stddev");
-      }
-      char* mean_end = nullptr;
-      char* stddev_end = nullptr;
-      const auto mean_text = item.substr(first_colon + 1,
-                                         second_colon - first_colon - 1);
-      const auto stddev_text = item.substr(second_colon + 1);
-      const double mean = std::strtod(mean_text.c_str(), &mean_end);
-      const double stddev = std::strtod(stddev_text.c_str(), &stddev_end);
-      if (mean_end != mean_text.c_str() + mean_text.size() ||
-          stddev_end != stddev_text.c_str() + stddev_text.size() ||
-          !std::isfinite(mean) || mean < 0.0 || !std::isfinite(stddev) ||
-          stddev < 0.0) {
-        throw std::invalid_argument(
-            "streaming temporal profile timings must be finite and non-negative");
-      }
-      profile.entries.push_back(
-          {item.substr(0, arrow),
-           item.substr(arrow + 2, first_colon - arrow - 2), 1, mean, stddev});
-      if (end == std::string::npos) break;
-      begin = end + 1;
-    }
+    auto profile = parse_temporal_profile_parameter(
+        request.get_param_value("streaming_temporal_profile"),
+        "streaming_temporal_profile");
     minera::CsvImportOptions import_options;
     if (request.has_param("streaming_temporal_case_id_column"))
       import_options.case_id_column =
@@ -7223,6 +7375,7 @@ int main(int argc, char** argv) {
   server.Options("/api/streaming-dfg", preflight);
   server.Options("/api/streaming-footprints", preflight);
   server.Options("/api/streaming-temporal", preflight);
+  server.Options("/api/temporal-conformance", preflight);
   server.Options("/api/streaming-tbr", preflight);
   server.Options("/api/knowledge-injection", preflight);
 
@@ -7327,6 +7480,7 @@ int main(int argc, char** argv) {
   server.Post("/api/streaming-dfg", handle_streaming_dfg);
   server.Post("/api/streaming-footprints", handle_streaming_footprints);
   server.Post("/api/streaming-temporal", handle_streaming_temporal);
+  server.Post("/api/temporal-conformance", handle_temporal_conformance);
   server.Post("/api/streaming-tbr", handle_streaming_tbr);
   server.Get("/api/playout", handle_playout);
   server.Post("/api/playout", handle_playout);

@@ -47,13 +47,14 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 28
-complete and 58 partial dispatcher rows, plus 157 complete and 230 partial
+adapter, integration, or missing are complete. The current manifest records 34
+complete and 52 partial dispatcher rows, plus 176 complete and 211 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
-DFG, 26-module Inductive discovery, 31-module POWL discovery, and 13-module
-footprints discovery/conformance stacks with distinct registered tests; 288
-coverage units still require exact proof.
+DFG, 26-module Inductive discovery, 31-module POWL discovery, 13-module
+footprints discovery/conformance, and the 19-module temporal/behavioral adapter
+stack with distinct registered tests; 263 coverage units still require exact
+proof.
 A release may
 additionally run the strict gate:
 
@@ -123,7 +124,7 @@ are reconciled.
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters |
 | Conformance: replay | forward token replay and backwards token replay | **Partial (implemented core; proof pending)** — forward replay remains the default; the backwards variation, reverse silent routing, weak firing, duplicate-label behavior, immediate-stop option, and named event activity selector are selectable |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Partial overall; footprints conformance complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance remain proof-pending |
-| Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Partial (implemented core; proof pending)** |
+| Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Partial (implemented core; proof pending)** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, and JSON/CLI/server/frontend adapters are implemented |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, and cross-family envelope rejection; broader OCEL schema coverage remains |
 | Discovery: Alpha | classic and Alpha+ | **Partial (implemented core; proof pending)** — event-log and direct-DFG classic entry points are available; Alpha+ remains an explicit event-log variant |
@@ -131,10 +132,10 @@ are reconciled.
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Partial (implemented core; proof pending)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
 | Discovery: declarative | Declare classic and log skeleton classic | **Partial (implemented core; proof pending)** |
-| Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Partial overall; the DFG dispatcher and thirteen modules are complete** — all eight statistical DFG routes, eager and lazy table adapters, performance behavior, replacement helpers, and graph utilities have focused native contracts plus JSON/CLI/server/frontend integration; both causal variants, all three correlation-miner variants, eventually-follows, and minimum self-distance with witnesses remain implemented but proof-pending in their separately tracked packages |
+| Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Partial overall; the DFG dispatcher, thirteen DFG modules, and minimum self-distance are complete** — all eight statistical DFG routes, eager and lazy table adapters, performance behavior, replacement helpers, graph utilities, and all three minimum-self-distance adapters with witnesses have focused native contracts plus JSON/CLI/server/frontend integration; both causal variants, all three correlation-miner variants, and eventually-follows remain implemented but proof-pending in their separately tracked packages |
 | Discovery: footprints | log entire/trace-by-trace, eager dataframe, lazy dataframe, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete** — all eight selectors have distinct registered contracts and production dispatch; eager/lazy ordering differences, activity/case/time/index selectors, explicit Petri markings, and inclusive-choice bottom-up behavior are covered |
-| Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Partial overall; POWL discovery complete** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data but remain proof-pending; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and the additional DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings, backed by exact selector and module contracts |
-| Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected plus log/dataframe projections; batches | **Partial (implemented core; proof pending)** — temporal profiles, all six named performance-spectrum projections, and all five batch classifications are available; batch activity/resource/timestamp/case-id selectors and columnar/lazyframe adapters share the native contract |
+| Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete** — view-based transition systems cover sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, occurrence data, flat and trace inputs, and explicit activity/case selectors; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and the additional DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings, backed by exact selector and module contracts |
+| Discovery: temporal/behavioral | temporal profile; performance spectrum log/dataframe/lazyframe connected and disconnected projections; batches | **Complete** — strict native temporal discovery and permissive bundled analysis, all six canonical spectrum projections with adapter-specific sampling and timestamp behavior, all three batch adapters and five classifications, and every activity/resource/time/case/event selector have registered native plus production integration contracts |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis (including the configurable generated index-column contract), OCDFG metrics (explicit total-object associations plus separate event-couple and total-object performance projections), annotated and unannotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics and custom scalar activity/object-type selectors, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; SAW weight distributions retain per-event transition multiplicity (including final routing) and merged-net arc ownership decorations; broader object-centric schema and visualization coverage remains |
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Partial (implemented core; proof pending)** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, normalized composite fitness/precision/generalization/simplicity weights with F-score, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Partial (implemented core; proof pending)** — deterministic native contextual splitting with token-aware contexts, weighted greedy-modularity clustering, strict edge thresholds, custom classifiers/targets, JSON/CLI/local-server/frontend adapters, and focused regressions for weighted gains, zero-edge graphs, zero-gain merges, and deterministic ties |
@@ -2171,75 +2172,76 @@ matrices, deterministic ties, and balanced transportation marginals.
 
 ## Performance-spectrum and batch parity evidence
 
-Performance spectra expose CONNECTED, DISCONNECTED, DATAFRAME, LOG,
-DATAFRAME_DISCONNECTED, and LOG_DISCONNECTED as distinct selectable variants.
-The log/dataframe names select the corresponding native projection while
-sharing the deterministic event-log implementation. All variants require at
-least two requested activities, strictly validate selected timestamps,
-optionally preserve input order, and otherwise use stable timestamp ordering.
-Connected discovery projects each case onto the requested activities and emits
-every overlapping full-pattern window. Disconnected discovery emits labeled
-contiguous subpatterns longest-first, removing matched events except the
-endpoint before considering shorter subpatterns so a full match is not
-rediscovered as all of its subsets.
+Performance-spectrum discovery exposes the six canonical selectors
+`DATAFRAME`, `LOG`, `DATAFRAME_DISCONNECTED`, `LOG_DISCONNECTED`, `LAZYFRAME`,
+and `LAZYFRAME_DISCONNECTED`. `CONNECTED` and `DISCONNECTED` remain compatibility
+aliases and do not replace a catalog selector. All paths require at least two
+requested activities, validate selected timestamps, and return observations in
+deterministic first-instant order. Connected discovery projects each case onto
+the requested sequence and emits overlapping full-pattern windows.
 
-Activity, timestamp, and case-id attributes are configurable. Built-in event
-fields and generic event/trace attributes are resolved consistently by the
-native API, request parser, CLI, and frontend controls; the selected attribute
-names are retained in JSON metadata.
+The adapters retain their observable input and sampling contracts. LOG uses
+trace boundaries, epoch-second instants, and midpoint sampling with forced
+extremes. Eager tables use their column projection and timestamp scaling;
+lazy tables retain prefix-oriented materialization. A sample size of zero is
+accepted and retains each adapter's boundary-sampling behavior: eager/lazy
+connected results are empty, while selectors that force boundary observations
+retain those observations. LOG_DISCONNECTED retains the pair-only compatibility
+behavior, while eager and lazy disconnected variants emit longest contiguous
+subpatterns first and suppress rediscovery of consumed interiors. Repeated
+labels retain explicit requested-pattern offsets in JSON and the UI.
 
-Observations are globally stable-sorted by their first instant. The default
-sample size is 10,000 and uses the pinned deterministic midpoint selector,
-including forced first and last observations; the result can therefore contain
-one or two more observations than the requested sample size. The pinned
-EventLog disconnected adapter has a generator-versus-tuple membership defect
-that limits it to pairs. Minera implements the intended dataframe/lazyframe
-longest-subpattern semantics and documents that repair rather than reproducing
-the wrapper defect. Columnar and lazyframe implementations otherwise remain
-input adapters to the native behavior.
+Batch discovery has distinct LOG, PANDAS, and POLARS components. Each groups
+events by selected activity and resource and uses completion timestamps as the
+default starts unless an interval-start field is configured. LOG selectors can
+resolve a case id per event; table variants can additionally use an event-id
+column to keep otherwise identical rows distinct. Without an event id, exact
+table-row identity tuples are intentionally deduplicated. Intervals merge by
+strict transitive overlap and then by the configured inclusive gap. Undersized
+groups are removed, and classification priority is simultaneous, batching on
+start, batching on end, sequential, then concurrent.
 
-Batch discovery exposes LOG, PANDAS, and POLARS selectors over the same
-deterministic interval core. Each variant groups events by selected activity
-and resource, using the selected completion timestamp (and completion time as
-the default start) or a configured interval-start attribute. Standard aliases
-and generic event/trace attributes are resolved consistently. It first merges
-strictly overlapping intervals transitively, then merges non-overlapping
-intervals whose gap is at most the configured distance. Groups smaller than
-the minimum batch size are removed. Classification priority is simultaneous,
-batching on start, batching on end, sequential, then concurrent. The reference
-group count is the number of detected batches; Minera additionally reports the
-number of member events and retains trace/event identities so duplicate
-timestamp/case tuples are not collapsed.
+Minimum self-distance has separate LOG, PANDAS, and POLARS components. LOG
+preserves real trace boundaries; flat inputs group interleaved rows by their
+selected case column while keeping source order. Every result includes the
+minimum distance and the distinct activities witnessed between repeated
+occurrences. Imported first-class fields, their recorded source keys, generic
+event values, and trace values are resolved consistently.
 
-Minimum self-distance discovery exposes LOG, PANDAS, and POLARS selectors
-through the same deterministic witness calculation. Configurable activity and
-case-id columns are resolved from native fields or event/trace attributes;
-interleaved case values are grouped by the selected case column, while witness
-events remain limited to that case. The selector and columns are carried
-through strict request parsing, CLI, local server, JSON metadata, and the
-frontend controls; all three adapters preserve the activity, distance, and
-witness contract.
+Temporal-profile discovery has distinct log and dataframe components, as does
+conformance. Discovery covers all ordered within-case event pairs, independent
+source-completion and target-start selectors, strict timestamp validation,
+custom or explicit-empty weekly business-hour schedules, and deterministic
+sample statistics. The direct adapters are strict by default; the always-on
+profile included with general mining stays permissive unless strictness is
+requested, so timestamp-less logs remain valid. Conformance preserves one
+bucket per case, applies the configured zeta threshold, and represents a
+zero-variance mismatch with the finite maximum-distance sentinel. It is exposed
+through grouped JSON, a cached local endpoint for LOG and DATAFRAME, and a typed
+frontend adapter.
 
-Spectrum variant, sampling, sorting, selected activity/timestamp/case-id
-attributes, batch variant/enablement, all four batch selectors, merge distance,
-minimum size, and start attribute are available through strict request parsing,
-CLI, local server, deterministic prevalidated JSON, and frontend controls.
-Batch JSON retains the selected variant and selector metadata, while custom
-activity groups carry a text label when no native graph id exists. Footprint
-JSON keeps separate dataframe and lazyframe discovery keys for adapter callers.
-Disconnected observations retain their per-point labels and explicit requested
-pattern offset in the JSON/UI, including when activity labels repeat. Batch
-JSON/UI exposes all five categories, group batch/event counts, resources,
-ranges, and case evidence.
+Transition-system discovery accepts EventLog, stream, eager table, lazy table,
+and generic event-data views. Sequence, set, and multiset states combine with
+forward/backward traversal, any nonnegative window including zero, optional
+occurrence evidence, and configurable activity and case selectors. Flat inputs
+retain original row ordering within regrouped cases and occurrence indices.
 
-Focused regressions cover stable sorting and its disable switch, overlapping
-connected windows, full and partial disconnected matches, loops, non-adjacent
-rejection, longest-first suppression, exact midpoint/extreme sampling, all five
-batch types and all three batch selectors, custom activity/resource/timestamp/
-case-id columns, strict-overlap/touching/gap/transitive merging, custom starts,
-minimum size, empty resources, duplicate event identities, malformed
-timestamps/options, JSON rejection before output, request boundaries, and
-frontend rendering.
+All selectors and settings above flow through the native API, strict request
+parser, standalone CLI, local server, deterministic prevalidated JSON, and
+frontend controls. Batch JSON carries variant and selector metadata, optional
+event ids, all five categories, group/event counts, resources, ranges, and case
+evidence. The coverage manifest records six completed packages and nineteen
+completed owned modules with independent implementation identities and Release
+contracts.
+
+Focused regressions cover adapter dispatch, imported source keys, stable and
+unsorted ordering, connected overlaps, disconnected full/partial matches,
+loops, longest-first suppression, every sampling boundary, all five batch
+types, per-event cases, row deduplication/event identity, custom fields,
+overlap/touch/gap/transitive merging, strict and permissive timestamps,
+one-sided temporal selectors, business calendars, zero variance, grouped
+conformance, all transition views/directions/windows, malformed requests, JSON
+rejection before output, and frontend serialization/rendering.
 
 ## Footprints parity evidence
 

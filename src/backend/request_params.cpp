@@ -57,6 +57,20 @@ double parse_finite_double(std::string_view value, std::string_view name) {
   return parsed;
 }
 
+double parse_temporal_zeta(std::string_view value, std::string_view name) {
+  std::string owned(value);
+  char* end = nullptr;
+  errno = 0;
+  const double parsed = std::strtod(owned.c_str(), &end);
+  if (end == owned.c_str() || end != owned.c_str() + owned.size() ||
+      errno == ERANGE || std::isnan(parsed)) {
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a number other than NaN, got '" +
+                                owned + "'");
+  }
+  return parsed;
+}
+
 bool parse_boolean(std::string_view value, std::string_view name) {
   if (value == "true" || value == "1") return true;
   if (value == "false" || value == "0") return false;
@@ -2004,6 +2018,49 @@ MineParams parse_mine_params(const FieldLookup& field,
   parse_powl_selector("powl_timestamp_key", params.powl.timestamp_key);
   parse_powl_selector("powl_case_id_key", params.powl.case_id_key);
 
+  for (const auto [name, target] : {
+           std::pair<std::string_view, std::string*>{
+               "temporal_activity_attribute",
+               &params.temporal_profile.activity_attribute},
+           std::pair<std::string_view, std::string*>{
+               "temporal_case_id_attribute",
+               &params.temporal_profile.case_id_attribute},
+           std::pair<std::string_view, std::string*>{
+               "temporal_source_timestamp_attribute",
+               &params.temporal_profile.source_timestamp_attribute},
+           std::pair<std::string_view, std::string*>{
+               "temporal_target_timestamp_attribute",
+               &params.temporal_profile.target_timestamp_attribute}}) {
+    if (!supplied(name)) continue;
+    *target = trim_text(field(name));
+    if (target->empty()) {
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected a non-empty attribute name");
+    }
+  }
+  if (supplied("temporal_business_hours")) {
+    params.temporal_profile.use_business_hours = parse_boolean(
+        field("temporal_business_hours"), "temporal_business_hours");
+  }
+  if (supplied("temporal_business_hour_slots")) {
+    const auto value = trim_text(field("temporal_business_hour_slots"));
+    params.temporal_profile.business_hour_slots_explicit = true;
+    if (value.empty() || value == "none") {
+      params.temporal_profile.business_hour_slots.clear();
+    } else {
+      params.temporal_profile.business_hour_slots = parse_business_hour_slots(
+          value, "temporal_business_hour_slots");
+    }
+  }
+  if (supplied("temporal_strict_attributes")) {
+    params.temporal_profile.strict_attributes = parse_boolean(
+        field("temporal_strict_attributes"), "temporal_strict_attributes");
+  }
+  if (supplied("temporal_zeta")) {
+    params.temporal_profile.zeta =
+        parse_temporal_zeta(field("temporal_zeta"), "temporal_zeta");
+  }
+
   if (const auto value = field("transition_view"); !value.empty()) {
     if (value == "sequence") params.transition_system.view = TransitionView::kSequence;
     else if (value == "set") params.transition_system.view = TransitionView::kSet;
@@ -2021,6 +2078,20 @@ MineParams parse_mine_params(const FieldLookup& field,
   if (const auto value = field("transition_include_data"); !value.empty()) {
     params.transition_system.include_data =
         parse_boolean(value, "transition_include_data");
+  }
+  for (const auto [name, target] : {
+           std::pair<std::string_view, std::string*>{
+               "transition_activity_attribute",
+               &params.transition_system.activity_attribute},
+           std::pair<std::string_view, std::string*>{
+               "transition_case_id_attribute",
+               &params.transition_system.case_id_attribute}}) {
+    if (!supplied(name)) continue;
+    *target = trim_text(field(name));
+    if (target->empty()) {
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected a non-empty attribute name");
+    }
   }
 
   if (const auto value = field("token_replay_variant"); !value.empty()) {
@@ -2554,9 +2625,11 @@ MineParams parse_mine_params(const FieldLookup& field,
   // clients cannot accidentally request an unusable analysis.
   {
     const auto value = field("spectrum_activities");
-    const bool supplied = present ? present("spectrum_activities") : !value.empty();
-    if (supplied) {
-      params.spectrum_activities = split_csv(value);
+    const bool activities_supplied =
+        present ? present("spectrum_activities") : !value.empty();
+    if (activities_supplied) {
+      params.spectrum_activities =
+          parse_strict_csv(value, "spectrum_activities");
       if (params.spectrum_activities.size() < 2) {
         throw std::invalid_argument(
             "spectrum_activities: expected at least two activities");
@@ -2597,16 +2670,22 @@ MineParams parse_mine_params(const FieldLookup& field,
     } else if (value == "log_disconnected" ||
                value == "LOG_DISCONNECTED") {
       params.spectrum.variant = PerformanceSpectrumVariant::kLogDisconnected;
+    } else if (value == "lazyframe" || value == "LAZYFRAME") {
+      params.spectrum.variant = PerformanceSpectrumVariant::kLazyframe;
+    } else if (value == "lazyframe_disconnected" ||
+               value == "LAZYFRAME_DISCONNECTED") {
+      params.spectrum.variant =
+          PerformanceSpectrumVariant::kLazyframeDisconnected;
     } else {
       throw std::invalid_argument(
-          "spectrum_variant: expected connected, disconnected, dataframe, log, dataframe_disconnected, or log_disconnected, got '" +
+          "spectrum_variant: expected connected, disconnected, dataframe, log, dataframe_disconnected, log_disconnected, lazyframe, or lazyframe_disconnected, got '" +
           value + "'");
     }
   }
   if (const auto value = field("spectrum_sample_size");
       present ? present("spectrum_sample_size") : !value.empty()) {
     params.spectrum.sample_size =
-        parse_positive_size(value, "spectrum_sample_size");
+        parse_nonnegative_size(value, "spectrum_sample_size");
   }
   if (const auto value = field("spectrum_sort_log");
       present ? present("spectrum_sort_log") : !value.empty()) {
@@ -2674,7 +2753,9 @@ MineParams parse_mine_params(const FieldLookup& field,
            std::pair<std::string_view, std::string*>{
                "batch_timestamp_attribute", &params.batch_options.timestamp_attribute},
            std::pair<std::string_view, std::string*>{
-               "batch_case_id_attribute", &params.batch_options.case_id_attribute}}) {
+               "batch_case_id_attribute", &params.batch_options.case_id_attribute},
+           std::pair<std::string_view, std::string*>{
+               "batch_event_id_attribute", &params.batch_options.event_id_attribute}}) {
     if (present ? present(name) : !field(name).empty()) {
       const auto value = field(name);
       if (value.empty()) {
@@ -2722,11 +2803,17 @@ MineParams parse_mine_params(const FieldLookup& field,
                           std::string_view{"batch_activity_attribute"},
                           std::string_view{"batch_resource_attribute"},
                           std::string_view{"batch_timestamp_attribute"},
-                          std::string_view{"batch_case_id_attribute"}}) {
-    const bool supplied = present ? present(name) : !field(name).empty();
-    if (supplied && (!batches_supplied || !params.batches)) {
+                          std::string_view{"batch_case_id_attribute"},
+                          std::string_view{"batch_event_id_attribute"}}) {
+    const bool option_supplied = present ? present(name) : !field(name).empty();
+    if (option_supplied && (!batches_supplied || !params.batches)) {
       throw std::invalid_argument(std::string(name) + ": requires batches=true");
     }
+  }
+  if (!params.batch_options.event_id_attribute.empty() &&
+      params.batch_options.variant == BatchDiscoveryVariant::kLog) {
+    throw std::invalid_argument(
+        "batch_event_id_attribute: requires batch_variant=pandas or polars");
   }
 
   return params;

@@ -30,6 +30,7 @@
 #include "minera/ltl_filter.hpp"
 #include "minera/log_skeleton.hpp"
 #include "minera/powl_discovery.hpp"
+#include "minera/temporal_profile.hpp"
 #include "minera/transition_system.hpp"
 #include "minera/performance_spectrum.hpp"
 #include "minera/batches.hpp"
@@ -136,6 +137,15 @@ struct MineParams {
   AlphaMinerOptions alpha;
   HeuristicMinerOptions heuristic;
   PowlDiscoveryOptions powl;
+  // The standalone temporal adapters are strict by default. Mining bundles
+  // this optional diagnostic into every analysis, so sparse/timestamp-less
+  // logs retain the established permissive behavior unless explicitly opted
+  // into strict validation.
+  TemporalProfileOptions temporal_profile = [] {
+    TemporalProfileOptions options;
+    options.strict_attributes = false;
+    return options;
+  }();
   TransitionSystemOptions transition_system;
   TokenReplayOptions token_replay;
   // Whether the token-replay activity field was explicitly supplied. This

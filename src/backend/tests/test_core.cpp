@@ -22,6 +22,7 @@
 #include "minera/pripel.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/log_conversion.hpp"
 #include "minera/log_skeleton.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/petri_net.hpp"
@@ -202,6 +203,12 @@ void minimum_self_distance_discovers_distances_and_witnesses() {
       {"t5", {{"", "Q", "", "", 0}, {"", "R", "", "", 1},
                {"", "R", "", "", 2}, {"", "Q", "", "", 3}}},
   };
+  // Explicitly distinguish a present empty activity value from a missing
+  // first-class activity field.
+  log.traces[3].events[0].activity_state =
+      minera::FirstClassAttributeState::kPresent;
+  log.traces[3].events[2].activity_state =
+      minera::FirstClassAttributeState::kPresent;
   const auto result = minera::discover_minimum_self_distances(log);
   minera::MinimumSelfDistanceOptions pandas_options;
   pandas_options.variant = minera::MinimumSelfDistanceVariant::kPandas;
@@ -350,7 +357,7 @@ void temporal_profile_scales_to_many_activities() {
   assert(deviations.empty());
 }
 
-void temporal_profile_skips_bad_timestamps_and_checks_deviations() {
+void temporal_profile_rejects_or_skips_bad_timestamps_and_checks_deviations() {
   minera::EventLog log;
   minera::Trace trace;
   trace.case_id = "case";
@@ -359,17 +366,30 @@ void temporal_profile_skips_bad_timestamps_and_checks_deviations() {
                   {"case", "C", "not-a-time"},
                   {"case", "D", "2025-12-31T23:00:00"}};
   log.traces.push_back(trace);
-  const auto profile = minera::discover_temporal_profile(log);
+  bool threw = false;
+  try {
+    (void)minera::discover_temporal_profile(log);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  minera::TemporalProfileOptions permissive;
+  permissive.strict_attributes = false;
+  const auto profile = minera::discover_temporal_profile(log, permissive);
   assert(profile.find("A", "B") != nullptr);
   assert(profile.find("A", "D") == nullptr);
   minera::TemporalProfile fixed;
   fixed.entries.push_back({"A", "B", 1, 10.0, 0.0});
-  auto deviations = minera::check_temporal_profile_conformance(log, fixed);
+  auto deviations =
+      minera::check_temporal_profile_conformance(log, fixed, permissive);
   assert(deviations.empty());
   trace.events[1].timestamp = "2026-01-01T00:00:11";
   log.traces[0] = trace;
-  deviations = minera::check_temporal_profile_conformance(log, fixed);
-  assert(deviations.size() == 1 && std::isinf(deviations[0].distance()));
+  deviations =
+      minera::check_temporal_profile_conformance(log, fixed, permissive);
+  assert(deviations.size() == 1 &&
+         deviations[0].distance() == static_cast<double>(
+             std::numeric_limits<std::int64_t>::max()));
 }
 
 void temporal_profile_supports_attributes_business_hours_and_validation() {
@@ -398,13 +418,12 @@ void temporal_profile_supports_attributes_business_hours_and_validation() {
   const auto custom = minera::discover_temporal_profile(log, options);
   assert(custom.find("A", "B")->mean_seconds == 0.0);
   options.zeta = 0.0;
-  bool threw = false;
-  try { (void)minera::check_temporal_profile_conformance(log, profile, options); }
-  catch (const std::invalid_argument&) { threw = true; }
-  assert(threw);
+  const auto zero_zeta =
+      minera::check_temporal_profile_conformance(log, profile, options);
+  assert(zero_zeta.size() == 1);
   options.zeta = 6.0;
   options.business_hour_slots = {{-1.0, 1.0}};
-  threw = false;
+  bool threw = false;
   try { (void)minera::discover_temporal_profile(log, options); }
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
@@ -464,6 +483,72 @@ void temporal_profile_validates_profiles_and_zeta_boundary() {
   try { (void)minera::check_temporal_profile_conformance(log, profile); }
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
+}
+
+void imported_first_class_selectors_reach_temporal_behavioral_adapters() {
+  std::istringstream input(
+      "case_ref,phase,occurred_at\n"
+      "c1,A,1970-01-01T00:00:00Z\n"
+      "c1,B,1970-01-01T00:00:10Z\n"
+      "c1,A,1970-01-01T00:00:20Z\n");
+  minera::CsvImportOptions import_options;
+  import_options.case_id_column = "case_ref";
+  import_options.activity_column = "phase";
+  import_options.timestamp_column = "occurred_at";
+  import_options.require_timestamp_column = true;
+  const auto log = minera::import_csv_event_log(input, import_options);
+  assert(log.traces.size() == 1 && log.traces.front().events.size() == 3);
+
+  minera::MinimumSelfDistanceOptions msd_options;
+  msd_options.activity_key = "phase";
+  msd_options.case_id_key = "case_ref";
+  const auto distances =
+      minera::discover_minimum_self_distances(log, msd_options);
+  assert(distances.size() == 1 && distances.front().activity == "A");
+  assert(distances.front().distance == 1);
+  assert((distances.front().witnesses == std::vector<std::string>{"B"}));
+
+  minera::TransitionSystemOptions transition_options;
+  transition_options.window = 1;
+  transition_options.activity_attribute = "phase";
+  transition_options.case_id_attribute = "case_ref";
+  const auto transition =
+      minera::discover_transition_system(log, transition_options);
+  assert(transition.transition_count() == 3);
+
+  minera::TemporalProfileOptions temporal_options;
+  temporal_options.activity_attribute = "phase";
+  temporal_options.source_timestamp_attribute = "occurred_at";
+  temporal_options.target_timestamp_attribute = "occurred_at";
+  const auto profile =
+      minera::discover_temporal_profile_log(log, temporal_options);
+  assert(profile.find("A", "B") != nullptr);
+  assert(profile.find("A", "B")->mean_seconds == 10.0);
+
+  minera::PerformanceSpectrumOptions spectrum_options;
+  spectrum_options.activity_attribute = "phase";
+  spectrum_options.timestamp_attribute = "occurred_at";
+  spectrum_options.case_id_attribute = "case_ref";
+  const auto spectrum = minera::discover_performance_spectrum_log(
+      log, {"A", "B"}, spectrum_options);
+  assert(!spectrum.observations.empty());
+  assert(spectrum.observations.front().case_id == "c1");
+
+  const auto table = minera::event_log_to_table(log);
+  const auto table_distances = minera::MinimumSelfDistancePandasDiscovery::apply(
+      table, msd_options);
+  assert(table_distances == distances);
+  const auto table_transition =
+      minera::discover_transition_system(table, transition_options);
+  assert(table_transition.transition_count() == 3);
+  temporal_options.case_id_attribute = "case_ref";
+  const auto table_profile =
+      minera::discover_temporal_profile_dataframe(table, temporal_options);
+  assert(table_profile.find("A", "B") != nullptr);
+  const auto table_spectrum =
+      minera::discover_performance_spectrum_dataframe(
+          table, {"A", "B"}, spectrum_options);
+  assert(!table_spectrum.observations.empty());
 }
 
 std::filesystem::path write_temp_log(const std::string& content) {
@@ -6096,10 +6181,11 @@ int main() {
   minimum_self_distance_supports_custom_activity_and_case_columns();
   minimum_self_distance_json_resolves_ids_and_validates_before_writing();
   temporal_profile_scales_to_many_activities();
-  temporal_profile_skips_bad_timestamps_and_checks_deviations();
+  temporal_profile_rejects_or_skips_bad_timestamps_and_checks_deviations();
   temporal_profile_supports_attributes_business_hours_and_validation();
   temporal_profile_business_hours_handle_multiweek_and_before_epoch();
   temporal_profile_validates_profiles_and_zeta_boundary();
+  imported_first_class_selectors_reach_temporal_behavioral_adapters();
   imports_csv_and_discovers_directly_follows_graph();
   handles_quoted_csv_fields_and_timestamp_sorting();
   aggregates_repeated_trace_variants();

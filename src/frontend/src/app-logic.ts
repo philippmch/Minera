@@ -99,6 +99,10 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       options.transitionDirection && options.transitionDirection !== "forward" ||
       options.transitionWindow !== undefined && options.transitionWindow !== 2 ||
       options.transitionIncludeData === true ||
+      Boolean(options.transitionActivityKey?.trim() &&
+        options.transitionActivityKey.trim() !== "concept:name") ||
+      Boolean(options.transitionCaseIdKey?.trim() &&
+        options.transitionCaseIdKey.trim() !== "case:concept:name") ||
       (options.powlVariant && options.powlVariant !== "maximal") ||
         (options.powlFilteringType && options.powlFilteringType !== "decreasing_factor") ||
       (options.powlFilteringThreshold !== undefined && options.powlFilteringThreshold !== 0) ||
@@ -142,6 +146,15 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       options.footprintsSortRequired === false ||
       Boolean(options.footprintsInitialMarking?.trim()) ||
       dfgStatisticalActive || dfgCausalActive || correlationActive
+      || Boolean(options.temporalActivityAttribute?.trim() &&
+        options.temporalActivityAttribute.trim() !== "concept:name")
+      || Boolean(options.temporalCaseIdAttribute?.trim() &&
+        options.temporalCaseIdAttribute.trim() !== "case:concept:name")
+      || Boolean(options.temporalSourceTimestampAttribute?.trim())
+      || Boolean(options.temporalTargetTimestampAttribute?.trim())
+      || options.temporalBusinessHours === true
+      || Boolean(options.temporalBusinessHourSlots?.trim())
+      || options.temporalStrictAttributes === true
       || spectrumActive
       || (options.batches === true)
       || (options.minimumSelfDistanceVariant && options.minimumSelfDistanceVariant !== "log")

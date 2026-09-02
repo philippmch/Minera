@@ -2,8 +2,10 @@
 
 #include <cstddef>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
 
 namespace minera {
@@ -17,6 +19,8 @@ enum class PerformanceSpectrumVariant {
   kLog,
   kDataframeDisconnected,
   kLogDisconnected,
+  kLazyframe,
+  kLazyframeDisconnected,
 
   CONNECTED = kConnected,
   DISCONNECTED = kDisconnected,
@@ -24,6 +28,8 @@ enum class PerformanceSpectrumVariant {
   LOG = kLog,
   DATAFRAME_DISCONNECTED = kDataframeDisconnected,
   LOG_DISCONNECTED = kLogDisconnected,
+  LAZYFRAME = kLazyframe,
+  LAZYFRAME_DISCONNECTED = kLazyframeDisconnected,
 };
 
 struct PerformanceSpectrumOptions {
@@ -69,13 +75,86 @@ struct PerformanceSpectrum {
 // Computes the spectrum after projecting each trace onto the pattern's
 // activities. Every selected event must have a parseable timestamp. Connected
 // mode emits full exact-pattern windows; disconnected mode emits labeled
-// contiguous subpatterns. The explicit LOG/DATAFRAME names select equivalent
-// native projections while preserving the four public variation names.
+// contiguous subpatterns. The explicit adapter names select distinct
+// projections while preserving the historical connected/disconnected names.
 // Windows may overlap. Invalid options, a pattern shorter than two activities,
 // or an invalid selected timestamp throw std::invalid_argument.
 [[nodiscard]] PerformanceSpectrum compute_performance_spectrum(
     const EventLog& log,
     std::vector<std::string> activities,
     PerformanceSpectrumOptions options = {});
+
+// Input-specific components.  The explicit names make the six selectable
+// implementations independently callable, while the shared result type
+// keeps callers independent of the source adapter's representation.
+[[nodiscard]] PerformanceSpectrum discover_performance_spectrum_log(
+    const EventLog& log, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {});
+[[nodiscard]] PerformanceSpectrum discover_performance_spectrum_dataframe(
+    const EventTable& table, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {});
+[[nodiscard]] PerformanceSpectrum discover_performance_spectrum_dataframe_disconnected(
+    const EventTable& table, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {});
+[[nodiscard]] PerformanceSpectrum discover_performance_spectrum_log_disconnected(
+    const EventLog& log, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {});
+[[nodiscard]] PerformanceSpectrum discover_performance_spectrum_lazyframe(
+    const LazyEventTable& table, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {});
+[[nodiscard]] PerformanceSpectrum discover_performance_spectrum_lazyframe_disconnected(
+    const LazyEventTable& table, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {});
+
+// The generic overloads select the adapter-specific canonical implementation
+// from the input type. Explicit options variants still select the requested
+// component, including the historical compatibility spellings.
+[[nodiscard]] PerformanceSpectrum compute_performance_spectrum(
+    const EventTable& table, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {});
+[[nodiscard]] PerformanceSpectrum compute_performance_spectrum(
+    const EventStream& stream, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {});
+[[nodiscard]] PerformanceSpectrum compute_performance_spectrum(
+    const LazyEventTable& table, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {});
+[[nodiscard]] PerformanceSpectrum compute_performance_spectrum(
+    const EventDataView& data, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {});
+
+[[nodiscard]] inline PerformanceSpectrum discover_performance_spectrum(
+    const EventLog& log, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {}) {
+  return compute_performance_spectrum(log, std::move(activities),
+                                      std::move(options));
+}
+
+[[nodiscard]] inline PerformanceSpectrum discover_performance_spectrum(
+    const EventTable& table, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {}) {
+  return compute_performance_spectrum(table, std::move(activities),
+                                      std::move(options));
+}
+
+[[nodiscard]] inline PerformanceSpectrum discover_performance_spectrum(
+    const EventStream& stream, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {}) {
+  return compute_performance_spectrum(stream, std::move(activities),
+                                      std::move(options));
+}
+
+[[nodiscard]] inline PerformanceSpectrum discover_performance_spectrum(
+    const LazyEventTable& table, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {}) {
+  return compute_performance_spectrum(table, std::move(activities),
+                                      std::move(options));
+}
+
+[[nodiscard]] inline PerformanceSpectrum discover_performance_spectrum(
+    const EventDataView& data, std::vector<std::string> activities,
+    PerformanceSpectrumOptions options = {}) {
+  return compute_performance_spectrum(data, std::move(activities),
+                                      std::move(options));
+}
 
 }  // namespace minera

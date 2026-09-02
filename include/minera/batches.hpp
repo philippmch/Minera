@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "minera/event_log.hpp"
+#include "minera/event_data.hpp"
 
 namespace minera {
 
@@ -41,6 +41,10 @@ struct BatchEvent {
   std::string case_id;
   std::size_t trace_index = 0;
   std::size_t event_index = 0;
+  // Present only when a table adapter was given an event-id selector.  The
+  // selector is part of tuple identity, so rows with distinct ids remain
+  // distinct even when every other event value matches.
+  std::string event_id;
 };
 
 struct Batch {
@@ -72,6 +76,9 @@ struct BatchDiscoveryOptions {
   std::string resource_attribute = "org:resource";
   std::string timestamp_attribute = "time:timestamp";
   std::string case_id_attribute = "case:concept:name";
+  // Empty disables the optional table event-id projection.  When selected,
+  // the value participates in event identity and is retained in BatchEvent.
+  std::string event_id_attribute;
 };
 
 struct BatchDiscovery {
@@ -82,5 +89,34 @@ struct BatchDiscovery {
 
 [[nodiscard]] BatchDiscovery discover_batches(
     const EventLog& log, BatchDiscoveryOptions options = {});
+[[nodiscard]] BatchDiscovery discover_batches(
+    const EventTable& table, BatchDiscoveryOptions options = {});
+[[nodiscard]] BatchDiscovery discover_batches(
+    const LazyEventTable& table, BatchDiscoveryOptions options = {});
+
+// The three adapter components intentionally remain separate callables.  The
+// result shape is shared, while each entry point fixes the corresponding
+// source variation in the returned metadata.
+class BatchLogDiscovery {
+ public:
+  [[nodiscard]] static BatchDiscovery apply(
+      const EventLog& log, BatchDiscoveryOptions options = {});
+};
+
+class BatchPandasDiscovery {
+ public:
+  [[nodiscard]] static BatchDiscovery apply(
+      const EventTable& table, BatchDiscoveryOptions options = {});
+};
+
+class BatchPolarsDiscovery {
+ public:
+  [[nodiscard]] static BatchDiscovery apply(
+      const LazyEventTable& table, BatchDiscoveryOptions options = {});
+};
+
+using LogBatchDiscovery = BatchLogDiscovery;
+using PandasBatchDiscovery = BatchPandasDiscovery;
+using PolarsBatchDiscovery = BatchPolarsDiscovery;
 
 }  // namespace minera

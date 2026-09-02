@@ -28,7 +28,8 @@ export interface Spectrum {
   maxTime: number;
   variant?:
     | "connected" | "disconnected" | "dataframe" | "log"
-    | "dataframe_disconnected" | "log_disconnected";
+    | "dataframe_disconnected" | "log_disconnected"
+    | "lazyframe" | "lazyframe_disconnected";
   activities?: string[];
 }
 

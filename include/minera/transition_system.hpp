@@ -1,9 +1,13 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
+#include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
 
 namespace minera {
@@ -35,6 +39,14 @@ struct TransitionSystemOptions {
   TransitionView view = TransitionView::kSequence;
   std::size_t window = 2;
   bool include_data = false;
+  // Selectors are used by flat event-data adapters. Canonical EventLog case
+  // selectors retain enclosing trace boundaries; an explicit custom case
+  // selector may regroup legacy mixed-case traces. The *_attribute aliases
+  // are accepted for callers that use the table-oriented vocabulary.
+  std::string activity_key = "concept:name";
+  std::string case_id_key = "case:concept:name";
+  std::string activity_attribute;
+  std::string case_id_attribute;
 };
 
 // A stable reference to an event traversal in the source event log.
@@ -61,6 +73,9 @@ struct TransitionSystemState {
   [[nodiscard]] const std::vector<std::string>& activities() const noexcept {
     return payload;
   }
+
+  friend bool operator==(const TransitionSystemState&,
+                         const TransitionSystemState&) = default;
 };
 
 struct TransitionSystemTransition {
@@ -71,6 +86,9 @@ struct TransitionSystemTransition {
   std::vector<TransitionOccurrence> occurrences;
 
   [[nodiscard]] const std::string& activity() const noexcept { return label; }
+
+  friend bool operator==(const TransitionSystemTransition&,
+                         const TransitionSystemTransition&) = default;
 };
 
 using TransitionState = TransitionSystemState;
@@ -78,6 +96,14 @@ using Transition = TransitionSystemTransition;
 
 class TransitionSystem {
  public:
+  TransitionSystem() = default;
+  TransitionSystem(TransitionSystemOptions options,
+                   std::vector<TransitionSystemState> states,
+                   std::vector<TransitionSystemTransition> transitions)
+      : options_(std::move(options)),
+        states_(std::move(states)),
+        transitions_(std::move(transitions)) {}
+
   [[nodiscard]] const std::vector<TransitionSystemState>& states() const noexcept {
     return states_;
   }
@@ -95,14 +121,51 @@ class TransitionSystem {
  private:
   friend TransitionSystem discover_transition_system(
       const EventLog&, const TransitionSystemOptions&);
+  friend TransitionSystem discover_transition_system(
+      const EventStream&, const TransitionSystemOptions&);
+  friend TransitionSystem discover_transition_system(
+      const EventTable&, const TransitionSystemOptions&);
+  friend TransitionSystem discover_transition_system(
+      const LazyEventTable&, const TransitionSystemOptions&);
+  friend TransitionSystem discover_transition_system(
+      const EventDataView&, const TransitionSystemOptions&);
 
   TransitionSystemOptions options_;
   std::vector<TransitionSystemState> states_;
   std::vector<TransitionSystemTransition> transitions_;
 };
 
+// The dispatcher has one currently supported transition-system algorithm.
+// Keeping the selector explicit gives callers the same callable surface for
+// direct, stream, eager-table, and lazy-table inputs.
+enum class TransitionSystemVariant {
+  kViewBased,
+  VIEW_BASED = kViewBased,
+};
+
+struct TransitionSystemSelectorDescriptor {
+  TransitionSystemVariant selector = TransitionSystemVariant::kViewBased;
+  std::string name;
+};
+
 [[nodiscard]] TransitionSystem discover_transition_system(
     const EventLog& event_log,
+    const TransitionSystemOptions& options = {});
+
+[[nodiscard]] TransitionSystem discover_transition_system(
+    const EventStream& event_stream,
+    const TransitionSystemOptions& options = {});
+
+[[nodiscard]] TransitionSystem discover_transition_system(
+    const EventTable& event_table,
+    const TransitionSystemOptions& options = {});
+
+[[nodiscard]] TransitionSystem discover_transition_system(
+    const LazyEventTable& event_table,
+    const TransitionSystemOptions& options = {});
+
+[[nodiscard]] TransitionSystem discover_transition_system(
+    const EventDataView& data,
     const TransitionSystemOptions& options = {});
 
 // Convenience overload matching the positional discovery parameters.
@@ -120,6 +183,30 @@ class TransitionSystem {
 }
 
 [[nodiscard]] inline TransitionSystem discover_view_based_transition_system(
+    const EventStream& event_stream,
+    const TransitionSystemOptions& options = {}) {
+  return discover_transition_system(event_stream, options);
+}
+
+[[nodiscard]] inline TransitionSystem discover_view_based_transition_system(
+    const EventTable& event_table,
+    const TransitionSystemOptions& options = {}) {
+  return discover_transition_system(event_table, options);
+}
+
+[[nodiscard]] inline TransitionSystem discover_view_based_transition_system(
+    const LazyEventTable& event_table,
+    const TransitionSystemOptions& options = {}) {
+  return discover_transition_system(event_table, options);
+}
+
+[[nodiscard]] inline TransitionSystem discover_view_based_transition_system(
+    const EventDataView& data,
+    const TransitionSystemOptions& options = {}) {
+  return discover_transition_system(data, options);
+}
+
+[[nodiscard]] inline TransitionSystem discover_view_based_transition_system(
     const EventLog& event_log,
     TransitionDirection direction,
     std::size_t window = 2,
@@ -128,5 +215,65 @@ class TransitionSystem {
   return discover_transition_system(event_log, direction, window, view,
                                     include_data);
 }
+
+class ViewBasedTransitionSystemDiscovery {
+ public:
+  [[nodiscard]] static TransitionSystem apply(
+      const EventLog& event_log,
+      const TransitionSystemOptions& options = {}) {
+    return discover_transition_system(event_log, options);
+  }
+  [[nodiscard]] static TransitionSystem apply(
+      const EventStream& event_stream,
+      const TransitionSystemOptions& options = {}) {
+    return discover_transition_system(event_stream, options);
+  }
+  [[nodiscard]] static TransitionSystem apply(
+      const EventTable& event_table,
+      const TransitionSystemOptions& options = {}) {
+    return discover_transition_system(event_table, options);
+  }
+  [[nodiscard]] static TransitionSystem apply(
+      const LazyEventTable& event_table,
+      const TransitionSystemOptions& options = {}) {
+    return discover_transition_system(event_table, options);
+  }
+  [[nodiscard]] static TransitionSystem apply(
+      const EventDataView& data,
+      const TransitionSystemOptions& options = {}) {
+    return discover_transition_system(data, options);
+  }
+};
+
+class TransitionSystemSelectorRegistry {
+ public:
+  [[nodiscard]] static const std::vector<TransitionSystemSelectorDescriptor>&
+  all();
+  [[nodiscard]] static bool supports(
+      TransitionSystemVariant selector) noexcept;
+  [[nodiscard]] static std::optional<TransitionSystemVariant> parse(
+      std::string_view name);
+
+  [[nodiscard]] static TransitionSystem dispatch(
+      const EventLog& event_log, TransitionSystemVariant selector,
+      const TransitionSystemOptions& options = {});
+  [[nodiscard]] static TransitionSystem dispatch(
+      const EventStream& event_stream, TransitionSystemVariant selector,
+      const TransitionSystemOptions& options = {});
+  [[nodiscard]] static TransitionSystem dispatch(
+      const EventTable& event_table, TransitionSystemVariant selector,
+      const TransitionSystemOptions& options = {});
+  [[nodiscard]] static TransitionSystem dispatch(
+      const LazyEventTable& event_table, TransitionSystemVariant selector,
+      const TransitionSystemOptions& options = {});
+  [[nodiscard]] static TransitionSystem dispatch(
+      const EventDataView& data, TransitionSystemVariant selector,
+      const TransitionSystemOptions& options = {});
+};
+
+[[nodiscard]] std::string_view transition_system_variant_name(
+    TransitionSystemVariant selector);
+[[nodiscard]] TransitionSystemVariant parse_transition_system_variant(
+    std::string_view name);
 
 }  // namespace minera

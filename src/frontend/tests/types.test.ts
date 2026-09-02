@@ -3,6 +3,28 @@ import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfg
 import { isGeneticMatrixConversionResult, isStochasticMapResult } from "../src/types";
 import { isBrowserHistoryResult } from "../src/types";
 import { isWindowsEventsResult } from "../src/types";
+import { isTemporalConformanceResult } from "../src/types";
+
+describe("temporal conformance result guard", () => {
+  const valid = {
+    family: "TEMPORAL_PROFILE_CONFORMANCE",
+    trace_count: 2,
+    deviation_count: 1,
+    traces: [[{
+      case_id: "c1", source: "A", target: "B", elapsed_seconds: 19,
+      standard_deviation_distance: 4.5,
+    }], []],
+  };
+  it("accepts grouped deviations and empty trace buckets", () => {
+    expect(isTemporalConformanceResult(valid)).toBe(true);
+  });
+  it("rejects inconsistent counts and non-finite values", () => {
+    expect(isTemporalConformanceResult({ ...valid, deviation_count: 2 })).toBe(false);
+    expect(isTemporalConformanceResult({ ...valid, traces: [[{
+      ...valid.traces[0][0], elapsed_seconds: Infinity,
+    }], []] })).toBe(false);
+  });
+});
 
 describe("browser history result guard", () => {
   const valid = { type: "BROWSER_HISTORY", variant: "chrome_history",
@@ -1191,6 +1213,67 @@ describe("isMineraExport", () => {
     })).toBe(true);
     expect(isMineraExport({ ...valid,
       batch_discovery: { groups: [{ ...batch, activity: -1 }] },
+    })).toBe(false);
+  });
+
+  it("validates optional batch event ids at runtime", () => {
+    const event = {
+      start: 0, complete: 1, case_id: "c1", trace_index: 0,
+      event_index: 2, event_id: "row-2",
+    };
+    const group = {
+      activity: null, resource: "team-1", batch_count: 1,
+      event_count: 1,
+      batches: [{ type: "simultaneous", start: 0, complete: 1,
+        events: [event] }],
+    };
+    expect(isMineraExport({ ...valid,
+      batch_discovery: { variant: "pandas", groups: [group] },
+    })).toBe(true);
+    expect(isMineraExport({ ...valid,
+      batch_discovery: {
+        variant: "pandas", event_id_attribute: "event_id", groups: [group],
+      },
+    })).toBe(true);
+    expect(isMineraExport({ ...valid,
+      batch_discovery: {
+        variant: "pandas", event_id_attribute: 7, groups: [group],
+      },
+    })).toBe(false);
+    expect(isMineraExport({ ...valid,
+      batch_discovery: {
+        variant: "pandas", groups: [{ ...group,
+          batches: [{ ...group.batches[0], events: [{ ...event, event_id: 7 }] }],
+        }],
+      },
+    })).toBe(false);
+    expect(isMineraExport({ ...valid,
+      batch_discovery: {
+        variant: "pandas", groups: [{ ...group,
+          batches: [{ ...group.batches[0], events: [{ ...event, start: 2, complete: 1 }] }],
+        }],
+      },
+    })).toBe(false);
+  });
+
+  it("accepts all performance-spectrum adapter names and validates observations", () => {
+    const spectrum = {
+      variant: "lazyframe_disconnected",
+      activities: ["A", "B"],
+      activity_attribute: "phase",
+      timestamp_attribute: "occurred_at",
+      case_id_attribute: "case_ref",
+      observations: [{ case_id: "c1", pattern_offset: 0,
+        instants: [1, 2], activities: ["A", "B"] }],
+    };
+    expect(isMineraExport({ ...valid, performance_spectrum: spectrum })).toBe(true);
+    expect(isMineraExport({ ...valid,
+      performance_spectrum: { ...spectrum, variant: "unknown" },
+    })).toBe(false);
+    expect(isMineraExport({ ...valid,
+      performance_spectrum: { ...spectrum,
+        observations: [{ ...spectrum.observations[0], instants: [1] }],
+      },
     })).toBe(false);
   });
 

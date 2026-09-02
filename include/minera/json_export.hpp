@@ -360,6 +360,8 @@ void write_analysis_json(std::ostream& out,
     const BoundaryActivitiesResult& result);
 [[nodiscard]] std::string variant_statistics_json(
     const VariantStatisticsResult& result);
+[[nodiscard]] std::string temporal_conformance_json(
+    const TemporalConformanceResult& result);
 [[nodiscard]] std::string organizational_sna_json(
     const OrganizationalSnaResult& result);
 [[nodiscard]] std::string network_analysis_json(

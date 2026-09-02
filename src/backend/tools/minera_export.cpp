@@ -647,6 +647,8 @@ int usage(const char* program) {
                "                            (default: 2; 0 collapses all states)\n"
                "  --transition-include-data Include stable trace/event occurrence\n"
                "                            references in the transition system\n"
+               "  --transition-activity-attribute <name> Activity selector\n"
+               "  --transition-case-id-attribute <name> Case-id selector\n"
                "  --powl-variant <id>       POWL discovery: tree, brute_force,\n"
                "                            maximal (default), dynamic_clustering,\n"
                "                            or dynamic_clustering_plain\n"
@@ -739,8 +741,8 @@ int usage(const char* program) {
                "                            steps): per occurrence, when each\n"
                "                            step happened; embedded under\n"
                "                            \"performance_spectrum\"\n"
-               "  --spectrum-variant <id>  connected, disconnected, log/dataframe, or *_disconnected\n"
-               "  --spectrum-sample-size <n> Positive spectrum sample size\n"
+               "  --spectrum-variant <id>  connected/disconnected or log/dataframe/lazyframe variants\n"
+               "  --spectrum-sample-size <n> Non-negative spectrum sample size\n"
                "  --spectrum-sort-log <bool> Sort log before spectrum mining\n"
                "  --spectrum-activity-key <name> Activity attribute\n"
                "  --spectrum-timestamp-key <name> Timestamp attribute\n"
@@ -858,9 +860,16 @@ int usage(const char* program) {
                "  --random-tree-silent <f>  PT-and-log silent probability\n"
                "  --random-tree-duplicate <f> PT-and-log duplicate probability\n"
                "  --random-tree-no-models <n> PT-and-log model count (zero or more)\n"
-               "  --random-tree-seed <n>      Random seed\n"
-               "  --random-tree-activities <a,b> Activity labels\n"
-               "  --batches                 Discover temporal event batches\n"
+                "  --random-tree-seed <n>      Random seed\n"
+                "  --random-tree-activities <a,b> Activity labels\n"
+                "  --temporal-activity-attribute <name> Temporal-profile activity attribute\n"
+                "  --temporal-case-id-attribute <name> Flat temporal-profile case attribute\n"
+                "  --temporal-source-timestamp-attribute <name> Source completion attribute\n"
+                "  --temporal-target-timestamp-attribute <name> Target start attribute\n"
+                "  --temporal-business-hours <bool> Use business-hour elapsed time\n"
+                "  --temporal-business-hour-slots <a-b,...|none> Weekly active slots\n"
+                "  --temporal-strict-attributes <bool> Fail on missing/malformed fields\n"
+                "  --batches                 Discover temporal event batches\n"
                "  --batch-variant <id>      log (default), pandas, or polars\n"
                "  --minimum-self-distance-variant <id> log (default), pandas, or polars\n"
                "  --minimum-self-distance-activity-key <name> Activity attribute\n"
@@ -937,6 +946,7 @@ int usage(const char* program) {
                "  --batch-timestamp-attribute <name> Completion timestamp selector\n"
                "  --batch-case-id-attribute <name> Case-id selector\n"
                "  --batch-start-timestamp-attribute <name> Optional start-time attribute\n"
+               "  --batch-event-id-attribute <name> Optional table event identity\n"
                "  --no-alignments           Skip the standard per-model alignment\n"
                "                            section; token replay, footprints, and\n"
                "                            explicitly selected evaluations stay\n"
@@ -1572,6 +1582,62 @@ bool parse_footprints_extra_option(std::string_view arg, const char* value,
   return false;
 }
 
+minera::MinimumSelfDistances discover_selected_minimum_self_distances(
+    const minera::EventLog& log,
+    const minera::MinimumSelfDistanceOptions& options) {
+  switch (options.variant) {
+    case minera::MinimumSelfDistanceVariant::kLog:
+      return minera::MinimumSelfDistanceLogDiscovery::apply(log, options);
+    case minera::MinimumSelfDistanceVariant::kPandas:
+      return minera::MinimumSelfDistancePandasDiscovery::apply(
+          minera::event_log_to_table(log), options);
+    case minera::MinimumSelfDistanceVariant::kPolars:
+      return minera::MinimumSelfDistancePolarsDiscovery::apply(
+          minera::event_log_to_lazy_table(log), options);
+  }
+  throw std::invalid_argument("minimum self-distance variant is invalid");
+}
+
+minera::PerformanceSpectrum discover_selected_performance_spectrum(
+    const minera::EventLog& log, const std::vector<std::string>& activities,
+    const minera::PerformanceSpectrumOptions& options) {
+  switch (options.variant) {
+    case minera::PerformanceSpectrumVariant::kDataframe:
+      return minera::discover_performance_spectrum_dataframe(
+          minera::event_log_to_table(log), activities, options);
+    case minera::PerformanceSpectrumVariant::kDataframeDisconnected:
+      return minera::discover_performance_spectrum_dataframe_disconnected(
+          minera::event_log_to_table(log), activities, options);
+    case minera::PerformanceSpectrumVariant::kLazyframe:
+      return minera::discover_performance_spectrum_lazyframe(
+          minera::event_log_to_lazy_table(log), activities, options);
+    case minera::PerformanceSpectrumVariant::kLazyframeDisconnected:
+      return minera::discover_performance_spectrum_lazyframe_disconnected(
+          minera::event_log_to_lazy_table(log), activities, options);
+    case minera::PerformanceSpectrumVariant::kConnected:
+    case minera::PerformanceSpectrumVariant::kDisconnected:
+    case minera::PerformanceSpectrumVariant::kLog:
+    case minera::PerformanceSpectrumVariant::kLogDisconnected:
+      return minera::compute_performance_spectrum(log, activities, options);
+  }
+  throw std::invalid_argument("performance spectrum variant is invalid");
+}
+
+minera::BatchDiscovery discover_selected_batches(
+    const minera::EventLog& log, const minera::BatchDiscoveryOptions& options) {
+  switch (options.variant) {
+    case minera::BatchDiscoveryVariant::kLog:
+      return minera::BatchLogDiscovery::apply(log, options);
+    case minera::BatchDiscoveryVariant::kPandas:
+      return minera::BatchPandasDiscovery::apply(
+          minera::event_log_to_table(log), options);
+    case minera::BatchDiscoveryVariant::kPolars:
+      return minera::BatchPolarsDiscovery::apply(
+          minera::event_log_to_lazy_table(log), options);
+  }
+  throw std::invalid_argument("batch discovery variant is invalid");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -1665,6 +1731,10 @@ int main(int argc, char** argv) {
   bool spectrum_requested = false;
   bool spectrum_option_used = false;
   minera::PerformanceSpectrumOptions spectrum_options;
+  minera::TemporalProfileOptions temporal_profile_options;
+  // Temporal discovery is bundled into the normal export. Do not make
+  // timestamp-less logs fail unless the caller requests strict validation.
+  temporal_profile_options.strict_attributes = false;
   bool batches = false;
   bool batch_option_used = false;
   minera::BatchDiscoveryOptions batch_options;
@@ -1973,7 +2043,8 @@ int main(int argc, char** argv) {
     if (arg == "--batch-activity-attribute" ||
         arg == "--batch-resource-attribute" ||
         arg == "--batch-timestamp-attribute" ||
-        arg == "--batch-case-id-attribute") {
+        arg == "--batch-case-id-attribute" ||
+        arg == "--batch-event-id-attribute") {
       batch_option_used = true;
       const auto* value = next();
       if (!value || std::string_view(value).empty()) {
@@ -1986,8 +2057,24 @@ int main(int argc, char** argv) {
         batch_options.resource_attribute = value;
       else if (arg == "--batch-timestamp-attribute")
         batch_options.timestamp_attribute = value;
-      else
+      else if (arg == "--batch-case-id-attribute")
         batch_options.case_id_attribute = value;
+      else
+        batch_options.event_id_attribute = value;
+      continue;
+    }
+    if (arg == "--transition-activity-attribute" ||
+        arg == "--transition-case-id-attribute") {
+      const auto* value = next();
+      if (!value || std::string_view(value).empty()) {
+        std::cerr << "error: " << arg
+                  << " expects a non-empty attribute name\n";
+        return 2;
+      }
+      if (arg == "--transition-activity-attribute")
+        transition_options.activity_attribute = value;
+      else
+        transition_options.case_id_attribute = value;
       continue;
     }
     if (arg == "--pnml-to-ptml" || arg == "--bpmn-to-ptml") {
@@ -2052,6 +2139,51 @@ int main(int argc, char** argv) {
       ltl_fields[key] = value;
       continue;
     }
+    if (arg == "--temporal-activity-attribute" ||
+        arg == "--temporal-case-id-attribute" ||
+        arg == "--temporal-source-timestamp-attribute" ||
+        arg == "--temporal-target-timestamp-attribute" ||
+        arg == "--temporal-business-hours" ||
+        arg == "--temporal-business-hour-slots" ||
+        arg == "--temporal-strict-attributes") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        if (arg == "--temporal-activity-attribute" ||
+            arg == "--temporal-case-id-attribute" ||
+            arg == "--temporal-source-timestamp-attribute" ||
+            arg == "--temporal-target-timestamp-attribute") {
+          if (std::string_view(value).empty()) return usage(argv[0]);
+          if (arg == "--temporal-activity-attribute")
+            temporal_profile_options.activity_attribute = value;
+          else if (arg == "--temporal-case-id-attribute")
+            temporal_profile_options.case_id_attribute = value;
+          else if (arg == "--temporal-source-timestamp-attribute")
+            temporal_profile_options.source_timestamp_attribute = value;
+          else
+            temporal_profile_options.target_timestamp_attribute = value;
+        } else if (arg == "--temporal-business-hours") {
+          temporal_profile_options.use_business_hours =
+              parse_boolean(value, arg);
+        } else if (arg == "--temporal-strict-attributes") {
+          temporal_profile_options.strict_attributes =
+              parse_boolean(value, arg);
+        } else {
+          temporal_profile_options.business_hour_slots_explicit = true;
+          if (std::string_view(value).empty() ||
+              std::string_view(value) == "none") {
+            temporal_profile_options.business_hour_slots.clear();
+          } else {
+            temporal_profile_options.business_hour_slots =
+                parse_dfg_business_hour_slots(value);
+          }
+        }
+      } catch (const std::exception& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      continue;
+    }
     if (arg == "--spectrum" || arg == "--spectrum-variant" ||
         arg == "--spectrum-sample-size" || arg == "--spectrum-sort-log" ||
         arg == "--spectrum-activity-key" ||
@@ -2081,14 +2213,18 @@ int main(int argc, char** argv) {
           spectrum_options.variant = minera::PerformanceSpectrumVariant::kDataframeDisconnected;
         else if (variant == "log_disconnected")
           spectrum_options.variant = minera::PerformanceSpectrumVariant::kLogDisconnected;
+        else if (variant == "lazyframe")
+          spectrum_options.variant = minera::PerformanceSpectrumVariant::kLazyframe;
+        else if (variant == "lazyframe_disconnected")
+          spectrum_options.variant = minera::PerformanceSpectrumVariant::kLazyframeDisconnected;
         else {
-          std::cerr << "error: --spectrum-variant expects connected, disconnected, dataframe, log, dataframe_disconnected, or log_disconnected\n";
+          std::cerr << "error: --spectrum-variant expects connected, disconnected, dataframe, log, dataframe_disconnected, log_disconnected, lazyframe, or lazyframe_disconnected\n";
           return 2;
         }
       } else if (arg == "--spectrum-sample-size") {
         spectrum_option_used = true;
         try {
-          spectrum_options.sample_size = parse_positive_size(value, arg);
+          spectrum_options.sample_size = parse_nonnegative_size(value, arg);
         } catch (const std::invalid_argument& error) {
           std::cerr << "error: " << error.what() << '\n';
           return 2;
@@ -4795,6 +4931,11 @@ int main(int argc, char** argv) {
     std::cerr << "error: --batch-* options require --batches\n";
     return 2;
   }
+  if (!batch_options.event_id_attribute.empty() &&
+      batch_options.variant == minera::BatchDiscoveryVariant::kLog) {
+    std::cerr << "error: --batch-event-id-attribute requires the pandas or polars batch variant\n";
+    return 2;
+  }
   if (alignment_option_used) {
     if (no_alignments) {
       std::cerr << "error: alignment options cannot be combined with --no-alignments\n";
@@ -6208,6 +6349,13 @@ int main(int argc, char** argv) {
                                       alignment_options.activity_attribute);
     register_activity_selector_values(graph, log,
                                       heuristic_options.activity_attribute);
+    register_activity_selector_values(
+        graph, log, temporal_profile_options.activity_attribute);
+    register_activity_selector_values(
+        graph, log,
+        transition_options.activity_attribute.empty()
+            ? transition_options.activity_key
+            : transition_options.activity_attribute);
     std::optional<minera::DfgAlignmentLogResult> dfg_alignment_result;
     std::optional<minera::DfgAlignmentProjection> dfg_projection_result;
     std::optional<minera::EventLog> dfg_projected_log;
@@ -6250,9 +6398,10 @@ int main(int argc, char** argv) {
       correlation_variants_analysis = analyze_correlation_variants(
           log, correlation_variants, correlation_options);
     }
-    const auto temporal_profile = minera::discover_temporal_profile(log);
+    const auto temporal_profile =
+        minera::discover_temporal_profile(log, temporal_profile_options);
     const auto minimum_self_distances =
-        minera::discover_minimum_self_distances(
+        discover_selected_minimum_self_distances(
             log, minimum_self_distance_options);
     // Selected activity columns can produce labels that are absent from the
     // native activity graph; register them before the JSON adapter resolves
@@ -6761,14 +6910,14 @@ int main(int argc, char** argv) {
     // Optionally compute the performance spectrum over an activity pattern.
     std::optional<minera::PerformanceSpectrum> spectrum;
     if (!spectrum_activities.empty()) {
-      spectrum = minera::compute_performance_spectrum(log, spectrum_activities,
-                                                      spectrum_options);
+      spectrum = discover_selected_performance_spectrum(
+          log, spectrum_activities, spectrum_options);
     }
     const minera::PerformanceSpectrum* spectrum_ptr =
         spectrum ? &*spectrum : nullptr;
     std::optional<minera::BatchDiscovery> batch_discovery;
     if (batches) {
-      batch_discovery = minera::discover_batches(log, batch_options);
+      batch_discovery = discover_selected_batches(log, batch_options);
     }
     const minera::BatchDiscovery* batch_ptr =
         batch_discovery ? &*batch_discovery : nullptr;

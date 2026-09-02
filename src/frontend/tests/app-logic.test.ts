@@ -895,10 +895,17 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ dfgStatisticalVariants: ["frequency_triples"] })).toBe(true);
     expect(hasActiveMinerOptions({ dfgCausalVariants: ["heuristic"] })).toBe(true);
     expect(hasActiveMinerOptions({ correlationVariants: ["trace_based"] })).toBe(true);
+    expect(hasActiveMinerOptions({ temporalActivityAttribute: "phase" })).toBe(true);
+    expect(hasActiveMinerOptions({ temporalBusinessHours: true })).toBe(true);
+    expect(hasActiveMinerOptions({ temporalStrictAttributes: true })).toBe(true);
     expect(hasActiveMinerOptions({ spectrumActivities: ["A", "B"] })).toBe(true);
     expect(hasActiveMinerOptions({ spectrumActivities: ["A"] })).toBe(false);
     expect(hasActiveMinerOptions({ spectrumVariant: "disconnected" })).toBe(false);
     expect(hasActiveMinerOptions({ batches: true })).toBe(true);
+    expect(hasActiveMinerOptions({ transitionActivityKey: "phase" })).toBe(true);
+    expect(hasActiveMinerOptions({ transitionCaseIdKey: "case_ref" })).toBe(true);
+    expect(hasActiveMinerOptions({ batches: true, batchEventIdAttribute: "event_id" })).toBe(true);
+    expect(hasActiveMinerOptions({ batchEventIdAttribute: "event_id" })).toBe(false);
   });
 });
 
@@ -1000,6 +1007,12 @@ describe("mineFormEntries", () => {
   it("maps temporal analyses and gates dependent defaults", () => {
     expect(mineFormEntries({ spectrumVariant: "disconnected", spectrumSampleSize: 3 })).toEqual([]);
     expect(mineFormEntries({
+      temporalActivityAttribute: " phase ", temporalCaseIdAttribute: " case_ref ",
+      temporalSourceTimestampAttribute: " finished_at ",
+      temporalTargetTimestampAttribute: " started_at ",
+      temporalBusinessHours: true,
+      temporalBusinessHourSlots: " 0-3600,7200-10800 ",
+      temporalStrictAttributes: false,
       spectrumActivities: [" A ", "B"], spectrumVariant: "disconnected",
       spectrumSampleSize: 3, spectrumSortLog: false,
       spectrumActivityKey: "phase", spectrumTimestampKey: "occurred_at",
@@ -1011,6 +1024,12 @@ describe("mineFormEntries", () => {
       minimumSelfDistanceActivityKey: "phase",
       minimumSelfDistanceCaseIdKey: "case_ref",
     })).toEqual([
+      ["temporal_activity_attribute", "phase"],
+      ["temporal_case_id_attribute", "case_ref"],
+      ["temporal_source_timestamp_attribute", "finished_at"],
+      ["temporal_target_timestamp_attribute", "started_at"],
+      ["temporal_business_hours", "true"],
+      ["temporal_business_hour_slots", "0-3600,7200-10800"],
       ["spectrum_activities", "A,B"], ["spectrum_variant", "disconnected"],
       ["spectrum_sample_size", "3"], ["spectrum_sort_log", "false"],
       ["spectrum_activity_key", "phase"], ["spectrum_timestamp_key", "occurred_at"],
@@ -1023,9 +1042,24 @@ describe("mineFormEntries", () => {
       ["minimum_self_distance_activity_key", "phase"],
       ["minimum_self_distance_case_id_key", "case_ref"],
     ]);
-    expect(mineFormEntries({ spectrumActivities: ["A"], spectrumSampleSize: 10000, spectrumSortLog: true, batches: true, batchMergeDistanceSeconds: 900, batchMinSize: 2 })).toEqual([["batches", "true"]]);
+    expect(() => mineFormEntries({
+      spectrumActivities: ["A"], spectrumSampleSize: 10000, spectrumSortLog: true,
+      batches: true, batchMergeDistanceSeconds: 900, batchMinSize: 2,
+    })).toThrow(/at least two/);
+    expect(() => mineFormEntries({ spectrumActivities: [] })).toThrow(/at least two/);
+    expect(() => mineFormEntries({ spectrumActivities: ["A", " "] }))
+      .toThrow(/empty activities/);
+    expect(() => mineFormEntries({ spectrumActivities: ["A", " ", "B"] }))
+      .toThrow(/empty activities/);
     expect(hasActiveMinerOptions({ minimumSelfDistanceVariant: "pandas" })).toBe(true);
     expect(hasActiveMinerOptions({ minimumSelfDistanceActivityKey: "phase" })).toBe(true);
+    expect(mineFormEntries({ temporalBusinessHourSlots: "none" })).toEqual([
+      ["temporal_business_hour_slots", "none"],
+    ]);
+    expect(() => mineFormEntries({ temporalActivityAttribute: "  " }))
+      .toThrow(/temporal_activity_attribute/);
+    expect(() => mineFormEntries({ temporalBusinessHourSlots: "2-1" }))
+      .toThrow(/temporalBusinessHourSlots/);
   });
 
   it("maps non-default transition-system settings", () => {
@@ -1041,6 +1075,82 @@ describe("mineFormEntries", () => {
       ["transition_include_data", "true"],
     ]);
     expect(mineFormEntries({ transitionView: "sequence", transitionDirection: "forward", transitionWindow: 2 })).toEqual([]);
+  });
+
+  it("maps transition selectors and validates their runtime values", () => {
+    expect(mineFormEntries({
+      transitionActivityKey: " phase ", transitionCaseIdKey: " case_ref ",
+    })).toEqual([
+      ["transition_activity_attribute", "phase"],
+      ["transition_case_id_attribute", "case_ref"],
+    ]);
+    expect(mineFormEntries({
+      transitionActivityKey: "concept:name",
+      transitionCaseIdKey: "case:concept:name",
+    })).toEqual([]);
+    expect(() => mineFormEntries({ transitionActivityKey: " " }))
+      .toThrow(/transition_activity_attribute/);
+    expect(() => mineFormEntries({ transitionCaseIdKey: "\t" }))
+      .toThrow(/transition_case_id_attribute/);
+    expect(() => mineFormEntries({ transitionWindow: -1 }))
+      .toThrow(/transitionWindow/);
+    expect(() => mineFormEntries({ transitionView: "invalid" as never }))
+      .toThrow(/transitionView/);
+  });
+
+  it("supports every spectrum adapter, including an explicit zero sample size", () => {
+    expect(mineFormEntries({
+      spectrumActivities: ["A", "B"], spectrumVariant: "lazyframe",
+      spectrumSampleSize: 0,
+    })).toEqual([
+      ["spectrum_activities", "A,B"],
+      ["spectrum_variant", "lazyframe"],
+      ["spectrum_sample_size", "0"],
+    ]);
+    expect(mineFormEntries({
+      spectrumActivities: ["A", "B"], spectrumVariant: "lazyframe_disconnected",
+      spectrumSampleSize: 10000,
+    })).toEqual([
+      ["spectrum_activities", "A,B"],
+      ["spectrum_variant", "lazyframe_disconnected"],
+    ]);
+    expect(() => mineFormEntries({
+      spectrumActivities: ["A", "B"], spectrumSampleSize: -1,
+    })).toThrow(/spectrumSampleSize/);
+    expect(() => mineFormEntries({
+      spectrumActivities: ["A", "B"], spectrumSampleSize: 1.5,
+    })).toThrow(/spectrumSampleSize/);
+    expect(() => mineFormEntries({
+      spectrumActivities: ["A", "B"], spectrumVariant: "unknown" as never,
+    })).toThrow(/spectrumVariant/);
+  });
+
+  it("maps and validates a table batch event-id selector", () => {
+    expect(() => mineFormEntries({
+      batches: true, batchVariant: "log", batchEventIdAttribute: " event_id ",
+    })).toThrow(/batchEventIdAttribute/);
+    expect(() => mineFormEntries({
+      batches: true, batchEventIdAttribute: " event_id ",
+    })).toThrow(/batchEventIdAttribute/);
+    expect(mineFormEntries({
+      batches: true, batchVariant: "pandas", batchEventIdAttribute: " event_id ",
+    })).toEqual([
+      ["batches", "true"],
+      ["batch_variant", "pandas"],
+      ["batch_event_id_attribute", "event_id"],
+    ]);
+    expect(mineFormEntries({ batchEventIdAttribute: "event_id" })).toEqual([]);
+    expect(() => mineFormEntries({ batches: true, batchVariant: "log", batchEventIdAttribute: " " }))
+      .toThrow(/batchEventIdAttribute/);
+    expect(() => mineFormEntries({ batches: true, batchVariant: "pandas", batchEventIdAttribute: " " }))
+      .toThrow(/batchEventIdAttribute/);
+  });
+
+  it("serializes strict temporal conformance only when explicitly enabled", () => {
+    expect(mineFormEntries({ temporalStrictAttributes: false })).toEqual([]);
+    expect(mineFormEntries({ temporalStrictAttributes: true })).toEqual([
+      ["temporal_strict_attributes", "true"],
+    ]);
   });
 
   it("maps non-default POWL settings and preserves meaningful zero values", () => {
