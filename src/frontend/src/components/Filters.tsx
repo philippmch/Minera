@@ -292,6 +292,55 @@ export function powlValidationMessage(input: {
   return null;
 }
 
+export interface InductiveSettingsForm {
+  disableStrictSequenceCut: boolean;
+  disableFallthroughs: boolean;
+  sortEventsByTimestamp: boolean;
+  activityKey: string;
+  timestampKey: string;
+  caseIdKey: string;
+}
+
+/** Converts the visible Inductive controls while eliding backend defaults. */
+export function inductiveOptionsFromForm(
+  input: InductiveSettingsForm,
+): Pick<MinerOptions,
+  | "inductiveDisableStrictSequenceCut"
+  | "inductiveDisableFallthroughs"
+  | "inductiveSortEventsByTimestamp"
+  | "inductiveActivityKey"
+  | "inductiveTimestampKey"
+  | "inductiveCaseIdKey"> {
+  return {
+    inductiveDisableStrictSequenceCut:
+      input.disableStrictSequenceCut || undefined,
+    inductiveDisableFallthroughs: input.disableFallthroughs || undefined,
+    inductiveSortEventsByTimestamp: input.sortEventsByTimestamp || undefined,
+    inductiveActivityKey:
+      input.activityKey.trim() !== "concept:name"
+        ? input.activityKey.trim() || undefined
+        : undefined,
+    inductiveTimestampKey:
+      input.timestampKey.trim() !== "time:timestamp"
+        ? input.timestampKey.trim() || undefined
+        : undefined,
+    inductiveCaseIdKey:
+      input.caseIdKey.trim() !== "case:concept:name"
+        ? input.caseIdKey.trim() || undefined
+        : undefined,
+  };
+}
+
+/** Reports whether an Inductive control differs from its effective default. */
+export function inductiveSettingsAreDirty(input: InductiveSettingsForm): boolean {
+  return input.disableStrictSequenceCut ||
+    input.disableFallthroughs ||
+    input.sortEventsByTimestamp ||
+    (input.activityKey.trim() || "concept:name") !== "concept:name" ||
+    (input.timestampKey.trim() || "time:timestamp") !== "time:timestamp" ||
+    (input.caseIdKey.trim() || "case:concept:name") !== "case:concept:name";
+}
+
 // A compact, collapsible bar for the log filters and the miner settings.
 // Every apply re-mines the original upload with the full spec, so nothing
 // compounds and every setting can always be widened again.
@@ -416,6 +465,12 @@ export function Filters({
   // Miner settings; an empty field leaves the backend default in charge.
   const [noiseThreshold, setNoiseThreshold] = useState("");
   const [inductiveVariant, setInductiveVariant] = useState<"log" | "imf" | "dfg">("log");
+  const [inductiveDisableStrictSequenceCut, setInductiveDisableStrictSequenceCut] = useState(false);
+  const [inductiveDisableFallthroughs, setInductiveDisableFallthroughs] = useState(false);
+  const [inductiveSortEventsByTimestamp, setInductiveSortEventsByTimestamp] = useState(false);
+  const [inductiveActivityKey, setInductiveActivityKey] = useState("concept:name");
+  const [inductiveTimestampKey, setInductiveTimestampKey] = useState("time:timestamp");
+  const [inductiveCaseIdKey, setInductiveCaseIdKey] = useState("case:concept:name");
   const [alphaVariant, setAlphaVariant] = useState<"plus" | "classic">("classic");
   const [heuristicVariant, setHeuristicVariant] =
     useState<"classic" | "plusplus">("classic");
@@ -985,6 +1040,14 @@ export function Filters({
       ltlResourceKey: ltlVariant ? ltlResourceKey || undefined : undefined,
       noiseThreshold: toFloat(noiseThreshold),
       inductiveVariant: inductiveVariant !== "log" ? inductiveVariant : undefined,
+      ...inductiveOptionsFromForm({
+        disableStrictSequenceCut: inductiveDisableStrictSequenceCut,
+        disableFallthroughs: inductiveDisableFallthroughs,
+        sortEventsByTimestamp: inductiveSortEventsByTimestamp,
+        activityKey: inductiveActivityKey,
+        timestampKey: inductiveTimestampKey,
+        caseIdKey: inductiveCaseIdKey,
+      }),
       alphaVariant: alphaVariant !== "classic" ? alphaVariant : undefined,
       heuristicVariant:
         heuristicVariant !== "classic" ? heuristicVariant : undefined,
@@ -1222,6 +1285,12 @@ export function Filters({
     setRemovedCaseValues(new Set());
     setNoiseThreshold("");
     setInductiveVariant("log");
+    setInductiveDisableStrictSequenceCut(false);
+    setInductiveDisableFallthroughs(false);
+    setInductiveSortEventsByTimestamp(false);
+    setInductiveActivityKey("concept:name");
+    setInductiveTimestampKey("time:timestamp");
+    setInductiveCaseIdKey("case:concept:name");
     setAlphaVariant("classic");
     setHeuristicVariant("classic");
     setDependencyThreshold("");
@@ -1389,6 +1458,14 @@ export function Filters({
     caseAttributeKey !== "" ||
     noiseThreshold !== "" ||
     inductiveVariant !== "log" ||
+    inductiveSettingsAreDirty({
+      disableStrictSequenceCut: inductiveDisableStrictSequenceCut,
+      disableFallthroughs: inductiveDisableFallthroughs,
+      sortEventsByTimestamp: inductiveSortEventsByTimestamp,
+      activityKey: inductiveActivityKey,
+      timestampKey: inductiveTimestampKey,
+      caseIdKey: inductiveCaseIdKey,
+    }) ||
     alphaVariant !== "classic" ||
     heuristicVariant !== "classic" ||
     heuristicActivityAttribute.trim() !== "concept:name" ||
@@ -2894,7 +2971,7 @@ export function Filters({
           </div>
           <div className="filters-row">
             <label className="filters-field">
-              <span>Inductive: noise threshold</span>
+              <span>Inductive: noise threshold (IMf only)</span>
               <input
                 type="number"
                 min={0}
@@ -2929,6 +3006,59 @@ export function Filters({
                 <option value="classic">classic (default, textbook)</option>
                 <option value="plus">Alpha+ (short loops)</option>
               </select>
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Inductive: activity field</span>
+              <input
+                type="text"
+                placeholder="concept:name"
+                value={inductiveActivityKey}
+                onChange={(e) => setInductiveActivityKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Inductive: timestamp field</span>
+              <input
+                type="text"
+                placeholder="time:timestamp"
+                value={inductiveTimestampKey}
+                onChange={(e) => setInductiveTimestampKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Inductive: case-id field</span>
+              <input
+                type="text"
+                placeholder="case:concept:name"
+                value={inductiveCaseIdKey}
+                onChange={(e) => setInductiveCaseIdKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field filters-check">
+              <input
+                type="checkbox"
+                checked={inductiveDisableStrictSequenceCut}
+                onChange={(e) => setInductiveDisableStrictSequenceCut(e.target.checked)}
+              />
+              <span>Disable strict sequence cut</span>
+            </label>
+            <label className="filters-field filters-check">
+              <input
+                type="checkbox"
+                checked={inductiveDisableFallthroughs}
+                onChange={(e) => setInductiveDisableFallthroughs(e.target.checked)}
+              />
+              <span>Disable specialized fall-throughs</span>
+            </label>
+            <label className="filters-field filters-check">
+              <input
+                type="checkbox"
+                checked={inductiveSortEventsByTimestamp}
+                onChange={(e) => setInductiveSortEventsByTimestamp(e.target.checked)}
+              />
+              <span>Sort events by timestamp</span>
             </label>
           </div>
           <div className="filters-row">

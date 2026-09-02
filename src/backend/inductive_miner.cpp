@@ -1,19 +1,26 @@
 #include "minera/inductive_miner.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <numeric>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "minera/timestamp.hpp"
+
 namespace minera {
 namespace {
 
 using ActId = std::size_t;
+
+using ActivityLabels = std::vector<std::string>;
 
 // A trace (as activity ids) together with how many cases share it. Working on
 // these variants instead of raw cases keeps every step proportional to the
@@ -689,16 +696,18 @@ std::vector<Sublog> split_exclusive(const Sublog& log,
   std::vector<Sublog> out(groups);
   std::vector<std::uint64_t> hits(groups);
   for (const auto& wt : log) {
-    if (wt.activities.empty()) {
-      out[0].push_back(wt);
-      continue;
-    }
     hits.assign(groups, 0);
     for (const ActId act : wt.activities) {
       ++hits[group_of.at(act)];
     }
-    const std::size_t target = static_cast<std::size_t>(
-        std::max_element(hits.begin(), hits.end()) - hits.begin());
+    // Sorting the reference candidates by (hit count, group index) descending
+    // means ties are deliberately routed to the highest-index group.  Keeping
+    // that rule for empty traces as well preserves the same deterministic
+    // projection when every group's hit count is zero.
+    std::size_t target = 0;
+    for (std::size_t group = 1; group < groups; ++group) {
+      if (hits[group] >= hits[target]) target = group;
+    }
     std::vector<ActId> kept;
     kept.reserve(wt.activities.size());
     for (const ActId act : wt.activities) {
@@ -714,10 +723,13 @@ std::vector<Sublog> split_exclusive(const Sublog& log,
   return out;
 }
 
-// Sequence and parallel: project each trace onto every group, preserving order.
-std::vector<Sublog> split_projection(const Sublog& log,
-                                     std::size_t groups,
-                                     const GroupOf& group_of) {
+// Parallel projection keeps every event in its corresponding branch.  Unlike
+// a sequence cut, concurrent branches are allowed to interleave, so there is
+// no split window to infer: each child receives the full subsequence for its
+// group.
+std::vector<Sublog> split_parallel_projection(const Sublog& log,
+                                              std::size_t groups,
+                                              const GroupOf& group_of) {
   std::vector<Sublog> out(groups);
   for (const auto& wt : log) {
     std::vector<std::vector<ActId>> parts(groups);
@@ -726,6 +738,58 @@ std::vector<Sublog> split_projection(const Sublog& log,
     }
     for (std::size_t i = 0; i < groups; ++i) {
       out[i].push_back(WeightedTrace{std::move(parts[i]), wt.count});
+    }
+  }
+  for (auto& sublog : out) {
+    sublog = compress(std::move(sublog));
+  }
+  return out;
+}
+
+// Sequence projection assigns each trace to ordered windows.  A noisy trace
+// may contain an event from a later group before returning to the current
+// group; projecting the whole subsequence would duplicate that detour in a
+// child and can manufacture a self-loop.  For each group, choose the earliest
+// minimum-cost split point after the previous window.  Events from the current
+// group lower the cost (they belong in this window), events from groups not yet
+// visited raise it, and events from already projected groups are neutral.  The
+// selected window contributes only events belonging to the current group;
+// empty windows are retained with their original weight.
+std::vector<Sublog> split_sequence_projection(
+    const Sublog& log, std::size_t groups, const GroupOf& group_of) {
+  std::vector<Sublog> out(groups);
+  std::vector<char> ignored(groups, 0);
+  for (const auto& wt : log) {
+    std::size_t split_point = 0;
+    std::fill(ignored.begin(), ignored.end(), static_cast<char>(0));
+    for (std::size_t group = 0; group < groups; ++group) {
+      int least_cost = 0;
+      std::size_t new_split_point = split_point;
+      int cost = 0;
+      for (std::size_t position = split_point; position < wt.activities.size();
+           ++position) {
+        const std::size_t activity_group = group_of.at(wt.activities[position]);
+        if (activity_group == group) {
+          --cost;
+        } else if (!ignored[activity_group]) {
+          ++cost;
+        }
+        if (cost < least_cost) {
+          least_cost = cost;
+          new_split_point = position + 1;
+        }
+      }
+
+      std::vector<ActId> projected;
+      projected.reserve(new_split_point - split_point);
+      for (std::size_t position = split_point; position < new_split_point;
+           ++position) {
+        const ActId activity = wt.activities[position];
+        if (group_of.at(activity) == group) projected.push_back(activity);
+      }
+      out[group].push_back(WeightedTrace{std::move(projected), wt.count});
+      split_point = new_split_point;
+      ignored[group] = 1;
     }
   }
   for (auto& sublog : out) {
@@ -812,13 +876,15 @@ ProcessTreeNode make_node(ProcessTreeOperator op,
 }
 
 ProcessTreeNode mine(const Sublog& log, double f,
-                     const InductiveMinerOptions& options);
+                     const InductiveMinerOptions& options,
+                     const ActivityLabels& labels);
 
 ProcessTreeNode build_from_cut(ProcessTreeOperator op,
                                const std::vector<std::vector<ActId>>& groups,
                                const Sublog& log,
                                double f,
-                               const InductiveMinerOptions& options) {
+                               const InductiveMinerOptions& options,
+                               const ActivityLabels& labels) {
   const GroupOf group_of = index_groups(groups);
   std::vector<Sublog> sublogs;
   switch (op) {
@@ -826,8 +892,10 @@ ProcessTreeNode build_from_cut(ProcessTreeOperator op,
       sublogs = split_exclusive(log, groups.size(), group_of);
       break;
     case ProcessTreeOperator::kSequence:
+      sublogs = split_sequence_projection(log, groups.size(), group_of);
+      break;
     case ProcessTreeOperator::kParallel:
-      sublogs = split_projection(log, groups.size(), group_of);
+      sublogs = split_parallel_projection(log, groups.size(), group_of);
       break;
     case ProcessTreeOperator::kLoop:
       sublogs = split_loop(log, groups.size(), group_of);
@@ -839,18 +907,27 @@ ProcessTreeNode build_from_cut(ProcessTreeOperator op,
   std::vector<ProcessTreeNode> children;
   children.reserve(sublogs.size());
   for (const auto& sublog : sublogs) {
-    children.push_back(mine(sublog, f, options));
+    children.push_back(mine(sublog, f, options, labels));
   }
   return make_node(op, std::move(children));
 }
 
 // Flower model: a loop with a silent body and every activity as a redo path.
 // The most permissive fall-through, used when no cut applies.
-ProcessTreeNode flower(const std::vector<ActId>& activities) {
+ProcessTreeNode flower(const std::vector<ActId>& activities,
+                       const ActivityLabels& labels) {
+  std::vector<ActId> ordered = activities;
+  std::sort(ordered.begin(), ordered.end(), [&](ActId left, ActId right) {
+    if (left < labels.size() && right < labels.size() &&
+        labels[left] != labels[right]) {
+      return labels[left] < labels[right];
+    }
+    return left < right;
+  });
   std::vector<ProcessTreeNode> children;
-  children.reserve(activities.size() + 1);
+  children.reserve(ordered.size() + 1);
   children.push_back(ProcessTreeNode::tau());
-  for (const ActId act : activities) {
+  for (const ActId act : ordered) {
     children.push_back(ProcessTreeNode::leaf(act));
   }
   ProcessTreeNode node;
@@ -859,12 +936,153 @@ ProcessTreeNode flower(const std::vector<ActId>& activities) {
   return node;
 }
 
+bool has_normal_cut(const LocalDfg& dfg,
+                    const InductiveMinerOptions& options) {
+  if (dfg.size() < 2) return false;
+  if (exclusive_cut(dfg)) return true;
+  if (options.disable_strict_sequence_cut ? sequence_cut(dfg)
+                                          : strict_sequence_cut(dfg)) {
+    return true;
+  }
+  if (parallel_cut(dfg)) return true;
+  return loop_cut(dfg).has_value();
+}
+
+std::vector<ActId> ordered_activities(const std::vector<ActId>& activities,
+                                      const ActivityLabels& labels) {
+  std::vector<ActId> ordered = activities;
+  std::sort(ordered.begin(), ordered.end(), [&](ActId left, ActId right) {
+    if (left < labels.size() && right < labels.size() &&
+        labels[left] != labels[right]) {
+      return labels[left] < labels[right];
+    }
+    return left < right;
+  });
+  return ordered;
+}
+
+std::pair<Sublog, Sublog> split_activity(const Sublog& log, ActId candidate) {
+  Sublog candidate_log;
+  Sublog residual_log;
+  candidate_log.reserve(log.size());
+  residual_log.reserve(log.size());
+  for (const auto& wt : log) {
+    std::vector<ActId> selected;
+    std::vector<ActId> residual;
+    selected.reserve(wt.activities.size());
+    residual.reserve(wt.activities.size());
+    for (const ActId activity : wt.activities) {
+      (activity == candidate ? selected : residual).push_back(activity);
+    }
+    candidate_log.push_back(
+        WeightedTrace{std::move(selected), wt.count});
+    residual_log.push_back(WeightedTrace{std::move(residual), wt.count});
+  }
+  return {compress(std::move(candidate_log)),
+          compress(std::move(residual_log))};
+}
+
+std::optional<ProcessTreeNode> specialized_fallthrough(
+    const Sublog& log, const LocalDfg& dfg, double f,
+    const InductiveMinerOptions& options, const ActivityLabels& labels) {
+  if (options.disable_fallthroughs) return std::nullopt;
+
+  const auto candidates = ordered_activities(dfg.to_global, labels);
+
+  // First isolate an activity that occurs exactly once in every trace.  The
+  // candidate ordering is by its visible label, making the split independent
+  // of hash-table iteration and stable for equivalent logs.
+  for (const ActId candidate : candidates) {
+    bool once_per_trace = true;
+    for (const auto& wt : log) {
+      if (std::count(wt.activities.begin(), wt.activities.end(), candidate) !=
+          1) {
+        once_per_trace = false;
+        break;
+      }
+    }
+    if (!once_per_trace) continue;
+    auto [candidate_log, residual_log] = split_activity(log, candidate);
+    return make_node(
+        ProcessTreeOperator::kParallel,
+        {mine(candidate_log, f, options, labels),
+         mine(residual_log, f, options, labels)});
+  }
+
+  // If removing a candidate reveals an ordinary cut, the candidate is a
+  // concurrent branch.  The candidate need not occur in every trace; missing
+  // occurrences become empty traces in its projected child and are handled by
+  // the ordinary empty-trace rule during recursion.
+  for (const ActId candidate : candidates) {
+    auto [candidate_log, residual_log] = split_activity(log, candidate);
+    if (!has_normal_cut(build_local_dfg(residual_log), options)) continue;
+    return make_node(
+        ProcessTreeOperator::kParallel,
+        {mine(candidate_log, f, options, labels),
+         mine(residual_log, f, options, labels)});
+  }
+
+  const auto project_silent_loop = [&](bool strict) {
+    Sublog projected;
+    projected.reserve(log.size());
+    const auto is_start = [&](ActId activity) {
+      const auto local = dfg.to_local.find(activity);
+      return local != dfg.to_local.end() && dfg.is_start[local->second];
+    };
+    const auto is_end = [&](ActId activity) {
+      const auto local = dfg.to_local.find(activity);
+      return local != dfg.to_local.end() && dfg.is_end[local->second];
+    };
+    std::uint64_t projected_weight = 0;
+    std::uint64_t original_weight = 0;
+    for (const auto& wt : log) {
+      original_weight += wt.count;
+      std::size_t begin = 0;
+      for (std::size_t i = 1; i < wt.activities.size(); ++i) {
+        const bool split = is_start(wt.activities[i]) &&
+                           (!strict || is_end(wt.activities[i - 1]));
+        if (!split) continue;
+        std::vector<ActId> fragment(wt.activities.begin() +
+                                        static_cast<std::ptrdiff_t>(begin),
+                                    wt.activities.begin() +
+                                        static_cast<std::ptrdiff_t>(i));
+        projected.push_back(
+            WeightedTrace{std::move(fragment), wt.count});
+        projected_weight += wt.count;
+        begin = i;
+      }
+      std::vector<ActId> fragment(
+          wt.activities.begin() + static_cast<std::ptrdiff_t>(begin),
+          wt.activities.end());
+      projected.push_back(WeightedTrace{std::move(fragment), wt.count});
+      projected_weight += wt.count;
+    }
+    if (projected_weight <= original_weight) return Sublog{};
+    return compress(std::move(projected));
+  };
+
+  if (auto projected = project_silent_loop(true); !projected.empty()) {
+    return make_node(
+        ProcessTreeOperator::kLoop,
+        {mine(std::move(projected), f, options, labels),
+         mine(Sublog{}, f, options, labels)});
+  }
+  if (auto projected = project_silent_loop(false); !projected.empty()) {
+    return make_node(
+        ProcessTreeOperator::kLoop,
+        {mine(std::move(projected), f, options, labels),
+         mine(Sublog{}, f, options, labels)});
+  }
+  return std::nullopt;
+}
+
 // Standard Inductive Miner recursion: empty traces are separated first, then
 // base cases and the four cut detectors run on the non-empty sublog, followed
 // by the remaining fall-throughs. Keeping the empty-trace decision outside the
 // cut search preserves the optional skip as one explicit branch.
 ProcessTreeNode mine(const Sublog& log, double f,
-                     const InductiveMinerOptions& options) {
+                     const InductiveMinerOptions& options,
+                     const ActivityLabels& labels) {
   std::uint64_t empty_weight = 0;
   std::uint64_t nonempty_weight = 0;
   for (const auto& wt : log) {
@@ -891,17 +1109,18 @@ ProcessTreeNode mine(const Sublog& log, double f,
     if (static_cast<double>(empty_weight) >
         f * static_cast<double>(total_weight)) {
       return make_node(ProcessTreeOperator::kExclusive,
-                       {ProcessTreeNode::tau(), mine(nonempty, f, options)});
+                       {ProcessTreeNode::tau(),
+                        mine(nonempty, f, options, labels)});
     }
-    return mine(nonempty, f, options);
+    return mine(nonempty, f, options, labels);
   }
 
   LocalDfg dfg = build_local_dfg(log);
+  const LocalDfg original_dfg = dfg;
 
   // Base case: a single activity with no empty traces. It is a bare leaf when
-  // it always occurs once; a self-loop when it genuinely repeats. Under the
-  // infrequent variant, repetitions rarer than the threshold are treated as
-  // noise and still yield a leaf.
+  // it always occurs once and a self-loop when it genuinely repeats. Filtering
+  // applies to graph relations, not to multiplicity inside a projected trace.
   if (dfg.size() == 1 && !has_empty) {
     const ActId act = dfg.to_global.front();
     std::uint64_t multi_weight = 0;
@@ -910,10 +1129,7 @@ ProcessTreeNode mine(const Sublog& log, double f,
         multi_weight += wt.count;
       }
     }
-    if (static_cast<double>(multi_weight) <=
-        f * static_cast<double>(nonempty_weight)) {
-      return ProcessTreeNode::leaf(act);
-    }
+    if (multi_weight == 0) return ProcessTreeNode::leaf(act);
     ProcessTreeNode node;
     node.op = ProcessTreeOperator::kLoop;
     node.children = {ProcessTreeNode::leaf(act), ProcessTreeNode::tau()};
@@ -923,21 +1139,22 @@ ProcessTreeNode mine(const Sublog& log, double f,
   const auto try_cuts = [&](const LocalDfg& d) -> std::optional<ProcessTreeNode> {
     if (auto cut = exclusive_cut(d)) {
       return build_from_cut(ProcessTreeOperator::kExclusive, *cut, log, f,
-                            options);
+                            options, labels);
     }
     const auto sequence = options.disable_strict_sequence_cut
                               ? sequence_cut(d)
                               : strict_sequence_cut(d);
     if (sequence) {
       return build_from_cut(ProcessTreeOperator::kSequence, *sequence, log, f,
-                            options);
+                            options, labels);
     }
     if (auto cut = parallel_cut(d)) {
       return build_from_cut(ProcessTreeOperator::kParallel, *cut, log, f,
-                            options);
+                            options, labels);
     }
     if (auto cut = loop_cut(d)) {
-      return build_from_cut(ProcessTreeOperator::kLoop, *cut, log, f, options);
+      return build_from_cut(ProcessTreeOperator::kLoop, *cut, log, f, options,
+                            labels);
     }
     return std::nullopt;
   };
@@ -959,10 +1176,17 @@ ProcessTreeNode mine(const Sublog& log, double f,
     }
   }
 
-  // The native fall-through set already consists of the empty-trace handling
-  // above and this flower fallback, both of which remain valid when callers
-  // request the reduced fall-through policy.
-  return flower(dfg.to_global);
+  // Specialized fall-throughs inspect the original unfiltered log.  Filtering
+  // is a graph-only retry in the infrequent variant; it must not change the
+  // activity projections used by these deterministic repairs.
+  if (auto node = specialized_fallthrough(log, original_dfg, f, options,
+                                           labels)) {
+    return std::move(*node);
+  }
+
+  // The flower fallback is retained even when specialized fall-throughs are
+  // disabled so every non-empty log still produces a process tree.
+  return flower(original_dfg.to_global, labels);
 }
 
 // --- IMd: recursion over the directly-follows graph -------------------------
@@ -1025,25 +1249,20 @@ LocalDfg project_dfg(const LocalDfg& parent,
 }
 
 ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
-                         const InductiveMinerOptions& options) {
+                         const InductiveMinerOptions& options,
+                         const ActivityLabels& labels) {
   if (dfg.size() == 0) {
     return ProcessTreeNode::tau();
   }
 
-  // Base case: a single activity is a bare leaf, or a self-loop when its
-  // self-edge survives the noise filter.
+  // A graph-recursive single activity is a leaf only when it has no self-edge.
+  // A self-edge reaches the graph flower fall-through, whose silent body keeps
+  // the graph abstraction's unknown empty-trace behavior explicit.
   if (dfg.size() == 1) {
-    if (f > 0.0) {
-      apply_noise_filter(dfg, f);
-    }
     if (!dfg.follows[0][0]) {
       return ProcessTreeNode::leaf(dfg.to_global.front());
     }
-    ProcessTreeNode node;
-    node.op = ProcessTreeOperator::kLoop;
-    node.children = {ProcessTreeNode::leaf(dfg.to_global.front()),
-                     ProcessTreeNode::tau()};
-    return node;
+    return flower(dfg.to_global, labels);
   }
 
   const auto build = [&](ProcessTreeOperator op,
@@ -1087,7 +1306,7 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
     children.reserve(groups.size());
     for (std::size_t i = 0; i < groups.size(); ++i) {
       auto child = mine_dfg(project_dfg(dfg, groups[i], crossing_edges), f,
-                            options);
+                            options, labels);
       if (skippable[i]) {
         child = make_node(ProcessTreeOperator::kExclusive,
                           {ProcessTreeNode::tau(), std::move(child)});
@@ -1129,7 +1348,7 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
     }
   }
 
-  return flower(dfg.to_global);
+  return flower(dfg.to_global, labels);
 }
 
 // IMd entry: one pass over the (variant-compressed) log builds the root graph,
@@ -1137,7 +1356,8 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
 // a directly-follows graph, so their explicit skip branch is decided here —
 // the one place the log itself is still in hand.
 ProcessTreeNode mine_dfg_root(const Sublog& log, double f,
-                              const InductiveMinerOptions& options) {
+                              const InductiveMinerOptions& options,
+                              const ActivityLabels& labels) {
   std::uint64_t empty_weight = 0;
   std::uint64_t nonempty_weight = 0;
   for (const auto& wt : log) {
@@ -1147,7 +1367,7 @@ ProcessTreeNode mine_dfg_root(const Sublog& log, double f,
     return ProcessTreeNode::tau();
   }
 
-  ProcessTreeNode root = mine_dfg(build_local_dfg(log), f, options);
+  ProcessTreeNode root = mine_dfg(build_local_dfg(log), f, options, labels);
   // The graph-backed variant carries the UVCL skip flag independently of the
   // infrequent threshold: if an empty trace was observed, retain it as the
   // optional tau branch.
@@ -1158,26 +1378,398 @@ ProcessTreeNode mine_dfg_root(const Sublog& log, double f,
   return root;
 }
 
-}  // namespace
+void validate_options(const InductiveMinerOptions& options) {
+  if (!std::isfinite(options.noise_threshold) ||
+      options.noise_threshold < 0.0 || options.noise_threshold > 1.0) {
+    throw std::invalid_argument(
+        "inductive miner: noise_threshold must be finite and in [0, 1]");
+  }
+  switch (options.variant) {
+    case InductiveMinerVariant::kLog:
+    case InductiveMinerVariant::kImf:
+    case InductiveMinerVariant::kDfg:
+      break;
+    default:
+      throw std::invalid_argument("inductive miner: unsupported variant");
+  }
+  if (options.activity_key.empty() || options.timestamp_key.empty() ||
+      options.case_id_key.empty()) {
+    throw std::invalid_argument(
+        "inductive miner: activity_key, timestamp_key, and case_id_key "
+        "must not be empty");
+  }
+}
 
-ProcessTree discover_process_tree(const EventLog& event_log,
-                                  const InductiveMinerOptions& options) {
-  std::vector<std::string> names;
+std::optional<std::string> event_value(const Event& event, const Trace& trace,
+                                       std::string_view key,
+                                       bool activity_selector) {
+  if (activity_selector && (key == "concept:name" || key == "activity")) {
+    if (event.has_activity()) return event.activity;
+    return std::nullopt;
+  }
+  if (!activity_selector &&
+      (key == "case:concept:name" || key == "case_id" ||
+       key == "concept:name")) {
+    if (trace.has_case_id()) return trace.case_id;
+    return std::nullopt;
+  }
+  if (key == "time:timestamp" || key == "timestamp") {
+    if (event.has_timestamp()) return event.timestamp;
+    return std::nullopt;
+  }
+  if (key == "org:resource" || key == "resource") {
+    if (event.has_resource()) return event.resource;
+    return std::nullopt;
+  }
+  if (!event.activity_source_key.empty() &&
+      key == event.activity_source_key && event.has_activity()) {
+    return event.activity;
+  }
+  if (!event.timestamp_source_key.empty() &&
+      key == event.timestamp_source_key && event.has_timestamp()) {
+    return event.timestamp;
+  }
+  if (!event.resource_source_key.empty() &&
+      key == event.resource_source_key && event.has_resource()) {
+    return event.resource;
+  }
+  if (!trace.case_id_source_key.empty() &&
+      key == trace.case_id_source_key && trace.has_case_id()) {
+    return trace.case_id;
+  }
+  if (const auto* value = event.attribute(key)) return *value;
+  if (const auto* value = trace.attribute(key)) return *value;
+  return std::nullopt;
+}
+
+std::string tree_key(const ProcessTreeNode& node,
+                     const ActivityLabels& labels) {
+  switch (node.op) {
+    case ProcessTreeOperator::kTau:
+      return "0";
+    case ProcessTreeOperator::kActivity:
+      return node.activity < labels.size()
+                 ? std::string("1:") + labels[node.activity]
+                 : std::string("1:#") + std::to_string(node.activity);
+    case ProcessTreeOperator::kSequence:
+      break;
+    case ProcessTreeOperator::kExclusive:
+      break;
+    case ProcessTreeOperator::kParallel:
+      break;
+    case ProcessTreeOperator::kInclusiveChoice:
+      break;
+    case ProcessTreeOperator::kInterleaving:
+      break;
+    case ProcessTreeOperator::kLoop:
+      break;
+  }
+  const auto op_key = [](ProcessTreeOperator op) {
+    switch (op) {
+      case ProcessTreeOperator::kSequence: return "2";
+      case ProcessTreeOperator::kExclusive: return "3";
+      case ProcessTreeOperator::kParallel: return "4";
+      case ProcessTreeOperator::kInclusiveChoice: return "5";
+      case ProcessTreeOperator::kInterleaving: return "6";
+      case ProcessTreeOperator::kLoop: return "7";
+      case ProcessTreeOperator::kActivity: return "1";
+      case ProcessTreeOperator::kTau: return "0";
+    }
+    return "9";
+  };
+  std::string result = std::string(op_key(node.op)) + "(";
+  for (const auto& child : node.children) {
+    const std::string key = tree_key(child, labels);
+    result += std::to_string(key.size()) + ":" + key + ";";
+  }
+  result += ")";
+  return result;
+}
+
+void canonicalize_tree(ProcessTreeNode& node, const ActivityLabels& labels) {
+  for (auto& child : node.children) canonicalize_tree(child, labels);
+  if (node.op != ProcessTreeOperator::kExclusive &&
+      node.op != ProcessTreeOperator::kParallel) {
+    return;
+  }
+  std::vector<ProcessTreeNode> flattened;
+  flattened.reserve(node.children.size());
+  for (auto& child : node.children) {
+    if (child.op == node.op) {
+      for (auto& grandchild : child.children)
+        flattened.push_back(std::move(grandchild));
+    } else {
+      flattened.push_back(std::move(child));
+    }
+  }
+  std::sort(flattened.begin(), flattened.end(), [&](const auto& left,
+                                                   const auto& right) {
+    return tree_key(left, labels) < tree_key(right, labels);
+  });
+  node.children = std::move(flattened);
+}
+
+EventLog select_event_log_fields(const EventLog& input,
+                                 const InductiveMinerOptions& options) {
+  const bool regroup = options.case_id_key != "case:concept:name";
+  const bool sort = options.sort_events_by_timestamp;
+  EventLog output;
+  output.attributes = input.attributes;
+  output.metadata = input.metadata;
+  std::unordered_map<std::string, std::size_t> trace_indexes;
+
+  for (std::size_t trace_index = 0; trace_index < input.traces.size();
+       ++trace_index) {
+    const auto& source_trace = input.traces[trace_index];
+    if (source_trace.events.empty()) {
+      if (!regroup) {
+        output.traces.push_back(source_trace);
+        continue;
+      }
+      const Event empty_event;
+      const auto selected_case =
+          event_value(empty_event, source_trace, options.case_id_key, false);
+      if (!selected_case || selected_case->empty()) {
+        throw std::invalid_argument(
+            "inductive miner: case id field '" + options.case_id_key +
+            "' is missing in empty EventLog trace " +
+            std::to_string(trace_index));
+      }
+      const bool inserted =
+          trace_indexes.emplace(*selected_case, output.traces.size()).second;
+      if (inserted) {
+        auto trace = source_trace;
+        trace.events.clear();
+        trace.case_id = *selected_case;
+        trace.case_id_state = FirstClassAttributeState::kPresent;
+        trace.case_id_source_key = options.case_id_key;
+        output.traces.push_back(std::move(trace));
+      }
+      continue;
+    }
+    std::size_t output_trace_index = std::numeric_limits<std::size_t>::max();
+    std::optional<std::string> native_case;
+    for (std::size_t event_index = 0; event_index < source_trace.events.size();
+         ++event_index) {
+      const auto& source_event = source_trace.events[event_index];
+      auto activity =
+          event_value(source_event, source_trace, options.activity_key, true);
+      if (!activity || activity->empty()) {
+        throw std::invalid_argument(
+            "inductive miner: activity field '" + options.activity_key +
+            "' is missing in EventLog trace " +
+            std::to_string(trace_index) + " event " +
+            std::to_string(event_index));
+      }
+      auto event = source_event;
+      event.activity = *activity;
+      event.activity_state = FirstClassAttributeState::kPresent;
+      event.activity_source_key = options.activity_key;
+
+      if (options.timestamp_key != "time:timestamp") {
+        const auto timestamp =
+            event_value(source_event, source_trace, options.timestamp_key, false);
+        if (!timestamp || timestamp->empty()) {
+          throw std::invalid_argument(
+              "inductive miner: timestamp field '" + options.timestamp_key +
+              "' is missing in EventLog trace " +
+              std::to_string(trace_index) + " event " +
+              std::to_string(event_index));
+        }
+        event.timestamp = *timestamp;
+        event.timestamp_state = FirstClassAttributeState::kPresent;
+        event.timestamp_source_key = options.timestamp_key;
+      }
+
+      if (regroup) {
+        native_case =
+            event_value(source_event, source_trace, options.case_id_key, false);
+        if (!native_case || native_case->empty()) {
+          throw std::invalid_argument(
+              "inductive miner: case id field '" + options.case_id_key +
+              "' is missing in EventLog trace " +
+              std::to_string(trace_index) + " event " +
+              std::to_string(event_index));
+        }
+        const auto [it, inserted] =
+            trace_indexes.emplace(*native_case, output.traces.size());
+        if (inserted) {
+          auto trace = source_trace;
+          trace.events.clear();
+          trace.case_id = *native_case;
+          trace.case_id_state = FirstClassAttributeState::kPresent;
+          trace.case_id_source_key = options.case_id_key;
+          output.traces.push_back(std::move(trace));
+        }
+        output_trace_index = it->second;
+      } else if (output_trace_index == std::numeric_limits<std::size_t>::max()) {
+        output_trace_index = output.traces.size();
+        output.traces.push_back(source_trace);
+        output.traces.back().events.clear();
+      }
+
+      auto& target_trace = output.traces[output_trace_index];
+      event.case_id = target_trace.case_id;
+      event.case_id_state = target_trace.case_id_state;
+      event.case_id_source_key = target_trace.case_id_source_key;
+      target_trace.events.push_back(std::move(event));
+    }
+    if (sort && !regroup && !output.traces.empty()) {
+      auto& trace = output.traces[output_trace_index];
+      for (std::size_t event_index = 0; event_index < trace.events.size();
+           ++event_index) {
+        const auto& timestamp = trace.events[event_index].timestamp;
+        if (timestamp.empty() || !parse_timestamp(timestamp)) {
+          throw std::invalid_argument(
+              "inductive miner: timestamp field '" + options.timestamp_key +
+              "' is missing or invalid in EventLog trace " +
+              std::to_string(trace_index) + " event " +
+              std::to_string(event_index));
+        }
+      }
+      order_events_by_time(trace.events);
+    }
+  }
+  if (sort && regroup) {
+    for (std::size_t trace_index = 0; trace_index < output.traces.size();
+         ++trace_index) {
+      auto& trace = output.traces[trace_index];
+      for (std::size_t event_index = 0; event_index < trace.events.size();
+           ++event_index) {
+        if (trace.events[event_index].timestamp.empty() ||
+            !parse_timestamp(trace.events[event_index].timestamp)) {
+          throw std::invalid_argument(
+              "inductive miner: timestamp field '" + options.timestamp_key +
+              "' is missing or invalid in EventLog trace " +
+              std::to_string(trace_index) + " event " +
+              std::to_string(event_index));
+        }
+      }
+      order_events_by_time(trace.events);
+    }
+  }
+  return output;
+}
+
+struct IndexedRecord {
+  EventRecord record;
+  std::size_t input_order = 0;
+};
+
+std::vector<IndexedRecord> event_data_records(const EventDataView& data) {
+  std::vector<IndexedRecord> records;
+  switch (data.kind()) {
+    case EventDataKind::kEventStream:
+      records.reserve(data.stream()->events.size());
+      for (std::size_t i = 0; i < data.stream()->events.size(); ++i)
+        records.push_back({data.stream()->events[i], i});
+      return records;
+    case EventDataKind::kEventTable: {
+      const auto& table = *data.table();
+      table.validate();
+      records.reserve(table.rows.size());
+      for (std::size_t row_index = 0; row_index < table.rows.size();
+           ++row_index) {
+        EventRecord record;
+        record.fields.reserve(table.columns.size());
+        for (std::size_t column = 0; column < table.columns.size(); ++column) {
+          if (!table.rows[row_index][column]) continue;
+          auto field = *table.rows[row_index][column];
+          field.key = table.columns[column];
+          record.fields.push_back(std::move(field));
+        }
+        records.push_back({std::move(record), row_index});
+      }
+      return records;
+    }
+    case EventDataKind::kLazyEventTable: {
+      const auto table = data.lazy_table()->materialize();
+      EventTable copy = table;
+      EventDataView materialized(copy);
+      return event_data_records(materialized);
+    }
+    case EventDataKind::kEventLog:
+      break;
+  }
+  throw std::invalid_argument("inductive miner: unsupported event-data kind");
+}
+
+std::string required_record_value(const EventRecord& record,
+                                  std::string_view key,
+                                  std::string_view role,
+                                  std::size_t row) {
+  const auto* field = record.field(key);
+  if (!field || field->is_null || field->value.empty()) {
+    throw std::invalid_argument(
+        "inductive miner: " + std::string(role) + " field '" +
+        std::string(key) + "' is missing or null at row " +
+        std::to_string(row));
+  }
+  return field->value;
+}
+
+EventLog event_data_to_log(const EventDataView& data,
+                           const InductiveMinerOptions& options) {
+  auto records = event_data_records(data);
+  EventLog log;
+  std::unordered_map<std::string, std::size_t> traces;
+  for (auto& indexed : records) {
+    const std::string case_id = required_record_value(
+        indexed.record, options.case_id_key, "case id", indexed.input_order);
+    const std::string activity = required_record_value(
+        indexed.record, options.activity_key, "activity", indexed.input_order);
+    const std::string timestamp = required_record_value(
+        indexed.record, options.timestamp_key, "timestamp", indexed.input_order);
+    if (!parse_timestamp(timestamp)) {
+      throw std::invalid_argument(
+          "inductive miner: timestamp field '" + options.timestamp_key +
+          "' is invalid at row " + std::to_string(indexed.input_order));
+    }
+
+    auto [trace_it, inserted] = traces.emplace(case_id, log.traces.size());
+    if (inserted) {
+      Trace trace;
+      trace.case_id = case_id;
+      trace.case_id_state = FirstClassAttributeState::kPresent;
+      trace.case_id_source_key = options.case_id_key;
+      log.traces.push_back(std::move(trace));
+    }
+    auto& trace = log.traces[trace_it->second];
+    Event event;
+    event.case_id = case_id;
+    event.case_id_state = FirstClassAttributeState::kPresent;
+    event.case_id_source_key = options.case_id_key;
+    event.activity = activity;
+    event.activity_state = FirstClassAttributeState::kPresent;
+    event.activity_source_key = options.activity_key;
+    event.timestamp = timestamp;
+    event.timestamp_state = FirstClassAttributeState::kPresent;
+    event.timestamp_source_key = options.timestamp_key;
+    event.input_order = indexed.input_order;
+    trace.events.push_back(std::move(event));
+  }
+  for (auto& trace : log.traces) {
+    order_events_by_time(trace.events);
+  }
+  return log;
+}
+
+ProcessTree discover_from_event_log(const EventLog& event_log,
+                                    const InductiveMinerOptions& options) {
+  std::set<std::string> alphabet;
+  for (const auto& trace : event_log.traces)
+    for (const auto& event : trace.events) alphabet.insert(event.activity);
+  std::vector<std::string> names(alphabet.begin(), alphabet.end());
   std::unordered_map<std::string, ActId> ids;
+  for (ActId id = 0; id < names.size(); ++id) ids.emplace(names[id], id);
 
-  // Compress cases into variants up front, interning activity names in first-
-  // seen order to match the directly-follows graph's activity ids.
   Sublog sublog;
   std::unordered_map<std::string, std::size_t> variant_index;
   for (const auto& trace : event_log.traces) {
     std::vector<ActId> activities;
     activities.reserve(trace.events.size());
     for (const auto& event : trace.events) {
-      auto [it, inserted] = ids.emplace(event.activity, names.size());
-      if (inserted) {
-        names.push_back(event.activity);
-      }
-      activities.push_back(it->second);
+      activities.push_back(ids.at(event.activity));
     }
 
     auto [vit, vinserted] =
@@ -1189,22 +1781,92 @@ ProcessTree discover_process_tree(const EventLog& event_log,
     }
   }
 
-  const double f = std::clamp(options.noise_threshold, 0.0, 1.0);
+  const double f = options.variant == InductiveMinerVariant::kImf
+                       ? options.noise_threshold
+                       : 0.0;
   ProcessTreeNode root = options.variant == InductiveMinerVariant::kDfg
-                             ? mine_dfg_root(sublog, f, options)
-                             : mine(sublog, f, options);
+                             ? mine_dfg_root(sublog, f, options, names)
+                             : mine(sublog, f, options, names);
+  canonicalize_tree(root, names);
   return ProcessTree(std::move(names), std::move(root));
+}
+
+ProcessTree discover_from_variants(const InductiveMinerVariantLog& variants,
+                                   const InductiveMinerOptions& options) {
+  std::set<std::string> alphabet;
+  for (const auto& variant : variants)
+    for (const auto& label : variant.activities) alphabet.insert(label);
+  std::vector<std::string> names(alphabet.begin(), alphabet.end());
+  std::unordered_map<std::string, ActId> ids;
+  for (ActId id = 0; id < names.size(); ++id) ids.emplace(names[id], id);
+  Sublog sublog;
+  std::unordered_map<std::string, std::size_t> variant_index;
+  for (const auto& variant : variants) {
+    if (variant.count == 0) continue;
+    std::vector<ActId> activities;
+    activities.reserve(variant.activities.size());
+    for (const auto& label : variant.activities)
+      activities.push_back(ids.at(label));
+    auto [it, inserted] =
+        variant_index.emplace(trace_key(activities), sublog.size());
+    if (inserted) {
+      sublog.push_back(WeightedTrace{std::move(activities), variant.count});
+    } else {
+      sublog[it->second].count += variant.count;
+    }
+  }
+  const double f = options.variant == InductiveMinerVariant::kImf
+                       ? options.noise_threshold
+                       : 0.0;
+  ProcessTreeNode root = options.variant == InductiveMinerVariant::kDfg
+                             ? mine_dfg_root(sublog, f, options, names)
+                             : mine(sublog, f, options, names);
+  canonicalize_tree(root, names);
+  return ProcessTree(std::move(names), std::move(root));
+}
+
+}  // namespace
+
+EventLog prepare_inductive_event_log(const EventLog& event_log,
+                                     const InductiveMinerOptions& options) {
+  validate_options(options);
+  return select_event_log_fields(event_log, options);
+}
+
+ProcessTree discover_process_tree(const EventLog& event_log,
+                                  const InductiveMinerOptions& options) {
+  validate_options(options);
+  return discover_from_event_log(prepare_inductive_event_log(event_log, options),
+                                 options);
 }
 
 ProcessTree discover_process_tree(const DirectlyFollowsGraph& graph,
                                   const InductiveMinerOptions& options) {
-  // A graph input has already discarded trace bodies, so all selectors use the
-  // graph-recursive IMd semantics just as the reference DFG entry point does.
-  // The noise threshold still applies to raw edge and endpoint counts during
-  // graph fall-throughs.
-  const double f = std::clamp(options.noise_threshold, 0.0, 1.0);
-  ProcessTreeNode root = mine_dfg(build_local_dfg(graph), f, options);
+  validate_options(options);
+  // A graph input has already discarded trace bodies, so it always uses the
+  // graph-recursive semantics. Selector values are validated for a uniform
+  // public contract but do not affect a graph that has no event columns.
+  const double f = 0.0;
+  const auto& names = graph.activities();
+  ProcessTreeNode root = mine_dfg(build_local_dfg(graph), f, options, names);
+  canonicalize_tree(root, names);
   return ProcessTree(graph.activities(), std::move(root));
+}
+
+ProcessTree discover_process_tree(const EventDataView& data,
+                                  const InductiveMinerOptions& options) {
+  validate_options(options);
+  if (data.kind() == EventDataKind::kEventLog) {
+    return discover_from_event_log(
+        prepare_inductive_event_log(*data.log(), options), options);
+  }
+  return discover_from_event_log(event_data_to_log(data, options), options);
+}
+
+ProcessTree discover_process_tree(const InductiveMinerVariantLog& variants,
+                                  const InductiveMinerOptions& options) {
+  validate_options(options);
+  return discover_from_variants(variants, options);
 }
 
 }  // namespace minera

@@ -80,6 +80,12 @@ void parse_mine_params_defaults_when_empty() {
   assert(params.csv.delimiter == ',');
   assert(!params.filter.any());
   assert(params.inductive.noise_threshold == 0.0);
+  assert(params.inductive.activity_key == "concept:name");
+  assert(params.inductive.timestamp_key == "time:timestamp");
+  assert(params.inductive.case_id_key == "case:concept:name");
+  assert(!params.inductive.sort_events_by_timestamp);
+  assert(!params.inductive.disable_strict_sequence_cut);
+  assert(!params.inductive.disable_fallthroughs);
   assert(!params.alpha.short_loops);  // classic Alpha is the default variant
   assert(params.powl.activity_key == "concept:name");
   assert(params.powl.timestamp_key == "time:timestamp");
@@ -976,6 +982,12 @@ void parse_mine_params_maps_csv_and_inductive_options() {
       {"noise_threshold", "0.25"},
       {"alpha_variant", "classic"},
       {"inductive_variant", "dfg"},
+      {"inductive_activity_key", " phase "},
+      {"inductive_timestamp_key", " finished_at "},
+      {"inductive_case_id_key", " case_ref "},
+      {"inductive_sort_events_by_timestamp", "1"},
+      {"inductive_disable_strict_sequence_cut", "true"},
+      {"inductive_disable_fallthroughs", "0"},
       {"heuristic_variant", "plusplus"},
       {"heuristic_activity_attribute", "phase"},
       {"heuristic_timestamp_attribute", "finished_at"},
@@ -1013,6 +1025,12 @@ void parse_mine_params_maps_csv_and_inductive_options() {
           std::vector<std::string>{"cost", "region"}));
   assert(params.inductive.noise_threshold == 0.25);
   assert(params.inductive.variant == minera::InductiveMinerVariant::kDfg);
+  assert(params.inductive.activity_key == "phase");
+  assert(params.inductive.timestamp_key == "finished_at");
+  assert(params.inductive.case_id_key == "case_ref");
+  assert(params.inductive.sort_events_by_timestamp);
+  assert(params.inductive.disable_strict_sequence_cut);
+  assert(!params.inductive.disable_fallthroughs);
   assert(!params.alpha.short_loops);
   assert(params.heuristic.variant ==
          minera::HeuristicMinerVariant::kPlusPlus);
@@ -1036,13 +1054,20 @@ void parse_mine_params_maps_csv_and_inductive_options() {
 }
 
 void parse_mine_params_rejects_an_unknown_inductive_variant() {
-  bool threw = false;
-  try {
-    (void)minera::parse_mine_params(fields({{"inductive_variant", "bogus"}}));
-  } catch (const std::invalid_argument&) {
-    threw = true;
+  for (const auto* value : {"bogus", ""}) {
+    const std::map<std::string, std::string> values{
+        {"inductive_variant", value}};
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(
+          fields(values), [&](std::string_view requested) {
+            return values.contains(std::string(requested));
+          });
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
   }
-  assert(threw);
 }
 
 void parse_mine_params_rejects_an_unknown_alpha_variant() {
@@ -1239,6 +1264,62 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.variant_max_coverage == 0.8);
   assert(params.filter.variant_percentage == 0.6);
   assert(params.filter.any());
+}
+
+void parse_mine_params_rejects_invalid_inductive_options() {
+  for (const auto& value : {"abc", "nan", "NaN", "inf", "-inf",
+                            "-0.1", "1.1", "1e9999"}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(
+          fields({{"noise_threshold", value}}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  {
+    const std::map<std::string, std::string> values{{"noise_threshold", ""}};
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(
+          fields(values), [&](std::string_view requested) {
+            return values.contains(std::string(requested));
+          });
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+
+  for (const auto& item : {
+           std::pair{"inductive_disable_strict_sequence_cut", "maybe"},
+           std::pair{"inductive_disable_fallthroughs", "TRUE"},
+           std::pair{"inductive_sort_events_by_timestamp", "yes"},
+       }) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+
+  for (const auto& name : {"inductive_activity_key", "inductive_timestamp_key",
+                           "inductive_case_id_key"}) {
+    const std::map<std::string, std::string> values{{name, "  "}};
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(
+          fields(values), [&](std::string_view requested) {
+            return values.contains(std::string(requested));
+          });
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
 }
 
 void parse_mine_params_rejects_invalid_xes_options() {
@@ -3908,6 +3989,7 @@ int main() {
   parse_mine_params_rejects_a_malformed_succession();
   parse_mine_params_rejects_an_unknown_alpha_variant();
   parse_mine_params_rejects_an_unknown_inductive_variant();
+  parse_mine_params_rejects_invalid_inductive_options();
   parse_mine_params_accepts_infrequent_inductive_variant();
   parse_mine_params_rejects_unknown_heuristic_settings();
   parse_mine_params_maps_spectrum_and_batch_options();

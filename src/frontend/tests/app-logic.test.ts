@@ -775,6 +775,14 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({})).toBe(false);
     expect(hasActiveMinerOptions({ noiseThreshold: 0 })).toBe(false);
     expect(hasActiveMinerOptions({ inductiveVariant: "log" })).toBe(false);
+    expect(hasActiveMinerOptions({
+      inductiveDisableStrictSequenceCut: false,
+      inductiveDisableFallthroughs: false,
+      inductiveSortEventsByTimestamp: false,
+      inductiveActivityKey: "concept:name",
+      inductiveTimestampKey: "time:timestamp",
+      inductiveCaseIdKey: "case:concept:name",
+    })).toBe(false);
     expect(hasActiveMinerOptions({ inductiveVariant: "imf" })).toBe(true);
     expect(hasActiveMinerOptions({ alphaVariant: "classic" })).toBe(false);
     expect(hasActiveMinerOptions({
@@ -808,6 +816,12 @@ describe("hasActiveMinerOptions", () => {
   it("is true when any setting deviates", () => {
     expect(hasActiveMinerOptions({ noiseThreshold: 0.2 })).toBe(true);
     expect(hasActiveMinerOptions({ inductiveVariant: "dfg" })).toBe(true);
+    expect(hasActiveMinerOptions({ inductiveDisableStrictSequenceCut: true })).toBe(true);
+    expect(hasActiveMinerOptions({ inductiveDisableFallthroughs: true })).toBe(true);
+    expect(hasActiveMinerOptions({ inductiveSortEventsByTimestamp: true })).toBe(true);
+    expect(hasActiveMinerOptions({ inductiveActivityKey: "phase" })).toBe(true);
+    expect(hasActiveMinerOptions({ inductiveTimestampKey: "occurred_at" })).toBe(true);
+    expect(hasActiveMinerOptions({ inductiveCaseIdKey: "case_ref" })).toBe(true);
     expect(hasActiveMinerOptions({ alphaVariant: "plus" })).toBe(true);
     expect(hasActiveMinerOptions({ heuristicVariant: "plusplus" })).toBe(true);
     expect(hasActiveMinerOptions({ heuristicActivityAttribute: "phase" })).toBe(true);
@@ -917,6 +931,41 @@ describe("mineFormEntries", () => {
       ["heuristic_start_timestamp_attribute", "started_at"],
       ["heuristic_lifecycle_instance_attribute", "instance"],
     ]);
+  });
+
+  it("maps non-default inductive selectors and switches", () => {
+    expect(mineFormEntries({
+      inductiveDisableStrictSequenceCut: true,
+      inductiveDisableFallthroughs: true,
+      inductiveSortEventsByTimestamp: true,
+      inductiveActivityKey: " phase ",
+      inductiveTimestampKey: " occurred_at ",
+      inductiveCaseIdKey: " case_ref ",
+    })).toEqual([
+      ["inductive_disable_strict_sequence_cut", "true"],
+      ["inductive_disable_fallthroughs", "true"],
+      ["inductive_sort_events_by_timestamp", "true"],
+      ["inductive_activity_key", "phase"],
+      ["inductive_timestamp_key", "occurred_at"],
+      ["inductive_case_id_key", "case_ref"],
+    ]);
+    expect(mineFormEntries({
+      inductiveDisableStrictSequenceCut: false,
+      inductiveDisableFallthroughs: false,
+      inductiveSortEventsByTimestamp: false,
+      inductiveActivityKey: "concept:name",
+      inductiveTimestampKey: "time:timestamp",
+      inductiveCaseIdKey: "case:concept:name",
+    })).toEqual([]);
+    expect(() => mineFormEntries({ inductiveActivityKey: "  " })).toThrow(
+      "inductive_activity_key must not be empty",
+    );
+    expect(() => mineFormEntries({ inductiveTimestampKey: "" })).toThrow(
+      "inductive_timestamp_key must not be empty",
+    );
+    expect(() => mineFormEntries({ inductiveCaseIdKey: "\t" })).toThrow(
+      "inductive_case_id_key must not be empty",
+    );
   });
 
   it("rejects blank heuristic selectors", () => {

@@ -611,6 +611,7 @@ std::string mine_tree_imf(const std::vector<std::vector<std::string>>& variants,
   const auto log = log_from_variants(variants);
   minera::InductiveMinerOptions options;
   options.noise_threshold = noise_threshold;
+  options.variant = minera::InductiveMinerVariant::kImf;
   const auto tree = minera::discover_process_tree(log, options);
   return render(tree, tree.root());
 }
@@ -650,11 +651,12 @@ void inductive_miner_models_empty_trace_before_cut() {
   assert(mine_tree({{}, {"a", "b"}}) == "X(tau, ->(a, b))");
 }
 
-void inductive_miner_falls_back_to_flower() {
-  // A directly-follows cycle (a->b->c->a) has no exclusive, sequence, parallel
-  // or loop cut, so it falls through to the flower model.
+void inductive_miner_repairs_a_cycle_with_specialized_fallthroughs() {
+  // A directly-follows cycle has no ordinary cut. Removing a reveals the
+  // optional b-then-c structure, so the activity-concurrent repair isolates a
+  // as the other parallel branch.
   const auto tree = mine_tree({{"a", "b"}, {"b", "c"}, {"c", "a"}});
-  assert(tree == "*(tau, a, b, c)");
+  assert(tree == "+(->(X(tau, b), X(tau, c)), X(tau, a))");
 }
 
 void inductive_miner_infrequent_recovers_a_noisy_sequence() {
@@ -666,8 +668,10 @@ void inductive_miner_infrequent_recovers_a_noisy_sequence() {
 
   // Classic IM (threshold 0) is misled by the rare edges.
   assert(mine_tree_imf(variants, 0.0) != "->(a, b, c, d)");
-  // IMf drops the noise and recovers the clean chain.
-  assert(mine_tree_imf(variants, 0.2) == "->(a, b, c, d)");
+  // IMf drops the rare cross-activity edges. Projected repeated activities
+  // remain visible self-loops because filtering does not erase trace
+  // multiplicity.
+  assert(mine_tree_imf(variants, 0.2) == "->(a, b, *(c, tau), d)");
 }
 
 void inductive_miner_infrequent_leaves_a_clean_log_untouched() {
@@ -751,14 +755,12 @@ void inductive_miner_dfg_skips_empty_traces_at_the_root() {
   assert(mine_tree_imd({{}, {"a", "b"}}) == "X(tau, ->(a, b))");
 }
 
-void inductive_miner_dfg_filters_noise_on_fallthrough() {
-  // The same noisy sequence the IMf test recovers: the rare a->c / c->a hops
-  // leave no cut, so the sub-graph is filtered and re-cut. The self-loop base
-  // case and the filter run on graph counts alone.
+void inductive_miner_dfg_ignores_the_infrequent_threshold() {
+  // The graph-recursive variant has no infrequent-filtering mode. Supplying a
+  // threshold therefore leaves its discovered model unchanged.
   std::vector<std::vector<std::string>> variants(20, {"a", "b", "c", "d"});
   variants.push_back({"a", "c", "a", "b", "c", "d"});
-  assert(mine_tree_imd(variants, 0.0) != "->(a, b, c, d)");
-  assert(mine_tree_imd(variants, 0.2) == "->(a, b, c, d)");
+  assert(mine_tree_imd(variants, 0.2) == mine_tree_imd(variants, 0.0));
 }
 
 void inductive_miner_accepts_direct_dfg_input() {
@@ -788,16 +790,16 @@ void inductive_miner_infrequent_drops_a_stray_edge_from_an_end_activity() {
   // this log to a flower.
   std::vector<std::vector<std::string>> variants(20, {"a", "b", "c"});
   variants.push_back({"a", "c", "a", "b", "c"});
-  assert(mine_tree_imf(variants, 0.2) == "->(a, b, c)");
+  assert(mine_tree_imf(variants, 0.2) ==
+         "->(a, b, *(c, tau))");
 }
 
 void inductive_miner_infrequent_preserves_observed_end_activities() {
   std::vector<std::vector<std::string>> variants(10, {"a", "b", "a"});
   variants.push_back({"a", "b"});
-  // The rare b-ending trace remains an observed endpoint. Preserving it keeps
-  // the filtered cycle unresolved, so the flower fall-through is selected;
-  // treating rare ends as noise would incorrectly manufacture a loop(a,b).
-  assert(mine_tree_imf(variants, 0.5) == "*(tau, a, b)");
+  // The rare b-ending trace remains an observed endpoint. The once-per-trace
+  // repair isolates b in parallel with the repeated a behaviour.
+  assert(mine_tree_imf(variants, 0.5) == "+(b, *(a, tau))");
 }
 
 void inductive_miner_infrequent_uses_total_trace_weight_for_empty_noise() {
@@ -1254,9 +1256,13 @@ void precision_is_high_for_a_tight_model_and_low_for_a_flower() {
   assert(tight.precision > 0.99);
 
   // A directly-follows cycle yields a flower model that permits any activity at
-  // any point, so escaping-edges precision drops sharply.
+  // any point when specialized repairs are disabled, so escaping-edges
+  // precision drops sharply.
   const auto flower_log = log_from_variants({{"a", "b"}, {"b", "c"}, {"c", "a"}});
-  const auto flower_tree = minera::discover_process_tree(flower_log);
+  minera::InductiveMinerOptions flower_options;
+  flower_options.disable_fallthroughs = true;
+  const auto flower_tree =
+      minera::discover_process_tree(flower_log, flower_options);
   const auto loose = minera::check_conformance(flower_log, flower_tree);
   assert(loose.fitness > 0.999);  // a flower still reproduces the log
   assert(loose.precision < 0.85);
@@ -6103,7 +6109,7 @@ int main() {
   inductive_miner_discovers_loop();
   inductive_miner_models_optional_skip();
   inductive_miner_models_empty_trace_before_cut();
-  inductive_miner_falls_back_to_flower();
+  inductive_miner_repairs_a_cycle_with_specialized_fallthroughs();
   inductive_miner_infrequent_recovers_a_noisy_sequence();
   inductive_miner_infrequent_leaves_a_clean_log_untouched();
   inductive_miner_infrequent_filters_an_edge_at_the_cutoff();
@@ -6114,7 +6120,7 @@ int main() {
   inductive_miner_infrequent_uses_total_trace_weight_for_empty_noise();
   inductive_miner_dfg_matches_log_recursion_on_structured_logs();
   inductive_miner_dfg_skips_empty_traces_at_the_root();
-  inductive_miner_dfg_filters_noise_on_fallthrough();
+  inductive_miner_dfg_ignores_the_infrequent_threshold();
   inductive_miner_accepts_direct_dfg_input();
   petri_net_translates_sequence();
   petri_net_reduces_parallel_routing();

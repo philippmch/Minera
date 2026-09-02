@@ -3631,12 +3631,24 @@ function isPetriAdvancedResult(value: unknown, algorithm: string): value is Petr
 export function isPetriAntiAlignmentResult(value: unknown): value is PetriAntiAlignmentResult { return isPetriAdvancedResult(value, "petri_anti_alignment"); }
 export function isPetriMultiAlignmentResult(value: unknown): value is PetriMultiAlignmentResult { return isPetriAdvancedResult(value, "petri_multi_alignment"); }
 
-function isProcessTreeNode(value: unknown): value is ProcessTreeNode {
-  if (!isRecord(value) || !["sequence", "exclusive", "inclusive_or", "parallel", "interleaving", "loop", "activity", "tau"].includes(value.operator as string)) return false;
-  if (value.operator === "activity" && !nonNegativeInt(value.activity)) return false;
-  if (value.activity !== undefined && !nonNegativeInt(value.activity)) return false;
-  if (value.children !== undefined && (!Array.isArray(value.children) || !value.children.every(isProcessTreeNode))) return false;
-  return value.operator === "activity" || value.operator === "tau" ? value.children === undefined || value.children.length === 0 : Boolean(value.children && value.children.length > 0);
+function isProcessTreeNode(value: unknown, activityCount?: number): value is ProcessTreeNode {
+  if (!isRecord(value) ||
+      !["sequence", "exclusive", "inclusive_or", "parallel", "interleaving", "loop", "activity", "tau"]
+        .includes(value.operator as string)) return false;
+  const operator = value.operator as ProcessTreeOperator;
+  if (operator === "activity") {
+    if (!Number.isSafeInteger(value.activity) || (value.activity as number) < 0 ||
+        (activityCount !== undefined && (value.activity as number) >= activityCount)) return false;
+  } else if (value.activity !== undefined) {
+    return false;
+  }
+  if (value.children !== undefined && !Array.isArray(value.children)) return false;
+  if (operator === "activity" || operator === "tau") {
+    return value.children === undefined ||
+      (value.children.length === 0 && value.children.every((child) => isProcessTreeNode(child, activityCount)));
+  }
+  return Boolean(value.children && value.children.length > 0 &&
+    value.children.every((child) => isProcessTreeNode(child, activityCount)));
 }
 export function isProcessTreeReductionResult(value: unknown): value is ProcessTreeReductionResult {
   return isRecord(value) && value.algorithm === "process_tree_reduction" && value.variant === "tree_tr_based" &&
@@ -6095,6 +6107,7 @@ export function isMineraExport(value: unknown): value is MineraExport {
       data.minimum_self_distance_variant === "log" ||
       data.minimum_self_distance_variant === "pandas" ||
       data.minimum_self_distance_variant === "polars") &&
+    (data.process_tree === undefined || isProcessTreeNode(data.process_tree, data.activities.length)) &&
     (data.powl === undefined || isPowlNode(data.powl, data.activities.length)) &&
     (data.decision_tables === undefined || isDecisionTablesResult(data.decision_tables)) &&
     validBatches &&

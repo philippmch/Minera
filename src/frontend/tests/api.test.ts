@@ -9,6 +9,38 @@ import { requestWorkflowHistory } from "../src/api";
 import { requestEnterpriseHistory } from "../src/api";
 import { requestCommunicationHistory } from "../src/api";
 import { knowledgeInjectionQuery, requestKnowledgeInjection } from "../src/api";
+import { mineFormEntries } from "../src/api";
+
+describe("Inductive request options", () => {
+  it("serializes enabled switches and custom selectors", () => {
+    expect(mineFormEntries({
+      inductiveDisableStrictSequenceCut: true,
+      inductiveDisableFallthroughs: true,
+      inductiveSortEventsByTimestamp: true,
+      inductiveActivityKey: " phase ",
+      inductiveTimestampKey: " occurred_at ",
+      inductiveCaseIdKey: " case_ref ",
+    })).toEqual([
+      ["inductive_disable_strict_sequence_cut", "true"],
+      ["inductive_disable_fallthroughs", "true"],
+      ["inductive_sort_events_by_timestamp", "true"],
+      ["inductive_activity_key", "phase"],
+      ["inductive_timestamp_key", "occurred_at"],
+      ["inductive_case_id_key", "case_ref"],
+    ]);
+  });
+
+  it("elides false switches and default selectors", () => {
+    expect(mineFormEntries({
+      inductiveDisableStrictSequenceCut: false,
+      inductiveDisableFallthroughs: false,
+      inductiveSortEventsByTimestamp: false,
+      inductiveActivityKey: "concept:name",
+      inductiveTimestampKey: "time:timestamp",
+      inductiveCaseIdKey: "case:concept:name",
+    })).toEqual([]);
+  });
+});
 
 describe("knowledge injection API", () => {
   it("serializes bounded provider-neutral prompt options", () => {

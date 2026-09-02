@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attributeOccurrenceValidationMessage, caseGroupingValidationMessage, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
+import { attributeOccurrenceValidationMessage, caseGroupingValidationMessage, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
 
 const valid = {
   spectrumConfigured: true,
@@ -124,6 +124,57 @@ describe("POWL option validation", () => {
       .toContain("timestamp");
     expect(powlValidationMessage({ ...validPowl, caseIdKey: "" }))
       .toContain("case-id");
+  });
+});
+
+describe("Inductive control contract", () => {
+  const defaults = {
+    disableStrictSequenceCut: false,
+    disableFallthroughs: false,
+    sortEventsByTimestamp: false,
+    activityKey: "concept:name",
+    timestampKey: "time:timestamp",
+    caseIdKey: "case:concept:name",
+  };
+
+  it("elides all backend defaults", () => {
+    expect(inductiveOptionsFromForm(defaults)).toEqual({
+      inductiveDisableStrictSequenceCut: undefined,
+      inductiveDisableFallthroughs: undefined,
+      inductiveSortEventsByTimestamp: undefined,
+      inductiveActivityKey: undefined,
+      inductiveTimestampKey: undefined,
+      inductiveCaseIdKey: undefined,
+    });
+  });
+
+  it("keeps enabled switches and trims custom selectors", () => {
+    expect(inductiveOptionsFromForm({
+      disableStrictSequenceCut: true,
+      disableFallthroughs: true,
+      sortEventsByTimestamp: true,
+      activityKey: " phase ",
+      timestampKey: " occurred_at ",
+      caseIdKey: " case_ref ",
+    })).toEqual({
+      inductiveDisableStrictSequenceCut: true,
+      inductiveDisableFallthroughs: true,
+      inductiveSortEventsByTimestamp: true,
+      inductiveActivityKey: "phase",
+      inductiveTimestampKey: "occurred_at",
+      inductiveCaseIdKey: "case_ref",
+    });
+  });
+
+  it("treats blank selectors as effective defaults for dirty state", () => {
+    expect(inductiveSettingsAreDirty({
+      ...defaults,
+      activityKey: " ",
+      timestampKey: "\t",
+      caseIdKey: "",
+    })).toBe(false);
+    expect(inductiveSettingsAreDirty({ ...defaults, sortEventsByTimestamp: true })).toBe(true);
+    expect(inductiveSettingsAreDirty({ ...defaults, activityKey: "phase" })).toBe(true);
   });
 });
 
