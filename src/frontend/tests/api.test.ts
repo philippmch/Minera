@@ -10,6 +10,9 @@ import { requestEnterpriseHistory } from "../src/api";
 import { requestCommunicationHistory } from "../src/api";
 import { knowledgeInjectionQuery, requestKnowledgeInjection } from "../src/api";
 import { mineFormEntries } from "../src/api";
+import { alignModel, alignmentQuery, decideModel, decisionMiningQuery,
+  decisionTablesQuery, evaluateModel, evaluationQuery,
+  requestDecisionTables } from "../src/api";
 
 describe("Inductive request options", () => {
   it("serializes enabled switches and custom selectors", () => {
@@ -284,6 +287,109 @@ describe("process-tree Petri conversion API", () => {
     expect(paths).toEqual([
       "/api/pnml?miner=inductive",
       "/api/bpmn?miner=inductive&process_tree_variant=transition_bordered",
+    ]);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("POWL export and deferred API routes", () => {
+  it("selects the POWL workflow net for PNML and BPMN exports", async () => {
+    const paths: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      paths.push(path);
+      return { ok: true, text: async () => "<model/>" };
+    }));
+    await expect(fetchPnml("powl")).resolves.toBe("<model/>");
+    await expect(fetchBpmn("powl")).resolves.toBe("<model/>");
+    expect(paths).toEqual([
+      "/api/pnml?miner=powl",
+      "/api/bpmn?miner=powl",
+    ]);
+    vi.unstubAllGlobals();
+  });
+
+  it("serializes basic POWL playout as an XES request", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toBe("/api/playout?miner=powl&mode=basic&traces=2&max_steps=4");
+      return { ok: true, text: async () => "<log/>" };
+    }));
+    await expect(fetchPlayout("powl", {
+      mode: "basic", traces: 2, max_steps: 4,
+    })).resolves.toBe("<log/>");
+    vi.unstubAllGlobals();
+  });
+
+  it("serializes POWL decision and decision-table requests", async () => {
+    const options = {
+      activity_attribute: " region ", max_depth: 3,
+      attributes: [" amount ", "status"], include_trace_attributes: true,
+    };
+    expect(decisionMiningQuery(options)).toBe(
+      "decision_activity_attribute=region&decision_max_depth=3&decision_include_trace_attributes=true&decision_attributes=amount%2Cstatus",
+    );
+    expect(decisionTablesQuery({ ...options, lookback: 2 })).toBe(
+      "decision_activity_attribute=region&decision_max_depth=3&decision_include_trace_attributes=true&decision_attributes=amount%2Cstatus&decision_lookback=2",
+    );
+
+    const paths: string[] = [];
+    const tablePayload = {
+      family: "DECISION_TABLES", variant: "encoded", trace_count: 1,
+      observed_traces: 1, tables: [{ place: 0, classes: ["yes"],
+        feature_names: [], rows: [] }],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      paths.push(path);
+      if (path.startsWith("/api/decision-tables"))
+        return { ok: true, json: async () => tablePayload };
+      return { ok: true, json: async () => ({ decision_points: [] }) };
+    }));
+    await expect(decideModel("powl", options))
+      .resolves.toMatchObject({ decision_points: [] });
+    await expect(requestDecisionTables("powl", { ...options, lookback: 2 }))
+      .resolves.toEqual(tablePayload);
+    expect(paths).toEqual([
+      "/api/decide?decision_activity_attribute=region&decision_max_depth=3&decision_include_trace_attributes=true&decision_attributes=amount%2Cstatus&miner=powl",
+      "/api/decision-tables?miner=powl&decision_activity_attribute=region&decision_max_depth=3&decision_include_trace_attributes=true&decision_attributes=amount%2Cstatus&decision_lookback=2",
+    ]);
+    vi.unstubAllGlobals();
+  });
+
+  it("serializes POWL evaluation and alignment requests", async () => {
+    expect(evaluationQuery({
+      evaluation_family: "generalization",
+      generalization_variant: "generalization_token",
+    })).toBe("evaluation_family=generalization&generalization_variant=generalization_token");
+    expect(alignmentQuery({
+      variant: "dijkstra_less_memory", max_states: 9,
+      activity_attribute: " label ",
+    })).toBe("alignment_variant=dijkstra_less_memory&max_states=9&alignment_activity_attribute=label");
+
+    const paths: string[] = [];
+    const evaluationPayload = {
+      miner: "powl",
+      generalization: {
+        variant: "generalization_token", computed: true, error: null,
+        score: 0.5, executed_transitions: 1, transition_count: 2,
+        transition_frequencies: [1, 0],
+      },
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      paths.push(path);
+      if (path.startsWith("/api/evaluate"))
+        return { ok: true, json: async () => evaluationPayload };
+      return { ok: true, json: async () => ({ computed: true }) };
+    }));
+    await expect(evaluateModel("powl", {
+      evaluation_family: "generalization",
+      generalization_variant: "generalization_token",
+    })).resolves.toEqual(evaluationPayload);
+    await expect(alignModel("powl", {
+      variant: "dijkstra_less_memory", max_states: 9,
+      activity_attribute: " label ",
+    })).resolves.toMatchObject({ computed: true });
+    expect(paths).toEqual([
+      "/api/evaluate?evaluation_family=generalization&generalization_variant=generalization_token&miner=powl",
+      "/api/align?miner=powl&alignment_variant=dijkstra_less_memory&max_states=9&alignment_activity_attribute=label",
     ]);
     vi.unstubAllGlobals();
   });

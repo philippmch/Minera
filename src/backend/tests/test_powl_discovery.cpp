@@ -396,6 +396,30 @@ int main() {
   assert(brute_partition_order.serialize() ==
          "PO=(nodes={T(\"A\"),T(\"B\"),T(\"C\")},order={})");
 
+  // A repeated one-activity projection is not a base case.  Filtering it
+  // first must preserve the singleton transition and its optional prefix.
+  EventLog repeated_projection;
+  append_trace(repeated_projection, {"B", "A"}, 5);
+  append_trace(repeated_projection, {"A", "A"}, 3);
+  auto repeated_projection_options = brute;
+  repeated_projection_options.filtering_threshold = 0.9;
+  const auto repeated_projection_result =
+      discover_powl(repeated_projection, repeated_projection_options);
+  assert(repeated_projection_result.kind() ==
+         PowlNodeKind::kStrictPartialOrder);
+  assert(repeated_projection_result.children().size() == 2);
+  assert(repeated_projection_result.has_edge(0, 1));
+  assert(repeated_projection_result.children()[0].kind() ==
+         PowlNodeKind::kXor);
+  assert(repeated_projection_result.children()[0].children().size() == 2);
+  assert(repeated_projection_result.children()[0].children()[0].kind() ==
+         PowlNodeKind::kSilent);
+  assert(repeated_projection_result.children()[0].children()[1].label() ==
+         "B");
+  assert(repeated_projection_result.children()[1].kind() ==
+         PowlNodeKind::kTransition);
+  assert(repeated_projection_result.children()[1].label() == "A");
+
   // Maximal groups activities with identical one-way EFG neighborhoods.
   PowlDiscoveryOptions maximal; maximal.variant = PowlDiscoveryVariant::kMaximal;
   const auto m = discover_powl(log({{"A", "B"}, {"A", "C"}}), maximal);

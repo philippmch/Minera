@@ -47,12 +47,12 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 25
-complete and 61 partial dispatcher rows, plus 113 complete and 274 partial
+adapter, integration, or missing are complete. The current manifest records 26
+complete and 60 partial dispatcher rows, plus 144 complete and 243 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
-DFG, and 26-module Inductive discovery stacks with distinct registered tests;
-335 coverage units still require exact proof.
+DFG, 26-module Inductive discovery, and 31-module POWL discovery stacks with
+distinct registered tests; 303 coverage units still require exact proof.
 A release may
 additionally run the strict gate:
 
@@ -132,7 +132,7 @@ are reconciled.
 | Discovery: declarative | Declare classic and log skeleton classic | **Partial (implemented core; proof pending)** |
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Partial overall; the DFG dispatcher and thirteen modules are complete** — all eight statistical DFG routes, eager and lazy table adapters, performance behavior, replacement helpers, and graph utilities have focused native contracts plus JSON/CLI/server/frontend integration; both causal variants, all three correlation-miner variants, eventually-follows, and minimum self-distance with witnesses remain implemented but proof-pending in their separately tracked packages |
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Partial (implemented core; proof pending)** — dataframe and lazyframe forms are adapters over the same native semantics |
-| Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Partial (implemented core; proof pending)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
+| Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Partial overall; POWL discovery complete** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data but remain proof-pending; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and the additional DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings, backed by exact selector and module contracts |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected plus log/dataframe projections; batches | **Partial (implemented core; proof pending)** — temporal profiles, all six named performance-spectrum projections, and all five batch classifications are available; batch activity/resource/timestamp/case-id selectors and columnar/lazyframe adapters share the native contract |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis (including the configurable generated index-column contract), OCDFG metrics (explicit total-object associations plus separate event-couple and total-object performance projections), annotated and unannotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics and custom scalar activity/object-type selectors, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; SAW weight distributions retain per-event transition multiplicity (including final routing) and merged-net arc ownership decorations; broader object-centric schema and visualization coverage remains |
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Partial (implemented core; proof pending)** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, normalized composite fitness/precision/generalization/simplicity weights with F-score, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
@@ -1324,9 +1324,13 @@ start- and end-side boundary reachability, split return components, single
 closed variants, strict transitive sequence grouping with skip repair,
 least-cost sequence projection, strict filtering boundaries, and dynamic
 zero-threshold filtering, and concurrency grouping with skippable-branch
-repair. The activity-concurrent fall-through performs a cut-only probe on its
-projected remainder: the probe runs the same cut validation and projection
-checks as discovery, then stops before recursively constructing child models.
+repair. Seeded black-box checks additionally matched 45 randomized logs for
+each pinned selector. A projected one-activity regression proves that filtering
+still runs for repeated or multi-variant logs instead of being bypassed by the
+singleton base case. The activity-concurrent fall-through performs a cut-only
+probe on its projected remainder: the probe runs the same cut validation and
+projection checks as discovery, then stops before recursively constructing
+child models.
 This preserves the boolean fall-through decision while avoiding duplicate
 recursive work; tree and dynamic variants exercise the path. Recursive POWL
 JSON, request
@@ -1334,6 +1338,15 @@ validation, CLI flags, local-server mining, frontend controls/rendering,
 converted-net conformance and decoration, and the PNML/BPMN/decision/playout
 selectors are exercised by native tests, frontend tests/build, and headless
 CLI/server smoke checks.
+
+The live discovery implementation is separated into explicit base-case, cut,
+fall-through, filtering, partial-order, variant, and selector-registry
+components. Each of the 31 owned non-dispatcher catalog modules has a distinct
+registered Release contract, and the four catalog selectors have separate
+tests tied to their exact bindings. The additional plain dynamic-clustering
+behavior remains a native extension rather than being added to the pinned
+selector inventory. The POWL dispatcher and all 31 owned module rows are
+therefore complete in the machine-readable ledger.
 
 The frontend conformance surface also exposes ordinary Petri-net playout for
 every discovered workflow-net selector, including POWL, with basic sampling,

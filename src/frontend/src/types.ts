@@ -2424,6 +2424,10 @@ export interface PetriTransition {
   inputs: number[];
   /** Place ids produced when the transition fires. */
   outputs: number[];
+  /** Optional reset arcs emitted by extended Petri-net serializers. */
+  reset_inputs?: number[];
+  /** Optional inhibitor arcs emitted by extended Petri-net serializers. */
+  inhibitor_inputs?: number[];
 }
 
 export interface PetriNetModel {
@@ -2432,6 +2436,45 @@ export interface PetriNetModel {
   source: number;
   sink: number;
   transitions: PetriTransition[];
+}
+
+/**
+ * Validates a serialized workflow net and all ids that refer to it.
+ *
+ * The export contains document-wide activity ids, so callers can provide the
+ * number of activities to reject a visible transition that points outside the
+ * activity table.  Extended serializers may omit reset/inhibitor arcs for
+ * older records; when present, those arrays are checked just like ordinary
+ * input/output arcs.
+ */
+function isPetriNetModel(value: unknown, activityCount?: number): value is PetriNetModel {
+  if (!isRecord(value) || Array.isArray(value) ||
+      !Number.isSafeInteger(value.place_count) || (value.place_count as number) <= 0 ||
+      !Number.isSafeInteger(value.source) || !Number.isSafeInteger(value.sink) ||
+      (value.source as number) < 0 || (value.sink as number) < 0 ||
+      (value.source as number) >= (value.place_count as number) ||
+      (value.sink as number) >= (value.place_count as number) ||
+      !Array.isArray(value.transitions)) return false;
+
+  const placeCount = value.place_count as number;
+  const validPlaces = (places: unknown): places is number[] =>
+    Array.isArray(places) && places.every((place) =>
+      Number.isSafeInteger(place) && (place as number) >= 0 &&
+      (place as number) < placeCount);
+  return value.transitions.every((rawTransition) => {
+    if (!isRecord(rawTransition) || Array.isArray(rawTransition) ||
+        !(rawTransition.activity === null ||
+          (Number.isSafeInteger(rawTransition.activity) &&
+           (rawTransition.activity as number) >= 0 &&
+           (activityCount === undefined ||
+            (rawTransition.activity as number) < activityCount))) ||
+        !validPlaces(rawTransition.inputs) ||
+        !validPlaces(rawTransition.outputs)) return false;
+    return (rawTransition.reset_inputs === undefined ||
+      validPlaces(rawTransition.reset_inputs)) &&
+      (rawTransition.inhibitor_inputs === undefined ||
+       validPlaces(rawTransition.inhibitor_inputs));
+  });
 }
 
 export interface PetriNetReductionResult {
@@ -2590,6 +2633,7 @@ export function isPowlNode(value: unknown, activityCount?: number, depth = 0): v
   if (!Array.isArray(children) || !Array.isArray(order) ||
       !children.every((child) => isPowlNode(child, activityCount, depth + 1))) return false;
   const adjacency: number[][] = children.map(() => []);
+  const seenEdges = new Set<string>();
   if (!order.every((edge) => {
     if (typeof edge !== "object" || edge === null) return false;
     const pair = edge as Record<string, unknown>;
@@ -2598,7 +2642,12 @@ export function isPowlNode(value: unknown, activityCount?: number, depth = 0): v
       pair.source >= 0 && pair.target >= 0 &&
       pair.source < children.length && pair.target < children.length &&
       pair.source !== pair.target;
-    if (valid) adjacency[pair.source as number].push(pair.target as number);
+    if (valid) {
+      const key = `${pair.source}:${pair.target}`;
+      if (seenEdges.has(key)) return false;
+      seenEdges.add(key);
+      adjacency[pair.source as number].push(pair.target as number);
+    }
     return valid;
   })) return false;
   // Native strict partial orders reject cyclic relations (including self
@@ -2715,6 +2764,38 @@ export interface PetriDecoration {
   transitions: number[];
   /** Per place id: token count and waiting time. */
   places: PetriPlaceDecoration[];
+}
+
+/** Validates replay decoration and its alignment with one serialized net. */
+function isPetriDecoration(
+  value: unknown,
+  net: PetriNetModel,
+): value is PetriDecoration {
+  if (!isRecord(value) || Array.isArray(value) ||
+      !Number.isSafeInteger(value.decorated_traces) ||
+      (value.decorated_traces as number) < 0 ||
+      !Number.isSafeInteger(value.trace_count) ||
+      (value.trace_count as number) < 0 ||
+      (value.decorated_traces as number) > (value.trace_count as number) ||
+      !Array.isArray(value.transitions) ||
+      value.transitions.length !== net.transitions.length ||
+      !Array.isArray(value.places) ||
+      value.places.length !== net.place_count ||
+      !value.transitions.every((count) =>
+        Number.isSafeInteger(count) && (count as number) >= 0)) return false;
+
+  const validDuration = (raw: unknown): raw is DurationStats => {
+    if (!isRecord(raw) || Array.isArray(raw) ||
+        !Number.isSafeInteger(raw.count) || (raw.count as number) < 0) {
+      return false;
+    }
+    return [raw.total, raw.mean, raw.median, raw.min, raw.max].every((item) =>
+      typeof item === "number" && Number.isFinite(item) && item >= 0);
+  };
+  return value.places.every((rawPlace) =>
+    isRecord(rawPlace) && !Array.isArray(rawPlace) &&
+    Number.isSafeInteger(rawPlace.count) && (rawPlace.count as number) >= 0 &&
+    validDuration(rawPlace.wait));
 }
 
 export interface HeuristicEdge {
@@ -6059,6 +6140,14 @@ function isMineraTrace(value: unknown): value is Trace {
 export function isMineraExport(value: unknown): value is MineraExport {
   if (typeof value !== "object" || value === null) return false;
   const data = value as MineraExport;
+  const activityCount = Array.isArray(data.activities)
+    ? data.activities.length
+    : undefined;
+  const validPetriProjection = (net: unknown, decoration: unknown): boolean => {
+    if (net === undefined && decoration === undefined) return true;
+    if (!isPetriNetModel(net, activityCount)) return false;
+    return decoration === undefined || isPetriDecoration(decoration, net);
+  };
   const overlap = data.overlap;
   const batches = data.batch_discovery;
   const validBatches = batches === undefined || (
@@ -6109,6 +6198,13 @@ export function isMineraExport(value: unknown): value is MineraExport {
       data.minimum_self_distance_variant === "polars") &&
     (data.process_tree === undefined || isProcessTreeNode(data.process_tree, data.activities.length)) &&
     (data.powl === undefined || isPowlNode(data.powl, data.activities.length)) &&
+    validPetriProjection(data.petri_net, data.petri_net_decoration) &&
+    validPetriProjection(data.inductive_petri_net,
+                         data.inductive_petri_net_decoration) &&
+    validPetriProjection(data.heuristic_petri_net,
+                         data.heuristic_petri_net_decoration) &&
+    validPetriProjection(data.powl_petri_net,
+                         data.powl_petri_net_decoration) &&
     (data.decision_tables === undefined || isDecisionTablesResult(data.decision_tables)) &&
     validBatches &&
     (overlap === undefined || (
