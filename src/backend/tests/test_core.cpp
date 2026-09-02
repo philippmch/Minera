@@ -745,7 +745,7 @@ void inductive_miner_dfg_matches_log_recursion_on_structured_logs() {
          "*(a, b)");
   // The flower fall-through is shared too.
   assert(mine_tree_imd({{"a", "b"}, {"b", "c"}, {"c", "a"}}) ==
-         "*(tau, a, b, c)");
+         "*(tau, X(a, b, c))");
 }
 
 void inductive_miner_dfg_skips_empty_traces_at_the_root() {
