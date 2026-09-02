@@ -429,6 +429,8 @@ export interface MinerOptions {
   inductiveDisableStrictSequenceCut?: boolean;
   /** Suppress specialized Inductive fall-throughs and use the generic fallback. */
   inductiveDisableFallthroughs?: boolean;
+  /** Evaluate large concurrent-activity fall-through searches in parallel. */
+  inductiveMultiprocessing?: boolean;
   /** Sort each case chronologically by the selected timestamp field. */
   inductiveSortEventsByTimestamp?: boolean;
   /** Event field used as the Inductive activity label. */
@@ -864,6 +866,8 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("inductive_disable_strict_sequence_cut", "true");
   if (options.inductiveDisableFallthroughs === true)
     add("inductive_disable_fallthroughs", "true");
+  if (options.inductiveMultiprocessing === true)
+    add("inductive_multiprocessing", "true");
   if (options.inductiveSortEventsByTimestamp === true)
     add("inductive_sort_events_by_timestamp", "true");
   const inductiveSelectors = [

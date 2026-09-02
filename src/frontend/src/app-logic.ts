@@ -63,6 +63,7 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       (options.inductiveVariant && options.inductiveVariant !== "log") ||
       options.inductiveDisableStrictSequenceCut === true ||
       options.inductiveDisableFallthroughs === true ||
+      options.inductiveMultiprocessing === true ||
       options.inductiveSortEventsByTimestamp === true ||
       Boolean(options.inductiveActivityKey?.trim() &&
         options.inductiveActivityKey.trim() !== "concept:name") ||

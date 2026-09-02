@@ -1623,8 +1623,102 @@
           "symbol": "IMd"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "IM": {
+          "selector": "IM",
+          "binding": {
+            "selector": "IM",
+            "modules": [
+              "algo.discovery.inductive.variants.instances"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "IM"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/inductive/semantics.hpp",
+              "symbol": "InductiveMinerLogVariant"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+              "executable": "minera_inductive_parity_contracts_tests",
+              "case": "im_selector_contract"
+            }
+          ]
+        },
+        "IMf": {
+          "selector": "IMf",
+          "binding": {
+            "selector": "IMf",
+            "modules": [
+              "algo.discovery.inductive.variants.instances"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "IMf"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/inductive/semantics.hpp",
+              "symbol": "InductiveMinerInfrequentVariant"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+              "executable": "minera_inductive_parity_contracts_tests",
+              "case": "imf_selector_contract"
+            }
+          ]
+        },
+        "IMd": {
+          "selector": "IMd",
+          "binding": {
+            "selector": "IMd",
+            "modules": [
+              "algo.discovery.inductive.variants.instances"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "IMd"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/inductive/semantics.hpp",
+              "symbol": "InductiveMinerDfgVariant"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+              "executable": "minera_inductive_parity_contracts_tests",
+              "case": "imd_selector_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/inductive_miner.hpp",
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp",
+        "src/backend/tests/test_inductive_miner.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/app-logic.ts",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/tests/api.test.ts",
+        "src/frontend/tests/app-logic.test.ts",
+        "src/frontend/tests/components/Filters.test.ts"
+      ]
     },
     {
       "package": "algo.discovery.log_skeleton",
@@ -6164,8 +6258,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.base_case.abc",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "BaseCase"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "base_case_abc_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.base_case.empty_log",
@@ -6173,8 +6288,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.base_case.empty_log",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "EmptyLogBaseCase"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "base_case_empty_log_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.base_case.factory",
@@ -6182,8 +6318,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.base_case.factory",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "BaseCaseFactory"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "base_case_factory_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.base_case.single_activity",
@@ -6191,8 +6348,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.base_case.single_activity",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "SingleActivityBaseCase"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "base_case_single_activity_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.cuts.abc",
@@ -6200,8 +6378,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.cuts.abc",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "Cut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "cuts_abc_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.cuts.concurrency",
@@ -6209,8 +6408,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.cuts.concurrency",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "ConcurrencyCut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "cuts_concurrency_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.cuts.factory",
@@ -6218,8 +6438,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.cuts.factory",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "CutFactory"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "cuts_factory_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.cuts.loop",
@@ -6227,8 +6468,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.cuts.loop",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "LoopCut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "cuts_loop_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.cuts.sequence",
@@ -6236,8 +6498,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.cuts.sequence",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "SequenceCut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "cuts_sequence_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.cuts.utils",
@@ -6245,8 +6528,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.cuts.utils",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "CutUtils"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "cuts_utils_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.cuts.xor",
@@ -6254,8 +6558,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.cuts.xor",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "ExclusiveChoiceCut"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "cuts_xor_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.dtypes.im_dfg",
@@ -6263,8 +6588,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.dtypes.im_dfg",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "InductiveDfg"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "dtypes_im_dfg_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.dtypes.im_ds",
@@ -6272,8 +6618,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.dtypes.im_ds",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "InductiveDataStructure"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "dtypes_im_ds_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.fall_through.abc",
@@ -6281,8 +6648,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.fall_through.abc",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "FallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "fall_through_abc_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.fall_through.activity_concurrent",
@@ -6290,8 +6678,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.fall_through.activity_concurrent",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "ActivityConcurrentFallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "fall_through_activity_concurrent_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.fall_through.activity_once_per_trace",
@@ -6299,8 +6708,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.fall_through.activity_once_per_trace",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "ActivityOncePerTraceFallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "fall_through_activity_once_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.fall_through.empty_traces",
@@ -6308,8 +6738,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.fall_through.empty_traces",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "EmptyTraceFallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "fall_through_empty_trace_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.fall_through.factory",
@@ -6317,8 +6768,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.fall_through.factory",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "FallThroughFactory"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "fall_through_factory_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.fall_through.flower",
@@ -6326,8 +6798,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.fall_through.flower",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "FlowerFallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "fall_through_flower_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.fall_through.strict_tau_loop",
@@ -6335,8 +6828,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.fall_through.strict_tau_loop",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "StrictTauLoopFallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "fall_through_strict_tau_loop_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.fall_through.tau_loop",
@@ -6344,8 +6858,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.fall_through.tau_loop",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "TauLoopFallThrough"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "fall_through_tau_loop_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.variants.abc",
@@ -6353,8 +6888,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.variants.abc",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "InductiveMinerFramework"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "variants_abc_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.variants.im",
@@ -6362,8 +6918,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.variants.im",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "InductiveMinerLogVariant"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "variants_im_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.variants.imd",
@@ -6371,8 +6948,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.variants.imd",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "InductiveMinerDfgVariant"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "variants_imd_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.variants.imf",
@@ -6380,8 +6978,29 @@
       "owner": "algo.discovery.inductive",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.variants.imf",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "InductiveMinerInfrequentVariant"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "variants_imf_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.variants.instances",
@@ -6402,8 +7021,29 @@
           "selector": "IMf"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/inductive/semantics.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tests/test_inductive_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.inductive.variants.instances",
+        "implementation": [
+          {
+            "path": "src/backend/inductive/semantics.hpp",
+            "symbol": "InductiveMinerInstances"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_inductive_parity_contracts.cpp",
+            "executable": "minera_inductive_parity_contracts_tests",
+            "case": "variants_instances_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.log_skeleton.trace_skel",

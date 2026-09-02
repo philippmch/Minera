@@ -1,9 +1,11 @@
 #include "minera/directly_follows_graph.hpp"
 #include "minera/event_data.hpp"
 #include "minera/inductive_miner.hpp"
+#include "../inductive/semantics.hpp"
 
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <initializer_list>
 #include <optional>
 #include <stdexcept>
@@ -62,6 +64,17 @@ bool has_operator(const ProcessTreeNode& node, ProcessTreeOperator op) {
   if (node.op == op) return true;
   return std::any_of(node.children.begin(), node.children.end(),
                      [&](const auto& child) { return has_operator(child, op); });
+}
+
+bool same_tree(const ProcessTreeNode& left, const ProcessTreeNode& right) {
+  if (left.op != right.op || left.activity != right.activity ||
+      left.children.size() != right.children.size()) {
+    return false;
+  }
+  for (std::size_t index = 0; index < left.children.size(); ++index) {
+    if (!same_tree(left.children[index], right.children[index])) return false;
+  }
+  return true;
 }
 
 EventAttribute field(std::string key, std::string value,
@@ -237,6 +250,40 @@ void specialized_fallthroughs_and_disabled_policy() {
          ProcessTreeOperator::kExclusive);
 }
 
+void large_candidate_multiprocessing_is_deterministic() {
+  using namespace minera::inductive_detail;
+
+  InductiveDfg dfg;
+  ActivityLabels labels;
+  for (std::size_t activity = 0; activity < 21; ++activity) {
+    dfg.to_global.push_back(activity);
+    dfg.to_local.emplace(activity, activity);
+    labels.push_back("a" + std::to_string(activity));
+  }
+
+  WeightedSublog log;
+  WeightedTrace first;
+  first.activities = {0, 0};
+  for (std::size_t activity = 1; activity < 21; ++activity) {
+    first.activities.push_back(activity);
+  }
+  log.push_back(std::move(first));
+  log.push_back(WeightedTrace{{0, 0}, 1});
+
+  InductiveMinerOptions serial_options;
+  const auto serial = ActivityConcurrentFallThrough::apply(
+      log, dfg, 0.0, serial_options, labels);
+  InductiveMinerOptions parallel_options = serial_options;
+  parallel_options.multiprocessing = true;
+  const auto parallel = ActivityConcurrentFallThrough::apply(
+      log, dfg, 0.0, parallel_options, labels);
+
+  assert(serial.has_value());
+  assert(parallel.has_value());
+  assert(same_tree(*serial, *parallel));
+  assert(serial->op == ProcessTreeOperator::kParallel);
+}
+
 void event_log_custom_selectors_and_ordering() {
   EventLog log;
   Trace trace;
@@ -295,7 +342,12 @@ void custom_case_grouping_handles_empty_traces() {
   assert(render(tree, tree.root()) == "a");
 
   log.traces.front().attributes.clear();
-  assert((throws([&] { (void)prepare_inductive_event_log(log, options); })));
+  const auto native = prepare_inductive_event_log(log, options);
+  assert(native.traces.size() == 2);
+  assert(native.traces.front().case_id == "native-empty");
+  assert(native.traces.front().events.empty());
+  assert(native.traces.back().case_id == "shared");
+  assert(native.traces.back().events.size() == 1);
 }
 
 EventTable standard_table(bool reverse_rows = true) {
@@ -483,6 +535,7 @@ int main() {
   loop_projection_retains_a_terminal_redo_skip();
   strict_sequence_toggle_is_observable();
   specialized_fallthroughs_and_disabled_policy();
+  large_candidate_multiprocessing_is_deterministic();
   event_log_custom_selectors_and_ordering();
   custom_case_grouping_handles_empty_traces();
   table_stream_lazy_and_custom_selectors();

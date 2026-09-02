@@ -1,60 +1,59 @@
 #include "minera/inductive_miner.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <exception>
 #include <limits>
 #include <numeric>
 #include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "minera/timestamp.hpp"
+#include "inductive/semantics.hpp"
 
 namespace minera {
-namespace {
+namespace inductive_detail {
 
-using ActId = std::size_t;
+using ActId = ActivityId;
+using Sublog = WeightedSublog;
+using LocalDfg = InductiveDfg;
 
-using ActivityLabels = std::vector<std::string>;
+bool WeightedTrace::empty() const noexcept { return activities.empty(); }
 
-// A trace (as activity ids) together with how many cases share it. Working on
-// these variants instead of raw cases keeps every step proportional to the
-// number of distinct behaviours rather than the number of cases.
-struct WeightedTrace {
-  std::vector<ActId> activities;
-  std::uint64_t count = 1;
-};
+bool InductiveDataStructure::empty() const noexcept {
+  return variants.empty();
+}
 
-using Sublog = std::vector<WeightedTrace>;
+std::size_t InductiveDfg::size() const noexcept { return to_global.size(); }
 
-// Dense, matrix-friendly view of a sublog. Activities are renumbered to
-// 0..size()-1 for cut detection and mapped back to global ids via to_global.
-// The `follows`/`succ`/`is_start`/`is_end` relations are what the cut detectors
-// read. They start out unfiltered; when no cut is found, the infrequent variant
-// recomputes them with the noise filter (from the retained raw counts) and the
-// cut detectors run once more.
-struct LocalDfg {
-  std::vector<ActId> to_global;
-  std::unordered_map<ActId, std::size_t> to_local;
-  std::vector<std::vector<char>> follows;     // follows[a][b]: a -> b kept
-  std::vector<std::vector<std::size_t>> succ;  // adjacency list of follows
-  std::vector<char> is_start;
-  std::vector<char> is_end;
+bool InductiveDfg::has_edge(ActivityId source, ActivityId target) const {
+  const auto source_local = to_local.find(source);
+  const auto target_local = to_local.find(target);
+  return source_local != to_local.end() && target_local != to_local.end() &&
+         source_local->second < follows.size() &&
+         target_local->second < follows[source_local->second].size() &&
+         follows[source_local->second][target_local->second] != 0;
+}
 
-  // Raw, unfiltered weighted counts (a -> b directly-follows, and how often each
-  // activity starts/ends a trace), summed over the weighted sublog.
-  std::vector<std::vector<std::uint64_t>> edge_count;
-  std::vector<std::uint64_t> start_count;
-  std::vector<std::uint64_t> end_count;
-  bool skip = false;
+bool BaseCaseResult::has_empty() const noexcept { return empty_weight > 0; }
 
-  [[nodiscard]] std::size_t size() const { return to_global.size(); }
-};
+bool BaseCaseResult::all_empty() const noexcept {
+  return nonempty_weight == 0;
+}
+
+bool EmptyTraceSplitResult::has_empty() const noexcept {
+  return empty_weight > 0;
+}
+
+bool FallThrough::handled() const noexcept { return node.has_value(); }
 
 // Recomputes the boolean relations the cut detectors use from the raw counts,
 // dropping behaviour that falls below the noise threshold:
@@ -325,7 +324,8 @@ std::optional<std::vector<std::vector<ActId>>> exclusive_cut(
 std::optional<std::vector<std::vector<ActId>>> sequence_cut(
     const LocalDfg& dfg) {
   const std::size_t n = dfg.size();
-  const std::vector<std::vector<char>> reachable = reachability(dfg);
+  const std::vector<std::vector<char>> reachable =
+      CutUtils::reachability(dfg);
 
   UnionFind uf(n);
   for (std::size_t a = 0; a < n; ++a) {
@@ -709,6 +709,85 @@ std::optional<std::vector<std::vector<ActId>>> loop_cut(const LocalDfg& dfg) {
   return to_global(dfg, result);
 }
 
+bool Cut::valid() const noexcept {
+  return groups.size() >= 2 &&
+         std::all_of(groups.begin(), groups.end(),
+                     [](const auto& group) { return !group.empty(); });
+}
+
+ProcessTreeOperator Cut::operation() const noexcept {
+  switch (kind) {
+    case CutKind::kExclusive:
+      return ProcessTreeOperator::kExclusive;
+    case CutKind::kSequence:
+      return ProcessTreeOperator::kSequence;
+    case CutKind::kParallel:
+      return ProcessTreeOperator::kParallel;
+    case CutKind::kLoop:
+      return ProcessTreeOperator::kLoop;
+  }
+  return ProcessTreeOperator::kExclusive;
+}
+
+std::vector<std::vector<char>> CutUtils::reachability(const LocalDfg& dfg) {
+  return ::minera::inductive_detail::reachability(dfg);
+}
+
+namespace {
+
+template <typename Groups>
+std::optional<Cut> make_cut(CutKind kind, Groups groups) {
+  Cut cut;
+  cut.kind = kind;
+  cut.groups = std::move(groups);
+  if (!cut.valid()) return std::nullopt;
+  return cut;
+}
+
+}  // namespace
+
+std::optional<Cut> ExclusiveChoiceCut::detect(const LocalDfg& dfg) {
+  auto groups = exclusive_cut(dfg);
+  if (!groups) return std::nullopt;
+  return make_cut(CutKind::kExclusive, std::move(*groups));
+}
+
+std::optional<Cut> SequenceCut::detect(const LocalDfg& dfg) {
+  auto groups = sequence_cut(dfg);
+  if (!groups) return std::nullopt;
+  return make_cut(CutKind::kSequence, std::move(*groups));
+}
+
+std::optional<Cut> SequenceCut::detect_strict(const LocalDfg& dfg) {
+  auto groups = strict_sequence_cut(dfg);
+  if (!groups) return std::nullopt;
+  return make_cut(CutKind::kSequence, std::move(*groups));
+}
+
+std::optional<Cut> ConcurrencyCut::detect(const LocalDfg& dfg) {
+  auto groups = parallel_cut(dfg);
+  if (!groups) return std::nullopt;
+  return make_cut(CutKind::kParallel, std::move(*groups));
+}
+
+std::optional<Cut> LoopCut::detect(const LocalDfg& dfg) {
+  auto groups = loop_cut(dfg);
+  if (!groups) return std::nullopt;
+  return make_cut(CutKind::kLoop, std::move(*groups));
+}
+
+std::optional<Cut> CutFactory::find(const LocalDfg& dfg,
+                                    const InductiveMinerOptions& options) {
+  if (auto cut = ExclusiveChoiceCut::detect(dfg)) return cut;
+  if (options.disable_strict_sequence_cut) {
+    if (auto cut = SequenceCut::detect(dfg)) return cut;
+  } else if (auto cut = SequenceCut::detect_strict(dfg)) {
+    return cut;
+  }
+  if (auto cut = ConcurrencyCut::detect(dfg)) return cut;
+  return LoopCut::detect(dfg);
+}
+
 // --- Log splitting ---------------------------------------------------------
 
 std::string trace_key(const std::vector<ActId>& activities) {
@@ -963,6 +1042,54 @@ ProcessTreeNode make_node(ProcessTreeOperator op,
   return node;
 }
 
+bool EmptyLogBaseCase::detects(const Sublog& log) {
+  return std::all_of(log.begin(), log.end(),
+                     [](const WeightedTrace& trace) { return trace.empty(); });
+}
+
+BaseCaseResult BaseCase::inspect(const Sublog& log) {
+  BaseCaseResult result;
+  for (const auto& trace : log) {
+    (trace.empty() ? result.empty_weight : result.nonempty_weight) +=
+        trace.count;
+  }
+  return result;
+}
+
+ProcessTreeNode BaseCaseFactory::empty() { return ProcessTreeNode::tau(); }
+
+ProcessTreeNode BaseCaseFactory::single(ActivityId activity, bool repeated) {
+  if (!repeated) return ProcessTreeNode::leaf(activity);
+  ProcessTreeNode node;
+  node.op = ProcessTreeOperator::kLoop;
+  node.children = {ProcessTreeNode::leaf(activity), ProcessTreeNode::tau()};
+  return node;
+}
+
+EmptyTraceSplitResult EmptyTraceFallThrough::split(const Sublog& log) {
+  const BaseCaseResult counts = BaseCase::inspect(log);
+  EmptyTraceSplitResult result;
+  result.empty_weight = counts.empty_weight;
+  result.nonempty_weight = counts.nonempty_weight;
+  if (counts.all_empty()) return result;
+  result.nonempty.reserve(log.size());
+  for (const auto& trace : log) {
+    if (!trace.empty()) result.nonempty.push_back(trace);
+  }
+  return result;
+}
+
+std::optional<ProcessTreeNode> SingleActivityBaseCase::resolve(
+    const Sublog& log, const LocalDfg& dfg) {
+  if (dfg.size() != 1) return std::nullopt;
+  const ActivityId activity = dfg.to_global.front();
+  const bool repeated = std::any_of(
+      log.begin(), log.end(), [](const WeightedTrace& trace) {
+        return trace.activities.size() > 1;
+      });
+  return BaseCaseFactory::single(activity, repeated);
+}
+
 ProcessTreeNode mine(const Sublog& log, double f,
                      const InductiveMinerOptions& options,
                      const ActivityLabels& labels);
@@ -1000,10 +1127,16 @@ ProcessTreeNode build_from_cut(ProcessTreeOperator op,
   return make_node(op, std::move(children));
 }
 
+ProcessTreeNode build_from_cut(const Cut& cut, const Sublog& log, double f,
+                               const InductiveMinerOptions& options,
+                               const ActivityLabels& labels) {
+  return build_from_cut(cut.operation(), cut.groups, log, f, options, labels);
+}
+
 // Flower model: a loop with a silent body and every activity as a redo path.
 // The most permissive fall-through, used when no cut applies.
-ProcessTreeNode flower(const std::vector<ActId>& activities,
-                       const ActivityLabels& labels) {
+ProcessTreeNode FlowerFallThrough::build(
+    const std::vector<ActId>& activities, const ActivityLabels& labels) {
   std::vector<ActId> ordered = activities;
   std::sort(ordered.begin(), ordered.end(), [&](ActId left, ActId right) {
     if (left < labels.size() && right < labels.size() &&
@@ -1029,14 +1162,7 @@ ProcessTreeNode flower(const std::vector<ActId>& activities,
 
 bool has_normal_cut(const LocalDfg& dfg,
                     const InductiveMinerOptions& options) {
-  if (dfg.size() < 2) return false;
-  if (exclusive_cut(dfg)) return true;
-  if (options.disable_strict_sequence_cut ? sequence_cut(dfg)
-                                          : strict_sequence_cut(dfg)) {
-    return true;
-  }
-  if (parallel_cut(dfg)) return true;
-  return loop_cut(dfg).has_value();
+  return CutFactory::find(dfg, options).has_value();
 }
 
 std::vector<ActId> ordered_activities(const std::vector<ActId>& activities,
@@ -1073,16 +1199,11 @@ std::pair<Sublog, Sublog> split_activity(const Sublog& log, ActId candidate) {
           compress(std::move(residual_log))};
 }
 
-std::optional<ProcessTreeNode> specialized_fallthrough(
+std::optional<ProcessTreeNode> ActivityOncePerTraceFallThrough::apply(
     const Sublog& log, const LocalDfg& dfg, double f,
     const InductiveMinerOptions& options, const ActivityLabels& labels) {
   if (options.disable_fallthroughs) return std::nullopt;
-
   const auto candidates = ordered_activities(dfg.to_global, labels);
-
-  // First isolate an activity that occurs exactly once in every trace.  The
-  // candidate ordering is by its visible label, making the split independent
-  // of hash-table iteration and stable for equivalent logs.
   for (const ActId candidate : candidates) {
     bool once_per_trace = true;
     for (const auto& wt : log) {
@@ -1099,11 +1220,59 @@ std::optional<ProcessTreeNode> specialized_fallthrough(
         {mine(candidate_log, f, options, labels),
          mine(residual_log, f, options, labels)});
   }
+  return std::nullopt;
+}
 
-  // If removing a candidate reveals an ordinary cut, the candidate is a
-  // concurrent branch.  The candidate need not occur in every trace; missing
-  // occurrences become empty traces in its projected child and are handled by
-  // the ordinary empty-trace rule during recursion.
+std::optional<ProcessTreeNode> ActivityConcurrentFallThrough::apply(
+    const Sublog& log, const LocalDfg& dfg, double f,
+    const InductiveMinerOptions& options, const ActivityLabels& labels) {
+  if (options.disable_fallthroughs) return std::nullopt;
+  const auto candidates = ordered_activities(dfg.to_global, labels);
+
+  // Viability checks are independent: projecting a candidate and looking for
+  // an ordinary cut only reads the current recursion inputs.  Keep the
+  // established serial path for small inputs and make the opt-in path bounded
+  // to two workers.  Results are stored by candidate index, so selecting the
+  // first viable entry remains deterministic regardless of completion order.
+  if (options.multiprocessing && candidates.size() > 20) {
+    std::vector<char> viable(candidates.size(), 0);
+    std::atomic<std::size_t> next{0};
+    const std::size_t worker_count =
+        std::min<std::size_t>(2, candidates.size());
+    std::vector<std::exception_ptr> errors(worker_count);
+    std::vector<std::jthread> workers;
+    workers.reserve(worker_count);
+    for (std::size_t worker = 0; worker < worker_count; ++worker) {
+      workers.emplace_back([&, worker] {
+        try {
+          for (;;) {
+            const std::size_t index =
+                next.fetch_add(1, std::memory_order_relaxed);
+            if (index >= candidates.size()) return;
+            auto split = split_activity(log, candidates[index]);
+            viable[index] =
+                has_normal_cut(build_local_dfg(split.second), options);
+          }
+        } catch (...) {
+          errors[worker] = std::current_exception();
+        }
+      });
+    }
+    for (auto& worker : workers) worker.join();
+    for (const auto& error : errors) {
+      if (error) std::rethrow_exception(error);
+    }
+    for (std::size_t index = 0; index < candidates.size(); ++index) {
+      if (!viable[index]) continue;
+      auto split = split_activity(log, candidates[index]);
+      return make_node(
+          ProcessTreeOperator::kParallel,
+          {mine(split.first, f, options, labels),
+           mine(split.second, f, options, labels)});
+    }
+    return std::nullopt;
+  }
+
   for (const ActId candidate : candidates) {
     auto [candidate_log, residual_log] = split_activity(log, candidate);
     if (!has_normal_cut(build_local_dfg(residual_log), options)) continue;
@@ -1112,59 +1281,83 @@ std::optional<ProcessTreeNode> specialized_fallthrough(
         {mine(candidate_log, f, options, labels),
          mine(residual_log, f, options, labels)});
   }
+  return std::nullopt;
+}
 
-  const auto project_silent_loop = [&](bool strict) {
-    Sublog projected;
-    projected.reserve(log.size());
-    const auto is_start = [&](ActId activity) {
-      const auto local = dfg.to_local.find(activity);
-      return local != dfg.to_local.end() && dfg.is_start[local->second];
-    };
-    const auto is_end = [&](ActId activity) {
-      const auto local = dfg.to_local.find(activity);
-      return local != dfg.to_local.end() && dfg.is_end[local->second];
-    };
-    std::uint64_t projected_weight = 0;
-    std::uint64_t original_weight = 0;
-    for (const auto& wt : log) {
-      original_weight += wt.count;
-      std::size_t begin = 0;
-      for (std::size_t i = 1; i < wt.activities.size(); ++i) {
-        const bool split = is_start(wt.activities[i]) &&
-                           (!strict || is_end(wt.activities[i - 1]));
-        if (!split) continue;
-        std::vector<ActId> fragment(wt.activities.begin() +
-                                        static_cast<std::ptrdiff_t>(begin),
-                                    wt.activities.begin() +
-                                        static_cast<std::ptrdiff_t>(i));
-        projected.push_back(
-            WeightedTrace{std::move(fragment), wt.count});
-        projected_weight += wt.count;
-        begin = i;
-      }
+Sublog project_silent_loop(const Sublog& log, const LocalDfg& dfg,
+                           bool strict) {
+  Sublog projected;
+  projected.reserve(log.size());
+  const auto is_start = [&](ActId activity) {
+    const auto local = dfg.to_local.find(activity);
+    return local != dfg.to_local.end() && dfg.is_start[local->second];
+  };
+  const auto is_end = [&](ActId activity) {
+    const auto local = dfg.to_local.find(activity);
+    return local != dfg.to_local.end() && dfg.is_end[local->second];
+  };
+  std::uint64_t projected_weight = 0;
+  std::uint64_t original_weight = 0;
+  for (const auto& wt : log) {
+    original_weight += wt.count;
+    std::size_t begin = 0;
+    for (std::size_t i = 1; i < wt.activities.size(); ++i) {
+      const bool split = is_start(wt.activities[i]) &&
+                         (!strict || is_end(wt.activities[i - 1]));
+      if (!split) continue;
       std::vector<ActId> fragment(
           wt.activities.begin() + static_cast<std::ptrdiff_t>(begin),
-          wt.activities.end());
+          wt.activities.begin() + static_cast<std::ptrdiff_t>(i));
       projected.push_back(WeightedTrace{std::move(fragment), wt.count});
       projected_weight += wt.count;
+      begin = i;
     }
-    if (projected_weight <= original_weight) return Sublog{};
-    return compress(std::move(projected));
-  };
+    std::vector<ActId> fragment(
+        wt.activities.begin() + static_cast<std::ptrdiff_t>(begin),
+        wt.activities.end());
+    projected.push_back(WeightedTrace{std::move(fragment), wt.count});
+    projected_weight += wt.count;
+  }
+  if (projected_weight <= original_weight) return Sublog{};
+  return compress(std::move(projected));
+}
 
-  if (auto projected = project_silent_loop(true); !projected.empty()) {
-    return make_node(
+Sublog StrictTauLoopFallThrough::project(const Sublog& log,
+                                         const LocalDfg& dfg) {
+  return project_silent_loop(log, dfg, true);
+}
+
+Sublog TauLoopFallThrough::project(const Sublog& log, const LocalDfg& dfg) {
+  return project_silent_loop(log, dfg, false);
+}
+
+FallThrough FallThroughFactory::apply(
+    const Sublog& log, const LocalDfg& dfg, double f,
+    const InductiveMinerOptions& options, const ActivityLabels& labels) {
+  if (options.disable_fallthroughs) return {};
+  if (auto node = ActivityOncePerTraceFallThrough::apply(
+          log, dfg, f, options, labels)) {
+    return FallThrough{std::move(node)};
+  }
+  if (auto node = ActivityConcurrentFallThrough::apply(
+          log, dfg, f, options, labels)) {
+    return FallThrough{std::move(node)};
+  }
+  if (auto projected = StrictTauLoopFallThrough::project(log, dfg);
+      !projected.empty()) {
+    return FallThrough{make_node(
         ProcessTreeOperator::kLoop,
         {mine(std::move(projected), f, options, labels),
-         mine(Sublog{}, f, options, labels)});
+         mine(Sublog{}, f, options, labels)})};
   }
-  if (auto projected = project_silent_loop(false); !projected.empty()) {
-    return make_node(
+  if (auto projected = TauLoopFallThrough::project(log, dfg);
+      !projected.empty()) {
+    return FallThrough{make_node(
         ProcessTreeOperator::kLoop,
         {mine(std::move(projected), f, options, labels),
-         mine(Sublog{}, f, options, labels)});
+         mine(Sublog{}, f, options, labels)})};
   }
-  return std::nullopt;
+  return {};
 }
 
 // Standard Inductive Miner recursion: empty traces are separated first, then
@@ -1174,36 +1367,32 @@ std::optional<ProcessTreeNode> specialized_fallthrough(
 ProcessTreeNode mine(const Sublog& log, double f,
                      const InductiveMinerOptions& options,
                      const ActivityLabels& labels) {
-  std::uint64_t empty_weight = 0;
-  std::uint64_t nonempty_weight = 0;
-  for (const auto& wt : log) {
-    (wt.activities.empty() ? empty_weight : nonempty_weight) += wt.count;
+  const EmptyTraceSplitResult empty_split =
+      EmptyTraceFallThrough::split(log);
+  if (EmptyLogBaseCase::detects(log)) {
+    return BaseCaseFactory::empty();
   }
-  const bool has_empty = empty_weight > 0;
+  const bool has_empty = empty_split.has_empty();
 
   // Base case: an empty log (or only empty traces) is a silent step.
-  if (nonempty_weight == 0) {
-    return ProcessTreeNode::tau();
+  if (empty_split.nonempty_weight == 0) {
+    return BaseCaseFactory::empty();
   }
 
   if (has_empty) {
-    const auto total_weight = empty_weight + nonempty_weight;
-    Sublog nonempty;
-    nonempty.reserve(log.size());
-    for (const auto& wt : log) {
-      if (!wt.activities.empty()) nonempty.push_back(wt);
-    }
+    const auto total_weight =
+        empty_split.empty_weight + empty_split.nonempty_weight;
     // Empty traces are retained when their share is strictly larger than the
     // configured noise threshold. The comparison uses all traces, not only
     // the non-empty denominator; at threshold zero every observed empty trace
     // is therefore part of the discovered language.
-    if (static_cast<double>(empty_weight) >
+    if (static_cast<double>(empty_split.empty_weight) >
         f * static_cast<double>(total_weight)) {
       return make_node(ProcessTreeOperator::kExclusive,
                        {ProcessTreeNode::tau(),
-                        mine(nonempty, f, options, labels)});
+                        mine(empty_split.nonempty, f, options, labels)});
     }
-    return mine(nonempty, f, options, labels);
+    return mine(empty_split.nonempty, f, options, labels);
   }
 
   LocalDfg dfg = build_local_dfg(log);
@@ -1213,39 +1402,18 @@ ProcessTreeNode mine(const Sublog& log, double f,
   // it always occurs once and a self-loop when it genuinely repeats. Filtering
   // applies to graph relations, not to multiplicity inside a projected trace.
   if (dfg.size() == 1 && !has_empty) {
-    const ActId act = dfg.to_global.front();
-    std::uint64_t multi_weight = 0;
-    for (const auto& wt : log) {
-      if (wt.activities.size() > 1) {
-        multi_weight += wt.count;
+    if (auto result = SingleActivityBaseCase::resolve(log, dfg)) {
+      if (options.disable_fallthroughs &&
+          result->op == ProcessTreeOperator::kLoop) {
+        return FlowerFallThrough::build(dfg.to_global, labels);
       }
+      return std::move(*result);
     }
-    if (multi_weight == 0) return ProcessTreeNode::leaf(act);
-    ProcessTreeNode node;
-    node.op = ProcessTreeOperator::kLoop;
-    node.children = {ProcessTreeNode::leaf(act), ProcessTreeNode::tau()};
-    return node;
   }
 
   const auto try_cuts = [&](const LocalDfg& d) -> std::optional<ProcessTreeNode> {
-    if (auto cut = exclusive_cut(d)) {
-      return build_from_cut(ProcessTreeOperator::kExclusive, *cut, log, f,
-                            options, labels);
-    }
-    const auto sequence = options.disable_strict_sequence_cut
-                              ? sequence_cut(d)
-                              : strict_sequence_cut(d);
-    if (sequence) {
-      return build_from_cut(ProcessTreeOperator::kSequence, *sequence, log, f,
-                            options, labels);
-    }
-    if (auto cut = parallel_cut(d)) {
-      return build_from_cut(ProcessTreeOperator::kParallel, *cut, log, f,
-                            options, labels);
-    }
-    if (auto cut = loop_cut(d)) {
-      return build_from_cut(ProcessTreeOperator::kLoop, *cut, log, f, options,
-                            labels);
+    if (auto cut = CutFactory::find(d, options)) {
+      return build_from_cut(*cut, log, f, options, labels);
     }
     return std::nullopt;
   };
@@ -1270,14 +1438,15 @@ ProcessTreeNode mine(const Sublog& log, double f,
   // Specialized fall-throughs inspect the original unfiltered log.  Filtering
   // is a graph-only retry in the infrequent variant; it must not change the
   // activity projections used by these deterministic repairs.
-  if (auto node = specialized_fallthrough(log, original_dfg, f, options,
-                                           labels)) {
-    return std::move(*node);
+  if (auto result = FallThroughFactory::apply(log, original_dfg, f, options,
+                                               labels);
+      result.handled()) {
+    return std::move(*result.node);
   }
 
   // The flower fallback is retained even when specialized fall-throughs are
   // disabled so every non-empty log still produces a process tree.
-  return flower(original_dfg.to_global, labels);
+  return FlowerFallThrough::build(original_dfg.to_global, labels);
 }
 
 // --- IMd: recursion over the directly-follows graph -------------------------
@@ -1522,10 +1691,10 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
   // A self-edge reaches the graph flower fall-through, whose silent body keeps
   // the graph abstraction's unknown empty-trace behavior explicit.
   if (dfg.size() == 1) {
-    if (!dfg.follows[0][0]) {
+    if (!dfg.has_edge(dfg.to_global.front(), dfg.to_global.front())) {
       return ProcessTreeNode::leaf(dfg.to_global.front());
     }
-    return flower(dfg.to_global, labels);
+    return FlowerFallThrough::build(dfg.to_global, labels);
   }
 
   const auto build = [&](ProcessTreeOperator op,
@@ -1554,20 +1723,8 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
   };
 
   const auto try_cuts = [&](const LocalDfg& d) -> std::optional<ProcessTreeNode> {
-    if (auto cut = exclusive_cut(d)) {
-      return build(ProcessTreeOperator::kExclusive, *cut);
-    }
-    const auto sequence = options.disable_strict_sequence_cut
-                              ? sequence_cut(d)
-                              : strict_sequence_cut(d);
-    if (sequence) {
-      return build(ProcessTreeOperator::kSequence, *sequence);
-    }
-    if (auto cut = parallel_cut(d)) {
-      return build(ProcessTreeOperator::kParallel, *cut);
-    }
-    if (auto cut = loop_cut(d)) {
-      return build(ProcessTreeOperator::kLoop, *cut);
+    if (auto cut = CutFactory::find(d, options)) {
+      return build(cut->operation(), cut->groups);
     }
     return std::nullopt;
   };
@@ -1585,7 +1742,7 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
     }
   }
 
-  return flower(dfg.to_global, labels);
+  return FlowerFallThrough::build(dfg.to_global, labels);
 }
 
 // IMd entry: one pass over the (variant-compressed) log builds the root graph,
@@ -1617,13 +1774,8 @@ void validate_options(const InductiveMinerOptions& options) {
     throw std::invalid_argument(
         "inductive miner: noise_threshold must be finite and in [0, 1]");
   }
-  switch (options.variant) {
-    case InductiveMinerVariant::kLog:
-    case InductiveMinerVariant::kImf:
-    case InductiveMinerVariant::kDfg:
-      break;
-    default:
-      throw std::invalid_argument("inductive miner: unsupported variant");
+  if (!InductiveMinerInstances::supports(options.variant)) {
+    throw std::invalid_argument("inductive miner: unsupported variant");
   }
   if (options.activity_key.empty() || options.timestamp_key.empty() ||
       options.case_id_key.empty()) {
@@ -1744,30 +1896,69 @@ void canonicalize_tree(ProcessTreeNode& node, const ActivityLabels& labels) {
 
 EventLog select_event_log_fields(const EventLog& input,
                                  const InductiveMinerOptions& options) {
-  const bool regroup = options.case_id_key != "case:concept:name";
+  const bool requested_regroup = options.case_id_key != "case:concept:name";
+  const bool requested_timestamp = options.timestamp_key != "time:timestamp";
   const bool sort = options.sort_events_by_timestamp;
   EventLog output;
   output.attributes = input.attributes;
   output.metadata = input.metadata;
   std::unordered_map<std::string, std::size_t> trace_indexes;
+  std::vector<char> sortable_traces;
 
   for (std::size_t trace_index = 0; trace_index < input.traces.size();
        ++trace_index) {
     const auto& source_trace = input.traces[trace_index];
+
+    // An EventLog is already case-grouped.  A custom case selector is an
+    // optional projection: use it when the source trace supplies the value,
+    // but keep the native grouping when the field is absent.
+    bool regroup_trace = requested_regroup;
+    if (regroup_trace) {
+      const Event empty_event;
+      if (source_trace.events.empty()) {
+        const auto value = event_value(empty_event, source_trace,
+                                       options.case_id_key, false);
+        regroup_trace = value.has_value() && !value->empty();
+      } else {
+        regroup_trace = std::all_of(
+            source_trace.events.begin(), source_trace.events.end(),
+            [&](const Event& event) {
+              const auto value = event_value(event, source_trace,
+                                             options.case_id_key, false);
+              return value.has_value() && !value->empty();
+            });
+      }
+    }
+
+    // Timestamp projection and sorting are likewise opportunistic for an
+    // EventLog.  Missing timestamps do not invalidate a trace that is already
+    // ordered by its caller; a supplied complete selector still provides the
+    // requested deterministic ordering.
+    bool timestamp_available = true;
+    if (requested_timestamp) {
+      timestamp_available = std::all_of(
+          source_trace.events.begin(), source_trace.events.end(),
+          [&](const Event& event) {
+            const auto value = event_value(event, source_trace,
+                                           options.timestamp_key, false);
+            return value.has_value() && !value->empty();
+          });
+    } else if (sort) {
+      timestamp_available = std::all_of(
+          source_trace.events.begin(), source_trace.events.end(),
+          [](const Event& event) { return !event.timestamp.empty(); });
+    }
+    const bool project_timestamp = requested_timestamp && timestamp_available;
+
     if (source_trace.events.empty()) {
-      if (!regroup) {
+      if (!regroup_trace) {
         output.traces.push_back(source_trace);
+        sortable_traces.push_back(1);
         continue;
       }
       const Event empty_event;
       const auto selected_case =
           event_value(empty_event, source_trace, options.case_id_key, false);
-      if (!selected_case || selected_case->empty()) {
-        throw std::invalid_argument(
-            "inductive miner: case id field '" + options.case_id_key +
-            "' is missing in empty EventLog trace " +
-            std::to_string(trace_index));
-      }
       const bool inserted =
           trace_indexes.emplace(*selected_case, output.traces.size()).second;
       if (inserted) {
@@ -1777,6 +1968,7 @@ EventLog select_event_log_fields(const EventLog& input,
         trace.case_id_state = FirstClassAttributeState::kPresent;
         trace.case_id_source_key = options.case_id_key;
         output.traces.push_back(std::move(trace));
+        sortable_traces.push_back(1);
       }
       continue;
     }
@@ -1799,31 +1991,17 @@ EventLog select_event_log_fields(const EventLog& input,
       event.activity_state = FirstClassAttributeState::kPresent;
       event.activity_source_key = options.activity_key;
 
-      if (options.timestamp_key != "time:timestamp") {
+      if (project_timestamp) {
         const auto timestamp =
             event_value(source_event, source_trace, options.timestamp_key, false);
-        if (!timestamp || timestamp->empty()) {
-          throw std::invalid_argument(
-              "inductive miner: timestamp field '" + options.timestamp_key +
-              "' is missing in EventLog trace " +
-              std::to_string(trace_index) + " event " +
-              std::to_string(event_index));
-        }
         event.timestamp = *timestamp;
         event.timestamp_state = FirstClassAttributeState::kPresent;
         event.timestamp_source_key = options.timestamp_key;
       }
 
-      if (regroup) {
+      if (regroup_trace) {
         native_case =
             event_value(source_event, source_trace, options.case_id_key, false);
-        if (!native_case || native_case->empty()) {
-          throw std::invalid_argument(
-              "inductive miner: case id field '" + options.case_id_key +
-              "' is missing in EventLog trace " +
-              std::to_string(trace_index) + " event " +
-              std::to_string(event_index));
-        }
         const auto [it, inserted] =
             trace_indexes.emplace(*native_case, output.traces.size());
         if (inserted) {
@@ -1833,12 +2011,14 @@ EventLog select_event_log_fields(const EventLog& input,
           trace.case_id_state = FirstClassAttributeState::kPresent;
           trace.case_id_source_key = options.case_id_key;
           output.traces.push_back(std::move(trace));
+          sortable_traces.push_back(1);
         }
         output_trace_index = it->second;
       } else if (output_trace_index == std::numeric_limits<std::size_t>::max()) {
         output_trace_index = output.traces.size();
         output.traces.push_back(source_trace);
         output.traces.back().events.clear();
+        sortable_traces.push_back(1);
       }
 
       auto& target_trace = output.traces[output_trace_index];
@@ -1846,34 +2026,31 @@ EventLog select_event_log_fields(const EventLog& input,
       event.case_id_state = target_trace.case_id_state;
       event.case_id_source_key = target_trace.case_id_source_key;
       target_trace.events.push_back(std::move(event));
-    }
-    if (sort && !regroup && !output.traces.empty()) {
-      auto& trace = output.traces[output_trace_index];
-      for (std::size_t event_index = 0; event_index < trace.events.size();
-           ++event_index) {
-        const auto& timestamp = trace.events[event_index].timestamp;
-        if (timestamp.empty() || !parse_timestamp(timestamp)) {
-          throw std::invalid_argument(
-              "inductive miner: timestamp field '" + options.timestamp_key +
-              "' is missing or invalid in EventLog trace " +
-              std::to_string(trace_index) + " event " +
-              std::to_string(event_index));
-        }
+      if (sort && !timestamp_available) {
+        sortable_traces[output_trace_index] = 0;
       }
-      order_events_by_time(trace.events);
     }
   }
-  if (sort && regroup) {
+  if (sort) {
     for (std::size_t trace_index = 0; trace_index < output.traces.size();
          ++trace_index) {
+      if (!sortable_traces[trace_index] || output.traces[trace_index].events.empty())
+        continue;
       auto& trace = output.traces[trace_index];
+      bool valid_timestamps = true;
+      for (const auto& event : trace.events) {
+        if (event.timestamp.empty()) {
+          valid_timestamps = false;
+          break;
+        }
+      }
+      if (!valid_timestamps) continue;
       for (std::size_t event_index = 0; event_index < trace.events.size();
            ++event_index) {
-        if (trace.events[event_index].timestamp.empty() ||
-            !parse_timestamp(trace.events[event_index].timestamp)) {
+        if (!parse_timestamp(trace.events[event_index].timestamp)) {
           throw std::invalid_argument(
               "inductive miner: timestamp field '" + options.timestamp_key +
-              "' is missing or invalid in EventLog trace " +
+              "' is invalid in EventLog trace " +
               std::to_string(trace_index) + " event " +
               std::to_string(event_index));
         }
@@ -1987,6 +2164,75 @@ EventLog event_data_to_log(const EventDataView& data,
   return log;
 }
 
+bool InductiveMinerInstances::supports(InductiveMinerVariant variant) noexcept {
+  switch (variant) {
+    case InductiveMinerVariant::kLog:
+    case InductiveMinerVariant::kImf:
+    case InductiveMinerVariant::kDfg:
+      return true;
+    default:
+      return false;
+  }
+}
+
+std::vector<InductiveMinerVariant> InductiveMinerInstances::all() {
+  return {InductiveMinerVariant::kLog, InductiveMinerVariant::kImf,
+          InductiveMinerVariant::kDfg};
+}
+
+double InductiveMinerInfrequentVariant::threshold(
+    const InductiveMinerOptions& options) {
+  return options.noise_threshold;
+}
+
+ProcessTree InductiveMinerLogVariant::discover(
+    const InductiveDataStructure& data, const InductiveMinerOptions& options,
+    const ActivityLabels& labels) {
+  ProcessTreeNode root = mine(data.variants, 0.0, options, labels);
+  canonicalize_tree(root, labels);
+  return ProcessTree(labels, std::move(root));
+}
+
+ProcessTree InductiveMinerInfrequentVariant::discover(
+    const InductiveDataStructure& data, const InductiveMinerOptions& options,
+    const ActivityLabels& labels) {
+  ProcessTreeNode root = mine(data.variants, threshold(options), options, labels);
+  canonicalize_tree(root, labels);
+  return ProcessTree(labels, std::move(root));
+}
+
+ProcessTree InductiveMinerDfgVariant::discover(
+    const InductiveDataStructure& data, const InductiveMinerOptions& options,
+    const ActivityLabels& labels) {
+  ProcessTreeNode root = mine_dfg_root(data.variants, 0.0, options, labels);
+  canonicalize_tree(root, labels);
+  return ProcessTree(labels, std::move(root));
+}
+
+ProcessTree InductiveMinerDfgVariant::discover(
+    const DirectlyFollowsGraph& graph, const InductiveMinerOptions& options) {
+  const auto& labels = graph.activities();
+  ProcessTreeNode root = mine_dfg(build_local_dfg(graph), 0.0, options, labels);
+  canonicalize_tree(root, labels);
+  return ProcessTree(graph.activities(), std::move(root));
+}
+
+ProcessTree InductiveMinerFramework::discover(
+    const InductiveDataStructure& data, const InductiveMinerOptions& options,
+    const ActivityLabels& labels) {
+  if (data.empty()) return ProcessTree(labels, BaseCaseFactory::empty());
+  switch (options.variant) {
+    case InductiveMinerVariant::kLog:
+      return InductiveMinerLogVariant::discover(data, options, labels);
+    case InductiveMinerVariant::kImf:
+      return InductiveMinerInfrequentVariant::discover(data, options, labels);
+    case InductiveMinerVariant::kDfg:
+      return InductiveMinerDfgVariant::discover(data, options, labels);
+    default:
+      throw std::invalid_argument("inductive miner: unsupported variant");
+  }
+}
+
 ProcessTree discover_from_event_log(const EventLog& event_log,
                                     const InductiveMinerOptions& options) {
   std::set<std::string> alphabet;
@@ -2014,14 +2260,8 @@ ProcessTree discover_from_event_log(const EventLog& event_log,
     }
   }
 
-  const double f = options.variant == InductiveMinerVariant::kImf
-                       ? options.noise_threshold
-                       : 0.0;
-  ProcessTreeNode root = options.variant == InductiveMinerVariant::kDfg
-                             ? mine_dfg_root(sublog, f, options, names)
-                             : mine(sublog, f, options, names);
-  canonicalize_tree(root, names);
-  return ProcessTree(std::move(names), std::move(root));
+  return InductiveMinerFramework::discover(
+      InductiveDataStructure{std::move(sublog)}, options, names);
 }
 
 ProcessTree discover_from_variants(const InductiveMinerVariantLog& variants,
@@ -2048,17 +2288,13 @@ ProcessTree discover_from_variants(const InductiveMinerVariantLog& variants,
       sublog[it->second].count += variant.count;
     }
   }
-  const double f = options.variant == InductiveMinerVariant::kImf
-                       ? options.noise_threshold
-                       : 0.0;
-  ProcessTreeNode root = options.variant == InductiveMinerVariant::kDfg
-                             ? mine_dfg_root(sublog, f, options, names)
-                             : mine(sublog, f, options, names);
-  canonicalize_tree(root, names);
-  return ProcessTree(std::move(names), std::move(root));
+  return InductiveMinerFramework::discover(
+      InductiveDataStructure{std::move(sublog)}, options, names);
 }
 
-}  // namespace
+}  // namespace inductive_detail
+
+using namespace inductive_detail;
 
 EventLog prepare_inductive_event_log(const EventLog& event_log,
                                      const InductiveMinerOptions& options) {
@@ -2079,11 +2315,7 @@ ProcessTree discover_process_tree(const DirectlyFollowsGraph& graph,
   // A graph input has already discarded trace bodies, so it always uses the
   // graph-recursive semantics. Selector values are validated for a uniform
   // public contract but do not affect a graph that has no event columns.
-  const double f = 0.0;
-  const auto& names = graph.activities();
-  ProcessTreeNode root = mine_dfg(build_local_dfg(graph), f, options, names);
-  canonicalize_tree(root, names);
-  return ProcessTree(graph.activities(), std::move(root));
+  return InductiveMinerDfgVariant::discover(graph, options);
 }
 
 ProcessTree discover_process_tree(const EventDataView& data,

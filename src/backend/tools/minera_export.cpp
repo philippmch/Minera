@@ -483,6 +483,8 @@ int usage(const char* program) {
                "                            Use the normal sequence cut\n"
                "  --inductive-disable-fallthroughs <bool>\n"
                "                            Suppress specialized fall-throughs\n"
+               "  --inductive-multiprocessing <bool>\n"
+               "                            Evaluate large fall-through candidate sets with two workers\n"
                "  --ilp-mine                Emit standalone classic ILP JSON\n"
                "  --ilp-activity-key <name> Event attribute used as activity\n"
                "  --ilp-artificial-start-activity <name> Artificial start label\n"
@@ -4261,6 +4263,7 @@ int main(int argc, char** argv) {
                                             : minera::InductiveMinerVariant::kLog;
     } else if (arg == "--inductive-disable-strict-sequence-cut" ||
                arg == "--inductive-disable-fallthroughs" ||
+               arg == "--inductive-multiprocessing" ||
                arg == "--inductive-sort-events-by-timestamp") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -4270,6 +4273,8 @@ int main(int argc, char** argv) {
           inductive_options.disable_strict_sequence_cut = parsed;
         } else if (arg == "--inductive-disable-fallthroughs") {
           inductive_options.disable_fallthroughs = parsed;
+        } else if (arg == "--inductive-multiprocessing") {
+          inductive_options.multiprocessing = parsed;
         } else {
           inductive_options.sort_events_by_timestamp = parsed;
         }
