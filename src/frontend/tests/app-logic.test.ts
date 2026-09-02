@@ -778,6 +778,7 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({
       inductiveDisableStrictSequenceCut: false,
       inductiveDisableFallthroughs: false,
+      inductiveMultiprocessing: false,
       inductiveSortEventsByTimestamp: false,
       inductiveActivityKey: "concept:name",
       inductiveTimestampKey: "time:timestamp",
@@ -818,6 +819,7 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ inductiveVariant: "dfg" })).toBe(true);
     expect(hasActiveMinerOptions({ inductiveDisableStrictSequenceCut: true })).toBe(true);
     expect(hasActiveMinerOptions({ inductiveDisableFallthroughs: true })).toBe(true);
+    expect(hasActiveMinerOptions({ inductiveMultiprocessing: true })).toBe(true);
     expect(hasActiveMinerOptions({ inductiveSortEventsByTimestamp: true })).toBe(true);
     expect(hasActiveMinerOptions({ inductiveActivityKey: "phase" })).toBe(true);
     expect(hasActiveMinerOptions({ inductiveTimestampKey: "occurred_at" })).toBe(true);
@@ -937,6 +939,7 @@ describe("mineFormEntries", () => {
     expect(mineFormEntries({
       inductiveDisableStrictSequenceCut: true,
       inductiveDisableFallthroughs: true,
+      inductiveMultiprocessing: true,
       inductiveSortEventsByTimestamp: true,
       inductiveActivityKey: " phase ",
       inductiveTimestampKey: " occurred_at ",
@@ -944,6 +947,7 @@ describe("mineFormEntries", () => {
     })).toEqual([
       ["inductive_disable_strict_sequence_cut", "true"],
       ["inductive_disable_fallthroughs", "true"],
+      ["inductive_multiprocessing", "true"],
       ["inductive_sort_events_by_timestamp", "true"],
       ["inductive_activity_key", "phase"],
       ["inductive_timestamp_key", "occurred_at"],
@@ -952,6 +956,7 @@ describe("mineFormEntries", () => {
     expect(mineFormEntries({
       inductiveDisableStrictSequenceCut: false,
       inductiveDisableFallthroughs: false,
+      inductiveMultiprocessing: false,
       inductiveSortEventsByTimestamp: false,
       inductiveActivityKey: "concept:name",
       inductiveTimestampKey: "time:timestamp",

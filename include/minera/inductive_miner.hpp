@@ -60,6 +60,9 @@ struct InductiveMinerOptions {
   // When enabled, use the normal sequence cut instead of the stricter cut
   // that merges groups made optional by observed skips.
   bool disable_strict_sequence_cut = false;
+  // Opt into bounded parallel evaluation of large activity-concurrency
+  // fall-through candidate sets. Small inputs and the default stay serial.
+  bool multiprocessing = false;
   // Suppress specialized fall-throughs. The empty-trace and flower cases
   // remain available so the miner still returns a process tree.
   bool disable_fallthroughs = false;

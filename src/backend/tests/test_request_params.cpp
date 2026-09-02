@@ -86,6 +86,7 @@ void parse_mine_params_defaults_when_empty() {
   assert(!params.inductive.sort_events_by_timestamp);
   assert(!params.inductive.disable_strict_sequence_cut);
   assert(!params.inductive.disable_fallthroughs);
+  assert(!params.inductive.multiprocessing);
   assert(!params.alpha.short_loops);  // classic Alpha is the default variant
   assert(params.powl.activity_key == "concept:name");
   assert(params.powl.timestamp_key == "time:timestamp");
@@ -988,6 +989,7 @@ void parse_mine_params_maps_csv_and_inductive_options() {
       {"inductive_sort_events_by_timestamp", "1"},
       {"inductive_disable_strict_sequence_cut", "true"},
       {"inductive_disable_fallthroughs", "0"},
+      {"inductive_multiprocessing", "true"},
       {"heuristic_variant", "plusplus"},
       {"heuristic_activity_attribute", "phase"},
       {"heuristic_timestamp_attribute", "finished_at"},
@@ -1031,6 +1033,7 @@ void parse_mine_params_maps_csv_and_inductive_options() {
   assert(params.inductive.sort_events_by_timestamp);
   assert(params.inductive.disable_strict_sequence_cut);
   assert(!params.inductive.disable_fallthroughs);
+  assert(params.inductive.multiprocessing);
   assert(!params.alpha.short_loops);
   assert(params.heuristic.variant ==
          minera::HeuristicMinerVariant::kPlusPlus);
@@ -1295,6 +1298,7 @@ void parse_mine_params_rejects_invalid_inductive_options() {
   for (const auto& item : {
            std::pair{"inductive_disable_strict_sequence_cut", "maybe"},
            std::pair{"inductive_disable_fallthroughs", "TRUE"},
+           std::pair{"inductive_multiprocessing", "sometimes"},
            std::pair{"inductive_sort_events_by_timestamp", "yes"},
        }) {
     bool threw = false;

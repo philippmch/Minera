@@ -329,6 +329,18 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_inductive_miner_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_inductive_miner_tests COMMAND minera_inductive_miner_tests)
 
+  add_executable(minera_inductive_parity_contracts_tests
+    src/backend/tests/test_inductive_parity_contracts.cpp
+  )
+  target_link_libraries(minera_inductive_parity_contracts_tests PRIVATE minera::core)
+  target_include_directories(minera_inductive_parity_contracts_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/backend
+  )
+  target_compile_features(minera_inductive_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_inductive_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_inductive_parity_contracts_tests
+           COMMAND minera_inductive_parity_contracts_tests)
+
   add_executable(minera_xes_io_tests
     src/backend/tests/test_xes_io.cpp
   )

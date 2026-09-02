@@ -131,6 +131,7 @@ describe("Inductive control contract", () => {
   const defaults = {
     disableStrictSequenceCut: false,
     disableFallthroughs: false,
+    multiprocessing: false,
     sortEventsByTimestamp: false,
     activityKey: "concept:name",
     timestampKey: "time:timestamp",
@@ -141,6 +142,7 @@ describe("Inductive control contract", () => {
     expect(inductiveOptionsFromForm(defaults)).toEqual({
       inductiveDisableStrictSequenceCut: undefined,
       inductiveDisableFallthroughs: undefined,
+      inductiveMultiprocessing: undefined,
       inductiveSortEventsByTimestamp: undefined,
       inductiveActivityKey: undefined,
       inductiveTimestampKey: undefined,
@@ -152,6 +154,7 @@ describe("Inductive control contract", () => {
     expect(inductiveOptionsFromForm({
       disableStrictSequenceCut: true,
       disableFallthroughs: true,
+      multiprocessing: true,
       sortEventsByTimestamp: true,
       activityKey: " phase ",
       timestampKey: " occurred_at ",
@@ -159,6 +162,7 @@ describe("Inductive control contract", () => {
     })).toEqual({
       inductiveDisableStrictSequenceCut: true,
       inductiveDisableFallthroughs: true,
+      inductiveMultiprocessing: true,
       inductiveSortEventsByTimestamp: true,
       inductiveActivityKey: "phase",
       inductiveTimestampKey: "occurred_at",
@@ -174,6 +178,7 @@ describe("Inductive control contract", () => {
       caseIdKey: "",
     })).toBe(false);
     expect(inductiveSettingsAreDirty({ ...defaults, sortEventsByTimestamp: true })).toBe(true);
+    expect(inductiveSettingsAreDirty({ ...defaults, multiprocessing: true })).toBe(true);
     expect(inductiveSettingsAreDirty({ ...defaults, activityKey: "phase" })).toBe(true);
   });
 });

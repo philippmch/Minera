@@ -1750,6 +1750,10 @@ MineParams parse_mine_params(const FieldLookup& field,
         field("inductive_disable_fallthroughs"),
         "inductive_disable_fallthroughs");
   }
+  if (supplied("inductive_multiprocessing")) {
+    params.inductive.multiprocessing = parse_boolean(
+        field("inductive_multiprocessing"), "inductive_multiprocessing");
+  }
   if (supplied("inductive_sort_events_by_timestamp")) {
     params.inductive.sort_events_by_timestamp = parse_boolean(
         field("inductive_sort_events_by_timestamp"),

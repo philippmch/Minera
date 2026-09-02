@@ -47,12 +47,12 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 24
-complete and 62 partial dispatcher rows, plus 87 complete and 300 partial
+adapter, integration, or missing are complete. The current manifest records 25
+complete and 61 partial dispatcher rows, plus 113 complete and 274 partial
 non-dispatcher module rows. The completed module group covers the implemented
-simulation, core transformation, Petri-analysis, organizational, and thirteen
-statistical DFG modules with distinct registered tests; 362 coverage units
-still require exact proof.
+simulation, core transformation, Petri-analysis, organizational, statistical
+DFG, and 26-module Inductive discovery stacks with distinct registered tests;
+335 coverage units still require exact proof.
 A release may
 additionally run the strict gate:
 
@@ -1425,23 +1425,37 @@ and graph-recursive selectors ignore it.
 Log recursion now applies the specialized repairs in deterministic order:
 activity once per trace, activity concurrent with a discoverable residual,
 strict silent loop, general silent loop, and finally flower. Disabling repairs
-retains empty-trace handling and the flower fallback. The native interface also
+retains empty-trace handling and the flower fallback, including the exact
+silent-body loop shape for a repeated single activity. The native interface also
 accepts weighted unique variants and all event-data views. Eager and lazy tables
 require selected case, activity, and timestamp fields and are stably grouped and
-ordered; EventLog callers can select alternate fields, regroup cases, and opt
-into timestamp ordering.
+ordered. EventLog callers can select alternate fields, regroup cases, and opt
+into timestamp ordering; absent optional case or timestamp metadata preserves
+the trace's existing grouping and order.
 
 The same settings are exposed through strict request parsing, the command-line
-exporter, local server, and frontend. The exact prepared Inductive log is reused
-for conversion-dependent conformance, alignment, footprints, decoration,
+exporter, local server, and frontend. Large concurrent-activity fall-through
+searches can use a bounded parallel viability scan while retaining deterministic
+candidate selection. The exact prepared Inductive log is reused for
+conversion-dependent conformance, alignment, footprints, decoration,
 evaluation, decision mining, process-tree reduction, stochastic fitting,
 comparison, and Monte Carlo consumers. Discovered labels are registered before
 recursive JSON serialization, including labels that exist only in a selected
-activity field. Focused Release regressions cover selector dispatch, all repair
-families and their disabled policy, strict-sequence behavior, input adapters,
-invalid fields and values, deterministic ordering, recursive JSON validation,
-and transport serialization. Broader trace-projection differential proof is
-still pending, so the package remains partial in the machine-readable ledger.
+activity field.
+
+The production implementation now has explicit base-case, cut, data-structure,
+fall-through, framework, selector-instance, and IM/IMf/IMd variant components.
+Each of the 26 non-dispatcher catalog modules has a distinct registered Release
+contract and each dispatcher selector has an exact binding proof. Focused
+regressions cover selector dispatch, every repair family and its disabled policy,
+strict-sequence behavior, input adapters, optional EventLog metadata, invalid
+values, deterministic ordering, recursive JSON validation, transport
+serialization, and parallel-search equivalence. A deterministic external
+differential run covered 160 variant/option combinations without a mismatch;
+a broader campaign found only reference-side hash-order variation and a
+reference-side exception, with no stable invariant-level mismatch. The package
+and all 26 owned module rows are therefore complete in the machine-readable
+ledger.
 
 ## ILP discovery parity evidence
 

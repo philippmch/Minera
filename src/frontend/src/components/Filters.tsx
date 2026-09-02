@@ -295,6 +295,7 @@ export function powlValidationMessage(input: {
 export interface InductiveSettingsForm {
   disableStrictSequenceCut: boolean;
   disableFallthroughs: boolean;
+  multiprocessing: boolean;
   sortEventsByTimestamp: boolean;
   activityKey: string;
   timestampKey: string;
@@ -307,6 +308,7 @@ export function inductiveOptionsFromForm(
 ): Pick<MinerOptions,
   | "inductiveDisableStrictSequenceCut"
   | "inductiveDisableFallthroughs"
+  | "inductiveMultiprocessing"
   | "inductiveSortEventsByTimestamp"
   | "inductiveActivityKey"
   | "inductiveTimestampKey"
@@ -315,6 +317,7 @@ export function inductiveOptionsFromForm(
     inductiveDisableStrictSequenceCut:
       input.disableStrictSequenceCut || undefined,
     inductiveDisableFallthroughs: input.disableFallthroughs || undefined,
+    inductiveMultiprocessing: input.multiprocessing || undefined,
     inductiveSortEventsByTimestamp: input.sortEventsByTimestamp || undefined,
     inductiveActivityKey:
       input.activityKey.trim() !== "concept:name"
@@ -335,6 +338,7 @@ export function inductiveOptionsFromForm(
 export function inductiveSettingsAreDirty(input: InductiveSettingsForm): boolean {
   return input.disableStrictSequenceCut ||
     input.disableFallthroughs ||
+    input.multiprocessing ||
     input.sortEventsByTimestamp ||
     (input.activityKey.trim() || "concept:name") !== "concept:name" ||
     (input.timestampKey.trim() || "time:timestamp") !== "time:timestamp" ||
@@ -467,6 +471,7 @@ export function Filters({
   const [inductiveVariant, setInductiveVariant] = useState<"log" | "imf" | "dfg">("log");
   const [inductiveDisableStrictSequenceCut, setInductiveDisableStrictSequenceCut] = useState(false);
   const [inductiveDisableFallthroughs, setInductiveDisableFallthroughs] = useState(false);
+  const [inductiveMultiprocessing, setInductiveMultiprocessing] = useState(false);
   const [inductiveSortEventsByTimestamp, setInductiveSortEventsByTimestamp] = useState(false);
   const [inductiveActivityKey, setInductiveActivityKey] = useState("concept:name");
   const [inductiveTimestampKey, setInductiveTimestampKey] = useState("time:timestamp");
@@ -1043,6 +1048,7 @@ export function Filters({
       ...inductiveOptionsFromForm({
         disableStrictSequenceCut: inductiveDisableStrictSequenceCut,
         disableFallthroughs: inductiveDisableFallthroughs,
+        multiprocessing: inductiveMultiprocessing,
         sortEventsByTimestamp: inductiveSortEventsByTimestamp,
         activityKey: inductiveActivityKey,
         timestampKey: inductiveTimestampKey,
@@ -1287,6 +1293,7 @@ export function Filters({
     setInductiveVariant("log");
     setInductiveDisableStrictSequenceCut(false);
     setInductiveDisableFallthroughs(false);
+    setInductiveMultiprocessing(false);
     setInductiveSortEventsByTimestamp(false);
     setInductiveActivityKey("concept:name");
     setInductiveTimestampKey("time:timestamp");
@@ -1461,6 +1468,7 @@ export function Filters({
     inductiveSettingsAreDirty({
       disableStrictSequenceCut: inductiveDisableStrictSequenceCut,
       disableFallthroughs: inductiveDisableFallthroughs,
+      multiprocessing: inductiveMultiprocessing,
       sortEventsByTimestamp: inductiveSortEventsByTimestamp,
       activityKey: inductiveActivityKey,
       timestampKey: inductiveTimestampKey,
@@ -3051,6 +3059,14 @@ export function Filters({
                 onChange={(e) => setInductiveDisableFallthroughs(e.target.checked)}
               />
               <span>Disable specialized fall-throughs</span>
+            </label>
+            <label className="filters-field filters-check">
+              <input
+                type="checkbox"
+                checked={inductiveMultiprocessing}
+                onChange={(e) => setInductiveMultiprocessing(e.target.checked)}
+              />
+              <span>Parallelize large fall-through searches</span>
             </label>
             <label className="filters-field filters-check">
               <input

@@ -16,6 +16,7 @@ describe("Inductive request options", () => {
     expect(mineFormEntries({
       inductiveDisableStrictSequenceCut: true,
       inductiveDisableFallthroughs: true,
+      inductiveMultiprocessing: true,
       inductiveSortEventsByTimestamp: true,
       inductiveActivityKey: " phase ",
       inductiveTimestampKey: " occurred_at ",
@@ -23,6 +24,7 @@ describe("Inductive request options", () => {
     })).toEqual([
       ["inductive_disable_strict_sequence_cut", "true"],
       ["inductive_disable_fallthroughs", "true"],
+      ["inductive_multiprocessing", "true"],
       ["inductive_sort_events_by_timestamp", "true"],
       ["inductive_activity_key", "phase"],
       ["inductive_timestamp_key", "occurred_at"],
@@ -34,6 +36,7 @@ describe("Inductive request options", () => {
     expect(mineFormEntries({
       inductiveDisableStrictSequenceCut: false,
       inductiveDisableFallthroughs: false,
+      inductiveMultiprocessing: false,
       inductiveSortEventsByTimestamp: false,
       inductiveActivityKey: "concept:name",
       inductiveTimestampKey: "time:timestamp",
