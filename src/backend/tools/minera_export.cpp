@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cerrno>
 #include <cmath>
 #include <cstring>
 #include <cctype>
@@ -469,10 +470,19 @@ int usage(const char* program) {
                "  --log-conversion-lazy-output <bool> Use restartable table output\n"
                "  --log-conversion-max-rows-to-materialize <n> Table row cap\n"
                "  --log-conversion-max-variants-to-return <n> Variant output cap\n"
-               "  --noise-threshold <f>     Inductive Miner – infrequent filter\n"
-               "                            in [0,1] (default: 0 = classic)\n"
+               "  --noise-threshold <f>     Infrequent-variant filter in [0,1]\n"
+               "                            (used only with --inductive-variant imf)\n"
                "  --inductive-variant <id>  log (default), imf (infrequent),\n"
                "                            or dfg (IMd: graph recursion)\n"
+               "  --inductive-activity-key <name> Event activity selector\n"
+               "  --inductive-timestamp-key <name> Event timestamp selector\n"
+               "  --inductive-case-id-key <name> Case identifier selector\n"
+               "  --inductive-sort-events-by-timestamp <bool>\n"
+               "                            Sort selected events chronologically\n"
+               "  --inductive-disable-strict-sequence-cut <bool>\n"
+               "                            Use the normal sequence cut\n"
+               "  --inductive-disable-fallthroughs <bool>\n"
+               "                            Suppress specialized fall-throughs\n"
                "  --ilp-mine                Emit standalone classic ILP JSON\n"
                "  --ilp-activity-key <name> Event attribute used as activity\n"
                "  --ilp-artificial-start-activity <name> Artificial start label\n"
@@ -1735,8 +1745,10 @@ int main(int argc, char** argv) {
   const auto parse_finite_double = [](const char* value,
                                       std::string_view option) {
     char* end = nullptr;
+    errno = 0;
     const double parsed = std::strtod(value, &end);
-    if (end != value + std::strlen(value) || !std::isfinite(parsed)) {
+    if (end == value || end != value + std::strlen(value) || errno == ERANGE ||
+        !std::isfinite(parsed)) {
       throw std::invalid_argument(std::string(option) +
                                   " expects a finite number");
     }
@@ -4225,7 +4237,17 @@ int main(int argc, char** argv) {
     } else if (arg == "--noise-threshold") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      inductive_options.noise_threshold = std::atof(value);
+      try {
+        const double parsed = parse_finite_double(value, arg);
+        if (parsed < 0.0 || parsed > 1.0) {
+          throw std::invalid_argument(
+              "--noise-threshold expects a number in [0, 1]");
+        }
+        inductive_options.noise_threshold = parsed;
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
     } else if (arg == "--inductive-variant") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -4237,6 +4259,41 @@ int main(int argc, char** argv) {
                                       : variant == "imf"
                                             ? minera::InductiveMinerVariant::kImf
                                             : minera::InductiveMinerVariant::kLog;
+    } else if (arg == "--inductive-disable-strict-sequence-cut" ||
+               arg == "--inductive-disable-fallthroughs" ||
+               arg == "--inductive-sort-events-by-timestamp") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        const bool parsed = parse_boolean(value, arg);
+        if (arg == "--inductive-disable-strict-sequence-cut") {
+          inductive_options.disable_strict_sequence_cut = parsed;
+        } else if (arg == "--inductive-disable-fallthroughs") {
+          inductive_options.disable_fallthroughs = parsed;
+        } else {
+          inductive_options.sort_events_by_timestamp = parsed;
+        }
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+    } else if (arg == "--inductive-activity-key" ||
+               arg == "--inductive-timestamp-key" ||
+               arg == "--inductive-case-id-key") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto selector = trim_text(value);
+      if (selector.empty()) {
+        std::cerr << "error: " << arg << " expects a non-empty name\n";
+        return 2;
+      }
+      if (arg == "--inductive-activity-key") {
+        inductive_options.activity_key = selector;
+      } else if (arg == "--inductive-timestamp-key") {
+        inductive_options.timestamp_key = selector;
+      } else {
+        inductive_options.case_id_key = selector;
+      }
     } else if (arg == "--alpha-variant") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -6055,11 +6112,17 @@ int main(int argc, char** argv) {
     }
     const auto transition_system =
         minera::discover_transition_system(log, transition_options);
+    const auto inductive_log =
+        minera::prepare_inductive_event_log(log, inductive_options);
     const auto tree = minera::discover_process_tree(log, inductive_options);
+    for (const auto& activity : tree.activities())
+      graph.ensure_activity(activity);
+    const auto inductive_graph =
+        minera::discover_directly_follows_graph(inductive_log);
     std::optional<minera::ProcessTreeAlignmentResult> process_tree_alignment_result;
     if (align_process_tree) {
       process_tree_alignment_result =
-          minera::align_process_tree(log, tree, pt_alignment_options);
+          minera::align_process_tree(inductive_log, tree, pt_alignment_options);
     }
     const auto net = minera::discover_petri_net(log, alpha_options);
     const auto heuristics =
@@ -6133,7 +6196,10 @@ int main(int argc, char** argv) {
                     << "' (expected inductive, alpha, heuristic, or powl)\n";
           return 2;
         }
-        const auto& fit_log = stochastic_map_miner == "powl" ? powl_log : log;
+        const auto& fit_log =
+            stochastic_map_miner == "powl"
+                ? powl_log
+                : stochastic_map_miner == "inductive" ? inductive_log : log;
         const auto report = minera::fit_stochastic_map_with_report(
             fit_log, *selected, stochastic_map_params.fit);
         stochastic_map_net = *selected;
@@ -6173,12 +6239,20 @@ int main(int argc, char** argv) {
       }
       file << stochastic_map_json.str() << '\n';
     }
-    const auto& footprints_log = footprints_options.model == "powl"
-                                     ? powl_log
-                                     : log;
-    const auto& footprints_graph = footprints_options.model == "powl"
-                                       ? powl_graph
-                                       : graph;
+    const auto& footprints_log =
+        footprints_options.model == "powl"
+            ? powl_log
+            : footprints_options.model == "inductive" ||
+                      footprints_options.model == "process_tree"
+                  ? inductive_log
+                  : log;
+    const auto& footprints_graph =
+        footprints_options.model == "powl"
+            ? powl_graph
+            : footprints_options.model == "inductive" ||
+                      footprints_options.model == "process_tree"
+                  ? inductive_graph
+                  : graph;
     const auto footprints =
         analyze_footprints(footprints_log, footprints_graph, tree, powl,
                            inductive_net, net,
@@ -6190,6 +6264,7 @@ int main(int argc, char** argv) {
     }
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
       const bool is_powl = id == "powl";
+      const bool is_inductive = id == "inductive";
       auto replay_options = token_replay_options;
       if (id == "heuristic" &&
           replay_options.activity_attribute == "concept:name") {
@@ -6204,7 +6279,10 @@ int main(int argc, char** argv) {
       std::optional<minera::EventLog> alignment_powl_log;
       const minera::EventLog* conformance_log = &log;
       const minera::EventLog* alignment_log = &log;
-      if (is_powl) {
+      if (is_inductive) {
+        conformance_log = &inductive_log;
+        alignment_log = &inductive_log;
+      } else if (is_powl) {
         replay_powl_log = project_powl_activity(
             log, replay_options.activity_attribute, powl_options.timestamp_key,
             powl_options.case_id_key);
@@ -6218,10 +6296,11 @@ int main(int argc, char** argv) {
           std::move(id), minera::final_marking_reachable(petri),
            minera::check_conformance(*conformance_log, petri, replay_options),
            is_powl ? minera::check_footprints(powl_log, petri)
-                   : minera::check_footprints(log, petri),
+           : is_inductive ? minera::check_footprints(inductive_log, petri)
+                          : minera::check_footprints(log, petri),
            no_alignments ? std::optional<minera::AlignmentResult>{}
                          : std::optional<minera::AlignmentResult>(
-                               (is_powl || alignment_option_used)
+                               (is_powl || is_inductive || alignment_option_used)
                                    ? minera::check_alignment(
                                          *alignment_log, petri,
                                          model_alignment_options)
@@ -6317,6 +6396,11 @@ int main(int argc, char** argv) {
         reference = project_powl_activity(
             reference, selector, powl_options.timestamp_key,
             powl_options.case_id_key);
+      } else if (compare_petri_miner == "inductive") {
+        normalized_comparison_log =
+            minera::prepare_inductive_event_log(reference, inductive_options);
+        comparison_log = &inductive_log;
+        reference = std::move(*normalized_comparison_log);
       }
       const auto comparison = minera::compare_petri_usage(
           *model_it->second, *comparison_log, reference, comparison_options);
@@ -6357,7 +6441,9 @@ int main(int argc, char** argv) {
         }
         case minera::PetriAnalysisFamily::kExtendedMarkingEquation: {
           const auto& analysis_log =
-              request.miner == "powl" ? powl_log : log;
+              request.miner == "powl"
+                  ? powl_log
+                  : request.miner == "inductive" ? inductive_log : log;
           if (request.trace_index >= analysis_log.traces.size()) {
             std::cerr << "error: --petri-analysis-trace-index out of range\n";
             return 2;
@@ -6419,7 +6505,10 @@ int main(int argc, char** argv) {
       evaluation.emplace();
       evaluation->reserve(available_models.size());
       for (const auto& [miner, petri] : available_models) {
-        const auto& evaluation_log = miner == "powl" ? powl_log : log;
+        const auto& evaluation_log =
+            miner == "powl"
+                ? powl_log
+                : miner == "inductive" ? inductive_log : log;
         minera::ModelEvaluation result;
         result.miner = miner;
         switch (evaluation_params->family) {
@@ -6474,6 +6563,8 @@ int main(int argc, char** argv) {
             log, decision_options.activity_attribute,
             powl_options.timestamp_key, powl_options.case_id_key);
         decision_log = &*projected_decision_log;
+      } else if (decisions_miner == "inductive") {
+        decision_log = &inductive_log;
       }
       decisions = minera::mine_decisions(*decision_log, *selected,
                                          decision_options);
@@ -6504,6 +6595,8 @@ int main(int argc, char** argv) {
             log, decision_options.activity_attribute,
             powl_options.timestamp_key, powl_options.case_id_key);
         decision_log = &*projected_decision_log;
+      } else if (decision_tables_miner == "inductive") {
+        decision_log = &inductive_log;
       }
       decision_tables =
           minera::mine_decision_tables(*decision_log, *selected, table_options);
@@ -6515,7 +6608,8 @@ int main(int argc, char** argv) {
     // the inductive net fits by construction, so its overlay always has data
     // even when the alpha net (the classic view) fits nothing of a real log.
     const auto petri_decoration = minera::decorate_model(log, net);
-    const auto inductive_decoration = minera::decorate_model(log, inductive_net);
+    const auto inductive_decoration =
+        minera::decorate_model(inductive_log, inductive_net);
     const auto heuristic_decoration = minera::decorate_model(
         log, heuristic_net, heuristic_options.activity_attribute,
         heuristic_options.timestamp_attribute);
@@ -6546,7 +6640,10 @@ int main(int argc, char** argv) {
     if (advanced_petri_miner == "alpha") advanced_net = &net;
     else if (advanced_petri_miner == "heuristic") advanced_net = &heuristic_net;
     else if (advanced_petri_miner == "powl") advanced_net = &powl_net;
-    const auto& advanced_log = advanced_petri_miner == "powl" ? powl_log : log;
+    const auto& advanced_log =
+        advanced_petri_miner == "powl"
+            ? powl_log
+            : advanced_petri_miner == "inductive" ? inductive_log : log;
     if (align_decomposed)
       decomposed_result =
           minera::align_decomposed(advanced_log, *advanced_net,
@@ -6560,9 +6657,9 @@ int main(int argc, char** argv) {
           minera::multi_align_petri(*advanced_net, advanced_log,
                                     petri_multi_options);
     if (reduce_trace_index) {
-      if (*reduce_trace_index >= log.traces.size()) { std::cerr << "error: --reduce-process-tree trace index out of range\n"; return 2; }
+      if (*reduce_trace_index >= inductive_log.traces.size()) { std::cerr << "error: --reduce-process-tree trace index out of range\n"; return 2; }
       minera::ProcessTreeReductionOptions ro; ro.activity_key = reduction_activity_key;
-      reduced_tree_result = minera::reduce_process_tree(tree, log.traces[*reduce_trace_index], ro);
+      reduced_tree_result = minera::reduce_process_tree(tree, inductive_log.traces[*reduce_trace_index], ro);
     }
 
     if (monte_carlo_json_requested) {
@@ -6588,6 +6685,9 @@ int main(int argc, char** argv) {
             log, effective_options.activity_key,
             effective_options.timestamp_key, powl_options.case_id_key);
         simulation_log = &*projected_monte_carlo_log;
+      } else if (playout_miner == "inductive" ||
+                 playout_miner == "monte_carlo") {
+        simulation_log = &inductive_log;
       }
       const auto body = minera::monte_carlo_json(
           minera::monte_carlo(*simulation_log, *selected, effective_options));
@@ -6831,7 +6931,9 @@ int main(int argc, char** argv) {
       }
       std::optional<minera::EventLog> projected_playout_log;
       const minera::EventLog* fit_log = &log;
-      if (model_miner == "powl" && stochastic) {
+      if (model_miner == "inductive") {
+        fit_log = &inductive_log;
+      } else if (model_miner == "powl" && stochastic) {
         projected_playout_log = project_powl_activity(
             log, powl_options.activity_key, powl_options.timestamp_key,
             powl_options.case_id_key);
@@ -6931,6 +7033,8 @@ int main(int argc, char** argv) {
                 effective_options.timestamp_key, powl_options.case_id_key);
             fit_log = &*projected_playout_log;
           }
+        } else if (model_miner == "inductive") {
+          fit_log = &inductive_log;
         }
         generated = minera::monte_carlo(*fit_log, *selected, effective_options).log;
       } else if (stochastic) {

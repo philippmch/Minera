@@ -1110,6 +1110,35 @@ describe("isMineraExport", () => {
     expect(isMineraExport(valid)).toBe(true);
   });
 
+  it("validates recursive process-tree operators and activity labels", () => {
+    const tree = {
+      operator: "sequence",
+      children: [
+        { operator: "activity", activity: 0 },
+        { operator: "loop", children: [
+          { operator: "tau" },
+          { operator: "activity", activity: 0 },
+        ] },
+      ],
+    };
+    expect(isMineraExport({ ...valid, activities: [{}], process_tree: tree })).toBe(true);
+    expect(isMineraExport({ ...valid, activities: [{}], process_tree: {
+      operator: "activity", activity: 1,
+    } })).toBe(false);
+    expect(isMineraExport({ ...valid, activities: [{}], process_tree: {
+      operator: "sequence", children: [],
+    } })).toBe(false);
+    expect(isMineraExport({ ...valid, activities: [{}], process_tree: {
+      operator: "tau", activity: 0,
+    } })).toBe(false);
+    expect(isMineraExport({ ...valid, activities: [{}], process_tree: {
+      operator: "activity", activity: 0, children: [{ operator: "tau" }],
+    } })).toBe(false);
+    expect(isMineraExport({ ...valid, activities: [{}], process_tree: {
+      operator: "unknown", children: [{ operator: "tau" }],
+    } })).toBe(false);
+  });
+
   it("rejects null or primitive overlap payloads", () => {
     expect(isMineraExport({ ...valid, overlap: null })).toBe(false);
     expect(isMineraExport({ ...valid, overlap: 4 })).toBe(false);

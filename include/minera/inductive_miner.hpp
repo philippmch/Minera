@@ -1,8 +1,13 @@
 #pragma once
 
 #include "minera/directly_follows_graph.hpp"
+#include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
 #include "minera/process_tree.hpp"
+
+#include <cstdint>
+#include <string>
+#include <vector>
 
 namespace minera {
 
@@ -37,9 +42,21 @@ struct InductiveMinerOptions {
   // available to the endpoint cut. Empty traces are retained when their share
   // is strictly greater than the threshold. 0.0 disables filtering and
   // reproduces the classic Inductive Miner; higher values resist noise that
-  // would otherwise collapse to a flower model. Applies to both variants.
+  // would otherwise collapse to a flower model. The selector is effective
+  // only for the infrequent variant; the standard and graph variants ignore
+  // it.
   double noise_threshold = 0.0;
   InductiveMinerVariant variant = InductiveMinerVariant::kLog;
+  // Event-data selectors.  The defaults retain the conventional flat event
+  // column names; an EventLog still uses its native activity projection unless
+  // a custom selector is supplied.
+  std::string activity_key = "concept:name";
+  std::string timestamp_key = "time:timestamp";
+  std::string case_id_key = "case:concept:name";
+  // EventLog callers historically supplied events in case order.  Keep that
+  // default while allowing callers using a custom timestamp projection to ask
+  // for deterministic chronological ordering explicitly.
+  bool sort_events_by_timestamp = false;
   // When enabled, use the normal sequence cut instead of the stricter cut
   // that merges groups made optional by observed skips.
   bool disable_strict_sequence_cut = false;
@@ -47,6 +64,26 @@ struct InductiveMinerOptions {
   // remain available so the miner still returns a process tree.
   bool disable_fallthroughs = false;
 };
+
+// A compact, weighted unique-variant log.  Each entry represents one distinct
+// activity sequence and count is the number of cases having that sequence.
+// This is useful when a caller already has compressed variants and avoids
+// expanding them into an EventLog before discovery.
+struct InductiveMinerWeightedVariant {
+  std::vector<std::string> activities;
+  std::uint64_t count = 1;
+};
+
+using InductiveMinerVariantLog =
+    std::vector<InductiveMinerWeightedVariant>;
+
+// Applies the EventLog selector, regrouping and optional timestamp ordering
+// rules used by discovery.  The returned value is an independent log suitable
+// for model decoration and other consumers that must share the exact discovery
+// alphabet.
+[[nodiscard]] EventLog prepare_inductive_event_log(
+    const EventLog& event_log,
+    const InductiveMinerOptions& options = {});
 
 // Discovers a block-structured process tree from an event log using the
 // Inductive Miner. The algorithm recursively detects exclusive-choice,
@@ -66,6 +103,17 @@ struct InductiveMinerOptions {
 // because graph input has no traces to feed the log-recursive variants.
 [[nodiscard]] ProcessTree discover_process_tree(
     const DirectlyFollowsGraph& graph,
+    const InductiveMinerOptions& options = {});
+
+// Discovers from a generic event-data adapter.  EventStream, EventTable and
+// LazyEventTable inputs are grouped by case_id_key, validated for all selected
+// fields, and stably ordered by timestamp_key before ordinary discovery.
+[[nodiscard]] ProcessTree discover_process_tree(
+    const EventDataView& data,
+    const InductiveMinerOptions& options = {});
+
+[[nodiscard]] ProcessTree discover_process_tree(
+    const InductiveMinerVariantLog& variants,
     const InductiveMinerOptions& options = {});
 
 }  // namespace minera

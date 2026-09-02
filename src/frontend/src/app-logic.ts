@@ -61,6 +61,15 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
   return Boolean(
     options.noiseThreshold ||
       (options.inductiveVariant && options.inductiveVariant !== "log") ||
+      options.inductiveDisableStrictSequenceCut === true ||
+      options.inductiveDisableFallthroughs === true ||
+      options.inductiveSortEventsByTimestamp === true ||
+      Boolean(options.inductiveActivityKey?.trim() &&
+        options.inductiveActivityKey.trim() !== "concept:name") ||
+      Boolean(options.inductiveTimestampKey?.trim() &&
+        options.inductiveTimestampKey.trim() !== "time:timestamp") ||
+      Boolean(options.inductiveCaseIdKey?.trim() &&
+        options.inductiveCaseIdKey.trim() !== "case:concept:name") ||
       (options.alphaVariant && options.alphaVariant !== "classic") ||
       (options.heuristicVariant && options.heuristicVariant !== "classic") ||
       (options.heuristicActivityAttribute &&

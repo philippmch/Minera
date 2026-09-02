@@ -126,7 +126,7 @@ are reconciled.
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Partial (implemented core; proof pending)** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, and JSON/CLI/server/frontend adapters are implemented |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, and cross-family envelope rejection; broader OCEL schema coverage remains |
 | Discovery: Alpha | classic and Alpha+ | **Partial (implemented core; proof pending)** — event-log and direct-DFG classic entry points are available; Alpha+ remains an explicit event-log variant |
-| Discovery: Inductive | IM, IMf, IMd | **Partial (implemented core; proof pending)** — `log`, explicit `imf`, graph-recursive `dfg`, and direct-DFG IMd entry points share deterministic native semantics; IMf uses strict edge-noise cutoffs, inclusive start handling, preserved observed ends, and total-trace empty-share weighting; request/CLI/frontend selectors cover event-log paths |
+| Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Partial (implemented core; proof pending)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
 | Discovery: declarative | Declare classic and log skeleton classic | **Partial (implemented core; proof pending)** |
@@ -1418,9 +1418,30 @@ boundary, and every observed end activity remains available to endpoint-aware
 cuts while its end count still raises the outgoing noise baseline. Empty-trace
 retention compares the empty share with the total trace count and separates the
 optional tau branch before recursive cut discovery; graph-recursive discovery
-preserves its source skip flag independently of the threshold. Focused Release
-regressions cover exact edge boundaries, rare observed ends, total-share empty
-thresholds, and graph/log recursion consistency.
+preserves its source skip flag independently of the threshold. The noise
+threshold is now active only for the explicit infrequent selector; the standard
+and graph-recursive selectors ignore it.
+
+Log recursion now applies the specialized repairs in deterministic order:
+activity once per trace, activity concurrent with a discoverable residual,
+strict silent loop, general silent loop, and finally flower. Disabling repairs
+retains empty-trace handling and the flower fallback. The native interface also
+accepts weighted unique variants and all event-data views. Eager and lazy tables
+require selected case, activity, and timestamp fields and are stably grouped and
+ordered; EventLog callers can select alternate fields, regroup cases, and opt
+into timestamp ordering.
+
+The same settings are exposed through strict request parsing, the command-line
+exporter, local server, and frontend. The exact prepared Inductive log is reused
+for conversion-dependent conformance, alignment, footprints, decoration,
+evaluation, decision mining, process-tree reduction, stochastic fitting,
+comparison, and Monte Carlo consumers. Discovered labels are registered before
+recursive JSON serialization, including labels that exist only in a selected
+activity field. Focused Release regressions cover selector dispatch, all repair
+families and their disabled policy, strict-sequence behavior, input adapters,
+invalid fields and values, deterministic ordering, recursive JSON validation,
+and transport serialization. Broader trace-projection differential proof is
+still pending, so the package remains partial in the machine-readable ledger.
 
 ## ILP discovery parity evidence
 

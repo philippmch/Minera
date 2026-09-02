@@ -55,8 +55,8 @@ and tracks every family as complete, partial, or missing.
 - Process-model discovery with the **Inductive Miner**: recursive
   exclusive/sequence/parallel/loop cuts on the directly-follows graph yield a
   block-structured process tree that is always sound and perfectly fits the log
-  (logs without a cut fall through to a flower model). A **noise threshold**
-  switches on the **infrequent variant (IMf)**: cuts are sought on the
+  (logs without a cut fall through to a flower model). The **infrequent
+  variant (IMf)** accepts a **noise threshold**: cuts are sought on the
   unfiltered relations first, and only a sublog with no cut has its weak
   directly-follows edges (and rare start/end activities, empty traces, and
   repetitions) filtered relative to the dominant behaviour before the cut
@@ -69,8 +69,9 @@ and tracks every family as complete, partial, or missing.
   activities rather than events, at some model-quality cost (a projected graph
   can imply orderings no trace exhibits, and skipped sequence steps are
   inferred from jumping edges instead of observed empty subtraces). Select it
-  with `--inductive-variant dfg` (CLI) or the `inductive_variant` form field;
-  the noise threshold applies to both variants.
+  with `--inductive-variant dfg` (CLI) or the `inductive_variant` form field.
+  Select IMf explicitly with `--inductive-variant imf`; its noise threshold is
+  not applied by the classic log or directly-follows variants.
 - Conformance checking of a log against **any** discovered model — every miner
   is translated to a workflow net (the Inductive Miner's process tree, the Alpha
   Miner's net directly, and the Heuristic Miner's dependency graph with its
@@ -558,13 +559,17 @@ without arguments to see usage. The same filters are available on
 `keep_activities`, `keep_resources`, `remove_resources`, `time_from`,
 `time_to`, `time_mode`, …).
 
-Pass `--noise-threshold <f>` (0–1) to run the Inductive Miner's infrequent
-variant (IMf) during discovery; `0` is the classic miner. The same value is
-accepted on `POST /api/mine` as the `noise_threshold` form field. The other
-miner settings travel the same two routes: `--inductive-variant log|dfg` /
-`inductive_variant`, `--alpha-variant plus|classic` / `alpha_variant`, and the
-Heuristic Miner's `--dependency-threshold` / `dependency_threshold` (default
-0.9), `--and-threshold` / `and_threshold` (default 0.65), and
+Select `--inductive-variant imf` and pass `--noise-threshold <f>` (0–1) to run
+the Inductive Miner's infrequent variant; a threshold of `0` retains all
+behaviour. The same values are accepted on `POST /api/mine` as
+`inductive_variant` and `noise_threshold`. The available variants are
+`--inductive-variant log|imf|dfg`. Discovery also exposes strict-sequence and
+fall-through switches, optional timestamp ordering, and activity, timestamp,
+and case-identifier selectors through the corresponding `--inductive-*` CLI
+options and `inductive_*` form fields. The other miner settings travel the same
+two routes: `--alpha-variant plus|classic` / `alpha_variant`, and the Heuristic
+Miner's `--dependency-threshold` / `dependency_threshold` (default 0.9),
+`--and-threshold` / `and_threshold` (default 0.65), and
 `--min-edge-frequency` / `min_edge_frequency` (default 1). In the frontend all
 of them live in the **Filters & miner settings** panel, where every apply
 re-mines the original upload — so a threshold can always be relaxed again.

@@ -47,7 +47,8 @@ double parse_finite_double(std::string_view value, std::string_view name) {
   char* end = nullptr;
   errno = 0;
   const double parsed = std::strtod(owned.c_str(), &end);
-  if (end != owned.c_str() + owned.size() || errno == ERANGE ||
+  if (end == owned.c_str() || end != owned.c_str() + owned.size() ||
+      errno == ERANGE ||
       !std::isfinite(parsed)) {
     throw std::invalid_argument(std::string(name) +
                                 ": expected a finite number, got '" +
@@ -1719,10 +1720,17 @@ MineParams parse_mine_params(const FieldLookup& field,
     throw std::invalid_argument(
         "variant_min_coverage: must not exceed variant_max_coverage");
   }
-  if (const auto value = field("noise_threshold"); !value.empty()) {
-    params.inductive.noise_threshold = std::atof(value.c_str());
+  if (supplied("noise_threshold")) {
+    params.inductive.noise_threshold =
+        parse_finite_double(field("noise_threshold"), "noise_threshold");
+    if (params.inductive.noise_threshold < 0.0 ||
+        params.inductive.noise_threshold > 1.0) {
+      throw std::invalid_argument(
+          "noise_threshold: expected a number in [0, 1]");
+    }
   }
-  if (const auto value = field("inductive_variant"); !value.empty()) {
+  if (supplied("inductive_variant")) {
+    const auto value = field("inductive_variant");
     if (value != "log" && value != "imf" && value != "dfg") {
       throw std::invalid_argument(
           "inductive_variant: expected log, imf, or dfg, got '" + value + "'");
@@ -1732,6 +1740,36 @@ MineParams parse_mine_params(const FieldLookup& field,
                                    : value == "imf" ? InductiveMinerVariant::kImf
                                                     : InductiveMinerVariant::kLog;
   }
+  if (supplied("inductive_disable_strict_sequence_cut")) {
+    params.inductive.disable_strict_sequence_cut = parse_boolean(
+        field("inductive_disable_strict_sequence_cut"),
+        "inductive_disable_strict_sequence_cut");
+  }
+  if (supplied("inductive_disable_fallthroughs")) {
+    params.inductive.disable_fallthroughs = parse_boolean(
+        field("inductive_disable_fallthroughs"),
+        "inductive_disable_fallthroughs");
+  }
+  if (supplied("inductive_sort_events_by_timestamp")) {
+    params.inductive.sort_events_by_timestamp = parse_boolean(
+        field("inductive_sort_events_by_timestamp"),
+        "inductive_sort_events_by_timestamp");
+  }
+  const auto parse_inductive_selector = [&](std::string_view name,
+                                             std::string& destination) {
+    if (!supplied(name)) return;
+    destination = trim_text(field(name));
+    if (destination.empty()) {
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected a non-empty name");
+    }
+  };
+  parse_inductive_selector("inductive_activity_key",
+                          params.inductive.activity_key);
+  parse_inductive_selector("inductive_timestamp_key",
+                          params.inductive.timestamp_key);
+  parse_inductive_selector("inductive_case_id_key",
+                          params.inductive.case_id_key);
   if (const auto value = field("alpha_variant"); !value.empty()) {
     if (value != "classic" && value != "plus") {
       throw std::invalid_argument("alpha_variant: expected classic or plus, got '" +

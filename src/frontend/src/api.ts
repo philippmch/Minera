@@ -425,6 +425,18 @@ export interface MinerOptions {
   noiseThreshold?: number;
   /** "log" splits sublogs; "imf" applies infrequent filtering; "dfg" recurses on the graph (IMd). */
   inductiveVariant?: "log" | "imf" | "dfg";
+  /** Disable the strict sequence cut and use the ordinary sequence cut. */
+  inductiveDisableStrictSequenceCut?: boolean;
+  /** Suppress specialized Inductive fall-throughs and use the generic fallback. */
+  inductiveDisableFallthroughs?: boolean;
+  /** Sort each case chronologically by the selected timestamp field. */
+  inductiveSortEventsByTimestamp?: boolean;
+  /** Event field used as the Inductive activity label. */
+  inductiveActivityKey?: string;
+  /** Event field used to order Inductive events. */
+  inductiveTimestampKey?: string;
+  /** Event field used to group rows into Inductive cases. */
+  inductiveCaseIdKey?: string;
   /** "classic" (default) is the textbook Alpha; "plus" handles short loops. */
   alphaVariant?: "plus" | "classic";
   /** Heuristic Miner algorithm variant (classic by default). */
@@ -848,6 +860,24 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.noiseThreshold !== undefined)
     add("noise_threshold", String(options.noiseThreshold));
   if (options.inductiveVariant) add("inductive_variant", options.inductiveVariant);
+  if (options.inductiveDisableStrictSequenceCut === true)
+    add("inductive_disable_strict_sequence_cut", "true");
+  if (options.inductiveDisableFallthroughs === true)
+    add("inductive_disable_fallthroughs", "true");
+  if (options.inductiveSortEventsByTimestamp === true)
+    add("inductive_sort_events_by_timestamp", "true");
+  const inductiveSelectors = [
+    ["inductiveActivityKey", "inductive_activity_key", "concept:name"],
+    ["inductiveTimestampKey", "inductive_timestamp_key", "time:timestamp"],
+    ["inductiveCaseIdKey", "inductive_case_id_key", "case:concept:name"],
+  ] as const;
+  for (const [option, wireName, defaultValue] of inductiveSelectors) {
+    const value = options[option];
+    if (value === undefined) continue;
+    const normalized = value.trim();
+    if (!normalized) throw new Error(`${wireName} must not be empty`);
+    if (normalized !== defaultValue) add(wireName, normalized);
+  }
   if (options.alphaVariant) add("alpha_variant", options.alphaVariant);
   if (options.heuristicVariant && options.heuristicVariant !== "classic")
     add("heuristic_variant", options.heuristicVariant);
