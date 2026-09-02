@@ -130,6 +130,17 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       footprintsConformanceActive ||
       options.footprintsStrict === true ||
       options.footprintsEnableActAlwaysExecuted === false ||
+      Boolean(options.footprintsActivityAttribute?.trim() &&
+        options.footprintsActivityAttribute.trim() !== "concept:name") ||
+      Boolean(options.footprintsCaseIdAttribute?.trim() &&
+        options.footprintsCaseIdAttribute.trim() !== "case:concept:name") ||
+      Boolean(options.footprintsTimestampAttribute?.trim() &&
+        options.footprintsTimestampAttribute.trim() !== "time:timestamp") ||
+      Boolean(options.footprintsIndexAttribute?.trim() &&
+        options.footprintsIndexAttribute.trim() !== "@@index") ||
+      Boolean(options.footprintsStartTimestampAttribute?.trim()) ||
+      options.footprintsSortRequired === false ||
+      Boolean(options.footprintsInitialMarking?.trim()) ||
       dfgStatisticalActive || dfgCausalActive || correlationActive
       || spectrumActive
       || (options.batches === true)

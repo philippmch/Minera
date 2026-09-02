@@ -48,6 +48,91 @@ describe("Inductive request options", () => {
   });
 });
 
+describe("Footprints request options", () => {
+  it("serializes every discovery and conformance selector", () => {
+    expect(mineFormEntries({
+      footprintsDiscoveryVariants: [
+        "entire_event_log", "entire_dataframe", "polars_lazyframes",
+        "trace_by_trace", "dfg", "petri_reach_graph", "process_tree", "powl",
+      ],
+      footprintsModel: "powl",
+      footprintsConformanceVariants: ["log_model", "log_extensive", "trace_extensive"],
+      footprintsStrict: true,
+      footprintsEnableActAlwaysExecuted: false,
+    })).toEqual([
+      ["footprints_discovery_variants", "entire_event_log,entire_dataframe,polars_lazyframes,trace_by_trace,dfg,petri_reach_graph,process_tree,powl"],
+      ["footprints_model", "powl"],
+      ["footprints_conformance_variants", "log_model,log_extensive,trace_extensive"],
+      ["footprints_strict", "true"],
+      ["footprints_enable_act_always_executed", "false"],
+    ]);
+  });
+
+  it("keeps native defaults quiet and rejects incompatible selectors", () => {
+    expect(mineFormEntries({
+      footprintsDiscoveryVariants: ["entire_event_log", "dfg", "process_tree", "powl"],
+      footprintsModel: "process_tree",
+      footprintsConformanceVariants: ["log_model"],
+    })).toEqual([]);
+    expect(() => mineFormEntries({
+      footprintsDiscoveryVariants: ["petri_reach_graph"],
+      footprintsModel: "dfg",
+    })).toThrow(/incompatible/);
+    expect(() => mineFormEntries({
+      footprintsDiscoveryVariants: ["unknown_variant" as never],
+    })).toThrow(/Unknown footprints discovery variant/);
+    expect(() => mineFormEntries({
+      footprintsConformanceVariants: ["unknown_variant" as never],
+    })).toThrow(/Unknown footprints conformance variant/);
+    expect(() => mineFormEntries({
+      footprintsModel: "unknown" as never,
+    })).toThrow(/Unknown footprints model/);
+    expect(() => mineFormEntries({
+      footprintsDiscoveryVariants: [],
+    })).toThrow(/must not be empty/);
+  });
+
+  it("serializes custom table selectors and canonicalizes markings", () => {
+    expect(mineFormEntries({
+      footprintsActivityAttribute: " phase ",
+      footprintsCaseIdAttribute: " case_ref ",
+      footprintsStartTimestampAttribute: " started_at ",
+      footprintsTimestampAttribute: " finished_at ",
+      footprintsIndexAttribute: " row_number ",
+      footprintsSortRequired: false,
+      footprintsInitialMarking: "000, 18446744073709551615",
+    })).toEqual([
+      ["footprints_activity_attribute", "phase"],
+      ["footprints_case_id_attribute", "case_ref"],
+      ["footprints_timestamp_attribute", "finished_at"],
+      ["footprints_index_attribute", "row_number"],
+      ["footprints_start_timestamp_attribute", "started_at"],
+      ["footprints_sort_required", "false"],
+      ["footprints_initial_marking", "0,18446744073709551615"],
+    ]);
+    expect(mineFormEntries({
+      footprintsActivityAttribute: "concept:name",
+      footprintsCaseIdAttribute: "case:concept:name",
+      footprintsTimestampAttribute: "time:timestamp",
+      footprintsIndexAttribute: "@@index",
+      footprintsStartTimestampAttribute: "",
+      footprintsSortRequired: true,
+    })).toEqual([]);
+    expect(mineFormEntries({ footprintsIndexAttribute: "  " })).toEqual([
+      ["footprints_index_attribute", ""],
+    ]);
+  });
+
+  it("rejects malformed footprint markings and selectors", () => {
+    expect(() => mineFormEntries({ footprintsInitialMarking: "1,,2" }))
+      .toThrow(/non-negative uint64/);
+    expect(() => mineFormEntries({ footprintsInitialMarking: "18446744073709551616" }))
+      .toThrow(/exceeds uint64/);
+    expect(() => mineFormEntries({ footprintsActivityAttribute: " " }))
+      .toThrow(/must not be empty/);
+  });
+});
+
 describe("knowledge injection API", () => {
   it("serializes bounded provider-neutral prompt options", () => {
     expect(knowledgeInjectionQuery({

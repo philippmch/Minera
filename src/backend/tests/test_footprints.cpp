@@ -1,7 +1,11 @@
 #include "minera/footprints.hpp"
 
+#include "../footprints/conformance_log_model.hpp"
+#include "../footprints/conformance_trace_extensive.hpp"
+
 #include <cassert>
 #include <initializer_list>
+#include <stdexcept>
 #include <string>
 
 using namespace minera;
@@ -121,8 +125,173 @@ void conformance_variants_and_evaluation() {
   assert(fp_fitness(empty, empty, check_footprints_log_extensive(empty, empty)) == 1.0);
 }
 
+void conformance_optional_fields_and_duplicate_variants() {
+  Footprint log;
+  log.activities = {"A"};
+  log.start_activities = {"A"};
+  log.end_activities = {"A"};
+  log.min_trace_length = 1;
+
+  Footprint model = log;
+  model.min_trace_length = 99;
+  model.min_trace_length_present = false;
+  const auto omitted = check_footprints_log_extensive(log, model);
+  assert(omitted.min_length_fit && omitted.is_fit);
+
+  Footprint model_with_length = log;
+  model_with_length.min_trace_length = 2;
+  const auto rejected = check_footprints_log_extensive(log, model_with_length);
+  assert(!rejected.min_length_fit && !rejected.is_fit);
+
+  // Trace-extensive conformance reuses an exact sequence variant.  The
+  // second object deliberately carries conflicting derived fields so a
+  // variant cache is observable and deterministic.
+  Footprint first = log;
+  first.trace = std::vector<std::string>{"A"};
+  Footprint second = first;
+  second.start_activities = {"B"};
+  second.end_activities = {"B"};
+  const auto cached = check_footprints_trace_extensive({first, second}, model);
+  assert(cached.size() == 2);
+  assert(cached[0].is_fit == cached[1].is_fit);
+  assert(cached[1].start_activities.empty());
+
+  EventLog source;
+  source.traces.push_back(Trace{"case-a", {Event{"case-a", "A"}}});
+  source.traces.push_back(Trace{"case-b", {Event{"case-b", "B"}}});
+  const auto diagnostics =
+      minera::footprints_conformance::TraceExtensiveVariant::diagnostics(
+          source, cached, "case_id");
+  assert(diagnostics.size() == 2);
+  assert(diagnostics[0].case_id == "case-a");
+  assert(diagnostics[1].case_id == "case-b");
+}
+
+void conformance_atomic_relation_extension_is_strict() {
+  Footprint log;
+  log.atomic_interleaving.insert({"A", "B"});
+  Footprint model;
+  model.sequence.insert({"A", "B"});
+  assert(check_footprints_log_model(log, model).empty());
+  assert(check_footprints_log_model(log, model, {true}).count({"A", "B"}) ==
+         1);
+}
+
+void conformance_summary_validates_cardinality() {
+  const auto log = discover_trace_footprints(make_log({{"A"}}));
+  const auto model = log.front();
+  const auto result = check_footprints_trace_extensive(log, model);
+  bool mismatched = false;
+  try {
+    (void)fp_fitness(log, model, {});
+  } catch (const std::invalid_argument&) {
+    mismatched = true;
+  }
+  assert(mismatched);
+
+  const auto empty = fp_fitness(
+      std::vector<Footprint>{}, model,
+      std::vector<FootprintsExtensiveResult>{});
+  assert(empty.perc_fit_traces == 0.0 && empty.log_fitness == 1.0);
+
+  bool wrong_size = false;
+  try {
+    (void)fp_fitness(log, model,
+                     std::vector<FootprintsExtensiveResult>{result.front(),
+                                                            result.front()});
+  } catch (const std::invalid_argument&) {
+    wrong_size = true;
+  }
+  assert(wrong_size);
+}
+
+void conformance_diagnostics_validate_case_id_selectors() {
+  EventLog source;
+  source.traces.push_back(Trace{"anonymous", {}});
+
+  // The default selector can still identify an anonymous native trace by
+  // position, which keeps diagnostics total for hand-built empty logs.
+  const auto default_log_model =
+      minera::footprints_conformance::LogModelVariant::diagnostics(
+          source, std::vector<FootprintViolations>{{}});
+  assert(default_log_model.size() == 1 &&
+         default_log_model.front().case_id == "anonymous");
+  const auto default_trace_extensive =
+      minera::footprints_conformance::TraceExtensiveVariant::diagnostics(
+          source, std::vector<FootprintsExtensiveResult>{{}});
+  assert(default_trace_extensive.size() == 1 &&
+         default_trace_extensive.front().case_id == "anonymous");
+
+  source.traces.front().case_id.clear();
+  const auto fallback_log_model =
+      minera::footprints_conformance::LogModelVariant::diagnostics(
+          source, std::vector<FootprintViolations>{{}});
+  const auto fallback_trace_extensive =
+      minera::footprints_conformance::TraceExtensiveVariant::diagnostics(
+          source, std::vector<FootprintsExtensiveResult>{{}});
+  assert(fallback_log_model.front().case_id == "trace-0");
+  assert(fallback_trace_extensive.front().case_id == "trace-0");
+
+  bool log_model_missing = false;
+  try {
+    (void)minera::footprints_conformance::LogModelVariant::diagnostics(
+        source, std::vector<FootprintViolations>{{}}, "external_case");
+  } catch (const std::invalid_argument&) {
+    log_model_missing = true;
+  }
+  bool trace_extensive_missing = false;
+  try {
+    (void)minera::footprints_conformance::TraceExtensiveVariant::diagnostics(
+        source, std::vector<FootprintsExtensiveResult>{{}}, "external_case");
+  } catch (const std::invalid_argument&) {
+    trace_extensive_missing = true;
+  }
+  assert(log_model_missing && trace_extensive_missing);
+
+  source.traces.front().case_id = "selected-case";
+  source.traces.front().case_id_state = FirstClassAttributeState::kPresent;
+  source.traces.front().case_id_source_key = "external_case";
+  source.traces.front().case_id_attribute =
+      EventAttribute{"external_case", "selected-case"};
+  const auto selected_log_model =
+      minera::footprints_conformance::LogModelVariant::diagnostics(
+          source, std::vector<FootprintViolations>{{}}, "external_case");
+  const auto selected_trace_extensive =
+      minera::footprints_conformance::TraceExtensiveVariant::diagnostics(
+          source, std::vector<FootprintsExtensiveResult>{{}},
+          "external_case");
+  assert(selected_log_model.front().case_id == "selected-case");
+  assert(selected_trace_extensive.front().case_id == "selected-case");
+  source.traces.front().case_id.clear();
+  source.traces.front().case_id_state = FirstClassAttributeState::kMissing;
+  source.traces.front().case_id_source_key.clear();
+  source.traces.front().case_id_attribute.reset();
+
+  source.traces.front().attributes.push_back(
+      EventAttribute{"external_case", "", AttributeKind::kString, true});
+  bool log_model_null = false;
+  try {
+    (void)minera::footprints_conformance::LogModelVariant::diagnostics(
+        source, std::vector<FootprintViolations>{{}}, "external_case");
+  } catch (const std::invalid_argument&) {
+    log_model_null = true;
+  }
+  bool trace_extensive_null = false;
+  try {
+    (void)minera::footprints_conformance::TraceExtensiveVariant::diagnostics(
+        source, std::vector<FootprintsExtensiveResult>{{}}, "external_case");
+  } catch (const std::invalid_argument&) {
+    trace_extensive_null = true;
+  }
+  assert(log_model_null && trace_extensive_null);
+}
+
 int main() {
   discovery_variants_are_deterministic();
   dfg_boundaries_are_inferred();
   conformance_variants_and_evaluation();
+  conformance_optional_fields_and_duplicate_variants();
+  conformance_atomic_relation_extension_is_strict();
+  conformance_summary_validates_cardinality();
+  conformance_diagnostics_validate_case_id_selectors();
 }

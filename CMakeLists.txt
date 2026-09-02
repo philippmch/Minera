@@ -70,6 +70,14 @@ add_library(minera_core
   src/backend/eventually_follows.cpp
   src/backend/enterprise_history.cpp
   src/backend/footprints.cpp
+  src/backend/footprints/conformance_evaluation.cpp
+  src/backend/footprints/conformance_log_extensive.cpp
+  src/backend/footprints/conformance_log_model.cpp
+  src/backend/footprints/conformance_trace_extensive.cpp
+  src/backend/footprints/conformance_tree_visualization.cpp
+  src/backend/footprints/discovery_log.cpp
+  src/backend/footprints/discovery_models.cpp
+  src/backend/footprints/discovery_registry.cpp
   src/backend/genetic_matrix_conversion.cpp
   src/backend/genetic_miner.cpp
   src/backend/gzip_codec.cpp
@@ -880,6 +888,9 @@ if(MINERA_BUILD_TESTS)
     src/backend/tests/test_footprints.cpp
   )
   target_link_libraries(minera_footprints_tests PRIVATE minera::core)
+  target_include_directories(minera_footprints_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/backend
+  )
   target_compile_features(minera_footprints_tests PRIVATE cxx_std_20)
   target_compile_options(minera_footprints_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
@@ -893,6 +904,30 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_footprints_models_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_footprints_models_tests COMMAND minera_footprints_models_tests)
+
+  add_executable(minera_footprints_discovery_parity_contracts_tests
+    src/backend/tests/test_footprints_discovery_parity_contracts.cpp
+  )
+  target_link_libraries(minera_footprints_discovery_parity_contracts_tests PRIVATE minera::core)
+  target_include_directories(minera_footprints_discovery_parity_contracts_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/backend
+  )
+  target_compile_features(minera_footprints_discovery_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_footprints_discovery_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_footprints_discovery_parity_contracts_tests
+           COMMAND minera_footprints_discovery_parity_contracts_tests)
+
+  add_executable(minera_footprints_conformance_parity_contracts_tests
+    src/backend/tests/test_footprints_conformance_parity_contracts.cpp
+  )
+  target_link_libraries(minera_footprints_conformance_parity_contracts_tests PRIVATE minera::core)
+  target_include_directories(minera_footprints_conformance_parity_contracts_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/backend
+  )
+  target_compile_features(minera_footprints_conformance_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_footprints_conformance_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_footprints_conformance_parity_contracts_tests
+           COMMAND minera_footprints_conformance_parity_contracts_tests)
 
   add_executable(minera_declare_tests
     src/backend/tests/test_declare.cpp

@@ -36,7 +36,9 @@ int main() {
   assert(inf.start_activities == std::set<std::string>({"A", "B"}));
   assert(inf.end_activities == std::set<std::string>({"A", "B"}));
   assert(inf.parallel.count({"A", "B"}) && inf.parallel.count({"B", "A"}));
-  assert(inf.min_trace_length && *inf.min_trace_length == 1);
+  assert(inf.activities_always_happening &&
+         *inf.activities_always_happening == std::set<std::string>({"A", "B"}));
+  assert(inf.min_trace_length && *inf.min_trace_length == 2);
   assert(inf.max_trace_length_without_loops &&
          *inf.max_trace_length_without_loops == 2);
   assert(inf.skippable && !*inf.skippable);
@@ -45,12 +47,34 @@ int main() {
       ProcessTreeNode{ProcessTreeOperator::kInclusiveChoice, 0,
           {ProcessTreeNode::tau(), ProcessTreeNode::leaf(0)}});
   const auto oinf = discover_footprints(optional_inclusive);
-  assert(oinf.skippable && *oinf.skippable);
-  assert(oinf.min_trace_length && *oinf.min_trace_length == 0);
+  assert(oinf.skippable && !*oinf.skippable);
+  assert(oinf.min_trace_length && *oinf.min_trace_length == 1);
   assert(oinf.max_trace_length_without_loops &&
          *oinf.max_trace_length_without_loops == 1);
   assert(oinf.activities_always_happening &&
-         oinf.activities_always_happening->empty());
+         *oinf.activities_always_happening == std::set<std::string>{"A"});
+
+  // OR composes nested blocks as mandatory concurrent children.  The
+  // sequence inside the first child is retained while the second child can
+  // interleave at either boundary.
+  const ProcessTree nested_inclusive({"A", "B", "C"},
+      ProcessTreeNode{ProcessTreeOperator::kInclusiveChoice, 0,
+          {ProcessTreeNode{ProcessTreeOperator::kSequence, 0,
+                           {ProcessTreeNode::leaf(0),
+                            ProcessTreeNode::leaf(1)}},
+           ProcessTreeNode::leaf(2)}});
+  const auto ninf = discover_footprints(nested_inclusive);
+  assert(ninf.min_trace_length && *ninf.min_trace_length == 3);
+  assert(ninf.max_trace_length_without_loops &&
+         *ninf.max_trace_length_without_loops == 3);
+  assert(ninf.activities_always_happening &&
+         *ninf.activities_always_happening ==
+             std::set<std::string>({"A", "B", "C"}));
+  assert(ninf.sequence.count({"A", "B"}));
+  assert(ninf.parallel.count({"A", "C"}) &&
+         ninf.parallel.count({"C", "A"}) &&
+         ninf.parallel.count({"B", "C"}) &&
+         ninf.parallel.count({"C", "B"}));
 
   const ProcessTree par_tree({"A", "B"},
       ProcessTreeNode{ProcessTreeOperator::kParallel, 0,
@@ -126,7 +150,11 @@ int main() {
   net.set_source(p0); net.set_sink(p2); net.set_activities({"A"});
   net.add_transition(std::nullopt, {p0}, {p1});
   net.add_transition(std::size_t{0}, {p1}, {p2});
-  const auto nf = discover_footprints(net);
+  FootprintsDiscoveryOptions compatibility_options;
+  compatibility_options.index_attribute.clear();
+  const auto nf = discover_footprints(net, compatibility_options);
+  const auto default_nf = discover_footprints(net, {});
+  assert(default_nf.activities == nf.activities);
   assert(nf.start_activities == std::set<std::string>({"A"}));
   assert(nf.activities == std::set<std::string>({"A"}));
   assert(!nf.dfg_present && !nf.end_activities_present && !nf.min_trace_length_present);
@@ -148,6 +176,27 @@ int main() {
   bool rejected = false;
   try { (void)discover_footprints(unbounded); } catch (const std::runtime_error&) { rejected = true; }
   assert(rejected);
+
+  // Inhibitor guards invalidate ordinary ancestor-dominance reasoning.  This
+  // bounded net reaches a larger marking once, then permanently disables the
+  // growth transition after the guard token is consumed.
+  PetriNet bounded_inhibitor;
+  const auto bi_source = bounded_inhibitor.add_place();
+  const auto bi_guard = bounded_inhibitor.add_place();
+  const auto bi_done = bounded_inhibitor.add_place();
+  const auto bi_sink = bounded_inhibitor.add_place();
+  bounded_inhibitor.set_source(bi_source);
+  bounded_inhibitor.set_sink(bi_sink);
+  bounded_inhibitor.set_activities({"A", "B"});
+  const auto grow = bounded_inhibitor.add_transition(
+      std::size_t{0}, {}, {bi_guard});
+  bounded_inhibitor.add_inhibitor_arc(grow, bi_guard);
+  bounded_inhibitor.add_inhibitor_arc(grow, bi_done);
+  bounded_inhibitor.add_transition(std::size_t{1}, {bi_guard},
+                                   {bi_done, bi_sink});
+  const auto bif = discover_footprints(bounded_inhibitor);
+  assert(bif.start_activities == std::set<std::string>({"A"}));
+  assert(bif.sequence.count({"A", "B"}) == 1);
 
   PetriNet silent_growth;
   const auto g0 = silent_growth.add_place();

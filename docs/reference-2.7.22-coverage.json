@@ -693,8 +693,112 @@
           "symbol": "TRACE_EXTENSIVE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "LOG_MODEL": {
+          "selector": "LOG_MODEL",
+          "binding": {
+            "selector": "LOG_MODEL",
+            "modules": [
+              "algo.conformance.footprints.variants.log_model"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "LOG_MODEL"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/footprints.hpp",
+              "symbol": "check_footprints_log_model"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_footprints_conformance_parity_contracts.cpp",
+              "executable": "minera_footprints_conformance_parity_contracts_tests",
+              "case": "log_model_selector_contract"
+            }
+          ]
+        },
+        "LOG_EXTENSIVE": {
+          "selector": "LOG_EXTENSIVE",
+          "binding": {
+            "selector": "LOG_EXTENSIVE",
+            "modules": [
+              "algo.conformance.footprints.variants.log_extensive"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "LOG_EXTENSIVE"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/footprints.hpp",
+              "symbol": "check_footprints_log_extensive"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_footprints_conformance_parity_contracts.cpp",
+              "executable": "minera_footprints_conformance_parity_contracts_tests",
+              "case": "log_extensive_selector_contract"
+            }
+          ]
+        },
+        "TRACE_EXTENSIVE": {
+          "selector": "TRACE_EXTENSIVE",
+          "binding": {
+            "selector": "TRACE_EXTENSIVE",
+            "modules": [
+              "algo.conformance.footprints.variants.trace_extensive"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "TRACE_EXTENSIVE"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/footprints.hpp",
+              "symbol": "check_footprints_trace_extensive"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_footprints_conformance_parity_contracts.cpp",
+              "executable": "minera_footprints_conformance_parity_contracts_tests",
+              "case": "trace_extensive_selector_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/footprints.hpp",
+        "src/backend/footprints.cpp",
+        "src/backend/footprints/conformance_evaluation.hpp",
+        "src/backend/footprints/conformance_evaluation.cpp",
+        "src/backend/footprints/conformance_log_extensive.hpp",
+        "src/backend/footprints/conformance_log_extensive.cpp",
+        "src/backend/footprints/conformance_log_model.hpp",
+        "src/backend/footprints/conformance_log_model.cpp",
+        "src/backend/footprints/conformance_trace_extensive.hpp",
+        "src/backend/footprints/conformance_trace_extensive.cpp",
+        "src/backend/footprints/conformance_tree_visualization.hpp",
+        "src/backend/footprints/conformance_tree_visualization.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_footprints.cpp",
+        "src/backend/tests/test_footprints_conformance_parity_contracts.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/api.test.ts",
+        "src/frontend/tests/components/Filters.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.conformance.log_skeleton",
@@ -1517,8 +1621,236 @@
           "symbol": "POLARS_LAZYFRAMES"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "ENTIRE_EVENT_LOG": {
+          "selector": "ENTIRE_EVENT_LOG",
+          "binding": {
+            "selector": "ENTIRE_EVENT_LOG",
+            "modules": [
+              "algo.discovery.footprints.log.variants.entire_event_log"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "ENTIRE_EVENT_LOG"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/footprints/discovery_registry.hpp",
+              "symbol": "FootprintsDiscoverySelectorRegistry"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+              "executable": "minera_footprints_discovery_parity_contracts_tests",
+              "case": "entire_event_log_selector_contract"
+            }
+          ]
+        },
+        "ENTIRE_DATAFRAME": {
+          "selector": "ENTIRE_DATAFRAME",
+          "binding": {
+            "selector": "ENTIRE_DATAFRAME",
+            "modules": [
+              "algo.discovery.footprints.log.variants.entire_dataframe"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "ENTIRE_DATAFRAME"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/footprints/discovery_registry.hpp",
+              "symbol": "FootprintsDiscoverySelectorRegistry"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+              "executable": "minera_footprints_discovery_parity_contracts_tests",
+              "case": "entire_dataframe_selector_contract"
+            }
+          ]
+        },
+        "TRACE_BY_TRACE": {
+          "selector": "TRACE_BY_TRACE",
+          "binding": {
+            "selector": "TRACE_BY_TRACE",
+            "modules": [
+              "algo.discovery.footprints.log.variants.trace_by_trace"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "TRACE_BY_TRACE"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/footprints/discovery_registry.hpp",
+              "symbol": "FootprintsDiscoverySelectorRegistry"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+              "executable": "minera_footprints_discovery_parity_contracts_tests",
+              "case": "trace_by_trace_selector_contract"
+            }
+          ]
+        },
+        "PETRI_REACH_GRAPH": {
+          "selector": "PETRI_REACH_GRAPH",
+          "binding": {
+            "selector": "PETRI_REACH_GRAPH",
+            "modules": [
+              "algo.discovery.footprints.petri.variants.reach_graph"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PETRI_REACH_GRAPH"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/footprints/discovery_registry.hpp",
+              "symbol": "FootprintsDiscoverySelectorRegistry"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+              "executable": "minera_footprints_discovery_parity_contracts_tests",
+              "case": "petri_reach_graph_selector_contract"
+            }
+          ]
+        },
+        "PROCESS_TREE": {
+          "selector": "PROCESS_TREE",
+          "binding": {
+            "selector": "PROCESS_TREE",
+            "modules": [
+              "algo.discovery.footprints.tree.variants.bottomup"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PROCESS_TREE"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/footprints/discovery_registry.hpp",
+              "symbol": "FootprintsDiscoverySelectorRegistry"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+              "executable": "minera_footprints_discovery_parity_contracts_tests",
+              "case": "process_tree_selector_contract"
+            }
+          ]
+        },
+        "POWL": {
+          "selector": "POWL",
+          "binding": {
+            "selector": "POWL",
+            "modules": [
+              "algo.discovery.footprints.powl.variants.bottomup"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "POWL"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/footprints/discovery_registry.hpp",
+              "symbol": "FootprintsDiscoverySelectorRegistry"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+              "executable": "minera_footprints_discovery_parity_contracts_tests",
+              "case": "powl_selector_contract"
+            }
+          ]
+        },
+        "DFG": {
+          "selector": "DFG",
+          "binding": {
+            "selector": "DFG",
+            "modules": [
+              "algo.discovery.footprints.dfg.variants.dfg"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "DFG"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/footprints/discovery_registry.hpp",
+              "symbol": "FootprintsDiscoverySelectorRegistry"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+              "executable": "minera_footprints_discovery_parity_contracts_tests",
+              "case": "dfg_selector_contract"
+            }
+          ]
+        },
+        "POLARS_LAZYFRAMES": {
+          "selector": "POLARS_LAZYFRAMES",
+          "binding": {
+            "selector": "POLARS_LAZYFRAMES",
+            "modules": [
+              "algo.discovery.footprints.log.variants.polars_lazyframes",
+              "algo.discovery.footprints.log.variants.entire_dataframe"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "POLARS_LAZYFRAMES"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/footprints/discovery_registry.hpp",
+              "symbol": "FootprintsDiscoverySelectorRegistry"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+              "executable": "minera_footprints_discovery_parity_contracts_tests",
+              "case": "polars_lazyframes_selector_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/footprints.hpp",
+        "src/backend/footprints.cpp",
+        "src/backend/footprints_models.cpp",
+        "src/backend/footprints/discovery_registry.hpp",
+        "src/backend/footprints/discovery_registry.cpp",
+        "src/backend/footprints/discovery_log.cpp",
+        "src/backend/footprints/discovery_models.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_footprints.cpp",
+        "src/backend/tests/test_footprints_models.cpp",
+        "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/app-logic.ts",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/api.test.ts",
+        "src/frontend/tests/app-logic.test.ts",
+        "src/frontend/tests/components/Filters.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.discovery.genetic",
@@ -5246,8 +5578,29 @@
       "owner": "algo.conformance.footprints",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/conformance_evaluation.hpp",
+        "src/backend/footprints/conformance_evaluation.cpp",
+        "src/backend/tests/test_footprints_conformance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.footprints.util.evaluation",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/conformance_evaluation.hpp",
+            "symbol": "EvaluationUtility"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_conformance_parity_contracts.cpp",
+            "executable": "minera_footprints_conformance_parity_contracts_tests",
+            "case": "evaluation_utility_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.footprints.util.tree_visualization",
@@ -5255,8 +5608,29 @@
       "owner": "algo.conformance.footprints",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/conformance_tree_visualization.hpp",
+        "src/backend/footprints/conformance_tree_visualization.cpp",
+        "src/backend/tests/test_footprints_conformance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.footprints.util.tree_visualization",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/conformance_tree_visualization.hpp",
+            "symbol": "TreeVisualizationProjection"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_conformance_parity_contracts.cpp",
+            "executable": "minera_footprints_conformance_parity_contracts_tests",
+            "case": "tree_visualization_projection_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.footprints.variants.log_extensive",
@@ -5269,8 +5643,29 @@
           "selector": "LOG_EXTENSIVE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/conformance_log_extensive.hpp",
+        "src/backend/footprints/conformance_log_extensive.cpp",
+        "src/backend/tests/test_footprints_conformance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.footprints.variants.log_extensive",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/conformance_log_extensive.hpp",
+            "symbol": "LogExtensiveVariant"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_conformance_parity_contracts.cpp",
+            "executable": "minera_footprints_conformance_parity_contracts_tests",
+            "case": "log_extensive_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.footprints.variants.log_model",
@@ -5283,8 +5678,29 @@
           "selector": "LOG_MODEL"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/conformance_log_model.hpp",
+        "src/backend/footprints/conformance_log_model.cpp",
+        "src/backend/tests/test_footprints_conformance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.footprints.variants.log_model",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/conformance_log_model.hpp",
+            "symbol": "LogModelVariant"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_conformance_parity_contracts.cpp",
+            "executable": "minera_footprints_conformance_parity_contracts_tests",
+            "case": "log_model_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.footprints.variants.trace_extensive",
@@ -5297,8 +5713,29 @@
           "selector": "TRACE_EXTENSIVE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/conformance_trace_extensive.hpp",
+        "src/backend/footprints/conformance_trace_extensive.cpp",
+        "src/backend/tests/test_footprints_conformance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.footprints.variants.trace_extensive",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/conformance_trace_extensive.hpp",
+            "symbol": "TraceExtensiveVariant"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_conformance_parity_contracts.cpp",
+            "executable": "minera_footprints_conformance_parity_contracts_tests",
+            "case": "trace_extensive_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.log_skeleton.variants.classic",
@@ -6210,8 +6647,29 @@
           "selector": "DFG"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/discovery_registry.hpp",
+        "src/backend/footprints/discovery_log.cpp",
+        "src/backend/tests/test_footprints_discovery_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.footprints.dfg.variants.dfg",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/discovery_registry.hpp",
+            "symbol": "DfgFootprintsDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+            "executable": "minera_footprints_discovery_parity_contracts_tests",
+            "case": "dfg_discovery_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.footprints.log.variants.entire_dataframe",
@@ -6228,8 +6686,29 @@
           "selector": "POLARS_LAZYFRAMES"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/discovery_registry.hpp",
+        "src/backend/footprints/discovery_log.cpp",
+        "src/backend/tests/test_footprints_discovery_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.footprints.log.variants.entire_dataframe",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/discovery_registry.hpp",
+            "symbol": "EntireDataframeFootprintsDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+            "executable": "minera_footprints_discovery_parity_contracts_tests",
+            "case": "entire_dataframe_discovery_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.footprints.log.variants.entire_event_log",
@@ -6242,8 +6721,29 @@
           "selector": "ENTIRE_EVENT_LOG"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/discovery_registry.hpp",
+        "src/backend/footprints/discovery_log.cpp",
+        "src/backend/tests/test_footprints_discovery_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.footprints.log.variants.entire_event_log",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/discovery_registry.hpp",
+            "symbol": "EntireEventLogFootprintsDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+            "executable": "minera_footprints_discovery_parity_contracts_tests",
+            "case": "entire_event_log_discovery_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.footprints.log.variants.polars_lazyframes",
@@ -6256,8 +6756,29 @@
           "selector": "POLARS_LAZYFRAMES"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/discovery_registry.hpp",
+        "src/backend/footprints/discovery_log.cpp",
+        "src/backend/tests/test_footprints_discovery_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.footprints.log.variants.polars_lazyframes",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/discovery_registry.hpp",
+            "symbol": "PolarsLazyframesFootprintsDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+            "executable": "minera_footprints_discovery_parity_contracts_tests",
+            "case": "polars_lazyframes_discovery_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.footprints.log.variants.trace_by_trace",
@@ -6270,8 +6791,29 @@
           "selector": "TRACE_BY_TRACE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/discovery_registry.hpp",
+        "src/backend/footprints/discovery_log.cpp",
+        "src/backend/tests/test_footprints_discovery_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.footprints.log.variants.trace_by_trace",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/discovery_registry.hpp",
+            "symbol": "TraceByTraceFootprintsDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+            "executable": "minera_footprints_discovery_parity_contracts_tests",
+            "case": "trace_by_trace_discovery_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.footprints.petri.variants.reach_graph",
@@ -6284,8 +6826,29 @@
           "selector": "PETRI_REACH_GRAPH"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/discovery_registry.hpp",
+        "src/backend/footprints/discovery_models.cpp",
+        "src/backend/tests/test_footprints_discovery_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.footprints.petri.variants.reach_graph",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/discovery_registry.hpp",
+            "symbol": "PetriReachabilityFootprintsDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+            "executable": "minera_footprints_discovery_parity_contracts_tests",
+            "case": "petri_reachability_discovery_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.footprints.powl.variants.bottomup",
@@ -6298,8 +6861,29 @@
           "selector": "POWL"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/discovery_registry.hpp",
+        "src/backend/footprints/discovery_models.cpp",
+        "src/backend/tests/test_footprints_discovery_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.footprints.powl.variants.bottomup",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/discovery_registry.hpp",
+            "symbol": "PowlBottomUpFootprintsDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+            "executable": "minera_footprints_discovery_parity_contracts_tests",
+            "case": "powl_bottom_up_discovery_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.footprints.tree.variants.bottomup",
@@ -6312,8 +6896,29 @@
           "selector": "PROCESS_TREE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/footprints/discovery_registry.hpp",
+        "src/backend/footprints/discovery_models.cpp",
+        "src/backend/tests/test_footprints_discovery_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.footprints.tree.variants.bottomup",
+        "implementation": [
+          {
+            "path": "src/backend/footprints/discovery_registry.hpp",
+            "symbol": "ProcessTreeBottomUpFootprintsDiscovery"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_footprints_discovery_parity_contracts.cpp",
+            "executable": "minera_footprints_discovery_parity_contracts_tests",
+            "case": "process_tree_bottom_up_discovery_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.genetic.util",

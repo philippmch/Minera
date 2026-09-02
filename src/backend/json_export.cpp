@@ -569,6 +569,16 @@ void validate_footprints_extensive(
 void validate_footprints_analysis(const FootprintsAnalysis& analysis,
                                   const EventLog& log,
                                   const DirectlyFollowsGraph& graph) {
+  if (analysis.trace_case_ids.size() != 0 &&
+      analysis.trace_case_ids.size() != log.traces.size()) {
+    throw std::invalid_argument(
+        "footprints diagnostic case ids must contain one value per trace");
+  }
+  if (analysis.activity_attribute.empty() ||
+      analysis.case_id_attribute.empty()) {
+    throw std::invalid_argument(
+        "footprints diagnostic selectors must not be empty");
+  }
   if (analysis.entire_event_log) {
     validate_footprint(*analysis.entire_event_log, graph);
   }
@@ -780,6 +790,11 @@ void write_footprints_analysis(std::ostream& out,
                                const FootprintsAnalysis& analysis,
                                const EventLog& log,
                                const DirectlyFollowsGraph& graph) {
+  const auto diagnostic_case_id = [&](std::size_t index) -> const std::string& {
+    if (analysis.trace_case_ids.size() == log.traces.size())
+      return analysis.trace_case_ids[index];
+    return log.traces[index].case_id;
+  };
   out << "{\"discovery\": {";
   bool emitted = false;
   const auto discovery = [&](std::string_view name,
@@ -805,7 +820,7 @@ void write_footprints_analysis(std::ostream& out,
     out << "\"trace_by_trace\": [";
     for (std::size_t i = 0; i < analysis.trace_by_trace->size(); ++i) {
       out << "{\"trace_index\": " << i << ", \"case_id\": ";
-      write_json_string(out, log.traces[i].case_id);
+      write_json_string(out, diagnostic_case_id(i));
       out << ", \"footprint\": ";
       write_footprint(out, (*analysis.trace_by_trace)[i], graph);
       out << '}' << (i + 1 < analysis.trace_by_trace->size() ? ", " : "");
@@ -836,7 +851,7 @@ void write_footprints_analysis(std::ostream& out,
     out << ", \"trace_extensive\": [";
     for (std::size_t i = 0; i < analysis.trace_extensive->size(); ++i) {
       out << "{\"trace_index\": " << i << ", \"case_id\": ";
-      write_json_string(out, log.traces[i].case_id);
+      write_json_string(out, diagnostic_case_id(i));
       out << ", ";
       write_footprints_extensive_fields(
           out, (*analysis.trace_extensive)[i], graph);
@@ -846,7 +861,16 @@ void write_footprints_analysis(std::ostream& out,
   }
   out << "}, \"metrics\": {\"precision\": " << analysis.precision
       << ", \"log_fitness\": " << analysis.log_fitness
-      << ", \"perc_fit_traces\": " << analysis.perc_fit_traces << "}}";
+      << ", \"perc_fit_traces\": " << analysis.perc_fit_traces << '}';
+  if (analysis.activity_attribute != "concept:name") {
+    out << ", \"activity_attribute\": ";
+    write_json_string(out, analysis.activity_attribute);
+  }
+  if (analysis.case_id_attribute != "case:concept:name") {
+    out << ", \"case_id_attribute\": ";
+    write_json_string(out, analysis.case_id_attribute);
+  }
+  out << '}';
 }
 
 void write_place_list(std::ostream& out, const std::vector<std::size_t>& places) {

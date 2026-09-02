@@ -6,10 +6,12 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "minera/directly_follows_graph.hpp"
+#include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/process_tree.hpp"
@@ -43,8 +45,53 @@ struct Footprint {
   std::optional<std::vector<std::string>> trace;
 };
 
+// Selectors shared by the event-log, table, lazy-table, and Petri discovery
+// adapters.  The value objects deliberately use attribute names rather than
+// importer-specific aliases so a caller can use the same options for every
+// input representation.  A missing start selector means that no separate
+// start-time column is required; completion timestamps remain the ordering
+// key for the eager adapter.
+struct FootprintsDiscoveryOptions {
+  std::string activity_attribute = "concept:name";
+  std::string case_id_attribute = "case:concept:name";
+  std::string timestamp_attribute = "time:timestamp";
+  std::optional<std::string> start_timestamp_attribute;
+  std::string index_attribute = "@@index";
+  bool sort_required = true;
+  // When engaged, this must contain one token count for every Petri place.
+  // An omitted marking uses the workflow source place's initial token.
+  std::optional<std::vector<std::uint64_t>> initial_marking;
+};
+
 Footprint discover_footprints(const EventLog& log);
+Footprint discover_footprints(
+    const EventLog& log, const FootprintsDiscoveryOptions& options);
 std::vector<Footprint> discover_trace_footprints(const EventLog& log);
+std::vector<Footprint> discover_trace_footprints(
+    const EventLog& log, const FootprintsDiscoveryOptions& options);
+Footprint discover_footprints(
+    const EventTable& table,
+    const FootprintsDiscoveryOptions& options = {});
+Footprint discover_footprints(
+    const LazyEventTable& table,
+    const FootprintsDiscoveryOptions& options = {});
+
+// Build the selector projection used by the aggregate adapters.  The
+// projection keeps the imported trace/event order and materializes selected
+// first-class values under the requested table column names only when a real
+// source column with that name is absent.
+EventLog prepare_footprints_event_log(
+    const EventLog& log, const FootprintsDiscoveryOptions& options = {});
+EventTable prepare_footprints_event_table(
+    const EventLog& log, const FootprintsDiscoveryOptions& options = {});
+LazyEventTable prepare_footprints_lazy_table(
+    const EventLog& log, const FootprintsDiscoveryOptions& options = {});
+
+// Resolve the case identifiers that trace diagnostics should expose.  A
+// custom selector must resolve to a present, non-null value for every event
+// in a trace; canonical selectors retain the trace's intrinsic identifier.
+std::vector<std::string> resolve_footprints_case_ids(
+    const EventLog& log, std::string_view case_id_attribute);
 Footprint discover_dfg_footprints(
     const std::map<FootprintPair, std::uint64_t>& dfg);
 Footprint discover_dfg_footprints(const DirectlyFollowsGraph& graph);
@@ -53,11 +100,14 @@ Footprint discover_dfg_footprints(const DirectlyFollowsGraph& graph);
 // only the fields defined by the corresponding variant; absent fields are
 // signalled by the *_present flags (or a disengaged optional).
 Footprint discover_footprints(const PetriNet& net);
+Footprint discover_footprints(
+    const PetriNet& net, const FootprintsDiscoveryOptions& options);
 Footprint discover_footprints(const ProcessTree& tree);
 Footprint discover_footprints(const PowlNode& model);
 
 struct FootprintsLogModelOptions {
   bool strict = false;
+  std::string case_id_attribute = "case:concept:name";
 };
 
 using FootprintViolations = std::set<FootprintPair>;
@@ -86,6 +136,7 @@ FootprintsExtensiveResult check_footprints_log_extensive(
 
 struct FootprintsTraceExtensiveOptions {
   bool enable_act_always_executed = true;
+  std::string case_id_attribute = "case:concept:name";
 };
 
 std::vector<FootprintsExtensiveResult> check_footprints_trace_extensive(
@@ -116,6 +167,14 @@ struct FootprintsOptions {
   std::set<std::string> conformance_variants = {"log_model"};
   bool strict = false;
   bool enable_act_always_executed = true;
+  // Event/table selectors used by the selected footprint discovery adapters.
+  std::string activity_attribute = "concept:name";
+  std::string case_id_attribute = "case:concept:name";
+  std::string timestamp_attribute = "time:timestamp";
+  std::optional<std::string> start_timestamp_attribute;
+  std::string index_attribute = "@@index";
+  bool sort_required = true;
+  std::optional<std::vector<std::uint64_t>> initial_marking;
 };
 
 // Aggregate transport object. Discovery fields are engaged only when their
@@ -141,6 +200,13 @@ struct FootprintsAnalysis {
   double precision = 1.0;
   double log_fitness = 1.0;
   double perc_fit_traces = 0.0;
+
+  // Selector provenance for aggregate diagnostics.  The case-id vector is
+  // aligned with the imported trace order and is used by JSON serializers
+  // instead of silently falling back to intrinsic trace ids.
+  std::string activity_attribute = "concept:name";
+  std::string case_id_attribute = "case:concept:name";
+  std::vector<std::string> trace_case_ids;
 };
 
 }  // namespace minera
