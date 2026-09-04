@@ -3645,6 +3645,9 @@ function isReplayFitnessEvaluation(value: unknown): value is ReplayFitnessEvalua
     metric(value.fitness) && metric(value.log_fitness) && metric(value.average_trace_fitness) &&
     metric(value.percentage_of_fitting_traces) && evaluationNonNegativeInt(value.fitting_traces) &&
     evaluationNonNegativeInt(value.trace_count) && metric(value.total_cost) && optionalRecord(value.token_replay) &&
+    (value.perc_fit_traces === undefined || metric(value.perc_fit_traces)) &&
+    (value.percFitTraces === undefined || metric(value.percFitTraces)) &&
+    (value.averageFitness === undefined || metric(value.averageFitness)) &&
     alignmentsValid;
 }
 
@@ -3671,11 +3674,18 @@ function isSimplicityEvaluation(value: unknown): value is SimplicityEvaluation {
 export interface CompositeEvaluation {
   computed: boolean;
   error: string | null;
-  fitness: EvaluationMetric;
+  /**
+   * Older exports used the scalar directly. New exports carry the complete
+   * replay-fitness record here and mirror its scalar log fitness in
+   * `fitness_score`.
+   */
+  fitness: EvaluationMetric | ReplayFitnessEvaluation;
+  fitness_score?: EvaluationMetric;
   precision: EvaluationMetric;
   generalization: EvaluationMetric;
   simplicity: EvaluationMetric;
-  metrics_average_weight: EvaluationMetric;
+  metrics_average_weight?: EvaluationMetric;
+  metricsAverageWeight?: EvaluationMetric;
   fscore: EvaluationMetric;
   weights: {
     fitness: EvaluationMetric;
@@ -3685,11 +3695,35 @@ export interface CompositeEvaluation {
   };
 }
 function isCompositeEvaluation(value: unknown): value is CompositeEvaluation {
+  const fitnessValue = isRecord(value) ? value.fitness : undefined;
+  const metricsAverageWeight = isRecord(value)
+    ? (value.metrics_average_weight !== undefined
+      ? value.metrics_average_weight
+      : value.metricsAverageWeight)
+    : undefined;
   if (!isRecord(value) || typeof value.computed !== "boolean" ||
-      !nullableString(value.error) || !metric(value.fitness) ||
+      !nullableString(value.error) ||
       !metric(value.precision) || !metric(value.generalization) ||
-      !metric(value.simplicity) || !metric(value.metrics_average_weight) ||
+      !metric(value.simplicity) || !metric(metricsAverageWeight) ||
       !metric(value.fscore) || !isRecord(value.weights)) return false;
+  if (isRecord(fitnessValue)) {
+    if (!isReplayFitnessEvaluation(fitnessValue)) return false;
+    if (value.fitness_score !== undefined &&
+        (!metric(value.fitness_score) ||
+         fitnessValue.log_fitness !== value.fitness_score)) return false;
+  } else {
+    if (!metric(fitnessValue)) return false;
+    if (value.fitness_score !== undefined &&
+        (!metric(value.fitness_score) ||
+         value.fitness_score !== value.fitness)) return false;
+  }
+  if (value.metrics_average_weight !== undefined &&
+      !metric(value.metrics_average_weight)) return false;
+  if (value.metricsAverageWeight !== undefined &&
+      !metric(value.metricsAverageWeight)) return false;
+  if (value.metrics_average_weight !== undefined &&
+      value.metricsAverageWeight !== undefined &&
+      value.metrics_average_weight !== value.metricsAverageWeight) return false;
   return metric(value.weights.fitness) && metric(value.weights.precision) &&
     metric(value.weights.simplicity) && metric(value.weights.generalization);
 }
@@ -4705,6 +4739,9 @@ export interface EvaluationOptions {
   evaluation_family?: EvaluationFamily;
   fitness_variant?: ReplayFitnessVariant;
   evaluation_activity_attribute?: string;
+  evaluation_case_id_attribute?: string;
+  /** Optional cap used when the evaluator materializes flat/lazy input. */
+  evaluation_max_rows_to_materialize?: number;
   evaluation_initial_marking?: number[];
   evaluation_final_marking?: number[];
   evaluation_token_replay_variant?: EvaluationTokenReplayVariant;
@@ -5609,6 +5646,11 @@ export interface ReplayFitnessEvaluation {
   log_fitness: EvaluationMetric;
   average_trace_fitness: EvaluationMetric;
   percentage_of_fitting_traces: EvaluationMetric;
+  /** Established token-replay summary spelling. */
+  perc_fit_traces?: EvaluationMetric;
+  /** Established alignment summary spellings. */
+  percFitTraces?: EvaluationMetric;
+  averageFitness?: EvaluationMetric;
   fitting_traces: number;
   trace_count: number;
   total_cost: EvaluationMetric;

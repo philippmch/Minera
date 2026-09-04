@@ -789,7 +789,7 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
   const modelKey = modelIds.join("|");
   const [miner, setMiner] = useState(modelIds[0] ?? "");
   const [options, setOptions] = useState<EvaluationOptions>({
-    evaluation_family: "replay_fitness",
+    evaluation_family: "composite",
     fitness_variant: "auto",
     precision_variant: "auto",
     precision_use_task_ids: false,
@@ -826,14 +826,14 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
     setLoading(false);
     const next = modelIds.includes(miner) ? miner : (modelIds[0] ?? "");
     setMiner(next);
-    const selected = options.evaluation_family ?? "replay_fitness";
+    const selected = options.evaluation_family ?? "composite";
     const embedded = next ? embeddedEvaluation(data, next, selected) : null;
     setResult(embedded);
     setResultSelectionKey(embedded ? selectionKeyFor(next, options) : null);
     setError(null);
   }, [data, modelKey]);
 
-  const family = options.evaluation_family ?? "replay_fitness";
+  const family = options.evaluation_family ?? "composite";
   const updateFamily = (next: EvaluationFamily) => {
     const nextOptions = { ...options, evaluation_family: next };
     if (next === "precision" &&
@@ -897,7 +897,8 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
     | "evaluation_alignment_model_cost"
     | "evaluation_alignment_silent_model_cost"
     | "evaluation_alignment_sync_cost"
-    | "evaluation_alignment_threshold_border_agreement", value: string) =>
+    | "evaluation_alignment_threshold_border_agreement"
+    | "evaluation_max_rows_to_materialize", value: string) =>
     setOptions((current) => ({ ...current, [name]: value === "" ? undefined : Number(value) }));
   const fitnessVariant = options.fitness_variant ?? "auto";
   const precisionVariant = options.precision_variant ?? "auto";
@@ -946,7 +947,7 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
   return <section className="panel conf-panel other-alignments">
     <div className="panel-head"><h2>Model quality evaluation</h2><span className="panel-meta">Fitness · precision · generalization · simplicity · composite</span></div>
     <div className="align-settings-grid">
-      <label>Model<select value={miner} onChange={(event) => { const next = event.target.value; setMiner(next); const embedded = embeddedEvaluation(data, next, options.evaluation_family ?? "replay_fitness"); setResult(embedded); setResultSelectionKey(embedded ? selectionKeyFor(next, options) : null); setError(null); }} disabled={modelIds.length === 0}>{modelIds.map((id) => <option value={id} key={id}>{id}</option>)}</select></label>
+      <label>Model<select value={miner} onChange={(event) => { const next = event.target.value; setMiner(next); const embedded = embeddedEvaluation(data, next, options.evaluation_family ?? "composite"); setResult(embedded); setResultSelectionKey(embedded ? selectionKeyFor(next, options) : null); setError(null); }} disabled={modelIds.length === 0}>{modelIds.map((id) => <option value={id} key={id}>{id}</option>)}</select></label>
       <label>Family<select value={family} onChange={(event) => updateFamily(event.target.value as EvaluationFamily)}><option value="replay_fitness">Replay fitness</option><option value="precision">Precision</option><option value="generalization">Generalization</option><option value="simplicity">Simplicity</option><option value="composite">Composite</option></select></label>
       {family === "replay_fitness" && <label>Variant<select value={options.fitness_variant ?? "auto"} onChange={(event) => setOptions({ ...options, fitness_variant: event.target.value as EvaluationOptions["fitness_variant"] })}><option value="auto">Automatic</option><option value="token_based">Token based</option><option value="alignment_based">Alignment based</option></select></label>}
       {family === "precision" && <>
@@ -956,6 +957,8 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
       </>}
       {family === "generalization" && <label>Variant<select value="generalization_token" disabled><option value="generalization_token">Transition-frequency token</option></select></label>}
       {family !== "simplicity" && <label>Activity field<input value={options.evaluation_activity_attribute ?? ""} placeholder="concept:name" onChange={(event) => setOptions({ ...options, evaluation_activity_attribute: event.target.value || undefined })} /></label>}
+      {family !== "simplicity" && <label>Case-id field<input value={options.evaluation_case_id_attribute ?? ""} placeholder="case:concept:name" onChange={(event) => setOptions({ ...options, evaluation_case_id_attribute: event.target.value || undefined })} /></label>}
+      {family !== "simplicity" && <label>Input row cap<input type="number" min={0} step={1} value={options.evaluation_max_rows_to_materialize ?? ""} placeholder="none" onChange={(event) => numberOption("evaluation_max_rows_to_materialize", event.target.value)} /></label>}
       {family !== "simplicity" && <>
         <label>Initial marking<input value={evaluationMarkings.initial} placeholder="default source token" onChange={(event) => setEvaluationMarkings({ ...evaluationMarkings, initial: event.target.value })} /></label>
         <label>Final marking<input value={evaluationMarkings.final} placeholder="default sink token" onChange={(event) => setEvaluationMarkings({ ...evaluationMarkings, final: event.target.value })} /></label>
@@ -1018,21 +1021,42 @@ function ModelEvaluationResultView({ result }: { result: ModelEvaluation }) {
     : "variant" in family
       ? family.variant.replaceAll("_", " ")
       : "unknown";
+  const replayAverage = result.replay_fitness
+    ? (result.replay_fitness.average_trace_fitness !== undefined
+      ? result.replay_fitness.average_trace_fitness
+      : (result.replay_fitness.averageFitness ?? null))
+    : null;
+  const replayPercentage = result.replay_fitness
+    ? (result.replay_fitness.percentage_of_fitting_traces !== undefined
+      ? result.replay_fitness.percentage_of_fitting_traces
+      : (result.replay_fitness.perc_fit_traces ?? result.replay_fitness.percFitTraces ?? null))
+    : null;
+  const compositeAverage = result.composite
+    ? (result.composite.metrics_average_weight !== undefined
+      ? result.composite.metrics_average_weight
+      : (result.composite.metricsAverageWeight ?? null))
+    : null;
+  const compositeFitnessScore = result.composite
+    ? (result.composite.fitness !== null &&
+      typeof result.composite.fitness === "object"
+      ? (result.composite.fitness_score ?? result.composite.fitness.log_fitness)
+      : (result.composite.fitness_score ?? result.composite.fitness))
+    : null;
   const metrics: Array<[string, number | null]> = result.replay_fitness ? [
     ["Fitness", result.replay_fitness.fitness],
-    ["Average trace fitness", result.replay_fitness.average_trace_fitness],
-    ["Fitting traces", result.replay_fitness.percentage_of_fitting_traces === null ? null : result.replay_fitness.percentage_of_fitting_traces / 100],
+    ["Average trace fitness", replayAverage],
+    ["Fitting traces", replayPercentage === null ? null : replayPercentage / 100],
   ] : result.precision ? [["Precision", result.precision.precision]]
     : result.generalization ? [["Generalization", result.generalization.score]]
       : result.simplicity ? [["Simplicity", result.simplicity.simplicity]]
-        : [["Composite average", result.composite?.metrics_average_weight ?? null], ["F-score", result.composite?.fscore ?? null]];
+        : [["Composite average", compositeAverage], ["F-score", result.composite?.fscore ?? null]];
   return <div className="other-result">
     <div className="conf-metrics">{metrics.map(([label, value]) => <div className={`conf-gauge ${value === null ? "poor" : grade(value)}`} key={label}><div className="conf-gauge-value">{value === null ? "—" : percent(value)}</div><div className="conf-gauge-label">{label}</div></div>)}</div>
     <p><strong>{result.miner}</strong> · {familyLabel} · {family.computed ? "computed" : "not computed"}{"exhausted" in family && family.exhausted ? " · search exhausted" : ""}</p>
     {result.replay_fitness && <small>{numberFormat.format(result.replay_fitness.fitting_traces)} / {numberFormat.format(result.replay_fitness.trace_count)} fitting traces · total cost {result.replay_fitness.total_cost ?? "—"}</small>}
     {result.generalization && <small>{numberFormat.format(result.generalization.executed_transitions)} / {numberFormat.format(result.generalization.transition_count)} transitions executed · frequencies {result.generalization.transition_frequencies.join(", ") || "none"}</small>}
     {result.simplicity && <small>Complexity {result.simplicity.complexity ?? "—"} · raw value {result.simplicity.value ?? "—"} · {numberFormat.format(result.simplicity.vertices)} vertices · {numberFormat.format(result.simplicity.edges)} edges · {numberFormat.format(result.simplicity.strongly_connected_components)} strongly connected components</small>}
-    {result.composite && <small>Fitness {result.composite.fitness === null ? "—" : percent(result.composite.fitness)} · precision {result.composite.precision === null ? "—" : percent(result.composite.precision)} · generalization {result.composite.generalization === null ? "—" : percent(result.composite.generalization)} · simplicity {result.composite.simplicity === null ? "—" : percent(result.composite.simplicity)}</small>}
+    {result.composite && <small>Fitness {compositeFitnessScore === null ? "—" : percent(compositeFitnessScore)} · precision {result.composite.precision === null ? "—" : percent(result.composite.precision)} · generalization {result.composite.generalization === null ? "—" : percent(result.composite.generalization)} · simplicity {result.composite.simplicity === null ? "—" : percent(result.composite.simplicity)}</small>}
     {error && <p className="conf-inline-note">{error}</p>}
     {(result.replay_fitness?.token_replay || result.replay_fitness?.alignments || result.precision?.token_replay || result.precision?.alignments) && <details><summary>Replay details</summary><pre className="json-preview">{JSON.stringify(result.replay_fitness?.token_replay ?? result.replay_fitness?.alignments ?? result.precision?.token_replay ?? result.precision?.alignments, null, 2)}</pre></details>}
   </div>;
@@ -1057,7 +1081,7 @@ function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditD
   const [emdReference, setEmdReference] = useState<File | null>(null);
   const [emd, setEmd] = useState<EmdResult | null>(data.earth_movers_distance ?? null);
   const [emdResultSelectionKey, setEmdResultSelectionKey] = useState<string | null>(data.earth_movers_distance ? "embedded" : null);
-  const [emdOptions, setEmdOptions] = useState<EmdOptions>({ emd_variant: "exact", normalize_masses: true, strict_equal_mass: false, use_fast_emd: true });
+  const [emdOptions, setEmdOptions] = useState<EmdOptions>({ emd_variant: "pyemd", normalize_masses: true, strict_equal_mass: false, use_fast_emd: true });
   const [emdError, setEmdError] = useState<string | null>(null);
   const [dfgOptions, setDfgOptions] = useState<DfgAlignmentOptions>({ variant: "CLASSIC", projection: "none" });
   const [editOptions, setEditOptions] = useState<EditDistanceOptions>({ variant: "EDIT_DISTANCE", projection: "none" });
@@ -1178,7 +1202,7 @@ function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditD
         <button className="button" disabled={!onRequestEditDistance || !reference || busy !== null} onClick={() => void runEdit()}>{busy === "edit" ? "Aligning…" : "Run edit-distance alignment"}</button>{edit && <EditDistanceResultView result={edit} />}
       </div>
       <div className="other-align-card"><h3>Stochastic-language distance</h3><p>Compare trace distributions with a reference CSV/XES log using optimal transport.</p><label className="file-picker">Reference log<input type="file" accept=".csv,.xes,.xes.gz,.gz,.xml" onChange={e => { invalidateEmd(); setEmdReference(e.target.files?.[0] ?? null); }} /></label>
-        <div className="align-settings-grid"><label>Distance variant<select value={emdOptions.emd_variant ?? "exact"} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, emd_variant: e.target.value as EmdOptions["emd_variant"] }); }}><option value="exact">Exact native</option><option value="pyemd">PYEMD-compatible</option></select></label><label>Normalize masses<select value={String(emdOptions.normalize_masses ?? true)} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, normalize_masses: e.target.value === "true" }); }}><option value="true">On</option><option value="false">Off</option></select></label><label>Equal mass required<select value={String(emdOptions.strict_equal_mass ?? false)} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, strict_equal_mass: e.target.value === "true" }); }}><option value="false">No</option><option value="true">Yes</option></select></label><label>Fast EMD backend<select value={String(emdOptions.use_fast_emd ?? true)} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, use_fast_emd: e.target.value === "true" }); }}><option value="true">On</option><option value="false">Off</option></select></label></div>
+        <div className="align-settings-grid"><label>Distance variant<select value={emdOptions.emd_variant ?? "pyemd"} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, emd_variant: e.target.value as EmdOptions["emd_variant"] }); }}><option value="pyemd">PYEMD-compatible</option><option value="exact">Exact native (explicit)</option></select></label><label>Normalize masses<select value={String(emdOptions.normalize_masses ?? true)} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, normalize_masses: e.target.value === "true" }); }}><option value="true">On</option><option value="false">Off</option></select></label><label>Equal mass required<select value={String(emdOptions.strict_equal_mass ?? false)} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, strict_equal_mass: e.target.value === "true" }); }}><option value="false">No</option><option value="true">Yes</option></select></label><label>Fast EMD backend<select value={String(emdOptions.use_fast_emd ?? true)} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, use_fast_emd: e.target.value === "true" }); }}><option value="true">On</option><option value="false">Off</option></select></label></div>
         <button className="button" disabled={!onRequestEmd || !emdReference || busy !== null} onClick={() => void runEmd()}>{busy === "emd" ? "Comparing…" : "Compare stochastic languages"}</button>{emdError && <p className="conf-inline-note">{emdError}</p>}{emd && (emdResultSelectionKey === emdSelectionKey || (emdResultSelectionKey === "embedded" && !emdReference)) && <EmdResultView result={emd} />}
       </div>
     </div>{error && <div className="conf-notice"><span className="conf-notice-mark">⚠</span><p>{error}</p></div>}

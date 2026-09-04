@@ -1727,6 +1727,17 @@ describe("model-quality result guards", () => {
       average_trace_fitness: 1, percentage_of_fitting_traces: 100, fitting_traces: 2,
       trace_count: 2, total_cost: 0,
     } })).toBe(true);
+    expect(isModelEvaluation({ miner: "inductive", replay_fitness: {
+      ...common, variant: "token_based", exhausted: false, fitness: 1, log_fitness: 1,
+      average_trace_fitness: 1, percentage_of_fitting_traces: 100,
+      perc_fit_traces: 100, fitting_traces: 2, trace_count: 2, total_cost: 0,
+    } })).toBe(true);
+    expect(isModelEvaluation({ miner: "alpha", replay_fitness: {
+      ...common, variant: "alignment_based", exhausted: false, fitness: 1,
+      log_fitness: 1, average_trace_fitness: 1,
+      percentage_of_fitting_traces: 100, percFitTraces: 100,
+      averageFitness: 1, fitting_traces: 1, trace_count: 1, total_cost: 0,
+    } })).toBe(true);
     expect(isModelEvaluation({ miner: "alpha", precision: {
       ...common, variant: "automaton_after_align", exhausted: false, precision: 0.75,
       alignments: {},

@@ -1842,7 +1842,7 @@ export async function alignEditDistance(reference: File, options: EditDistanceOp
 
 /** Stable, validated query serialization for one model-quality evaluation. */
 export function evaluationQuery(options: EvaluationOptions = {}): string {
-  const family = options.evaluation_family ?? "replay_fitness";
+  const family = options.evaluation_family ?? "composite";
   if (!["replay_fitness", "precision", "generalization", "simplicity", "composite"].includes(family)) {
     throw new Error("evaluation_family is invalid");
   }
@@ -1852,6 +1852,15 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
   if (options.evaluation_activity_attribute !== undefined &&
       !options.evaluation_activity_attribute.trim()) {
     throw new Error("evaluation_activity_attribute must not be empty");
+  }
+  if (options.evaluation_case_id_attribute !== undefined &&
+      !options.evaluation_case_id_attribute.trim()) {
+    throw new Error("evaluation_case_id_attribute must not be empty");
+  }
+  if (options.evaluation_max_rows_to_materialize !== undefined &&
+      (!Number.isInteger(options.evaluation_max_rows_to_materialize) ||
+       options.evaluation_max_rows_to_materialize < 0)) {
+    throw new Error("evaluation_max_rows_to_materialize must be a non-negative integer");
   }
   if (options.evaluation_token_replay_variant !== undefined &&
       !["forward", "backwards"].includes(options.evaluation_token_replay_variant)) {
@@ -2002,6 +2011,12 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
     add("evaluation_activity_attribute",
         options.evaluation_activity_attribute.trim());
   }
+  if (options.evaluation_case_id_attribute !== undefined) {
+    add("evaluation_case_id_attribute",
+        options.evaluation_case_id_attribute.trim());
+  }
+  add("evaluation_max_rows_to_materialize",
+      options.evaluation_max_rows_to_materialize);
   add("evaluation_initial_marking", options.evaluation_initial_marking);
   add("evaluation_final_marking", options.evaluation_final_marking);
   add("evaluation_token_replay_variant", options.evaluation_token_replay_variant);
@@ -2104,7 +2119,8 @@ export async function analyzePetriModel(options: PetriAnalysisOptions = {}): Pro
 
 /** Stable query serialization for stochastic-language distance controls. */
 export function emdQuery(options: EmdOptions = {}): string {
-  if (options.emd_variant !== undefined && options.emd_variant !== "exact" && options.emd_variant !== "pyemd") {
+  const variant = options.emd_variant ?? "pyemd";
+  if (variant !== "exact" && variant !== "pyemd") {
     throw new Error("emd_variant is invalid");
   }
   for (const [name, value] of Object.entries(options)) {
@@ -2112,7 +2128,7 @@ export function emdQuery(options: EmdOptions = {}): string {
     if (typeof value !== "boolean") throw new Error(`${name} must be boolean`);
   }
   const query = new URLSearchParams();
-  if (options.emd_variant !== undefined) query.set("emd_variant", options.emd_variant);
+  query.set("emd_variant", variant);
   if (options.normalize_masses !== undefined) query.set("normalize_masses", String(options.normalize_masses));
   if (options.strict_equal_mass !== undefined) query.set("strict_equal_mass", String(options.strict_equal_mass));
   if (options.use_fast_emd !== undefined) query.set("use_fast_emd", String(options.use_fast_emd));

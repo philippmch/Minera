@@ -976,9 +976,11 @@ int usage(const char* program) {
                "  --evaluation-family <id> Model evaluation: replay_fitness,\n"
                "                            precision, generalization, simplicity,\n"
                "                            or composite\n"
-               "  --fitness-variant <id>   auto, token_based, or alignment_based\n"
-               "  --evaluation-activity-attribute <name> Evaluator activity selector\n"
-               "  --evaluation-initial-marking <n,...> Common evaluator initial marking\n"
+                "  --fitness-variant <id>   auto, token_based, or alignment_based\n"
+                "  --evaluation-activity-attribute <name> Evaluator activity selector\n"
+                "  --evaluation-case-id-attribute <name> Evaluator case-id selector\n"
+                "  --evaluation-max-rows-to-materialize <n> Flat-input row cap\n"
+                "  --evaluation-initial-marking <n,...> Common evaluator initial marking\n"
                "  --evaluation-final-marking <n,...> Common evaluator final marking\n"
                "  --evaluation-token-replay-variant <id> forward or backwards\n"
                "  --fitness-consider-unknown-activities <bool> Include unknown labels in forward fitness\n"
@@ -1031,7 +1033,7 @@ int usage(const char* program) {
                "  --petri-analysis-diagnostics <bool> Include diagnostics\n"
                "  --petri-analysis-return-asap-when-unsound <bool> Stop at first unsound witness\n"
                "  --emd-reference <file>   Compare trace languages with CSV/XES log\n"
-               "  --emd-variant <id>       exact (default) or pyemd\n"
+               "  --emd-variant <id>       pyemd (default) or exact\n"
                "  --emd-normalize-masses <bool> Normalize unequal language masses\n"
                "  --emd-strict-equal-mass <bool> Reject unequal language masses\n"
                "  --emd-use-fast-emd <bool> Select accelerated EMD when available\n"
@@ -1743,7 +1745,10 @@ int main(int argc, char** argv) {
   bool compare_petri_reach_final_through_hidden = true;
   bool compare_petri_stop_immediately_unfit = false;
   bool compare_petri_replay_option_used = false;
+  // Select the public default explicitly at the CLI boundary. EXACT remains
+  // available when --emd-variant exact is supplied.
   minera::EmdOptions emd_options;
+  emd_options.variant = minera::EmdVariant::PYEMD;
   bool emd_option_used = false;
   minera::AlignmentOptions alignment_options;
   bool alignment_option_used = false;
@@ -3371,6 +3376,8 @@ int main(int argc, char** argv) {
 
     if (arg == "--evaluation-family" || arg == "--fitness-variant" ||
         arg == "--evaluation-activity-attribute" ||
+        arg == "--evaluation-case-id-attribute" ||
+        arg == "--evaluation-max-rows-to-materialize" ||
         arg == "--evaluation-initial-marking" ||
         arg == "--evaluation-final-marking" ||
         arg == "--evaluation-token-replay-variant" ||

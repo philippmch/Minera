@@ -1,4 +1,5 @@
 #include "minera/dfg_precision.hpp"
+#include "minera/log_conversion.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -21,6 +22,15 @@ const std::string& event_activity(const Event& event,
                                   std::string_view attribute) {
   if (attribute == "activity" || attribute == "concept:name" ||
       attribute == "Activity")
+    return event.activity;
+  // Flat adapters may project a selected source column into Event::activity
+  // while retaining the original spelling separately. Resolve that
+  // first-class source before looking at ordinary attributes so custom
+  // selectors keep working after a round trip through a stream or table.
+  if ((!event.activity_source_key.empty() &&
+       event.activity_source_key == attribute) ||
+      (event.activity_attribute &&
+       event.activity_attribute->key == attribute))
     return event.activity;
   const auto* value = event.attribute(attribute);
   if (!value)
@@ -66,6 +76,100 @@ std::string json_quote(std::string_view value) {
   return out.str();
 }
 
+int dfg_activity_selector_priority(const EventAttribute& field,
+                                   std::string_view selector) {
+  if (field.key == selector) return 3;
+  if (!field.first_class_source_key.empty() &&
+      field.first_class_source_key == selector)
+    return 2;
+  const bool alias = selector == "concept:name" || selector == "activity";
+  return alias && (field.key == "concept:name" || field.key == "activity")
+             ? 1
+             : 0;
+}
+
+int dfg_case_selector_priority(const EventAttribute& field,
+                               std::string_view selector) {
+  if (field.key == selector) return 3;
+  if (!field.first_class_source_key.empty() &&
+      field.first_class_source_key == selector)
+    return 2;
+  const bool alias = selector == "case:concept:name" ||
+                     selector == "case:id" || selector == "case_id" ||
+                     selector == "case";
+  return alias && (field.key == "case:concept:name" ||
+                   field.key == "case:id" || field.key == "case_id" ||
+                   field.key == "case")
+             ? 1
+             : 0;
+}
+
+std::optional<std::size_t> dfg_selected_field(
+    const EventRecord& record, std::string_view selector,
+    std::string_view name,
+    int (*priority)(const EventAttribute&, std::string_view)) {
+  int best = 0;
+  std::optional<std::size_t> selected;
+  for (std::size_t index = 0; index < record.fields.size(); ++index) {
+    const int current = priority(record.fields[index], selector);
+    if (current == 0) continue;
+    if (current > best) {
+      best = current;
+      selected = index;
+    } else if (current == best) {
+      throw std::invalid_argument("DFG precision: " + std::string(name) +
+                                  " selector is ambiguous: " +
+                                  std::string(selector));
+    }
+  }
+  return selected;
+}
+
+void project_dfg_stream(EventStream& stream,
+                        const DfgPrecisionOptions& options) {
+  for (auto& record : stream.events) {
+    const auto case_index = dfg_selected_field(
+        record, options.case_id_attribute, "case-id",
+        dfg_case_selector_priority);
+    const auto activity_index = dfg_selected_field(
+        record, options.activity_attribute, "activity",
+        dfg_activity_selector_priority);
+    const auto selected_case =
+        case_index ? std::optional<EventAttribute>(record.fields[*case_index])
+                   : std::nullopt;
+    const auto selected_activity =
+        activity_index ? std::optional<EventAttribute>(record.fields[*activity_index])
+                       : std::nullopt;
+    for (auto& field : record.fields) {
+      field.first_class_role = FirstClassAttributeRole::kNone;
+      field.first_class_state = FirstClassAttributeState::kMissing;
+      field.first_class_source_key.clear();
+    }
+    const auto append_projection = [&](EventAttribute field,
+                                       FirstClassAttributeRole role,
+                                       std::string_view source_key) {
+      const auto state = field.first_class_role == FirstClassAttributeRole::kNone
+                             ? (field.is_null
+                                    ? FirstClassAttributeState::kNull
+                                    : FirstClassAttributeState::kPresent)
+                             : field.first_class_state;
+      field.first_class_role = role;
+      field.first_class_state = state;
+      field.first_class_source_key = std::string(source_key);
+      record.fields.push_back(std::move(field));
+    };
+    if (selected_case) {
+      append_projection(*selected_case, FirstClassAttributeRole::kCaseId,
+                        options.case_id_attribute);
+    }
+    if (selected_activity) {
+      append_projection(*selected_activity,
+                        FirstClassAttributeRole::kActivity,
+                        options.activity_attribute);
+    }
+  }
+}
+
 }  // namespace
 
 DfgPrecisionResult evaluate_dfg_precision(
@@ -73,6 +177,9 @@ DfgPrecisionResult evaluate_dfg_precision(
     const DfgPrecisionOptions& options) {
   if (options.activity_attribute.empty())
     throw std::invalid_argument("DFG precision: activity attribute must not be empty");
+  if (options.max_rows_to_materialize &&
+      log.event_count() > *options.max_rows_to_materialize)
+    throw std::length_error("DFG precision: row materialization cap exceeded");
 
   std::map<std::string, ActivitySet> exiting;
   for (const auto& [edge, count] : model.graph) {
@@ -160,6 +267,45 @@ DfgPrecisionResult evaluate_dfg_precision(
   }
   result.computed = true;
   return result;
+}
+
+DfgPrecisionResult evaluate_dfg_precision(
+    const EventDataView& data, const DfgCleanAnalysis& model,
+    const DfgPrecisionOptions& options) {
+  if (options.activity_attribute.empty())
+    throw std::invalid_argument(
+        "DFG precision: activity attribute must not be empty");
+  if (options.case_id_attribute.empty())
+    throw std::invalid_argument(
+        "DFG precision: case-id attribute must not be empty");
+
+  if (options.max_rows_to_materialize) {
+    std::optional<std::size_t> known_rows;
+    switch (data.kind()) {
+      case EventDataKind::kEventLog:
+        known_rows = data.log()->event_count();
+        break;
+      case EventDataKind::kEventStream:
+        known_rows = data.stream()->events.size();
+        break;
+      case EventDataKind::kEventTable:
+        known_rows = data.table()->rows.size();
+        break;
+      case EventDataKind::kLazyEventTable:
+        known_rows = data.lazy_table()->row_count();
+        break;
+    }
+    if (known_rows && *known_rows > *options.max_rows_to_materialize)
+      throw std::length_error("DFG precision: row materialization cap exceeded");
+  }
+
+  LogConversionOptions conversion;
+  conversion.case_id_key = options.case_id_attribute;
+  conversion.max_rows_to_materialize = options.max_rows_to_materialize;
+  auto stream = event_data_to_event_stream(data, conversion);
+  project_dfg_stream(stream, options);
+  return evaluate_dfg_precision(event_stream_to_event_log(stream, conversion),
+                                model, options);
 }
 
 std::string serialize_dfg_precision_json(const DfgPrecisionResult& result) {

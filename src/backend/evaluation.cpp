@@ -1,4 +1,5 @@
 #include "minera/evaluation.hpp"
+#include "minera/log_conversion.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -105,10 +106,190 @@ std::string selected_evaluation_activity(
       activity_attribute == "activity") {
     return event.activity;
   }
+  // Flat adapters retain the selected source spelling on the first-class
+  // projection. Consult it before generic attributes so a selected field
+  // remains available even when it has no nested attribute payload.
+  if ((!event.activity_source_key.empty() &&
+       event.activity_source_key == activity_attribute) ||
+      (event.activity_attribute &&
+       event.activity_attribute->key == activity_attribute)) {
+    return event.activity;
+  }
   if (const auto* value = event.attribute(activity_attribute)) return *value;
   throw std::invalid_argument(
       "evaluation: event is missing activity attribute '" +
       std::string(activity_attribute) + "'");
+}
+
+void validate_evaluation_selector(std::string_view selector,
+                                  std::string_view name) {
+  if (selector.empty())
+    throw std::invalid_argument("evaluation: " + std::string(name) +
+                                " selector must not be empty");
+}
+
+int evaluation_activity_selector_priority(const EventAttribute& field,
+                                           std::string_view selector) {
+  if (field.key == selector) return 3;
+  if (!field.first_class_source_key.empty() &&
+      field.first_class_source_key == selector)
+    return 2;
+  const bool alias = selector == "concept:name" || selector == "activity";
+  return alias && (field.key == "concept:name" || field.key == "activity")
+             ? 1
+             : 0;
+}
+
+int evaluation_case_selector_priority(const EventAttribute& field,
+                                      std::string_view selector) {
+  if (field.key == selector) return 3;
+  if (!field.first_class_source_key.empty() &&
+      field.first_class_source_key == selector)
+    return 2;
+  const bool alias = selector == "case:concept:name" ||
+                     selector == "case:id" || selector == "case_id" ||
+                     selector == "case";
+  return alias && (field.key == "case:concept:name" ||
+                   field.key == "case:id" || field.key == "case_id" ||
+                   field.key == "case")
+             ? 1
+             : 0;
+}
+
+EventLog project_evaluation_activity(const EventLog& log,
+                                     std::string_view activity_attribute);
+
+template <typename Priority>
+std::optional<std::size_t> select_evaluation_selector_field(
+    const EventRecord& record, std::string_view selector,
+    std::string_view name, Priority priority) {
+  int best_priority = 0;
+  std::optional<std::size_t> selected;
+  std::size_t matches = 0;
+  for (std::size_t index = 0; index < record.fields.size(); ++index) {
+    const auto& field = record.fields[index];
+    const int current = priority(field, selector);
+    if (current == 0) continue;
+    if (current > best_priority) {
+      best_priority = current;
+      selected = index;
+      matches = 1;
+    } else if (current == best_priority) {
+      ++matches;
+    }
+  }
+  if (!selected) return std::nullopt;
+  if (matches > 1) {
+    throw std::invalid_argument("evaluation: " + std::string(name) +
+                                " selector is ambiguous: " +
+                                std::string(selector));
+  }
+  return selected;
+}
+
+template <typename Priority>
+void validate_evaluation_selector_fields(const EventRecord& record,
+                                         std::string_view selector,
+                                         std::string_view name,
+                                         Priority priority) {
+  (void)select_evaluation_selector_field(record, selector, name, priority);
+}
+
+void validate_evaluation_selectors(const EventStream& stream,
+                                   std::string_view activity_attribute,
+                                   std::string_view case_id_attribute) {
+  for (const auto& record : stream.events) {
+    validate_evaluation_selector_fields(
+        record, activity_attribute, "activity",
+        evaluation_activity_selector_priority);
+    validate_evaluation_selector_fields(
+        record, case_id_attribute, "case-id", evaluation_case_selector_priority);
+  }
+}
+
+void project_evaluation_stream(EventStream& stream,
+                               std::string_view activity_attribute,
+                               std::string_view case_id_attribute) {
+  for (auto& record : stream.events) {
+    const auto activity_index = select_evaluation_selector_field(
+        record, activity_attribute, "activity",
+        evaluation_activity_selector_priority);
+    const auto case_index = select_evaluation_selector_field(
+        record, case_id_attribute, "case-id",
+        evaluation_case_selector_priority);
+    const auto selected_activity =
+        activity_index ? std::optional<EventAttribute>(record.fields[*activity_index])
+                       : std::nullopt;
+    const auto selected_case =
+        case_index ? std::optional<EventAttribute>(record.fields[*case_index])
+                   : std::nullopt;
+    for (auto& field : record.fields) {
+      // Clear stale roles before installing authoritative projections for the
+      // two requested selectors.
+      field.first_class_role = FirstClassAttributeRole::kNone;
+      field.first_class_state = FirstClassAttributeState::kMissing;
+      field.first_class_source_key.clear();
+    }
+    const auto append_projection = [&](EventAttribute field,
+                                       FirstClassAttributeRole role,
+                                       std::string_view source_key) {
+      const auto state = field.first_class_role == FirstClassAttributeRole::kNone
+                             ? (field.is_null
+                                    ? FirstClassAttributeState::kNull
+                                    : FirstClassAttributeState::kPresent)
+                             : field.first_class_state;
+      field.first_class_role = role;
+      field.first_class_state = state;
+      field.first_class_source_key = std::string(source_key);
+      record.fields.push_back(std::move(field));
+    };
+    if (selected_case) {
+      append_projection(*selected_case, FirstClassAttributeRole::kCaseId,
+                        case_id_attribute);
+    }
+    if (selected_activity) {
+      append_projection(*selected_activity,
+                        FirstClassAttributeRole::kActivity,
+                        activity_attribute);
+    }
+  }
+}
+
+EventLog evaluation_event_log(const EventDataView& data,
+                              std::string_view activity_attribute,
+                              std::string_view case_id_attribute,
+                              std::optional<std::size_t> max_rows) {
+  const auto activity = activity_attribute.empty() ? "concept:name"
+                                                    : activity_attribute;
+  validate_evaluation_selector(activity, "activity");
+  validate_evaluation_selector(case_id_attribute, "case-id");
+  LogConversionOptions conversion;
+  conversion.case_id_key = std::string(case_id_attribute);
+  conversion.max_rows_to_materialize = max_rows;
+
+  if (data.kind() == EventDataKind::kEventLog) {
+    const auto* log = data.log();
+    if (max_rows && log->event_count() > *max_rows)
+      throw std::length_error("evaluation: row materialization cap exceeded");
+    return project_evaluation_activity(*log, activity);
+  }
+
+  auto stream = event_data_to_event_stream(data, conversion);
+  if (max_rows && stream.events.size() > *max_rows)
+    throw std::length_error("evaluation: row materialization cap exceeded");
+  // Conversion already preserves first-class projections and generic fields.
+  // Clear stale roles and project the requested glue key before grouping so an
+  // older case projection cannot override the caller's selector.
+  validate_evaluation_selectors(stream, activity, case_id_attribute);
+  project_evaluation_stream(stream, activity, case_id_attribute);
+  return project_evaluation_activity(
+      event_stream_to_event_log(stream, conversion), activity);
+}
+
+void enforce_evaluation_event_log_cap(
+    const EventLog& log, std::optional<std::size_t> max_rows) {
+  if (max_rows && log.event_count() > *max_rows)
+    throw std::length_error("evaluation: row materialization cap exceeded");
 }
 
 EventLog project_evaluation_activity(
@@ -119,9 +300,28 @@ EventLog project_evaluation_activity(
          ++event) {
       const auto& source = log.traces[trace].events[event];
       auto& target = projected.traces[trace].events[event];
+      const auto selected =
+          selected_evaluation_activity(source, activity_attribute);
       set_event_activity_context(
-          source, selected_evaluation_activity(source, activity_attribute),
-          target);
+          source, selected, target);
+      if (!activity_attribute.empty() && activity_attribute != "concept:name" &&
+          activity_attribute != "activity") {
+        // The lower-level replay engines resolve custom selectors through the
+        // generic attribute collection. Keep a synchronized string view in
+        // addition to the first-class projection used by adapters.
+        auto found = std::find_if(
+            target.attributes.begin(), target.attributes.end(),
+            [&](const auto& attribute) {
+              return attribute.key == activity_attribute;
+            });
+        if (found == target.attributes.end()) {
+          target.attributes.push_back(
+              {std::string(activity_attribute), selected, AttributeKind::kString});
+        } else {
+          found->value = selected;
+          found->is_null = false;
+        }
+      }
     }
   }
   return projected;
@@ -317,6 +517,7 @@ bool has_reachable_final_marking(const PetriNet& net,
 ReplayFitnessResult evaluate_replay_fitness(
     const EventLog& log, const PetriNet& net, ReplayFitnessVariant variant,
     const ReplayFitnessOptions& options) {
+  enforce_evaluation_event_log_cap(log, options.max_rows_to_materialize);
   ReplayFitnessResult out;
   out.trace_count = log.trace_count();
   switch (variant) {
@@ -520,6 +721,243 @@ ReplayFitnessResult evaluate_replay_fitness(
   return evaluate_replay_fitness(l, to_petri_net(t), v, o);
 }
 
+ReplayFitnessResult evaluate_replay_fitness(
+    const EventDataView& data, const PetriNet& net, ReplayFitnessVariant variant,
+    const ReplayFitnessOptions& options) {
+  return evaluate_replay_fitness(
+      evaluation_event_log(data, options.activity_attribute,
+                           options.case_id_attribute,
+                           options.max_rows_to_materialize),
+      net, variant, options);
+}
+
+ReplayFitnessResult evaluate_replay_fitness(
+    const EventDataView& data, const ProcessTree& tree,
+    ReplayFitnessVariant variant, const ReplayFitnessOptions& options) {
+  return evaluate_replay_fitness(
+      evaluation_event_log(data, options.activity_attribute,
+                           options.case_id_attribute,
+                           options.max_rows_to_materialize),
+      tree, variant, options);
+}
+
+ReplayFitnessResult evaluate_replay_fitness(
+    const std::vector<PrecomputedTokenReplay>& results,
+    ReplayFitnessVariant variant) {
+  ReplayFitnessResult output;
+  output.variant = variant;
+  output.token_result.activity_attribute = "concept:name";
+  if (variant != ReplayFitnessVariant::TOKEN_BASED) {
+    output.computed = false;
+    output.error = "precomputed token results require token-based replay";
+    output.token_result.fitness = 0.0;
+    return output;
+  }
+
+  double fitness_sum = 0.0;
+  std::uint64_t trace_count = 0;
+  std::uint64_t fitting_traces = 0;
+  std::uint64_t produced = 0;
+  std::uint64_t consumed = 0;
+  std::uint64_t missing = 0;
+  std::uint64_t remaining = 0;
+  std::vector<std::uint64_t> transition_frequencies;
+  std::vector<VariantConformance> variants;
+  const auto add_counter = [](std::uint64_t& destination,
+                              std::uint64_t value) {
+    if (value > std::numeric_limits<std::uint64_t>::max() - destination)
+      return false;
+    destination += value;
+    return true;
+  };
+  const auto supplied_counter = [](std::uint64_t primary,
+                                   std::uint64_t alias) {
+    return primary != 0 ? primary : alias;
+  };
+  for (const auto& result : results) {
+    if (!result.computed) {
+      // A caller may provide an unfinished trace alongside completed traces.
+      // Treat it like a missing result: it contributes neither to the
+      // denominator nor to the aggregate counters.
+      continue;
+    }
+    output.exhausted = output.exhausted || result.exhausted;
+    if (!std::isfinite(result.trace_fitness) || result.trace_fitness < 0.0 ||
+        result.trace_fitness > 1.0) {
+      output.computed = false;
+      output.error = "invalid precomputed trace fitness";
+      return output;
+    }
+    const auto result_produced =
+        supplied_counter(result.produced_tokens, result.produced);
+    const auto result_consumed =
+        supplied_counter(result.consumed_tokens, result.consumed);
+    const auto result_missing =
+        supplied_counter(result.missing_tokens, result.missing);
+    const auto result_remaining =
+        supplied_counter(result.remaining_tokens, result.remaining);
+    if (!add_counter(trace_count, 1) ||
+        !add_counter(produced, result_produced) ||
+        !add_counter(consumed, result_consumed) ||
+        !add_counter(missing, result_missing) ||
+        !add_counter(remaining, result_remaining)) {
+      output.computed = false;
+      output.error = "precomputed token counter overflow";
+      return output;
+    }
+    if (result.trace_is_fit && !add_counter(fitting_traces, 1)) {
+      output.computed = false;
+      output.error = "precomputed token counter overflow";
+      return output;
+    }
+    fitness_sum += result.trace_fitness;
+    if (!std::isfinite(fitness_sum)) {
+      output.computed = false;
+      output.error = "precomputed token fitness overflow";
+      return output;
+    }
+    if (transition_frequencies.size() < result.transition_activations.size()) {
+      transition_frequencies.resize(result.transition_activations.size(), 0);
+    }
+    for (std::size_t i = 0; i < result.transition_activations.size(); ++i) {
+      if (!add_counter(transition_frequencies[i],
+                       result.transition_activations[i])) {
+        output.computed = false;
+        output.error = "precomputed token counter overflow";
+        return output;
+      }
+    }
+    variants.push_back(VariantConformance{{}, 1, result.trace_fitness});
+  }
+
+  output.trace_count = trace_count;
+  output.fitting_traces = fitting_traces;
+  output.token_result.trace_count = trace_count;
+  output.token_result.fitting_traces = fitting_traces;
+  output.token_result.produced = produced;
+  output.token_result.consumed = consumed;
+  output.token_result.missing = missing;
+  output.token_result.remaining = remaining;
+  output.token_result.transition_frequencies = std::move(transition_frequencies);
+  output.token_result.variants = std::move(variants);
+  if (output.trace_count > 0 && consumed > 0 && produced > 0) {
+    output.average_trace_fitness = fitness_sum / output.trace_count;
+    output.percentage_fit_traces =
+        100.0 * output.fitting_traces / output.trace_count;
+    const double consumed_deviation =
+        static_cast<double>(missing) / static_cast<double>(consumed);
+    const double produced_deviation =
+        static_cast<double>(remaining) / static_cast<double>(produced);
+    output.fitness = 0.5 * (1.0 - consumed_deviation) +
+                     0.5 * (1.0 - produced_deviation);
+  }
+  output.log_fitness = output.fitness;
+  output.token_result.fitness = output.fitness;
+  output.token_result.precision = 0.0;
+  output.total_cost = 0.0;
+  return output;
+}
+
+ReplayFitnessResult evaluate_replay_fitness(
+    const std::vector<PrecomputedAlignmentReplay>& results,
+    ReplayFitnessVariant variant) {
+  ReplayFitnessResult output;
+  output.variant = variant;
+  if (variant != ReplayFitnessVariant::ALIGNMENT_BASED) {
+    output.computed = false;
+    output.error = "precomputed alignment results require alignment-based replay";
+    return output;
+  }
+
+  double fitness_sum = 0.0;
+  double total_best_worst = 0.0;
+  double total_cost = 0.0;
+  std::uint64_t trace_count = 0;
+  std::uint64_t fitting_traces = 0;
+  std::vector<VariantAlignment> variants;
+  for (const auto& result : results) {
+    if (!result.computed) {
+      // Null/incomplete alignment entries are intentionally excluded from
+      // the aggregate, matching the evaluator's treatment of absent traces.
+      continue;
+    }
+    output.exhausted = output.exhausted || result.exhausted;
+    if (!std::isfinite(result.fitness) || result.fitness < 0.0 ||
+        result.fitness > 1.0 || !std::isfinite(result.cost) ||
+        result.cost < 0.0) {
+      output.computed = false;
+      output.error = "invalid precomputed alignment result";
+      return output;
+    }
+    // Consumers commonly serialize the denominator as `bwc`; retain the
+    // descriptive native spelling as the primary field while accepting the
+    // wire-compatible alias when it is the only value supplied.
+    const double best_worst_cost =
+        result.best_worst_cost != 0.0 ? result.best_worst_cost : result.bwc;
+    if (!std::isfinite(best_worst_cost) || best_worst_cost < 0.0) {
+      output.computed = false;
+      output.error = "invalid precomputed alignment result";
+      return output;
+    }
+    if (trace_count == std::numeric_limits<std::uint64_t>::max() ||
+        (result.fitness == 1.0 &&
+         fitting_traces == std::numeric_limits<std::uint64_t>::max())) {
+      output.computed = false;
+      output.error = "precomputed alignment counter overflow";
+      return output;
+    }
+    const double next_total_cost = total_cost + result.cost;
+    const double next_fitness_sum = fitness_sum + result.fitness;
+    const double next_total_best_worst = total_best_worst + best_worst_cost;
+    if (!std::isfinite(next_total_cost) ||
+        !std::isfinite(next_fitness_sum) ||
+        !std::isfinite(next_total_best_worst)) {
+      output.computed = false;
+      output.error = "precomputed alignment metric overflow";
+      return output;
+    }
+    ++trace_count;
+    if (result.fitness == 1.0) ++fitting_traces;
+    total_cost = next_total_cost;
+    fitness_sum = next_fitness_sum;
+    total_best_worst = next_total_best_worst;
+    VariantAlignment variant_result;
+    variant_result.count = 1;
+    variant_result.fitness = result.fitness;
+    variant_result.cost = result.cost;
+    variant_result.worst_cost = best_worst_cost;
+    variants.push_back(std::move(variant_result));
+  }
+
+  output.trace_count = trace_count;
+  output.fitting_traces = fitting_traces;
+  output.total_cost = total_cost;
+  output.average_trace_fitness = output.trace_count == 0
+                                     ? 0.0
+                                     : fitness_sum / output.trace_count;
+  output.percentage_fit_traces = output.trace_count == 0
+                                     ? 0.0
+                                     : 100.0 * output.fitting_traces /
+                                           output.trace_count;
+  // The cost-based evaluator reports a unit score for a nonempty collection
+  // whose best-worst denominator is zero.
+  if (output.trace_count > 0) {
+    output.fitness = total_best_worst > 0.0
+                         ? 1.0 - output.total_cost / total_best_worst
+                         : 1.0;
+  }
+  output.log_fitness = output.fitness;
+  output.alignment_result.computed = true;
+  output.alignment_result.trace_count = output.trace_count;
+  output.alignment_result.fitting_traces = output.fitting_traces;
+  output.alignment_result.total_cost = output.total_cost;
+  output.alignment_result.fitness = output.fitness;
+  output.alignment_result.variant = AlignmentVariant::kDijkstraLessMemory;
+  output.alignment_result.activity_attribute = "concept:name";
+  output.alignment_result.variants = std::move(variants);
+  return output;
+}
+
 namespace {
 
 struct PrefixInfo {
@@ -654,6 +1092,7 @@ StopAlignmentResult align_to_stop_prefix(const PetriNet& net,
 PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net,
                                          PrecisionVariant variant,
                                          const PrecisionOptions& options) {
+  enforce_evaluation_event_log_cap(log, options.max_rows_to_materialize);
   PrecisionResult out;
   out.variant = variant;
   switch (variant) {
@@ -780,6 +1219,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
     out.error = out.exhausted ? "alignment search exhausted" : "alignment failed";
     return out;
   }
+  out.alignment_detail_present = true;
 
   // Automaton-after-align projects each optimal alignment to visible model
   // moves.  A shared prefix is weighted by variants that have another move;
@@ -860,6 +1300,28 @@ PrecisionResult evaluate_precision(const EventLog& l, const PetriNet& n,
   return evaluate_precision_impl(l, n, v, o);
 }
 
+PrecisionResult evaluate_precision(const EventDataView& data,
+                                   const PetriNet& net,
+                                   PrecisionVariant variant,
+                                   const PrecisionOptions& options) {
+  return evaluate_precision_impl(
+      evaluation_event_log(data, options.activity_attribute,
+                           options.case_id_attribute,
+                           options.max_rows_to_materialize),
+      net, variant, options);
+}
+
+PrecisionResult evaluate_precision(const EventDataView& data,
+                                   const ProcessTree& tree,
+                                   PrecisionVariant variant,
+                                   const PrecisionOptions& options) {
+  return evaluate_precision(
+      evaluation_event_log(data, options.activity_attribute,
+                           options.case_id_attribute,
+                           options.max_rows_to_materialize),
+      tree, variant, options);
+}
+
 GeneralizationResult evaluate_generalization(
     const EventLog& log, const PetriNet& net, GeneralizationVariant variant) {
   return evaluate_generalization(log, net, variant, {});
@@ -868,6 +1330,7 @@ GeneralizationResult evaluate_generalization(
 GeneralizationResult evaluate_generalization(
     const EventLog& log, const PetriNet& net, GeneralizationVariant v,
     const GeneralizationOptions& options) {
+  enforce_evaluation_event_log_cap(log, options.max_rows_to_materialize);
   GeneralizationResult out;
   out.variant = v;
   out.transition_count = net.transitions().size();
@@ -919,6 +1382,26 @@ GeneralizationResult evaluate_generalization(
     const EventLog& log, const ProcessTree& tree,
     GeneralizationVariant variant, const GeneralizationOptions& options) {
   return evaluate_generalization(log, to_petri_net(tree), variant, options);
+}
+
+GeneralizationResult evaluate_generalization(
+    const EventDataView& data, const PetriNet& net,
+    GeneralizationVariant variant, const GeneralizationOptions& options) {
+  return evaluate_generalization(
+      evaluation_event_log(data, options.activity_attribute,
+                           options.case_id_attribute,
+                           options.max_rows_to_materialize),
+      net, variant, options);
+}
+
+GeneralizationResult evaluate_generalization(
+    const EventDataView& data, const ProcessTree& tree,
+    GeneralizationVariant variant, const GeneralizationOptions& options) {
+  return evaluate_generalization(
+      evaluation_event_log(data, options.activity_attribute,
+                           options.case_id_attribute,
+                           options.max_rows_to_materialize),
+      tree, variant, options);
 }
 
 SimplicityResult evaluate_simplicity(const PetriNet& net,
@@ -1116,12 +1599,16 @@ SimplicityResult evaluate_simplicity(const ProcessTree& tree,
 CompositeEvaluationResult evaluate_composite(
     const EventLog& log, const PetriNet& net,
     const CompositeEvaluationOptions& options) {
+  enforce_evaluation_event_log_cap(log, options.max_rows_to_materialize);
   CompositeEvaluationResult out;
+  out.fitness_details.variant = ReplayFitnessVariant::TOKEN_BASED;
   if (const auto error = validate_evaluation_markings(
           net, options.initial_marking, options.final_marking);
       !error.empty()) {
     out.computed = false;
     out.error = error;
+    out.fitness_details.computed = false;
+    out.fitness_details.error = error;
     return out;
   }
   const double total = options.fitness_weight + options.precision_weight +
@@ -1135,6 +1622,8 @@ CompositeEvaluationResult evaluate_composite(
       !std::isfinite(total) || total <= 0.0) {
     out.computed = false;
     out.error = "composite weights must be finite, non-negative, and have a positive total";
+    out.fitness_details.computed = false;
+    out.fitness_details.error = out.error;
     return out;
   }
   out.fitness_weight = options.fitness_weight / total;
@@ -1147,14 +1636,21 @@ CompositeEvaluationResult evaluate_composite(
                                              : options.activity_attribute;
   ReplayFitnessOptions fitness_options;
   fitness_options.activity_attribute = activity_attribute;
+  fitness_options.case_id_attribute = options.case_id_attribute;
+  fitness_options.max_rows_to_materialize = options.max_rows_to_materialize;
   fitness_options.initial_marking = options.initial_marking;
   fitness_options.final_marking = options.final_marking;
   PrecisionOptions precision_options;
   precision_options.activity_attribute = activity_attribute;
+  precision_options.case_id_attribute = options.case_id_attribute;
+  precision_options.max_rows_to_materialize = options.max_rows_to_materialize;
   precision_options.initial_marking = options.initial_marking;
   precision_options.final_marking = options.final_marking;
   GeneralizationOptions generalization_options;
   generalization_options.activity_attribute = activity_attribute;
+  generalization_options.case_id_attribute = options.case_id_attribute;
+  generalization_options.max_rows_to_materialize =
+      options.max_rows_to_materialize;
   generalization_options.initial_marking = options.initial_marking;
   generalization_options.final_marking = options.final_marking;
   const auto fitness = evaluate_replay_fitness(
@@ -1166,7 +1662,9 @@ CompositeEvaluationResult evaluate_composite(
       generalization_options);
   const auto simplicity = evaluate_simplicity(
       net, SimplicityVariant::ARC_DEGREE);
+  out.fitness_details = fitness;
   out.fitness = fitness.log_fitness;
+  out.fitness_score = out.fitness;
   out.precision = precision.precision;
   out.generalization = generalization.generalization;
   out.simplicity = simplicity.simplicity;
@@ -1196,16 +1694,194 @@ CompositeEvaluationResult evaluate_composite(
   return evaluate_composite(log, to_petri_net(tree), options);
 }
 
-StochasticLanguage derive_stochastic_language(const EventLog& log,bool normalize) {
-  StochasticLanguage out; std::map<std::vector<std::string>,double> counts; for(const auto&tr:log.traces){std::vector<std::string>a;for(const auto&e:tr.events)a.push_back(e.activity);counts[a]+=1.0;}
-  for(auto&[a,w]:counts){out.traces.push_back({a,w});out.total_mass+=w;} if(normalize&&out.total_mass>0)for(auto&t:out.traces)t.weight/=out.total_mass; if(normalize&&out.total_mass>0)out.total_mass=1; return out;
+CompositeEvaluationResult evaluate_composite(
+    const EventDataView& data, const PetriNet& net,
+    const CompositeEvaluationOptions& options) {
+  return evaluate_composite(
+      evaluation_event_log(data, options.activity_attribute,
+                           options.case_id_attribute,
+                           options.max_rows_to_materialize),
+      net, options);
 }
 
-EmdResult evaluate_emd(const StochasticLanguage& aa,const StochasticLanguage& bb,const EmdOptions& opt) {
+CompositeEvaluationResult evaluate_composite(
+    const EventDataView& data, const ProcessTree& tree,
+    const CompositeEvaluationOptions& options) {
+  return evaluate_composite(
+      evaluation_event_log(data, options.activity_attribute,
+                           options.case_id_attribute,
+                           options.max_rows_to_materialize),
+      tree, options);
+}
+
+StochasticLanguage derive_stochastic_language(const EventLog& log,
+                                              bool normalize) {
+  StochasticLanguage out;
+  std::map<std::vector<std::string>, double> counts;
+  for (const auto& trace : log.traces) {
+    std::vector<std::string> activities;
+    activities.reserve(trace.events.size());
+    for (const auto& event : trace.events) activities.push_back(event.activity);
+    counts[std::move(activities)] += 1.0;
+  }
+  for (auto& [activities, weight] : counts) {
+    out.traces.push_back({activities, weight});
+    out.total_mass += weight;
+  }
+  if (normalize && out.total_mass > 0.0) {
+    for (auto& trace : out.traces) trace.weight /= out.total_mass;
+    out.total_mass = 1.0;
+  }
+  return out;
+}
+
+namespace {
+
+using TraceKey = std::vector<std::string>;
+using TraceMasses = std::map<TraceKey, double>;
+
+bool forbidden_language_codepoint(char32_t codepoint) {
+  // These symbols have special meaning to the regular-expression utilities
+  // that consume encoded traces. Keep the assignment deterministic while
+  // allowing a full Unicode code point per activity.
+  switch (codepoint) {
+    case U'[':
+    case U']':
+    case U'(':
+    case U')':
+    case U'*':
+    case U'+':
+    case U'^':
+    case U'?':
+    case U'\r':
+    case U'\n':
+    case U' ':
+    case U'\t':
+    case U'$':
+    case U'"':
+    case U'!':
+    case U'#':
+    case U'&':
+    case U'%':
+    case U'|':
+    case U'.':
+    case U',':
+    case U';':
+    case U'-':
+    case U'\'':
+    case U'\\':
+    case U'/':
+    case U'{':
+    case U'}':
+      return true;
+    default:
+      return false;
+  }
+}
+
+std::map<std::string, char32_t> encode_activity_union(
+    const TraceMasses& left, const TraceMasses& right) {
+  std::set<std::string> activities;
+  for (const auto& [trace, _] : left)
+    activities.insert(trace.begin(), trace.end());
+  for (const auto& [trace, _] : right)
+    activities.insert(trace.begin(), trace.end());
+
+  std::map<std::string, char32_t> encoded;
+  char32_t next = 1;
+  for (const auto& activity : activities) {
+    while (forbidden_language_codepoint(next) ||
+           (next >= 0xD800 && next <= 0xDFFF)) {
+      ++next;
+    }
+    if (next > 0x10FFFF)
+      throw std::length_error("stochastic language alphabet is too large");
+    encoded.emplace(activity, next++);
+  }
+  return encoded;
+}
+
+std::u32string encode_trace(const TraceKey& trace,
+                            const std::map<std::string, char32_t>& alphabet) {
+  std::u32string encoded;
+  encoded.reserve(trace.size());
+  for (const auto& activity : trace) encoded.push_back(alphabet.at(activity));
+  return encoded;
+}
+
+std::string utf8_from_encoded(const std::u32string& value) {
+  std::string out;
+  for (const char32_t codepoint : value) {
+    if (codepoint <= 0x7F) {
+      out.push_back(static_cast<char>(codepoint));
+    } else if (codepoint <= 0x7FF) {
+      out.push_back(static_cast<char>(0xC0 | (codepoint >> 6)));
+      out.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+    } else if (codepoint <= 0xFFFF) {
+      out.push_back(static_cast<char>(0xE0 | (codepoint >> 12)));
+      out.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+      out.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+    } else {
+      out.push_back(static_cast<char>(0xF0 | (codepoint >> 18)));
+      out.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+      out.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+      out.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+    }
+  }
+  return out;
+}
+
+bool consolidate_language(const StochasticLanguage& input,
+                          TraceMasses& output, double& total_mass) {
+  output.clear();
+  for (const auto& trace : input.traces) {
+    if (!std::isfinite(trace.weight) || trace.weight < 0.0) return false;
+    auto& total = output[trace.activities];
+    total += trace.weight;
+    if (!std::isfinite(total)) return false;
+  }
+  total_mass = 0.0;
+  for (const auto& [_, weight] : output) {
+    total_mass += weight;
+    if (!std::isfinite(total_mass)) return false;
+  }
+  return true;
+}
+
+double encoded_normalized_levenshtein(const std::u32string& left,
+                                       const std::u32string& right) {
+  if (left.empty() && right.empty()) return 0.0;
+  std::vector<double> distance(right.size() + 1);
+  std::iota(distance.begin(), distance.end(), 0.0);
+  for (std::size_t i = 1; i <= left.size(); ++i) {
+    double previous = distance[0];
+    distance[0] = static_cast<double>(i);
+    for (std::size_t j = 1; j <= right.size(); ++j) {
+      const double saved = distance[j];
+      distance[j] = std::min(
+          {distance[j] + 1.0, distance[j - 1] + 1.0,
+           previous + (left[i - 1] == right[j - 1] ? 0.0 : 1.0)});
+      previous = saved;
+    }
+  }
+  return distance.back() /
+         static_cast<double>(std::max(left.size(), right.size()));
+}
+
+}  // namespace
+
+double normalized_levenshtein_distance(const std::u32string& left,
+                                       const std::u32string& right) {
+  return encoded_normalized_levenshtein(left, right);
+}
+
+EmdResult evaluate_emd(const StochasticLanguage& left_input,
+                       const StochasticLanguage& right_input,
+                       const EmdOptions& options) {
   EmdResult out;
-  out.variant = opt.variant;
-  out.use_fast_emd = opt.use_fast_emd;
-  switch (opt.variant) {
+  out.variant = options.variant;
+  out.use_fast_emd = options.use_fast_emd;
+  switch (options.variant) {
     case EmdVariant::EXACT:
     case EmdVariant::PYEMD:
       break;
@@ -1215,61 +1891,232 @@ EmdResult evaluate_emd(const StochasticLanguage& aa,const StochasticLanguage& bb
       return out;
   }
 
-  // Validate every source weight before consolidation. This prevents an
-  // invalid negative entry from being hidden by a duplicate positive entry.
-  // The ordered map gives duplicate traces a deterministic representation.
-  auto consolidate=[](const StochasticLanguage& input,
-                       StochasticLanguage& output) -> bool {
-    std::map<std::vector<std::string>,double> c;
-    for (const auto& trace : input.traces) {
-      if (!std::isfinite(trace.weight) || trace.weight < 0.0) return false;
-      c[trace.activities] += trace.weight;
-    }
-    output.traces.clear();
-    output.total_mass = 0.0;
-    for (const auto& [activities, weight] : c) {
-      if (!std::isfinite(weight) || weight < 0.0) return false;
-      output.traces.push_back({activities, weight});
-      output.total_mass += weight;
-    }
-    return std::isfinite(output.total_mass);
-  };
-  StochasticLanguage a, b;
-  if (!consolidate(aa, a) || !consolidate(bb, b)) {
-    out.computed=false;
-    out.error="invalid language weight";
+  TraceMasses left;
+  TraceMasses right;
+  double left_mass = 0.0;
+  double right_mass = 0.0;
+  if (!consolidate_language(left_input, left, left_mass) ||
+      !consolidate_language(right_input, right, right_mass)) {
+    out.computed = false;
+    out.error = "invalid language weight";
     return out;
   }
-  double ma=a.total_mass,mb=b.total_mass;
-  if (a.traces.empty()&&b.traces.empty()){out.distance=0;return out;} if(ma<=0||mb<=0){out.computed=false;out.error="stochastic language has zero mass";return out;}
-  const bool masses_close =
-      std::abs(ma - mb) <= 1e-8 + 1e-5 * std::abs(mb);
-  if(!masses_close){
-    // Strict mode is deliberately checked before the default
-    // normalization: callers opting into it asked to detect unequal mass,
-    // not to silently rescale it away.
-    if(opt.strict_equal_mass){out.computed=false;out.error="masses must be equal";return out;}
-    // The accelerated implementation normalizes unequal histograms before
-    // solving. Its fallback requires equal totals, even when the caller's
-    // normalization extension is enabled.
-    if(opt.variant == EmdVariant::PYEMD && !opt.use_fast_emd){
-      out.computed=false;out.error="masses must be equal";return out;
-    }
-    if(opt.normalize_masses){for(auto&t:a.traces)t.weight/=ma;for(auto&t:b.traces)t.weight/=mb;ma=mb=1;out.normalized=true;}
-    else {out.computed=false;out.error="masses must be equal";return out;}
+
+  // A language with only zero-weight entries is still part of the alphabet,
+  // but carries no transport. Two such languages therefore have distance
+  // zero, including when their trace keys differ.
+  if (left_mass == 0.0 && right_mass == 0.0) {
+    out.distance = 0.0;
+    return out;
   }
-  // Both selectors use normalized Levenshtein by default. A native distance
-  // callback is authoritative for either selector when supplied.
-  const auto dist = opt.distance ? opt.distance
-                                 : DistanceFunction(normalized_levenshtein_distance);
-  const std::size_t n=a.traces.size(),m=b.traces.size();
-  std::vector<std::vector<double>> cost(n,std::vector<double>(m)); for(std::size_t i=0;i<n;++i)for(std::size_t j=0;j<m;++j){cost[i][j]=dist(a.traces[i].activities,b.traces[j].activities);if(!std::isfinite(cost[i][j])||cost[i][j]<0){out.computed=false;out.error="invalid distance";return out;}}
-  struct Edge{int to,rev;double cap,cost;}; const int S=0,I=1,J=int(1+n),T=J+int(m),N=T+1; std::vector<std::vector<Edge>> g(N);
-  auto add=[&](int u,int v,double c,double w){g[u].push_back({v,(int)g[v].size(),c,w});g[v].push_back({u,(int)g[u].size()-1,0,-w});};
-  for(std::size_t i=0;i<n;++i)add(S,I+int(i),a.traces[i].weight,0); for(std::size_t j=0;j<m;++j)add(J+int(j),T,b.traces[j].weight,0); for(std::size_t i=0;i<n;++i)for(std::size_t j=0;j<m;++j)add(I+int(i),J+int(j),std::numeric_limits<double>::infinity(),cost[i][j]);
-  double total=0,flow=0,target=std::min(ma,mb); while(flow+1e-10<target){std::vector<double>d(N,std::numeric_limits<double>::infinity());std::vector<int>pv(N,-1),pe(N,-1);d[S]=0;for(int it=0;it<N-1;++it){bool ch=false;for(int u=0;u<N;++u)if(std::isfinite(d[u]))for(int k=0;k<(int)g[u].size();++k){auto&e=g[u][k];if(e.cap>1e-12&&d[e.to]>d[u]+e.cost+1e-12){d[e.to]=d[u]+e.cost;pv[e.to]=u;pe[e.to]=k;ch=true;}}if(!ch)break;}if(pv[T]<0){out.computed=false;out.error="transportation solve failed";return out;}double f=target-flow;for(int v=T;v!=S;v=pv[v])f=std::min(f,g[pv[v]][pe[v]].cap);for(int v=T;v!=S;v=pv[v]){auto&e=g[pv[v]][pe[v]];e.cap-=f;g[v][e.rev].cap+=f;}flow+=f;total+=f*d[T];}
-  out.distance=total; return out;
+  if (left_mass <= 0.0 || right_mass <= 0.0) {
+    out.computed = false;
+    out.error = "stochastic language has zero mass";
+    return out;
+  }
+
+  const bool masses_close =
+      std::abs(left_mass - right_mass) <=
+      1e-8 + 1e-5 * std::abs(right_mass);
+  if (!masses_close) {
+    // Strict mode is checked before normalization so callers can detect an
+    // unequal input even though the accelerated path normally rescales it.
+    if (options.strict_equal_mass) {
+      out.computed = false;
+      out.error = "masses must be equal";
+      return out;
+    }
+    // The fallback implementation has equality constraints. The accelerated
+    // path is the only one that accepts unequal masses by normalization.
+    if (options.variant == EmdVariant::PYEMD && !options.use_fast_emd) {
+      out.computed = false;
+      out.error = "masses must be equal";
+      return out;
+    }
+    if (!options.normalize_masses) {
+      out.computed = false;
+      out.error = "masses must be equal";
+      return out;
+    }
+    for (auto& [_, weight] : left) weight /= left_mass;
+    for (auto& [_, weight] : right) weight /= right_mass;
+    left_mass = right_mass = 1.0;
+    out.normalized = true;
+  }
+
+  // Ensure every trace key occurs in both histograms. This is important for
+  // encoded callbacks: a distance callback sees the same deterministic union
+  // alphabet regardless of which side introduced a trace.
+  for (const auto& [trace, _] : left) right.try_emplace(trace, 0.0);
+  for (const auto& [trace, _] : right) left.try_emplace(trace, 0.0);
+  const auto alphabet = encode_activity_union(left, right);
+
+  std::vector<TraceKey> left_keys;
+  std::vector<TraceKey> right_keys;
+  std::vector<double> left_weights;
+  std::vector<double> right_weights;
+  left_keys.reserve(left.size());
+  right_keys.reserve(right.size());
+  left_weights.reserve(left.size());
+  right_weights.reserve(right.size());
+  std::vector<std::u32string> left_encoded;
+  std::vector<std::u32string> right_encoded;
+  left_encoded.reserve(left.size());
+  right_encoded.reserve(right.size());
+  for (const auto& [trace, weight] : left) {
+    left_keys.push_back(trace);
+    left_weights.push_back(weight);
+    left_encoded.push_back(encode_trace(trace, alphabet));
+  }
+  for (const auto& [trace, weight] : right) {
+    right_keys.push_back(trace);
+    right_weights.push_back(weight);
+    right_encoded.push_back(encode_trace(trace, alphabet));
+  }
+
+  const auto distance = [&](std::size_t i, std::size_t j) {
+    if (options.encoded_distance) {
+      return options.encoded_distance(left_encoded[i], right_encoded[j]);
+    }
+    if (options.string_distance) {
+      return options.string_distance(left_encoded[i], right_encoded[j]);
+    }
+    if (options.utf8_string_distance) {
+      return options.utf8_string_distance(
+          utf8_from_encoded(left_encoded[i]),
+          utf8_from_encoded(right_encoded[j]));
+    }
+    if (options.distance) {
+      return options.distance(left_keys[i], right_keys[j]);
+    }
+    return encoded_normalized_levenshtein(left_encoded[i], right_encoded[j]);
+  };
+
+  const std::size_t left_size = left_keys.size();
+  const std::size_t right_size = right_keys.size();
+  std::vector<std::vector<double>> costs(
+      left_size, std::vector<double>(right_size, 0.0));
+  try {
+    for (std::size_t i = 0; i < left_size; ++i) {
+      for (std::size_t j = 0; j < right_size; ++j) {
+        costs[i][j] = distance(i, j);
+        if (!std::isfinite(costs[i][j]) || costs[i][j] < 0.0) {
+          out.computed = false;
+          out.error = "invalid distance";
+          return out;
+        }
+      }
+    }
+  } catch (const std::exception& error) {
+    out.computed = false;
+    out.error = std::string("distance callback failed: ") + error.what();
+    return out;
+  } catch (...) {
+    out.computed = false;
+    out.error = "distance callback failed";
+    return out;
+  }
+
+  struct Edge {
+    int to = 0;
+    int reverse = 0;
+    double capacity = 0.0;
+    double cost = 0.0;
+  };
+  const int source = 0;
+  const int left_begin = 1;
+  const int right_begin = left_begin + static_cast<int>(left_size);
+  const int sink = right_begin + static_cast<int>(right_size);
+  const int node_count = sink + 1;
+  std::vector<std::vector<Edge>> graph(node_count);
+  const auto add_edge = [&](int from, int to, double capacity, double cost) {
+    graph[from].push_back(
+        {to, static_cast<int>(graph[to].size()), capacity, cost});
+    graph[to].push_back({from, static_cast<int>(graph[from].size() - 1), 0.0,
+                         -cost});
+  };
+  for (std::size_t i = 0; i < left_size; ++i)
+    add_edge(source, left_begin + static_cast<int>(i), left_weights[i], 0.0);
+  for (std::size_t j = 0; j < right_size; ++j)
+    add_edge(right_begin + static_cast<int>(j), sink, right_weights[j], 0.0);
+  for (std::size_t i = 0; i < left_size; ++i) {
+    for (std::size_t j = 0; j < right_size; ++j) {
+      add_edge(left_begin + static_cast<int>(i),
+               right_begin + static_cast<int>(j),
+               std::numeric_limits<double>::infinity(), costs[i][j]);
+    }
+  }
+
+  const double target = std::min(left_mass, right_mass);
+  constexpr double kDistanceEpsilon = 1e-12;
+  const double flow_epsilon =
+      64.0 * std::numeric_limits<double>::epsilon() * target;
+  double flow = 0.0;
+  double total_cost = 0.0;
+  while (flow + flow_epsilon < target) {
+    std::vector<double> distances(
+        node_count, std::numeric_limits<double>::infinity());
+    std::vector<int> previous_node(node_count, -1);
+    std::vector<int> previous_edge(node_count, -1);
+    distances[source] = 0.0;
+    for (int iteration = 0; iteration < node_count - 1; ++iteration) {
+      bool changed = false;
+      for (int from = 0; from < node_count; ++from) {
+        if (!std::isfinite(distances[from])) continue;
+        for (std::size_t edge = 0; edge < graph[from].size(); ++edge) {
+          const auto& candidate = graph[from][edge];
+          if (candidate.capacity <= flow_epsilon) continue;
+          if (distances[candidate.to] >
+              distances[from] + candidate.cost + kDistanceEpsilon) {
+            distances[candidate.to] = distances[from] + candidate.cost;
+            previous_node[candidate.to] = from;
+            previous_edge[candidate.to] = static_cast<int>(edge);
+            changed = true;
+          }
+        }
+      }
+      if (!changed) break;
+    }
+    if (previous_node[sink] < 0) {
+      out.computed = false;
+      out.error = "transportation solve failed";
+      return out;
+    }
+    double amount = target - flow;
+    for (int node = sink; node != source; node = previous_node[node]) {
+      const auto& edge = graph[previous_node[node]][previous_edge[node]];
+      amount = std::min(amount, edge.capacity);
+    }
+    if (!(amount > flow_epsilon) || !std::isfinite(amount)) {
+      out.computed = false;
+      out.error = "transportation solve failed";
+      return out;
+    }
+    for (int node = sink; node != source; node = previous_node[node]) {
+      auto& edge = graph[previous_node[node]][previous_edge[node]];
+      edge.capacity -= amount;
+      graph[node][edge.reverse].capacity += amount;
+    }
+    const double cost_increment = amount * distances[sink];
+    const double next_total_cost = total_cost + cost_increment;
+    if (!std::isfinite(cost_increment) || !std::isfinite(next_total_cost)) {
+      out.computed = false;
+      out.error = "transportation cost overflow";
+      return out;
+    }
+    flow += amount;
+    total_cost = next_total_cost;
+  }
+  out.distance = total_cost;
+  return out;
 }
-double earth_movers_distance(const StochasticLanguage&a,const StochasticLanguage&b,const EmdOptions&o){auto r=evaluate_emd(a,b,o);if(!r.computed) throw std::invalid_argument(r.error);return r.distance;}
+
+double earth_movers_distance(const StochasticLanguage& left,
+                             const StochasticLanguage& right,
+                             const EmdOptions& options) {
+  const auto result = evaluate_emd(left, right, options);
+  if (!result.computed) throw std::invalid_argument(result.error);
+  return result.distance;
+}
 
 } // namespace minera

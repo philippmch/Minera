@@ -3414,8 +3414,49 @@
           "symbol": "PYEMD"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "PYEMD": {
+          "selector": "PYEMD",
+          "binding": {
+            "selector": "PYEMD",
+            "modules": [
+              "algo.evaluation.earth_mover_distance.variants.pyemd"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PYEMD"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/evaluation.hpp",
+              "symbol": "evaluate_emd"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_evaluation_parity_contracts.cpp",
+              "executable": "minera_evaluation_parity_contracts_tests",
+              "case": "emd_pyemd_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_evaluation.cpp",
+        "src/backend/tests/test_evaluation_parity_contracts.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/components/Conformance.tsx",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/app-logic.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.evaluation.generalization",
@@ -3491,8 +3532,42 @@
           "symbol": null
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "default": {
+          "selector": "default",
+          "binding": {
+            "selector": "default",
+            "modules": [
+              "algo.evaluation.precision.dfg.algorithm"
+            ],
+            "kind": "default",
+            "class": null,
+            "symbol": null
+          },
+          "implementation": [
+            {
+              "path": "include/minera/dfg_precision.hpp",
+              "symbol": "evaluate_dfg_precision"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_evaluation_parity_contracts.cpp",
+              "executable": "minera_evaluation_parity_contracts_tests",
+              "case": "dfg_precision_default_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/dfg_precision.hpp",
+        "src/backend/dfg_precision.cpp",
+        "src/backend/tools/minera_dfg_precision.cpp",
+        "src/backend/tests/test_dfg_precision.cpp",
+        "src/backend/tests/test_evaluation_parity_contracts.cpp"
+      ]
     },
     {
       "package": "algo.evaluation.replay_fitness",
@@ -10585,8 +10660,29 @@
           "selector": "PYEMD"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "src/backend/tests/test_evaluation_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.evaluation.earth_mover_distance.variants.pyemd",
+        "implementation": [
+          {
+            "path": "include/minera/evaluation.hpp",
+            "symbol": "evaluate_emd"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_evaluation_parity_contracts.cpp",
+            "executable": "minera_evaluation_parity_contracts_tests",
+            "case": "emd_pyemd_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.evaluation.generalization.variants.token_based",

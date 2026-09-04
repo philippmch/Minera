@@ -2837,7 +2837,7 @@ void parse_native_adapter_params_contract() {
 
 void parse_evaluation_params_defaults_and_variants() {
   const auto defaults = minera::parse_evaluation_params(fields({}));
-  assert(defaults.family == minera::EvaluationFamily::kReplayFitness);
+  assert(defaults.family == minera::EvaluationFamily::kComposite);
   assert(defaults.replay_fitness_variant == minera::ReplayFitnessVariant::AUTO);
   assert(defaults.replay_fitness_options.activity_attribute == "concept:name");
   assert(defaults.replay_fitness_options.token_replay_variant ==
@@ -2915,6 +2915,8 @@ void parse_evaluation_params_defaults_and_variants() {
       {"evaluation_family", "simplicity"},
       {"fitness_variant", "alignment_based"},
       {"evaluation_activity_attribute", " phase "},
+      {"evaluation_case_id_attribute", " case:order "},
+      {"evaluation_max_rows_to_materialize", "78"},
       {"evaluation_initial_marking", "0, 2,0"},
       {"evaluation_final_marking", "0,0,2"},
       {"evaluation_token_replay_variant", "forward"},
@@ -2946,6 +2948,18 @@ void parse_evaluation_params_defaults_and_variants() {
          all.precision_options.activity_attribute == "phase" &&
          all.generalization_options.activity_attribute == "phase" &&
          all.composite_options.activity_attribute == "phase");
+  assert(all.replay_fitness_options.case_id_attribute == "case:order" &&
+         all.precision_options.case_id_attribute == "case:order" &&
+         all.generalization_options.case_id_attribute == "case:order" &&
+         all.composite_options.case_id_attribute == "case:order");
+  assert(all.replay_fitness_options.max_rows_to_materialize &&
+         *all.replay_fitness_options.max_rows_to_materialize == 78 &&
+         all.precision_options.max_rows_to_materialize &&
+         *all.precision_options.max_rows_to_materialize == 78 &&
+         all.generalization_options.max_rows_to_materialize &&
+         *all.generalization_options.max_rows_to_materialize == 78 &&
+         all.composite_options.max_rows_to_materialize &&
+         *all.composite_options.max_rows_to_materialize == 78);
   assert(all.replay_fitness_options.token_replay_variant ==
              minera::TokenReplayVariant::kForward &&
          all.precision_options.token_replay_variant ==

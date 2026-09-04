@@ -5342,7 +5342,10 @@ void handle_evaluate_emd(const httplib::Request& request,
       throw std::invalid_argument(key +
                                   " expects true, false, 1, or 0");
     };
+    // Select the public default explicitly at the HTTP boundary. The exact
+    // native solver remains available through an explicit query selector.
     minera::EmdOptions options;
+    options.variant = minera::EmdVariant::PYEMD;
     if (request.has_param("emd_variant")) {
       const auto value = lower_ascii(request.get_param_value("emd_variant"));
       if (value == "exact") {

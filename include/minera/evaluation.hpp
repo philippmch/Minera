@@ -6,11 +6,13 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "minera/conformance.hpp"
 #include "minera/decomposed_alignment.hpp"
+#include "minera/event_data.hpp"
 
 namespace minera {
 
@@ -73,6 +75,12 @@ struct ReplayFitnessOptions {
   // vectors retain that engine's workflow-net defaults.
   std::vector<int> initial_marking;
   std::vector<int> final_marking;
+  // Case field used by flat event-data adapters. It is ignored for an
+  // already grouped EventLog, whose Trace boundaries are authoritative.
+  std::string case_id_attribute = "case:concept:name";
+  // Optional hard cap for grouped or flat input materialization. Exceeding it
+  // is a deterministic length error rather than silent truncation.
+  std::optional<std::size_t> max_rows_to_materialize;
 };
 
 struct PrecisionResult {
@@ -83,6 +91,9 @@ struct PrecisionResult {
   std::string error;
   ConformanceResult token_result;
   AlignmentResult alignment_result;
+  // ALIGN_ETCONFORMANCE computes prefix alignments only. In that variation
+  // alignment_result is deliberately not an ordinary full-log payload.
+  bool alignment_detail_present = false;
 };
 struct PrecisionOptions {
   bool use_task_ids = false;
@@ -93,12 +104,16 @@ struct PrecisionOptions {
   TokenReplayVariant token_replay_variant = TokenReplayVariant::kForward;
   std::vector<int> initial_marking;
   std::vector<int> final_marking;
+  std::string case_id_attribute = "case:concept:name";
+  std::optional<std::size_t> max_rows_to_materialize;
 };
 
 struct GeneralizationOptions {
   std::string activity_attribute = "concept:name";
   std::vector<int> initial_marking;
   std::vector<int> final_marking;
+  std::string case_id_attribute = "case:concept:name";
+  std::optional<std::size_t> max_rows_to_materialize;
 };
 
 struct GeneralizationResult {
@@ -141,6 +156,8 @@ struct CompositeEvaluationOptions {
   std::string activity_attribute = "concept:name";
   std::vector<int> initial_marking;
   std::vector<int> final_marking;
+  std::string case_id_attribute = "case:concept:name";
+  std::optional<std::size_t> max_rows_to_materialize;
 };
 
 struct CompositeEvaluationResult {
@@ -156,6 +173,12 @@ struct CompositeEvaluationResult {
   double generalization_weight = 0.25;
   bool computed = true;
   std::string error;
+  // The composite evaluator performs one token replay and retains its full
+  // result so callers do not need to run the replay a second time. `fitness`
+  // remains the historical scalar score; `fitness_score` is an explicit alias
+  // for serializers that expose the detailed result under `fitness`.
+  ReplayFitnessResult fitness_details;
+  double fitness_score = 0.0;
 };
 
 struct WeightedTrace {
@@ -168,9 +191,15 @@ struct StochasticLanguage {
 };
 using DistanceFunction = std::function<double(const std::vector<std::string>&,
                                               const std::vector<std::string>&)>;
-// EMD variants. EXACT is the historical native implementation. PYEMD uses
-// the same dependency-free transportation solver with the standard normalized
-// trace distance, while retaining the legacy variant as the default.
+// Callback receiving the one-character-per-activity strings used by the
+// stochastic-language transport calculation. The union of both input
+// languages is encoded in sorted activity order before the callback runs.
+using EncodedDistanceFunction =
+    std::function<double(const std::u32string&, const std::u32string&)>;
+using Utf8EncodedDistanceFunction =
+    std::function<double(const std::string&, const std::string&)>;
+// EMD variants. PYEMD is the reference-compatible default. EXACT remains an
+// explicit native compatibility extension and is never selected implicitly.
 enum class EmdVariant {
   EXACT,
   PYEMD,
@@ -182,10 +211,18 @@ struct EmdOptions {
   bool strict_equal_mass = false;
   DistanceFunction distance;
   // Appended to preserve positional initialization of the legacy options.
-  EmdVariant variant = EmdVariant::EXACT;
+  EmdVariant variant = EmdVariant::PYEMD;
   // Selects the accelerated implementation when one is available. Native
   // builds retain the same deterministic transportation fallback either way.
   bool use_fast_emd = true;
+  // Reference-style callback over encoded Unicode strings. encoded_distance
+  // wins over string_distance when both are supplied.
+  EncodedDistanceFunction encoded_distance;
+  // Readable alias for callers porting a string-distance callback.
+  EncodedDistanceFunction string_distance;
+  // Optional UTF-8 callback extension for clients whose string-distance
+  // implementation cannot consume UTF-32 code points directly.
+  Utf8EncodedDistanceFunction utf8_string_distance;
 };
 struct EmdResult {
   double distance = std::numeric_limits<double>::quiet_NaN();
@@ -193,9 +230,52 @@ struct EmdResult {
   bool normalized = false;
   std::string error;
   // Appended to preserve positional initialization of the legacy result.
-  EmdVariant variant = EmdVariant::EXACT;
+  EmdVariant variant = EmdVariant::PYEMD;
   bool use_fast_emd = true;
 };
+
+// One already-computed token replay record. `computed=false` represents a
+// failed/unfinished replay while retaining any counters the caller has.
+struct PrecomputedTokenReplay {
+  bool computed = true;
+  bool exhausted = false;
+  bool trace_is_fit = false;
+  double trace_fitness = 0.0;
+  std::uint64_t missing_tokens = 0;
+  std::uint64_t consumed_tokens = 0;
+  std::uint64_t remaining_tokens = 0;
+  std::uint64_t produced_tokens = 0;
+  std::vector<std::uint64_t> transition_activations;
+  std::string error;
+  // Short aliases mirror the aggregate fields exposed by ConformanceResult.
+  // A zero *_tokens value is the unspecified sentinel for alias input;
+  // otherwise the descriptive *_tokens spelling takes precedence.
+  std::uint64_t missing = 0;
+  std::uint64_t consumed = 0;
+  std::uint64_t remaining = 0;
+  std::uint64_t produced = 0;
+};
+
+// One already-computed alignment replay record. `best_worst_cost` is the
+// denominator used by the cost-based log fitness; a zero denominator follows
+// the reference evaluator and yields a unit log fitness for nonempty
+// computable input.
+struct PrecomputedAlignmentReplay {
+  bool computed = true;
+  bool exhausted = false;
+  bool trace_is_fit = false;
+  double fitness = 0.0;
+  double cost = 0.0;
+  double best_worst_cost = 0.0;
+  std::string error;
+  // Common serialized spelling for the best-worst denominator. A zero
+  // best_worst_cost is the unspecified sentinel when bwc is nonzero.
+  double bwc = 0.0;
+};
+
+// Descriptive aliases for clients that name the source algorithm explicitly.
+using TokenReplayEvaluationResult = PrecomputedTokenReplay;
+using AlignmentReplayEvaluationResult = PrecomputedAlignmentReplay;
 
 // A request-scoped container for the selected model-quality evaluation.  Only
 // the result corresponding to the requested family is populated.
@@ -218,10 +298,114 @@ struct ModelEvaluation {
 [[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
     const EventLog&, const ProcessTree&, ReplayFitnessVariant,
     const ReplayFitnessOptions&);
+
+// Flat event-data adapters. EventStream, EventTable, LazyEventTable, and the
+// tagged EventDataView all preserve the grouped EventLog contract after
+// deterministic case/activity selector projection.
+[[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
+    const EventDataView&, const PetriNet&, ReplayFitnessVariant = ReplayFitnessVariant::AUTO,
+    const ReplayFitnessOptions& = {});
+[[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
+    const EventDataView&, const ProcessTree&, ReplayFitnessVariant = ReplayFitnessVariant::AUTO,
+    const ReplayFitnessOptions& = {});
+
+[[nodiscard]] inline ReplayFitnessResult evaluate_replay_fitness(
+    const EventStream& data, const PetriNet& net,
+    ReplayFitnessVariant variant = ReplayFitnessVariant::AUTO,
+    const ReplayFitnessOptions& options = {}) {
+  return evaluate_replay_fitness(EventDataView(data), net, variant, options);
+}
+[[nodiscard]] inline ReplayFitnessResult evaluate_replay_fitness(
+    const EventTable& data, const PetriNet& net,
+    ReplayFitnessVariant variant = ReplayFitnessVariant::AUTO,
+    const ReplayFitnessOptions& options = {}) {
+  return evaluate_replay_fitness(EventDataView(data), net, variant, options);
+}
+[[nodiscard]] inline ReplayFitnessResult evaluate_replay_fitness(
+    const LazyEventTable& data, const PetriNet& net,
+    ReplayFitnessVariant variant = ReplayFitnessVariant::AUTO,
+    const ReplayFitnessOptions& options = {}) {
+  return evaluate_replay_fitness(EventDataView(data), net, variant, options);
+}
+[[nodiscard]] inline ReplayFitnessResult evaluate_replay_fitness(
+    const EventStream& data, const ProcessTree& tree,
+    ReplayFitnessVariant variant = ReplayFitnessVariant::AUTO,
+    const ReplayFitnessOptions& options = {}) {
+  return evaluate_replay_fitness(EventDataView(data), tree, variant, options);
+}
+[[nodiscard]] inline ReplayFitnessResult evaluate_replay_fitness(
+    const EventTable& data, const ProcessTree& tree,
+    ReplayFitnessVariant variant = ReplayFitnessVariant::AUTO,
+    const ReplayFitnessOptions& options = {}) {
+  return evaluate_replay_fitness(EventDataView(data), tree, variant, options);
+}
+[[nodiscard]] inline ReplayFitnessResult evaluate_replay_fitness(
+    const LazyEventTable& data, const ProcessTree& tree,
+    ReplayFitnessVariant variant = ReplayFitnessVariant::AUTO,
+    const ReplayFitnessOptions& options = {}) {
+  return evaluate_replay_fitness(EventDataView(data), tree, variant, options);
+}
+[[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
+    const std::vector<PrecomputedTokenReplay>&,
+    ReplayFitnessVariant = ReplayFitnessVariant::TOKEN_BASED);
+[[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
+    const std::vector<PrecomputedAlignmentReplay>&,
+    ReplayFitnessVariant = ReplayFitnessVariant::ALIGNMENT_BASED);
+
+[[nodiscard]] inline ReplayFitnessResult evaluate_replay_fitness_from_token_results(
+    const std::vector<PrecomputedTokenReplay>& results) {
+  return evaluate_replay_fitness(results, ReplayFitnessVariant::TOKEN_BASED);
+}
+[[nodiscard]] inline ReplayFitnessResult evaluate_replay_fitness_from_alignment_results(
+    const std::vector<PrecomputedAlignmentReplay>& results) {
+  return evaluate_replay_fitness(results, ReplayFitnessVariant::ALIGNMENT_BASED);
+}
 [[nodiscard]] PrecisionResult evaluate_precision(
     const EventLog&, const PetriNet&, PrecisionVariant = PrecisionVariant::AUTO);
 [[nodiscard]] PrecisionResult evaluate_precision(
     const EventLog&, const PetriNet&, PrecisionVariant, const PrecisionOptions&);
+[[nodiscard]] PrecisionResult evaluate_precision(
+    const EventDataView&, const PetriNet&, PrecisionVariant = PrecisionVariant::AUTO,
+    const PrecisionOptions& = {});
+[[nodiscard]] PrecisionResult evaluate_precision(
+    const EventDataView&, const ProcessTree&, PrecisionVariant = PrecisionVariant::AUTO,
+    const PrecisionOptions& = {});
+[[nodiscard]] inline PrecisionResult evaluate_precision(
+    const EventStream& data, const PetriNet& net,
+    PrecisionVariant variant = PrecisionVariant::AUTO,
+    const PrecisionOptions& options = {}) {
+  return evaluate_precision(EventDataView(data), net, variant, options);
+}
+[[nodiscard]] inline PrecisionResult evaluate_precision(
+    const EventTable& data, const PetriNet& net,
+    PrecisionVariant variant = PrecisionVariant::AUTO,
+    const PrecisionOptions& options = {}) {
+  return evaluate_precision(EventDataView(data), net, variant, options);
+}
+[[nodiscard]] inline PrecisionResult evaluate_precision(
+    const LazyEventTable& data, const PetriNet& net,
+    PrecisionVariant variant = PrecisionVariant::AUTO,
+    const PrecisionOptions& options = {}) {
+  return evaluate_precision(EventDataView(data), net, variant, options);
+}
+[[nodiscard]] inline PrecisionResult evaluate_precision(
+    const EventStream& data, const ProcessTree& tree,
+    PrecisionVariant variant = PrecisionVariant::AUTO,
+    const PrecisionOptions& options = {}) {
+  return evaluate_precision(EventDataView(data), tree, variant, options);
+}
+[[nodiscard]] inline PrecisionResult evaluate_precision(
+    const EventTable& data, const ProcessTree& tree,
+    PrecisionVariant variant = PrecisionVariant::AUTO,
+    const PrecisionOptions& options = {}) {
+  return evaluate_precision(EventDataView(data), tree, variant, options);
+}
+[[nodiscard]] inline PrecisionResult evaluate_precision(
+    const LazyEventTable& data, const ProcessTree& tree,
+    PrecisionVariant variant = PrecisionVariant::AUTO,
+    const PrecisionOptions& options = {}) {
+  return evaluate_precision(EventDataView(data), tree, variant, options);
+}
 [[nodiscard]] PrecisionResult evaluate_precision(
     const EventLog&, const ProcessTree&, PrecisionVariant = PrecisionVariant::AUTO);
 [[nodiscard]] PrecisionResult evaluate_precision(
@@ -236,6 +420,50 @@ struct ModelEvaluation {
 [[nodiscard]] GeneralizationResult evaluate_generalization(
     const EventLog&, const ProcessTree&, GeneralizationVariant,
     const GeneralizationOptions&);
+[[nodiscard]] GeneralizationResult evaluate_generalization(
+    const EventDataView&, const PetriNet&,
+    GeneralizationVariant = GeneralizationVariant::GENERALIZATION_TOKEN,
+    const GeneralizationOptions& = {});
+[[nodiscard]] GeneralizationResult evaluate_generalization(
+    const EventDataView&, const ProcessTree&,
+    GeneralizationVariant = GeneralizationVariant::GENERALIZATION_TOKEN,
+    const GeneralizationOptions& = {});
+[[nodiscard]] inline GeneralizationResult evaluate_generalization(
+    const EventStream& data, const PetriNet& net,
+    GeneralizationVariant variant = GeneralizationVariant::GENERALIZATION_TOKEN,
+    const GeneralizationOptions& options = {}) {
+  return evaluate_generalization(EventDataView(data), net, variant, options);
+}
+[[nodiscard]] inline GeneralizationResult evaluate_generalization(
+    const EventTable& data, const PetriNet& net,
+    GeneralizationVariant variant = GeneralizationVariant::GENERALIZATION_TOKEN,
+    const GeneralizationOptions& options = {}) {
+  return evaluate_generalization(EventDataView(data), net, variant, options);
+}
+[[nodiscard]] inline GeneralizationResult evaluate_generalization(
+    const LazyEventTable& data, const PetriNet& net,
+    GeneralizationVariant variant = GeneralizationVariant::GENERALIZATION_TOKEN,
+    const GeneralizationOptions& options = {}) {
+  return evaluate_generalization(EventDataView(data), net, variant, options);
+}
+[[nodiscard]] inline GeneralizationResult evaluate_generalization(
+    const EventStream& data, const ProcessTree& tree,
+    GeneralizationVariant variant = GeneralizationVariant::GENERALIZATION_TOKEN,
+    const GeneralizationOptions& options = {}) {
+  return evaluate_generalization(EventDataView(data), tree, variant, options);
+}
+[[nodiscard]] inline GeneralizationResult evaluate_generalization(
+    const EventTable& data, const ProcessTree& tree,
+    GeneralizationVariant variant = GeneralizationVariant::GENERALIZATION_TOKEN,
+    const GeneralizationOptions& options = {}) {
+  return evaluate_generalization(EventDataView(data), tree, variant, options);
+}
+[[nodiscard]] inline GeneralizationResult evaluate_generalization(
+    const LazyEventTable& data, const ProcessTree& tree,
+    GeneralizationVariant variant = GeneralizationVariant::GENERALIZATION_TOKEN,
+    const GeneralizationOptions& options = {}) {
+  return evaluate_generalization(EventDataView(data), tree, variant, options);
+}
 [[nodiscard]] SimplicityResult evaluate_simplicity(
     const PetriNet&, SimplicityVariant = SimplicityVariant::ARC_DEGREE,
     const SimplicityOptions& = {});
@@ -246,6 +474,42 @@ struct ModelEvaluation {
 [[nodiscard]] CompositeEvaluationResult evaluate_composite(
     const EventLog&, const ProcessTree&,
     const CompositeEvaluationOptions& = {});
+[[nodiscard]] CompositeEvaluationResult evaluate_composite(
+    const EventDataView&, const PetriNet&,
+    const CompositeEvaluationOptions& = {});
+[[nodiscard]] CompositeEvaluationResult evaluate_composite(
+    const EventDataView&, const ProcessTree&,
+    const CompositeEvaluationOptions& = {});
+[[nodiscard]] inline CompositeEvaluationResult evaluate_composite(
+    const EventStream& data, const PetriNet& net,
+    const CompositeEvaluationOptions& options = {}) {
+  return evaluate_composite(EventDataView(data), net, options);
+}
+[[nodiscard]] inline CompositeEvaluationResult evaluate_composite(
+    const EventTable& data, const PetriNet& net,
+    const CompositeEvaluationOptions& options = {}) {
+  return evaluate_composite(EventDataView(data), net, options);
+}
+[[nodiscard]] inline CompositeEvaluationResult evaluate_composite(
+    const LazyEventTable& data, const PetriNet& net,
+    const CompositeEvaluationOptions& options = {}) {
+  return evaluate_composite(EventDataView(data), net, options);
+}
+[[nodiscard]] inline CompositeEvaluationResult evaluate_composite(
+    const EventStream& data, const ProcessTree& tree,
+    const CompositeEvaluationOptions& options = {}) {
+  return evaluate_composite(EventDataView(data), tree, options);
+}
+[[nodiscard]] inline CompositeEvaluationResult evaluate_composite(
+    const EventTable& data, const ProcessTree& tree,
+    const CompositeEvaluationOptions& options = {}) {
+  return evaluate_composite(EventDataView(data), tree, options);
+}
+[[nodiscard]] inline CompositeEvaluationResult evaluate_composite(
+    const LazyEventTable& data, const ProcessTree& tree,
+    const CompositeEvaluationOptions& options = {}) {
+  return evaluate_composite(EventDataView(data), tree, options);
+}
 [[nodiscard]] SimplicityResult evaluate_simplicity(
     const ProcessTree&, SimplicityVariant = SimplicityVariant::ARC_DEGREE,
     const SimplicityOptions& = {});
@@ -255,12 +519,21 @@ struct ModelEvaluation {
 [[nodiscard]] double earth_movers_distance(const StochasticLanguage&, const StochasticLanguage&, const EmdOptions& = {});
 [[nodiscard]] double normalized_levenshtein_distance(const std::vector<std::string>&,
                                                      const std::vector<std::string>&);
+[[nodiscard]] double normalized_levenshtein_distance(const std::u32string&,
+                                                     const std::u32string&);
 
 // Short aliases used by clients that model evaluator modules as
 // free functions rather than selecting an evaluator object.
 inline ReplayFitnessResult replay_fitness(const EventLog& l, const PetriNet& n,
                                           ReplayFitnessVariant v = ReplayFitnessVariant::AUTO) {
   return evaluate_replay_fitness(l, n, v);
+}
+
+inline ReplayFitnessResult replay_fitness(const EventDataView& d,
+                                          const PetriNet& n,
+                                          ReplayFitnessVariant v = ReplayFitnessVariant::AUTO,
+                                          const ReplayFitnessOptions& o = {}) {
+  return evaluate_replay_fitness(d, n, v, o);
 }
 inline ReplayFitnessResult replay_fitness(const EventLog& l, const PetriNet& n,
                                           ReplayFitnessVariant v,
