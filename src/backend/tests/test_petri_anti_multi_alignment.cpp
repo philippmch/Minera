@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cmath>
+#include <string>
 #include <stdexcept>
 
 #include "minera/petri_anti_alignment.hpp"
@@ -31,7 +32,80 @@ static PetriNet single_label_net(const char* label) {
   return net;
 }
 
+static PetriNet equal_objective_tie_net() {
+  PetriNet net; net.set_activities({});
+  const auto source = net.add_place(), sink = net.add_place();
+  net.set_source(source); net.set_sink(sink);
+  net.add_transition(std::nullopt, {source}, {sink});
+  net.add_transition(std::nullopt, {source}, {source});
+  net.add_transition(std::nullopt, {source}, {sink});
+  return net;
+}
+
+static void discounted_anti_alignment_contract() {
+  PetriAntiAlignmentOptions options;
+  options.exponent = 2.0;
+  options.epsilon = 0.0;
+
+  PetriNet tau_only; tau_only.set_activities({});
+  const auto source = tau_only.add_place(), sink = tau_only.add_place();
+  tau_only.set_source(source); tau_only.set_sink(sink);
+  tau_only.add_transition(std::nullopt, {source}, {sink});
+
+  // Unequal lengths exercise the unmodeled orientation of discounted DP.
+  const auto unequal = anti_align_petri(
+      tau_only, log_of({{"x", "y"}}), options);
+  assert(std::abs(unequal.cost + 0.75) < 1e-12);
+
+  // The ordinary diagnostic metric has raw borders, and the denominator uses
+  // the complete model run even though its only transition is silent.
+  const auto full_run = anti_align_petri(tau_only, log_of({{}}), options);
+  assert(full_run.transitions == std::vector<std::size_t>{0});
+  assert(std::abs(full_run.precision) < 1e-12);
+
+  PetriAntiAlignmentOptions epsilon_options = options;
+  epsilon_options.epsilon = 0.5;
+  const auto epsilon = anti_align_petri(
+      tau_only, log_of({{"x"}}), epsilon_options);
+  assert(std::abs(epsilon.precision - 2.0 / 3.0) < 1e-12);
+
+  // Equal objectives choose the longer run before transition ordering.
+  const auto tie_net = equal_objective_tie_net();
+  PetriAntiAlignmentOptions tie_options = options;
+  tie_options.marking_limit = 1;
+  const auto tie = anti_align_petri(tie_net, log_of({{}}), tie_options);
+  assert((tie.transitions == std::vector<std::size_t>{1, 0}));
+  assert(tie.activities.empty());
+}
+
+static void discounted_multi_alignment_contract() {
+  PetriMultiAlignmentOptions options;
+  options.exponent = 2.0;
+
+  PetriNet tau_only; tau_only.set_activities({});
+  const auto source = tau_only.add_place(), sink = tau_only.add_place();
+  tau_only.set_source(source); tau_only.set_sink(sink);
+  tau_only.add_transition(std::nullopt, {source}, {sink});
+
+  // The maximum ordinary distance includes the silent transition in both the
+  // run and its raw-index border.
+  const auto full_run = multi_align_petri(tau_only, log_of({{}}), options);
+  assert(full_run.transitions == std::vector<std::size_t>{0});
+  assert(full_run.max_distance_to_log == 1.0);
+
+  // The longer equal-objective loop run wins deterministically at the limit.
+  const auto tie_net = equal_objective_tie_net();
+  PetriMultiAlignmentOptions tie_options = options;
+  tie_options.marking_limit = 1;
+  const auto tie = multi_align_petri(tie_net, log_of({{}}), tie_options);
+  assert((tie.transitions == std::vector<std::size_t>{1, 0}));
+  assert(tie.activities.empty());
+}
+
 int main() {
+  discounted_anti_alignment_contract();
+  discounted_multi_alignment_contract();
+
   const auto net = choice_net();
   PetriAntiAlignmentOptions ao; ao.exponent = 2.0; ao.epsilon = 0.0;
   const auto anti = anti_align_petri(net, log_of({{"a"}}), ao);
@@ -53,16 +127,6 @@ int main() {
   const auto ta = anti_align_petri(tau, log_of({{}}), ao);
   assert(ta.transitions.size() == 2 && ta.transitions[0] == 0 && ta.activities.size() == 1);
 
-  // The length swap exercises the unmodeled/tau branch of discounted DP.
-  PetriNet tau_only; tau_only.set_activities({});
-  const auto ts = tau_only.add_place(), tf = tau_only.add_place(); tau_only.set_source(ts); tau_only.set_sink(tf);
-  tau_only.add_transition(std::nullopt, {ts}, {tf});
-  const auto swapped = anti_align_petri(tau_only, log_of({{"x", "y"}}), ao);
-  assert(std::abs(swapped.cost + 0.75) < 1e-12);
-  PetriAntiAlignmentOptions precision_options = ao; precision_options.epsilon = 0.5;
-  const auto tau_precision = anti_align_petri(tau_only, log_of({{"x"}}), precision_options);
-  assert(std::abs(tau_precision.precision - 2.0 / 3.0) < 1e-12);
-
   // Duplicate traces collapse to one variant; result is deterministic.
   const auto d1 = multi_align_petri(net, log_of({{"a"}, {"a"}}), mo);
   const auto d2 = multi_align_petri(net, log_of({{"a"}, {"a"}}), mo);
@@ -82,6 +146,24 @@ int main() {
   PetriAntiAlignmentOptions limited = ao; limited.marking_limit = 1;
   const auto lr = anti_align_petri(loop, log_of({{"b"}}), limited);
   assert(lr.diagnostics.exhausted);
+
+  // A limit of one permits the first revisit and exhausts only when a later
+  // expansion would exceed that per-marking boundary.
+  PetriNet unreachable_loop; unreachable_loop.set_activities({"a"});
+  const auto us = unreachable_loop.add_place(), uf = unreachable_loop.add_place();
+  unreachable_loop.set_source(us); unreachable_loop.set_sink(uf);
+  unreachable_loop.add_transition(0, {us}, {us});
+  bool exhausted_anti = false;
+  try { (void)anti_align_petri(unreachable_loop, log_of({{"b"}}), limited); }
+  catch (const std::runtime_error& error) {
+    exhausted_anti = std::string(error.what()).find("state limit") != std::string::npos;
+  }
+  assert(exhausted_anti);
+  bool exhausted_multi = false;
+  PetriMultiAlignmentOptions multi_limited = mo; multi_limited.marking_limit = 1;
+  try { (void)multi_align_petri(unreachable_loop, log_of({{"b"}}), multi_limited); }
+  catch (const std::runtime_error&) { exhausted_multi = true; }
+  assert(exhausted_multi);
 
   bool threw = false;
   try { auto bad = mo; bad.exponent = 1.0; (void)multi_align_petri(net, log_of({{"a"}}), bad); }

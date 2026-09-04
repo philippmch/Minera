@@ -635,8 +635,40 @@
           "symbol": "VERSION_DISCOUNTED_A_STAR"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "VERSION_DISCOUNTED_A_STAR": {
+          "selector": "VERSION_DISCOUNTED_A_STAR",
+          "binding": {
+            "selector": "VERSION_DISCOUNTED_A_STAR",
+            "modules": [
+              "algo.conformance.antialignments.variants.discounted_a_star"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "VERSION_DISCOUNTED_A_STAR"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/petri_anti_alignment.cpp",
+              "symbol": "anti_align_petri"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_petri_anti_multi_alignment.cpp",
+              "executable": "minera_petri_anti_multi_alignment_tests",
+              "case": "discounted_anti_alignment_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/petri_anti_alignment.hpp",
+        "src/backend/petri_anti_alignment.cpp",
+        "src/backend/tests/test_petri_anti_multi_alignment.cpp"
+      ]
     },
     {
       "package": "algo.conformance.declare",
@@ -654,8 +686,40 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.conformance.declare.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/declare.hpp",
+              "symbol": "check_declare_conformance"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_declare.cpp",
+              "executable": "minera_declare_tests",
+              "case": "conformance_checks_direction_and_order"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/declare.hpp",
+        "src/backend/declare.cpp",
+        "src/backend/tests/test_declare.cpp"
+      ]
     },
     {
       "package": "algo.conformance.footprints",
@@ -816,8 +880,40 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.conformance.log_skeleton.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/log_skeleton.hpp",
+              "symbol": "check_log_skeleton_conformance"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_log_skeleton.cpp",
+              "executable": "minera_log_skeleton_tests",
+              "case": "considered_constraints_have_presence_semantics"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/log_skeleton.hpp",
+        "src/backend/log_skeleton.cpp",
+        "src/backend/tests/test_log_skeleton.cpp"
+      ]
     },
     {
       "package": "algo.conformance.multialignments",
@@ -835,8 +931,40 @@
           "symbol": "VERSION_DISCOUNTED_A_STAR"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "VERSION_DISCOUNTED_A_STAR": {
+          "selector": "VERSION_DISCOUNTED_A_STAR",
+          "binding": {
+            "selector": "VERSION_DISCOUNTED_A_STAR",
+            "modules": [
+              "algo.conformance.multialignments.variants.discounted_a_star"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "VERSION_DISCOUNTED_A_STAR"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/petri_multi_alignment.cpp",
+              "symbol": "multi_align_petri"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_petri_anti_multi_alignment.cpp",
+              "executable": "minera_petri_anti_multi_alignment_tests",
+              "case": "discounted_multi_alignment_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/petri_multi_alignment.hpp",
+        "src/backend/petri_multi_alignment.cpp",
+        "src/backend/tests/test_petri_anti_multi_alignment.cpp"
+      ]
     },
     {
       "package": "algo.conformance.ocel.etot",
@@ -1522,8 +1650,40 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.discovery.declare.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/declare.hpp",
+              "symbol": "discover_declare"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_declare.cpp",
+              "executable": "minera_declare_tests",
+              "case": "flat_inputs_and_diagnostics_are_equivalent"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/declare.hpp",
+        "src/backend/declare.cpp",
+        "src/backend/tests/test_declare.cpp"
+      ]
     },
     {
       "package": "algo.discovery.dfg",
@@ -2376,8 +2536,40 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.discovery.log_skeleton.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/log_skeleton.hpp",
+              "symbol": "discover_log_skeleton"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_log_skeleton.cpp",
+              "executable": "minera_log_skeleton_tests",
+              "case": "flat_inputs_variants_and_diagnostics_are_equivalent"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/log_skeleton.hpp",
+        "src/backend/log_skeleton.cpp",
+        "src/backend/tests/test_log_skeleton.cpp"
+      ]
     },
     {
       "package": "algo.discovery.minimum_self_distance",
@@ -6204,8 +6396,28 @@
           "selector": "VERSION_DISCOUNTED_A_STAR"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/petri_anti_alignment.cpp",
+        "src/backend/tests/test_petri_anti_multi_alignment.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.antialignments.variants.discounted_a_star",
+        "implementation": [
+          {
+            "path": "src/backend/petri_anti_alignment.cpp",
+            "symbol": "anti_align_petri"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_petri_anti_multi_alignment.cpp",
+            "executable": "minera_petri_anti_multi_alignment_tests",
+            "case": "discounted_anti_alignment_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.declare.variants.classic",
@@ -6218,8 +6430,28 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/declare.hpp",
+        "src/backend/tests/test_declare.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.declare.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/declare.hpp",
+            "symbol": "check_declare_conformance"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_declare.cpp",
+            "executable": "minera_declare_tests",
+            "case": "conformance_checks_direction_and_order"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.footprints.util.evaluation",
@@ -6397,8 +6629,28 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/log_skeleton.hpp",
+        "src/backend/tests/test_log_skeleton.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.log_skeleton.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/log_skeleton.hpp",
+            "symbol": "check_log_skeleton_conformance"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_skeleton.cpp",
+            "executable": "minera_log_skeleton_tests",
+            "case": "considered_constraints_have_presence_semantics"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.multialignments.variants.discounted_a_star",
@@ -6411,8 +6663,28 @@
           "selector": "VERSION_DISCOUNTED_A_STAR"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/petri_multi_alignment.cpp",
+        "src/backend/tests/test_petri_anti_multi_alignment.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.multialignments.variants.discounted_a_star",
+        "implementation": [
+          {
+            "path": "src/backend/petri_multi_alignment.cpp",
+            "symbol": "multi_align_petri"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_petri_anti_multi_alignment.cpp",
+            "executable": "minera_petri_anti_multi_alignment_tests",
+            "case": "discounted_multi_alignment_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.ocel.etot.variants.graph_comparison",
@@ -7096,8 +7368,28 @@
       "owner": "algo.discovery.declare",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "src/backend/declare.cpp",
+        "src/backend/tests/test_declare.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.declare.templates",
+        "implementation": [
+          {
+            "path": "src/backend/declare.cpp",
+            "symbol": "DeclareModel::add"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_declare.cpp",
+            "executable": "minera_declare_tests",
+            "case": "every_template_family_and_prerequisite_rules"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.declare.variants.classic",
@@ -7110,8 +7402,28 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/declare.hpp",
+        "src/backend/tests/test_declare.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.declare.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/declare.hpp",
+            "symbol": "discover_declare"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_declare.cpp",
+            "executable": "minera_declare_tests",
+            "case": "duplicate_traces_and_thresholds_are_weighted"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.adapters.pandas.df_statistics",
@@ -8688,8 +9000,28 @@
       "owner": "algo.discovery.log_skeleton",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/log_skeleton.hpp",
+        "src/backend/tests/test_log_skeleton.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.log_skeleton.trace_skel",
+        "implementation": [
+          {
+            "path": "include/minera/log_skeleton.hpp",
+            "symbol": "LogSkeletonVariantList"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_skeleton.cpp",
+            "executable": "minera_log_skeleton_tests",
+            "case": "flat_inputs_variants_and_diagnostics_are_equivalent"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.log_skeleton.variants.classic",
@@ -8702,8 +9034,28 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/log_skeleton.hpp",
+        "src/backend/tests/test_log_skeleton.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.log_skeleton.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/log_skeleton.hpp",
+            "symbol": "discover_log_skeleton"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_skeleton.cpp",
+            "executable": "minera_log_skeleton_tests",
+            "case": "directly_follows_preserves_repeated_edge_support"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.minimum_self_distance.utils",

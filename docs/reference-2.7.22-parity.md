@@ -47,14 +47,15 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 36
-complete and 50 partial dispatcher rows, plus 182 complete and 205 partial
+adapter, integration, or missing are complete. The current manifest records 42
+complete and 44 partial dispatcher rows, plus 190 complete and 197 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
 DFG, causal and correlation discovery, 26-module Inductive discovery, 31-module
 POWL discovery, 13-module footprints discovery/conformance, and the 19-module
-temporal/behavioral adapter stack with distinct registered tests; 255 coverage
-units still require exact proof.
+temporal/behavioral adapter stack, plus discounted anti-/multi-alignment and
+classic Declare/log-skeleton discovery and conformance, with distinct
+registered tests; 241 coverage units still require exact proof.
 A release may
 additionally run the strict gate:
 
@@ -123,15 +124,15 @@ are reconciled.
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Partial (implemented core; proof pending)** — all six variants are explicitly selectable; less-memory Dijkstra with legacy unit costs is the generic default, with named event activity fields available at replay time |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors |
 | Conformance: replay | forward token replay and backwards token replay | **Partial (implemented core; proof pending)** — forward replay remains the default; the backwards variation, reverse silent routing, weak firing, duplicate-label behavior, immediate-stop option, and named event activity selector are selectable |
-| Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Partial overall; footprints conformance complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance now carry strict activity selectors and exact empty/subset family-selection behavior but remain proof-pending |
+| Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance add trace/log/flat adapters, strict activity and case selectors, exact empty/subset family-selection behavior, typed per-case diagnostics, and distinct registered proofs |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
-| Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Partial (implemented core; proof pending)** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters are implemented |
+| Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both `VERSION_DISCOUNTED_A_STAR` algorithms preserve the asymmetric discounted recurrence, complete model-transition runs, raw ordinary-distance borders, deterministic longer-run ties, exact marking-limit boundaries, objectives, precision/distance diagnostics, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters, with distinct registered proofs |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, strict direct-OCDFG activity/object-type selectors, and cross-family envelope rejection; broader OCEL schema coverage remains |
 | Discovery: Alpha | classic and Alpha+ | **Partial (implemented core; proof pending)** — event-log and direct-DFG classic entry points are available; Alpha+ adds deterministic source, sink, interior, and loop-only length-one-loop handling, aggregated predecessor/successor reconstruction, plus-only disconnected-transition cleanup, and a strict selectable activity field through native, JSON, CLI, local-server, frontend, and downstream model-log adapters |
 | Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Partial (implemented core; proof pending)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
-| Discovery: declarative | Declare classic and log skeleton classic | **Partial (implemented core; proof pending)** |
+| Discovery: declarative | Declare classic and log skeleton classic | **Complete** — all 18 Declare templates and all six log-skeleton constraint families retain their weighted threshold, vacuity, ordering, and diagnostic contracts; grouped logs, streams, eager/lazy tables, strict custom activity/case selectors, and log-skeleton variant lists are supported by distinct registered proofs |
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete** — all eight statistical DFG routes, eager and lazy table adapters, performance behavior, replacement helpers, graph utilities, both causal variants, all three correlation variants, and all three minimum-self-distance adapters with witnesses have focused native contracts plus JSON/CLI/server/frontend integration; eventually-follows is covered as a native statistical extension outside the algorithm-dispatch catalog |
 | Discovery: footprints | log entire/trace-by-trace, eager dataframe, lazy dataframe, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete** — all eight selectors have distinct registered contracts and production dispatch; eager/lazy ordering differences, activity/case/time/index selectors, explicit Petri markings, and inclusive-choice bottom-up behavior are covered |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete** — view-based transition systems cover sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, occurrence data, flat and trace inputs, and explicit activity/case selectors; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and the additional DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings, backed by exact selector and module contracts |
@@ -1861,12 +1862,24 @@ activity-frequency diagnostics, per-trace deviation totals, fitness, and fit
 status. Omitted constraints mean all families, while an explicitly empty list
 performs no checks and is distinct from a non-empty subset. Discovery and
 conformance accept the same strict activity selector contract as Declare.
-Focused tests cover repetition-sensitive relations, noisy weighted
-variants, threshold and tie quirks, family selection, duplicate variants,
-unknown/missing activities, non-finite direct-call behavior, and empty inputs.
-The model and trace diagnostics are serialized with prevalidated activity IDs,
-available through CLI/server requests, and rendered in the frontend with all
-settings exposed.
+Stream, eager-table, lazy-table, and generic event-data adapters use an
+independent case selector for grouping. Exact fields outrank imported source
+keys and canonical aliases, equal-priority collisions reject, and an exact null
+never falls back to a lower-priority field. Grouped logs ignore this flat-only
+case selector.
+
+The explicit variant-list discovery contract materializes one trace per list
+entry: the attached count is metadata, duplicates remain repeated entries, and
+empty variants remain representable. Variant conformance returns one result per
+distinct activity sequence with later duplicate keys replacing earlier ones.
+Typed diagnostics preserve the selected case cell's scalar kind and native
+value, validate result cardinality, and reject totals outside the signed 64-bit
+table range. Focused tests cover repetition-sensitive relations, noisy weighted
+variants, threshold and tie quirks, family selection, duplicate and empty
+variants, selector collisions/nulls, typed case IDs, unknown/missing activities,
+non-finite direct-call behavior, and empty inputs. The model and trace
+diagnostics are serialized with prevalidated activity IDs, available through
+CLI/server requests, and rendered in the frontend with all settings exposed.
 
 ## DFG statistical and causal parity evidence
 
@@ -2379,17 +2392,23 @@ and one result per input trace.
 
 Discovery and trace/log conformance share a strict configurable activity
 selector. Canonical aliases, imported first-class source keys, and generic
-scalar attributes resolve consistently; an explicitly blank, missing, or null
-selection fails instead of falling back to the canonical label. The selector
-is exposed through request, CLI, local-server, and frontend mining contracts so
-the discovered model and its immediate conformance diagnostics use the same
-projected alphabet.
+scalar attributes resolve with exact-field, source-key, then alias precedence;
+equal-priority collisions reject. An explicitly blank, missing, or null
+selection fails instead of falling back to the canonical label. Flat streams,
+eager tables, lazy tables, and generic event-data views additionally expose a
+strict case selector for grouping, while already-grouped logs ignore it. The
+activity selector is exposed through request, CLI, local-server, and frontend
+mining contracts so the discovered model and its immediate conformance
+diagnostics use the same projected alphabet.
 
 The batch model and conformance diagnostics are exposed through the native API,
 strict request fields, CLI, local server, deterministic numeric-ID JSON, and
-the frontend. Tests cover every template family, positive and violating traces,
-empty and unusual activity labels, duplicate cases, explicit-empty filters,
-threshold edge values, malformed output validation, and duplicate rule keys.
+the frontend. Per-case diagnostic tables retain numeric, Boolean, date, ID, and
+string case-cell metadata instead of reducing identifiers to text. Tests cover
+every template family, positive and violating traces, flat-adapter equivalence,
+selector precedence/ambiguity/null handling, typed case IDs, empty and unusual
+activity labels, duplicate cases, explicit-empty filters, threshold edge
+values, malformed output validation, and duplicate rule keys.
 
 The separate streaming AUTOMATA implementation is stateful, mutex-serialized,
 and intentionally prefix-only: pending obligations are not finalized at the
@@ -2500,6 +2519,18 @@ and per-trace time limits are enforced; a reachable search that hits a limit
 reports `computed=false, exhausted=true` rather than a fabricated optimum.
 Diagnostics include visited/queued states, traversed arcs, closed-set size,
 visited markings, and LP solves.
+
+Discounted anti-alignment and multi-alignment use the complete fired-transition
+run, including null and other silent moves, for their ordinary precision and
+maximum-distance diagnostics. The discounted recurrence retains its asymmetric
+model-prefix rules, while the ordinary insertion/deletion metric initializes
+its first row and column with raw edit costs and makes silent deletion free only
+in interior cells. Exact objective ties prefer the longer transition run before
+the deterministic transition order. Per-marking limits permit the configured
+number of revisits and report exhaustion only when the next expansion would
+cross that boundary. Focused contracts cover unequal lengths, null/tau/n*/skip
+labels, silent-only runs, epsilon normalization, longer-loop ties, unreachable
+final markings, and the zero/one marking-limit boundary for both algorithms.
 
 Silent (`tau`) model moves remain explicit routing moves in diagnostics and
 alignments, while weighted input/output arc multiplicity is preserved when
