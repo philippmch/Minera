@@ -23,6 +23,8 @@ struct PetriAntiAlignmentOptions {
   std::size_t max_states = 0;  // compatibility alias; zero uses marking_limit
   std::vector<std::size_t> initial_marking;
   std::vector<std::size_t> final_marking;
+  // Event field used to construct the log variants.
+  std::string activity_attribute = "concept:name";
 };
 
 struct PetriAntiAlignmentDiagnostics {

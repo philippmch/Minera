@@ -45,6 +45,8 @@ struct DecomposedAlignmentOptions {
   std::unordered_map<std::string, double> activity_sync_costs;
   std::vector<std::size_t> initial_marking;
   std::vector<std::size_t> final_marking;
+  // Event field used to construct alignment words.
+  std::string activity_attribute = "concept:name";
 };
 
 struct DecomposedAlignmentTrace {

@@ -1822,10 +1822,13 @@ void parse_mine_params_rejects_invalid_token_replay_fields() {
 void parse_mine_params_maps_log_skeleton_options() {
   const auto params = minera::parse_mine_params(fields({
       {"log_skeleton_noise_threshold", "0.25"},
+      {"log_skeleton_activity_attribute", " phase "},
       {"log_skeleton_constraints",
        " always_after, equivalence, always_after,, activ_freq "},
   }));
   assert(params.log_skeleton.noise_threshold == 0.25);
+  assert(params.log_skeleton.activity_key == "phase");
+  assert(params.log_skeleton.considered_constraints_present);
   assert((params.log_skeleton.considered_constraints ==
           std::vector<std::string>{"activ_freq", "always_after",
                                    "equivalence"}));
@@ -1849,6 +1852,7 @@ void parse_mine_params_rejects_invalid_log_skeleton_fields() {
 
 void parse_mine_params_maps_declare_options() {
   const auto params = minera::parse_mine_params(fields({
+      {"declare_activity_attribute", " phase "},
       {"declare_considered_activities", " B, A, B "},
       {"declare_allowed_templates", "response, existence,response"},
       {"declare_min_support_ratio", "0.25"},
@@ -1856,6 +1860,8 @@ void parse_mine_params_maps_declare_options() {
       {"declare_auto_selection_multiplier", "0.75"},
   }));
   assert(params.declare_options.considered_activities.has_value());
+  assert(params.declare_options.activity_key == "phase");
+  assert(params.declare_conformance_options.activity_key == "phase");
   assert((params.declare_options.considered_activities.value() ==
           std::vector<std::string>{"B", "A", "B"}));
   assert((params.declare_options.allowed_templates.value() ==
@@ -1873,6 +1879,8 @@ void parse_mine_params_maps_declare_options() {
   assert(!defaults.declare_options.allowed_templates.has_value());
   assert(!defaults.declare_options.has_min_support_ratio);
   assert(!defaults.declare_options.has_min_confidence_ratio);
+  assert(defaults.declare_options.activity_key == "concept:name");
+  assert(defaults.declare_conformance_options.activity_key == "concept:name");
 }
 
 void parse_mine_params_preserves_explicit_empty_declare_filters() {
@@ -1902,6 +1910,37 @@ void parse_mine_params_preserves_explicit_empty_declare_filters() {
       fields({}), [](std::string_view) { return false; });
   assert(!absent.declare_options.considered_activities.has_value());
   assert(!absent.declare_options.allowed_templates.has_value());
+}
+
+void parse_mine_params_preserves_explicit_empty_log_skeleton_constraints() {
+  const std::map<std::string, std::string> values = {
+      {"log_skeleton_constraints", ""},
+  };
+  const auto explicit_empty = minera::parse_mine_params(
+      fields(values), [&](std::string_view key) {
+        return values.contains(std::string(key));
+      });
+  assert(explicit_empty.log_skeleton.considered_constraints_present);
+  assert(explicit_empty.log_skeleton.considered_constraints.empty());
+  const auto omitted = minera::parse_mine_params(fields({}));
+  assert(!omitted.log_skeleton.considered_constraints_present);
+}
+
+void parse_mine_params_rejects_blank_declarative_selectors() {
+  for (const auto name : {"log_skeleton_activity_attribute",
+                          "declare_activity_attribute"}) {
+    const std::map<std::string, std::string> values = {{name, "  "}};
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(
+          fields(values), [&](std::string_view key) {
+            return values.contains(std::string(key));
+          });
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
 }
 
 void parse_mine_params_rejects_invalid_declare_fields() {
@@ -2619,6 +2658,7 @@ void parse_process_tree_alignment_params_maps_variants_and_limits() {
       {"pt_alignment_max_total_time_ms", "0"},
       {"pt_alignment_max_trace_length", "0"},
       {"pt_alignment_max_process_tree_height", "3"},
+      {"pt_alignment_activity_attribute", " phase "},
       {"pt_alignment_use_global_cache", "true"},
       {"pt_alignment_batch_size", "2"},
       {"pt_alignment_clear_cache", "false"}}));
@@ -2626,6 +2666,7 @@ void parse_process_tree_alignment_params_maps_variants_and_limits() {
   assert(p.max_states == 0 && p.max_time_seconds == 1.5);
   assert(p.max_total_time_seconds == 0.0 && p.max_trace_length == 0);
   assert(p.max_process_tree_height == 3 && p.use_global_cache && p.batch_size == 2 && !p.clear_cache);
+  assert(p.activity_attribute == "phase");
 }
 
 void parse_process_tree_alignment_params_rejects_bad_values() {
@@ -2638,23 +2679,65 @@ void parse_process_tree_alignment_params_rejects_bad_values() {
     catch (const std::invalid_argument&) { threw = true; }
     assert(threw);
   }
+  for (const auto name : {"pt_alignment_activity_attribute"}) {
+    const std::map<std::string, std::string> values = {{name, "  "}};
+    bool threw = false;
+    try {
+      (void)minera::parse_process_tree_alignment_params(
+          fields(values), [&](std::string_view key) {
+            return values.contains(std::string(key));
+          });
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
 }
 
 void parse_native_adapter_params_contract() {
   const auto d = minera::parse_decomposed_alignment_params(fields({
       {"variant", "recompos_maximal"}, {"max_states", "42"},
+      {"activity_attribute", " phase "},
       {"threshold_border_agreement", "2.5"}, {"initial_marking", "1, 0"},
       {"tau_move_cost", "3"}, {"sync_cost", "0.5"},
       {"activity_log_costs", "A\\,B=7"}}));
   assert(d.max_states == 42 && d.initial_marking.size() == 2 &&
          d.tau_model_cost == 3.0 && d.sync_cost == 0.5 &&
-         d.activity_log_costs.at("A,B") == 7.0);
+         d.activity_log_costs.at("A,B") == 7.0 &&
+         d.activity_attribute == "phase");
   assert(minera::parse_activity_costs("A\\=B:4", "costs").at("A=B") ==
          4.0);
   const auto a = minera::parse_petri_anti_alignment_params(fields({
       {"variant", "version_discounted_a_star"}, {"exponent", "2"},
-      {"marking_limit", "10"}, {"max_states", "0"}}));
-  assert(a.marking_limit == 10 && a.max_states == 0);
+      {"marking_limit", "10"}, {"max_states", "0"},
+      {"activity_attribute", " phase "}}));
+  assert(a.marking_limit == 10 && a.max_states == 0 &&
+         a.activity_attribute == "phase");
+  for (const auto name : {"activity_attribute"}) {
+    const std::map<std::string, std::string> values = {{name, "\t"}};
+    bool rejected = false;
+    try {
+      (void)minera::parse_decomposed_alignment_params(
+          fields(values), [&](std::string_view key) {
+            return values.contains(std::string(key));
+          });
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+  bool multi_rejected = false;
+  try {
+    const std::map<std::string, std::string> values = {
+        {"activity_attribute", "  "}};
+    (void)minera::parse_petri_multi_alignment_params(
+        fields(values), [&](std::string_view key) {
+          return values.contains(std::string(key));
+        });
+  } catch (const std::invalid_argument&) {
+    multi_rejected = true;
+  }
+  assert(multi_rejected);
   bool threw = false;
   try { (void)minera::parse_petri_multi_alignment_params(fields({{"marking_limit", "0"}})); }
   catch (const std::invalid_argument&) { threw = true; }
@@ -3067,9 +3150,13 @@ void parse_dfg_and_edit_alignment_params_contract() {
   const auto d = minera::parse_dfg_alignment_params(fields({
       {"dfg_variant", "CLASSIC"}, {"dfg_max_states", "0"},
       {"dfg_max_time_ms", "12"}, {"dfg_sync_cost", R"(A=1,B:2,A=3,A\,B=4,A\=B=5,A\:B=6,A\\B=7,\sA=8,A\s=9,A\tB=10)"},
+      {"dfg_activity_attribute", " phase "},
+      {"dfg_timestamp_attribute", " occurred_at "},
       {"dfg_model_move_cost", "A=4"}, {"dfg_log_move_cost", "B=5"},
       {"dfg_internal_log_move_cost", "A=0.25"}}));
   assert(d.max_visited_states == 0 && d.max_time_ms == 12);
+  assert(d.activity_attribute == "phase");
+  assert(d.timestamp_attribute == "occurred_at");
   assert(d.sync_cost.at("A") == 3.0 && d.sync_cost.at("B") == 2.0);
   assert(d.sync_cost.at("A,B") == 4.0 && d.sync_cost.at("A=B") == 5.0);
   assert(d.sync_cost.at("A:B") == 6.0 && d.sync_cost.at("A\\B") == 7.0);
@@ -3079,14 +3166,21 @@ void parse_dfg_and_edit_alignment_params_contract() {
   assert(d.internal_log_move_cost.at("A") == 0.25);
   const auto e = minera::parse_edit_distance_params(fields({
       {"edit_variant", "Variants.EDIT_DISTANCE"}, {"anti", "1"},
-      {"deviation_cost", "7"}}));
+      {"deviation_cost", "7"}, {"edit_activity_attribute", " phase "},
+      {"edit_timestamp_attribute", " occurred_at "}}));
   assert(e.perform_anti_alignment && e.deviation_cost == 7);
+  assert(e.activity_attribute == "phase");
+  assert(e.timestamp_attribute == "occurred_at");
 
   const auto expect_throw = [](std::map<std::string, std::string> values,
                                bool dfg) {
     bool threw = false;
-    try { if (dfg) (void)minera::parse_dfg_alignment_params(fields(std::move(values)));
-          else (void)minera::parse_edit_distance_params(fields(std::move(values))); }
+    const auto lookup = fields(values);
+    const auto present = [&values](std::string_view name) {
+      return values.contains(std::string(name));
+    };
+    try { if (dfg) (void)minera::parse_dfg_alignment_params(lookup, present);
+          else (void)minera::parse_edit_distance_params(lookup, present); }
     catch (const std::invalid_argument&) { threw = true; }
     assert(threw);
   };
@@ -3100,6 +3194,10 @@ void parse_dfg_and_edit_alignment_params_contract() {
   expect_throw({{"edit_variant", "EDIT_DISTANCE"}, {"anti", "maybe"}}, false);
   expect_throw({{"deviation_cost", "0"}}, false);
   expect_throw({{"deviation_cost", "-2"}}, false);
+  expect_throw({{"dfg_activity_attribute", "  "}}, true);
+  expect_throw({{"dfg_timestamp_attribute", "  "}}, true);
+  expect_throw({{"edit_activity_attribute", "  "}}, false);
+  expect_throw({{"edit_timestamp_attribute", "  "}}, false);
   const std::map<std::string, std::string> empty{{"dfg_log_move_cost", ""}};
   const auto lookup = fields(empty);
   bool threw = false;
@@ -4538,6 +4636,8 @@ int main() {
   parse_mine_params_rejects_invalid_log_skeleton_fields();
   parse_mine_params_maps_declare_options();
   parse_mine_params_preserves_explicit_empty_declare_filters();
+  parse_mine_params_preserves_explicit_empty_log_skeleton_constraints();
+  parse_mine_params_rejects_blank_declarative_selectors();
   parse_mine_params_rejects_invalid_declare_fields();
   parse_mine_params_maps_footprints_options();
   parse_mine_params_rejects_invalid_footprints_options();

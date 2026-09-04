@@ -29,6 +29,11 @@ struct DfgAlignmentOptions {
   std::map<std::string, double> internal_log_move_cost;
   std::size_t max_visited_states = 0;  // zero means unlimited
   std::uint64_t max_time_ms = 0;       // zero means unlimited
+  // Event fields used when converting traces to DFG alignment words and when
+  // materializing projected logs.  The conventional aliases resolve to the
+  // first-class Event projections; other names resolve to generic attributes.
+  std::string activity_attribute = "concept:name";
+  std::string timestamp_attribute = "time:timestamp";
 };
 
 struct DfgAlignmentResult {

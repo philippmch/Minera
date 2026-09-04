@@ -3093,6 +3093,8 @@ export type DfgAlignmentProjection = "none" | "log" | "metrics";
 export type DfgCostMap = Record<string, number>;
 export interface DfgAlignmentOptions {
   variant?: DfgAlignmentVariant;
+  activity_attribute?: string;
+  timestamp_attribute?: string;
   max_states?: number;
   max_time_ms?: number;
   sync_cost?: DfgCostMap;
@@ -3168,6 +3170,8 @@ export interface DfgPetriConversionResult {
 export type EditDistanceVariant = "EDIT_DISTANCE";
 export interface EditDistanceOptions {
   variant?: EditDistanceVariant;
+  activity_attribute?: string;
+  timestamp_attribute?: string;
   anti?: boolean;
   deviation_cost?: number;
   projection?: "none" | "log";
@@ -3206,6 +3210,7 @@ export type ProcessTreeAlignmentVariant =
 
 export interface ProcessTreeAlignmentOptions {
   variant?: ProcessTreeAlignmentVariant;
+  activity_attribute?: string;
   max_states?: number;
   max_time_ms?: number;
   max_total_time_ms?: number;
@@ -3260,6 +3265,7 @@ export interface ProcessTreeAlignmentResult {
 export type DecomposedAlignmentVariant = "recompos_maximal";
 export interface DecomposedAlignmentOptions {
   variant?: DecomposedAlignmentVariant;
+  activity_attribute?: string;
   threshold_border_agreement?: number;
   max_time_trace?: number;
   max_time_total?: number;
@@ -3326,6 +3332,7 @@ export interface DecomposedAlignmentResult {
 export type PetriAdvancedAlignmentVariant = "version_discounted_a_star";
 export interface PetriAntiAlignmentOptions {
   variant?: PetriAdvancedAlignmentVariant;
+  activity_attribute?: string;
   exponent?: number;
   epsilon?: number;
   marking_limit?: number;
@@ -3335,6 +3342,7 @@ export interface PetriAntiAlignmentOptions {
 }
 export interface PetriMultiAlignmentOptions {
   variant?: PetriAdvancedAlignmentVariant;
+  activity_attribute?: string;
   exponent?: number;
   marking_limit?: number;
   max_states?: number;

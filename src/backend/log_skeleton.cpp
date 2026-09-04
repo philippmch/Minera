@@ -1,7 +1,9 @@
 #include "minera/log_skeleton.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <set>
+#include <stdexcept>
 
 namespace minera {
 namespace {
@@ -10,22 +12,114 @@ using Activities = std::vector<std::string>;
 using CountMap = std::map<std::string, std::size_t>;
 using VariantMap = std::map<Activities, std::size_t>;
 
+void validate_activity_key(std::string_view activity_key) {
+  if (activity_key.empty() ||
+      std::all_of(activity_key.begin(), activity_key.end(), [](char value) {
+        return std::isspace(static_cast<unsigned char>(value)) != 0;
+      })) {
+    throw std::invalid_argument(
+        "log skeleton: activity selector must not be blank");
+  }
+}
+
 bool considered(const LogSkeletonOptions& options, const std::string& name) {
-  return options.considered_constraints.empty() ||
+  return (!options.considered_constraints_present &&
+          options.considered_constraints.empty()) ||
          std::find(options.considered_constraints.begin(),
                    options.considered_constraints.end(), name) !=
              options.considered_constraints.end();
 }
 
-long double threshold(std::size_t denominator, double noise) {
-  return static_cast<long double>(denominator) *
-         (1.0L - static_cast<long double>(noise));
+double threshold(std::size_t denominator, double noise) {
+  return static_cast<double>(denominator) * (1.0 - noise);
 }
 
-Activities activities_of(const Trace& trace) {
+const std::string* first_class_value(
+    const std::string& value, FirstClassAttributeState state) {
+  if (state == FirstClassAttributeState::kNull) return nullptr;
+  if (state != FirstClassAttributeState::kMissing || !value.empty())
+    return &value;
+  return nullptr;
+}
+
+bool matches_source(std::string_view source_key,
+                    const std::optional<EventAttribute>& attribute,
+                    std::string_view selector) {
+  return (!source_key.empty() && source_key == selector) ||
+         (attribute && attribute->key == selector);
+}
+
+const std::string* resolve_event_field(const Event& event,
+                                       std::string_view selector) {
+  const auto resolve = [](const std::string& value,
+                          FirstClassAttributeState state,
+                          const std::optional<EventAttribute>& attribute)
+      -> const std::string* {
+    if (state == FirstClassAttributeState::kNull) return nullptr;
+    if (const auto* selected = first_class_value(value, state))
+      return selected;
+    if (attribute && !attribute->is_null) return &attribute->value;
+    return nullptr;
+  };
+
+  const bool activity = selector == "concept:name" || selector == "activity" ||
+                        matches_source(event.activity_source_key,
+                                       event.activity_attribute, selector);
+  if (activity)
+    return resolve(event.activity, event.activity_state,
+                   event.activity_attribute);
+
+  const bool timestamp = selector == "time:timestamp" ||
+                         selector == "timestamp" ||
+                         matches_source(event.timestamp_source_key,
+                                        event.timestamp_attribute, selector);
+  if (timestamp)
+    return resolve(event.timestamp, event.timestamp_state,
+                   event.timestamp_attribute);
+
+  const bool resource = selector == "org:resource" || selector == "resource" ||
+                        matches_source(event.resource_source_key,
+                                       event.resource_attribute, selector);
+  if (resource)
+    return resolve(event.resource, event.resource_state,
+                   event.resource_attribute);
+
+  const bool lifecycle = selector == "lifecycle:transition" ||
+                         selector == "lifecycle" ||
+                         matches_source(event.lifecycle_source_key,
+                                        event.lifecycle_attribute, selector);
+  if (lifecycle)
+    return resolve(event.lifecycle, event.lifecycle_state,
+                   event.lifecycle_attribute);
+
+  const bool case_id = selector == "case:concept:name" ||
+                       selector == "case:id" || selector == "case_id" ||
+                       selector == "case" ||
+                       (!event.case_id_source_key.empty() &&
+                        event.case_id_source_key == selector);
+  if (case_id)
+    return first_class_value(event.case_id, event.case_id_state);
+
+  for (const auto& attribute : event.attributes)
+    if (attribute.key == selector)
+      return attribute.is_null ? nullptr : &attribute.value;
+  return nullptr;
+}
+
+std::string selected_activity(const Event& event, std::string_view activity_key) {
+  validate_activity_key(activity_key);
+  if (const auto* value = resolve_event_field(event, activity_key)) return *value;
+  throw std::invalid_argument(
+      "log skeleton: event activity selector is missing or null: '" +
+      std::string(activity_key) + "'");
+}
+
+Activities activities_of(const Trace& trace, std::string_view activity_key) {
+  validate_activity_key(activity_key);
   Activities result;
   result.reserve(trace.events.size());
-  for (const auto& event : trace.events) result.push_back(event.activity);
+  for (const auto& event : trace.events)
+    result.push_back(selected_activity(event, activity_key));
   return result;
 }
 
@@ -71,6 +165,7 @@ std::vector<LogSkeletonPair> sorted_pairs(const std::set<LogSkeletonPair>& pairs
 
 LogSkeletonModel discover_log_skeleton(const EventLog& log,
                                        const LogSkeletonOptions& options) {
+  validate_activity_key(options.activity_key);
   LogSkeletonModel model;
   // The native API preserves the raw arithmetic for unusual callers.
   // User-facing request/CLI boundaries validate the conventional [0,1] range.
@@ -82,7 +177,7 @@ LogSkeletonModel discover_log_skeleton(const EventLog& log,
   std::vector<std::string> activity_order;
   std::size_t events_count = 0;
   for (const auto& trace : log.traces) {
-    auto acts = activities_of(trace);
+    auto acts = activities_of(trace, options.activity_key);
     auto variant_it = variants.find(acts);
     if (variant_it == variants.end()) {
       variants.emplace(acts, 1);
@@ -97,33 +192,32 @@ LogSkeletonModel discover_log_skeleton(const EventLog& log,
     }
   }
 
-  if (considered(options, "equivalence")) {
+  {
     std::map<LogSkeletonPair, std::size_t> support;
     for (const auto& [trace, weight] : variants)
       for (const auto& pair : relation_set(trace, "equivalence"))
         support[pair] += weight * frequencies(trace).at(pair.source);
     std::set<LogSkeletonPair> kept;
     for (const auto& [pair, count] : support)
-      if (count + 1e-12 >= threshold(all_activs[pair.source], noise))
+      if (count >= threshold(all_activs[pair.source], noise))
         kept.insert(pair);
     model.equivalence = sorted_pairs(kept);
   }
 
   for (const std::string family : {"always_after", "always_before"}) {
-    if (!considered(options, family)) continue;
     std::map<LogSkeletonPair, std::size_t> support;
     for (const auto& [trace, weight] : variants) {
       for (const auto& pair : relation_set(trace, family)) support[pair] += weight;
     }
     std::set<LogSkeletonPair> kept;
     for (const auto& [pair, count] : support)
-      if (count + 1e-12 >= threshold(all_activs[pair.source], noise))
+      if (count >= threshold(all_activs[pair.source], noise))
         kept.insert(pair);
     if (family == "always_after") model.always_after = sorted_pairs(kept);
     else model.always_before = sorted_pairs(kept);
   }
 
-  if (considered(options, "never_together")) {
+  {
     std::map<LogSkeletonPair, long long> support;
     for (const auto& [a, _] : all_activs)
       for (const auto& [b, __] : all_activs)
@@ -145,7 +239,7 @@ LogSkeletonModel discover_log_skeleton(const EventLog& log,
     model.never_together = sorted_pairs(kept);
   }
 
-  if (considered(options, "directly_follows")) {
+  {
     std::map<LogSkeletonPair, std::size_t> support;
     for (const auto& [trace, weight] : variants) {
       for (std::size_t i = 1; i < trace.size(); ++i)
@@ -153,11 +247,11 @@ LogSkeletonModel discover_log_skeleton(const EventLog& log,
     }
     std::set<LogSkeletonPair> kept;
     for (const auto& [pair, count] : support)
-      if (count + 1e-12 >= threshold(all_activs[pair.source], noise)) kept.insert(pair);
+      if (count >= threshold(all_activs[pair.source], noise)) kept.insert(pair);
     model.directly_follows = sorted_pairs(kept);
   }
 
-  if (considered(options, "activ_freq")) {
+  {
     std::map<std::string, std::vector<std::pair<std::size_t, std::size_t>>> support;
     for (const auto& trace : variant_order) {
       const auto weight = variants.at(trace);
@@ -184,7 +278,8 @@ LogSkeletonModel discover_log_skeleton(const EventLog& log,
       for (const auto& [frequency, count] : ranked) {
         allowed.push_back(frequency);
         cumulative += count;
-        if (static_cast<double>(cumulative) + 1e-12 >= threshold(events_count, noise)) break;
+        if (static_cast<double>(cumulative) >= threshold(events_count, noise))
+          break;
       }
       std::sort(allowed.begin(), allowed.end());
       model.activ_freq.emplace(activity, std::move(allowed));
@@ -278,12 +373,14 @@ LogSkeletonConformance check_log_skeleton_conformance(
 LogSkeletonConformance check_log_skeleton_conformance(
     const Trace& trace, const LogSkeletonModel& model,
     const LogSkeletonOptions& options) {
-  return check_log_skeleton_conformance(activities_of(trace), model, options);
+  return check_log_skeleton_conformance(
+      activities_of(trace, options.activity_key), model, options);
 }
 
 std::vector<LogSkeletonConformance> check_log_skeleton_conformance(
     const EventLog& log, const LogSkeletonModel& model,
     const LogSkeletonOptions& options) {
+  validate_activity_key(options.activity_key);
   std::vector<LogSkeletonConformance> result;
   result.reserve(log.traces.size());
   for (const auto& trace : log.traces)

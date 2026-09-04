@@ -2689,8 +2689,13 @@ OcdfgConformanceResult compare_ocdfg(const OcdfgGraph& real,
 OcdfgConformanceResult compare_ocdfg(
     const Ocel& real, const OcdfgGraph& normative,
     const OcdfgConformanceOptions& options) {
-  return compare_ocdfg(discover_ocdfg_classic(real, false), normative,
-                       options);
+  OcdfgDiscoveryOptions discovery;
+  discovery.compute_edges_performance = false;
+  discovery.activity_attribute = options.activity_attribute;
+  discovery.object_type_attribute = options.object_type_attribute;
+  return compare_ocdfg(
+      discover_ocdfg_classic_with_options(real, discovery), normative,
+      options);
 }
 
 std::string etot_conformance_json(const EtotConformanceResult& result) {

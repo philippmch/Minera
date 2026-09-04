@@ -601,6 +601,8 @@ export function Filters({
     ["activ_freq", "Activity frequency"],
   ] as const;
   const [logSkeletonNoiseThreshold, setLogSkeletonNoiseThreshold] = useState("");
+  const [logSkeletonActivityAttribute, setLogSkeletonActivityAttribute] =
+    useState("concept:name");
   const [logSkeletonConstraints, setLogSkeletonConstraints] = useState<Set<string>>(
     () => new Set(logSkeletonFamilies.map(([name]) => name)),
   );
@@ -622,6 +624,8 @@ export function Filters({
     ["nonchainsuccession", "Non-chain succession"],
   ] as const;
   const [declareConsideredActivities, setDeclareConsideredActivities] = useState("");
+  const [declareActivityAttribute, setDeclareActivityAttribute] =
+    useState("concept:name");
   const [declareAllowedTemplates, setDeclareAllowedTemplates] = useState<Set<string>>(
     () => new Set(DECLARE_TEMPLATES),
   );
@@ -1003,6 +1007,12 @@ export function Filters({
     indexAttribute: footprintsIndexAttribute,
     initialMarking: footprintsInitialMarking,
   });
+  const selectorValidationError =
+    !logSkeletonActivityAttribute.trim()
+      ? "Log skeleton activity attribute must not be empty."
+      : !declareActivityAttribute.trim()
+        ? "Declare activity attribute must not be empty."
+        : null;
 
   const apply = () => {
     if (temporalValidationError || ltlValidationError || segmentValidationError ||
@@ -1012,7 +1022,7 @@ export function Filters({
         relativeAttributeValidationError || attributeOccurrenceValidationError ||
         variantCoverageValidationError || repetitionValidationError ||
         caseGroupingValidationError || powlValidationError ||
-        footprintsValidationError) return;
+        footprintsValidationError || selectorValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
     const removeLifecycleList = lifecycles.filter((l) =>
@@ -1238,10 +1248,18 @@ export function Filters({
       tokenReplayActivityAttribute:
         tokenReplayActivityAttribute.trim() || undefined,
       logSkeletonNoiseThreshold: toLogSkeletonNoise(logSkeletonNoiseThreshold),
+      logSkeletonActivityAttribute:
+        logSkeletonActivityAttribute.trim() !== "concept:name"
+          ? logSkeletonActivityAttribute.trim() || undefined
+          : undefined,
       logSkeletonConstraints:
         logSkeletonConstraints.size === logSkeletonFamilies.length
           ? undefined
           : [...logSkeletonConstraints],
+      declareActivityAttribute:
+        declareActivityAttribute.trim() !== "concept:name"
+          ? declareActivityAttribute.trim() || undefined
+          : undefined,
       declareConsideredActivities: toDeclareActivities(declareConsideredActivities),
       declareAllowedTemplates:
         declareAllowedTemplates.size === declareFamilies.length
@@ -1494,8 +1512,10 @@ export function Filters({
     setTokenReplayStopImmediatelyUnfit(false);
     setTokenReplayActivityAttribute("concept:name");
     setLogSkeletonNoiseThreshold("");
+    setLogSkeletonActivityAttribute("concept:name");
     setLogSkeletonConstraints(new Set(logSkeletonFamilies.map(([name]) => name)));
     setDeclareConsideredActivities("");
+    setDeclareActivityAttribute("concept:name");
     setDeclareAllowedTemplates(new Set(DECLARE_TEMPLATES));
     setDeclareMinSupportRatio("");
     setDeclareMinConfidenceRatio("");
@@ -1699,8 +1719,10 @@ export function Filters({
     tokenReplayActivityAttribute.trim() !== "concept:name";
   const logSkeletonDirty =
     logSkeletonNoiseThreshold !== "" ||
-    logSkeletonConstraints.size !== logSkeletonFamilies.length;
+    logSkeletonConstraints.size !== logSkeletonFamilies.length ||
+    logSkeletonActivityAttribute.trim() !== "concept:name";
   const declareDirty =
+    declareActivityAttribute.trim() !== "concept:name" ||
     declareConsideredActivities.trim() !== "" ||
     declareAllowedTemplates.size !== declareFamilies.length ||
     declareMinSupportRatio !== "" || declareMinConfidenceRatio !== "" ||
@@ -2132,6 +2154,15 @@ export function Filters({
 
           <div className="filters-row">
             <label className="filters-field">
+              <span>Log skeleton activity attribute</span>
+              <input
+                type="text"
+                placeholder="concept:name"
+                value={logSkeletonActivityAttribute}
+                onChange={(event) => setLogSkeletonActivityAttribute(event.target.value)}
+              />
+            </label>
+            <label className="filters-field">
               <span>Log skeleton noise threshold</span>
               <input
                 type="number"
@@ -2168,6 +2199,15 @@ export function Filters({
           </div>
 
           <div className="filters-row">
+            <label className="filters-field">
+              <span>Declare activity attribute</span>
+              <input
+                type="text"
+                placeholder="concept:name"
+                value={declareActivityAttribute}
+                onChange={(event) => setDeclareActivityAttribute(event.target.value)}
+              />
+            </label>
             <label className="filters-field filters-field-wide">
               <span>Declare considered activities <small>(comma-separated; blank = infer)</small></span>
               <input
@@ -3937,11 +3977,11 @@ export function Filters({
             relativeAttributeValidationError || attributeOccurrenceValidationError ||
             variantCoverageValidationError || repetitionValidationError ||
             caseGroupingValidationError || powlValidationError ||
-            footprintsValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError || footprintsValidationError}</p>
+            footprintsValidationError || selectorValidationError) && (
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError || footprintsValidationError || selectorValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError || footprintsValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError || footprintsValidationError || selectorValidationError)}>
               Apply
             </button>
             <button

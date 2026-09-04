@@ -11,7 +11,7 @@ import {
   logLifecycles,
   maxEdgeCount,
 } from "../src/app-logic";
-import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriAnalysisDiagnosticsFragment, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, isRandomTreeResult, isModelEvaluation, type EdgeStat, type MineraExport, type Trace } from "../src/types";
+import { DECLARE_TEMPLATES, isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriAnalysisDiagnosticsFragment, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, isRandomTreeResult, isModelEvaluation, type EdgeStat, type MineraExport, type Trace } from "../src/types";
 
 describe("native alignment adapters", () => {
   it("serializes the complete XES import contract", () => {
@@ -231,9 +231,14 @@ describe("native alignment adapters", () => {
   });
   it("serializes advanced options deterministically", () => {
     expect(decomposedAlignmentQuery({ max_states: 10, final_marking: [2, 1], initial_marking: [0], tau_model_cost: 1, sync_cost: 0 })).toBe("final_marking=2%2C1&initial_marking=0&max_states=10&sync_cost=0&tau_model_cost=1&variant=recompos_maximal");
+    expect(new URLSearchParams(decomposedAlignmentQuery({ activity_attribute: " phase " })).get("activity_attribute")).toBe("phase");
+    expect(() => decomposedAlignmentQuery({ activity_attribute: "  " })).toThrow(/must not be empty/);
     expect(new URLSearchParams(decomposedAlignmentQuery({ activity_log_costs: { "A,B\\C": 2 } })).get("activity_log_costs")).toBe("A\\,B\\\\C=2");
+    expect(new URLSearchParams(petriAntiAlignmentQuery({ exponent: 2, epsilon: 0.005, activity_attribute: " phase " })).get("activity_attribute")).toBe("phase");
     expect(new URLSearchParams(petriAntiAlignmentQuery({ exponent: 2, epsilon: 0.005 })).get("variant")).toBe("version_discounted_a_star");
+    expect(() => petriAntiAlignmentQuery({ activity_attribute: "\t" })).toThrow(/must not be empty/);
     expect(new URLSearchParams(petriMultiAlignmentQuery({ marking_limit: 5 })).get("marking_limit")).toBe("5");
+    expect(new URLSearchParams(petriMultiAlignmentQuery({ activity_attribute: " phase " })).get("activity_attribute")).toBe("phase");
     expect(new URLSearchParams(processTreeReductionQuery({ activity_key: "concept:name" })).get("activity_key")).toBe("concept:name");
     expect(parseMarkingInput(" 0, 2,3 ")).toEqual([0, 2, 3]);
     expect(() => parseMarkingInput("0,-1")).toThrow(/non-negative/);
@@ -433,8 +438,10 @@ describe("evaluation adapters", () => {
 
 describe("DFG and edit-distance contracts", () => {
   it("serializes DFG options and cost maps deterministically", () => {
-    const p = new URLSearchParams(dfgAlignmentQuery({ variant: "CLASSIC", max_states: 10, projection: "metrics", sync_cost: { B: 2, A: 1 } }));
+    const p = new URLSearchParams(dfgAlignmentQuery({ variant: "CLASSIC", activity_attribute: " phase ", timestamp_attribute: " occurred_at ", max_states: 10, projection: "metrics", sync_cost: { B: 2, A: 1 } }));
     expect(p.get("dfg_variant")).toBe("CLASSIC");
+    expect(p.get("dfg_activity_attribute")).toBe("phase");
+    expect(p.get("dfg_timestamp_attribute")).toBe("occurred_at");
     expect(p.get("dfg_sync_cost")).toBe("A=1,B=2");
     expect(p.get("projection")).toBe("metrics");
     expect(new URLSearchParams(dfgAlignmentQuery({ max_states: 0, max_time_ms: -1 })).toString()).toBe("");
@@ -446,9 +453,13 @@ describe("DFG and edit-distance contracts", () => {
     expect(parseDfgCostMapInput(whitespace)).toEqual({ " A": 5, "A ": 6, "A\tB": 7 });
     expect(() => parseDfgCostMapInput("A=1,broken")).toThrow(/activity=value/);
     expect(() => parseDfgCostMapInput("A\\q=1")).toThrow(/invalid escape/);
+    expect(() => dfgAlignmentQuery({ activity_attribute: " " })).toThrow(/must not be empty/);
+    expect(() => dfgAlignmentQuery({ timestamp_attribute: "\t" })).toThrow(/must not be empty/);
   });
   it("prunes absent edit options", () => {
     expect(editDistanceFormEntries({ variant: "EDIT_DISTANCE", anti: false, projection: "none" })).toEqual([["edit_variant", "EDIT_DISTANCE"], ["anti", "false"], ["projection", "none"]]);
+    expect(editDistanceFormEntries({ activity_attribute: " phase ", timestamp_attribute: " occurred_at " })).toEqual([["edit_activity_attribute", "phase"], ["edit_timestamp_attribute", "occurred_at"]]);
+    expect(() => editDistanceFormEntries({ activity_attribute: "" })).toThrow(/must not be empty/);
   });
   it("guards compatible alignment results and rejects wrong families", () => {
     const dfg = { family: "DFG", variant: "CLASSIC", unique_variants: 1, alignments: [{ cost: 0, internal_cost: 0, fitness: 1, best_worst_cost: 0, visited_states: 1, closed: 1, closed_states: 1, moves: [{ log: "A", model: "A" }] }] };
@@ -470,6 +481,8 @@ describe("process-tree alignment contract", () => {
     expect(params.get("pt_alignment_max_process_tree_height")).toBe("4");
     expect(params.get("pt_alignment_max_trace_length")).toBe("0");
     expect(params.has("pt_alignment_batch_size")).toBe(false);
+    expect(new URLSearchParams(processTreeAlignmentQuery({ activity_attribute: " phase " })).get("pt_alignment_activity_attribute")).toBe("phase");
+    expect(() => processTreeAlignmentQuery({ activity_attribute: "  " })).toThrow(/must not be empty/);
   });
   it("rejects invalid bounds", () => {
     expect(() => processTreeAlignmentQuery({ max_states: -1 })).toThrow(/non-negative/);
@@ -878,6 +891,9 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ powlVariant: "maximal", powlFilteringType: "decreasing_factor", powlFilteringThreshold: 0, powlOrderFrequencyRatio: 1, powlBruteForceActivityLimit: 0 })).toBe(false);
     expect(hasActiveMinerOptions({ tokenReplayVariant: "forward", tokenReplayStopImmediatelyUnfit: false })).toBe(false);
     expect(hasActiveMinerOptions({ logSkeletonNoiseThreshold: 0, logSkeletonConstraints: ["equivalence", "always_after", "always_before", "never_together", "directly_follows", "activ_freq"] })).toBe(false);
+    expect(hasActiveMinerOptions({ logSkeletonConstraints: [] })).toBe(true);
+    expect(hasActiveMinerOptions({ declareAllowedTemplates: DECLARE_TEMPLATES.slice() })).toBe(false);
+    expect(hasActiveMinerOptions({ declareAllowedTemplates: [] })).toBe(true);
     expect(hasActiveMinerOptions({ declareAutoSelectionMultiplier: 0.8 })).toBe(false);
     expect(hasActiveMinerOptions({
       footprintsDiscoveryVariants: ["entire_event_log", "dfg", "process_tree", "powl"],
@@ -1305,8 +1321,25 @@ describe("mineFormEntries", () => {
       logSkeletonNoiseThreshold: 0,
       logSkeletonConstraints: ["equivalence", "always_after", "always_before", "never_together", "directly_follows", "activ_freq"],
     })).toEqual([]);
-    // Empty or unknown-only selections cannot accidentally override defaults.
-    expect(mineFormEntries({ logSkeletonConstraints: [] })).toEqual([]);
+    // An explicit empty selection is preserved for conformance; omission keeps
+    // the native default constraint families.
+    expect(mineFormEntries({ logSkeletonConstraints: [] })).toEqual([
+      ["log_skeleton_constraints", ""],
+    ]);
+    // Invalid identifiers in a non-empty list retain legacy omission rather
+    // than becoming an accidental explicit empty selection.
+    expect(mineFormEntries({ logSkeletonConstraints: ["not-a-constraint"] })).toEqual([]);
+    expect(mineFormEntries({
+      logSkeletonActivityAttribute: " phase ",
+      declareActivityAttribute: " occurred_at ",
+    })).toEqual([
+      ["log_skeleton_activity_attribute", "phase"],
+      ["declare_activity_attribute", "occurred_at"],
+    ]);
+    expect(() => mineFormEntries({ logSkeletonActivityAttribute: " " }))
+      .toThrow(/must not be empty/);
+    expect(() => mineFormEntries({ declareActivityAttribute: "\t" }))
+      .toThrow(/must not be empty/);
     expect(mineFormEntries({ logSkeletonNoiseThreshold: 1 })).toEqual([
       ["log_skeleton_noise_threshold", "1"],
     ]);
@@ -1333,6 +1366,9 @@ describe("mineFormEntries", () => {
       declareMinConfidenceRatio: 1.1,
       declareAutoSelectionMultiplier: Number.NaN,
     })).toEqual([]);
+    expect(mineFormEntries({ declareAllowedTemplates: [] })).toEqual([
+      ["declare_allowed_templates", ""],
+    ]);
     expect(mineFormEntries({ declareAutoSelectionMultiplier: 0.8 })).toEqual([]);
     expect(mineFormEntries({
       declareMinSupportRatio: 0.2,

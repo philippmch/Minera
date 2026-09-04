@@ -28,6 +28,13 @@ struct LogSkeletonOptions {
   // equivalence, always_after, always_before, never_together,
   // directly_follows, activ_freq.
   std::vector<std::string> considered_constraints;
+  // Event attribute used as the activity label.  The canonical activity
+  // field is selected by default; any other key must be present and non-null
+  // on every event.
+  std::string activity_key = "concept:name";
+  // Distinguish an explicitly empty conformance family selection from the
+  // legacy omitted form (an empty vector means all families).
+  bool considered_constraints_present = false;
 };
 
 struct LogSkeletonModel {

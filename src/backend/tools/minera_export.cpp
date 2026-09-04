@@ -953,12 +953,16 @@ int usage(const char* program) {
                "  --align-dfg              Embed classic DFG alignments\n"
                "  --dfg-max-states <n>     DFG alignment state bound\n"
                "  --dfg-max-time-ms <n>    DFG alignment time bound\n"
+               "  --dfg-activity-attribute <name> Activity selector\n"
+               "  --dfg-timestamp-attribute <name> Timestamp selector\n"
                "  --dfg-sync-cost a=f      Per-activity sync cost\n"
                "  --dfg-model-move-cost a=f  Per-activity model cost\n"
                "  --dfg-log-move-cost a=f  Per-activity log cost\n"
                "  --dfg-internal-log-move-cost a=f  Internal log cost\n"
                "  --dfg-projection <mode>  none, log, or metrics\n"
                "  --align-edit-distance <file>  Align against CSV/XES reference\n"
+               "  --edit-activity-attribute <name> Activity selector\n"
+               "  --edit-timestamp-attribute <name> Timestamp selector\n"
                "  --edit-anti              Use farthest (anti) alignment\n"
                "  --edit-deviation-cost <n>  Positive edit deviation cost\n"
                "  --edit-projection <mode>  none or log\n"
@@ -1034,6 +1038,7 @@ int usage(const char* program) {
                "  --compare-petri-reach-final-through-hidden <bool> Route silently after a trace\n"
                "  --compare-petri-stop-immediately-unfit <bool> Stop a trace after its first deviation\n"
                "  --align-process-tree     Embed process-tree alignments\n"
+               "  --pt-alignment-activity-attribute <name> Activity selector\n"
                "  --pt-alignment-variant <id> SEARCH_GRAPH_PT (default),\n"
                "                            DYNAMIC_PROGRAMMING, MILP, or\n"
                "                            APPROXIMATED_ORIGINAL\n"
@@ -1066,6 +1071,7 @@ int usage(const char* program) {
                "  --alignment-activity-attribute <name> Event field for variants\n"
                "  --align-decomposed        Embed recompos_maximal decomposed alignment\n"
                "  --decomposed-variant <id> recompos_maximal\n"
+               "  --decomposed-activity-attribute <name> Activity selector\n"
                "  --decomposed-max-states <n> State bound\n"
                "  --decomposed-max-total-states <n> Total state bound\n"
                "  --decomposed-max-time-trace <f> Per-trace seconds\n"
@@ -1084,6 +1090,7 @@ int usage(const char* program) {
                "  --align-petri-anti         Embed version_discounted_a_star anti-alignment\n"
                "  --align-petri-multi        Embed version_discounted_a_star multi-alignment\n"
                "  --advanced-petri-miner <id> inductive, alpha, heuristic, or powl\n"
+               "  --petri-activity-attribute <name> Activity selector for anti/multi\n"
                "  --petri-exponent <f>        Discount exponent (>1)\n"
                "  --petri-epsilon <f>         Anti-alignment epsilon\n"
                "  --petri-marking-limit <n>   Positive marking bound\n"
@@ -1099,11 +1106,13 @@ int usage(const char* program) {
                "                            first event that cannot be enabled\n"
                "  --token-replay-activity-attribute <name> Event field for variants\n"
                "  --log-skeleton-noise-threshold <f> Log-skeleton noise in [0,1]\n"
+               "  --log-skeleton-activity-attribute <name> Activity selector\n"
                "  --log-skeleton-constraints <a,b,...> Constraint families:\n"
                "                            equivalence, always_after, always_before,\n"
                "                            never_together, directly_follows, activ_freq\n"
                "  --declare-considered-activities <a,b,...> Declare activity filter\n"
                "                            (omit = infer; empty = use none)\n"
+               "  --declare-activity-attribute <name> Activity selector\n"
                "  --declare-allowed-templates <a,b,...> Declare template families\n"
                "                            (omit = all; empty = use none)\n"
                "  --declare-min-support-ratio <f> Declare support ratio in [0,1]\n"
@@ -1738,6 +1747,7 @@ int main(int argc, char** argv) {
   bool alignment_silent_cost_used = false;
   bool alignment_sync_cost_used = false;
   bool align_decomposed = false;
+  bool decomposed_activity_option_used = false;
   bool align_petri_anti = false;
   bool align_petri_multi = false;
   std::optional<std::size_t> reduce_trace_index;
@@ -1745,6 +1755,7 @@ int main(int argc, char** argv) {
   std::string advanced_petri_miner = "inductive";
   bool advanced_petri_miner_used = false;
   bool petri_option_used = false;
+  bool petri_activity_option_used = false;
   minera::DecomposedAlignmentOptions decomposed_options;
   minera::PetriAntiAlignmentOptions petri_anti_options;
   minera::PetriMultiAlignmentOptions petri_multi_options;
@@ -3531,25 +3542,6 @@ int main(int argc, char** argv) {
       continue;
     }
 
-    // Keep the DFG playout option family outside the legacy parser chain;
-    // that chain is already close to MSVC's block-nesting limit.
-    if (arg == "--dfg-activity-attribute" ||
-        arg == "--dfg-timestamp-attribute") {
-      const auto* value = next();
-      if (!value || trim_text(value).empty()) {
-        std::cerr << "error: " << arg
-                  << " expects a non-empty name\n";
-        return 2;
-      }
-      if (arg == "--dfg-activity-attribute") {
-        dfg_statistics_options.activity_attribute = trim_text(value);
-        dfg_dataframe_fields["dfg_activity_attribute"] = trim_text(value);
-      } else {
-        dfg_statistics_options.timestamp_attribute = trim_text(value);
-        dfg_dataframe_fields["dfg_timestamp_attribute"] = trim_text(value);
-      }
-      continue;
-    }
     if (arg == "--dfg-dataframe-output") {
       const auto* value = next();
       if (!value || std::string_view(value).empty()) return usage(argv[0]);
@@ -3802,6 +3794,52 @@ int main(int argc, char** argv) {
           advanced_petri_miner != "heuristic" &&
           advanced_petri_miner != "powl") {
         return usage(argv[0]);
+      }
+      continue;
+    }
+    if (arg == "--dfg-activity-attribute" ||
+        arg == "--dfg-timestamp-attribute" ||
+        arg == "--edit-activity-attribute" ||
+        arg == "--edit-timestamp-attribute" ||
+        arg == "--decomposed-activity-attribute" ||
+        arg == "--petri-activity-attribute" ||
+        arg == "--log-skeleton-activity-attribute" ||
+        arg == "--declare-activity-attribute") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto selector = trim_text(value);
+      if (selector.empty()) {
+        std::cerr << "error: " << arg
+                  << " expects a non-empty attribute name\n";
+        return 2;
+      }
+      if (arg == "--dfg-activity-attribute") {
+        dfg_alignment_options.activity_attribute = selector;
+        dfg_statistics_options.activity_attribute = selector;
+        dfg_dataframe_fields["dfg_activity_attribute"] = selector;
+      } else if (arg == "--dfg-timestamp-attribute") {
+        dfg_alignment_options.timestamp_attribute = selector;
+        dfg_statistics_options.timestamp_attribute = selector;
+        dfg_dataframe_fields["dfg_timestamp_attribute"] = selector;
+      } else if (arg == "--edit-activity-attribute") {
+        edit_options.activity_attribute = selector;
+        edit_option_used = true;
+      } else if (arg == "--edit-timestamp-attribute") {
+        edit_options.timestamp_attribute = selector;
+        edit_option_used = true;
+      } else if (arg == "--decomposed-activity-attribute") {
+        decomposed_options.activity_attribute = selector;
+        align_decomposed = true;
+        decomposed_activity_option_used = true;
+      } else if (arg == "--petri-activity-attribute") {
+        petri_anti_options.activity_attribute = selector;
+        petri_multi_options.activity_attribute = selector;
+        petri_option_used = true;
+        petri_activity_option_used = true;
+      } else if (arg == "--log-skeleton-activity-attribute") {
+        log_skeleton_options.activity_key = selector;
+      } else {
+        declare_options.activity_key = selector;
       }
       continue;
     }
@@ -4111,12 +4149,23 @@ int main(int argc, char** argv) {
                arg == "--pt-alignment-max-trace-length" ||
                arg == "--pt-alignment-max-process-tree-height" ||
                arg == "--pt-alignment-max-trace-time-ms" ||
-               arg == "--pt-alignment-max-per-trace-time-ms") {
+               arg == "--pt-alignment-max-per-trace-time-ms" ||
+               arg == "--pt-alignment-activity-attribute") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
-      pt_alignment_fields[key] = value;
+      if (arg == "--pt-alignment-activity-attribute") {
+        const auto selector = trim_text(value);
+        if (selector.empty()) {
+          std::cerr << "error: " << arg
+                    << " expects a non-empty attribute name\n";
+          return 2;
+        }
+        pt_alignment_fields[key] = selector;
+      } else {
+        pt_alignment_fields[key] = value;
+      }
       align_process_tree = true;
     } else if (arg == "--align-dfg" || arg == "--dfg-max-states" || arg == "--dfg-max-time-ms" || arg == "--dfg-projection" || arg == "--dfg-sync-cost" || arg == "--dfg-model-move-cost" || arg == "--dfg-log-move-cost" || arg == "--dfg-internal-log-move-cost" || arg == "--align-edit-distance" || arg == "--edit-anti" || arg == "--edit-deviation-cost" || arg == "--edit-projection") {
       if (arg == "--align-dfg") { align_dfg = true; }
@@ -4247,6 +4296,7 @@ int main(int argc, char** argv) {
       constraints.erase(std::unique(constraints.begin(), constraints.end()),
                         constraints.end());
       log_skeleton_options.considered_constraints = std::move(constraints);
+      log_skeleton_options.considered_constraints_present = true;
     } else if (arg == "--declare-considered-activities") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -6403,10 +6453,26 @@ int main(int argc, char** argv) {
     std::optional<minera::DfgAlignmentProjection> dfg_projection_result;
     std::optional<minera::EventLog> dfg_projected_log;
     if (align_dfg) {
-      minera::DfgStatisticalOptions dfg_opts; dfg_opts.window = 1;
+      minera::DfgStatisticalOptions dfg_opts;
+      dfg_opts.window = 1;
+      dfg_opts.activity_attribute = dfg_alignment_options.activity_attribute;
+      dfg_opts.timestamp_attribute = dfg_alignment_options.timestamp_attribute;
       const auto dfg = minera::discover_frequency_dfg(log, dfg_opts);
       std::map<std::string, std::uint64_t> starts, ends;
-      for (const auto& t : log.traces) if (!t.events.empty()) { ++starts[t.events.front().activity]; ++ends[t.events.back().activity]; }
+      for (const auto& trace : log.traces) {
+        if (trace.events.empty()) continue;
+        const auto* first = minera::dfg_event_field_value(
+            trace.events.front(), dfg_alignment_options.activity_attribute);
+        const auto* last = minera::dfg_event_field_value(
+            trace.events.back(), dfg_alignment_options.activity_attribute);
+        if (first == nullptr || last == nullptr) {
+          throw std::invalid_argument(
+              "DFG alignment: event is missing activity attribute '" +
+              dfg_alignment_options.activity_attribute + "'");
+        }
+        ++starts[*first];
+        ++ends[*last];
+      }
       dfg_alignment_result = minera::align_log_on_dfg(log, dfg, starts, ends, dfg_alignment_options);
       if (dfg_projection == "metrics") dfg_projection_result = minera::project_alignments_on_dfg(log, dfg, starts, ends, dfg_alignment_options);
       if (dfg_projection == "log") dfg_projected_log = minera::project_log_on_dfg(log, dfg, starts, ends, dfg_alignment_options);
@@ -6418,7 +6484,10 @@ int main(int argc, char** argv) {
           ? minera::import_xes_event_log(edit_reference)
           : minera::import_csv_event_log(edit_reference, options);
       edit_result = minera::align_edit_distance(log, reference, edit_options);
-      if (edit_projection == "log") { edit_projected_log = minera::project_log_on_alignments(log, *edit_result); }
+      if (edit_projection == "log") {
+        edit_projected_log = minera::project_log_on_alignments(
+            log, *edit_result, edit_options);
+      }
     }
     std::optional<minera::EmdResult> emd_result;
     if (!emd_reference.empty()) {
@@ -6489,8 +6558,10 @@ int main(int argc, char** argv) {
     const auto log_skeleton_conformance = minera::check_log_skeleton_conformance(
         log, log_skeleton, log_skeleton_options);
     const auto declare = minera::discover_declare(log, declare_options);
-    const auto declare_conformance =
-        minera::check_declare_conformance(log, declare);
+    minera::DeclareConformanceOptions declare_conformance_options;
+    declare_conformance_options.activity_key = declare_options.activity_key;
+    const auto declare_conformance = minera::check_declare_conformance(
+        log, declare, declare_conformance_options);
     for (const auto& [family, rules] : declare.rules) {
       (void)family;
       for (const auto& rule : rules) {
@@ -6975,22 +7046,39 @@ int main(int argc, char** argv) {
     if (advanced_petri_miner == "alpha") advanced_net = &net;
     else if (advanced_petri_miner == "heuristic") advanced_net = &heuristic_net;
     else if (advanced_petri_miner == "powl") advanced_net = &powl_net;
-    const auto& advanced_log =
+    const minera::EventLog* advanced_log =
         advanced_petri_miner == "powl"
-            ? powl_log
-            : advanced_petri_miner == "inductive" ? inductive_log : log;
+            ? &powl_log
+            : advanced_petri_miner == "inductive" ? &inductive_log : &log;
+    std::optional<minera::EventLog> decomposed_powl_log;
+    std::optional<minera::EventLog> petri_powl_log;
+    const minera::EventLog* decomposed_alignment_log = advanced_log;
+    const minera::EventLog* petri_alignment_log = advanced_log;
+    if (advanced_petri_miner == "powl") {
+      if (align_decomposed && decomposed_activity_option_used) {
+        decomposed_powl_log = project_powl_activity(
+            log, decomposed_options.activity_attribute,
+            powl_options.timestamp_key, powl_options.case_id_key);
+        decomposed_alignment_log = &*decomposed_powl_log;
+      }
+      if ((align_petri_anti || align_petri_multi) &&
+          petri_activity_option_used) {
+        petri_powl_log = project_powl_activity(
+            log, petri_anti_options.activity_attribute,
+            powl_options.timestamp_key, powl_options.case_id_key);
+        petri_alignment_log = &*petri_powl_log;
+      }
+    }
     if (align_decomposed)
       decomposed_result =
-          minera::align_decomposed(advanced_log, *advanced_net,
+          minera::align_decomposed(*decomposed_alignment_log, *advanced_net,
                                    decomposed_options);
     if (align_petri_anti)
-      petri_anti_result =
-          minera::anti_align_petri(*advanced_net, advanced_log,
-                                   petri_anti_options);
+      petri_anti_result = minera::anti_align_petri(
+          *advanced_net, *petri_alignment_log, petri_anti_options);
     if (align_petri_multi)
-      petri_multi_result =
-          minera::multi_align_petri(*advanced_net, advanced_log,
-                                    petri_multi_options);
+      petri_multi_result = minera::multi_align_petri(
+          *advanced_net, *petri_alignment_log, petri_multi_options);
     if (reduce_trace_index) {
       if (*reduce_trace_index >= inductive_log.traces.size()) { std::cerr << "error: --reduce-process-tree trace index out of range\n"; return 2; }
       minera::ProcessTreeReductionOptions ro; ro.activity_key = reduction_activity_key;

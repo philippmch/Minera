@@ -542,6 +542,18 @@ DfgAlignmentOptions parse_dfg_alignment_params(const FieldLookup& field,
   if (supplied("max_visited_states")) parse_bound("max_visited_states", o.max_visited_states);
   if (supplied("dfg_max_time_ms")) o.max_time_ms = parse_nonnegative_size(require("dfg_max_time_ms"), "dfg_max_time_ms");
   if (supplied("max_time_ms")) o.max_time_ms = parse_nonnegative_size(require("max_time_ms"), "max_time_ms");
+  if (supplied("dfg_activity_attribute")) {
+    o.activity_attribute = trim_text(require("dfg_activity_attribute"));
+    if (o.activity_attribute.empty())
+      throw std::invalid_argument(
+          "dfg_activity_attribute: expected a non-empty attribute name");
+  }
+  if (supplied("dfg_timestamp_attribute")) {
+    o.timestamp_attribute = trim_text(require("dfg_timestamp_attribute"));
+    if (o.timestamp_attribute.empty())
+      throw std::invalid_argument(
+          "dfg_timestamp_attribute: expected a non-empty attribute name");
+  }
   const auto map_field = [&](std::string_view canonical, std::initializer_list<std::string_view> aliases,
                              std::map<std::string,double>& dst) {
     std::string_view found = canonical;
@@ -574,6 +586,18 @@ EditDistanceOptions parse_edit_distance_params(const FieldLookup& field,
   if (!anti_name.empty()) o.perform_anti_alignment = parse_boolean(require(anti_name), anti_name);
   const std::string_view cost_name = supplied("deviation_cost") ? "deviation_cost" : (supplied("edit_deviation_cost") ? "edit_deviation_cost" : "");
   if (!cost_name.empty()) o.deviation_cost = parse_positive_u64(require(cost_name), cost_name);
+  if (supplied("edit_activity_attribute")) {
+    o.activity_attribute = trim_text(require("edit_activity_attribute"));
+    if (o.activity_attribute.empty())
+      throw std::invalid_argument(
+          "edit_activity_attribute: expected a non-empty attribute name");
+  }
+  if (supplied("edit_timestamp_attribute")) {
+    o.timestamp_attribute = trim_text(require("edit_timestamp_attribute"));
+    if (o.timestamp_attribute.empty())
+      throw std::invalid_argument(
+          "edit_timestamp_attribute: expected a non-empty attribute name");
+  }
   return o;
 }
 
@@ -739,6 +763,13 @@ ProcessTreeAlignmentOptions parse_process_tree_alignment_params(
     options.clear_cache = parse_boolean(require("pt_alignment_clear_cache"),
                                          "pt_alignment_clear_cache");
   }
+  if (supplied("pt_alignment_activity_attribute")) {
+    options.activity_attribute =
+        trim_text(require("pt_alignment_activity_attribute"));
+    if (options.activity_attribute.empty())
+      throw std::invalid_argument(
+          "pt_alignment_activity_attribute: expected a non-empty attribute name");
+  }
   return options;
 }
 
@@ -758,7 +789,14 @@ DecomposedAlignmentOptions parse_decomposed_alignment_params(const FieldLookup& 
   if(supplied("use_cache")) o.use_cache=parse_boolean(require("use_cache"),"use_cache"); if(supplied("clear_cache")) o.clear_cache=parse_boolean(require("clear_cache"),"clear_cache");
   nonneg("log_move_cost",o.log_move_cost); nonneg("model_move_cost",o.model_move_cost); nonneg("tau_move_cost",o.tau_model_cost); nonneg("tau_model_cost",o.tau_model_cost); nonneg("sync_move_cost",o.sync_cost); nonneg("sync_cost",o.sync_cost);
   parse_activity_cost_field(field,present,"activity_log_costs",o.activity_log_costs); parse_activity_cost_field(field,present,"activity_model_costs",o.activity_model_costs); parse_activity_cost_field(field,present,"activity_sync_costs",o.activity_sync_costs);
-  if(supplied("initial_marking")) o.initial_marking=parse_marking(require("initial_marking"),"initial_marking"); if(supplied("final_marking")) o.final_marking=parse_marking(require("final_marking"),"final_marking"); return o;
+  if(supplied("initial_marking")) o.initial_marking=parse_marking(require("initial_marking"),"initial_marking"); if(supplied("final_marking")) o.final_marking=parse_marking(require("final_marking"),"final_marking");
+  if (supplied("activity_attribute")) {
+    o.activity_attribute = trim_text(require("activity_attribute"));
+    if (o.activity_attribute.empty())
+      throw std::invalid_argument(
+          "activity_attribute: expected a non-empty attribute name");
+  }
+  return o;
 }
 
 PetriAntiAlignmentOptions parse_petri_anti_alignment_params(const FieldLookup& field) { return parse_petri_anti_alignment_params(field, FieldPresence{}); }
@@ -766,12 +804,26 @@ PetriAntiAlignmentOptions parse_petri_anti_alignment_params(const FieldLookup& f
   PetriAntiAlignmentOptions o; const auto supplied=[&](std::string_view n){return present?present(n):!field(n).empty();}; const auto require=[&](std::string_view n){auto v=field(n);if(!supplied(n)||v.empty())throw std::invalid_argument(std::string(n)+": expected a value");return v;};
   if(supplied("variant")){auto v=require("variant");if(v!="version_discounted_a_star"&&v!="VERSION_DISCOUNTED_A_STAR"&&v!="discounted_a_star")throw std::invalid_argument("variant: expected version_discounted_a_star");}
   if(supplied("exponent")){o.exponent=parse_finite_double(require("exponent"),"exponent");if(o.exponent<=1)throw std::invalid_argument("exponent: expected > 1");} if(supplied("epsilon")){o.epsilon=parse_finite_double(require("epsilon"),"epsilon");if(o.epsilon<0)throw std::invalid_argument("epsilon: expected non-negative");}
-  if(supplied("marking_limit"))o.marking_limit=parse_positive_size(require("marking_limit"),"marking_limit"); if(supplied("max_states"))o.max_states=parse_nonnegative_size(require("max_states"),"max_states"); if(supplied("initial_marking"))o.initial_marking=parse_marking(require("initial_marking"),"initial_marking"); if(supplied("final_marking"))o.final_marking=parse_marking(require("final_marking"),"final_marking"); return o;
+  if(supplied("marking_limit"))o.marking_limit=parse_positive_size(require("marking_limit"),"marking_limit"); if(supplied("max_states"))o.max_states=parse_nonnegative_size(require("max_states"),"max_states"); if(supplied("initial_marking"))o.initial_marking=parse_marking(require("initial_marking"),"initial_marking"); if(supplied("final_marking"))o.final_marking=parse_marking(require("final_marking"),"final_marking");
+  if (supplied("activity_attribute")) {
+    o.activity_attribute = trim_text(require("activity_attribute"));
+    if (o.activity_attribute.empty())
+      throw std::invalid_argument(
+          "activity_attribute: expected a non-empty attribute name");
+  }
+  return o;
 }
 PetriMultiAlignmentOptions parse_petri_multi_alignment_params(const FieldLookup& field) { return parse_petri_multi_alignment_params(field, FieldPresence{}); }
 PetriMultiAlignmentOptions parse_petri_multi_alignment_params(const FieldLookup& field,const FieldPresence& present) {
   PetriMultiAlignmentOptions o; const auto supplied=[&](std::string_view n){return present?present(n):!field(n).empty();}; const auto require=[&](std::string_view n){auto v=field(n);if(!supplied(n)||v.empty())throw std::invalid_argument(std::string(n)+": expected a value");return v;};
-  if(supplied("variant")){auto v=require("variant");if(v!="version_discounted_a_star"&&v!="VERSION_DISCOUNTED_A_STAR"&&v!="discounted_a_star")throw std::invalid_argument("variant: expected version_discounted_a_star");} if(supplied("exponent")){o.exponent=parse_finite_double(require("exponent"),"exponent");if(o.exponent<=1)throw std::invalid_argument("exponent: expected > 1");} if(supplied("marking_limit"))o.marking_limit=parse_positive_size(require("marking_limit"),"marking_limit"); if(supplied("max_states"))o.max_states=parse_nonnegative_size(require("max_states"),"max_states"); if(supplied("initial_marking"))o.initial_marking=parse_marking(require("initial_marking"),"initial_marking"); if(supplied("final_marking"))o.final_marking=parse_marking(require("final_marking"),"final_marking"); return o;
+  if(supplied("variant")){auto v=require("variant");if(v!="version_discounted_a_star"&&v!="VERSION_DISCOUNTED_A_STAR"&&v!="discounted_a_star")throw std::invalid_argument("variant: expected version_discounted_a_star");} if(supplied("exponent")){o.exponent=parse_finite_double(require("exponent"),"exponent");if(o.exponent<=1)throw std::invalid_argument("exponent: expected > 1");} if(supplied("marking_limit"))o.marking_limit=parse_positive_size(require("marking_limit"),"marking_limit"); if(supplied("max_states"))o.max_states=parse_nonnegative_size(require("max_states"),"max_states"); if(supplied("initial_marking"))o.initial_marking=parse_marking(require("initial_marking"),"initial_marking"); if(supplied("final_marking"))o.final_marking=parse_marking(require("final_marking"),"final_marking");
+  if (supplied("activity_attribute")) {
+    o.activity_attribute = trim_text(require("activity_attribute"));
+    if (o.activity_attribute.empty())
+      throw std::invalid_argument(
+          "activity_attribute: expected a non-empty attribute name");
+  }
+  return o;
 }
 ProcessTreeReductionOptions parse_process_tree_reduction_params(const FieldLookup& field) { return parse_process_tree_reduction_params(field, FieldPresence{}); }
 ProcessTreeReductionOptions parse_process_tree_reduction_params(const FieldLookup& field,const FieldPresence& present) {
@@ -2333,7 +2385,8 @@ MineParams parse_mine_params(const FieldLookup& field,
           "log_skeleton_noise_threshold: expected 0 <= value <= 1");
     }
   }
-  if (const auto value = field("log_skeleton_constraints"); !value.empty()) {
+  if (const auto value = field("log_skeleton_constraints");
+      supplied("log_skeleton_constraints")) {
     const auto parts = split_csv(value);
     static constexpr std::string_view allowed[] = {
         "equivalence", "always_after", "always_before", "never_together",
@@ -2351,7 +2404,24 @@ MineParams parse_mine_params(const FieldLookup& field,
     constraints.erase(std::unique(constraints.begin(), constraints.end()),
                       constraints.end());
     params.log_skeleton.considered_constraints = std::move(constraints);
+    params.log_skeleton.considered_constraints_present = true;
   }
+
+  const auto parse_selector = [&](std::string_view field_name,
+                                  std::string& destination) {
+    if (!supplied(field_name)) return;
+    destination = trim_text(field(field_name));
+    if (destination.empty()) {
+      throw std::invalid_argument(std::string(field_name) +
+                                  ": expected a non-empty attribute name");
+    }
+  };
+  parse_selector("log_skeleton_activity_attribute",
+                 params.log_skeleton.activity_key);
+  parse_selector("declare_activity_attribute",
+                 params.declare_options.activity_key);
+  params.declare_conformance_options.activity_key =
+      params.declare_options.activity_key;
 
   if (const auto value = field("declare_considered_activities");
       present ? present("declare_considered_activities") : !value.empty()) {

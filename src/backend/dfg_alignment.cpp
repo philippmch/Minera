@@ -2,12 +2,14 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <limits>
 #include <optional>
 #include <queue>
 #include <set>
 #include <stdexcept>
+#include <string_view>
 #include <unordered_map>
 
 namespace minera {
@@ -21,6 +23,18 @@ struct Model {
 };
 
 void validate_costs(const DfgAlignmentOptions& o) {
+  const auto validate_selector = [](std::string_view selector,
+                                    std::string_view role) {
+    if (selector.empty() || std::all_of(selector.begin(), selector.end(),
+                                        [](unsigned char c) {
+                                          return std::isspace(c) != 0;
+                                        })) {
+      throw std::invalid_argument("DFG alignment " + std::string(role) +
+                                  " selector must not be blank");
+    }
+  };
+  validate_selector(o.activity_attribute, "activity");
+  validate_selector(o.timestamp_attribute, "timestamp");
   auto check = [](const auto& m) {
     for (const auto& kv : m)
       if (!std::isfinite(kv.second) || kv.second < 0.0)
@@ -28,6 +42,197 @@ void validate_costs(const DfgAlignmentOptions& o) {
   };
   check(o.sync_cost); check(o.model_move_cost); check(o.log_move_cost);
   check(o.internal_log_move_cost);
+}
+
+const std::string& required_activity(const Event& event,
+                                     std::string_view selector) {
+  const auto* value = dfg_event_field_value(event, selector);
+  if (value == nullptr) {
+    throw std::invalid_argument("DFG alignment: missing or null activity " +
+                                std::string(selector));
+  }
+  return *value;
+}
+
+const EventAttribute* selected_attribute(const Event& event,
+                                         std::string_view selector) {
+  const auto matches = [&](std::string_view key) {
+    return !key.empty() && key == selector;
+  };
+  if (event.activity_attribute && !event.activity_attribute->is_null &&
+      (matches(event.activity_attribute->key) ||
+       matches(event.activity_source_key) ||
+       selector == "concept:name" || selector == "activity")) {
+    return &*event.activity_attribute;
+  }
+  if (event.timestamp_attribute && !event.timestamp_attribute->is_null &&
+      (matches(event.timestamp_attribute->key) ||
+       matches(event.timestamp_source_key) || selector == "time:timestamp" ||
+       selector == "timestamp")) {
+    return &*event.timestamp_attribute;
+  }
+  if (event.resource_attribute && !event.resource_attribute->is_null &&
+      (matches(event.resource_attribute->key) ||
+       matches(event.resource_source_key) || selector == "org:resource" ||
+       selector == "resource")) {
+    return &*event.resource_attribute;
+  }
+  if (event.lifecycle_attribute && !event.lifecycle_attribute->is_null &&
+      (matches(event.lifecycle_attribute->key) ||
+       matches(event.lifecycle_source_key) ||
+       selector == "lifecycle:transition" || selector == "lifecycle")) {
+    return &*event.lifecycle_attribute;
+  }
+  for (const auto& attribute : event.attributes) {
+    if (attribute.key == selector && !attribute.is_null) return &attribute;
+  }
+  return nullptr;
+}
+
+std::vector<std::string> activity_word(const Trace& trace,
+                                       std::string_view selector) {
+  std::vector<std::string> result;
+  result.reserve(trace.events.size());
+  for (const auto& event : trace.events)
+    result.push_back(required_activity(event, selector));
+  return result;
+}
+
+struct SelectedTimestamp {
+  std::string value;
+  FirstClassAttributeState state = FirstClassAttributeState::kMissing;
+  std::string source_key;
+  std::optional<EventAttribute> attribute;
+};
+
+SelectedTimestamp timestamp_value(const Event& event,
+                                  std::string_view selector,
+                                  bool allow_conventional_missing = false) {
+  const auto* value = dfg_event_field_value(event, selector);
+  if (value == nullptr) {
+    if (allow_conventional_missing &&
+        (selector == "time:timestamp" || selector == "timestamp") &&
+        event.timestamp_state == FirstClassAttributeState::kMissing &&
+        event.timestamp.empty() && !event.timestamp_attribute) {
+      SelectedTimestamp result;
+      result.source_key = event.timestamp_source_key;
+      result.state = event.timestamp_state;
+      return result;
+    }
+    throw std::invalid_argument("DFG alignment: missing or null timestamp " +
+                                std::string(selector));
+  }
+  SelectedTimestamp result;
+  result.value = *value;
+  if (const auto* attribute = selected_attribute(event, selector)) {
+    result.attribute = *attribute;
+    result.source_key = attribute->key;
+    result.state = attribute->is_null ? FirstClassAttributeState::kNull
+                                      : FirstClassAttributeState::kPresent;
+  } else {
+    result.source_key = event.timestamp_source_key.empty()
+                            ? std::string(selector)
+                            : event.timestamp_source_key;
+    result.state = event.timestamp_state == FirstClassAttributeState::kMissing
+                       ? FirstClassAttributeState::kPresent
+                       : event.timestamp_state;
+  }
+  return result;
+}
+
+EventAttribute projected_activity_attribute(const EventAttribute& source,
+                                             std::string_view key,
+                                             std::string_view value) {
+  auto result = source;
+  result.key = key.empty() ? source.key : std::string(key);
+  result.value = value;
+  result.is_null = false;
+  result.container = AttributeContainerKind::kScalar;
+  result.children.clear();
+  if (result.kind != AttributeKind::kString && result.kind != AttributeKind::kId)
+    result.kind = AttributeKind::kString;
+  result.typed_value = std::monostate{};
+  return result;
+}
+
+void replace_selected_attribute(std::vector<EventAttribute>& attributes,
+                                const EventAttribute& selected) {
+  attributes.erase(
+      std::remove_if(attributes.begin(), attributes.end(),
+                     [&](const EventAttribute& attribute) {
+                       return attribute.key == selected.key;
+                     }),
+      attributes.end());
+  attributes.push_back(selected);
+}
+
+void set_projected_activity(Event& target, const Event* source,
+                            std::string_view selector,
+                            std::string_view value) {
+  target.activity = value;
+  target.activity_state = FirstClassAttributeState::kPresent;
+  if (source != nullptr) {
+    if (const auto* attribute = selected_attribute(*source, selector)) {
+      target.activity_source_key = attribute->key;
+      target.activity_attribute = projected_activity_attribute(
+          *attribute, attribute->key, value);
+      replace_selected_attribute(target.attributes, *target.activity_attribute);
+      return;
+    }
+    if ((selector == "concept:name" || selector == "activity") &&
+        !source->activity_source_key.empty()) {
+      target.activity_source_key = source->activity_source_key;
+      if (source->activity_attribute)
+        target.activity_attribute = projected_activity_attribute(
+            *source->activity_attribute, target.activity_source_key, value);
+      else
+        target.activity_attribute.reset();
+      if (target.activity_attribute)
+        replace_selected_attribute(target.attributes, *target.activity_attribute);
+      return;
+    }
+  }
+  target.activity_source_key = std::string(selector);
+  target.activity_attribute.reset();
+}
+
+// A synchronous projection copies the source event.  Bind the selected
+// projection metadata without rebuilding its attribute bag: its original
+// kind, typed value, children, and document order are part of the source
+// event's observable contract.
+void bind_selected_activity(Event& target, const Event& source,
+                            std::string_view selector,
+                            std::string_view value) {
+  target.activity = value;
+  target.activity_state = FirstClassAttributeState::kPresent;
+  if (const auto* attribute = selected_attribute(source, selector)) {
+    target.activity_source_key = attribute->key;
+    target.activity_attribute = *attribute;
+  } else if ((selector == "concept:name" || selector == "activity" ||
+              selector == source.activity_source_key) &&
+             !source.activity_source_key.empty()) {
+    target.activity_source_key = source.activity_source_key;
+    target.activity_attribute = source.activity_attribute;
+  } else {
+    target.activity_source_key = source.activity_source_key;
+    target.activity_attribute = source.activity_attribute;
+  }
+}
+
+void set_projected_timestamp(Event& target, const SelectedTimestamp& timestamp) {
+  target.timestamp = timestamp.value;
+  target.timestamp_state = timestamp.state;
+  target.timestamp_source_key = timestamp.source_key;
+  target.timestamp_attribute = timestamp.attribute;
+  if (target.timestamp_attribute)
+    replace_selected_attribute(target.attributes, *target.timestamp_attribute);
+}
+
+void bind_selected_timestamp(Event& target, const SelectedTimestamp& timestamp) {
+  target.timestamp = timestamp.value;
+  target.timestamp_state = timestamp.state;
+  target.timestamp_source_key = timestamp.source_key;
+  target.timestamp_attribute = timestamp.attribute;
 }
 
 Model make_model(const DfgFrequency& dfg,
@@ -142,21 +347,36 @@ DfgAlignmentResult align_trace_on_dfg(const std::vector<std::string>& trace,cons
   auto empty=align_impl({},m,o); double bwc=empty.cost; for(const auto& a:trace) bwc+=get_cost(o.log_move_cost,a,10000); r.best_worst_cost=bwc; r.fitness=bwc>0?1.0-r.cost/bwc:(r.cost==0?1.0:0.0); return r;
 }
 DfgAlignmentResult align_trace_on_dfg(std::initializer_list<std::string> trace,const DfgFrequency& d,const std::map<std::string,std::uint64_t>& s,const std::map<std::string,std::uint64_t>& e,const DfgAlignmentOptions& o){ return align_trace_on_dfg(std::vector<std::string>(trace),d,s,e,o); }
-DfgAlignmentResult align_trace_on_dfg(const Trace& t,const DfgFrequency& d,const std::map<std::string,std::uint64_t>& s,const std::map<std::string,std::uint64_t>& e,const DfgAlignmentOptions& o){std::vector<std::string> a;for(const auto& x:t.events)a.push_back(x.activity);return align_trace_on_dfg(a,d,s,e,o);}
+DfgAlignmentResult align_trace_on_dfg(const Trace& t,const DfgFrequency& d,const std::map<std::string,std::uint64_t>& s,const std::map<std::string,std::uint64_t>& e,const DfgAlignmentOptions& o){
+  validate_costs(o);
+  return align_trace_on_dfg(activity_word(t, o.activity_attribute), d, s, e, o);
+}
 DfgAlignmentLogResult align_log_on_dfg(const EventLog& log,const DfgFrequency& d,const std::map<std::string,std::uint64_t>& s,const std::map<std::string,std::uint64_t>& e,const DfgAlignmentOptions& o){
-  std::map<std::vector<std::string>,DfgAlignmentResult> cache; DfgAlignmentLogResult out; out.alignments.reserve(log.traces.size()); for(const auto& t:log.traces){std::vector<std::string> a;for(const auto& x:t.events)a.push_back(x.activity);auto it=cache.find(a);if(it==cache.end())it=cache.emplace(a,align_trace_on_dfg(a,d,s,e,o)).first;out.alignments.push_back(it->second);} out.unique_variants=cache.size(); return out;
+  validate_costs(o);
+  std::map<std::vector<std::string>,DfgAlignmentResult> cache;
+  DfgAlignmentLogResult out;
+  out.alignments.reserve(log.traces.size());
+  for(const auto& t:log.traces){
+    auto a = activity_word(t, o.activity_attribute);
+    auto it=cache.find(a);
+    if(it==cache.end())it=cache.emplace(a,align_trace_on_dfg(a,d,s,e,o)).first;
+    out.alignments.push_back(it->second);
+  }
+  out.unique_variants=cache.size();
+  return out;
 }
 
 EventLog project_log_on_dfg(const EventLog& log,const DfgFrequency& d,const std::map<std::string,std::uint64_t>& s,const std::map<std::string,std::uint64_t>& e,const DfgAlignmentOptions& o){
+  validate_costs(o);
   auto ars=align_log_on_dfg(log,d,s,e,o); EventLog out; copy_event_log_context(log, out);
   set_reserved(out.attributes, "@@aligned_dfg", "DFG alignment projection", AttributeKind::kString);
-  for(std::size_t i=0;i<log.traces.size();++i){const auto& in=log.traces[i]; Trace t; copy_trace_context(in, t); const Event* activity_template=nullptr; for(const auto& candidate:in.events) if(!candidate.activity_source_key.empty()||candidate.activity_attribute){activity_template=&candidate;break;} if(activity_template==nullptr&&!in.events.empty())activity_template=&in.events.front(); std::size_t z=0; std::string ts; FirstClassAttributeState ts_state=FirstClassAttributeState::kMissing; std::string ts_source_key; std::optional<EventAttribute> ts_attribute; if(!in.events.empty()){ts=in.events.front().timestamp;ts_state=in.events.front().timestamp_state;ts_source_key=in.events.front().timestamp_source_key;ts_attribute=in.events.front().timestamp_attribute;}
-    std::string original; for(std::size_t j=0;j<in.events.size();++j){if(j)original+=",";original+=in.events[j].activity;}
+  for(std::size_t i=0;i<log.traces.size();++i){const auto& in=log.traces[i]; Trace t; copy_trace_context(in, t); const Event* activity_template=in.events.empty()?nullptr:&in.events.front(); std::size_t z=0; SelectedTimestamp timestamp; if(!in.events.empty()) timestamp=timestamp_value(in.events.front(), o.timestamp_attribute, true);
+    std::string original; for(std::size_t j=0;j<in.events.size();++j){if(j)original+=",";original+=required_activity(in.events[j], o.activity_attribute);}
     set_reserved(t.attributes, "@@original_trace", original, AttributeKind::kString);
     for(const auto& mv:ars.alignments[i].alignment){if(mv.model==kGap){++z;continue;} bool sync=mv.log!=kGap; Event ev;
-      if(sync){ev=in.events[z++]; ts=ev.timestamp; ts_state=ev.timestamp_state; ts_source_key=ev.timestamp_source_key; ts_attribute=ev.timestamp_attribute;}
-      else {copy_event_case_context(in, ev); if(activity_template!=nullptr)set_event_activity_context(*activity_template, mv.model, ev); else {ev.activity=mv.model; ev.activity_state=FirstClassAttributeState::kPresent; ev.activity_source_key="concept:name";} ev.timestamp=ts; ev.timestamp_state=ts_state==FirstClassAttributeState::kMissing&&!ts.empty()?FirstClassAttributeState::kPresent:ts_state; ev.timestamp_source_key=ts_source_key; ev.timestamp_attribute=ts_attribute;}
-      ev.activity=mv.model; ev.input_order=t.events.size();
+      if(sync){if(z>=in.events.size()) throw std::invalid_argument("DFG alignment projection consumes too many source events"); const auto& source_event=in.events[z++]; ev=source_event; bind_selected_activity(ev, source_event, o.activity_attribute, mv.model); timestamp=timestamp_value(source_event, o.timestamp_attribute, true); bind_selected_timestamp(ev, timestamp);}
+      else {copy_event_case_context(in, ev); set_projected_activity(ev, activity_template, o.activity_attribute, mv.model); set_projected_timestamp(ev, timestamp);}
+      ev.input_order=t.events.size();
       set_reserved(ev.attributes, "@@is_conforming", sync?"true":"false", AttributeKind::kBoolean);
       t.events.push_back(std::move(ev)); }
     out.traces.push_back(std::move(t)); }

@@ -1,11 +1,15 @@
 #include "minera/petri_multi_alignment.hpp"
 
+#include "minera/dfg_variants.hpp"
+
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <limits>
 #include <map>
 #include <queue>
 #include <stdexcept>
+#include <string_view>
 
 namespace minera {
 namespace {
@@ -51,9 +55,30 @@ double discounted_distance(Sequence s1, Sequence s2, double exponent) {
   return p[m];
 }
 
-std::vector<std::vector<std::string>> variants_of(const EventLog& log) {
+void validate_selector(std::string_view selector) {
+  if (selector.empty() || std::all_of(selector.begin(), selector.end(),
+                                      [](unsigned char c) {
+                                        return std::isspace(c) != 0;
+                                      })) {
+    throw std::invalid_argument(
+        "petri multi-alignment activity selector must not be blank");
+  }
+}
+
+std::string selected_activity(const Event& event,
+                              std::string_view selector) {
+  const auto* value = dfg_event_field_value(event, selector);
+  if (value == nullptr)
+    throw std::invalid_argument(
+        "petri multi-alignment: missing or null activity " +
+        std::string(selector));
+  return *value;
+}
+
+std::vector<std::vector<std::string>> variants_of(
+    const EventLog& log, std::string_view selector) {
   std::map<std::vector<std::string>, bool> u;
-  for (const auto& trace : log.traces) { std::vector<std::string> v; for (const auto& e : trace.events) v.push_back(e.activity); u.emplace(std::move(v), true); }
+  for (const auto& trace : log.traces) { std::vector<std::string> v; v.reserve(trace.events.size()); for (const auto& e : trace.events) v.push_back(selected_activity(e, selector)); u.emplace(std::move(v), true); }
   std::vector<std::vector<std::string>> out; for (auto& x : u) out.push_back(std::move(x.first)); return out;
 }
 Sequence run_sequence(const Node& n, const PetriNet& net) { Sequence out; for (auto t : n.path) { const auto& tr = net.transitions()[t]; out.push_back(tr.activity ? Token{net.activities()[*tr.activity], false} : Token{"", true}); } return out; }
@@ -63,6 +88,7 @@ bool path_less(const Node& a, const Node& b, const PetriNet& net) {
   const auto ka = key(a), kb = key(b); if (ka != kb) return ka < kb; return a.path < b.path;
 }
 void validate(const PetriNet& n, const PetriMultiAlignmentOptions& o) {
+  validate_selector(o.activity_attribute);
   if (o.variant != PetriAlignmentVariant::kDiscountedAStar) throw std::invalid_argument("unsupported petri multi-alignment variant");
   if (!std::isfinite(o.exponent) || o.exponent <= 1.0) throw std::invalid_argument("petri multi-alignment exponent must be finite and > 1");
   if (!(o.max_states ? o.max_states : o.marking_limit)) throw std::invalid_argument("petri multi-alignment marking_limit must be positive");
@@ -72,7 +98,7 @@ void validate(const PetriNet& n, const PetriMultiAlignmentOptions& o) {
 }
 
 PetriMultiAlignmentResult multi_align_petri(const PetriNet& net, const EventLog& log, PetriMultiAlignmentOptions o) {
-  validate(net, o); const auto variants = variants_of(log); if (variants.empty()) throw std::invalid_argument("petri multi-alignment log must not be empty");
+  validate(net, o); const auto variants = variants_of(log, o.activity_attribute); if (variants.empty()) throw std::invalid_argument("petri multi-alignment log must not be empty");
   std::vector<std::size_t> initial = o.initial_marking, final = o.final_marking;
   if (initial.empty()) { initial.assign(net.place_count(), 0); initial[net.source()] = 1; }
   if (final.empty()) { final.assign(net.place_count(), 0); final[net.sink()] = 1; }

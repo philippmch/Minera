@@ -72,5 +72,46 @@ int main() {
   bool malformed=false; try { ProcessTree t({"a"},ProcessTreeNode::leaf(3)); (void)align_process_tree(log_of({"a"}),t); } catch(const std::invalid_argument&) { malformed=true; } assert(malformed);
   bool nonbinary=false; try { ProcessTree t({"a"},ProcessTreeNode{ProcessTreeOperator::kLoop,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(0)}}); ProcessTreeAlignmentOptions o; o.variant=ProcessTreeAlignmentVariant::MILP; (void)align_process_tree(log_of({"a"}),t,o); } catch(const std::invalid_argument&) { nonbinary=true; } assert(nonbinary);
   bool bad_batch=false; try { ProcessTreeAlignmentOptions o; o.variant=ProcessTreeAlignmentVariant::DYNAMIC_PROGRAMMING; o.batch_size=0; (void)align_process_tree(log_of({"a"}),seq({"a"}),o); } catch(const std::invalid_argument&) { bad_batch=true; } assert(bad_batch);
+
+  // Every native process-tree variant consumes the selected generic activity
+  // field, not the convenience Event::activity projection.
+  EventLog selected;
+  Trace selected_trace;
+  Event first{"c", "ignored"};
+  first.attributes.push_back({"phase", "a"});
+  Event second{"c", "ignored"};
+  second.attributes.push_back({"phase", "b"});
+  selected_trace.events = {std::move(first), std::move(second)};
+  selected.traces.push_back(std::move(selected_trace));
+  for (auto v : {ProcessTreeAlignmentVariant::SEARCH_GRAPH_PT,
+                 ProcessTreeAlignmentVariant::DYNAMIC_PROGRAMMING,
+                 ProcessTreeAlignmentVariant::MILP,
+                 ProcessTreeAlignmentVariant::APPROXIMATED_ORIGINAL}) {
+    ProcessTreeAlignmentOptions options;
+    options.variant = v;
+    options.activity_attribute = "phase";
+    const auto result = align_process_tree(selected, seq({"a", "b"}), options);
+    assert(result.computed && result.total_cost == 0 &&
+           result.traces.front().trace == std::vector<std::string>({"a", "b"}));
+  }
+  ProcessTreeAlignmentOptions missing_selector;
+  missing_selector.activity_attribute = "missing-phase";
+  bool missing = false;
+  try { (void)align_process_tree(selected, seq({"a", "b"}), missing_selector); }
+  catch (const std::invalid_argument&) { missing = true; }
+  assert(missing);
+  EventLog null_selected = selected;
+  null_selected.traces.front().events.front().attributes.front().is_null = true;
+  ProcessTreeAlignmentOptions null_options;
+  null_options.activity_attribute = "phase";
+  missing = false;
+  try { (void)align_process_tree(null_selected, seq({"a", "b"}), null_options); }
+  catch (const std::invalid_argument&) { missing = true; }
+  assert(missing);
+  missing_selector.activity_attribute = "\t";
+  missing = false;
+  try { (void)align_process_tree(selected, seq({"a", "b"}), missing_selector); }
+  catch (const std::invalid_argument&) { missing = true; }
+  assert(missing);
   return 0;
 }

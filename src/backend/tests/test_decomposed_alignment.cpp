@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
 
 using namespace minera;
 
@@ -118,5 +119,38 @@ int main() {
   custom.tau_model_cost=7;
   auto custom_tau = align_decomposed(log_of({{"a"}}), zero_input_split(), [&] { auto x=custom; x.initial_marking={0,0,0}; x.final_marking={0,0,1}; return x; }());
   assert(custom_tau.complete && custom_tau.best_worst_cost==5007.0 && custom_tau.traces[0].cost==7.0 && custom_tau.traces[0].best_worst_cost==7007.0);
+
+  // The decomposed search and recomposition use the configured generic
+  // activity field for every projected trace.
+  EventLog selected;
+  Trace selected_trace;
+  Event first{"c", "ignored"}; first.attributes.push_back({"phase", "a"});
+  Event second{"c", "ignored"}; second.attributes.push_back({"phase", "b"});
+  selected_trace.events = {std::move(first), std::move(second)};
+  selected.traces.push_back(std::move(selected_trace));
+  DecomposedAlignmentOptions selected_options;
+  selected_options.activity_attribute = "phase";
+  const auto selected_result = align_decomposed(selected, n, selected_options);
+  assert(selected_result.complete && selected_result.traces.size() == 1 &&
+         selected_result.traces.front().activities ==
+             std::vector<std::string>({"a", "b"}) &&
+         selected_result.traces.front().cost == 0.0);
+  DecomposedAlignmentOptions missing_options = selected_options;
+  missing_options.activity_attribute = "missing-phase";
+  bool missing = false;
+  try { (void)align_decomposed(selected, n, missing_options); }
+  catch (const std::invalid_argument&) { missing = true; }
+  assert(missing);
+  EventLog null_selected = selected;
+  null_selected.traces.front().events.front().attributes.front().is_null = true;
+  missing = false;
+  try { (void)align_decomposed(null_selected, n, selected_options); }
+  catch (const std::invalid_argument&) { missing = true; }
+  assert(missing);
+  missing_options.activity_attribute = " ";
+  missing = false;
+  try { (void)align_decomposed(selected, n, missing_options); }
+  catch (const std::invalid_argument&) { missing = true; }
+  assert(missing);
   std::cout << "decomposed alignment tests passed\n";
 }

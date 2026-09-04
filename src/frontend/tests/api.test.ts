@@ -2281,6 +2281,16 @@ describe("OCEL API", () => {
     expect(ocelConformanceQuery({ variant: "etot", alpha: 0.5, etot_theta: 0.2 }))
       .toBe("variant=etot&alpha=0.5&etot_theta=0.2");
     expect(ocelConformanceQuery({
+      variant: "ocdfg", ocdfg_activity_attribute: " event_kind ",
+      ocdfg_object_type_attribute: " object_class ",
+    })).toBe("variant=ocdfg&ocdfg_activity_attribute=event_kind&ocdfg_object_type_attribute=object_class");
+    expect(() => ocelConformanceQuery({
+      ocdfg_activity_attribute: "  ",
+    })).toThrow(/must not be empty/);
+    expect(() => ocelConformanceQuery({
+      ocdfg_object_type_attribute: "\t",
+    })).toThrow(/must not be empty/);
+    expect(ocelConformanceQuery({
       variant: "otg", otg_theta: 0.4, otg_theta_interaction: 0.1,
       otg_theta_descendants: 0.2, otg_theta_inheritance: 0.3,
       otg_theta_cobirth: 0.4, otg_theta_codeath: 0.5,

@@ -1,11 +1,15 @@
 #include "minera/petri_anti_alignment.hpp"
 
+#include "minera/dfg_variants.hpp"
+
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <limits>
 #include <map>
 #include <queue>
 #include <stdexcept>
+#include <string_view>
 
 namespace minera {
 namespace {
@@ -88,11 +92,34 @@ double ordinary_insert_delete(const std::vector<std::string>& a,
   return static_cast<double>(p[b.size()]);
 }
 
-std::vector<std::vector<std::string>> variants_of(const EventLog& log) {
+void validate_selector(std::string_view selector) {
+  if (selector.empty() || std::all_of(selector.begin(), selector.end(),
+                                      [](unsigned char c) {
+                                        return std::isspace(c) != 0;
+                                      })) {
+    throw std::invalid_argument(
+        "petri anti-alignment activity selector must not be blank");
+  }
+}
+
+std::string selected_activity(const Event& event,
+                              std::string_view selector) {
+  const auto* value = dfg_event_field_value(event, selector);
+  if (value == nullptr)
+    throw std::invalid_argument(
+        "petri anti-alignment: missing or null activity " +
+        std::string(selector));
+  return *value;
+}
+
+std::vector<std::vector<std::string>> variants_of(
+    const EventLog& log, std::string_view selector) {
   std::map<std::vector<std::string>, bool> unique;
   for (const auto& trace : log.traces) {
     std::vector<std::string> v;
-    for (const auto& event : trace.events) v.push_back(event.activity);
+    v.reserve(trace.events.size());
+    for (const auto& event : trace.events)
+      v.push_back(selected_activity(event, selector));
     unique.emplace(std::move(v), true);
   }
   std::vector<std::vector<std::string>> out;
@@ -125,6 +152,7 @@ bool path_less(const Node& a, const Node& b, const PetriNet& net) {
 }
 
 void validate(const PetriNet& net, const PetriAntiAlignmentOptions& o) {
+  validate_selector(o.activity_attribute);
   if (o.variant != PetriAlignmentVariant::kDiscountedAStar) throw std::invalid_argument("unsupported petri anti-alignment variant");
   if (!std::isfinite(o.exponent) || o.exponent <= 1.0) throw std::invalid_argument("petri anti-alignment exponent must be finite and > 1");
   if (!std::isfinite(o.epsilon) || o.epsilon < 0.0) throw std::invalid_argument("petri anti-alignment epsilon must be finite and non-negative");
@@ -142,7 +170,7 @@ void validate(const PetriNet& net, const PetriAntiAlignmentOptions& o) {
 
 PetriAntiAlignmentResult anti_align_petri(const PetriNet& net, const EventLog& log, PetriAntiAlignmentOptions options) {
   validate(net, options);
-  const auto variants = variants_of(log);
+  const auto variants = variants_of(log, options.activity_attribute);
   if (variants.empty()) throw std::invalid_argument("petri anti-alignment log must not be empty");
   std::vector<std::size_t> initial = options.initial_marking, final = options.final_marking;
   if (initial.empty()) { initial.assign(net.place_count(), 0); initial[net.source()] = 1; }

@@ -608,6 +608,28 @@ int main() {
          std::vector<std::string>({"item-main", "order-main"}));
   assert(selected_ocdfg.edges.at("order-main").at({"Assemble", "Deliver"})
              .performance_event_couples.size() == 1);
+  const auto unselected_conformance =
+      minera::compare_ocdfg(selected_log, selected_ocdfg);
+  assert(unselected_conformance.fitness < 1.0);
+  minera::OcdfgConformanceOptions selected_conformance_options;
+  selected_conformance_options.activity_attribute = "selected_activity";
+  selected_conformance_options.object_type_attribute = "selected_type";
+  const auto selected_conformance = minera::compare_ocdfg(
+      selected_log, selected_ocdfg, selected_conformance_options);
+  assert(selected_conformance.fitness == 1.0);
+  assert(selected_conformance.missing_activities.empty() &&
+         selected_conformance.additional_activities.empty() &&
+         selected_conformance.missing_flows.empty() &&
+         selected_conformance.additional_flows.empty());
+  bool conformance_missing_selector_rejected = false;
+  try {
+    auto invalid = selected_conformance_options;
+    invalid.object_type_attribute = "missing_type";
+    (void)minera::compare_ocdfg(selected_log, selected_ocdfg, invalid);
+  } catch (const std::invalid_argument&) {
+    conformance_missing_selector_rejected = true;
+  }
+  assert(conformance_missing_selector_rejected);
   ocdfg_selected_options.compute_edges_performance = false;
   const auto selected_ocdfg_plain =
       minera::discover_ocdfg_classic_with_options(selected_log,
