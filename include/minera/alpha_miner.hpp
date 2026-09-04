@@ -17,7 +17,25 @@ struct AlphaMinerOptions {
   // The omitted/default variant is the classic Alpha miner; callers opt into
   // Alpha+ explicitly by setting this to true.
   bool short_loops = false;
+
+  // Event field used as the activity label.  The default preserves the
+  // conventional Event::activity projection.  Non-default selectors are
+  // resolved strictly: every event in a non-empty trace must contain a
+  // non-null value for the selected field.
+  std::string activity_attribute = "concept:name";
+
+  // Alpha+ keeps transitions that the footprint cannot connect by default,
+  // matching the historical native surface.  Set this only when the caller
+  // explicitly wants disconnected visible transitions removed.
+  bool remove_unconnected = false;
 };
+
+// Return a copy of the event log with the selected activity field projected
+// into Event::activity.  All other event, trace, and log data is preserved in
+// input order.  Missing or explicitly null selected fields are rejected.
+// An empty selector is treated as the default "concept:name" field.
+[[nodiscard]] EventLog normalize_alpha_event_log(
+    const EventLog& event_log, const AlphaMinerOptions& options = {});
 
 // Discovers a Petri net from an event log using the Alpha Miner. The algorithm
 // reads the log's footprint — direct succession, causality, parallel and

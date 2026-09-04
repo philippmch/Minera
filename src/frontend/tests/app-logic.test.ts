@@ -873,6 +873,10 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ inductiveVariant: "imf" })).toBe(true);
     expect(hasActiveMinerOptions({ alphaVariant: "classic" })).toBe(false);
     expect(hasActiveMinerOptions({
+      alphaActivityAttribute: "concept:name",
+      alphaRemoveUnconnected: false,
+    })).toBe(false);
+    expect(hasActiveMinerOptions({
       heuristicVariant: "classic",
       heuristicDecoration: "frequency",
       heuristicPerformanceAggregation: "mean",
@@ -922,6 +926,8 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ inductiveTimestampKey: "occurred_at" })).toBe(true);
     expect(hasActiveMinerOptions({ inductiveCaseIdKey: "case_ref" })).toBe(true);
     expect(hasActiveMinerOptions({ alphaVariant: "plus" })).toBe(true);
+    expect(hasActiveMinerOptions({ alphaActivityAttribute: "phase" })).toBe(true);
+    expect(hasActiveMinerOptions({ alphaRemoveUnconnected: true })).toBe(true);
     expect(hasActiveMinerOptions({ heuristicVariant: "plusplus" })).toBe(true);
     expect(hasActiveMinerOptions({ heuristicActivityAttribute: "phase" })).toBe(true);
     expect(hasActiveMinerOptions({ heuristicTimestampAttribute: "finished_at" })).toBe(true);

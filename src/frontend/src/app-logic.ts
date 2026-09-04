@@ -80,6 +80,9 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       Boolean(options.inductiveCaseIdKey?.trim() &&
         options.inductiveCaseIdKey.trim() !== "case:concept:name") ||
       (options.alphaVariant && options.alphaVariant !== "classic") ||
+      Boolean(options.alphaActivityAttribute?.trim() &&
+        options.alphaActivityAttribute.trim() !== "concept:name") ||
+      options.alphaRemoveUnconnected === true ||
       (options.heuristicVariant && options.heuristicVariant !== "classic") ||
       (options.heuristicActivityAttribute &&
         options.heuristicActivityAttribute.trim() !== "concept:name") ||

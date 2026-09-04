@@ -407,6 +407,30 @@ export function inductiveSettingsAreDirty(input: InductiveSettingsForm): boolean
     (input.caseIdKey.trim() || "case:concept:name") !== "case:concept:name";
 }
 
+export interface AlphaSettingsForm {
+  activityAttribute: string;
+  removeUnconnected: boolean;
+}
+
+/** Converts the visible Alpha controls while eliding backend defaults. */
+export function alphaOptionsFromForm(
+  input: AlphaSettingsForm,
+): Pick<MinerOptions, "alphaActivityAttribute" | "alphaRemoveUnconnected"> {
+  return {
+    alphaActivityAttribute:
+      input.activityAttribute.trim() !== "concept:name"
+        ? input.activityAttribute.trim() || undefined
+        : undefined,
+    alphaRemoveUnconnected: input.removeUnconnected || undefined,
+  };
+}
+
+/** Reports whether an Alpha control differs from its effective default. */
+export function alphaSettingsAreDirty(input: AlphaSettingsForm): boolean {
+  return input.removeUnconnected ||
+    (input.activityAttribute.trim() || "concept:name") !== "concept:name";
+}
+
 // A compact, collapsible bar for the log filters and the miner settings.
 // Every apply re-mines the original upload with the full spec, so nothing
 // compounds and every setting can always be widened again.
@@ -539,6 +563,9 @@ export function Filters({
   const [inductiveTimestampKey, setInductiveTimestampKey] = useState("time:timestamp");
   const [inductiveCaseIdKey, setInductiveCaseIdKey] = useState("case:concept:name");
   const [alphaVariant, setAlphaVariant] = useState<"plus" | "classic">("classic");
+  const [alphaActivityAttribute, setAlphaActivityAttribute] =
+    useState("concept:name");
+  const [alphaRemoveUnconnected, setAlphaRemoveUnconnected] = useState(false);
   const [heuristicVariant, setHeuristicVariant] =
     useState<"classic" | "plusplus">("classic");
   const [heuristicActivityAttribute, setHeuristicActivityAttribute] =
@@ -1186,6 +1213,10 @@ export function Filters({
         caseIdKey: inductiveCaseIdKey,
       }),
       alphaVariant: alphaVariant !== "classic" ? alphaVariant : undefined,
+      ...alphaOptionsFromForm({
+        activityAttribute: alphaActivityAttribute,
+        removeUnconnected: alphaRemoveUnconnected,
+      }),
       heuristicVariant:
         heuristicVariant !== "classic" ? heuristicVariant : undefined,
       heuristicActivityAttribute:
@@ -1487,6 +1518,8 @@ export function Filters({
     setInductiveTimestampKey("time:timestamp");
     setInductiveCaseIdKey("case:concept:name");
     setAlphaVariant("classic");
+    setAlphaActivityAttribute("concept:name");
+    setAlphaRemoveUnconnected(false);
     setHeuristicVariant("classic");
     setDependencyThreshold("");
     setAndThreshold("");
@@ -1686,6 +1719,10 @@ export function Filters({
       caseIdKey: inductiveCaseIdKey,
     }) ||
     alphaVariant !== "classic" ||
+    alphaSettingsAreDirty({
+      activityAttribute: alphaActivityAttribute,
+      removeUnconnected: alphaRemoveUnconnected,
+    }) ||
     heuristicVariant !== "classic" ||
     heuristicActivityAttribute.trim() !== "concept:name" ||
     heuristicTimestampAttribute.trim() !== "time:timestamp" ||
@@ -3326,6 +3363,23 @@ export function Filters({
                 <option value="classic">classic (default, textbook)</option>
                 <option value="plus">Alpha+ (short loops)</option>
               </select>
+            </label>
+            <label className="filters-field">
+              <span>Alpha: activity field</span>
+              <input
+                type="text"
+                placeholder="concept:name"
+                value={alphaActivityAttribute}
+                onChange={(e) => setAlphaActivityAttribute(e.target.value)}
+              />
+            </label>
+            <label className="filters-field filters-check">
+              <input
+                type="checkbox"
+                checked={alphaRemoveUnconnected}
+                onChange={(e) => setAlphaRemoveUnconnected(e.target.checked)}
+              />
+              <span>Alpha: remove unconnected transitions</span>
             </label>
           </div>
           <div className="filters-row">

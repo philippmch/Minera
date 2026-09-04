@@ -331,6 +331,14 @@ if(MINERA_BUILD_TESTS)
 
   add_test(NAME minera_core_tests COMMAND minera_core_tests)
 
+  add_executable(minera_alpha_miner_tests
+    src/backend/tests/test_alpha_miner.cpp
+  )
+  target_link_libraries(minera_alpha_miner_tests PRIVATE minera::core)
+  target_compile_features(minera_alpha_miner_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_alpha_miner_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_alpha_miner_tests COMMAND minera_alpha_miner_tests)
+
   add_executable(minera_inductive_miner_tests
     src/backend/tests/test_inductive_miner.cpp
   )

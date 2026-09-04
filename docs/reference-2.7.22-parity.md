@@ -127,7 +127,7 @@ are reconciled.
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Partial (implemented core; proof pending)** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters are implemented |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, strict direct-OCDFG activity/object-type selectors, and cross-family envelope rejection; broader OCEL schema coverage remains |
-| Discovery: Alpha | classic and Alpha+ | **Partial (implemented core; proof pending)** — event-log and direct-DFG classic entry points are available; Alpha+ remains an explicit event-log variant |
+| Discovery: Alpha | classic and Alpha+ | **Partial (implemented core; proof pending)** — event-log and direct-DFG classic entry points are available; Alpha+ adds deterministic source, sink, interior, and loop-only length-one-loop handling, aggregated predecessor/successor reconstruction, plus-only disconnected-transition cleanup, and a strict selectable activity field through native, JSON, CLI, local-server, frontend, and downstream model-log adapters |
 | Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Partial (implemented core; proof pending)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
@@ -202,7 +202,17 @@ local-server, and typed frontend helpers expose the same JSON contract.
 Alpha discovery defaults evidence: omitted `alpha_variant` selects classic
 Alpha consistently across native options, strict request parsing, CLI, and the
 frontend. The short-loop-aware Alpha+ implementation remains available through
-an explicit `plus` selection.
+an explicit `plus` selection. Its length-one-loop reconstruction covers leading,
+trailing, interior, and loop-only traces. Each loop label aggregates all of its
+non-loop predecessors and successors before one all-or-nothing maximal-place
+match; boundary and interior observations are not attached independently.
+The optional disconnected-transition cleanup applies only to Alpha+, including
+its no-loop fast path. The strict activity-field projection used for discovery
+is cached and reused for conformance, footprints, alignment, decoration,
+comparison, evaluation, decision mining, stochastic fitting, analysis, and
+playout routes. Focused native, request, and frontend regressions cover the new
+contracts; the row remains partial pending the remaining adapter and differential
+proof work.
 
 Random-tree generation evidence: the native generator exposes both the
 `BASIC` strategy and the seeded, bounded `PTANDLOGGENERATOR` strategy. The
