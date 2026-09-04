@@ -1,14 +1,20 @@
 #include "minera/declare.hpp"
 
+#include "minera/log_conversion.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <iomanip>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 #include <tuple>
 #include <unordered_map>
+#include <utility>
 
 namespace minera {
 namespace {
@@ -19,6 +25,15 @@ void validate_activity_key(std::string_view activity_key) {
         return std::isspace(static_cast<unsigned char>(value)) != 0;
       })) {
     throw std::invalid_argument("declare: activity selector must not be blank");
+  }
+}
+
+void validate_case_selector_key(std::string_view case_id_key) {
+  if (case_id_key.empty() ||
+      std::all_of(case_id_key.begin(), case_id_key.end(), [](char value) {
+        return std::isspace(static_cast<unsigned char>(value)) != 0;
+      })) {
+    throw std::invalid_argument("declare: case-id selector must not be blank");
   }
 }
 
@@ -256,13 +271,6 @@ const std::string* first_class_value(
   return nullptr;
 }
 
-bool matches_source(std::string_view source_key,
-                    const std::optional<EventAttribute>& attribute,
-                    std::string_view selector) {
-  return (!source_key.empty() && source_key == selector) ||
-         (attribute && attribute->key == selector);
-}
-
 const std::string* resolve_event_field(const Event& event,
                                        std::string_view selector) {
   const auto resolve = [](const std::string& value,
@@ -276,48 +284,59 @@ const std::string* resolve_event_field(const Event& event,
     return nullptr;
   };
 
-  const bool activity = selector == "concept:name" || selector == "activity" ||
-                        matches_source(event.activity_source_key,
-                                       event.activity_attribute, selector);
-  if (activity)
-    return resolve(event.activity, event.activity_state,
-                   event.activity_attribute);
-
-  const bool timestamp = selector == "time:timestamp" ||
-                         selector == "timestamp" ||
-                         matches_source(event.timestamp_source_key,
-                                        event.timestamp_attribute, selector);
-  if (timestamp)
-    return resolve(event.timestamp, event.timestamp_state,
-                   event.timestamp_attribute);
-
-  const bool resource = selector == "org:resource" || selector == "resource" ||
-                        matches_source(event.resource_source_key,
-                                       event.resource_attribute, selector);
-  if (resource)
-    return resolve(event.resource, event.resource_state,
-                   event.resource_attribute);
-
-  const bool lifecycle = selector == "lifecycle:transition" ||
-                         selector == "lifecycle" ||
-                         matches_source(event.lifecycle_source_key,
-                                        event.lifecycle_attribute, selector);
-  if (lifecycle)
-    return resolve(event.lifecycle, event.lifecycle_state,
-                   event.lifecycle_attribute);
-
-  const bool case_id = selector == "case:concept:name" ||
-                       selector == "case:id" || selector == "case_id" ||
-                       selector == "case" ||
-                       (!event.case_id_source_key.empty() &&
-                        event.case_id_source_key == selector);
-  if (case_id)
-    return first_class_value(event.case_id, event.case_id_state);
+  std::vector<const std::string*> candidates;
+  int best_priority = 0;
+  const auto consider = [&](int priority, const std::string* value) {
+    if (priority < best_priority) return;
+    if (priority > best_priority) {
+      best_priority = priority;
+      candidates.clear();
+    }
+    candidates.push_back(value);
+  };
+  const auto consider_first_class =
+      [&](std::string_view source_key, const std::string& value,
+          FirstClassAttributeState state,
+          const std::optional<EventAttribute>& attribute, bool alias) {
+        const bool source_match =
+            (!source_key.empty() && source_key == selector) ||
+            (attribute && attribute->key == selector);
+        if (!source_match && !alias) return;
+        consider(source_match ? 2 : 1, resolve(value, state, attribute));
+      };
 
   for (const auto& attribute : event.attributes)
     if (attribute.key == selector)
-      return attribute.is_null ? nullptr : &attribute.value;
-  return nullptr;
+      consider(3, attribute.is_null ? nullptr : &attribute.value);
+  consider_first_class(
+      event.activity_source_key, event.activity, event.activity_state,
+      event.activity_attribute,
+      selector == "concept:name" || selector == "activity");
+  consider_first_class(
+      event.timestamp_source_key, event.timestamp, event.timestamp_state,
+      event.timestamp_attribute,
+      selector == "time:timestamp" || selector == "timestamp");
+  consider_first_class(
+      event.resource_source_key, event.resource, event.resource_state,
+      event.resource_attribute,
+      selector == "org:resource" || selector == "resource");
+  consider_first_class(
+      event.lifecycle_source_key, event.lifecycle, event.lifecycle_state,
+      event.lifecycle_attribute,
+      selector == "lifecycle:transition" || selector == "lifecycle");
+  const bool case_source = !event.case_id_source_key.empty() &&
+                           event.case_id_source_key == selector;
+  const bool case_alias = selector == "case:concept:name" ||
+                          selector == "case:id" || selector == "case_id" ||
+                          selector == "case";
+  if (case_source || case_alias)
+    consider(case_source ? 2 : 1,
+             first_class_value(event.case_id, event.case_id_state));
+
+  if (candidates.size() > 1)
+    throw std::invalid_argument("declare: event selector is ambiguous: '" +
+                                std::string(selector) + "'");
+  return candidates.empty() ? nullptr : candidates.front();
 }
 
 std::string selected_activity(const Event& event, std::string_view activity_key) {
@@ -372,6 +391,193 @@ std::pair<int, int> stats_for(const std::vector<Statuses>& rows,
     if (status == 1) confidence += weights[i];
   }
   return {support, confidence};
+}
+
+int activity_selector_priority(const EventAttribute& field,
+                               std::string_view selector) {
+  if (field.key == selector) return 3;
+  if (!field.first_class_source_key.empty() &&
+      field.first_class_source_key == selector)
+    return 2;
+  const bool activity_alias = selector == "concept:name" || selector == "activity";
+  return activity_alias &&
+                 (field.key == "concept:name" || field.key == "activity")
+             ? 1
+             : 0;
+}
+
+int case_selector_priority(const EventAttribute& field,
+                           std::string_view selector) {
+  if (field.key == selector) return 3;
+  if (!field.first_class_source_key.empty() &&
+      field.first_class_source_key == selector)
+    return 2;
+  const bool case_alias = selector == "case:concept:name" ||
+                          selector == "case:id" || selector == "case_id" ||
+                          selector == "case";
+  return case_alias &&
+                 (field.key == "case:concept:name" || field.key == "case:id" ||
+                  field.key == "case_id" || field.key == "case")
+             ? 1
+             : 0;
+}
+
+template <typename Matcher>
+void promote_selected_role(std::vector<EventAttribute>& fields,
+                           std::string_view selector,
+                           FirstClassAttributeRole role,
+                           std::string_view field_name, Matcher&& matcher) {
+  struct Candidate {
+    std::size_t index = 0;
+    FirstClassAttributeState state = FirstClassAttributeState::kMissing;
+    std::string source_key;
+    bool already_projected = false;
+  };
+  std::vector<Candidate> candidates;
+  int best_priority = 0;
+  for (std::size_t index = 0; index < fields.size(); ++index) {
+    const auto& field = fields[index];
+    const int priority = matcher(field, selector);
+    if (priority == 0) continue;
+    if (priority > best_priority) {
+      best_priority = priority;
+      candidates.clear();
+    }
+    if (priority == best_priority)
+      candidates.push_back({index, field.first_class_state,
+                            field.first_class_source_key,
+                            field.first_class_role !=
+                                FirstClassAttributeRole::kNone});
+  }
+  if (candidates.size() > 1)
+    throw std::invalid_argument("declare: " + std::string(field_name) +
+                                " selector is ambiguous: " +
+                                std::string(selector));
+  for (auto& field : fields) {
+    if (field.first_class_role != role) continue;
+    field.first_class_role = FirstClassAttributeRole::kNone;
+    field.first_class_state = FirstClassAttributeState::kMissing;
+    field.first_class_source_key.clear();
+  }
+  if (candidates.empty()) return;
+  const auto candidate = candidates.front();
+  auto& field = fields[candidate.index];
+  field.first_class_role = role;
+  field.first_class_state =
+      candidate.already_projected
+          ? candidate.state
+          : (field.is_null ? FirstClassAttributeState::kNull
+                           : FirstClassAttributeState::kPresent);
+  field.first_class_source_key =
+      candidate.source_key == selector ? candidate.source_key : field.key;
+}
+
+void promote_selected(std::vector<EventAttribute>& fields,
+                      std::string_view activity_key,
+                      std::string_view case_id_key) {
+  promote_selected_role(fields, activity_key,
+                        FirstClassAttributeRole::kActivity, "activity",
+                        activity_selector_priority);
+  promote_selected_role(fields, case_id_key,
+                        FirstClassAttributeRole::kCaseId, "case-id",
+                        case_selector_priority);
+}
+
+void normalize_row_keys(EventTable::Row& row,
+                        const std::vector<std::string>& columns) {
+  for (std::size_t index = 0; index < row.size() && index < columns.size();
+       ++index)
+    if (row[index]) row[index]->key = columns[index];
+}
+
+void promote_selected(EventRecord& record, std::string_view activity_key,
+                      std::string_view case_id_key) {
+  promote_selected(record.fields, activity_key, case_id_key);
+}
+
+void promote_selected(EventStream& stream, std::string_view activity_key,
+                      std::string_view case_id_key) {
+  for (auto& record : stream.events)
+    promote_selected(record, activity_key, case_id_key);
+}
+
+void promote_selected(EventTable& table, std::string_view activity_key,
+                      std::string_view case_id_key) {
+  table.validate();
+  for (auto& row : table.rows) {
+    normalize_row_keys(row, table.columns);
+    std::vector<EventAttribute> fields;
+    std::vector<std::size_t> indexes;
+    fields.reserve(row.size());
+    indexes.reserve(row.size());
+    for (std::size_t index = 0; index < row.size(); ++index) {
+      if (!row[index]) continue;
+      indexes.push_back(index);
+      fields.push_back(*row[index]);
+    }
+    promote_selected(fields, activity_key, case_id_key);
+    for (std::size_t index = 0; index < fields.size(); ++index)
+      *row[indexes[index]] = std::move(fields[index]);
+  }
+}
+
+LazyEventTable promoted_selector_table(const LazyEventTable& source,
+                                       std::string activity_key,
+                                       std::string case_id_key) {
+  return LazyEventTable(
+      source.columns(),
+      [source, activity_key = std::move(activity_key),
+       case_id_key = std::move(case_id_key)](
+          const LazyEventTable::RowConsumer& consumer) {
+        source.scan([&](const LazyEventTable::Row& input) {
+          auto row = input;
+          normalize_row_keys(row, source.columns());
+          std::vector<EventAttribute> fields;
+          std::vector<std::size_t> indexes;
+          fields.reserve(row.size());
+          indexes.reserve(row.size());
+          for (std::size_t index = 0; index < row.size(); ++index) {
+            if (!row[index]) continue;
+            indexes.push_back(index);
+            fields.push_back(*row[index]);
+          }
+          promote_selected(fields, activity_key, case_id_key);
+          for (std::size_t index = 0; index < fields.size(); ++index)
+            *row[indexes[index]] = std::move(fields[index]);
+          if (consumer) consumer(row);
+        });
+      },
+      source.attributes(), source.metadata(), source.row_count());
+}
+
+EventLog event_data_log(const EventDataView& data,
+                        std::string_view activity_key,
+                        std::string_view case_id_key) {
+  validate_activity_key(activity_key);
+  validate_case_selector_key(case_id_key);
+  LogConversionOptions conversion;
+  conversion.case_id_key = std::string(case_id_key);
+  switch (data.kind()) {
+    case EventDataKind::kEventLog:
+      return *data.log();
+    case EventDataKind::kEventStream: {
+      auto stream = *data.stream();
+      promote_selected(stream, activity_key, case_id_key);
+      return event_data_to_event_log(EventDataView(stream), conversion);
+    }
+    case EventDataKind::kEventTable: {
+      auto table = *data.table();
+      promote_selected(table, activity_key, case_id_key);
+      return event_data_to_event_log(EventDataView(table), conversion);
+    }
+    case EventDataKind::kLazyEventTable: {
+      auto table = promoted_selector_table(*data.lazy_table(),
+                                            std::string(activity_key),
+                                            std::string(case_id_key));
+      return event_data_to_event_log(EventDataView(table), conversion);
+    }
+  }
+  throw std::invalid_argument("event data: invalid input kind");
 }
 
 }  // namespace
@@ -452,6 +658,45 @@ DeclareModel discover_declare(const EventLog& log, const DeclareDiscoveryOptions
   return model;
 }
 
+DeclareModel discover_declare(std::initializer_list<Trace> traces,
+                              const DeclareDiscoveryOptions& options) {
+  EventLog log;
+  log.traces.assign(traces.begin(), traces.end());
+  return discover_declare(log, options);
+}
+
+DeclareModel discover_declare(const EventStream& stream,
+                              const DeclareDiscoveryOptions& options) {
+  return discover_declare(event_data_log(EventDataView(stream),
+                                         options.activity_key,
+                                         options.case_id_key),
+                          options);
+}
+
+DeclareModel discover_declare(const EventTable& table,
+                              const DeclareDiscoveryOptions& options) {
+  return discover_declare(event_data_log(EventDataView(table),
+                                         options.activity_key,
+                                         options.case_id_key),
+                          options);
+}
+
+DeclareModel discover_declare(const LazyEventTable& table,
+                              const DeclareDiscoveryOptions& options) {
+  return discover_declare(event_data_log(EventDataView(table),
+                                         options.activity_key,
+                                         options.case_id_key),
+                          options);
+}
+
+DeclareModel discover_declare(const EventDataView& data,
+                              const DeclareDiscoveryOptions& options) {
+  if (data.kind() == EventDataKind::kEventLog)
+    return discover_declare(*data.log(), options);
+  return discover_declare(
+      event_data_log(data, options.activity_key, options.case_id_key), options);
+}
+
 DeclareConformance check_declare_conformance(const std::vector<std::string>& trace,
                                              const DeclareModel& model) {
   DeclareConformance result;
@@ -513,6 +758,46 @@ std::vector<DeclareConformance> check_declare_conformance(
   return result;
 }
 
+std::vector<DeclareConformance> check_declare_conformance(
+    const EventStream& stream, const DeclareModel& model,
+    const DeclareConformanceOptions& options) {
+  return check_declare_conformance(
+      event_data_log(EventDataView(stream), options.activity_key,
+                     options.case_id_key),
+      model,
+      options);
+}
+
+std::vector<DeclareConformance> check_declare_conformance(
+    const EventTable& table, const DeclareModel& model,
+    const DeclareConformanceOptions& options) {
+  return check_declare_conformance(
+      event_data_log(EventDataView(table), options.activity_key,
+                     options.case_id_key),
+      model,
+      options);
+}
+
+std::vector<DeclareConformance> check_declare_conformance(
+    const LazyEventTable& table, const DeclareModel& model,
+    const DeclareConformanceOptions& options) {
+  return check_declare_conformance(
+      event_data_log(EventDataView(table), options.activity_key,
+                     options.case_id_key),
+      model,
+      options);
+}
+
+std::vector<DeclareConformance> check_declare_conformance(
+    const EventDataView& data, const DeclareModel& model,
+    const DeclareConformanceOptions& options) {
+  if (data.kind() == EventDataKind::kEventLog)
+    return check_declare_conformance(*data.log(), model, options);
+  return check_declare_conformance(
+      event_data_log(data, options.activity_key, options.case_id_key), model,
+      options);
+}
+
 DeclareConformance check_declare_conformance(const Trace& trace,
                                               const DeclareModel& model) {
   return check_declare_conformance(trace, model, DeclareConformanceOptions{});
@@ -527,6 +812,151 @@ DeclareConformance check_declare_conformance(
   for (const auto& event : trace.events)
     activities.push_back(selected_activity(event, options.activity_key));
   return check_declare_conformance(activities, model);
+}
+
+namespace {
+
+void validate_case_id_key(std::string_view key) {
+  if (key.empty() ||
+      std::all_of(key.begin(), key.end(), [](char value) {
+        return std::isspace(static_cast<unsigned char>(value)) != 0;
+      }))
+    throw std::invalid_argument(
+        "declare diagnostics: case-id selector must not be blank");
+}
+
+std::optional<EventAttribute> trace_case_attribute(
+    const Trace& trace, std::string_view case_id_key) {
+  if (trace.case_id_attribute && trace.case_id_attribute->key == case_id_key) {
+    if (trace.case_id_attribute->is_null) return std::nullopt;
+    return *trace.case_id_attribute;
+  }
+  for (const auto& attribute : trace.attributes)
+    if (attribute.key == case_id_key)
+      return attribute.is_null ? std::nullopt
+                               : std::optional<EventAttribute>(attribute);
+  const bool intrinsic =
+      case_id_key == "case:concept:name" || case_id_key == "case:id" ||
+      case_id_key == "case_id" || case_id_key == "case" ||
+      (!trace.case_id_source_key.empty() &&
+       trace.case_id_source_key == case_id_key);
+  if (intrinsic) {
+    if (trace.case_id_state == FirstClassAttributeState::kNull ||
+        !trace.has_case_id())
+      return std::nullopt;
+    if (!trace.case_id_source_key.empty() &&
+        trace.case_id_source_key == case_id_key && trace.case_id_attribute)
+      return *trace.case_id_attribute;
+    return EventAttribute{std::string(case_id_key), trace.case_id};
+  }
+  for (const auto& event : trace.events) {
+    if (!event.case_id_source_key.empty() &&
+        event.case_id_source_key == case_id_key) {
+      if (event.case_id_state == FirstClassAttributeState::kNull ||
+          !event.has_case_id())
+        return std::nullopt;
+      return EventAttribute{std::string(case_id_key), event.case_id};
+    }
+  }
+  return std::nullopt;
+}
+
+EventLog case_id_log(const EventDataView& data,
+                     std::string_view case_id_key) {
+  return event_data_log(data, "concept:name", case_id_key);
+}
+
+EventAttribute case_cell(EventAttribute result, std::string source_key) {
+  result.key = "case_id";
+  result.first_class_role = FirstClassAttributeRole::kCaseId;
+  result.first_class_state = FirstClassAttributeState::kPresent;
+  result.first_class_source_key = std::move(source_key);
+  return result;
+}
+
+EventAttribute integer_cell(std::string key, std::int64_t value) {
+  EventAttribute result{std::move(key), std::to_string(value),
+                        AttributeKind::kInt};
+  result.typed_value = value;
+  return result;
+}
+
+EventAttribute floating_cell(std::string key, double value) {
+  if (!std::isfinite(value))
+    throw std::invalid_argument(
+        "declare diagnostics: result fitness must be finite");
+  std::ostringstream formatted;
+  formatted << std::setprecision(std::numeric_limits<double>::max_digits10)
+            << value;
+  EventAttribute result{std::move(key), formatted.str(), AttributeKind::kFloat};
+  result.typed_value = value;
+  return result;
+}
+
+EventTable make_diagnostics_table(
+    const EventLog& log, const std::vector<DeclareConformance>& results,
+    const DeclareDiagnosticsOptions& options) {
+  validate_case_id_key(options.case_id_key);
+  if (results.size() != log.traces.size())
+    throw std::invalid_argument(
+        "declare diagnostics: result count does not match trace count");
+  EventTable table;
+  table.columns = {"case_id", "no_dev_total", "no_constr_total",
+                   "dev_fitness"};
+  table.rows.reserve(results.size());
+  for (std::size_t index = 0; index < results.size(); ++index) {
+    auto id = trace_case_attribute(log.traces[index], options.case_id_key);
+    if (!id)
+      throw std::invalid_argument(
+          "declare diagnostics: case-id selector is missing or null");
+    const auto& result = results[index];
+    table.rows.push_back(
+        {case_cell(std::move(*id), options.case_id_key),
+         integer_cell("no_dev_total", result.no_dev_total),
+         integer_cell("no_constr_total", result.no_constr_total),
+         floating_cell("dev_fitness", result.dev_fitness)});
+  }
+  table.validate();
+  return table;
+}
+
+}  // namespace
+
+EventTable declare_conformance_diagnostics(
+    const EventLog& log, const std::vector<DeclareConformance>& results,
+    const DeclareDiagnosticsOptions& options) {
+  return make_diagnostics_table(log, results, options);
+}
+
+EventTable declare_conformance_diagnostics(
+    const EventStream& stream, const std::vector<DeclareConformance>& results,
+    const DeclareDiagnosticsOptions& options) {
+  return make_diagnostics_table(case_id_log(EventDataView(stream),
+                                             options.case_id_key),
+                                results, options);
+}
+
+EventTable declare_conformance_diagnostics(
+    const EventTable& table, const std::vector<DeclareConformance>& results,
+    const DeclareDiagnosticsOptions& options) {
+  return make_diagnostics_table(case_id_log(EventDataView(table),
+                                             options.case_id_key),
+                                results, options);
+}
+
+EventTable declare_conformance_diagnostics(
+    const LazyEventTable& table, const std::vector<DeclareConformance>& results,
+    const DeclareDiagnosticsOptions& options) {
+  return make_diagnostics_table(case_id_log(EventDataView(table),
+                                             options.case_id_key),
+                                results, options);
+}
+
+EventTable declare_conformance_diagnostics(
+    const EventDataView& data, const std::vector<DeclareConformance>& results,
+    const DeclareDiagnosticsOptions& options) {
+  return make_diagnostics_table(case_id_log(data, options.case_id_key),
+                                results, options);
 }
 
 }  // namespace minera

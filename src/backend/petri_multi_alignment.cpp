@@ -18,10 +18,9 @@ using Sequence = std::vector<Token>;
 struct Node { std::vector<std::size_t> marking; std::vector<std::size_t> path; double priority = 0.0; };
 struct MarkingLess { bool operator()(const std::vector<std::size_t>& a, const std::vector<std::size_t>& b) const noexcept { return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end()); } };
 
-// Keep the pinned distinction between prefix handling and modeled-cell
-// handling: null transitions are silent, prefixes recognize exact "tau" and
-// labels beginning with 'n', and modeled cells additionally recognize
-// labels containing "skip".
+// Discounted DP has an asymmetric prefix recurrence.  Model-side interior
+// rules recognize null moves, tau, and n*-style labels; modeled interior
+// cells additionally recognize labels containing skip.
 bool silent_prefix(const Token& token) {
   return token.tau || token.value == "tau" ||
          (!token.value.empty() && token.value.front() == 'n');
@@ -33,6 +32,10 @@ bool silent_run_label(const std::string& value) {
   return value.find("tau") != std::string::npos ||
          (!value.empty() && value.front() == 'n') ||
          value.find("skip") != std::string::npos;
+}
+
+bool silent_run_label(const Token& token) {
+  return token.tau || silent_run_label(token.value);
 }
 
 double discounted_distance(Sequence s1, Sequence s2, double exponent) {
@@ -87,6 +90,11 @@ bool path_less(const Node& a, const Node& b, const PetriNet& net) {
   auto key = [&net](const Node& n) { std::vector<std::string> k; for (auto t : n.path) k.push_back(net.transitions()[t].activity ? net.activities()[*net.transitions()[t].activity] : "\x01"); return k; };
   const auto ka = key(a), kb = key(b); if (ka != kb) return ka < kb; return a.path < b.path;
 }
+
+bool path_preferred(const Node& a, const Node& b, const PetriNet& net) {
+  if (a.path.size() != b.path.size()) return a.path.size() > b.path.size();
+  return path_less(a, b, net);
+}
 void validate(const PetriNet& n, const PetriMultiAlignmentOptions& o) {
   validate_selector(o.activity_attribute);
   if (o.variant != PetriAlignmentVariant::kDiscountedAStar) throw std::invalid_argument("unsupported petri multi-alignment variant");
@@ -113,7 +121,7 @@ PetriMultiAlignmentResult multi_align_petri(const PetriNet& net, const EventLog&
     }
     return worst;
   };
-  struct Compare { const PetriNet* net; bool operator()(const Node& a, const Node& b) const { if (a.priority != b.priority) return a.priority > b.priority; if (path_less(a, b, *net)) return false; if (path_less(b, a, *net)) return true; return false; } };
+  struct Compare { const PetriNet* net; bool operator()(const Node& a, const Node& b) const { if (a.priority != b.priority) return a.priority > b.priority; if (a.path.size() != b.path.size()) return a.path.size() < b.path.size(); if (path_less(a, b, *net)) return false; if (path_less(b, a, *net)) return true; return false; } };
   std::priority_queue<Node, std::vector<Node>, Compare> queue((Compare{&net})); Node start{initial, {}, 0.0}; queue.push(start);
   std::map<std::vector<std::size_t>, std::size_t, MarkingLess> closed; PetriMultiAlignmentDiagnostics d;
   bool have = false; Node best; double best_score = std::numeric_limits<double>::infinity();
@@ -122,7 +130,10 @@ PetriMultiAlignmentResult multi_align_petri(const PetriNet& net, const EventLog&
     if (have && node.priority > best_score) break;
     if (node.marking == final) {
       const auto run = run_sequence(node, net); double score = 0.0; for (const auto& v : variants) score = std::max(score, discounted_distance(run, variant_sequence(v), o.exponent));
-      if (!have || score < best_score || (score == best_score && path_less(node, best, net))) { have = true; best_score = score; best = node; }
+      if (!have || score < best_score ||
+          (score == best_score && path_preferred(node, best, net))) {
+        have = true; best_score = score; best = node;
+      }
       continue;
     }
     ++closed[node.marking]; ++d.visited_states;
@@ -141,22 +152,33 @@ PetriMultiAlignmentResult multi_align_petri(const PetriNet& net, const EventLog&
   if (!have) throw std::runtime_error(d.exhausted ? "petri multi-alignment state limit reached before final marking" : "petri net final marking is unreachable");
   PetriMultiAlignmentResult r; r.transitions = best.path; for (auto t : best.path) if (net.transitions()[t].activity) r.activities.push_back(net.activities()[*net.transitions()[t].activity]); r.cost = r.objective = best_score;
   r.max_distance_to_log = 0.0;
-  auto ordinary = [](const std::vector<std::string>& a,
-                     const std::vector<std::string>& b) {
-    std::vector<std::size_t> p(b.size() + 1), c(b.size() + 1);
-    for (std::size_t j = 0; j <= b.size(); ++j) p[j] = j;
-    for (std::size_t i = 1; i <= a.size(); ++i) {
-      c[0] = p[0] + (silent_run_label(a[i - 1]) ? 0u : 1u);
-      for (std::size_t j = 1; j <= b.size(); ++j) {
-        const auto substitution =
-            a[i - 1] == b[j - 1] && !silent_run_label(a[i - 1]) ? 0u : 2u;
-        c[j] = std::min({p[j] + (silent_run_label(a[i - 1]) ? 0u : 1u),
-                         c[j - 1] + 1, p[j - 1] + substitution});
+  auto ordinary = [](const Sequence& model,
+                     const std::vector<std::string>& log) {
+    std::vector<std::size_t> previous(log.size() + 1), current(log.size() + 1);
+    for (std::size_t j = 0; j <= log.size(); ++j) previous[j] = j;
+    for (std::size_t i = 1; i <= model.size(); ++i) {
+      current[0] = previous[0] + 1;
+      const auto& token = model[i - 1];
+      const bool silent = silent_run_label(token);
+      for (std::size_t j = 1; j <= log.size(); ++j) {
+        if (silent) {
+          current[j] = std::min(previous[j], current[j - 1] + 1);
+        } else if (token.value == log[j - 1]) {
+          current[j] = std::min({previous[j] + 1, current[j - 1] + 1,
+                                 previous[j - 1]});
+        } else {
+          current[j] = std::min(previous[j] + 1, current[j - 1] + 1);
+        }
       }
-      p.swap(c);
+      previous.swap(current);
     }
-    return p[b.size()];
+    return previous[log.size()];
   };
-  for (const auto& v : variants) r.max_distance_to_log = std::max(r.max_distance_to_log, static_cast<double>(ordinary(r.activities, v))); r.diagnostics = d; return r;
+  const auto run = run_sequence(best, net);
+  for (const auto& v : variants)
+    r.max_distance_to_log = std::max(
+        r.max_distance_to_log, static_cast<double>(ordinary(run, v)));
+  r.diagnostics = d;
+  return r;
 }
 }  // namespace minera

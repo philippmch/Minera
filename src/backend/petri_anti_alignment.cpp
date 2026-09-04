@@ -28,10 +28,9 @@ struct MarkingLess {
   }
 };
 
-// The pinned label conventions distinguish the prefix handling from
-// interior modeled-cell handling.  Null transitions are always silent; the
-// prefix additionally recognizes the exact label "tau" and labels starting
-// with 'n', while modeled cells also recognize labels containing "skip".
+// Discounted DP has an asymmetric prefix recurrence.  Its model-side rules
+// recognize null moves, tau, and n*-style labels; modeled interior cells
+// additionally recognize labels containing skip.
 bool silent_prefix(const Token& token) {
   return token.tau || token.value == "tau" ||
          (!token.value.empty() && token.value.front() == 'n');
@@ -45,6 +44,10 @@ bool silent_run_label(const std::string& value) {
          value.find("skip") != std::string::npos;
 }
 
+bool silent_run_label(const Token& token) {
+  return token.tau || silent_run_label(token.value);
+}
+
 double discounted_distance(Sequence s1, Sequence s2, double exponent) {
   bool modeled = true;
   if (s1.size() < s2.size()) {
@@ -55,11 +58,14 @@ double discounted_distance(Sequence s1, Sequence s2, double exponent) {
   std::vector<double> previous(m + 1, 0.0), current(m + 1, 0.0);
   auto weight = [exponent](std::size_t k) { return std::pow(exponent, -static_cast<double>(k)); };
   for (std::size_t j = 1; j <= m; ++j) {
-    // In the unmodeled orientation, tau elements of the model are free.
+    // In the unmodeled orientation, silent model elements are free along the
+    // initial row, matching the asymmetric discounted recurrence.
     previous[j] = previous[j - 1] + ((!modeled && silent_prefix(s2[j - 1])) ? 0.0 : weight(j - 1));
   }
   for (std::size_t i = 1; i <= n; ++i) {
-    // Silent modeled moves do not contribute to an insertion/deletion prefix.
+    // Silent modeled moves are free along the initial column in this
+    // discounted recurrence; the ordinary diagnostic metric has separate
+    // raw-index borders below.
     current[0] = previous[0] + ((modeled && silent_prefix(s1[i - 1])) ? 0.0 : weight(i - 1));
     for (std::size_t j = 1; j <= m; ++j) {
       const double edit = weight(i - 1 + j);
@@ -75,21 +81,30 @@ double discounted_distance(Sequence s1, Sequence s2, double exponent) {
   return previous[m];
 }
 
-double ordinary_insert_delete(const std::vector<std::string>& a,
-                              const std::vector<std::string>& b) {
-  std::vector<std::size_t> p(b.size() + 1), c(b.size() + 1);
-  for (std::size_t j = 0; j <= b.size(); ++j) p[j] = j;
-  for (std::size_t i = 1; i <= a.size(); ++i) {
-    c[0] = p[0] + (silent_run_label(a[i - 1]) ? 0u : 1u);
-    for (std::size_t j = 1; j <= b.size(); ++j) {
-      const auto substitution =
-          a[i - 1] == b[j - 1] && !silent_run_label(a[i - 1]) ? 0u : 2u;
-      c[j] = std::min({p[j] + (silent_run_label(a[i - 1]) ? 0u : 1u), c[j - 1] + 1,
-                       p[j - 1] + substitution});
+double ordinary_insert_delete(const Sequence& model,
+                              const std::vector<std::string>& log) {
+  // This is the insertion/deletion distance used by the precision
+  // diagnostic.  A silent model element can be deleted for free in an
+  // interior cell, but the first column remains an ordinary prefix.
+  std::vector<std::size_t> previous(log.size() + 1), current(log.size() + 1);
+  for (std::size_t j = 0; j <= log.size(); ++j) previous[j] = j;
+  for (std::size_t i = 1; i <= model.size(); ++i) {
+    current[0] = previous[0] + 1;
+    const auto& token = model[i - 1];
+    const bool silent = silent_run_label(token);
+    for (std::size_t j = 1; j <= log.size(); ++j) {
+      if (silent) {
+        current[j] = std::min(previous[j], current[j - 1] + 1);
+      } else if (token.value == log[j - 1]) {
+        current[j] = std::min({previous[j] + 1, current[j - 1] + 1,
+                               previous[j - 1]});
+      } else {
+        current[j] = std::min(previous[j] + 1, current[j - 1] + 1);
+      }
     }
-    p.swap(c);
+    previous.swap(current);
   }
-  return static_cast<double>(p[b.size()]);
+  return static_cast<double>(previous[log.size()]);
 }
 
 void validate_selector(std::string_view selector) {
@@ -151,6 +166,11 @@ bool path_less(const Node& a, const Node& b, const PetriNet& net) {
   return a.path < b.path;
 }
 
+bool path_preferred(const Node& a, const Node& b, const PetriNet& net) {
+  if (a.path.size() != b.path.size()) return a.path.size() > b.path.size();
+  return path_less(a, b, net);
+}
+
 void validate(const PetriNet& net, const PetriAntiAlignmentOptions& o) {
   validate_selector(o.activity_attribute);
   if (o.variant != PetriAlignmentVariant::kDiscountedAStar) throw std::invalid_argument("unsupported petri anti-alignment variant");
@@ -192,6 +212,7 @@ PetriAntiAlignmentResult anti_align_petri(const PetriNet& net, const EventLog& l
   struct Compare {
     const PetriNet* net; bool operator()(const Node& a, const Node& b) const {
       if (a.priority != b.priority) return a.priority > b.priority;
+      if (a.path.size() != b.path.size()) return a.path.size() < b.path.size();
       if (path_less(a, b, *net)) return false;
       if (path_less(b, a, *net)) return true;
       return false;
@@ -213,7 +234,10 @@ PetriAntiAlignmentResult anti_align_petri(const PetriNet& net, const EventLog& l
       const auto run = run_sequence(node, net); const double div = std::pow(1.0 + options.epsilon, static_cast<double>(run.size()));
       double score = std::numeric_limits<double>::infinity();
       for (const auto& v : variants) score = std::min(score, discounted_distance(run, variant_sequence(v), options.exponent) / div);
-      if (!have_best || score > best_score || (score == best_score && path_less(node, best_node, net))) { have_best = true; best_score = score; best_node = node; }
+      if (!have_best || score > best_score ||
+          (score == best_score && path_preferred(node, best_node, net))) {
+        have_best = true; best_score = score; best_node = node;
+      }
       continue;
     }
     ++closed[node.marking]; ++diagnostics.visited_states;
@@ -239,12 +263,13 @@ PetriAntiAlignmentResult anti_align_petri(const PetriNet& net, const EventLog& l
   for (auto t : best_node.path) if (net.transitions()[t].activity) result.activities.push_back(net.activities()[*net.transitions()[t].activity]);
   result.cost = result.objective = -best_score;
   double nearest = std::numeric_limits<double>::infinity();
+  const auto run = run_sequence(best_node, net);
   for (const auto& v : variants) {
-    const auto d = ordinary_insert_delete(result.activities, v);
+    const auto d = ordinary_insert_delete(run, v);
     const auto den = best_node.path.size() + v.size();
     const double n = den == 0 ? 0.0 : d / static_cast<double>(den);
-  // Precision is discounted by the complete transition run, including
-    // silent moves (whose edit contribution is nevertheless zero).
+    // Precision is discounted by the complete transition run, including
+    // silent moves; only their interior deletion contribution is free.
     nearest = std::min(nearest, n / std::pow(1.0 + options.epsilon, static_cast<double>(best_node.path.size())));
   }
   result.precision = std::clamp(1.0 - nearest, 0.0, 1.0); result.diagnostics = diagnostics; return result;

@@ -1,7 +1,10 @@
 #include "minera/declare.hpp"
+#include "minera/log_conversion.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <limits>
 #include <string_view>
@@ -83,6 +86,7 @@ void vacuity_and_empty_inputs() {
   assert(check_declare_conformance(std::vector<std::string>{"C"}, model).is_fit);
   assert(check_declare_conformance(std::vector<std::string>{}, model).is_fit);
   assert(discover_declare(EventLog{}).size() == 0);
+  assert(discover_declare({}).size() == 0);
 }
 
 void every_template_family_and_prerequisite_rules() {
@@ -454,6 +458,29 @@ void blank_activity_selectors_reject_empty_inputs() {
   assert(threw);
 }
 
+void grouped_inputs_ignore_flat_case_selector() {
+  DeclareDiscoveryOptions discovery;
+  discovery.case_id_key = " \t ";
+  discovery.allowed_templates = {kDeclareExistence};
+  const auto source = log({{"A"}});
+  const auto model = discover_declare(source, discovery);
+  assert(model.rules.at(kDeclareExistence).size() == 1);
+
+  DeclareConformanceOptions conformance;
+  conformance.case_id_key = "";
+  assert(check_declare_conformance(source, model, conformance).size() == 1);
+  assert(check_declare_conformance(source.traces[0], model, conformance)
+             .is_fit);
+
+  bool threw = false;
+  try {
+    (void)discover_declare(event_log_to_table(source), discovery);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void first_class_activity_selectors_are_supported() {
   for (const std::string selector : {"org:resource", "time:timestamp",
                                      "lifecycle:transition", "worker", "when",
@@ -518,6 +545,281 @@ void first_class_activity_selectors_are_supported() {
   }
   assert(threw);
 }
+
+void activity_selector_precedence_and_ambiguity_are_strict() {
+  const auto collision_log = [](bool exact_attribute, bool exact_null,
+                                bool ambiguous_source) {
+    EventLog result;
+    Trace trace;
+    trace.case_id = "0";
+    for (const char* activity : {"A", "B"}) {
+      Event event{"0", "canonical"};
+      event.resource = "resource";
+      event.resource_state = FirstClassAttributeState::kPresent;
+      event.resource_source_key = "worker";
+      event.resource_attribute = EventAttribute{"worker", "resource"};
+      if (ambiguous_source) {
+        event.timestamp = "timestamp";
+        event.timestamp_state = FirstClassAttributeState::kPresent;
+        event.timestamp_source_key = "worker";
+        event.timestamp_attribute = EventAttribute{"worker", "timestamp"};
+      }
+      if (exact_attribute)
+        event.attributes.push_back(EventAttribute{
+            "worker", exact_null ? "" : activity, AttributeKind::kString,
+            exact_null});
+      trace.events.push_back(std::move(event));
+    }
+    result.traces.push_back(std::move(trace));
+    return result;
+  };
+
+  DeclareDiscoveryOptions options;
+  options.activity_key = "worker";
+  options.allowed_templates = {kDeclareExistence};
+  options.has_min_support_ratio = true;
+  options.has_min_confidence_ratio = true;
+  const auto exact = discover_declare(collision_log(true, false, false), options);
+  assert(exact.rules.at(kDeclareExistence).size() == 2);
+  assert(exact.rules.at(kDeclareExistence)[0].first == "A");
+  assert(exact.rules.at(kDeclareExistence)[1].first == "B");
+
+  for (const auto candidate : {collision_log(true, true, false),
+                               collision_log(false, false, true)}) {
+    bool threw = false;
+    try {
+      (void)discover_declare(candidate, options);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+}
+
+void flat_inputs_and_diagnostics_are_equivalent() {
+  DeclareDiscoveryOptions discovery;
+  discovery.allowed_templates = {kDeclareExistence, kDeclareResponse};
+  discovery.has_min_support_ratio = true;
+  discovery.has_min_confidence_ratio = true;
+  const auto source = log({{"A", "B"}, {"A"}});
+  const auto stream = event_log_to_event_stream(source);
+  const auto table = event_log_to_table(source);
+  const auto lazy = LazyEventTable::from_table(table);
+
+  const auto expected = discover_declare(source, discovery);
+  assert(discover_declare(stream, discovery).rules == expected.rules);
+  assert(discover_declare(table, discovery).rules == expected.rules);
+  assert(discover_declare(lazy, discovery).rules == expected.rules);
+  assert(discover_declare(EventDataView(table), discovery).rules == expected.rules);
+
+  const auto results = check_declare_conformance(source, expected);
+  assert(check_declare_conformance(stream, expected).size() == results.size());
+  assert(check_declare_conformance(table, expected).size() == results.size());
+  assert(check_declare_conformance(lazy, expected).size() == results.size());
+  assert(check_declare_conformance(EventDataView(stream), expected).size() ==
+         results.size());
+  assert(results.size() == 2);
+
+  const auto diagnostics = declare_conformance_diagnostics(source, results);
+  assert(diagnostics.columns ==
+         std::vector<std::string>({"case_id", "no_dev_total",
+                                   "no_constr_total", "dev_fitness"}));
+  assert(diagnostics.rows.size() == 2);
+  assert(diagnostics.rows[0][0]->value == "0");
+  assert(diagnostics.rows[1][0]->value == "1");
+  assert(diagnostics.rows[0][0]->first_class_role ==
+         FirstClassAttributeRole::kCaseId);
+  assert(std::get<std::int64_t>(diagnostics.rows[0][1]->typed_value) ==
+         results[0].no_dev_total);
+  assert(diagnostics.rows[0][3]->kind == AttributeKind::kFloat);
+  assert(declare_conformance_diagnostics(table, results).rows ==
+         diagnostics.rows);
+
+  DeclareDiagnosticsOptions custom_case;
+  custom_case.case_id_key = "case:batch";
+  auto custom = source;
+  custom.traces[0].attributes.push_back({"case:batch", "north"});
+  custom.traces[1].attributes.push_back({"case:batch", "south"});
+  const auto custom_results = check_declare_conformance(custom, expected);
+  const auto custom_diagnostics =
+      declare_conformance_diagnostics(custom, custom_results, custom_case);
+  assert(custom_diagnostics.rows[0][0]->value == "north");
+  assert(custom_diagnostics.rows[1][0]->value == "south");
+
+  bool threw = false;
+  try {
+    (void)declare_conformance_diagnostics(source, {results.front()});
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    DeclareDiagnosticsOptions missing;
+    missing.case_id_key = "case:missing";
+    (void)declare_conformance_diagnostics(source, results, missing);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+void custom_flat_selectors_have_precedence_and_group_cases() {
+  const auto make_table = [](bool custom_activity_first,
+                             bool custom_case_first) {
+    EventTable table;
+    const auto activities =
+        custom_activity_first
+            ? std::vector<std::string>{"phase", "concept:name"}
+            : std::vector<std::string>{"concept:name", "phase"};
+    const auto cases =
+        custom_case_first
+            ? std::vector<std::string>{"case:batch", "case:concept:name"}
+            : std::vector<std::string>{"case:concept:name", "case:batch"};
+    table.columns = activities;
+    table.columns.insert(table.columns.end(), cases.begin(), cases.end());
+    const auto append = [&](const char* case_id, const char* activity) {
+      EventTable::Row row(table.columns.size());
+      for (std::size_t index = 0; index < table.columns.size(); ++index) {
+        const auto& column = table.columns[index];
+        const auto value = column == "phase"
+                               ? std::string(activity)
+                               : (column == "case:batch"
+                                      ? std::string(case_id)
+                                      : (column == "concept:name"
+                                             ? std::string("wrong")
+                                             : std::string("wrong-case")));
+        EventAttribute field{column, value};
+        if (column == "phase") {
+          field.first_class_role = FirstClassAttributeRole::kLifecycle;
+          field.first_class_state = FirstClassAttributeState::kPresent;
+          field.first_class_source_key = column;
+        } else if (column == "concept:name") {
+          field.first_class_role = FirstClassAttributeRole::kActivity;
+          field.first_class_state = FirstClassAttributeState::kPresent;
+          field.first_class_source_key = column;
+        } else if (column == "case:concept:name") {
+          field.first_class_role = FirstClassAttributeRole::kCaseId;
+          field.first_class_state = FirstClassAttributeState::kPresent;
+          field.first_class_source_key = column;
+        }
+        row[index] = std::move(field);
+      }
+      table.rows.push_back(std::move(row));
+    };
+    append("c1", "A");
+    append("c1", "B");
+    append("c2", "A");
+    return table;
+  };
+
+  DeclareDiscoveryOptions expected_options;
+  expected_options.allowed_templates = {kDeclareExistence,
+                                         kDeclareResponse};
+  expected_options.has_min_support_ratio = true;
+  expected_options.has_min_confidence_ratio = true;
+  const auto expected_log = log({{"A", "B"}, {"A"}});
+  const auto expected = discover_declare(expected_log, expected_options);
+
+  DeclareDiscoveryOptions selected_options = expected_options;
+  selected_options.activity_key = "phase";
+  selected_options.case_id_key = "case:batch";
+  DeclareConformanceOptions conformance_options;
+  conformance_options.activity_key = "phase";
+  conformance_options.case_id_key = "case:batch";
+
+  for (const bool custom_first : {false, true})
+    for (const bool custom_case_first : {false, true}) {
+      const auto table = make_table(custom_first, custom_case_first);
+      const auto stream = event_table_to_event_stream(table);
+      const auto lazy = LazyEventTable::from_table(table);
+      assert(discover_declare(table, selected_options).rules == expected.rules);
+      assert(discover_declare(stream, selected_options).rules == expected.rules);
+      assert(discover_declare(lazy, selected_options).rules == expected.rules);
+      const auto results =
+          check_declare_conformance(table, expected, conformance_options);
+      assert(results.size() == 2);
+      assert(check_declare_conformance(stream, expected, conformance_options)
+                 .size() == results.size());
+      assert(check_declare_conformance(lazy, expected, conformance_options)
+                 .size() == results.size());
+      DeclareDiagnosticsOptions diagnostics_options;
+      diagnostics_options.case_id_key = "case:batch";
+      const auto diagnostics = declare_conformance_diagnostics(
+          table, results, diagnostics_options);
+      assert(diagnostics.rows[0][0]->value == "c1");
+      assert(diagnostics.rows[1][0]->value == "c2");
+    }
+
+  auto typed = make_table(false, false);
+  const auto case_column = static_cast<std::size_t>(
+      std::find(typed.columns.begin(), typed.columns.end(), "case:batch") -
+      typed.columns.begin());
+  for (auto& row : typed.rows) {
+    auto& cell = *row[case_column];
+    cell.value = cell.value == "c1" ? "7" : "8";
+    cell.kind = AttributeKind::kInt;
+    cell.typed_value = static_cast<std::int64_t>(cell.value == "7" ? 7 : 8);
+  }
+  const auto typed_results =
+      check_declare_conformance(typed, expected, conformance_options);
+  DeclareDiagnosticsOptions diagnostics_options;
+  diagnostics_options.case_id_key = "case:batch";
+  const auto typed_diagnostics = declare_conformance_diagnostics(
+      typed, typed_results, diagnostics_options);
+  assert(typed_diagnostics.rows[0][0]->kind == AttributeKind::kInt);
+  assert(std::get<std::int64_t>(typed_diagnostics.rows[0][0]->typed_value) ==
+         7);
+
+  const auto expect_rejected = [](auto&& action) {
+    bool threw = false;
+    try {
+      action();
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  };
+  auto null_table = make_table(false, false);
+  const auto phase_column = static_cast<std::size_t>(
+      std::find(null_table.columns.begin(), null_table.columns.end(), "phase") -
+      null_table.columns.begin());
+  null_table.rows[0][phase_column]->is_null = true;
+  null_table.rows[0][phase_column]->first_class_state =
+      FirstClassAttributeState::kNull;
+  const auto null_stream = event_table_to_event_stream(null_table);
+  const auto null_lazy = LazyEventTable::from_table(null_table);
+  expect_rejected(
+      [&] { (void)discover_declare(null_table, selected_options); });
+  expect_rejected(
+      [&] { (void)discover_declare(null_stream, selected_options); });
+  expect_rejected(
+      [&] { (void)discover_declare(null_lazy, selected_options); });
+
+  EventTable ambiguous;
+  ambiguous.columns = {"resource_value", "timestamp_value", "case:batch"};
+  EventAttribute resource{"resource_value", "A"};
+  resource.first_class_role = FirstClassAttributeRole::kResource;
+  resource.first_class_state = FirstClassAttributeState::kPresent;
+  resource.first_class_source_key = "worker";
+  EventAttribute timestamp{"timestamp_value", "B"};
+  timestamp.first_class_role = FirstClassAttributeRole::kTimestamp;
+  timestamp.first_class_state = FirstClassAttributeState::kPresent;
+  timestamp.first_class_source_key = "worker";
+  EventAttribute case_id{"case:batch", "c1"};
+  ambiguous.rows.push_back(
+      {std::move(resource), std::move(timestamp), std::move(case_id)});
+  auto ambiguous_options = selected_options;
+  ambiguous_options.activity_key = "worker";
+  const auto ambiguous_stream = event_table_to_event_stream(ambiguous);
+  const auto ambiguous_lazy = LazyEventTable::from_table(ambiguous);
+  expect_rejected(
+      [&] { (void)discover_declare(ambiguous, ambiguous_options); });
+  expect_rejected(
+      [&] { (void)discover_declare(ambiguous_stream, ambiguous_options); });
+  expect_rejected(
+      [&] { (void)discover_declare(ambiguous_lazy, ambiguous_options); });
+}
 }  // namespace
 
 int main() {
@@ -533,6 +835,10 @@ int main() {
   missing_exactly_one_activity_does_not_create_empty_occurrences();
   custom_activity_selector_is_strict();
   blank_activity_selectors_reject_empty_inputs();
+  grouped_inputs_ignore_flat_case_selector();
   first_class_activity_selectors_are_supported();
+  activity_selector_precedence_and_ambiguity_are_strict();
+  flat_inputs_and_diagnostics_are_equivalent();
+  custom_flat_selectors_have_precedence_and_group_cases();
   std::cout << "declare tests passed\n";
 }

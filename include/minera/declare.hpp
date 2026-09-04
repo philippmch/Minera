@@ -1,8 +1,10 @@
 #pragma once
 
+#include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
 
 #include <cstddef>
+#include <initializer_list>
 #include <map>
 #include <optional>
 #include <string>
@@ -36,6 +38,8 @@ struct DeclareConstraint {
   bool binary = false;
   int support = 0;
   int confidence = 0;
+  friend bool operator==(const DeclareConstraint&, const DeclareConstraint&) =
+      default;
 };
 
 struct DeclareModel {
@@ -62,10 +66,25 @@ struct DeclareDiscoveryOptions {
   // field is selected by default; any other key must be present and non-null
   // on every event.
   std::string activity_key = "concept:name";
+  // Case attribute used to group flat event records.  It is ignored for an
+  // already grouped EventLog, but is applied by stream/table adapters.
+  std::string case_id_key = "case:concept:name";
 };
 
 [[nodiscard]] DeclareModel discover_declare(
     const EventLog& log, const DeclareDiscoveryOptions& options = {});
+// Retain the pre-adapter brace-call form (for example, an empty log as `{}`).
+[[nodiscard]] DeclareModel discover_declare(
+    std::initializer_list<Trace> traces,
+    const DeclareDiscoveryOptions& options = {});
+[[nodiscard]] DeclareModel discover_declare(
+    const EventStream& stream, const DeclareDiscoveryOptions& options = {});
+[[nodiscard]] DeclareModel discover_declare(
+    const EventTable& table, const DeclareDiscoveryOptions& options = {});
+[[nodiscard]] DeclareModel discover_declare(
+    const LazyEventTable& table, const DeclareDiscoveryOptions& options = {});
+[[nodiscard]] DeclareModel discover_declare(
+    const EventDataView& data, const DeclareDiscoveryOptions& options = {});
 
 struct DeclareDeviation {
   std::string template_name;
@@ -87,6 +106,15 @@ struct DeclareConformanceOptions {
   // field is selected by default; any other key must be present and non-null
   // on every event.
   std::string activity_key = "concept:name";
+  // Case attribute used to group flat event records.  It is ignored for an
+  // already grouped EventLog, but is applied by stream/table adapters.
+  std::string case_id_key = "case:concept:name";
+};
+
+struct DeclareDiagnosticsOptions {
+  // Case-id attribute used for the diagnostics table. Canonical and custom
+  // first-class selectors are both accepted.
+  std::string case_id_key = "case:concept:name";
 };
 
 [[nodiscard]] DeclareConformance check_declare_conformance(
@@ -101,5 +129,33 @@ struct DeclareConformanceOptions {
 [[nodiscard]] std::vector<DeclareConformance> check_declare_conformance(
     const EventLog& log, const DeclareModel& model,
     const DeclareConformanceOptions& options);
+[[nodiscard]] std::vector<DeclareConformance> check_declare_conformance(
+    const EventStream& stream, const DeclareModel& model,
+    const DeclareConformanceOptions& options = {});
+[[nodiscard]] std::vector<DeclareConformance> check_declare_conformance(
+    const EventTable& table, const DeclareModel& model,
+    const DeclareConformanceOptions& options = {});
+[[nodiscard]] std::vector<DeclareConformance> check_declare_conformance(
+    const LazyEventTable& table, const DeclareModel& model,
+    const DeclareConformanceOptions& options = {});
+[[nodiscard]] std::vector<DeclareConformance> check_declare_conformance(
+    const EventDataView& data, const DeclareModel& model,
+    const DeclareConformanceOptions& options = {});
+
+[[nodiscard]] EventTable declare_conformance_diagnostics(
+    const EventLog& log, const std::vector<DeclareConformance>& results,
+    const DeclareDiagnosticsOptions& options = {});
+[[nodiscard]] EventTable declare_conformance_diagnostics(
+    const EventStream& stream, const std::vector<DeclareConformance>& results,
+    const DeclareDiagnosticsOptions& options = {});
+[[nodiscard]] EventTable declare_conformance_diagnostics(
+    const EventTable& table, const std::vector<DeclareConformance>& results,
+    const DeclareDiagnosticsOptions& options = {});
+[[nodiscard]] EventTable declare_conformance_diagnostics(
+    const LazyEventTable& table, const std::vector<DeclareConformance>& results,
+    const DeclareDiagnosticsOptions& options = {});
+[[nodiscard]] EventTable declare_conformance_diagnostics(
+    const EventDataView& data, const std::vector<DeclareConformance>& results,
+    const DeclareDiagnosticsOptions& options = {});
 
 }  // namespace minera
