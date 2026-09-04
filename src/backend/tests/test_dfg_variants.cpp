@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -370,7 +371,7 @@ void clean_stable_ties_and_clean_time_repeated_activities() {
   assert(invalid);
 }
 
-void causal_variants_cover_zero_reverse_absence_and_self() {
+void causal_alpha_contract() {
   const DfgFrequency dfg = {
       {{"A", "B"}, 3}, {{"B", "A"}, 1}, {{"C", "D"}, 2},
       {{"D", "C"}, 0}, {{"E", "F"}, 0}, {{"X", "X"}, 4},
@@ -378,7 +379,13 @@ void causal_variants_cover_zero_reverse_absence_and_self() {
   const auto alpha = discover_dfg_causality(dfg, DfgCausalVariant::ALPHA);
   assert(alpha.relations.size() == 1);
   assert(alpha.relations.at({"C", "D"}) == 1.0);
+}
 
+void causal_heuristic_contract() {
+  const DfgFrequency dfg = {
+      {{"A", "B"}, 3}, {{"B", "A"}, 1}, {{"C", "D"}, 2},
+      {{"D", "C"}, 0}, {{"E", "F"}, 0}, {{"X", "X"}, 4},
+  };
   const auto heuristic =
       discover_dfg_causality(dfg, DfgCausalVariant::HEURISTIC);
   assert(std::abs(heuristic.relations.at({"A", "B"}) - 0.4) < 1e-9);
@@ -391,6 +398,27 @@ void causal_variants_cover_zero_reverse_absence_and_self() {
   assert(heuristic.relations.at({"E", "F"}) == 0.0);
   assert(heuristic.relations.at({"X", "X"}) == 0.0);
   assert(std::signbit(heuristic.relations.at({"X", "X"})));
+
+  const auto maximum = std::numeric_limits<std::uint64_t>::max();
+  const DfgFrequency near_max = {
+      {{"wide", "other"}, maximum},
+      {{"other", "wide"}, maximum - 1},
+  };
+  const auto wide =
+      discover_dfg_causality(near_max, DfgCausalVariant::HEURISTIC);
+  assert(wide.relations.at({"wide", "other"}) > 0.0);
+  assert(wide.relations.at({"other", "wide"}) < 0.0);
+}
+
+void causal_rejects_unknown_variant() {
+  bool rejected = false;
+  try {
+    (void)discover_dfg_causality(
+        {{{"A", "B"}, 1}}, static_cast<DfgCausalVariant>(99));
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
 }
 
 }  // namespace
@@ -404,6 +432,8 @@ int main() {
   case_attributes_cover_ids_custom_missing_and_nodes();
   clean_preserves_boundaries_and_middle_owned_edges();
   clean_stable_ties_and_clean_time_repeated_activities();
-  causal_variants_cover_zero_reverse_absence_and_self();
+  causal_alpha_contract();
+  causal_heuristic_contract();
+  causal_rejects_unknown_variant();
   return 0;
 }

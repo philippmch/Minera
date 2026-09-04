@@ -1,0 +1,5 @@
+case_id,activity,timestamp,causal_label
+one,A,2024-01-01T00:00:00Z,begin
+one,B,2024-01-01T00:00:10Z,finish
+two,A,2024-01-01T00:01:00Z,begin
+two,B,2024-01-01T00:01:10Z,finish

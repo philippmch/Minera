@@ -24,6 +24,7 @@
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "httplib.h"
@@ -692,7 +693,7 @@ minera::CorrelationVariant correlation_variant(std::string_view name) {
 }
 
 minera::CorrelationVariantsAnalysis analyze_correlation_variants(
-    const minera::EventLog& log, const std::vector<std::string>& variants,
+    const minera::EventDataView& data, const std::vector<std::string>& variants,
     const minera::CorrelationMinerOptions& shared_options) {
   minera::CorrelationVariantsAnalysis result;
   result.variants.reserve(variants.size());
@@ -700,7 +701,7 @@ minera::CorrelationVariantsAnalysis analyze_correlation_variants(
     auto options = shared_options;
     options.variant = correlation_variant(name);
     result.variants.push_back(
-        {name, minera::discover_correlation_miner(log, options)});
+        {name, minera::discover_correlation_miner(data, options)});
   }
   return result;
 }
@@ -742,10 +743,18 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
           });
     }
 
+    const bool xes_input = looks_like_xes(dataset, csv);
     std::istringstream input(csv);
-    auto log = looks_like_xes(dataset, csv)
-                   ? minera::import_xes_event_log(input, params.xes)
-                   : minera::import_csv_event_log(input, params.csv);
+    minera::EventLog log;
+    std::optional<minera::CsvEventData> csv_data;
+    if (xes_input) {
+      log = minera::import_xes_event_log(input, params.xes);
+    } else if (!params.correlation_variants.empty()) {
+      csv_data = minera::import_csv_event_data(input, params.csv);
+      log = std::move(csv_data->log);
+    } else {
+      log = minera::import_csv_event_log(input, params.csv);
+    }
     if (params.filter.any()) {
       log = minera::filter_event_log(log, params.filter);
     }
@@ -770,6 +779,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         params.transition_system.activity_attribute.empty()
             ? params.transition_system.activity_key
             : params.transition_system.activity_attribute);
+    register_activity_selector_values(
+        graph, log, params.dfg_statistics.activity_attribute);
     std::optional<minera::DfgVariantsAnalysis> dfg_variants_analysis;
     if (!params.dfg_statistical_variants.empty() ||
         !params.dfg_causal_variants.empty()) {
@@ -780,8 +791,17 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     std::optional<minera::CorrelationVariantsAnalysis>
         correlation_variants_analysis;
     if (!params.correlation_variants.empty()) {
-      correlation_variants_analysis = analyze_correlation_variants(
-          log, params.correlation_variants, params.correlation);
+      if (xes_input) {
+        correlation_variants_analysis = analyze_correlation_variants(
+            minera::EventDataView(log), params.correlation_variants,
+            params.correlation);
+      } else {
+        const auto correlation_table =
+            minera::project_csv_event_table(csv_data->table, log);
+        correlation_variants_analysis = analyze_correlation_variants(
+            minera::EventDataView(correlation_table),
+            params.correlation_variants, params.correlation);
+      }
       minera::register_correlation_activities(
           graph, *correlation_variants_analysis);
     }

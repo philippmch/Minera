@@ -2583,8 +2583,21 @@ std::size_t dfg_variant_activity_id(
   return *id;
 }
 
+// JSON numbers are consumed as IEEE-754 doubles by the frontend. Keep every
+// statistical DFG count within the exactly representable integer range before
+// writing the document.
+constexpr std::uint64_t kMaxJsonSafeInteger = 9007199254740991ULL;
+
+void validate_dfg_count(std::uint64_t count, std::string_view field) {
+  if (count > kMaxJsonSafeInteger) {
+    throw std::invalid_argument("DFG " + std::string(field) +
+                                " exceeds the JSON safe-integer limit");
+  }
+}
+
 void validate_dfg_performance_statistics(
     const DfgPerformanceStatistics& statistics) {
+  validate_dfg_count(statistics.summary.count, "performance summary count");
   const auto finite = [](double value) { return std::isfinite(value); };
   const auto& summary = statistics.summary;
   if (!finite(summary.mean) || !finite(summary.median) ||
@@ -2611,6 +2624,8 @@ void validate_dfg_performance_statistics(
                 "DFG selected performance samples must be finite");
           }
         } else {
+          validate_dfg_count(value.count,
+                             "selected performance summary count");
           if (!finite(value.mean) || !finite(value.median) ||
               !finite(value.minimum) || !finite(value.maximum) ||
               !finite(value.standard_deviation) || !finite(value.sum)) {
@@ -2624,22 +2639,47 @@ void validate_dfg_performance_statistics(
 
 void validate_dfg_variants(const DfgVariantsAnalysis& variants,
                            const DirectlyFollowsGraph& graph) {
+  const auto statistical_variant_for_name =
+      [](std::string_view name) -> std::optional<DfgStatisticalVariant> {
+    if (name == "native" || name == "frequency" ||
+        name == "frequency_greedy") {
+      return DfgStatisticalVariant::kNative;
+    }
+    if (name == "frequency_triples")
+      return DfgStatisticalVariant::kFrequencyTriples;
+    if (name == "performance" || name == "performance_greedy")
+      return DfgStatisticalVariant::kPerformance;
+    if (name == "case_attributes")
+      return DfgStatisticalVariant::kCaseAttributes;
+    if (name == "clean") return DfgStatisticalVariant::kClean;
+    if (name == "clean_polars") return DfgStatisticalVariant::kCleanPolars;
+    if (name == "clean_time") return DfgStatisticalVariant::kCleanTime;
+    return std::nullopt;
+  };
+  const auto causal_variant_for_name =
+      [](std::string_view name) -> std::optional<DfgCausalVariant> {
+    if (name == "alpha") return DfgCausalVariant::kAlpha;
+    if (name == "heuristic") return DfgCausalVariant::kHeuristic;
+    return std::nullopt;
+  };
   const auto validate_pair =
       [&](const DfgActivityPair& pair) {
         (void)dfg_variant_activity_id(graph, pair.first);
         (void)dfg_variant_activity_id(graph, pair.second);
       };
   for (const auto& named : variants.statistical) {
-    if (named.name.empty()) {
-      throw std::invalid_argument("DFG statistical variant name is empty");
+    const auto expected_variant = statistical_variant_for_name(named.name);
+    if (!expected_variant || *expected_variant != named.analysis.variant) {
+      throw std::invalid_argument(
+          "DFG statistical variant name and result do not agree");
     }
     const auto& analysis = named.analysis;
     for (const auto& [pair, count] : analysis.frequency_dfg) {
-      (void)count;
+      validate_dfg_count(count, "frequency count");
       validate_pair(pair);
     }
     for (const auto& [triple, count] : analysis.frequency_triples) {
-      (void)count;
+      validate_dfg_count(count, "frequency triple count");
       (void)dfg_variant_activity_id(graph, std::get<0>(triple));
       (void)dfg_variant_activity_id(graph, std::get<1>(triple));
       (void)dfg_variant_activity_id(graph, std::get<2>(triple));
@@ -2649,25 +2689,37 @@ void validate_dfg_variants(const DfgVariantsAnalysis& variants,
       validate_dfg_performance_statistics(statistics);
     }
     for (const auto& [pair, attributes] : analysis.case_attributes.edges) {
-      (void)attributes;
       validate_pair(pair);
+      for (const auto& [attribute, values] : attributes) {
+        (void)attribute;
+        for (const auto& [value, count] : values) {
+          (void)value;
+          validate_dfg_count(count, "case-attribute value count");
+        }
+      }
     }
     for (const auto& [activity, attributes] :
          analysis.case_attributes.nodes) {
-      (void)attributes;
       (void)dfg_variant_activity_id(graph, activity);
+      for (const auto& [attribute, values] : attributes) {
+        (void)attribute;
+        for (const auto& [value, count] : values) {
+          (void)value;
+          validate_dfg_count(count, "case-attribute value count");
+        }
+      }
     }
     for (const auto& [pair, count] : analysis.clean.graph) {
-      (void)count;
+      validate_dfg_count(count, "clean DFG count");
       validate_pair(pair);
     }
     for (const auto& [activity, count] :
          analysis.clean.start_activities) {
-      (void)count;
+      validate_dfg_count(count, "clean start-activity count");
       (void)dfg_variant_activity_id(graph, activity);
     }
     for (const auto& [activity, count] : analysis.clean.end_activities) {
-      (void)count;
+      validate_dfg_count(count, "clean end-activity count");
       (void)dfg_variant_activity_id(graph, activity);
     }
     for (const auto& [activity, value] : analysis.clean_time) {
@@ -2678,8 +2730,10 @@ void validate_dfg_variants(const DfgVariantsAnalysis& variants,
     }
   }
   for (const auto& named : variants.causal) {
-    if (named.name.empty()) {
-      throw std::invalid_argument("DFG causal variant name is empty");
+    const auto expected_variant = causal_variant_for_name(named.name);
+    if (!expected_variant || *expected_variant != named.analysis.variant) {
+      throw std::invalid_argument(
+          "DFG causal variant name and result do not agree");
     }
     for (const auto& [pair, value] : named.analysis.relations) {
       validate_pair(pair);
@@ -2895,7 +2949,9 @@ void write_dfg_variants(std::ostream& out,
       if (emitted++ != 0) out << ", ";
       out << "{\"source\": " << dfg_variant_activity_id(graph, pair.first)
           << ", \"target\": " << dfg_variant_activity_id(graph, pair.second)
-          << ", \"value\": " << value << '}';
+          << ", \"value\": "
+          << std::setprecision(std::numeric_limits<double>::max_digits10)
+          << value << '}';
     }
     out << "]}";
     out << (i + 1 < variants.causal.size() ? ", " : "");

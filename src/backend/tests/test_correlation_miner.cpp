@@ -230,6 +230,35 @@ void exact_matching_accepts_equal_boundaries_and_large_populations() {
   assert_near(result.duration_matrix.at(kBA), 0.0);
 }
 
+void correlation_utility_matrix_and_transport_contract() {
+  EventLog log;
+  log.traces = {trace(
+      "rectangular",
+      {interval_event("A", 0.0, 0.0), interval_event("A", 1.0, 5.0),
+       interval_event("A", 2.0, 2.0), interval_event("B", 4.0, 4.0),
+       interval_event("B", 6.0, 6.0)})};
+  CorrelationMinerOptions options;
+  options.start_timestamp_attribute = "start";
+
+  const auto greedy = discover_correlation_miner(log, options);
+  assert_near(greedy.precede_succeed_probability.at(kAB), 5.0 / 6.0);
+  assert_near(greedy.duration_matrix.at(kAB), 2.5);
+
+  options.exact_time_matching = true;
+  const auto exact = discover_correlation_miner(log, options);
+  assert_near(exact.precede_succeed_probability.at(kAB), 5.0 / 6.0);
+  assert_near(exact.duration_matrix.at(kAB), 1.5);
+
+  std::map<std::string, std::uint64_t> outgoing;
+  std::map<std::string, std::uint64_t> incoming;
+  for (const auto& [edge, count] : exact.frequency_dfg) {
+    outgoing[edge.first] += count;
+    incoming[edge.second] += count;
+  }
+  assert(outgoing == exact.activity_counts);
+  assert(incoming == exact.activity_counts);
+}
+
 void custom_interval_key_is_used_and_timestamp_errors_are_strict() {
   EventLog valid;
   valid.traces = {trace(
@@ -319,6 +348,7 @@ int main() {
   empty_and_single_activity_logs_are_supported();
   greedy_matching_preserves_zero_when_one_direction_is_empty();
   exact_matching_accepts_equal_boundaries_and_large_populations();
+  correlation_utility_matrix_and_transport_contract();
   custom_interval_key_is_used_and_timestamp_errors_are_strict();
   split_rejects_zero_sample_size();
   transportation_is_deterministic_and_balanced();

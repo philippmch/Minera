@@ -5648,8 +5648,8 @@ void json_export_carries_dfg_variants_contract() {
 
   minera::DfgCausalAnalysis causal;
   causal.variant = minera::DfgCausalVariant::kHeuristic;
-  causal.relations[{"a", "b"}] = 0.75;
-  causal.relations[{"b", "a"}] = -0.75;
+  causal.relations[{"a", "b"}] = 0.12345678901234566;
+  causal.relations[{"b", "a"}] = -0.12345678901234566;
   variants.causal.push_back({"heuristic", causal});
 
   const auto json = minera::analysis_json(
@@ -5672,7 +5672,9 @@ void json_export_carries_dfg_variants_contract() {
         "\"attribute\": \"concept:name\"", "\"value\": \"c1\"",
         "\"variant\": \"clean_polars\"", "\"start_activities\"",
         "\"mean_seconds_from_case_start\": 5.5", "\"causal\"",
-        "\"variant\": \"heuristic\"", "\"value\": -0.75"}) {
+        "\"variant\": \"heuristic\"",
+        "\"value\": 0.12345678901234566",
+        "\"value\": -0.12345678901234566"}) {
     assert(json.find(fragment) != std::string::npos);
   }
   assert(minera::analysis_json("test", log, graph).find("\"dfg_variants\"") ==
@@ -5697,6 +5699,153 @@ void json_export_carries_dfg_variants_contract() {
   }
   assert(threw);
   assert(stream.str().empty());
+
+  auto statistical_mismatched = variants;
+  statistical_mismatched.statistical.front().name = "performance";
+  std::ostringstream statistical_mismatch_stream;
+  threw = false;
+  try {
+    minera::write_analysis_json(
+        statistical_mismatch_stream, "test", log, graph,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, &statistical_mismatched);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  assert(statistical_mismatch_stream.str().empty());
+
+  auto statistical_unknown = variants;
+  statistical_unknown.statistical.front().name = "future";
+  std::ostringstream statistical_unknown_stream;
+  threw = false;
+  try {
+    minera::write_analysis_json(
+        statistical_unknown_stream, "test", log, graph,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, &statistical_unknown);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  assert(statistical_unknown_stream.str().empty());
+
+  auto mismatched = variants;
+  mismatched.causal.front().name = "alpha";
+  std::ostringstream mismatch_stream;
+  threw = false;
+  try {
+    minera::write_analysis_json(
+        mismatch_stream, "test", log, graph,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, &mismatched);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  assert(mismatch_stream.str().empty());
+
+  auto unknown = variants;
+  unknown.causal.front().name = "future";
+  std::ostringstream unknown_stream;
+  threw = false;
+  try {
+    minera::write_analysis_json(
+        unknown_stream, "test", log, graph,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, &unknown);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  assert(unknown_stream.str().empty());
+
+  const auto expect_oversized_dfg_count_rejected =
+      [&](const minera::DfgVariantsAnalysis& oversized) {
+        std::ostringstream oversized_stream;
+        bool oversized_threw = false;
+        try {
+          minera::write_analysis_json(
+              oversized_stream, "test", log, graph,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, &oversized);
+        } catch (const std::invalid_argument&) {
+          oversized_threw = true;
+        }
+        assert(oversized_threw);
+        assert(oversized_stream.str().empty());
+      };
+  constexpr std::uint64_t kFirstUnsafeJsonInteger = 9007199254740992ULL;
+
+  auto oversized_frequency = variants;
+  oversized_frequency.statistical[0].analysis.frequency_dfg[{"a", "b"}] =
+      kFirstUnsafeJsonInteger;
+  expect_oversized_dfg_count_rejected(oversized_frequency);
+
+  auto oversized_triples = variants;
+  oversized_triples.statistical[1].analysis.frequency_triples[
+      {"a", "b", "a"}] = kFirstUnsafeJsonInteger;
+  expect_oversized_dfg_count_rejected(oversized_triples);
+
+  auto oversized_performance_summary = variants;
+  oversized_performance_summary.statistical[2]
+      .analysis.performance_dfg[{"a", "b"}]
+      .summary.count = kFirstUnsafeJsonInteger;
+  expect_oversized_dfg_count_rejected(oversized_performance_summary);
+
+  auto oversized_selected_summary = variants;
+  oversized_selected_summary.statistical[2]
+      .analysis.performance_dfg[{"a", "b"}]
+      .value = minera::DfgPerformanceSummary{
+          kFirstUnsafeJsonInteger, 3.0, 3.0, 2.0, 4.0, std::sqrt(2.0), 6.0};
+  expect_oversized_dfg_count_rejected(oversized_selected_summary);
+
+  auto oversized_case_attribute_edge = variants;
+  oversized_case_attribute_edge.statistical[3]
+      .analysis.case_attributes.edges[{"a", "b"}]["concept:name"]["c1"] =
+      kFirstUnsafeJsonInteger;
+  expect_oversized_dfg_count_rejected(oversized_case_attribute_edge);
+
+  auto oversized_case_attribute_node = variants;
+  oversized_case_attribute_node.statistical[3]
+      .analysis.case_attributes.nodes["a"]["region"]["EU"] =
+      kFirstUnsafeJsonInteger;
+  expect_oversized_dfg_count_rejected(oversized_case_attribute_node);
+
+  auto oversized_clean_graph = variants;
+  oversized_clean_graph.statistical[4].analysis.clean.graph[{"a", "b"}] =
+      kFirstUnsafeJsonInteger;
+  expect_oversized_dfg_count_rejected(oversized_clean_graph);
+
+  auto oversized_clean_start = variants;
+  oversized_clean_start.statistical[4].analysis.clean.start_activities["a"] =
+      kFirstUnsafeJsonInteger;
+  expect_oversized_dfg_count_rejected(oversized_clean_start);
+
+  auto oversized_clean_end = variants;
+  oversized_clean_end.statistical[4].analysis.clean.end_activities["b"] =
+      kFirstUnsafeJsonInteger;
+  expect_oversized_dfg_count_rejected(oversized_clean_end);
 }
 
 void json_export_carries_correlation_mining_contract() {

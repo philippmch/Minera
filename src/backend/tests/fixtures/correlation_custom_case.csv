@@ -1,0 +1,3 @@
+case_id,activity,timestamp,group
+native-one,A,2024-01-01T00:00:00Z,merged
+native-two,B,2024-01-01T00:00:10Z,merged

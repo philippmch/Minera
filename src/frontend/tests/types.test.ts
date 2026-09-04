@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isBasicPlayoutVisitedResult, isProcessTreePlayoutSetResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelObjectGraphResult, isOcelHeterogeneousGraphResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isPetriAnalysisDiagnosticsFragment, isConceptDriftResult, isPetriNetReductionResult, type MineraExport } from "../src/types";
+import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isDfgVariantsAnalysis, isBasicPlayoutVisitedResult, isProcessTreePlayoutSetResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelObjectGraphResult, isOcelHeterogeneousGraphResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isPetriAnalysisDiagnosticsFragment, isConceptDriftResult, isPetriNetReductionResult, type MineraExport } from "../src/types";
 import { isGeneticMatrixConversionResult, isStochasticMapResult } from "../src/types";
 import { isBrowserHistoryResult } from "../src/types";
 import { isWindowsEventsResult } from "../src/types";
@@ -1115,6 +1115,102 @@ describe("formatDuration", () => {
     expect(formatDuration(60)).toBe("1.0m");
     expect(formatDuration(3599)).toBe("60.0m");
     expect(formatDuration(86399)).toBe("24.0h");
+  });
+});
+
+describe("isDfgVariantsAnalysis", () => {
+  const valid = {
+    statistical: [
+      { variant: "native", frequency_dfg: [{ source: 0, target: 1, count: 2 }] },
+      { variant: "frequency", frequency_dfg: [] },
+      { variant: "frequency_greedy", frequency_dfg: [] },
+      { variant: "frequency_triples", frequency_triples: [
+        { first: 0, middle: 1, last: 0, count: 1 },
+      ] },
+      { variant: "performance", performance_dfg: [{
+        source: 0, target: 1,
+        summary: { count: 1, mean: 2, median: 2, min: 2, max: 2, stdev: 0, sum: 2 },
+        raw_values: [2], value: 2,
+      }] },
+      { variant: "performance_greedy", performance_dfg: [] },
+      { variant: "case_attributes", case_attributes: {
+        edges: [{ source: 0, target: 1, attributes: [{
+          attribute: "region", values: [{ value: "north", count: 1 }],
+        }] }],
+        nodes: [{ activity: 1, attributes: [] }],
+      } },
+      { variant: "clean", clean: {
+        dfg: [], start_activities: [{ activity: 0, count: 1 }],
+        end_activities: [{ activity: 1, count: 1 }],
+      } },
+      { variant: "clean_polars", clean: {
+        dfg: [], start_activities: [], end_activities: [],
+      } },
+      { variant: "clean_time", clean_time: [
+        { activity: 0, mean_seconds_from_case_start: 1.5 },
+      ] },
+    ],
+    causal: [{
+      variant: "alpha",
+      relations: [{ source: 0, target: 1, value: 1 }, { source: 1, target: 0, value: -0.5 }],
+    }, { variant: "heuristic", relations: [] }],
+  };
+
+  it("accepts every exported variant shape with bounded activity references", () => {
+    expect(isDfgVariantsAnalysis(valid, 2)).toBe(true);
+    expect(isMineraExport({
+      dataset: "dfg", trace_count: 0, event_count: 0,
+      activities: [{}, {}], edges: [], variants: [], dfg_variants: valid,
+    })).toBe(true);
+  });
+
+  it("rejects malformed envelopes, variant names, ids, and numeric values", () => {
+    expect(isDfgVariantsAnalysis({ ...valid, causal: undefined }, 2)).toBe(false);
+    expect(isDfgVariantsAnalysis({ ...valid, statistical: [
+      { variant: "unknown", frequency_dfg: [] },
+    ] }, 2)).toBe(false);
+    expect(isDfgVariantsAnalysis({ ...valid, causal: [{
+      variant: "alpha", relations: [{ source: 2, target: 0, value: 1 }],
+    }] }, 2)).toBe(false);
+    expect(isDfgVariantsAnalysis({ ...valid, causal: [{
+      variant: "alpha", relations: [{ source: 0, target: 1, value: Number.NaN }],
+    }] }, 2)).toBe(false);
+    expect(isDfgVariantsAnalysis({ ...valid, statistical: [{
+      variant: "performance", performance_dfg: [{
+        source: 0, target: 1,
+        summary: { count: 1, mean: Number.POSITIVE_INFINITY, median: 0,
+          min: 0, max: 0, stdev: 0, sum: 0 },
+        raw_values: [0], value: 0,
+      }],
+    }] }, 2)).toBe(false);
+    expect(isMineraExport({
+      dataset: "dfg", trace_count: 0, event_count: 0,
+      activities: [{}], edges: [], variants: [], dfg_variants: {
+        statistical: [], causal: [{
+          variant: "heuristic", relations: [{ source: 0, target: 1, value: 1 }],
+        }],
+      },
+    })).toBe(false);
+  });
+
+  it("accepts the JSON safe-integer boundary and rejects the next value", () => {
+    const atBoundary = {
+      ...valid,
+      statistical: valid.statistical.map((analysis, index) =>
+        index === 0
+          ? { ...analysis, frequency_dfg: [{ source: 0, target: 1, count: Number.MAX_SAFE_INTEGER }] }
+          : analysis),
+    };
+    expect(isDfgVariantsAnalysis(atBoundary, 2)).toBe(true);
+
+    const aboveBoundary = {
+      ...valid,
+      statistical: valid.statistical.map((analysis, index) =>
+        index === 0
+          ? { ...analysis, frequency_dfg: [{ source: 0, target: 1, count: Number.MAX_SAFE_INTEGER + 1 }] }
+          : analysis),
+    };
+    expect(isDfgVariantsAnalysis(aboveBoundary, 2)).toBe(false);
   });
 });
 

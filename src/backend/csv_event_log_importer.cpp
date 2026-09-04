@@ -5,6 +5,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -124,9 +125,12 @@ std::string field_at(
 
 }  // namespace
 
-EventLog import_csv_event_log(
+namespace {
+
+CsvEventData import_csv_event_data_impl(
     std::istream& input,
-    const CsvImportOptions& options) {
+    const CsvImportOptions& options,
+    bool preserve_table) {
   if (!options.has_header) {
     throw std::invalid_argument("CSV import currently requires a header row");
   }
@@ -188,7 +192,10 @@ EventLog import_csv_event_log(
   }
 
   std::unordered_map<std::string, std::size_t> trace_ids;
-  EventLog log;
+  CsvEventData result;
+  EventLog& log = result.log;
+  EventTable& table = result.table;
+  if (preserve_table) table.columns = header;
 
   std::size_t line_number = 1;
   std::size_t input_order = 0;
@@ -267,6 +274,47 @@ EventLog import_csv_event_log(
       event.attributes.push_back(
           EventAttribute{header[index], fields[index], AttributeKind::kString});
     }
+    if (preserve_table) {
+      EventTable::Row table_row;
+      table_row.reserve(header.size());
+      for (std::size_t index = 0; index < header.size(); ++index) {
+        if (index >= fields.size()) {
+          table_row.push_back(std::nullopt);
+          continue;
+        }
+        const bool is_timestamp = timestamp_index && index == *timestamp_index;
+        EventAttribute cell{header[index], fields[index],
+                            is_timestamp ? AttributeKind::kDate
+                                         : AttributeKind::kString};
+        const auto set_role = [&](FirstClassAttributeRole role,
+                                  FirstClassAttributeState state) {
+          cell.first_class_role = role;
+          cell.first_class_state = state;
+          cell.first_class_source_key = header[index];
+        };
+        if (index == case_index) {
+          set_role(FirstClassAttributeRole::kCaseId,
+                   FirstClassAttributeState::kPresent);
+        } else if (index == activity_index) {
+          set_role(FirstClassAttributeRole::kActivity,
+                   FirstClassAttributeState::kPresent);
+        } else if (timestamp_index && index == *timestamp_index) {
+          set_role(FirstClassAttributeRole::kTimestamp,
+                   fields[index].empty() ? FirstClassAttributeState::kMissing
+                                         : FirstClassAttributeState::kPresent);
+        } else if (resource_index && index == *resource_index) {
+          set_role(FirstClassAttributeRole::kResource,
+                   fields[index].empty() ? FirstClassAttributeState::kMissing
+                                         : FirstClassAttributeState::kPresent);
+        } else if (lifecycle_index && index == *lifecycle_index) {
+          set_role(FirstClassAttributeRole::kLifecycle,
+                   fields[index].empty() ? FirstClassAttributeState::kMissing
+                                         : FirstClassAttributeState::kPresent);
+        }
+        table_row.push_back(std::move(cell));
+      }
+      table.rows.push_back(std::move(table_row));
+    }
     log.traces[it->second].events.push_back(std::move(event));
   }
 
@@ -276,7 +324,148 @@ EventLog import_csv_event_log(
     }
   }
 
-  return log;
+  if (preserve_table) table.validate();
+  return result;
+}
+
+}  // namespace
+
+CsvEventData import_csv_event_data(
+    std::istream& input,
+    const CsvImportOptions& options) {
+  return import_csv_event_data_impl(input, options, true);
+}
+
+CsvEventData import_csv_event_data(
+    const std::filesystem::path& path,
+    const CsvImportOptions& options) {
+  std::ifstream input(path);
+  if (!input) {
+    throw std::runtime_error("Unable to open CSV event log: " + path.string());
+  }
+  return import_csv_event_data(input, options);
+}
+
+EventTable project_csv_event_table(const EventTable& source,
+                                   const EventLog& filtered) {
+  source.validate();
+
+  struct Candidate {
+    std::size_t source_row = 0;
+    std::size_t encounter = 0;
+    const Event* event = nullptr;
+  };
+
+  std::vector<Candidate> candidates;
+  candidates.reserve(filtered.event_count());
+  std::size_t encounter = 0;
+  for (const auto& trace : filtered.traces) {
+    for (const auto& event : trace.events) {
+      if (event.input_order >= source.rows.size()) {
+        throw std::invalid_argument(
+            "CSV table projection event provenance is outside the source "
+            "table");
+      }
+      candidates.push_back({event.input_order, encounter++, &event});
+    }
+  }
+  // Importer-created traces are timestamp ordered, while flat correlation
+  // semantics use source row order. Stable ordering also gives deterministic
+  // placement to the rare transformed event that shares an input_order.
+  std::stable_sort(candidates.begin(), candidates.end(),
+                   [](const Candidate& left, const Candidate& right) {
+                     if (left.source_row != right.source_row)
+                       return left.source_row < right.source_row;
+                     return left.encounter < right.encounter;
+                   });
+
+  EventTable result = source;
+  result.rows.clear();
+  result.rows.reserve(candidates.size());
+
+  const auto first_class_value = [](const Event& event,
+                                    FirstClassAttributeRole role)
+      -> std::tuple<std::string, FirstClassAttributeState,
+                    const std::optional<EventAttribute>*> {
+    switch (role) {
+      case FirstClassAttributeRole::kCaseId:
+        return {event.case_id, event.case_id_state, nullptr};
+      case FirstClassAttributeRole::kActivity:
+        return {event.activity, event.activity_state,
+                &event.activity_attribute};
+      case FirstClassAttributeRole::kTimestamp:
+        return {event.timestamp, event.timestamp_state,
+                &event.timestamp_attribute};
+      case FirstClassAttributeRole::kResource:
+        return {event.resource, event.resource_state,
+                &event.resource_attribute};
+      case FirstClassAttributeRole::kLifecycle:
+        return {event.lifecycle, event.lifecycle_state,
+                &event.lifecycle_attribute};
+      case FirstClassAttributeRole::kNone:
+        break;
+    }
+    return {{}, FirstClassAttributeState::kMissing, nullptr};
+  };
+
+  for (const auto& candidate : candidates) {
+    EventTable::Row row = source.rows[candidate.source_row];
+    const Event& event = *candidate.event;
+    for (std::size_t index = 0; index < source.columns.size(); ++index) {
+      const auto source_cell = row[index];
+      const auto role = source_cell
+                            ? source_cell->first_class_role
+                            : FirstClassAttributeRole::kNone;
+      if (role != FirstClassAttributeRole::kNone) {
+        const auto [value, state, metadata] = first_class_value(event, role);
+        if (!source_cell && state == FirstClassAttributeState::kMissing)
+          continue;
+
+        EventAttribute replacement = source_cell.value_or(EventAttribute{
+            source.columns[index], value,
+            role == FirstClassAttributeRole::kTimestamp
+                ? AttributeKind::kDate
+                : AttributeKind::kString});
+        replacement.key = source.columns[index];
+        replacement.value = value;
+        replacement.is_null = state == FirstClassAttributeState::kNull;
+        replacement.first_class_role = role;
+        replacement.first_class_state = state;
+        if (replacement.first_class_source_key.empty())
+          replacement.first_class_source_key = source.columns[index];
+        if (metadata && *metadata &&
+            (*metadata)->value == replacement.value &&
+            (*metadata)->is_null == replacement.is_null) {
+          replacement.kind = (*metadata)->kind;
+          replacement.typed_value = (*metadata)->typed_value;
+          replacement.container = (*metadata)->container;
+          replacement.children = (*metadata)->children;
+        }
+        row[index] = std::move(replacement);
+        continue;
+      }
+
+      const auto found = std::find_if(
+          event.attributes.begin(), event.attributes.end(),
+          [&](const auto& attribute) {
+            return attribute.key == source.columns[index];
+          });
+      if (found != event.attributes.end()) {
+        auto replacement = *found;
+        replacement.key = source.columns[index];
+        row[index] = std::move(replacement);
+      }
+    }
+    result.rows.push_back(std::move(row));
+  }
+  result.validate();
+  return result;
+}
+
+EventLog import_csv_event_log(
+    std::istream& input,
+    const CsvImportOptions& options) {
+  return import_csv_event_data_impl(input, options, false).log;
 }
 
 EventLog import_csv_event_log(
