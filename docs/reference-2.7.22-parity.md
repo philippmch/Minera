@@ -137,7 +137,7 @@ are reconciled.
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete** — view-based transition systems cover sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, occurrence data, flat and trace inputs, and explicit activity/case selectors; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and the additional DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings, backed by exact selector and module contracts |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum log/dataframe/lazyframe connected and disconnected projections; batches | **Complete** — strict native temporal discovery and permissive bundled analysis, all six canonical spectrum projections with adapter-specific sampling and timestamp behavior, all three batch adapters and five classifications, and every activity/resource/time/case/event selector have registered native plus production integration contracts |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis (including the configurable generated index-column contract), OCDFG metrics (explicit total-object associations plus separate event-couple and total-object performance projections), annotated and unannotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics and custom scalar activity/object-type selectors, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; SAW weight distributions retain per-event transition multiplicity (including final routing) and merged-net arc ownership decorations; broader object-centric schema and visualization coverage remains |
-| Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Partial (implemented core; proof pending)** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, normalized composite fitness/precision/generalization/simplicity weights with F-score, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
+| Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Partial (implemented core; proof pending)** — dynamic marked-net soundness dispatch, marked token/alignment/decomposed fitness, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, normalized composite fitness/precision/generalization/simplicity weights with F-score, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, frontend adapters, and a registered native evaluator contract suite cover the exposed settings and externally supplied comparison logs |
 | Label splitting | contextual | **Partial (implemented core; proof pending)** — deterministic native contextual splitting with token-aware contexts, weighted greedy-modularity clustering, strict edge thresholds, custom classifiers/targets, JSON/CLI/local-server/frontend adapters, and focused regressions for weighted gains, zero-edge graphs, zero-gain merges, and deterministic ties |
 | Merging | case relations | **Partial (implemented core; proof pending)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Complete** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) have native/JSON/CLI/server/frontend adapters; focused contracts prove LOG/PANDAS adapters, custom selectors, diagnostics, common role records, and all eight SNA selectors |
@@ -1670,6 +1670,15 @@ bound, and explicit initial/final markings. Distance comparison accepts an
 external CSV or XES log and independently controls mass normalization and
 strict equal-mass validation.
 
+Replay fitness, all three Petri precision variations, token generalization, and
+composite evaluation accept common nonnegative initial/final marking vectors.
+Those markings drive token replay, every ordinary alignment search variation,
+automatic soundness selection, decomposed recomposition, aligned-prefix states,
+and the composite submetrics. Empty vectors retain the workflow source/sink
+defaults. Dimensions and token signs are validated before evaluation, including
+for empty logs, and native callers receive explicit unsupported-variation
+results instead of silently falling through to another evaluator.
+
 Replay fitness and precision share a selectable activity field and forward or
 backwards token replay. Forward token fitness can choose whether unknown activities
 affect fitness. Alignment fitness defaults to less-memory Dijkstra with
@@ -1678,10 +1687,16 @@ decomposed recomposition, state/time bounds, dependent generator and discounted
 controls, move costs, and decomposed cache and merge settings. Token precision
 uses its metric-specific prefix-stop and final-marking policies internally;
 alignment precision intentionally does not advertise an independent alignment
-engine selector.
+engine selector. Prefix-stop alignment consumes only synchronous visible moves
+and silent model routing; non-replayable prefixes are omitted rather than
+repaired with log or visible model-only moves.
 
-The shared request parser rejects empty, malformed, non-finite, negative, and
-out-of-range settings before evaluation. Results have standalone and embedded
+The shared request parser rejects empty, malformed, non-finite, and out-of-range
+settings, plus negative values for fields whose domain is nonnegative, before
+evaluation. Arc-degree `k` deliberately accepts every finite baseline, including
+negative values. Its structural arc count includes ordinary, reset, inhibitor,
+and output arcs; extended Cardoso likewise treats all three input-arc kinds as
+structural outgoing choices. Results have standalone and embedded
 JSON forms, active-variation replay details, explicit completion/exhaustion
 state, and finite-or-null metrics. Composite results include the four component
 scores, normalized weights, weighted average, and F-score. The CLI evaluates every built-in Petri model
@@ -1690,7 +1705,10 @@ accepts multipart reference logs. The frontend exposes the complete option set,
 discovers models from actual nets as well as embedded results, and guards
 on-demand caches/results across analysis changes. Native evaluator, request,
 JSON, CLI, hidden-server, frontend-test, and production-build validation cover
-the full vertical.
+the full vertical. A separately registered Release-safe contract executable
+exercises every evaluator variation, automatic dispatch, activity selectors,
+prefix rules, simplicity structure, composite aggregation, and both distance
+execution modes.
 
 Earth-mover evaluation retains the historical `EXACT` selector as the
 backwards-compatible default and also exposes `PYEMD`. The explicit variant
@@ -1703,6 +1721,8 @@ variant is retained in standalone and embedded JSON. The `use_fast_emd`
 compatibility setting is available through native options, the local server,
 CLI, request query, and frontend controls; native builds preserve the same
 deterministic transport result when the accelerated runtime is unavailable.
+Equal-mass detection uses the standard relative-plus-absolute near-equality
+tolerance; the fallback path retains its strict equal-total precondition.
 
 ## Token-replay parity evidence
 
@@ -1712,7 +1732,11 @@ sequentially against the evolving marking, and a blocked unique transition
 searches backwards through silent transitions before weak firing. Reverse
 routing uses the reference's global transition-visit rule and weighted-marking
 difference semantics. Exact final-marking deficits and surplus tokens feed the
-legacy fitness accounting.
+legacy fitness accounting, including its actual-token consumption denominator
+at final-marked places. Both forward and backwards replay accept arbitrary
+nonnegative initial/final vectors; forward replay consumes the requested final
+token multiplicities, while the legacy variation preserves its distinct final
+accounting.
 
 The variation and immediate-stop setting are exposed through the native API,
 strict request parsing, CLI, local server, and frontend controls. Focused

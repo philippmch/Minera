@@ -158,8 +158,30 @@ void automaton_differs_from_alignment_precision_on_deviation() {
   auto a=evaluate_precision(l,n,PrecisionVariant::ALIGN_ETCONFORMANCE);
   auto p=evaluate_precision(l,n,PrecisionVariant::AUTOMATON_AFTER_ALIGN);
   assert(a.computed && p.computed);
-  assert(std::abs(a.precision-0.5)<1e-12);
+  assert(std::abs(a.precision)<1e-12);
   assert(std::abs(p.precision-1.0)<1e-12);
+}
+
+void alignment_precision_excludes_unfit_prefixes() {
+  PetriNet n;
+  const auto source = n.add_place();
+  const auto branch = n.add_place();
+  const auto sink = n.add_place();
+  n.set_source(source);
+  n.set_sink(sink);
+  n.set_activities({"A", "B", "C"});
+  n.add_transition(0, {source}, {branch});
+  n.add_transition(1, {branch}, {sink});
+  n.add_transition(2, {branch}, {sink});
+
+  // The fitting prefix A contributes two escaping edges because X is not
+  // available. A,X cannot replay exactly and must not contribute a second
+  // copy of that marking through a fabricated log move.
+  const auto result = evaluate_precision(
+      log({{"A", "X", "Y"}}), n,
+      PrecisionVariant::ALIGN_ETCONFORMANCE);
+  assert(result.computed && !result.exhausted);
+  assert(std::abs(result.precision - (1.0 / 3.0)) < 1e-12);
 }
 
 void cyclomatic_default_multiple_empty_preset_places() {
@@ -169,6 +191,37 @@ void cyclomatic_default_multiple_empty_preset_places() {
   auto s=evaluate_simplicity(n,SimplicityVariant::EXTENDED_CYCLOMATIC);
   assert(s.computed && s.vertices==4 && s.edges==4 && s.strongly_connected_components==4);
   assert(std::abs(s.value-4.0)<1e-12);
+}
+
+void simplicity_counts_extended_arcs_and_accepts_finite_baselines() {
+  PetriNet n;
+  const auto source = n.add_place();
+  const auto reset = n.add_place();
+  const auto inhibitor = n.add_place();
+  const auto sink = n.add_place();
+  n.set_source(source);
+  n.set_sink(sink);
+  n.set_activities({"A"});
+  const auto transition = n.add_transition(0, {source}, {sink});
+  n.add_arc(transition, reset, PetriArcType::kReset);
+  n.add_arc(transition, inhibitor, PetriArcType::kInhibitor);
+
+  SimplicityOptions arc_options;
+  arc_options.arc_degree_k = 0.0;
+  const auto arc_degree = evaluate_simplicity(
+      n, SimplicityVariant::ARC_DEGREE, arc_options);
+  assert(arc_degree.computed);
+  assert(std::abs(arc_degree.value - (1.0 / 2.6)) < 1e-12);
+
+  arc_options.arc_degree_k = -1.0;
+  const auto lowered = evaluate_simplicity(
+      n, SimplicityVariant::ARC_DEGREE, arc_options);
+  assert(lowered.computed);
+  assert(std::abs(lowered.value - (1.0 / 3.6)) < 1e-12);
+
+  const auto cardoso = evaluate_simplicity(
+      n, SimplicityVariant::EXTENDED_CARDOSO);
+  assert(cardoso.computed && cardoso.value == 3.0);
 }
 
 void default_variant_dispatch_follows_soundness() {
@@ -264,6 +317,234 @@ void evaluator_selectors_reach_every_native_engine() {
   assert(composite_result.computed && composite_result.fitness == 1.0);
 }
 
+void marked_net_options_reach_every_evaluator_engine() {
+  const auto n = sequence_net();
+  const auto suffix = log({{"B"}});
+  const std::vector<int> initial{0, 1, 0};
+  const std::vector<int> final{0, 0, 1};
+
+  TokenReplayOptions replay;
+  replay.initial_marking = initial;
+  replay.final_marking = final;
+  const auto direct_replay = check_conformance(suffix, n, replay);
+  assert(direct_replay.fitness == 1.0 && direct_replay.fitting_traces == 1);
+  const auto diagnostics = replay_token_diagnostics(suffix, n, replay);
+  assert(diagnostics.fitting_traces == 1 &&
+         diagnostics.transition_activations ==
+             std::vector<std::uint64_t>({0, 1}));
+  replay.variant = TokenReplayVariant::kBackwards;
+  const auto backwards_replay = check_conformance(suffix, n, replay);
+  assert(backwards_replay.fitness == 1.0 &&
+         backwards_replay.fitting_traces == 1);
+
+  TokenReplayOptions underfilled;
+  underfilled.initial_marking = initial;
+  underfilled.final_marking = {0, 0, 2};
+  const auto forward_underfilled = check_conformance(suffix, n, underfilled);
+  underfilled.variant = TokenReplayVariant::kBackwards;
+  const auto backwards_underfilled = check_conformance(suffix, n, underfilled);
+  assert(std::abs(forward_underfilled.fitness - (5.0 / 6.0)) < 1e-12);
+  assert(std::abs(backwards_underfilled.fitness - 0.75) < 1e-12);
+
+  for (const auto variant : {
+           AlignmentVariant::kStateEquationAStar,
+           AlignmentVariant::kDijkstraNoHeuristics,
+           AlignmentVariant::kDijkstraLessMemory,
+           AlignmentVariant::kDiscountedAStar,
+           AlignmentVariant::kGeneratorDijkstraNoHeuristics,
+           AlignmentVariant::kGeneratorDijkstraLessMemory}) {
+    AlignmentOptions alignment;
+    alignment.variant = variant;
+    alignment.initial_marking = initial;
+    alignment.final_marking = final;
+    const auto result = check_alignment(suffix, n, alignment);
+    assert(result.computed && result.fitness == 1.0 &&
+           result.fitting_traces == 1);
+  }
+
+  ReplayFitnessOptions fitness;
+  fitness.initial_marking = initial;
+  fitness.final_marking = final;
+  const auto token = evaluate_replay_fitness(
+      suffix, n, ReplayFitnessVariant::TOKEN_BASED, fitness);
+  const auto aligned = evaluate_replay_fitness(
+      suffix, n, ReplayFitnessVariant::ALIGNMENT_BASED, fitness);
+  const auto automatic = evaluate_replay_fitness(
+      suffix, n, ReplayFitnessVariant::AUTO, fitness);
+  assert(token.computed && token.fitness == 1.0);
+  assert(aligned.computed && aligned.fitness == 1.0);
+  assert(automatic.computed && automatic.fitness == 1.0 &&
+         automatic.variant == ReplayFitnessVariant::ALIGNMENT_BASED);
+
+  fitness.decomposed_alignment_options = DecomposedAlignmentOptions{};
+  const auto decomposed = evaluate_replay_fitness(
+      suffix, n, ReplayFitnessVariant::ALIGNMENT_BASED, fitness);
+  assert(decomposed.computed && decomposed.fitness == 1.0 &&
+         decomposed.decomposed_alignment_result.has_value());
+
+  ReplayFitnessOptions nested_decomposed;
+  nested_decomposed.decomposed_alignment_options =
+      DecomposedAlignmentOptions{};
+  nested_decomposed.decomposed_alignment_options->initial_marking = {0, 1, 0};
+  nested_decomposed.decomposed_alignment_options->final_marking = {0, 0, 1};
+  const auto nested_automatic = evaluate_replay_fitness(
+      suffix, n, ReplayFitnessVariant::AUTO, nested_decomposed);
+  assert(nested_automatic.computed && nested_automatic.fitness == 1.0 &&
+         nested_automatic.variant == ReplayFitnessVariant::ALIGNMENT_BASED &&
+         nested_automatic.decomposed_alignment_result.has_value());
+
+  for (const auto variant : {
+           PrecisionVariant::ETCONFORMANCE_TOKEN,
+           PrecisionVariant::ALIGN_ETCONFORMANCE,
+           PrecisionVariant::AUTOMATON_AFTER_ALIGN,
+           PrecisionVariant::AUTO}) {
+    PrecisionOptions precision;
+    precision.initial_marking = initial;
+    precision.final_marking = final;
+    const auto result = evaluate_precision(suffix, n, variant, precision);
+    assert(result.computed && result.precision == 1.0);
+  }
+
+  GeneralizationOptions generalization;
+  generalization.initial_marking = initial;
+  generalization.final_marking = final;
+  const auto generalized = evaluate_generalization(
+      suffix, n, GeneralizationVariant::GENERALIZATION_TOKEN,
+      generalization);
+  assert(generalized.computed &&
+         generalized.transition_frequencies ==
+             std::vector<std::uint64_t>({0, 1}));
+
+  CompositeEvaluationOptions composite;
+  composite.initial_marking = initial;
+  composite.final_marking = final;
+  const auto combined = evaluate_composite(suffix, n, composite);
+  assert(combined.computed && combined.fitness == 1.0 &&
+         combined.precision == 1.0);
+
+  // A non-default final marking must be honored by every evaluator.  The
+  // trace stops after A, so the middle place is the requested goal rather
+  // than the workflow sink.
+  const auto marked_prefix = log({{"A"}});
+  const std::vector<int> source_marking{1, 0, 0};
+  const std::vector<int> middle_marking{0, 1, 0};
+  for (const auto variant : {
+           AlignmentVariant::kStateEquationAStar,
+           AlignmentVariant::kDijkstraNoHeuristics,
+           AlignmentVariant::kDijkstraLessMemory,
+           AlignmentVariant::kDiscountedAStar,
+           AlignmentVariant::kGeneratorDijkstraNoHeuristics,
+           AlignmentVariant::kGeneratorDijkstraLessMemory}) {
+    AlignmentOptions alignment;
+    alignment.variant = variant;
+    alignment.initial_marking = source_marking;
+    alignment.final_marking = middle_marking;
+    const auto result = check_alignment(marked_prefix, n, alignment);
+    assert(result.computed && result.fitness == 1.0 &&
+           result.fitting_traces == 1);
+  }
+
+  ReplayFitnessOptions marked_fitness;
+  marked_fitness.initial_marking = source_marking;
+  marked_fitness.final_marking = middle_marking;
+  const auto marked_token = evaluate_replay_fitness(
+      marked_prefix, n, ReplayFitnessVariant::TOKEN_BASED, marked_fitness);
+  const auto marked_alignment = evaluate_replay_fitness(
+      marked_prefix, n, ReplayFitnessVariant::ALIGNMENT_BASED,
+      marked_fitness);
+  marked_fitness.decomposed_alignment_options =
+      DecomposedAlignmentOptions{};
+  const auto marked_decomposed = evaluate_replay_fitness(
+      marked_prefix, n, ReplayFitnessVariant::ALIGNMENT_BASED,
+      marked_fitness);
+  assert(marked_token.computed && marked_alignment.computed &&
+         marked_decomposed.computed && marked_token.fitness == 1.0 &&
+         marked_alignment.fitness == 1.0 && marked_decomposed.fitness == 1.0);
+
+  for (const auto variant : {
+           PrecisionVariant::ETCONFORMANCE_TOKEN,
+           PrecisionVariant::ALIGN_ETCONFORMANCE,
+           PrecisionVariant::AUTOMATON_AFTER_ALIGN,
+           PrecisionVariant::AUTO}) {
+    PrecisionOptions precision_options;
+    precision_options.initial_marking = source_marking;
+    precision_options.final_marking = middle_marking;
+    const auto result = evaluate_precision(
+        marked_prefix, n, variant, precision_options);
+    assert(result.computed && result.precision == 1.0);
+  }
+
+  GeneralizationOptions marked_generalization;
+  marked_generalization.initial_marking = source_marking;
+  marked_generalization.final_marking = middle_marking;
+  const auto marked_generalization_result = evaluate_generalization(
+      marked_prefix, n, GeneralizationVariant::GENERALIZATION_TOKEN,
+      marked_generalization);
+  assert(marked_generalization_result.computed &&
+         marked_generalization_result.transition_frequencies ==
+             std::vector<std::uint64_t>({1, 0}));
+
+  CompositeEvaluationOptions marked_composite;
+  marked_composite.initial_marking = source_marking;
+  marked_composite.final_marking = middle_marking;
+  const auto marked_composite_result =
+      evaluate_composite(marked_prefix, n, marked_composite);
+  assert(marked_composite_result.computed &&
+         marked_composite_result.fitness == 1.0 &&
+         marked_composite_result.precision == 1.0);
+}
+
+void evaluators_reject_invalid_markings_and_variants() {
+  const auto n = sequence_net();
+  const auto l = log({{"A", "B"}});
+
+  ReplayFitnessOptions bad_marking;
+  bad_marking.initial_marking = {1, -1, 0};
+  const auto invalid_marking = evaluate_replay_fitness(
+      EventLog{}, n, ReplayFitnessVariant::TOKEN_BASED, bad_marking);
+  assert(!invalid_marking.computed && !invalid_marking.error.empty());
+
+  PrecisionOptions short_marking;
+  short_marking.final_marking = {0, 1};
+  const auto invalid_precision = evaluate_precision(
+      l, n, PrecisionVariant::ETCONFORMANCE_TOKEN, short_marking);
+  assert(!invalid_precision.computed && !invalid_precision.error.empty());
+
+  bool replay_threw = false;
+  try {
+    TokenReplayOptions invalid;
+    invalid.initial_marking = {1, 0};
+    (void)check_conformance(l, n, invalid);
+  } catch (const std::invalid_argument&) {
+    replay_threw = true;
+  }
+  assert(replay_threw);
+
+  AlignmentOptions invalid_alignment;
+  invalid_alignment.final_marking = {0, -1, 1};
+  assert(!check_alignment(l, n, invalid_alignment).computed);
+
+  const auto bad_fitness = evaluate_replay_fitness(
+      l, n, static_cast<ReplayFitnessVariant>(999));
+  const auto bad_precision = evaluate_precision(
+      l, n, static_cast<PrecisionVariant>(999));
+  const auto bad_generalization = evaluate_generalization(
+      l, n, static_cast<GeneralizationVariant>(999));
+  const auto bad_simplicity = evaluate_simplicity(
+      n, static_cast<SimplicityVariant>(999));
+  assert(!bad_fitness.computed && !bad_fitness.error.empty());
+  assert(!bad_precision.computed && !bad_precision.error.empty());
+  assert(!bad_generalization.computed && !bad_generalization.error.empty());
+  assert(!bad_simplicity.computed && !bad_simplicity.error.empty());
+
+  ReplayFitnessOptions bad_replay_engine;
+  bad_replay_engine.token_replay_variant =
+      static_cast<TokenReplayVariant>(999);
+  const auto bad_engine = evaluate_replay_fitness(
+      l, n, ReplayFitnessVariant::TOKEN_BASED, bad_replay_engine);
+  assert(!bad_engine.computed && !bad_engine.error.empty());
+}
+
 void empty_replay_fitness_preserves_the_selected_engine() {
   const auto n = sequence_net();
   const EventLog empty_log;
@@ -296,6 +577,62 @@ void empty_replay_fitness_preserves_the_selected_engine() {
   assert(decomposed_json.find("\"variant\":\"recompos_maximal\"") !=
          std::string::npos);
   assert(decomposed_json.find("dijkstra_less_memory") == std::string::npos);
+}
+
+void empty_replay_fitness_rejects_invalid_selected_engine_options() {
+  const auto n = sequence_net();
+  const EventLog empty_log;
+
+  ReplayFitnessOptions invalid_alignment;
+  invalid_alignment.alignment_options.variant =
+      static_cast<AlignmentVariant>(999);
+  auto result = evaluate_replay_fitness(
+      empty_log, n, ReplayFitnessVariant::ALIGNMENT_BASED,
+      invalid_alignment);
+  assert(!result.computed && !result.error.empty());
+
+  invalid_alignment = {};
+  invalid_alignment.alignment_options.cost_profile =
+      static_cast<AlignmentCostProfile>(999);
+  result = evaluate_replay_fitness(
+      empty_log, n, ReplayFitnessVariant::ALIGNMENT_BASED,
+      invalid_alignment);
+  assert(!result.computed && !result.error.empty());
+
+  invalid_alignment = {};
+  invalid_alignment.alignment_options.default_trace_cost = -1.0;
+  result = evaluate_replay_fitness(
+      empty_log, n, ReplayFitnessVariant::ALIGNMENT_BASED,
+      invalid_alignment);
+  assert(!result.computed && !result.error.empty());
+
+  ReplayFitnessOptions invalid_decomposed;
+  invalid_decomposed.decomposed_alignment_options =
+      DecomposedAlignmentOptions{};
+  invalid_decomposed.decomposed_alignment_options->variant =
+      static_cast<DecomposedAlignmentVariant>(999);
+  result = evaluate_replay_fitness(
+      empty_log, n, ReplayFitnessVariant::ALIGNMENT_BASED,
+      invalid_decomposed);
+  assert(!result.computed && !result.error.empty());
+
+  invalid_decomposed = {};
+  invalid_decomposed.decomposed_alignment_options =
+      DecomposedAlignmentOptions{};
+  invalid_decomposed.decomposed_alignment_options->max_states = 0;
+  result = evaluate_replay_fitness(
+      empty_log, n, ReplayFitnessVariant::ALIGNMENT_BASED,
+      invalid_decomposed);
+  assert(!result.computed && !result.error.empty());
+
+  invalid_decomposed = {};
+  invalid_decomposed.decomposed_alignment_options =
+      DecomposedAlignmentOptions{};
+  invalid_decomposed.decomposed_alignment_options->log_move_cost = -1.0;
+  result = evaluate_replay_fitness(
+      empty_log, n, ReplayFitnessVariant::ALIGNMENT_BASED,
+      invalid_decomposed);
+  assert(!result.computed && !result.error.empty());
 }
 
 void replay_fitness_selects_backwards_token_replay() {
@@ -494,6 +831,15 @@ void emd_pyemd_variant_is_deterministic_and_strict() {
   const auto normalized = evaluate_emd(unequal, right, strict);
   assert(normalized.computed && normalized.normalized);
 
+  StochasticLanguage close_left{{{{"A"}, 1.000009}}, 1.000009};
+  StochasticLanguage close_right{{{{"A"}, 1.0}}, 1.0};
+  EmdOptions close_strict = pyemd;
+  close_strict.strict_equal_mass = true;
+  const auto close_result = evaluate_emd(
+      close_left, close_right, close_strict);
+  assert(close_result.computed && !close_result.normalized &&
+         close_result.distance == 0.0);
+
   // The fallback implementation has the equal-total precondition of the
   // reference solver; the accelerated path performs the normalization above.
   EmdOptions fallback_unequal = pyemd;
@@ -552,11 +898,16 @@ int main() {
   automaton_model_only_projection(); automaton_ignores_log_only_moves();
   automaton_unions_shared_prefix_observations(); automaton_excludes_short_terminal_prefix_frequency();
   automaton_task_ids_disambiguate_duplicate_labels(); automaton_differs_from_alignment_precision_on_deviation();
+  alignment_precision_excludes_unfit_prefixes();
   cyclomatic_default_multiple_empty_preset_places(); default_variant_dispatch_follows_soundness();
+  simplicity_counts_extended_arcs_and_accepts_finite_baselines();
   precision_option_errors_preserve_variant_and_convert_trees();
   replay_fitness_excludes_unknown_activities_by_default();
   evaluator_selectors_reach_every_native_engine();
+  marked_net_options_reach_every_evaluator_engine();
+  evaluators_reject_invalid_markings_and_variants();
   empty_replay_fitness_preserves_the_selected_engine();
+  empty_replay_fitness_rejects_invalid_selected_engine_options();
   replay_fitness_selects_backwards_token_replay();
   token_precision_stops_at_an_unfit_prefix();
   composite_evaluation_uses_equal_and_custom_weights();

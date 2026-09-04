@@ -49,11 +49,89 @@ struct MarkingHash {
   }
 };
 
+Marking resolve_workflow_marking(const PetriNet& net,
+                                 const Marking& requested,
+                                 bool initial) {
+  if (requested.empty()) {
+    Marking marking(net.place_count(), 0);
+    const std::size_t place = initial ? net.source() : net.sink();
+    if (place < marking.size()) marking[place] = 1;
+    return marking;
+  }
+  if (requested.size() != net.place_count()) {
+    throw std::invalid_argument(initial
+                                    ? "initial marking dimension does not match net"
+                                    : "final marking dimension does not match net");
+  }
+  if (std::any_of(requested.begin(), requested.end(),
+                  [](int tokens) { return tokens < 0; })) {
+    throw std::invalid_argument(initial ? "initial marking contains a negative token count"
+                                        : "final marking contains a negative token count");
+  }
+  return requested;
+}
+
+bool marking_covers(const Marking& marking, const Marking& target) {
+  for (std::size_t place = 0; place < marking.size(); ++place) {
+    if (marking[place] < target[place]) return false;
+  }
+  return true;
+}
+
+bool marking_has_final_places(const Marking& marking, const Marking& target) {
+  for (std::size_t place = 0; place < marking.size(); ++place) {
+    if (target[place] > 0 && marking[place] <= 0) return false;
+  }
+  return true;
+}
+
+bool valid_explicit_marking(const PetriNet& net, const Marking& marking) {
+  return marking.empty() ||
+         (marking.size() == net.place_count() &&
+          std::none_of(marking.begin(), marking.end(),
+                       [](int tokens) { return tokens < 0; }));
+}
+
+bool valid_token_replay_variant(TokenReplayVariant variant) {
+  switch (variant) {
+    case TokenReplayVariant::kForward:
+    case TokenReplayVariant::kBackwards:
+      return true;
+  }
+  return false;
+}
+
+bool valid_alignment_variant(AlignmentVariant variant) {
+  switch (variant) {
+    case AlignmentVariant::kStateEquationAStar:
+    case AlignmentVariant::kDijkstraNoHeuristics:
+    case AlignmentVariant::kDijkstraLessMemory:
+    case AlignmentVariant::kDiscountedAStar:
+    case AlignmentVariant::kGeneratorDijkstraNoHeuristics:
+    case AlignmentVariant::kGeneratorDijkstraLessMemory:
+      return true;
+  }
+  return false;
+}
+
+bool valid_alignment_cost_profile(AlignmentCostProfile profile) {
+  switch (profile) {
+    case AlignmentCostProfile::kLegacyUnit:
+    case AlignmentCostProfile::kStandard:
+      return true;
+  }
+  return false;
+}
+
 // Holds the net plus the lookups token replay needs and drives both the
 // fitness and precision passes over a single shared translation.
 class Replayer {
  public:
-  explicit Replayer(const PetriNet& net) : net_(net) {
+  explicit Replayer(const PetriNet& net, const Marking& initial = {},
+                    const Marking& final = {})
+      : net_(net),
+        initial_(resolve_workflow_marking(net, initial, true)),
+        final_(resolve_workflow_marking(net, final, false)) {
     for (std::size_t i = 0; i < net_.activities().size(); ++i) {
       name_to_activity_.emplace(net_.activities()[i], i);
     }
@@ -102,9 +180,12 @@ class Replayer {
       const TokenReplayOptions& options = {}) const {
     Marking marking = initial_marking();
     Counts counts;
-    counts.produced = 1;  // the initial token on the source place
     counts.places.resize(net_.place_count());
-    ++counts.places[net_.source()].produced;
+    for (std::size_t place = 0; place < initial_.size(); ++place) {
+      const auto tokens = static_cast<std::uint64_t>(initial_[place]);
+      counts.produced += tokens;
+      counts.places[place].produced += tokens;
+    }
 
     for (const auto& step : trace) {
       if (!step || transitions_by_activity_[*step].empty()) {
@@ -134,7 +215,8 @@ class Replayer {
       }
     }
 
-    // Route whatever is left toward the sink, then consume the final token.
+    // Route whatever is left toward the requested final marking, then consume
+    // its required tokens and retain any surplus as remaining tokens.
     if (options.try_to_reach_final_marking_through_hidden) {
       const Step& finish = cached_finish(marking);
       marking = finish.marking;
@@ -146,16 +228,18 @@ class Replayer {
         for (const std::size_t t : finish.fired) ++(*executions)[t];
       }
     }
-    ++counts.consumed;
-    if (marking[net_.sink()] > 0) {
-      --marking[net_.sink()];
-      ++counts.places[net_.sink()].consumed;
-    } else {
-      ++counts.missing;
-      ++counts.places[net_.sink()].missing;
-      ++counts.places[net_.sink()].consumed;
-    }
     for (std::size_t place = 0; place < marking.size(); ++place) {
+      const auto required = static_cast<std::uint64_t>(final_[place]);
+      counts.consumed += required;
+      counts.places[place].consumed += required;
+      if (marking[place] >= final_[place]) {
+        marking[place] -= final_[place];
+      } else {
+        const auto missing = static_cast<std::uint64_t>(final_[place] - marking[place]);
+        counts.missing += missing;
+        counts.places[place].missing += missing;
+        marking[place] = 0;
+      }
       if (marking[place] > 0) {
         const auto tokens = static_cast<std::uint64_t>(marking[place]);
         counts.remaining += tokens;
@@ -181,9 +265,12 @@ class Replayer {
     Marking marking = initial_marking();
     BackwardsOutcome outcome;
     auto& counts = outcome.counts;
-    counts.produced = 1;  // initial source token
     counts.places.resize(net_.place_count());
-    ++counts.places[net_.source()].produced;
+    for (std::size_t place = 0; place < initial_.size(); ++place) {
+      const auto tokens = static_cast<std::uint64_t>(initial_[place]);
+      counts.produced += tokens;
+      counts.places[place].produced += tokens;
+    }
 
     for (const auto& step : trace) {
       // The deprecated variation silently discards labels absent from the net.
@@ -227,15 +314,15 @@ class Replayer {
       }
     }
 
-    // Compare the exact final marking (one token on sink), with no routing.
-    // Tokens present at final-marked places are consumed as part of the legacy
-    // accounting before surplus/deficit are measured.
-    counts.consumed += static_cast<std::uint64_t>(
-        std::max(0, marking[net_.sink()]));
-    counts.places[net_.sink()].consumed +=
-        static_cast<std::uint64_t>(std::max(0, marking[net_.sink()]));
+    // Compare the exact requested final marking, with no end routing in the
+    // legacy variation.
     for (std::size_t p = 0; p < marking.size(); ++p) {
-      const int target = p == net_.sink() ? 1 : 0;
+      const int target = final_[p];
+      if (target > 0 && marking[p] > 0) {
+        const auto available = static_cast<std::uint64_t>(marking[p]);
+        counts.consumed += available;
+        counts.places[p].consumed += available;
+      }
       if (marking[p] > target) {
         const auto value = static_cast<std::uint64_t>(marking[p] - target);
         counts.remaining += value;
@@ -276,8 +363,10 @@ class Replayer {
     const Step& finish = cached_finish(marking);
     if (finish.missing != 0) return std::nullopt;
     marking = finish.marking;
-    if (marking[net_.sink()] <= 0) return std::nullopt;
-    --marking[net_.sink()];
+    if (!marking_covers(marking, final_)) return std::nullopt;
+    for (std::size_t place = 0; place < marking.size(); ++place) {
+      marking[place] -= final_[place];
+    }
     for (const int tokens : marking) {
       if (tokens > 0) return std::nullopt;
     }
@@ -285,12 +374,7 @@ class Replayer {
     return steps;
   }
 
-  // The marking replay starts from: one token on the source place.
-  [[nodiscard]] Marking initial_marking() const {
-    Marking marking(net_.place_count(), 0);
-    marking[net_.source()] = 1;
-    return marking;
-  }
+  [[nodiscard]] Marking initial_marking() const { return initial_; }
 
   // Advances `marking` by replaying one activity — the same step `replay`
   // takes, so walking a trace with `advance` reaches exactly the markings a
@@ -434,14 +518,15 @@ class Replayer {
     return it->second;
   }
 
-  // The end-of-trace routing toward the sink, cached like a step.
+  // The end-of-trace routing toward the requested final marking, cached like
+  // an ordinary replay step.
   [[nodiscard]] const Step& cached_finish(const Marking& marking) const {
     const auto [it, inserted] = finish_cache_.try_emplace(marking);
     if (inserted) {
       Step& step = it->second;
       step.marking = marking;
       Counts counts;
-      route_silently_to(step.marking, net_.sink(), counts, &step.fired);
+      route_silently_to_marking(step.marking, counts, &step.fired);
       step.produced = counts.produced;
       step.consumed = counts.consumed;
       step.missing = counts.missing;
@@ -760,20 +845,22 @@ class Replayer {
     if (fired) fired->insert(fired->end(), path->begin(), path->end());
   }
 
-  void route_silently_to(Marking& marking,
-                         std::size_t place,
-                         Counts& counts,
-                         std::vector<std::size_t>* fired = nullptr) const {
-    if (marking[place] > 0) return;
-    if (!relaxed_silent_places(marking)[place]) return;  // provably unreachable
-    const auto path =
-        silent_path(marking, [&](const Marking& m) { return m[place] > 0; });
+  void route_silently_to_marking(
+      Marking& marking, Counts& counts,
+      std::vector<std::size_t>* fired = nullptr) const {
+    if (marking_has_final_places(marking, final_)) return;
+    const auto path = silent_path(
+        marking, [&](const Marking& candidate) {
+          return marking_has_final_places(candidate, final_);
+        });
     if (!path) return;
     for (const std::size_t s : *path) fire(marking, s, counts);
     if (fired) fired->insert(fired->end(), path->begin(), path->end());
   }
 
   const PetriNet& net_;
+  Marking initial_;
+  Marking final_;
   std::unordered_map<std::string, std::size_t> name_to_activity_;
   std::vector<std::vector<std::size_t>> transitions_by_activity_;
   std::vector<std::size_t> silent_transitions_;
@@ -1223,13 +1310,12 @@ class Aligner {
       const PetriNet& net, const AlignmentOptions& options = AlignmentOptions{},
       std::chrono::steady_clock::time_point deadline =
           std::chrono::steady_clock::time_point::max())
-      : net_(net) {
+      : net_(net),
+        initial_(resolve_workflow_marking(net, options.initial_marking, true)),
+        final_(resolve_workflow_marking(net, options.final_marking, false)) {
     for (std::size_t i = 0; i < net_.activities().size(); ++i) {
       name_to_activity_.emplace(net_.activities()[i], i);
     }
-    final_ = Marking(net_.place_count(), 0);
-    final_[net_.sink()] = 1;
-
     // Net incidence (tokens produced minus consumed per place) as sparse
     // columns for the marking-equation heuristic.
     incidence_.resize(net_.transitions().size());
@@ -1301,8 +1387,7 @@ class Aligner {
       if (options.model_cost_function) value = options.model_cost_function(name, t);
       return value;
     };
-    Marking start(net_.place_count(), 0);
-    start[net_.source()] = 1;
+    Marking start = initial_;
     std::priority_queue<std::pair<double, Marking>,
                         std::vector<std::pair<double, Marking>>,
                         std::greater<>> queue;
@@ -1369,8 +1454,7 @@ class Aligner {
     // enabled()/the firing below only ever touch place indices < pc, so the
     // appended position rides along untouched until a log or sync move bumps it.
     using State = Marking;
-    State start_key(pc, 0);
-    start_key[net_.source()] = 1;
+    State start_key = initial_;
     start_key.push_back(0);
     State final_key = final_;
     final_key.push_back(static_cast<int>(len));
@@ -1902,8 +1986,7 @@ class Aligner {
     const std::size_t len = ids.size();
     const std::size_t pc = net_.place_count();
     using State = Marking;
-    State start(pc, 0);
-    start[net_.source()] = 1;
+    State start = initial_;
     start.push_back(0);
     State goal = final_;
     goal.push_back(static_cast<int>(len));
@@ -2237,8 +2320,7 @@ class Aligner {
       const AlignmentOptions& options,
       std::chrono::steady_clock::time_point deadline,
       bool& exhausted) const {
-    Marking start(net_.place_count(), 0);
-    start[net_.source()] = 1;
+    Marking start = initial_;
     std::priority_queue<std::pair<std::uint64_t, Marking>,
                         std::vector<std::pair<std::uint64_t, Marking>>,
                         std::greater<>>
@@ -2276,6 +2358,7 @@ class Aligner {
 
   const PetriNet& net_;
   std::unordered_map<std::string, std::size_t> name_to_activity_;
+  Marking initial_;
   Marking final_;
   bool reachable_ = false;
   bool reachability_exhausted_ = false;
@@ -2480,7 +2563,10 @@ FootprintResult check_footprints(const EventLog& event_log,
 ConformanceResult check_conformance(const EventLog& event_log,
                                     const PetriNet& net,
                                     TokenReplayOptions options) {
-  const Replayer replayer(net);
+  if (!valid_token_replay_variant(options.variant)) {
+    throw std::invalid_argument("unsupported token replay variant");
+  }
+  const Replayer replayer(net, options.initial_marking, options.final_marking);
   const std::string activity_attribute =
       options.activity_attribute.empty() ? "concept:name"
                                          : options.activity_attribute;
@@ -2559,7 +2645,10 @@ ConformanceResult check_conformance(const EventLog& event_log,
 TokenReplayDiagnostics replay_token_diagnostics(
     const EventLog& event_log, const PetriNet& net,
     TokenReplayOptions options) {
-  const Replayer replayer(net);
+  if (!valid_token_replay_variant(options.variant)) {
+    throw std::invalid_argument("unsupported token replay variant");
+  }
+  const Replayer replayer(net, options.initial_marking, options.final_marking);
   const std::string activity_attribute =
       options.activity_attribute.empty() ? "concept:name"
                                          : options.activity_attribute;
@@ -2621,6 +2710,13 @@ AlignmentResult check_alignment(const EventLog& event_log,
                                          : options.activity_attribute;
   result.activity_attribute = activity_attribute;
   result.trace_count = event_log.trace_count();
+  if (!valid_alignment_variant(options.variant) ||
+      !valid_alignment_cost_profile(options.cost_profile) ||
+      !valid_explicit_marking(net, options.initial_marking) ||
+      !valid_explicit_marking(net, options.final_marking)) {
+    result.computed = false;
+    return result;
+  }
   if (result.trace_count == 0) return result;
   const auto total_start = std::chrono::steady_clock::now();
   const auto valid_table = [](const std::unordered_map<std::string, double>& table) {
@@ -2816,7 +2912,7 @@ AlignmentResult check_alignment(const EventLog& event_log,
   result.fitness = total_worst <= 1e-12
                      ? 1.0
                      : std::clamp(1.0 - result.total_cost / total_worst, 0.0, 1.0);
-  const Replayer replayer(net);
+  const Replayer replayer(net, options.initial_marking, options.final_marking);
   result.precision = compute_alignment_precision(variants, variant_markings, replayer);
   std::stable_sort(result.variants.begin(), result.variants.end(),
                    [](const VariantAlignment& a, const VariantAlignment& b) {

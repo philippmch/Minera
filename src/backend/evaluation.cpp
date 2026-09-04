@@ -127,12 +127,188 @@ EventLog project_evaluation_activity(
   return projected;
 }
 
-bool has_reachable_final_marking(const PetriNet& net) {
+std::string validate_evaluation_markings(const PetriNet& net,
+                                         const Marking& initial_marking,
+                                         const Marking& final_marking) {
+  if ((!initial_marking.empty() &&
+       initial_marking.size() != net.place_count()) ||
+      (!final_marking.empty() &&
+       final_marking.size() != net.place_count())) {
+    return "marking dimension does not match net";
+  }
+  const auto has_negative = [](const Marking& marking) {
+    return std::any_of(marking.begin(), marking.end(),
+                       [](int tokens) { return tokens < 0; });
+  };
+  if (has_negative(initial_marking) || has_negative(final_marking)) {
+    return "marking contains a negative token count";
+  }
+  return {};
+}
+
+Marking evaluation_initial_marking(const PetriNet& net,
+                                   const Marking& requested) {
+  if (!requested.empty()) return requested;
+  Marking marking(net.place_count(), 0);
+  if (net.source() < marking.size()) marking[net.source()] = 1;
+  return marking;
+}
+
+std::vector<std::size_t> unsigned_marking(const Marking& marking) {
+  std::vector<std::size_t> converted;
+  converted.reserve(marking.size());
+  for (const int tokens : marking) {
+    converted.push_back(static_cast<std::size_t>(tokens));
+  }
+  return converted;
+}
+
+bool signed_marking(const std::vector<std::size_t>& marking,
+                    Marking& converted) {
+  converted.clear();
+  converted.reserve(marking.size());
+  for (const std::size_t tokens : marking) {
+    if (tokens > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+      converted.clear();
+      return false;
+    }
+    converted.push_back(static_cast<int>(tokens));
+  }
+  return true;
+}
+
+bool valid_token_replay_variant(TokenReplayVariant variant) {
+  switch (variant) {
+    case TokenReplayVariant::kForward:
+    case TokenReplayVariant::kBackwards:
+      return true;
+  }
+  return false;
+}
+
+bool valid_alignment_variant_for_evaluation(AlignmentVariant variant) {
+  switch (variant) {
+    case AlignmentVariant::kStateEquationAStar:
+    case AlignmentVariant::kDijkstraNoHeuristics:
+    case AlignmentVariant::kDijkstraLessMemory:
+    case AlignmentVariant::kDiscountedAStar:
+    case AlignmentVariant::kGeneratorDijkstraNoHeuristics:
+    case AlignmentVariant::kGeneratorDijkstraLessMemory:
+      return true;
+  }
+  return false;
+}
+
+bool valid_alignment_cost_profile_for_evaluation(
+    AlignmentCostProfile profile) {
+  switch (profile) {
+    case AlignmentCostProfile::kLegacyUnit:
+    case AlignmentCostProfile::kStandard:
+      return true;
+  }
+  return false;
+}
+
+std::string validate_alignment_evaluation_options(
+    const PetriNet& net, const AlignmentOptions& options) {
+  if (!valid_alignment_variant_for_evaluation(options.variant)) {
+    return "unsupported alignment variant";
+  }
+  if (!valid_alignment_cost_profile_for_evaluation(options.cost_profile)) {
+    return "unsupported alignment cost profile";
+  }
+  if (const auto error = validate_evaluation_markings(
+          net, options.initial_marking, options.final_marking);
+      !error.empty()) {
+    return error;
+  }
+  const auto valid_cost = [](double value) {
+    return std::isfinite(value) && value >= 0.0;
+  };
+  const auto valid_table = [&](const auto& table) {
+    for (const auto& [_, value] : table) {
+      if (!valid_cost(value)) return false;
+    }
+    return true;
+  };
+  const auto valid_vector = [&](const auto& values) {
+    for (const double value : values) {
+      if (!valid_cost(value)) return false;
+    }
+    return true;
+  };
+  const auto valid_optional = [&](const std::optional<double>& value) {
+    return !value || valid_cost(*value);
+  };
+  if (!valid_optional(options.default_trace_cost) ||
+      !valid_optional(options.default_model_cost) ||
+      !valid_optional(options.default_sync_cost) ||
+      !valid_optional(options.default_silent_cost) ||
+      !valid_table(options.trace_costs) ||
+      !valid_table(options.model_costs) ||
+      !valid_table(options.sync_costs) ||
+      !valid_vector(options.trace_costs_by_position) ||
+      !valid_vector(options.model_costs_by_transition) ||
+      !valid_vector(options.sync_costs_by_transition)) {
+    return "invalid alignment cost";
+  }
+  if (options.variant == AlignmentVariant::kDiscountedAStar &&
+      (!std::isfinite(options.exponent) || options.exponent <= 0.0)) {
+    return "invalid discounted alignment exponent";
+  }
+  return {};
+}
+
+std::string validate_decomposed_evaluation_options(
+    const PetriNet& net, const DecomposedAlignmentOptions& options) {
+  if (options.variant != DecomposedAlignmentVariant::kRecomposMaximal) {
+    return "unsupported decomposed alignment variant";
+  }
+  if (options.max_states == 0 || options.max_total_states == 0) {
+    return "invalid decomposed alignment state limit";
+  }
+  const auto valid_cost = [](double value) {
+    return std::isfinite(value) && value >= 0.0;
+  };
+  if (!valid_cost(options.threshold_border_agreement) ||
+      !valid_cost(options.max_time_trace) ||
+      !valid_cost(options.max_time_total) ||
+      !valid_cost(options.log_move_cost) ||
+      !valid_cost(options.model_move_cost) ||
+      !valid_cost(options.tau_model_cost) ||
+      !valid_cost(options.sync_cost)) {
+    return "invalid decomposed alignment cost";
+  }
+  const auto valid_table = [&](const auto& table) {
+    for (const auto& [_, value] : table) {
+      if (!valid_cost(value)) return false;
+    }
+    return true;
+  };
+  if (!valid_table(options.activity_log_costs) ||
+      !valid_table(options.activity_model_costs) ||
+      !valid_table(options.activity_sync_costs)) {
+    return "invalid decomposed alignment cost";
+  }
+  if ((!options.initial_marking.empty() &&
+       options.initial_marking.size() != net.place_count()) ||
+      (!options.final_marking.empty() &&
+       options.final_marking.size() != net.place_count())) {
+    return "marking dimension does not match net";
+  }
+  return {};
+}
+
+bool has_reachable_final_marking(const PetriNet& net,
+                                 const Marking& initial_marking = {},
+                                 const Marking& final_marking = {}) {
   EventLog probe;
   probe.traces.push_back(Trace{});
-  const AlignmentOptions options{
+  AlignmentOptions options{
       AlignmentVariant::kDijkstraLessMemory,
       AlignmentCostProfile::kStandard};
+  options.initial_marking = initial_marking;
+  options.final_marking = final_marking;
   return check_alignment(probe, net, options).computed;
 }
 
@@ -143,16 +319,111 @@ ReplayFitnessResult evaluate_replay_fitness(
     const ReplayFitnessOptions& options) {
   ReplayFitnessResult out;
   out.trace_count = log.trace_count();
+  switch (variant) {
+    case ReplayFitnessVariant::AUTO:
+    case ReplayFitnessVariant::TOKEN_BASED:
+    case ReplayFitnessVariant::ALIGNMENT_BASED:
+      break;
+    default:
+      out.variant = variant;
+      out.computed = false;
+      out.error = "unsupported replay-fitness variant";
+      return out;
+  }
+  if (const auto error = validate_evaluation_markings(
+          net, options.initial_marking, options.final_marking);
+      !error.empty()) {
+    out.variant = variant;
+    out.computed = false;
+    out.error = error;
+    return out;
+  }
   AlignmentOptions alignment_options = options.alignment_options;
   alignment_options.activity_attribute = options.activity_attribute.empty()
                                              ? "concept:name"
                                              : options.activity_attribute;
+  std::optional<DecomposedAlignmentOptions> decomposed_options =
+      options.decomposed_alignment_options;
+  if (variant == ReplayFitnessVariant::AUTO && decomposed_options) {
+    const auto& decomposed = *decomposed_options;
+    if (options.initial_marking.empty() &&
+        !decomposed.initial_marking.empty() &&
+        !signed_marking(decomposed.initial_marking,
+                        alignment_options.initial_marking)) {
+      out.variant = variant;
+      out.computed = false;
+      out.error = "marking token count exceeds alignment range";
+      return out;
+    }
+    if (options.final_marking.empty() &&
+        !decomposed.final_marking.empty() &&
+        !signed_marking(decomposed.final_marking,
+                        alignment_options.final_marking)) {
+      out.variant = variant;
+      out.computed = false;
+      out.error = "marking token count exceeds alignment range";
+      return out;
+    }
+  }
+  if (!options.initial_marking.empty()) {
+    alignment_options.initial_marking = options.initial_marking;
+  }
+  if (!options.final_marking.empty()) {
+    alignment_options.final_marking = options.final_marking;
+  }
+  if (decomposed_options) {
+    if (!options.initial_marking.empty()) {
+      decomposed_options->initial_marking =
+          unsigned_marking(options.initial_marking);
+    }
+    if (!options.final_marking.empty()) {
+      decomposed_options->final_marking =
+          unsigned_marking(options.final_marking);
+    }
+  }
   if (variant == ReplayFitnessVariant::AUTO) {
-    variant = has_reachable_final_marking(net)
+    if (const auto error = validate_evaluation_markings(
+            net, alignment_options.initial_marking,
+            alignment_options.final_marking);
+        !error.empty()) {
+      out.variant = variant;
+      out.computed = false;
+      out.error = error;
+      return out;
+    }
+    variant = has_reachable_final_marking(
+                  net, alignment_options.initial_marking,
+                  alignment_options.final_marking)
                   ? ReplayFitnessVariant::ALIGNMENT_BASED
                   : ReplayFitnessVariant::TOKEN_BASED;
   }
   out.variant = variant;
+  if (variant == ReplayFitnessVariant::TOKEN_BASED &&
+      !valid_token_replay_variant(options.token_replay_variant)) {
+    out.computed = false;
+    out.error = "unsupported token replay variant";
+    return out;
+  }
+  if (variant == ReplayFitnessVariant::ALIGNMENT_BASED &&
+      !decomposed_options) {
+    if (const auto error = validate_alignment_evaluation_options(
+            net, alignment_options);
+        !error.empty()) {
+      out.computed = false;
+      out.error = error;
+      return out;
+    }
+  }
+  if (variant == ReplayFitnessVariant::ALIGNMENT_BASED &&
+      decomposed_options) {
+    if (const auto error = validate_decomposed_evaluation_options(
+            net, *decomposed_options);
+        !error.empty()) {
+      out.computed = false;
+      out.error = error;
+      return out;
+    }
+  }
   if (log.trace_count() == 0) {
     // Evaluators have no observations from which to compute a score;
     // unlike the generic conformance API, their empty-log metrics are zero.
@@ -160,7 +431,7 @@ ReplayFitnessResult evaluate_replay_fitness(
     // an unrelated default payload for an otherwise valid empty evaluation.
     if (variant == ReplayFitnessVariant::TOKEN_BASED) {
       out.token_result.activity_attribute = alignment_options.activity_attribute;
-    } else if (options.decomposed_alignment_options) {
+    } else if (decomposed_options) {
       out.decomposed_alignment_result = DecomposedAlignmentResult{};
     } else {
       out.alignment_result.variant = alignment_options.variant;
@@ -179,6 +450,8 @@ ReplayFitnessResult evaluate_replay_fitness(
     replay_options.consider_activities_not_in_model_in_fitness =
         options.consider_activities_not_in_model_in_fitness;
     replay_options.activity_attribute = alignment_options.activity_attribute;
+    replay_options.initial_marking = options.initial_marking;
+    replay_options.final_marking = options.final_marking;
     out.token_result = check_conformance(log, net, replay_options);
     out.fitness = out.token_result.fitness;
     out.log_fitness = out.fitness;
@@ -193,11 +466,10 @@ ReplayFitnessResult evaluate_replay_fitness(
       out.log_fitness = 0.0;
       out.average_trace_fitness = 0.0;
     }
-  } else if (options.decomposed_alignment_options) {
-    auto decomposed_options = *options.decomposed_alignment_options;
+  } else if (decomposed_options) {
     const auto projected = project_evaluation_activity(
         log, alignment_options.activity_attribute);
-    auto decomposed = align_decomposed(projected, net, decomposed_options);
+    auto decomposed = align_decomposed(projected, net, *decomposed_options);
     out.computed = decomposed.complete;
     out.exhausted = decomposed.exhausted || decomposed.timed_out;
     out.fitness = out.computed ? decomposed.fitness : 0.0;
@@ -281,6 +553,7 @@ std::map<std::vector<std::string>, PrefixInfo> collect_prefixes(
 struct StopAlignmentResult {
   bool computed = true;
   bool exhausted = false;
+  bool fit = false;
   double cost = 0.0;
   std::vector<Marking> markings;
 };
@@ -301,6 +574,7 @@ struct ProductHash {
 
 StopAlignmentResult align_to_stop_prefix(const PetriNet& net,
                                           const std::vector<std::string>& prefix,
+                                          const Marking& initial_marking,
                                           std::size_t cap) {
   StopAlignmentResult result;
   if (cap == 0) {
@@ -313,15 +587,13 @@ StopAlignmentResult align_to_stop_prefix(const PetriNet& net,
   std::vector<State> states;
   std::vector<double> distances;
   std::unordered_map<ProductKey, std::size_t, ProductHash> ids;
-  Marking start(net.place_count(), 0);
-  if (net.source() < start.size()) start[net.source()] = 1;
+  Marking start = initial_marking;
   ids.emplace(ProductKey{start, 0}, 0);
   states.push_back({start, 0});
   distances.push_back(0.0);
   std::priority_queue<QueueItem, std::vector<QueueItem>, std::greater<QueueItem>> queue;
   queue.push({0.0, 0});
   constexpr double kSync = 0.0;
-  constexpr double kModelOrLog = 10000.0;
   constexpr double kTau = 1.0;
   double best = std::numeric_limits<double>::infinity();
   while (!queue.empty()) {
@@ -333,6 +605,7 @@ StopAlignmentResult align_to_stop_prefix(const PetriNet& net,
     // reallocate `states` and invalidate references into the vector.
     const State state = states[item.id];
     if (state.position == prefix.size()) {
+      result.fit = true;
       if (item.cost < best) {
         best = item.cost;
         result.markings.clear();
@@ -360,25 +633,19 @@ StopAlignmentResult align_to_stop_prefix(const PetriNet& net,
         queue.push({next_cost, it->second});
       }
     };
-    if (state.position < prefix.size()) relax(state.marking, state.position + 1, kModelOrLog);
     for (const auto& transition : net.transitions()) {
       if (!enabled(transition, state.marking)) continue;
       const auto next = fire(transition, state.marking);
       if (transition.silent()) {
         relax(next, state.position, kTau);
-      } else {
-        if (net.activities()[*transition.activity] == prefix[state.position])
-          relax(next, state.position + 1, kSync);
-        relax(next, state.position, kModelOrLog);
+      } else if (net.activities()[*transition.activity] ==
+                 prefix[state.position]) {
+        relax(next, state.position + 1, kSync);
       }
     }
     if (!result.computed) return result;
   }
-  if (!std::isfinite(best)) {
-    result.computed = false;
-    result.exhausted = false;
-  }
-  result.cost = best;
+  result.cost = result.fit ? best : 0.0;
   std::sort(result.markings.begin(), result.markings.end());
   result.markings.erase(std::unique(result.markings.begin(), result.markings.end()), result.markings.end());
   return result;
@@ -389,6 +656,26 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
                                          const PrecisionOptions& options) {
   PrecisionResult out;
   out.variant = variant;
+  switch (variant) {
+    case PrecisionVariant::AUTO:
+    case PrecisionVariant::ETCONFORMANCE_TOKEN:
+    case PrecisionVariant::ALIGN_ETCONFORMANCE:
+    case PrecisionVariant::AUTOMATON_AFTER_ALIGN:
+      break;
+    default:
+      out.computed = false;
+      out.error = "unsupported precision variant";
+      return out;
+  }
+  if (const auto error = validate_evaluation_markings(
+          net, options.initial_marking, options.final_marking);
+      !error.empty()) {
+    out.computed = false;
+    out.error = error;
+    return out;
+  }
+  const Marking initial_marking =
+      evaluation_initial_marking(net, options.initial_marking);
   const std::string activity_attribute = options.activity_attribute.empty()
                                              ? "concept:name"
                                              : options.activity_attribute;
@@ -396,6 +683,8 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
       AlignmentVariant::kDijkstraLessMemory,
       AlignmentCostProfile::kStandard};
   alignment_options.activity_attribute = activity_attribute;
+  alignment_options.initial_marking = options.initial_marking;
+  alignment_options.final_marking = options.final_marking;
   if (options.max_states == 0) {
     out.computed = false;
     out.exhausted = true;
@@ -403,12 +692,18 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
     return out;
   }
   if (variant == PrecisionVariant::AUTO) {
-    variant = has_reachable_final_marking(net)
+    variant = has_reachable_final_marking(
+                  net, options.initial_marking, options.final_marking)
                   ? PrecisionVariant::ALIGN_ETCONFORMANCE
                   : PrecisionVariant::ETCONFORMANCE_TOKEN;
   }
   out.variant = variant;
   if (variant == PrecisionVariant::ETCONFORMANCE_TOKEN) {
+    if (!valid_token_replay_variant(options.token_replay_variant)) {
+      out.computed = false;
+      out.error = "unsupported token replay variant";
+      return out;
+    }
     TokenReplayOptions replay_options;
     replay_options.variant = options.token_replay_variant;
     replay_options.stop_immediately_unfit = true;
@@ -416,6 +711,8 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
     replay_options.try_to_reach_final_marking_through_hidden = false;
     replay_options.consider_activities_not_in_model_in_fitness = false;
     replay_options.activity_attribute = activity_attribute;
+    replay_options.initial_marking = options.initial_marking;
+    replay_options.final_marking = options.final_marking;
     out.token_result = check_conformance(log, net, replay_options);
     out.precision = out.token_result.precision;
     return out;
@@ -442,17 +739,17 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
       if (info.frequency == 0) continue;
       std::vector<Marking> markings;
       if (prefix.empty()) {
-        Marking start(net.place_count(), 0);
-        if (net.source() < start.size()) start[net.source()] = 1;
-        markings.push_back(std::move(start));
+        markings.push_back(initial_marking);
       } else {
-        auto stop = align_to_stop_prefix(net, prefix, options.max_states);
+        auto stop = align_to_stop_prefix(
+            net, prefix, initial_marking, options.max_states);
         if (!stop.computed) {
           out.computed = false;
           out.exhausted = stop.exhausted;
-          out.error = stop.exhausted ? "precision search exhausted" : "prefix cannot be aligned";
+          out.error = "precision search exhausted";
           return out;
         }
+        if (!stop.fit) continue;
         markings = std::move(stop.markings);
       }
       std::set<std::string> available;
@@ -497,9 +794,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
   for (const auto& variant_alignment : out.alignment_result.variants) {
     auto& root = trie[0];
     root.frequency += variant_alignment.count;
-    Marking start(net.place_count(), 0);
-    if (net.source() < start.size()) start[net.source()] = 1;
-    root.markings.push_back(start);
+    root.markings.push_back(initial_marking);
     std::size_t node = 0;
     for (std::size_t i = 0; i < variant_alignment.projected_model_moves.size(); ++i) {
       const auto& move = variant_alignment.projected_model_moves[i];
@@ -577,6 +872,18 @@ GeneralizationResult evaluate_generalization(
   out.variant = v;
   out.transition_count = net.transitions().size();
   out.transition_frequencies.assign(net.transitions().size(), 0);
+  if (v != GeneralizationVariant::GENERALIZATION_TOKEN) {
+    out.computed = false;
+    out.error = "unsupported generalization variant";
+    return out;
+  }
+  if (const auto error = validate_evaluation_markings(
+          net, options.initial_marking, options.final_marking);
+      !error.empty()) {
+    out.computed = false;
+    out.error = error;
+    return out;
+  }
   if (log.trace_count() == 0) {
     out.generalization = net.transitions().empty() ? 1.0 : 0.0;
     return out;
@@ -586,6 +893,8 @@ GeneralizationResult evaluate_generalization(
   replay_options.activity_attribute = options.activity_attribute.empty()
                                           ? "concept:name"
                                           : options.activity_attribute;
+  replay_options.initial_marking = options.initial_marking;
+  replay_options.final_marking = options.final_marking;
   const auto replay = check_conformance(log, net, replay_options);
   out.transition_frequencies = replay.transition_frequencies;
   if (out.transition_frequencies.size() < net.transitions().size())
@@ -618,7 +927,7 @@ SimplicityResult evaluate_simplicity(const PetriNet& net,
   SimplicityResult out;
   out.variant = variant;
   if (variant == SimplicityVariant::ARC_DEGREE) {
-    if (!std::isfinite(options.arc_degree_k) || options.arc_degree_k < 0.0) {
+    if (!std::isfinite(options.arc_degree_k)) {
       out.computed = false;
       out.error = "invalid arc-degree k";
       return out;
@@ -627,9 +936,15 @@ SimplicityResult evaluate_simplicity(const PetriNet& net,
     for (const auto& transition : net.transitions()) {
       const std::unordered_set<std::size_t> inputs(
           transition.inputs.begin(), transition.inputs.end());
+      const std::unordered_set<std::size_t> reset_inputs(
+          transition.reset_inputs.begin(), transition.reset_inputs.end());
+      const std::unordered_set<std::size_t> inhibitor_inputs(
+          transition.inhibitor_inputs.begin(),
+          transition.inhibitor_inputs.end());
       const std::unordered_set<std::size_t> outputs(
           transition.outputs.begin(), transition.outputs.end());
-      arcs += inputs.size() + outputs.size();
+      arcs += inputs.size() + reset_inputs.size() + inhibitor_inputs.size() +
+              outputs.size();
     }
     out.vertices = net.place_count() + net.transitions().size();
     const double mean_degree = out.vertices
@@ -646,8 +961,12 @@ SimplicityResult evaluate_simplicity(const PetriNet& net,
     for (std::size_t place = 0; place < net.place_count(); ++place) {
       std::set<std::vector<std::size_t>> downstream;
       for (const auto& transition : net.transitions()) {
-        if (std::find(transition.inputs.begin(), transition.inputs.end(),
-                      place) == transition.inputs.end())
+        const auto contains_place = [place](const auto& inputs) {
+          return std::find(inputs.begin(), inputs.end(), place) != inputs.end();
+        };
+        if (!contains_place(transition.inputs) &&
+            !contains_place(transition.reset_inputs) &&
+            !contains_place(transition.inhibitor_inputs))
           continue;
         auto places = transition.outputs;
         std::sort(places.begin(), places.end());
@@ -659,6 +978,12 @@ SimplicityResult evaluate_simplicity(const PetriNet& net,
     out.vertices = net.place_count();
     out.complexity = out.value = double(total);
     out.simplicity = out.value;
+    return out;
+  }
+
+  if (variant != SimplicityVariant::EXTENDED_CYCLOMATIC) {
+    out.computed = false;
+    out.error = "unsupported simplicity variant";
     return out;
   }
 
@@ -792,6 +1117,13 @@ CompositeEvaluationResult evaluate_composite(
     const EventLog& log, const PetriNet& net,
     const CompositeEvaluationOptions& options) {
   CompositeEvaluationResult out;
+  if (const auto error = validate_evaluation_markings(
+          net, options.initial_marking, options.final_marking);
+      !error.empty()) {
+    out.computed = false;
+    out.error = error;
+    return out;
+  }
   const double total = options.fitness_weight + options.precision_weight +
                        options.simplicity_weight + options.generalization_weight;
   if (!std::isfinite(options.fitness_weight) ||
@@ -815,10 +1147,16 @@ CompositeEvaluationResult evaluate_composite(
                                              : options.activity_attribute;
   ReplayFitnessOptions fitness_options;
   fitness_options.activity_attribute = activity_attribute;
+  fitness_options.initial_marking = options.initial_marking;
+  fitness_options.final_marking = options.final_marking;
   PrecisionOptions precision_options;
   precision_options.activity_attribute = activity_attribute;
+  precision_options.initial_marking = options.initial_marking;
+  precision_options.final_marking = options.final_marking;
   GeneralizationOptions generalization_options;
   generalization_options.activity_attribute = activity_attribute;
+  generalization_options.initial_marking = options.initial_marking;
+  generalization_options.final_marking = options.final_marking;
   const auto fitness = evaluate_replay_fitness(
       log, net, ReplayFitnessVariant::TOKEN_BASED, fitness_options);
   const auto precision = evaluate_precision(
@@ -904,7 +1242,9 @@ EmdResult evaluate_emd(const StochasticLanguage& aa,const StochasticLanguage& bb
   }
   double ma=a.total_mass,mb=b.total_mass;
   if (a.traces.empty()&&b.traces.empty()){out.distance=0;return out;} if(ma<=0||mb<=0){out.computed=false;out.error="stochastic language has zero mass";return out;}
-  if(std::abs(ma-mb)>1e-9){
+  const bool masses_close =
+      std::abs(ma - mb) <= 1e-8 + 1e-5 * std::abs(mb);
+  if(!masses_close){
     // Strict mode is deliberately checked before the default
     // normalization: callers opting into it asked to detect unequal mass,
     // not to silently rescale it away.

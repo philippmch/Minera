@@ -4526,6 +4526,8 @@ export interface EvaluationOptions {
   evaluation_family?: EvaluationFamily;
   fitness_variant?: ReplayFitnessVariant;
   evaluation_activity_attribute?: string;
+  evaluation_initial_marking?: number[];
+  evaluation_final_marking?: number[];
   evaluation_token_replay_variant?: EvaluationTokenReplayVariant;
   /** Applies to forward token replay; the backwards variation ignores unknown labels. */
   fitness_consider_unknown_activities?: boolean;

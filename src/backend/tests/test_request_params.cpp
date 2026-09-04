@@ -2775,6 +2775,8 @@ void parse_evaluation_params_defaults_and_variants() {
       {"evaluation_family", "simplicity"},
       {"fitness_variant", "alignment_based"},
       {"evaluation_activity_attribute", " phase "},
+      {"evaluation_initial_marking", "0, 2,0"},
+      {"evaluation_final_marking", "0,0,2"},
       {"evaluation_token_replay_variant", "forward"},
       {"fitness_consider_unknown_activities", "true"},
       {"evaluation_alignment_variant", "discounted_a_star"},
@@ -2793,7 +2795,7 @@ void parse_evaluation_params_defaults_and_variants() {
       {"precision_max_states", "1"},
       {"generalization_variant", "generalization_token"},
       {"simplicity_variant", "extended_cyclomatic"},
-      {"simplicity_arc_degree_k", "0"},
+      {"simplicity_arc_degree_k", "-0.5"},
       {"simplicity_max_states", "7"},
       {"simplicity_initial_marking", "0, 1,2"},
       {"simplicity_final_marking", "3,4"},
@@ -2807,7 +2809,17 @@ void parse_evaluation_params_defaults_and_variants() {
   assert(all.replay_fitness_options.token_replay_variant ==
              minera::TokenReplayVariant::kForward &&
          all.precision_options.token_replay_variant ==
-             minera::TokenReplayVariant::kForward);
+              minera::TokenReplayVariant::kForward);
+  const std::vector<int> evaluation_initial{0, 2, 0};
+  const std::vector<int> evaluation_final{0, 0, 2};
+  assert(all.replay_fitness_options.initial_marking == evaluation_initial &&
+         all.replay_fitness_options.final_marking == evaluation_final &&
+         all.precision_options.initial_marking == evaluation_initial &&
+         all.precision_options.final_marking == evaluation_final &&
+         all.generalization_options.initial_marking == evaluation_initial &&
+         all.generalization_options.final_marking == evaluation_final &&
+         all.composite_options.initial_marking == evaluation_initial &&
+         all.composite_options.final_marking == evaluation_final);
   assert(all.replay_fitness_options
              .consider_activities_not_in_model_in_fitness);
   const auto& alignment = all.replay_fitness_options.alignment_options;
@@ -2821,8 +2833,10 @@ void parse_evaluation_params_defaults_and_variants() {
   assert(alignment.default_trace_cost == 4.0 &&
          alignment.default_model_cost == 5.0 &&
          alignment.default_silent_cost == 0.5 &&
-         alignment.default_sync_cost == 0.0);
-  assert(all.simplicity_options.arc_degree_k == 0.0 &&
+          alignment.default_sync_cost == 0.0);
+  assert(alignment.initial_marking == evaluation_initial &&
+         alignment.final_marking == evaluation_final);
+  assert(all.simplicity_options.arc_degree_k == -0.5 &&
          all.simplicity_options.max_states == 7);
   assert((all.simplicity_options.initial_marking == std::vector<int>{0, 1, 2}));
   assert((all.simplicity_options.final_marking == std::vector<int>{3, 4}));
@@ -2871,8 +2885,19 @@ void parse_evaluation_params_defaults_and_variants() {
          !recomposition.use_cache && recomposition.clear_cache &&
          recomposition.log_move_cost == 11.0 &&
          recomposition.model_move_cost == 12.0 &&
-         recomposition.tau_model_cost == 1.0 &&
-         recomposition.sync_cost == 0.0);
+          recomposition.tau_model_cost == 1.0 &&
+          recomposition.sync_cost == 0.0);
+
+  const auto marked_decomposed = minera::parse_evaluation_params(fields({
+      {"evaluation_alignment_variant", "recompos_maximal"},
+      {"evaluation_initial_marking", "0,2,0"},
+      {"evaluation_final_marking", "0,0,2"}}));
+  const auto& marked_recomposition =
+      *marked_decomposed.replay_fitness_options.decomposed_alignment_options;
+  assert((marked_recomposition.initial_marking ==
+          std::vector<std::size_t>{0, 2, 0}));
+  assert((marked_recomposition.final_marking ==
+          std::vector<std::size_t>{0, 0, 2}));
 }
 
 void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
@@ -2880,6 +2905,9 @@ void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
            std::pair{"evaluation_family", "unknown"},
            std::pair{"fitness_variant", "token"},
            std::pair{"evaluation_token_replay_variant", "reverse"},
+           std::pair{"evaluation_initial_marking", "1,,2"},
+           std::pair{"evaluation_initial_marking", "-1"},
+           std::pair{"evaluation_final_marking", "999999999999999999999999"},
            std::pair{"fitness_consider_unknown_activities", "yes"},
            std::pair{"evaluation_alignment_variant", "unknown"},
            std::pair{"evaluation_alignment_max_states", "0"},
@@ -2891,7 +2919,6 @@ void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
            std::pair{"precision_max_states", "184467440737095516160"},
            std::pair{"generalization_variant", "token"},
            std::pair{"simplicity_variant", "cardoso"},
-           std::pair{"simplicity_arc_degree_k", "-0.1"},
            std::pair{"simplicity_arc_degree_k", "nan"},
            std::pair{"simplicity_arc_degree_k", "inf"},
            std::pair{"simplicity_max_states", "0"},
@@ -2933,6 +2960,8 @@ void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
 
   for (const auto& field_name : {"evaluation_family",
                                  "evaluation_activity_attribute",
+                                 "evaluation_initial_marking",
+                                 "evaluation_final_marking",
                                  "evaluation_token_replay_variant",
                                  "precision_use_task_ids",
                                  "simplicity_initial_marking"}) {
