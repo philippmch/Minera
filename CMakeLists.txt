@@ -790,6 +790,23 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_correlation_miner_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_correlation_miner_tests COMMAND minera_correlation_miner_tests)
 
+  add_executable(minera_correlation_mining_parity_contracts_tests
+    src/backend/tests/correlation_mining_parity_contracts.cpp
+  )
+  target_link_libraries(minera_correlation_mining_parity_contracts_tests PRIVATE minera::core)
+  target_compile_features(minera_correlation_mining_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_correlation_mining_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_correlation_mining_parity_contracts_tests
+           COMMAND minera_correlation_mining_parity_contracts_tests)
+
+  add_test(NAME minera_correlation_cli_projected_labels
+           COMMAND minera_export
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/correlation_case_activity.csv"
+                   --correlation-variants classic
+                   --correlation-activity-attribute case:id)
+  set_tests_properties(minera_correlation_cli_projected_labels PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"activity_counts\"")
+
   add_executable(minera_perspective_tests
     src/backend/tests/test_perspectives.cpp
   )

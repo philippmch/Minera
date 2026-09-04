@@ -62,9 +62,9 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
   const dfgCausalActive = options.dfgCausalVariants?.some((name) =>
     ["alpha", "heuristic"].includes(name),
   );
-  const correlationActive = options.correlationVariants?.some((name) =>
+  const correlationActive = Boolean(options.correlationVariants?.some((name) =>
     ["classic", "classic_split", "trace_based"].includes(name),
-  );
+  ));
   const spectrumActive = (options.spectrumActivities ?? []).filter((name) => name.trim()).length >= 2;
   return Boolean(
     options.noiseThreshold ||
@@ -155,6 +155,13 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       options.footprintsSortRequired === false ||
       Boolean(options.footprintsInitialMarking?.trim()) ||
       dfgStatisticalActive || dfgCausalActive || correlationActive
+      || Boolean(correlationActive && options.correlationActivityAttribute?.trim() &&
+        options.correlationActivityAttribute.trim() !== "concept:name")
+      || Boolean(correlationActive && options.correlationTimestampAttribute?.trim() &&
+        options.correlationTimestampAttribute.trim() !== "time:timestamp")
+      || Boolean(correlationActive && options.correlationStartTimestampAttribute?.trim())
+      || Boolean(correlationActive && options.correlationCaseIdAttribute?.trim() &&
+        options.correlationCaseIdAttribute.trim() !== "case:concept:name")
       || Boolean(options.temporalActivityAttribute?.trim() &&
         options.temporalActivityAttribute.trim() !== "concept:name")
       || Boolean(options.temporalCaseIdAttribute?.trim() &&

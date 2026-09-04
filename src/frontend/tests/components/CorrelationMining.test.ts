@@ -24,6 +24,10 @@ const analysis = (
   variant: CorrelationMinerAnalysis["variant"],
 ): CorrelationMinerAnalysis => ({
   variant,
+  activity_counts: [
+    { activity: 0, count: 2 },
+    { activity: 1, count: 2 },
+  ],
   frequency_dfg: [
     { source: 0, target: 0, count: 1 },
     { source: 1, target: 0, count: 1 },

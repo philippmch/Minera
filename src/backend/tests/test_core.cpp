@@ -5704,6 +5704,7 @@ void json_export_carries_correlation_mining_contract() {
   const auto graph = minera::discover_directly_follows_graph(log);
   minera::CorrelationMinerResult result;
   result.variant = minera::CorrelationVariant::kClassicSplit;
+  result.activity_counts = {{"a", 1}, {"b", 1}};
   result.frequency_dfg[{"a", "b"}] = 1;
   result.frequency_dfg[{"b", "a"}] = 1;
   result.performance_dfg[{"a", "b"}] = 4.5;
@@ -5738,6 +5739,45 @@ void json_export_carries_correlation_mining_contract() {
         "\"duration_matrix\"", "\"value\": 0.75"}) {
     assert(json.find(fragment) != std::string::npos);
   }
+
+  auto projected_graph = graph;
+  minera::CorrelationMinerResult projected_result;
+  projected_result.variant = minera::CorrelationVariant::kClassicSplit;
+  projected_result.activity_counts = {{"x", 1}, {"y", 1}};
+  projected_result.frequency_dfg[{"x", "y"}] = 1;
+  projected_result.frequency_dfg[{"y", "x"}] = 1;
+  projected_result.performance_dfg[{"x", "y"}] = 2.0;
+  projected_result.performance_dfg[{"y", "x"}] = 3.0;
+  for (const auto& source : {"x", "y"}) {
+    for (const auto& target : {"x", "y"}) {
+      projected_result.precede_succeed_probability[{source, target}] = 0.0;
+      projected_result.duration_matrix[{source, target}] = 0.0;
+    }
+  }
+  minera::CorrelationVariantsAnalysis projected_analyses;
+  projected_analyses.variants.push_back(
+      {"classic_split", std::move(projected_result)});
+  minera::register_correlation_activities(projected_graph,
+                                          projected_analyses);
+  assert(projected_graph.activity_count("x") == 0);
+  assert(projected_graph.activity_count("y") == 0);
+  assert(projected_graph.activity_count("a") == 1);
+  const auto projected_json = minera::analysis_json(
+      "test", log, projected_graph,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, &projected_analyses);
+  assert(projected_json.find("\"name\": \"x\", \"count\": 0") !=
+         std::string::npos);
+  assert(projected_json.find(
+             "\"activity_counts\": [{\"activity\": 2, \"count\": 1") !=
+         std::string::npos);
+  assert(projected_json.find(
+             "\"frequency_dfg\": [{\"source\": 2, \"target\": 3") !=
+         std::string::npos);
   assert(minera::analysis_json("test", log, graph).find(
              "\"correlation_mining\"") == std::string::npos);
 
@@ -5787,6 +5827,16 @@ void json_export_carries_correlation_mining_contract() {
   missing_duration.variants.front().analysis.duration_matrix.erase(
       {"b", "a"});
   rejects(missing_duration);
+
+  minera::CorrelationMinerResult isolated;
+  isolated.variant = minera::CorrelationVariant::kClassicSplit;
+  isolated.activity_counts = {{"a", 1}};
+  isolated.frequency_dfg[{"a", "a"}] = 1;
+  isolated.performance_dfg[{"a", "a"}] = 0.0;
+  minera::CorrelationVariantsAnalysis missing_isolated_matrices;
+  missing_isolated_matrices.variants.push_back(
+      {"classic_split", std::move(isolated)});
+  rejects(missing_isolated_matrices);
 }
 
 void transition_system_forward_backward_views() {

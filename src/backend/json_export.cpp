@@ -2910,15 +2910,6 @@ void validate_correlation_mining(
     (void)dfg_variant_activity_id(graph, pair.first);
     (void)dfg_variant_activity_id(graph, pair.second);
   };
-  std::set<DfgActivityPair> expected_matrix_pairs;
-  for (const auto& source : graph.activities()) {
-    if (graph.activity_count(source) == 0) continue;
-    for (const auto& target : graph.activities()) {
-      if (graph.activity_count(target) != 0) {
-        expected_matrix_pairs.emplace(source, target);
-      }
-    }
-  }
   for (const auto& named : variants.variants) {
     std::optional<CorrelationVariant> named_variant;
     if (named.name == "classic") {
@@ -2937,32 +2928,62 @@ void validate_correlation_mining(
       throw std::invalid_argument(
           "correlation frequency/performance DFGs must have the same edges");
     }
-    for (const auto& [pair, count] : analysis.frequency_dfg) {
-      (void)count;
-      validate_pair(pair);
-      if (!analysis.performance_dfg.contains(pair)) {
+    for (const auto& [activity, count] : analysis.activity_counts) {
+      (void)dfg_variant_activity_id(graph, activity);
+      if (count == 0) {
         throw std::invalid_argument(
-            "correlation frequency edge has no performance value");
+            "correlation activity counts must be positive");
       }
     }
-    for (const auto& [pair, value] : analysis.performance_dfg) {
+    const auto validate_observed_pair = [&](const DfgActivityPair& pair) {
       validate_pair(pair);
+      if (!analysis.activity_counts.contains(pair.first) ||
+          !analysis.activity_counts.contains(pair.second)) {
+        throw std::invalid_argument(
+            "correlation edge references an unobserved activity");
+      }
+    };
+    std::map<std::string, std::uint64_t> outgoing;
+    std::map<std::string, std::uint64_t> incoming;
+    const auto accumulate = [](std::uint64_t& total, std::uint64_t value) {
+      if (value > std::numeric_limits<std::uint64_t>::max() - total) {
+        throw std::invalid_argument("correlation frequency count overflow");
+      }
+      total += value;
+    };
+    for (const auto& [pair, count] : analysis.frequency_dfg) {
+      validate_observed_pair(pair);
+      if (count == 0 || !analysis.performance_dfg.contains(pair)) {
+        throw std::invalid_argument(
+            "correlation frequency edge is invalid");
+      }
+      accumulate(outgoing[pair.first], count);
+      accumulate(incoming[pair.second], count);
+    }
+    for (const auto& [pair, value] : analysis.performance_dfg) {
+      validate_observed_pair(pair);
       if (!analysis.frequency_dfg.contains(pair) || !std::isfinite(value) ||
           value < 0.0) {
         throw std::invalid_argument(
             "correlation performance edge is invalid");
       }
     }
+    for (const auto& [activity, count] : analysis.activity_counts) {
+      if (outgoing[activity] != count || incoming[activity] != count) {
+        throw std::invalid_argument(
+            "correlation frequency marginals must match activity counts");
+      }
+    }
     for (const auto& [pair, value] :
          analysis.precede_succeed_probability) {
-      validate_pair(pair);
+      validate_observed_pair(pair);
       if (!std::isfinite(value) || value < 0.0 || value > 1.0) {
         throw std::invalid_argument(
             "correlation precede/succeed probability must be finite");
       }
     }
     for (const auto& [pair, value] : analysis.duration_matrix) {
-      validate_pair(pair);
+      validate_observed_pair(pair);
       if (!std::isfinite(value) || value < 0.0) {
         throw std::invalid_argument(
             "correlation duration value must be finite");
@@ -2977,6 +2998,14 @@ void validate_correlation_mining(
           }
           return keys;
         };
+    std::set<DfgActivityPair> expected_matrix_pairs;
+    for (const auto& [source, source_count] : analysis.activity_counts) {
+      (void)source_count;
+      for (const auto& [target, target_count] : analysis.activity_counts) {
+        (void)target_count;
+        expected_matrix_pairs.emplace(source, target);
+      }
+    }
     if (matrix_keys(analysis.precede_succeed_probability) !=
             expected_matrix_pairs ||
         matrix_keys(analysis.duration_matrix) != expected_matrix_pairs) {
@@ -3010,7 +3039,15 @@ void write_correlation_mining(
     const auto& named = variants.variants[i];
     out << "{\"variant\": ";
     write_json_string(out, named.name);
-    out << ", \"frequency_dfg\": ";
+    out << ", \"activity_counts\": [";
+    std::size_t activity_index = 0;
+    for (const auto& [activity, count] : named.analysis.activity_counts) {
+      if (activity_index++ != 0) out << ", ";
+      out << "{\"activity\": "
+          << dfg_variant_activity_id(graph, activity)
+          << ", \"count\": " << count << '}';
+    }
+    out << "], \"frequency_dfg\": ";
     write_dfg_frequency(out, named.analysis.frequency_dfg, graph);
     out << ", \"performance_dfg\": [";
     std::size_t emitted = 0;

@@ -169,7 +169,9 @@ void register_activity_selector_values(
   }
   for (const auto& trace : log.traces) {
     for (const auto& event : trace.events) {
-      if (const auto* value = event.attribute(activity_attribute))
+      if (const auto* value = minera::dfg_event_field_value(
+              event, activity_attribute);
+          value != nullptr && !trim_text(*value).empty())
         graph.ensure_activity(*value);
     }
   }
@@ -780,6 +782,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     if (!params.correlation_variants.empty()) {
       correlation_variants_analysis = analyze_correlation_variants(
           log, params.correlation_variants, params.correlation);
+      minera::register_correlation_activities(
+          graph, *correlation_variants_analysis);
     }
     const auto temporal_profile =
         minera::discover_temporal_profile(log, params.temporal_profile);

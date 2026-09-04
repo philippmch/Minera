@@ -4477,6 +4477,10 @@ export interface CorrelationMatrixEntry {
 }
 export interface CorrelationMinerAnalysis {
   variant: CorrelationMinerVariant;
+  activity_counts: Array<{
+    activity: number;
+    count: number;
+  }>;
   frequency_dfg: EdgeStat[];
   performance_dfg: Array<{
     source: number;

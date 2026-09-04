@@ -166,7 +166,9 @@ void register_activity_selector_values(
   }
   for (const auto& trace : log.traces) {
     for (const auto& event : trace.events) {
-      if (const auto* value = event.attribute(activity_attribute))
+      if (const auto* value = minera::dfg_event_field_value(
+              event, activity_attribute);
+          value != nullptr && !trim_text(*value).empty())
         graph.ensure_activity(*value);
     }
   }
@@ -1176,7 +1178,10 @@ int usage(const char* program) {
                "  --dfg-keep-first-following <bool> Keep first following pair\n"
                "  --correlation-variants <a,b,...> Correlation miner analyses:\n"
                "                            classic, classic_split, trace_based\n"
+               "  --correlation-activity-attribute <name> Activity field\n"
+               "  --correlation-timestamp-attribute <name> Completion time field\n"
                "  --correlation-start-timestamp-attribute <name> Correlation start time\n"
+               "  --correlation-case-id-attribute <name> Case-id field\n"
                "  --correlation-exact-time-matching <bool> Exact timestamp matching\n"
                "                            (true, false, 1, or 0)\n"
                "  --correlation-sample-size <n> Positive correlation sample size\n"
@@ -4542,10 +4547,26 @@ int main(int argc, char** argv) {
         std::cerr << "error: " << error.what() << '\n';
         return 2;
       }
-    } else if (arg == "--correlation-start-timestamp-attribute") {
+    } else if (arg == "--correlation-activity-attribute" ||
+               arg == "--correlation-timestamp-attribute" ||
+               arg == "--correlation-start-timestamp-attribute" ||
+               arg == "--correlation-case-id-attribute") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      correlation_options.start_timestamp_attribute = value;
+      const auto selector = trim_text(value);
+      if (selector.empty() &&
+          arg != "--correlation-start-timestamp-attribute") {
+        std::cerr << "error: " << arg << " expects a non-empty name\n";
+        return 2;
+      }
+      auto* destination = &correlation_options.case_id_attribute;
+      if (arg == "--correlation-activity-attribute")
+        destination = &correlation_options.activity_attribute;
+      if (arg == "--correlation-timestamp-attribute")
+        destination = &correlation_options.timestamp_attribute;
+      if (arg == "--correlation-start-timestamp-attribute")
+        destination = &correlation_options.start_timestamp_attribute;
+      *destination = selector;
     } else if (arg == "--correlation-exact-time-matching") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -6531,6 +6552,8 @@ int main(int argc, char** argv) {
     if (!correlation_variants.empty()) {
       correlation_variants_analysis = analyze_correlation_variants(
           log, correlation_variants, correlation_options);
+      minera::register_correlation_activities(
+          graph, *correlation_variants_analysis);
     }
     const auto temporal_profile =
         minera::discover_temporal_profile(log, temporal_profile_options);

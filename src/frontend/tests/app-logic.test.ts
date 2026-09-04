@@ -990,6 +990,12 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ dfgStatisticalVariants: ["frequency_triples"] })).toBe(true);
     expect(hasActiveMinerOptions({ dfgCausalVariants: ["heuristic"] })).toBe(true);
     expect(hasActiveMinerOptions({ correlationVariants: ["trace_based"] })).toBe(true);
+    expect(hasActiveMinerOptions({ correlationActivityAttribute: "phase" })).toBe(false);
+    expect(hasActiveMinerOptions({ correlationTimestampAttribute: "finished_at" })).toBe(false);
+    expect(hasActiveMinerOptions({ correlationStartTimestampAttribute: "started_at" })).toBe(false);
+    expect(hasActiveMinerOptions({ correlationCaseIdAttribute: "case_ref" })).toBe(false);
+    expect(hasActiveMinerOptions({ correlationVariants: ["classic"],
+      correlationActivityAttribute: "phase" })).toBe(true);
     expect(hasActiveMinerOptions({ temporalActivityAttribute: "phase" })).toBe(true);
     expect(hasActiveMinerOptions({ temporalBusinessHours: true })).toBe(true);
     expect(hasActiveMinerOptions({ temporalStrictAttributes: true })).toBe(true);
@@ -1489,12 +1495,18 @@ describe("mineFormEntries", () => {
   it("maps correlation variants and only their relevant settings", () => {
     expect(mineFormEntries({
       correlationVariants: ["trace_based", "bogus", "classic_split", "classic"],
+      correlationActivityAttribute: " event_kind ",
+      correlationTimestampAttribute: " finished_at ",
       correlationStartTimestampAttribute: "started",
+      correlationCaseIdAttribute: " case_ref ",
       correlationExactTimeMatching: true,
       correlationSampleSize: 2,
     })).toEqual([
       ["correlation_variants", "classic,classic_split,trace_based"],
+      ["correlation_activity_attribute", "event_kind"],
+      ["correlation_timestamp_attribute", "finished_at"],
       ["correlation_start_timestamp_attribute", "started"],
+      ["correlation_case_id_attribute", "case_ref"],
       ["correlation_exact_time_matching", "true"],
       ["correlation_sample_size", "2"],
     ]);
@@ -1515,6 +1527,36 @@ describe("mineFormEntries", () => {
       correlationVariants: ["unknown"],
       correlationStartTimestampAttribute: "started",
     })).toEqual([]);
+    expect(mineFormEntries({
+      correlationVariants: ["classic"],
+      correlationActivityAttribute: "concept:name",
+      correlationTimestampAttribute: "time:timestamp",
+      correlationStartTimestampAttribute: " ",
+      correlationCaseIdAttribute: " ",
+    })).toEqual([["correlation_variants", "classic"]]);
+    expect(mineFormEntries({ correlationActivityAttribute: "  " }))
+      .toEqual([]);
+    expect(() => mineFormEntries({ correlationVariants: ["classic"],
+      correlationActivityAttribute: "  " }))
+      .toThrow(/correlation_activity_attribute/);
+    expect(mineFormEntries({ correlationTimestampAttribute: "\t" }))
+      .toEqual([]);
+    expect(() => mineFormEntries({ correlationVariants: ["classic"],
+      correlationTimestampAttribute: "\t" }))
+      .toThrow(/correlation_timestamp_attribute/);
+    expect(mineFormEntries({ correlationCaseIdAttribute: " " }))
+      .toEqual([]);
+    expect(mineFormEntries({ correlationVariants: ["classic"],
+      correlationCaseIdAttribute: " " })).toEqual([
+        ["correlation_variants", "classic"],
+      ]);
+    expect(() => mineFormEntries({ correlationVariants: ["trace_based"],
+      correlationCaseIdAttribute: " " })).toThrow(/correlation_case_id_attribute/);
+    for (const sampleSize of [0, -1, 2.5, Number.MAX_SAFE_INTEGER + 1,
+      Number.NaN, "junk" as never, "" as never]) {
+      expect(() => mineFormEntries({ correlationVariants: ["classic_split"],
+        correlationSampleSize: sampleSize as number })).toThrow(/SampleSize|sample size/);
+    }
   });
 
   it("keeps the filter mappings intact", () => {
