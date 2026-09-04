@@ -303,6 +303,8 @@ describe("evaluation adapters", () => {
       evaluation_family: "replay_fitness",
       fitness_variant: "alignment_based",
       evaluation_activity_attribute: " phase ",
+      evaluation_initial_marking: [0, 2, 0],
+      evaluation_final_marking: [0, 0, 2],
       evaluation_token_replay_variant: "forward",
       fitness_consider_unknown_activities: true,
       evaluation_alignment_variant: "discounted_a_star",
@@ -319,6 +321,8 @@ describe("evaluation adapters", () => {
     }));
     expect(Object.fromEntries(alignment)).toMatchObject({
       evaluation_activity_attribute: "phase",
+      evaluation_initial_marking: "0,2,0",
+      evaluation_final_marking: "0,0,2",
       evaluation_token_replay_variant: "forward",
       fitness_consider_unknown_activities: "true",
       evaluation_alignment_variant: "discounted_a_star",
@@ -389,7 +393,10 @@ describe("evaluation adapters", () => {
   it("validates supplied settings even when another family is selected", () => {
     expect(() => evaluationQuery({ evaluation_family: "precision", simplicity_max_states: 0 })).toThrow(/positive integer/);
     expect(() => evaluationQuery({ evaluation_family: "generalization", simplicity_initial_marking: [] })).toThrow(/non-negative integers/);
+    expect(() => evaluationQuery({ evaluation_initial_marking: [] })).toThrow(/non-negative integers/);
+    expect(() => evaluationQuery({ evaluation_final_marking: [0, -1] })).toThrow(/non-negative integers/);
     expect(() => evaluationQuery({ simplicity_arc_degree_k: Number.POSITIVE_INFINITY })).toThrow(/finite/);
+    expect(evaluationQuery({ simplicity_arc_degree_k: -0.1 })).toContain("simplicity_arc_degree_k=-0.1");
     expect(() => evaluationQuery({ evaluation_family: "composite", fitness_weight: 0, precision_weight: 0, simplicity_weight: 0, generalization_weight: 0 })).toThrow(/positive total/);
     expect(evaluationQuery({ evaluation_family: "composite", fitness_weight: 0 })).toContain("fitness_weight=0");
     expect(() => evaluationQuery({ fitness_weight: Number.NaN })).toThrow(/finite/);

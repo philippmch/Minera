@@ -1012,6 +1012,40 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
         std::move(alignment_options);
   }
 
+  const auto apply_evaluation_marking = [&](std::string_view name,
+                                            bool initial_marking) {
+    if (!supplied(name)) return;
+    const auto marking = parse_int_marking(require(name), name);
+    auto assign = [&](auto& options) {
+      if (initial_marking) {
+        options.initial_marking = marking;
+      } else {
+        options.final_marking = marking;
+      }
+    };
+    assign(params.replay_fitness_options);
+    assign(params.replay_fitness_options.alignment_options);
+    assign(params.precision_options);
+    assign(params.generalization_options);
+    assign(params.composite_options);
+    if (params.replay_fitness_options.decomposed_alignment_options) {
+      std::vector<std::size_t> converted;
+      converted.reserve(marking.size());
+      for (const int tokens : marking) {
+        converted.push_back(static_cast<std::size_t>(tokens));
+      }
+      if (initial_marking) {
+        params.replay_fitness_options.decomposed_alignment_options
+            ->initial_marking = std::move(converted);
+      } else {
+        params.replay_fitness_options.decomposed_alignment_options
+            ->final_marking = std::move(converted);
+      }
+    }
+  };
+  apply_evaluation_marking("evaluation_initial_marking", true);
+  apply_evaluation_marking("evaluation_final_marking", false);
+
   if (supplied("fitness_variant")) {
     const auto value = require("fitness_variant");
     if (value == "auto") {
@@ -1097,10 +1131,6 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
     params.simplicity_options.arc_degree_k =
         parse_finite_double(require("simplicity_arc_degree_k"),
                             "simplicity_arc_degree_k");
-    if (params.simplicity_options.arc_degree_k < 0.0) {
-      throw std::invalid_argument(
-          "simplicity_arc_degree_k: expected a non-negative number");
-    }
   }
   if (supplied("simplicity_max_states")) {
     params.simplicity_options.max_states =

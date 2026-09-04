@@ -69,6 +69,10 @@ struct ReplayFitnessOptions {
   // Engaging this option selects decomposed recomposition instead of the
   // ordinary Petri-net alignment engine.
   std::optional<DecomposedAlignmentOptions> decomposed_alignment_options;
+  // Common marked-net contract applied to the selected replay engine. Empty
+  // vectors retain that engine's workflow-net defaults.
+  std::vector<int> initial_marking;
+  std::vector<int> final_marking;
 };
 
 struct PrecisionResult {
@@ -87,10 +91,14 @@ struct PrecisionOptions {
   std::size_t max_states = 100000;
   std::string activity_attribute = "concept:name";
   TokenReplayVariant token_replay_variant = TokenReplayVariant::kForward;
+  std::vector<int> initial_marking;
+  std::vector<int> final_marking;
 };
 
 struct GeneralizationOptions {
   std::string activity_attribute = "concept:name";
+  std::vector<int> initial_marking;
+  std::vector<int> final_marking;
 };
 
 struct GeneralizationResult {
@@ -131,6 +139,8 @@ struct CompositeEvaluationOptions {
   double simplicity_weight = 0.25;
   double generalization_weight = 0.25;
   std::string activity_attribute = "concept:name";
+  std::vector<int> initial_marking;
+  std::vector<int> final_marking;
 };
 
 struct CompositeEvaluationResult {

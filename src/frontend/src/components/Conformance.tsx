@@ -800,7 +800,8 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
     simplicity_weight: 0.25,
     generalization_weight: 0.25,
   });
-  const [markings, setMarkings] = useState({ initial: "", final: "" });
+  const [evaluationMarkings, setEvaluationMarkings] = useState({ initial: "", final: "" });
+  const [simplicityMarkings, setSimplicityMarkings] = useState({ initial: "", final: "" });
   const [result, setResult] = useState<ModelEvaluation | null>(null);
   const [resultSelectionKey, setResultSelectionKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -808,7 +809,8 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
   const dataIdentity = useRef({ data, id: 0 });
   if (dataIdentity.current.data !== data) dataIdentity.current = { data, id: dataIdentity.current.id + 1 };
   const selectionKeyFor = (selectedMiner: string, selectedOptions: EvaluationOptions) =>
-    JSON.stringify([dataIdentity.current.id, selectedMiner, selectedOptions, markings]);
+    JSON.stringify([dataIdentity.current.id, selectedMiner, selectedOptions,
+      evaluationMarkings, simplicityMarkings]);
   const selectionKey = selectionKeyFor(miner, options);
   const selectionKeyRef = useRef(selectionKey);
   const requestSequence = useRef(0);
@@ -857,8 +859,11 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
     try {
       const request: EvaluationOptions = { ...options };
       if (family === "simplicity") {
-        request.simplicity_initial_marking = parseMarkingInput(markings.initial);
-        request.simplicity_final_marking = parseMarkingInput(markings.final);
+        request.simplicity_initial_marking = parseMarkingInput(simplicityMarkings.initial);
+        request.simplicity_final_marking = parseMarkingInput(simplicityMarkings.final);
+      } else {
+        request.evaluation_initial_marking = parseMarkingInput(evaluationMarkings.initial);
+        request.evaluation_final_marking = parseMarkingInput(evaluationMarkings.final);
       }
       const next = await onRequestEvaluation(miner, request);
       if (sequence === requestSequence.current && requestedSelection === selectionKeyRef.current) {
@@ -951,6 +956,10 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
       </>}
       {family === "generalization" && <label>Variant<select value="generalization_token" disabled><option value="generalization_token">Transition-frequency token</option></select></label>}
       {family !== "simplicity" && <label>Activity field<input value={options.evaluation_activity_attribute ?? ""} placeholder="concept:name" onChange={(event) => setOptions({ ...options, evaluation_activity_attribute: event.target.value || undefined })} /></label>}
+      {family !== "simplicity" && <>
+        <label>Initial marking<input value={evaluationMarkings.initial} placeholder="default source token" onChange={(event) => setEvaluationMarkings({ ...evaluationMarkings, initial: event.target.value })} /></label>
+        <label>Final marking<input value={evaluationMarkings.final} placeholder="default sink token" onChange={(event) => setEvaluationMarkings({ ...evaluationMarkings, final: event.target.value })} /></label>
+      </>}
       {usesTokenReplay && <>
         <label>Replay direction<select value={options.evaluation_token_replay_variant ?? "forward"} onChange={(event) => updateTokenReplayVariant(event.target.value as NonNullable<EvaluationOptions["evaluation_token_replay_variant"]>)}><option value="forward">Forward</option><option value="backwards">Backwards</option></select></label>
         {family === "replay_fitness" && <label className={`checkbox-label ${options.evaluation_token_replay_variant === "backwards" ? "disabled" : ""}`}><input type="checkbox" disabled={options.evaluation_token_replay_variant === "backwards"} checked={options.fitness_consider_unknown_activities ?? false} onChange={(event) => setOptions({ ...options, fitness_consider_unknown_activities: event.target.checked })} /> Penalize unknown activities (forward)</label>}
@@ -975,10 +984,10 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
       </>}
       {family === "simplicity" && <>
         <label>Variant<select value={options.simplicity_variant ?? "arc_degree"} onChange={(event) => setOptions({ ...options, simplicity_variant: event.target.value as EvaluationOptions["simplicity_variant"] })}><option value="arc_degree">Arc degree</option><option value="extended_cardoso">Extended Cardoso</option><option value="extended_cyclomatic">Extended cyclomatic</option></select></label>
-        {options.simplicity_variant === "arc_degree" && <label>Arc-degree k<input type="number" min={0} step={0.1} value={options.simplicity_arc_degree_k ?? ""} placeholder="2" onChange={(event) => numberOption("simplicity_arc_degree_k", event.target.value)} /></label>}
+        {options.simplicity_variant === "arc_degree" && <label>Arc-degree k<input type="number" step={0.1} value={options.simplicity_arc_degree_k ?? ""} placeholder="2" onChange={(event) => numberOption("simplicity_arc_degree_k", event.target.value)} /></label>}
         <label>State limit<input type="number" min={1} step={1} value={options.simplicity_max_states ?? ""} placeholder="100000" onChange={(event) => numberOption("simplicity_max_states", event.target.value)} /></label>
-        <label>Initial marking<input value={markings.initial} placeholder="0,1" onChange={(event) => setMarkings({ ...markings, initial: event.target.value })} /></label>
-        <label>Final marking<input value={markings.final} placeholder="2,3" onChange={(event) => setMarkings({ ...markings, final: event.target.value })} /></label>
+        <label>Initial marking<input value={simplicityMarkings.initial} placeholder="0,1" onChange={(event) => setSimplicityMarkings({ ...simplicityMarkings, initial: event.target.value })} /></label>
+        <label>Final marking<input value={simplicityMarkings.final} placeholder="2,3" onChange={(event) => setSimplicityMarkings({ ...simplicityMarkings, final: event.target.value })} /></label>
       </>}
       {family === "composite" && <>
         <label>Fitness weight<input type="number" min={0} step={0.05} value={options.fitness_weight ?? ""} onChange={(event) => numberOption("fitness_weight", event.target.value)} /></label>

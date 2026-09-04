@@ -1877,8 +1877,8 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
   ] as const) {
     if (value !== undefined && (!Number.isInteger(value) || value < 1)) throw new Error(`${name} must be a positive integer`);
   }
-  if (options.simplicity_arc_degree_k !== undefined && (!Number.isFinite(options.simplicity_arc_degree_k) || options.simplicity_arc_degree_k < 0)) {
-    throw new Error("simplicity_arc_degree_k must be a finite non-negative number");
+  if (options.simplicity_arc_degree_k !== undefined && !Number.isFinite(options.simplicity_arc_degree_k)) {
+    throw new Error("simplicity_arc_degree_k must be finite");
   }
   const weights = [
     ["fitness_weight", options.fitness_weight],
@@ -1899,6 +1899,8 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
     throw new Error("composite weights must have a positive total");
   }
   for (const [name, value] of [
+    ["evaluation_initial_marking", options.evaluation_initial_marking],
+    ["evaluation_final_marking", options.evaluation_final_marking],
     ["simplicity_initial_marking", options.simplicity_initial_marking],
     ["simplicity_final_marking", options.simplicity_final_marking],
   ] as const) {
@@ -1916,6 +1918,8 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
     add("evaluation_activity_attribute",
         options.evaluation_activity_attribute.trim());
   }
+  add("evaluation_initial_marking", options.evaluation_initial_marking);
+  add("evaluation_final_marking", options.evaluation_final_marking);
   add("evaluation_token_replay_variant", options.evaluation_token_replay_variant);
   add("fitness_consider_unknown_activities", options.fitness_consider_unknown_activities);
   add("evaluation_alignment_variant", options.evaluation_alignment_variant);

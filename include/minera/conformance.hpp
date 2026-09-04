@@ -71,6 +71,11 @@ struct TokenReplayOptions {
   bool consider_remaining_in_fitness = true;
   bool try_to_reach_final_marking_through_hidden = true;
   bool consider_activities_not_in_model_in_fitness = true;
+  // Empty vectors select the workflow-net defaults (one token at source and
+  // one token at sink). Explicit markings must match the net's place count
+  // and contain only non-negative token counts.
+  std::vector<int> initial_marking;
+  std::vector<int> final_marking;
 };
 
 // Per-place token accounting for a replayed log.  The four counters use the
@@ -205,6 +210,11 @@ struct AlignmentOptions {
   // "concept:name" and "activity" use Event::activity; other names resolve
   // through Event::attribute.
   std::string activity_attribute = "concept:name";
+  // Empty vectors select the workflow-net defaults (one token at source and
+  // one token at sink). Explicit markings must match the net's place count
+  // and contain only non-negative token counts.
+  std::vector<int> initial_marking;
+  std::vector<int> final_marking;
 };
 
 struct AlignmentDiagnostics {

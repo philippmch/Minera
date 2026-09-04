@@ -967,6 +967,8 @@ int usage(const char* program) {
                "                            or composite\n"
                "  --fitness-variant <id>   auto, token_based, or alignment_based\n"
                "  --evaluation-activity-attribute <name> Evaluator activity selector\n"
+               "  --evaluation-initial-marking <n,...> Common evaluator initial marking\n"
+               "  --evaluation-final-marking <n,...> Common evaluator final marking\n"
                "  --evaluation-token-replay-variant <id> forward or backwards\n"
                "  --fitness-consider-unknown-activities <bool> Include unknown labels in forward fitness\n"
                "  --evaluation-alignment-variant <id> Petri alignment variant or recompos_maximal\n"
@@ -992,7 +994,7 @@ int usage(const char* program) {
                "  --generalization-variant <id> generalization_token\n"
                "  --simplicity-variant <id> arc_degree, extended_cardoso,\n"
                "                            or extended_cyclomatic\n"
-               "  --simplicity-arc-degree-k <f> Non-negative arc-degree target\n"
+               "  --simplicity-arc-degree-k <f> Finite arc-degree target\n"
                "  --simplicity-max-states <n> Positive simplicity search limit\n"
                "  --simplicity-initial-marking <n,...> Initial place marking\n"
                "  --simplicity-final-marking <n,...> Final place marking\n"
@@ -3348,6 +3350,8 @@ int main(int argc, char** argv) {
 
     if (arg == "--evaluation-family" || arg == "--fitness-variant" ||
         arg == "--evaluation-activity-attribute" ||
+        arg == "--evaluation-initial-marking" ||
+        arg == "--evaluation-final-marking" ||
         arg == "--evaluation-token-replay-variant" ||
         arg == "--fitness-consider-unknown-activities" ||
         arg == "--evaluation-alignment-variant" ||
