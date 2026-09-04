@@ -807,6 +807,41 @@ if(MINERA_BUILD_TESTS)
   set_tests_properties(minera_correlation_cli_projected_labels PROPERTIES
     PASS_REGULAR_EXPRESSION "\"activity_counts\"")
 
+  add_test(NAME minera_correlation_cli_custom_case
+           COMMAND minera_export
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/correlation_custom_case.csv"
+                   --correlation-variants trace_based
+                   --correlation-case-id-attribute group)
+  set_tests_properties(minera_correlation_cli_custom_case PROPERTIES
+    PASS_REGULAR_EXPRESSION
+      "\"precede_succeed_probability\".*\"source\": 0, \"target\": 1, \"value\": 1")
+
+  add_test(NAME minera_correlation_cli_classic_split_source_order
+           COMMAND minera_export
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/correlation_classic_split_source_order.csv"
+                   --correlation-variants classic_split
+                   --correlation-sample-size 2)
+  set_tests_properties(minera_correlation_cli_classic_split_source_order PROPERTIES
+    PASS_REGULAR_EXPRESSION
+      "\"precede_succeed_probability\".*\"source\": 0, \"target\": 1, \"value\": 1")
+
+  add_test(NAME minera_correlation_cli_blank_case
+           COMMAND minera_export
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/correlation_blank_case.csv"
+                   --correlation-variants trace_based
+                   --correlation-case-id-attribute group)
+  set_tests_properties(minera_correlation_cli_blank_case PROPERTIES
+    PASS_REGULAR_EXPRESSION
+      "\"precede_succeed_probability\".*\"source\": 0, \"target\": 1, \"value\": 1")
+
+  add_test(NAME minera_dfg_causal_cli_custom_activity
+           COMMAND minera_export
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/dfg_causal_custom_activity.csv"
+                   --dfg-causal-variants alpha
+                   --dfg-activity-attribute causal_label)
+  set_tests_properties(minera_dfg_causal_cli_custom_activity PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"name\": \"begin\"")
+
   add_executable(minera_perspective_tests
     src/backend/tests/test_perspectives.cpp
   )

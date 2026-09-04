@@ -39,7 +39,13 @@ struct PreparedInput {
   std::vector<PreparedEvents> traces;
 };
 
-enum class SelectorRole { kActivity, kTimestamp, kCaseId };
+enum class SelectorRole {
+  kActivity,
+  kTimestamp,
+  kResource,
+  kLifecycle,
+  kCaseId,
+};
 
 std::string require_selector(std::string_view selector,
                              std::string_view description) {
@@ -57,6 +63,10 @@ bool is_alias(SelectorRole role, std::string_view selector) {
       return selector == "concept:name" || selector == "activity";
     case SelectorRole::kTimestamp:
       return selector == "time:timestamp" || selector == "timestamp";
+    case SelectorRole::kResource:
+      return selector == "org:resource" || selector == "resource";
+    case SelectorRole::kLifecycle:
+      return selector == "lifecycle:transition" || selector == "lifecycle";
     case SelectorRole::kCaseId:
       return selector == "case:concept:name" || selector == "case_id" ||
              selector == "case:id" || selector == "case";
@@ -70,6 +80,10 @@ std::vector<std::string_view> aliases(SelectorRole role) {
       return {"concept:name", "activity"};
     case SelectorRole::kTimestamp:
       return {"time:timestamp", "timestamp"};
+    case SelectorRole::kResource:
+      return {"org:resource", "resource"};
+    case SelectorRole::kLifecycle:
+      return {"lifecycle:transition", "lifecycle"};
     case SelectorRole::kCaseId:
       return {"case:concept:name", "case_id", "case:id", "case"};
   }
@@ -82,6 +96,10 @@ bool role_matches(const EventAttribute& field, SelectorRole role) {
       return field.first_class_role == FirstClassAttributeRole::kActivity;
     case SelectorRole::kTimestamp:
       return field.first_class_role == FirstClassAttributeRole::kTimestamp;
+    case SelectorRole::kResource:
+      return field.first_class_role == FirstClassAttributeRole::kResource;
+    case SelectorRole::kLifecycle:
+      return field.first_class_role == FirstClassAttributeRole::kLifecycle;
     case SelectorRole::kCaseId:
       return field.first_class_role == FirstClassAttributeRole::kCaseId;
   }
@@ -120,21 +138,37 @@ const EventAttribute* select_flat_field(const std::vector<EventAttribute>& field
                                         SelectorRole role) {
   if (selector.empty()) return nullptr;
 
-  // A source spelling attached to a first-class field is stronger than a
-  // stale generic field carrying the same key.
+  // An attached source spelling identifies the selected first-class cell.
   if (const auto* selected = source_field(fields, selector, role))
     return selected;
 
-  // Canonical aliases select the role projection before considering ordinary
-  // columns. This keeps a custom first-class source key usable after a flat
-  // conversion has removed its canonical spelling.
-  if (is_alias(role, selector)) {
-    if (const auto* selected = role_field(fields, role)) return selected;
-    for (const auto alias : aliases(role)) {
+  // A configured flat selector names an exact column before it acts as an
+  // alias for another projection.
+  if (const auto* selected = exact_field(fields, selector)) return selected;
+
+  const auto projected_alias = [&](SelectorRole projected_role) {
+    if (const auto* selected = source_field(fields, selector, projected_role))
+      return selected;
+    if (!is_alias(projected_role, selector))
+      return static_cast<const EventAttribute*>(nullptr);
+    if (const auto* selected = role_field(fields, projected_role))
+      return selected;
+    for (const auto alias : aliases(projected_role)) {
       if (const auto* selected = exact_field(fields, alias)) return selected;
     }
+    return static_cast<const EventAttribute*>(nullptr);
+  };
+
+  if (const auto* selected = projected_alias(role)) return selected;
+  if (role == SelectorRole::kActivity) {
+    for (const auto projected_role :
+         {SelectorRole::kTimestamp, SelectorRole::kResource,
+          SelectorRole::kLifecycle, SelectorRole::kCaseId}) {
+      if (const auto* selected = projected_alias(projected_role))
+        return selected;
+    }
   }
-  return exact_field(fields, selector);
+  return nullptr;
 }
 
 const EventAttribute* event_attribute(const Event& event,
@@ -159,6 +193,17 @@ std::string require_value(const EventAttribute* field,
     throw std::invalid_argument("correlation miner " + std::string(description) +
                                 " selector '" + std::string(selector) +
                                 "' is blank");
+  }
+  return field->value;
+}
+
+std::string require_case_value(const EventAttribute* field,
+                               std::string_view selector) {
+  if (field == nullptr || field->is_null ||
+      field->first_class_state == FirstClassAttributeState::kNull) {
+    throw std::invalid_argument("correlation miner case-id selector '" +
+                                std::string(selector) +
+                                "' is missing or null");
   }
   return field->value;
 }
@@ -189,30 +234,50 @@ std::string selected_event_value(const Event& event, std::string_view selector,
                                  SelectorRole role,
                                  std::string_view description) {
   const auto canonical = is_alias(role, selector);
+  const auto* exact = event_attribute(event, selector);
   const auto source_matches = [&](std::string_view source) {
     return !source.empty() && source == selector;
   };
   if (role == SelectorRole::kActivity &&
-      (canonical || source_matches(event.activity_source_key))) {
+      (source_matches(event.activity_source_key) ||
+       (canonical && exact == nullptr))) {
     if (const auto value = first_class_value(
             event.activity, event.activity_state, event.activity_attribute,
             selector, description))
       return *value;
   }
   if (role == SelectorRole::kTimestamp &&
-      (canonical || source_matches(event.timestamp_source_key))) {
+      (source_matches(event.timestamp_source_key) ||
+       (canonical && exact == nullptr))) {
     if (const auto value = first_class_value(
             event.timestamp, event.timestamp_state, event.timestamp_attribute,
             selector, description))
       return *value;
   }
   if (role == SelectorRole::kCaseId &&
-      (canonical || source_matches(event.case_id_source_key))) {
+      (source_matches(event.case_id_source_key) ||
+       (canonical && exact == nullptr))) {
     if (const auto value = first_class_value(
             event.case_id, event.case_id_state, std::nullopt, selector,
             description))
       return *value;
   }
+
+  // Retained first-class metadata represents the requested projection even
+  // when a transformation no longer carries its source spelling separately.
+  const std::optional<EventAttribute>* metadata = nullptr;
+  if (role == SelectorRole::kActivity) metadata = &event.activity_attribute;
+  if (role == SelectorRole::kTimestamp) metadata = &event.timestamp_attribute;
+  if (metadata && *metadata &&
+      ((*metadata)->key == selector ||
+       (*metadata)->first_class_source_key == selector))
+    return require_value(&**metadata, description, selector);
+
+  // An exact generic event attribute wins over cross-projection aliases. For
+  // example, an activity column named "resource" must not silently select the
+  // event's first-class resource projection.
+  if (exact != nullptr) return require_value(exact, description, selector);
+
   if (role == SelectorRole::kActivity) {
     if (selector == "time:timestamp" || selector == "timestamp" ||
         source_matches(event.timestamp_source_key)) {
@@ -245,17 +310,6 @@ std::string selected_event_value(const Event& event, std::string_view selector,
     }
   }
 
-  // A custom first-class source may be represented only by its retained
-  // selected attribute after a transformation. Honor that metadata before
-  // falling back to the ordinary attribute vector.
-  const std::optional<EventAttribute>* metadata = nullptr;
-  if (role == SelectorRole::kActivity) metadata = &event.activity_attribute;
-  if (role == SelectorRole::kTimestamp) metadata = &event.timestamp_attribute;
-  if (metadata && *metadata &&
-      ((*metadata)->key == selector ||
-       (*metadata)->first_class_source_key == selector))
-    return require_value(&**metadata, description, selector);
-
   if (role == SelectorRole::kActivity) {
     for (const auto* projected : {&event.timestamp_attribute,
                                   &event.resource_attribute,
@@ -267,8 +321,6 @@ std::string selected_event_value(const Event& event, std::string_view selector,
     }
   }
 
-  if (const auto* field = event_attribute(event, selector))
-    return require_value(field, description, selector);
   throw std::invalid_argument("correlation miner " + std::string(description) +
                               " selector '" + std::string(selector) +
                               "' is missing");
@@ -276,9 +328,8 @@ std::string selected_event_value(const Event& event, std::string_view selector,
 
 std::string selected_flat_case(const std::vector<EventAttribute>& fields,
                                std::string_view selector) {
-  return require_value(
-      select_flat_field(fields, selector, SelectorRole::kCaseId), "case-id",
-      selector);
+  return require_case_value(
+      select_flat_field(fields, selector, SelectorRole::kCaseId), selector);
 }
 
 double selected_timestamp(const std::vector<EventAttribute>& fields,
@@ -441,9 +492,19 @@ bool table_declares_selector(const EventTable& table,
            table.columns.end();
   };
   if (has_column(selector)) return true;
-  if (!is_alias(role, selector)) return false;
-  const auto role_aliases = aliases(role);
-  return std::any_of(role_aliases.begin(), role_aliases.end(), has_column);
+  const auto declares_alias = [&](SelectorRole projected_role) {
+    if (!is_alias(projected_role, selector)) return false;
+    const auto role_aliases = aliases(projected_role);
+    return std::any_of(role_aliases.begin(), role_aliases.end(), has_column);
+  };
+  if (declares_alias(role)) return true;
+  if (role == SelectorRole::kActivity) {
+    return declares_alias(SelectorRole::kTimestamp) ||
+           declares_alias(SelectorRole::kResource) ||
+           declares_alias(SelectorRole::kLifecycle) ||
+           declares_alias(SelectorRole::kCaseId);
+  }
+  return false;
 }
 
 void validate_empty_table_schema(

@@ -1294,8 +1294,77 @@
           "symbol": "CAUSAL_HEURISTIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "CAUSAL_ALPHA": {
+          "selector": "CAUSAL_ALPHA",
+          "binding": {
+            "selector": "CAUSAL_ALPHA",
+            "modules": [
+              "algo.discovery.causal.variants.alpha"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CAUSAL_ALPHA"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/dfg_variants.cpp",
+              "symbol": "discover_dfg_causality"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_dfg_variants.cpp",
+              "executable": "minera_dfg_variants_tests",
+              "case": "causal_alpha_contract"
+            }
+          ]
+        },
+        "CAUSAL_HEURISTIC": {
+          "selector": "CAUSAL_HEURISTIC",
+          "binding": {
+            "selector": "CAUSAL_HEURISTIC",
+            "modules": [
+              "algo.discovery.causal.variants.heuristic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CAUSAL_HEURISTIC"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/dfg_variants.cpp",
+              "symbol": "discover_dfg_causality"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_dfg_variants.cpp",
+              "executable": "minera_dfg_variants_tests",
+              "case": "causal_heuristic_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_dfg_variants.cpp",
+        "src/backend/tests/test_core.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/components/DfgVariants.tsx",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/app-logic.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.discovery.correlation_mining",
@@ -1333,8 +1402,109 @@
           "symbol": "TRACE_BASED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "CLASSIC_SPLIT": {
+          "selector": "CLASSIC_SPLIT",
+          "binding": {
+            "selector": "CLASSIC_SPLIT",
+            "modules": [
+              "algo.discovery.correlation_mining.variants.classic_split"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC_SPLIT"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/correlation_miner.cpp",
+              "symbol": "discover_correlation_miner"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_correlation_miner.cpp",
+              "executable": "minera_correlation_miner_tests",
+              "case": "split_uses_raw_chunks_and_reference_aggregation"
+            }
+          ]
+        },
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.discovery.correlation_mining.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/correlation_miner.cpp",
+              "symbol": "discover_correlation_miner"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_correlation_miner.cpp",
+              "executable": "minera_correlation_miner_tests",
+              "case": "classic_matches_reference_fixture"
+            }
+          ]
+        },
+        "TRACE_BASED": {
+          "selector": "TRACE_BASED",
+          "binding": {
+            "selector": "TRACE_BASED",
+            "modules": [
+              "algo.discovery.correlation_mining.variants.trace_based"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "TRACE_BASED"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/correlation_miner.cpp",
+              "symbol": "discover_correlation_miner"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_correlation_miner.cpp",
+              "executable": "minera_correlation_miner_tests",
+              "case": "trace_based_keeps_case_boundaries_and_ignores_exact_matching"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/correlation_miner.hpp",
+        "include/minera/csv_event_log_importer.hpp",
+        "include/minera/log_conversion.hpp",
+        "src/backend/correlation_miner.cpp",
+        "src/backend/csv_event_log_importer.cpp",
+        "src/backend/log_conversion.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_correlation_miner.cpp",
+        "src/backend/tests/correlation_mining_parity_contracts.cpp",
+        "src/backend/tests/test_core.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/app-logic.ts",
+        "src/frontend/src/components/CorrelationMining.tsx",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/app-logic.test.ts",
+        "src/frontend/tests/types.test.ts",
+        "src/frontend/tests/components/CorrelationMining.test.ts"
+      ]
     },
     {
       "package": "algo.discovery.declare",
@@ -6725,8 +6895,29 @@
           "selector": "CAUSAL_ALPHA"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/tests/test_dfg_variants.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.causal.variants.alpha",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_variants.hpp",
+            "symbol": "DfgCausalVariant::ALPHA"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_variants.cpp",
+            "executable": "minera_dfg_variants_tests",
+            "case": "causal_alpha_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.causal.variants.heuristic",
@@ -6739,8 +6930,29 @@
           "selector": "CAUSAL_HEURISTIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/tests/test_dfg_variants.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.causal.variants.heuristic",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_variants.hpp",
+            "symbol": "DfgCausalVariant::HEURISTIC"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_variants.cpp",
+            "executable": "minera_dfg_variants_tests",
+            "case": "causal_heuristic_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.correlation_mining.util",
@@ -6748,8 +6960,30 @@
       "owner": "algo.discovery.correlation_mining",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/correlation_miner.hpp",
+        "src/backend/correlation_miner.cpp",
+        "src/backend/tests/test_correlation_miner.cpp",
+        "src/backend/tests/test_core.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.correlation_mining.util",
+        "implementation": [
+          {
+            "path": "src/backend/correlation_miner.cpp",
+            "symbol": "discover_correlation_miner"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_correlation_miner.cpp",
+            "executable": "minera_correlation_miner_tests",
+            "case": "correlation_utility_matrix_and_transport_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.correlation_mining.variants.classic",
@@ -6762,8 +6996,29 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/correlation_miner.hpp",
+        "src/backend/correlation_miner.cpp",
+        "src/backend/tests/test_correlation_miner.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.correlation_mining.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/correlation_miner.hpp",
+            "symbol": "CorrelationVariant::kClassic"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_correlation_miner.cpp",
+            "executable": "minera_correlation_miner_tests",
+            "case": "classic_matches_reference_fixture"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.correlation_mining.variants.classic_split",
@@ -6776,8 +7031,29 @@
           "selector": "CLASSIC_SPLIT"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/correlation_miner.hpp",
+        "src/backend/correlation_miner.cpp",
+        "src/backend/tests/test_correlation_miner.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.correlation_mining.variants.classic_split",
+        "implementation": [
+          {
+            "path": "include/minera/correlation_miner.hpp",
+            "symbol": "CorrelationVariant::kClassicSplit"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_correlation_miner.cpp",
+            "executable": "minera_correlation_miner_tests",
+            "case": "split_uses_raw_chunks_and_reference_aggregation"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.correlation_mining.variants.trace_based",
@@ -6790,8 +7066,29 @@
           "selector": "TRACE_BASED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/correlation_miner.hpp",
+        "src/backend/correlation_miner.cpp",
+        "src/backend/tests/test_correlation_miner.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.correlation_mining.variants.trace_based",
+        "implementation": [
+          {
+            "path": "include/minera/correlation_miner.hpp",
+            "symbol": "CorrelationVariant::kTraceBased"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_correlation_miner.cpp",
+            "executable": "minera_correlation_miner_tests",
+            "case": "trace_based_keeps_case_boundaries_and_ignores_exact_matching"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.declare.templates",

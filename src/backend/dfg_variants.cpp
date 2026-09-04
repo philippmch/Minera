@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <set>
@@ -604,6 +605,10 @@ DfgStatisticalAnalysis discover_dfg_statistics(
 
 DfgCausalAnalysis discover_dfg_causality(const DfgFrequency& dfg,
                                           DfgCausalVariant variant) {
+  if (variant != DfgCausalVariant::kAlpha &&
+      variant != DfgCausalVariant::kHeuristic) {
+    throw std::invalid_argument("DFG causal variant is unsupported");
+  }
   DfgCausalAnalysis result;
   result.variant = variant;
   if (variant == DfgCausalVariant::kAlpha) {
@@ -617,17 +622,43 @@ DfgCausalAnalysis discover_dfg_causality(const DfgFrequency& dfg,
     return result;
   }
 
+  const auto causal_strength = [](std::uint64_t frequency,
+                                  std::uint64_t reverse_frequency) {
+    // Keep the arithmetic in the integer domain until the final conversion.
+    // In particular, converting two adjacent values near 2^64 to double
+    // first would erase their one-count difference.
+    const bool negative = frequency < reverse_frequency;
+    const std::uint64_t difference =
+        negative ? reverse_frequency - frequency
+                 : frequency - reverse_frequency;
+
+    // The denominator is frequency + reverse_frequency + 1. It can need 65
+    // bits, so retain the carry separately instead of allowing uint64_t wrap.
+    const auto maximum = std::numeric_limits<std::uint64_t>::max();
+    const bool sum_carry = frequency > maximum - reverse_frequency;
+    const std::uint64_t sum_low = frequency + reverse_frequency;
+    const std::uint64_t denominator_low = sum_low + 1;
+    const bool denominator_carry = sum_carry || denominator_low == 0;
+    const double denominator = denominator_carry
+                                   ? std::ldexp(
+                                         1.0 +
+                                             std::ldexp(
+                                                 static_cast<double>(
+                                                     denominator_low),
+                                                 -64),
+                                         64)
+                                   : static_cast<double>(denominator_low);
+    const double magnitude = static_cast<double>(difference) / denominator;
+    return negative ? -magnitude : magnitude;
+  };
+
   for (const auto& [pair, frequency] : dfg) {
     if (result.relations.contains(pair)) continue;
     const auto reverse_pair = DfgActivityPair{pair.second, pair.first};
     const auto reverse = dfg.find(reverse_pair);
     const std::uint64_t reverse_frequency =
         reverse == dfg.end() ? 0 : reverse->second;
-    const double strength =
-        (static_cast<double>(frequency) -
-         static_cast<double>(reverse_frequency)) /
-        (static_cast<double>(frequency) +
-         static_cast<double>(reverse_frequency) + 1.0);
+    const double strength = causal_strength(frequency, reverse_frequency);
     result.relations[pair] = strength;
     // For self-pairs this intentionally overwrites the same dictionary key,
     // matching Python assignment behavior (the value remains negative zero).

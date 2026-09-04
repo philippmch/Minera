@@ -4,11 +4,14 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "minera/csv_event_log_importer.hpp"
+#include "minera/segment_filter.hpp"
 #include "minera/timestamp.hpp"
 
 namespace {
@@ -227,6 +230,35 @@ void canonical_aliases_and_first_class_source_metadata_work() {
                                 "case:id") == "case-label");
 }
 
+void exact_generic_activity_selectors_beat_projection_aliases() {
+  auto collision = event(
+      "projected-activity", 0.0,
+      {field("activity", "generic-activity-label"),
+       field("timestamp", "generic-timestamp-label"),
+       field("resource", "generic-resource-label")});
+  collision.resource = "projected-resource";
+  collision.resource_state = FirstClassAttributeState::kPresent;
+  collision.resource_attribute = field("org:resource", "projected-resource");
+
+  EventLog log;
+  log.traces = {trace("collision", {std::move(collision)})};
+  CorrelationMinerOptions options;
+  options.activity_attribute = "activity";
+  const auto activity = discover_correlation_miner(log, options);
+  assert(activity.activity_counts.at("generic-activity-label") == 1);
+  assert(!activity.activity_counts.contains("projected-activity"));
+
+  options.activity_attribute = "timestamp";
+  const auto timestamp = discover_correlation_miner(log, options);
+  assert(timestamp.activity_counts.at("generic-timestamp-label") == 1);
+  assert(!timestamp.activity_counts.contains(format_timestamp(0.0)));
+
+  options.activity_attribute = "resource";
+  const auto resource = discover_correlation_miner(log, options);
+  assert(resource.activity_counts.at("generic-resource-label") == 1);
+  assert(!resource.activity_counts.contains("projected-resource"));
+}
+
 void trace_based_groups_flat_rows_by_selected_case() {
   const std::vector<std::string> columns = {"case_ref", "phase", "finished"};
   const auto row = [&](std::string case_id, std::string activity,
@@ -251,6 +283,22 @@ void trace_based_groups_flat_rows_by_selected_case() {
   const auto explicit_name =
       discover_correlation_miner(explicit_name_table, options);
   assert_same(trace_result, explicit_name);
+}
+
+void trace_based_accepts_blank_case_values() {
+  const auto table = table_from_rows(
+      {"case_ref", "phase", "finished"},
+      {EventTable::Row{field("case_ref", ""), field("phase", "A"),
+                       field("finished", format_timestamp(0.0),
+                             AttributeKind::kDate)},
+       EventTable::Row{field("case_ref", ""), field("phase", "B"),
+                       field("finished", format_timestamp(10.0),
+                             AttributeKind::kDate)}});
+  auto options = custom_options();
+  options.variant = CorrelationVariant::kTraceBased;
+  options.start_timestamp_attribute.clear();
+  const auto result = discover_correlation_miner(table, options);
+  assert_near(result.precede_succeed_probability.at({"A", "B"}), 1.0);
 }
 
 void split_order_distinguishes_raw_flat_and_preordered_tables() {
@@ -381,6 +429,56 @@ void native_trace_boundaries_survive_custom_case_selectors() {
   assert_near(result.precede_succeed_probability.at({"A", "B"}), 0.0);
 }
 
+void filtered_csv_projection_preserves_rows_and_segment_case_ids() {
+  std::istringstream csv(
+      "case_id,activity,timestamp,group\n"
+      "one,A,2024-01-01T00:00:00Z,\n"
+      "one,B,2024-01-01T00:00:10Z,\n"
+      "one,A,2024-01-01T00:00:20Z,\n"
+      "one,B,2024-01-01T00:00:30Z,\n"
+      "one,C,2024-01-01T00:00:40Z,\n");
+  const auto imported = import_csv_event_data(csv);
+  const auto filtered = filter_between(imported.log, "A", "B", "::");
+  assert(filtered.trace_count() == 2);
+  assert(filtered.event_count() == 4);
+
+  const auto table = project_csv_event_table(imported.table, filtered);
+  assert(table.rows.size() == 4);
+  const auto case_index = table.column_index("case_id");
+  const auto activity_index = table.column_index("activity");
+  const auto group_index = table.column_index("group");
+  const std::vector<std::string> expected_cases{
+      "one::1", "one::1", "one::2", "one::2"};
+  const std::vector<std::string> expected_activities{"A", "B", "A", "B"};
+  for (std::size_t row = 0; row < table.rows.size(); ++row) {
+    assert(table.rows[row][case_index]);
+    assert(table.rows[row][case_index]->value == expected_cases[row]);
+    assert(table.rows[row][activity_index]);
+    assert(table.rows[row][activity_index]->value == expected_activities[row]);
+    assert(table.rows[row][group_index]);
+    assert(table.rows[row][group_index]->value.empty());
+    assert(!table.rows[row][group_index]->is_null);
+  }
+
+  CorrelationMinerOptions options;
+  options.variant = CorrelationVariant::kTraceBased;
+  options.case_id_attribute = "case_id";
+  const auto result = discover_correlation_miner(table, options);
+  assert_near(result.precede_succeed_probability.at({"A", "B"}), 1.0);
+  assert(!result.activity_counts.contains("C"));
+
+  auto invalid_provenance = filtered;
+  invalid_provenance.traces.front().events.front().input_order =
+      imported.table.rows.size();
+  bool threw = false;
+  try {
+    (void)project_csv_event_table(imported.table, invalid_provenance);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void lazy_inputs_restart_and_all_variants_are_deterministic() {
   const auto table = custom_table();
   const auto lazy = LazyEventTable::from_table(table);
@@ -406,10 +504,13 @@ int main() {
   selected_fields_work_for_all_eager_and_lazy_kinds();
   omitted_start_follows_selected_completion();
   canonical_aliases_and_first_class_source_metadata_work();
+  exact_generic_activity_selectors_beat_projection_aliases();
   trace_based_groups_flat_rows_by_selected_case();
+  trace_based_accepts_blank_case_values();
   split_order_distinguishes_raw_flat_and_preordered_tables();
   strict_required_cells_and_timestamps_fail_deterministically();
   native_trace_boundaries_survive_custom_case_selectors();
+  filtered_csv_projection_preserves_rows_and_segment_case_ids();
   lazy_inputs_restart_and_all_variants_are_deterministic();
   return 0;
 }

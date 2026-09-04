@@ -47,14 +47,14 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 34
-complete and 52 partial dispatcher rows, plus 176 complete and 211 partial
+adapter, integration, or missing are complete. The current manifest records 36
+complete and 50 partial dispatcher rows, plus 182 complete and 205 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
-DFG, 26-module Inductive discovery, 31-module POWL discovery, 13-module
-footprints discovery/conformance, and the 19-module temporal/behavioral adapter
-stack with distinct registered tests; 263 coverage units still require exact
-proof.
+DFG, causal and correlation discovery, 26-module Inductive discovery, 31-module
+POWL discovery, 13-module footprints discovery/conformance, and the 19-module
+temporal/behavioral adapter stack with distinct registered tests; 255 coverage
+units still require exact proof.
 A release may
 additionally run the strict gate:
 
@@ -132,7 +132,7 @@ are reconciled.
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Partial (implemented core; proof pending)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
 | Discovery: declarative | Declare classic and log skeleton classic | **Partial (implemented core; proof pending)** |
-| Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Partial overall; the DFG dispatcher, thirteen DFG modules, and minimum self-distance are complete** — all eight statistical DFG routes, eager and lazy table adapters, performance behavior, replacement helpers, graph utilities, and all three minimum-self-distance adapters with witnesses have focused native contracts plus JSON/CLI/server/frontend integration; both causal variants, all three correlation-miner variants, and eventually-follows remain implemented but proof-pending in their separately tracked packages |
+| Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete** — all eight statistical DFG routes, eager and lazy table adapters, performance behavior, replacement helpers, graph utilities, both causal variants, all three correlation variants, and all three minimum-self-distance adapters with witnesses have focused native contracts plus JSON/CLI/server/frontend integration; eventually-follows is covered as a native statistical extension outside the algorithm-dispatch catalog |
 | Discovery: footprints | log entire/trace-by-trace, eager dataframe, lazy dataframe, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete** — all eight selectors have distinct registered contracts and production dispatch; eager/lazy ordering differences, activity/case/time/index selectors, explicit Petri markings, and inclusive-choice bottom-up behavior are covered |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete** — view-based transition systems cover sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, occurrence data, flat and trace inputs, and explicit activity/case selectors; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and the additional DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings, backed by exact selector and module contracts |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum log/dataframe/lazyframe connected and disconnected projections; batches | **Complete** — strict native temporal discovery and permissive bundled analysis, all six canonical spectrum projections with adapter-specific sampling and timestamp behavior, all three batch adapters and five classifications, and every activity/resource/time/case/event selector have registered native plus production integration contracts |
@@ -1902,17 +1902,22 @@ averaging those case means.
 Causal ALPHA emits a relation only when its positive reverse is absent.
 Causal HEURISTIC emits both directions with
 `(forward-reverse)/(forward+reverse+1)`, including synthesized zero-reverse
-entries and the pinned self-relation assignment behavior. Focused tests cover
+entries and the pinned self-relation assignment behavior. Integer differences
+and sums are formed before floating conversion, preserving near-maximum-count
+signals; invalid native selector values are rejected. Focused tests cover
 all aliases, windows including zero, deduplication, triples, every performance
 aggregation, timestamp fallback and rejection, custom business hours, missing
 case attributes, node counts, CLEAN boundary/tie behavior, CLEAN_TIME repeated
-activities, zero-frequency reverses, and self loops.
+activities, zero-frequency reverses, self loops, maximum-count arithmetic,
+custom projected labels, and lossless causal JSON values and metadata checks.
 
 Every variant remains individually selectable through the native API, strict
 request fields, CLI, and local server. Deterministic JSON resolves all
 activities against the shared registry and preserves alias names; the frontend
 exposes all settings and renders frequency, triple, performance,
-case-attribute, clean-time, and causal artifacts.
+case-attribute, clean-time, and causal artifacts. Native statistical counts
+remain unsigned 64-bit values. The JSON/frontend boundary rejects counts above
+9,007,199,254,740,991 so numeric values remain exact after JavaScript parsing.
 
 The statistical dispatcher routes and thirteen non-dispatcher rows now carry
 machine-checked implementation and registered-test proofs. Focused contracts
@@ -1938,7 +1943,8 @@ events and expose configured helper-column names as result metadata instead of
 returning a language-runtime joined dataframe. Lazy table inputs currently
 materialize into the value-semantic table engine before discovery; this affects
 memory usage, not results. With those native representation differences stated,
-the DFG dispatcher package and its tracked statistical modules are complete.
+the DFG dispatcher, causal dispatcher, and their tracked statistical and causal
+modules are complete with distinct machine-checked proofs.
 
 DFG precision evidence: `evaluate_dfg_precision` builds weighted observed
 prefix observations, admits only prefixes reachable through the supplied start
@@ -2209,9 +2215,11 @@ Activity, completion timestamp, interval start, and case-id selectors are
 available through the native API, strict request parser, CLI, local server,
 deterministic JSON, and frontend, together with the exact-match toggle and
 split sample size. Canonical aliases, imported first-class source spellings,
-and ordinary attributes resolve consistently. An omitted or empty start
+and ordinary attributes resolve consistently. Exact generic activity columns
+win over projection aliases with the same spelling. An omitted or empty start
 selector uses the selected completion field. Required missing, null, blank, or
-malformed values fail explicitly.
+malformed activity and timestamp values fail explicitly; present blank case
+values remain valid grouping keys.
 
 Event logs and flat event streams preserve their flattened source order before
 CLASSIC_SPLIT creates chunks. Eager and lazy tables first order rows by
@@ -2219,15 +2227,30 @@ completion and start, then retain stable source order for ties. TRACE_BASED
 keeps native trace boundaries and groups flat inputs by the selected case id;
 each case is ordered independently. All four input forms are also available
 through the generic event-data dispatcher. The native TRACE_BASED path honors
-every selector rather than dropping configured trace parameters.
+every selector rather than dropping configured trace parameters. CLI and local
+server CSV requests retain the source header, source row order, and
+present-empty cells in a flat table. After filters, surviving events are
+projected back to those rows by their stable input order and filter-side field
+changes are overlaid, so selected case columns can regroup rows independently
+of importer-created native traces without losing filter effects. XES requests
+retain their native trace boundaries.
 
 Focused regressions cover canonical classic/trace/split fixtures, raw and
 table-ordered split chunks, all eager/lazy/stream/log adapters, custom
 activity/completion/start/case selectors, first-class source metadata, missing
-and null cells, forced reverse and self edges, one-sided greedy matching, equal
-interval boundaries, exact matching above 25 events, strict timestamp errors,
-empty and single-activity logs, complete diagnostic matrices, projected-label
-JSON ids and counts, deterministic ties, and balanced transportation marginals.
+and null cells, blank case groups, exact-key/projection collisions, forced
+reverse and self edges, one-sided greedy matching, equal interval boundaries,
+a rectangular fixture that distinguishes exact matching from both greedy
+orders, exact matching above 25 events, strict timestamp errors, empty and
+single-activity logs, complete diagnostic matrices, projected-label JSON ids
+and counts, nonblank and blank custom-case CLI regrouping, source-order split
+ties, deterministic transportation ties, and balanced transportation
+marginals. Native activity and case identities use their stable text projection
+because Minera's graph model is string-labelled; typed scalar storage remains
+available on the input cells. The dispatcher, three variant modules, and
+correlation support module carry distinct machine-checked proofs; the support
+proof exercises probability/duration matrices and balanced transport rather
+than JSON label registration.
 
 ## Performance-spectrum and batch parity evidence
 

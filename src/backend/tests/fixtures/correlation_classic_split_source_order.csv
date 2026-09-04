@@ -1,0 +1,5 @@
+case_id,activity,timestamp
+case-a,A,2024-01-01T00:00:00Z
+case-b,B,2024-01-01T00:00:10Z
+case-a,A,2024-01-01T00:00:10Z
+case-b,B,2024-01-01T00:00:20Z

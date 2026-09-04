@@ -4247,6 +4247,173 @@ export interface DfgVariantsAnalysis {
   causal: DfgCausalAnalysis[];
 }
 
+const dfgStatisticalVariants = new Set<DfgStatisticalVariant>([
+  "native", "frequency", "frequency_greedy", "frequency_triples",
+  "performance", "performance_greedy", "case_attributes", "clean",
+  "clean_polars", "clean_time",
+]);
+const dfgCausalVariants = new Set<DfgCausalVariant>(["alpha", "heuristic"]);
+
+function isDfgRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isDfgActivityId(value: unknown, activityCount?: number): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0 &&
+    (activityCount === undefined || (value as number) < activityCount);
+}
+
+function isDfgCount(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+function isDfgEdge(value: unknown, activityCount?: number): value is EdgeStat {
+  return isDfgRecord(value) &&
+    isDfgActivityId(value.source, activityCount) &&
+    isDfgActivityId(value.target, activityCount) &&
+    isDfgCount(value.count);
+}
+
+function isDfgTriple(value: unknown, activityCount?: number): boolean {
+  return isDfgRecord(value) &&
+    isDfgActivityId(value.first, activityCount) &&
+    isDfgActivityId(value.middle, activityCount) &&
+    isDfgActivityId(value.last, activityCount) &&
+    isDfgCount(value.count);
+}
+
+function isDfgPerformanceSummary(value: unknown): value is DfgPerformanceSummary {
+  return isDfgRecord(value) && isDfgCount(value.count) &&
+    [value.mean, value.median, value.min, value.max, value.stdev, value.sum]
+      .every((item) => typeof item === "number" && Number.isFinite(item));
+}
+
+function isDfgPerformanceValue(value: unknown): boolean {
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) {
+    return value.every((item) => typeof item === "number" && Number.isFinite(item));
+  }
+  return isDfgPerformanceSummary(value);
+}
+
+function isDfgPerformanceEdge(value: unknown, activityCount?: number): boolean {
+  return isDfgRecord(value) &&
+    isDfgActivityId(value.source, activityCount) &&
+    isDfgActivityId(value.target, activityCount) &&
+    isDfgPerformanceSummary(value.summary) &&
+    Array.isArray(value.raw_values) &&
+    value.raw_values.every((item) => typeof item === "number" && Number.isFinite(item)) &&
+    isDfgPerformanceValue(value.value);
+}
+
+function isDfgNamedAttributeCounts(value: unknown): boolean {
+  return Array.isArray(value) && value.every((rawAttribute) => {
+    if (!isDfgRecord(rawAttribute) || typeof rawAttribute.attribute !== "string" ||
+        !Array.isArray(rawAttribute.values)) return false;
+    return rawAttribute.values.every((rawValue) =>
+      isDfgRecord(rawValue) && typeof rawValue.value === "string" &&
+      isDfgCount(rawValue.count));
+  });
+}
+
+function isDfgCaseAttributeEdge(value: unknown, activityCount?: number): boolean {
+  return isDfgRecord(value) &&
+    isDfgActivityId(value.source, activityCount) &&
+    isDfgActivityId(value.target, activityCount) &&
+    isDfgNamedAttributeCounts(value.attributes);
+}
+
+function isDfgCaseAttributeNode(value: unknown, activityCount?: number): boolean {
+  return isDfgRecord(value) &&
+    isDfgActivityId(value.activity, activityCount) &&
+    isDfgNamedAttributeCounts(value.attributes);
+}
+
+function isDfgBoundaryActivity(value: unknown, activityCount?: number): boolean {
+  return isDfgRecord(value) &&
+    isDfgActivityId(value.activity, activityCount) &&
+    isDfgCount(value.count);
+}
+
+function isDfgStatisticalAnalysis(
+  value: unknown,
+  activityCount?: number,
+): value is DfgStatisticalAnalysis {
+  if (!isDfgRecord(value) ||
+      !dfgStatisticalVariants.has(value.variant as DfgStatisticalVariant)) {
+    return false;
+  }
+  switch (value.variant as DfgStatisticalVariant) {
+    case "native":
+    case "frequency":
+    case "frequency_greedy":
+      return Array.isArray(value.frequency_dfg) &&
+        value.frequency_dfg.every((edge) => isDfgEdge(edge, activityCount));
+    case "frequency_triples":
+      return Array.isArray(value.frequency_triples) &&
+        value.frequency_triples.every((triple) =>
+          isDfgTriple(triple, activityCount));
+    case "performance":
+    case "performance_greedy":
+      return Array.isArray(value.performance_dfg) &&
+        value.performance_dfg.every((edge) =>
+          isDfgPerformanceEdge(edge, activityCount));
+    case "case_attributes":
+      return isDfgRecord(value.case_attributes) &&
+        Array.isArray(value.case_attributes.edges) &&
+        Array.isArray(value.case_attributes.nodes) &&
+        value.case_attributes.edges.every((edge) =>
+          isDfgCaseAttributeEdge(edge, activityCount)) &&
+        value.case_attributes.nodes.every((node) =>
+          isDfgCaseAttributeNode(node, activityCount));
+    case "clean":
+    case "clean_polars":
+      return isDfgRecord(value.clean) &&
+        Array.isArray(value.clean.dfg) &&
+        Array.isArray(value.clean.start_activities) &&
+        Array.isArray(value.clean.end_activities) &&
+        value.clean.dfg.every((edge) => isDfgEdge(edge, activityCount)) &&
+        value.clean.start_activities.every((item) =>
+          isDfgBoundaryActivity(item, activityCount)) &&
+        value.clean.end_activities.every((item) =>
+          isDfgBoundaryActivity(item, activityCount));
+    case "clean_time":
+      return Array.isArray(value.clean_time) &&
+        value.clean_time.every((item) => isDfgRecord(item) &&
+          isDfgActivityId(item.activity, activityCount) &&
+          typeof item.mean_seconds_from_case_start === "number" &&
+          Number.isFinite(item.mean_seconds_from_case_start));
+  }
+}
+
+function isDfgCausalAnalysis(
+  value: unknown,
+  activityCount?: number,
+): value is DfgCausalAnalysis {
+  if (!isDfgRecord(value) ||
+      !dfgCausalVariants.has(value.variant as DfgCausalVariant) ||
+      !Array.isArray(value.relations)) return false;
+  return value.relations.every((rawRelation) =>
+    isDfgRecord(rawRelation) &&
+    isDfgActivityId(rawRelation.source, activityCount) &&
+    isDfgActivityId(rawRelation.target, activityCount) &&
+    typeof rawRelation.value === "number" &&
+    Number.isFinite(rawRelation.value));
+}
+
+/** Runtime validation for the optional statistical/causal DFG envelope. */
+export function isDfgVariantsAnalysis(
+  value: unknown,
+  activityCount?: number,
+): value is DfgVariantsAnalysis {
+  return isDfgRecord(value) && Array.isArray(value.statistical) &&
+    Array.isArray(value.causal) &&
+    value.statistical.every((analysis) =>
+      isDfgStatisticalAnalysis(analysis, activityCount)) &&
+    value.causal.every((analysis) =>
+      isDfgCausalAnalysis(analysis, activityCount));
+}
+
 /** Operations exposed by the table-backed DFG endpoint. */
 export type DfgDataframeOperation =
   | "graph"
@@ -6653,6 +6820,8 @@ export function isMineraExport(value: unknown): value is MineraExport {
         traceCount,
         data.traces,
       )) &&
+    (data.dfg_variants === undefined ||
+      isDfgVariantsAnalysis(data.dfg_variants, activityCount)) &&
     (data.decision_tables === undefined || isDecisionTablesResult(data.decision_tables)) &&
     validBatches &&
     (data.performance_spectrum === undefined ||
