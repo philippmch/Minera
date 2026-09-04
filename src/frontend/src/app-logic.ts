@@ -1,6 +1,7 @@
 import { type FilterOptions, type MinerOptions } from "./api";
 import { type MineraExport } from "./types";
 import {
+  DECLARE_TEMPLATES,
   FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS,
 } from "./types";
 
@@ -32,10 +33,17 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
   ];
   const logSkeletonConstraintsActive =
     options.logSkeletonConstraints !== undefined &&
-    options.logSkeletonConstraints.length > 0 &&
-    (options.logSkeletonConstraints.length !== allLogSkeletonConstraints.length ||
+    (options.logSkeletonConstraints.length === 0 ||
+      options.logSkeletonConstraints.length !== allLogSkeletonConstraints.length ||
       allLogSkeletonConstraints.some(
         (name) => !options.logSkeletonConstraints?.includes(name),
+      ));
+  const declareAllowedTemplatesActive =
+    options.declareAllowedTemplates !== undefined &&
+    (options.declareAllowedTemplates.length === 0 ||
+      options.declareAllowedTemplates.length !== DECLARE_TEMPLATES.length ||
+      DECLARE_TEMPLATES.some(
+        (name) => !options.declareAllowedTemplates?.includes(name),
       ));
   const footprintsDiscoveryActive =
     options.footprintsDiscoveryVariants !== undefined &&
@@ -122,10 +130,8 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
         options.logSkeletonNoiseThreshold !== 0 ||
       logSkeletonConstraintsActive ||
       options.declareConsideredActivities?.length ||
-        (options.declareAllowedTemplates !== undefined &&
-          options.declareAllowedTemplates.length > 0 &&
-          options.declareAllowedTemplates.length < 18) ||
-        options.declareMinSupportRatio !== undefined ||
+      declareAllowedTemplatesActive ||
+      options.declareMinSupportRatio !== undefined ||
       options.declareMinConfidenceRatio !== undefined ||
         (options.declareAutoSelectionMultiplier !== undefined &&
           options.declareAutoSelectionMultiplier !== 0.8) ||

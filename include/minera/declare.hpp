@@ -58,6 +58,10 @@ struct DeclareDiscoveryOptions {
   bool has_min_support_ratio = false;
   bool has_min_confidence_ratio = false;
   double auto_selection_multiplier = 0.8;
+  // Event attribute used as the activity label.  The canonical activity
+  // field is selected by default; any other key must be present and non-null
+  // on every event.
+  std::string activity_key = "concept:name";
 };
 
 [[nodiscard]] DeclareModel discover_declare(
@@ -78,11 +82,24 @@ struct DeclareConformance {
   bool is_fit = true;
 };
 
+struct DeclareConformanceOptions {
+  // Event attribute used as the activity label.  The canonical activity
+  // field is selected by default; any other key must be present and non-null
+  // on every event.
+  std::string activity_key = "concept:name";
+};
+
 [[nodiscard]] DeclareConformance check_declare_conformance(
     const std::vector<std::string>& trace, const DeclareModel& model);
 [[nodiscard]] DeclareConformance check_declare_conformance(
     const Trace& trace, const DeclareModel& model);
+[[nodiscard]] DeclareConformance check_declare_conformance(
+    const Trace& trace, const DeclareModel& model,
+    const DeclareConformanceOptions& options);
 [[nodiscard]] std::vector<DeclareConformance> check_declare_conformance(
     const EventLog& log, const DeclareModel& model);
+[[nodiscard]] std::vector<DeclareConformance> check_declare_conformance(
+    const EventLog& log, const DeclareModel& model,
+    const DeclareConformanceOptions& options);
 
 }  // namespace minera

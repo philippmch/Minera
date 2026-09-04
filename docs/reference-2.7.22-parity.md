@@ -121,12 +121,12 @@ are reconciled.
 | Comparison | Petri-net element-usage comparison | **Partial (implemented core; proof pending)** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters, including explicit initial/final markings, every ordinary/reset/inhibitor arc, a selectable event activity attribute, element labels, and signed-direction colors |
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Partial (implemented core; proof pending)** — the explicit `BOSE` selector covers relation-count features, seeded permutation windows, ranked/capped drift boundaries, boundary-partitioned result logs, optional timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Partial (implemented core; proof pending)** — all six variants are explicitly selectable; less-memory Dijkstra with legacy unit costs is the generic default, with named event activity fields available at replay time |
-| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters |
+| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors |
 | Conformance: replay | forward token replay and backwards token replay | **Partial (implemented core; proof pending)** — forward replay remains the default; the backwards variation, reverse silent routing, weak firing, duplicate-label behavior, immediate-stop option, and named event activity selector are selectable |
-| Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Partial overall; footprints conformance complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance remain proof-pending |
+| Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Partial overall; footprints conformance complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance now carry strict activity selectors and exact empty/subset family-selection behavior but remain proof-pending |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
-| Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Partial (implemented core; proof pending)** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, and JSON/CLI/server/frontend adapters are implemented |
-| Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, and cross-family envelope rejection; broader OCEL schema coverage remains |
+| Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Partial (implemented core; proof pending)** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters are implemented |
+| Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, strict direct-OCDFG activity/object-type selectors, and cross-family envelope rejection; broader OCEL schema coverage remains |
 | Discovery: Alpha | classic and Alpha+ | **Partial (implemented core; proof pending)** — event-log and direct-DFG classic entry points are available; Alpha+ remains an explicit event-log variant |
 | Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Partial (implemented core; proof pending)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
@@ -1839,14 +1839,19 @@ Classic log-skeleton discovery exposes all six pinned constraint families:
 equivalence, always-after, always-before, never-together, directly-follows,
 and activity frequency. It preserves weighted trace variants, the reference's
 event-occurrence denominators, positive-only counter subtraction, first-seen
-frequency tie ordering, and the event-count noise threshold. Direct native
-callers retain the pinned raw threshold arithmetic; CLI and server boundaries
+frequency tie ordering, repeated adjacent-edge multiplicity, and the
+event-count noise threshold. Discovery always computes all six families;
+considered constraints apply only to conformance. Direct native callers retain
+the pinned raw threshold arithmetic; CLI and server boundaries
 strictly validate the conventional finite `[0,1]` range.
 
 Classic conformance supports activity-list, trace, and whole-log entry points,
 selected constraint families, source-absent vacuity, unknown and required
 activity-frequency diagnostics, per-trace deviation totals, fitness, and fit
-status. Focused tests cover repetition-sensitive relations, noisy weighted
+status. Omitted constraints mean all families, while an explicitly empty list
+performs no checks and is distinct from a non-empty subset. Discovery and
+conformance accept the same strict activity selector contract as Declare.
+Focused tests cover repetition-sensitive relations, noisy weighted
 variants, threshold and tie quirks, family selection, duplicate variants,
 unknown/missing activities, non-finite direct-call behavior, and empty inputs.
 The model and trace diagnostics are serialized with prevalidated activity IDs,
@@ -2329,6 +2334,14 @@ the reference's support/confidence counts. Classic conformance provides the
 pinned deviation order, totals, fitness, fit status, unknown-family behavior,
 and one result per input trace.
 
+Discovery and trace/log conformance share a strict configurable activity
+selector. Canonical aliases, imported first-class source keys, and generic
+scalar attributes resolve consistently; an explicitly blank, missing, or null
+selection fails instead of falling back to the canonical label. The selector
+is exposed through request, CLI, local-server, and frontend mining contracts so
+the discovered model and its immediate conformance diagnostics use the same
+projected alphabet.
+
 The batch model and conformance diagnostics are exposed through the native API,
 strict request fields, CLI, local server, deterministic numeric-ID JSON, and
 the frontend. Tests cover every template family, positive and violating traces,
@@ -2502,6 +2515,12 @@ fields are milliseconds (`pt_alignment_max_time_ms`,
 `--pt-alignment-*` bounds, cache, and threshold flags. The deferred HTTP entry
 point is `POST /api/align-process-tree`.
 
+All four variants construct their trace words from the same strict activity
+selector. Canonical aliases, imported source keys, and generic scalar fields
+are accepted, while blank, missing, and null selections fail before search;
+the request, CLI, server, and frontend adapters expose that selector without
+changing the canonical default.
+
 The JSON result has `family: "PROCESS_TREE"`, the selected `variant`, aggregate
 `total_cost`/`fitness`, per-trace `trace`, `cost`, `fitness`, `moves` (`sync`,
 `log`, or `model` with log/model/activity labels), and diagnostics for visited,
@@ -2538,6 +2557,12 @@ and internal-log costs are configurable: the reported cost can differ from the
 search's internal cost (for example, unknown labels may have a free internal
 move), and both are serialized.
 
+Trace alignment uses a strict configurable activity selector, while log
+projection also accepts a strict timestamp selector. Projected original-trace
+metadata and synchronous/model events are written under the selected keys and
+retain compatible typed metadata. The selected activity is also used to build
+the server-side DFG boundaries and edges, preventing model/log alphabet drift.
+
 Whole-log alignment caches exact activity variants in an ordered map, reports
 `unique_variants`, and restores results to the original trace order. Trace
 results include fitness, best/worst cost, visited and closed-state diagnostics;
@@ -2569,6 +2594,12 @@ source time, omits source-only moves, and marks each projected event's
 `@@is_conforming` value. Scalar EventLog log attributes (including these
 projection markers) and their XES scalar types round-trip through the XES
 importer/exporter.
+
+Edit-distance source and target variants use the same configurable activity
+selector, and projection uses that activity selector plus a configurable
+timestamp selector. Existing conventional-key overloads remain compatible;
+strict request, CLI, server, and frontend adapters reject blank or missing
+selected fields rather than silently mixing alphabets.
 
 Concept-drift adapters expose deterministic `CONCEPT_DRIFT` JSON with the
 selected `bose` variant from the CLI

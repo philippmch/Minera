@@ -191,6 +191,11 @@ struct MineParams {
   bool overlap = false;
   OverlapOptions overlap_options;
   MinimumSelfDistanceOptions minimum_self_distance;
+  // Declare conformance shares the discovery activity selector, but keeps a
+  // separate native options object so callers can pass the contract directly.
+  // Keep this extension at the end so existing positional aggregate
+  // initialization of MineParams remains source-compatible.
+  DeclareConformanceOptions declare_conformance_options;
 };
 
 using ConceptDriftParams = ConceptDriftOptions;
@@ -413,9 +418,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
     std::string_view value, std::string_view name = "activity_costs");
 
 // Standalone conformance option parsers. Wire fields use the dfg_* and
-// edit_* prefixes; map values are comma-separated `activity=value` pairs
-// (a colon is accepted as a compatibility separator). Explicitly present
-// empty values are rejected for every option.
+// edit_* prefixes; selectors use dfg_activity_attribute/dfg_timestamp_attribute
+// and edit_activity_attribute/edit_timestamp_attribute. Map values are
+// comma-separated `activity=value` pairs (a colon is accepted as a
+// compatibility separator). Explicitly present empty values are rejected for
+// every option.
 [[nodiscard]] DfgAlignmentOptions parse_dfg_alignment_params(
     const FieldLookup& field);
 [[nodiscard]] DfgAlignmentOptions parse_dfg_alignment_params(
@@ -435,7 +442,8 @@ using FieldPresence = std::function<bool(std::string_view)>;
 
 // Parses process-tree alignment settings. Wire fields use the canonical
 // `pt_alignment_` prefix (for example `pt_alignment_variant` and
-// `pt_alignment_max_time_ms`). Time limits are expressed in milliseconds on
+// `pt_alignment_max_time_ms`); activity uses
+// `pt_alignment_activity_attribute`. Time limits are expressed in milliseconds on
 // the wire and converted to the core's seconds representation. Zero means
 // unlimited where supported by the core.
 [[nodiscard]] ProcessTreeAlignmentOptions parse_process_tree_alignment_params(

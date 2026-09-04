@@ -838,7 +838,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto declare =
         minera::discover_declare(log, params.declare_options);
     const auto declare_conformance =
-        minera::check_declare_conformance(log, declare);
+        minera::check_declare_conformance(
+            log, declare, params.declare_conformance_options);
     for (const auto& [family, rules] : declare.rules) {
       (void)family;
       for (const auto& rule : rules) {
@@ -1803,15 +1804,15 @@ void handle_ocel_discovery(const httplib::Request& request,
       options.compute_edges_performance =
           ocel_query_bool(request, "compute_edges_performance", true);
       if (request.has_param("ocdfg_activity_attribute")) {
-        options.activity_attribute =
-            request.get_param_value("ocdfg_activity_attribute");
+        options.activity_attribute = trim_text(
+            request.get_param_value("ocdfg_activity_attribute"));
         if (options.activity_attribute.empty())
           throw std::invalid_argument(
               "ocdfg_activity_attribute expects a non-empty value");
       }
       if (request.has_param("ocdfg_object_type_attribute")) {
-        options.object_type_attribute =
-            request.get_param_value("ocdfg_object_type_attribute");
+        options.object_type_attribute = trim_text(
+            request.get_param_value("ocdfg_object_type_attribute"));
         if (options.object_type_attribute.empty())
           throw std::invalid_argument(
               "ocdfg_object_type_attribute expects a non-empty value");
@@ -2691,7 +2692,8 @@ void handle_ocel_conformance(const httplib::Request& request,
         "otg_theta", "otg_theta_interaction", "otg_theta_descendants",
         "otg_theta_inheritance", "otg_theta_cobirth", "otg_theta_codeath",
         "ocdfg_theta_activity", "ocdfg_theta_flow", "real",
-        "real_graph_kind"};
+        "real_graph_kind", "ocdfg_activity_attribute",
+        "ocdfg_object_type_attribute"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -2845,6 +2847,21 @@ void handle_ocel_conformance(const httplib::Request& request,
           request, "ocdfg_theta_activity", options.theta_activity);
       options.theta_flow =
           ocel_query_number(request, "ocdfg_theta_flow", options.theta_flow);
+      if (request.has_param("ocdfg_activity_attribute")) {
+        options.activity_attribute =
+            trim_text(request.get_param_value("ocdfg_activity_attribute"));
+        if (options.activity_attribute.empty())
+          throw std::invalid_argument(
+              "ocdfg_activity_attribute expects a non-empty value");
+      }
+      if (request.has_param("ocdfg_object_type_attribute")) {
+        options.object_type_attribute =
+            trim_text(
+                request.get_param_value("ocdfg_object_type_attribute"));
+        if (options.object_type_attribute.empty())
+          throw std::invalid_argument(
+              "ocdfg_object_type_attribute expects a non-empty value");
+      }
       std::optional<minera::OcdfgGraph> real_graph;
       if (real_mode == "graph")
         real_graph = minera::parse_ocdfg_json(real_body);
@@ -2859,18 +2876,30 @@ void handle_ocel_conformance(const httplib::Request& request,
           payload = minera::ocdfg_conformance_json(
               minera::compare_ocdfg(*real_graph, *graph, options));
         } else {
+          minera::OcdfgDiscoveryOptions discovery;
+          discovery.compute_edges_performance = false;
+          discovery.activity_attribute = options.activity_attribute;
+          discovery.object_type_attribute = options.object_type_attribute;
           payload = minera::ocdfg_conformance_json(minera::compare_ocdfg(
               *real_graph,
-              minera::discover_ocdfg_classic(normative_log(), false),
+              minera::discover_ocdfg_classic_with_options(normative_log(),
+                                                          discovery),
               options));
         }
       } else if (graph) {
         payload = minera::ocdfg_conformance_json(
             minera::compare_ocdfg(*real_ocel, *graph, options));
       } else {
+        minera::OcdfgDiscoveryOptions discovery;
+        discovery.compute_edges_performance = false;
+        discovery.activity_attribute = options.activity_attribute;
+        discovery.object_type_attribute = options.object_type_attribute;
         payload = minera::ocdfg_conformance_json(minera::compare_ocdfg(
-            minera::discover_ocdfg_classic(*real_ocel, false),
-            minera::discover_ocdfg_classic(normative_log(), false), options));
+            minera::discover_ocdfg_classic_with_options(*real_ocel,
+                                                        discovery),
+            minera::discover_ocdfg_classic_with_options(normative_log(),
+                                                        discovery),
+            options));
       }
     }
     response.set_content(ocel_conformance_response(variant, std::move(payload)),
@@ -5309,6 +5338,21 @@ void handle_align_process_tree(const httplib::Request& request,
     return;
   }
   try {
+    static const std::set<std::string> allowed = {
+        "pt_alignment_variant", "pt_alignment_max_states",
+        "pt_alignment_max_time_ms", "pt_alignment_max_total_time_ms",
+        "pt_alignment_use_global_cache", "pt_alignment_batch_size",
+        "pt_alignment_clear_cache", "pt_alignment_max_trace_length",
+        "pt_alignment_max_process_tree_height",
+        "pt_alignment_max_trace_time_ms",
+        "pt_alignment_max_per_trace_time_ms",
+        "pt_alignment_activity_attribute"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown process-tree alignment parameter: " + key);
+    }
     const auto lookup = [&](std::string_view name) {
       const auto key = std::string(name);
       if (request.has_param(key)) return request.get_param_value(key);
@@ -5336,7 +5380,22 @@ void handle_align_decomposed(const httplib::Request& request, httplib::Response&
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
   const auto miner = request.get_param_value("miner"); const auto it=session->nets.find(miner);
   if (it==session->nets.end()) { response.status=400; response.set_content(error_json("unknown miner: "+miner),"application/json"); return; }
-  try { const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_decomposed_alignment_params(lookup,present); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){projected_powl_log=project_powl_activity(session->log,session->powl_activity_key,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::align_decomposed(*alignment_log,it->second,o); response.set_content(minera::decomposed_alignment_json(r),"application/json"); }
+  try {
+    static const std::set<std::string> allowed = {
+        "miner", "variant", "threshold_border_agreement",
+        "max_time_trace", "max_time_total", "max_states",
+        "max_total_states", "use_cache", "clear_cache", "log_move_cost",
+        "model_move_cost", "tau_move_cost", "tau_model_cost",
+        "sync_move_cost", "sync_cost", "activity_log_costs",
+        "activity_model_costs", "activity_sync_costs", "initial_marking",
+        "final_marking", "activity_attribute"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown decomposed alignment parameter: " + key);
+    }
+    const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_decomposed_alignment_params(lookup,present); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(session->log,o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::align_decomposed(*alignment_log,it->second,o); response.set_content(minera::decomposed_alignment_json(r),"application/json"); }
   catch(const std::exception& e){response.status=400; response.set_content(error_json(e.what()),"application/json");}
 }
 
@@ -5344,14 +5403,14 @@ void handle_align_petri_anti(const httplib::Request& request, httplib::Response&
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
   const auto miner=request.get_param_value("miner"); const auto it=session->nets.find(miner); if(it==session->nets.end()){response.status=400;response.set_content(error_json("unknown miner: "+miner),"application/json");return;}
-  try { const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_petri_anti_alignment_params(lookup,present); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){projected_powl_log=project_powl_activity(session->log,session->powl_activity_key,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::anti_align_petri(it->second,*alignment_log,o); response.set_content(minera::petri_anti_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
+  try { static const std::set<std::string> allowed = {"miner", "variant", "exponent", "epsilon", "marking_limit", "max_states", "initial_marking", "final_marking", "activity_attribute"}; for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown Petri anti-alignment parameter: " + key); } const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_petri_anti_alignment_params(lookup,present); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(session->log,o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::anti_align_petri(it->second,*alignment_log,o); response.set_content(minera::petri_anti_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
 }
 
 void handle_align_petri_multi(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
   const auto miner=request.get_param_value("miner"); const auto it=session->nets.find(miner); if(it==session->nets.end()){response.status=400;response.set_content(error_json("unknown miner: "+miner),"application/json");return;}
-  try { const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_petri_multi_alignment_params(lookup,present); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){projected_powl_log=project_powl_activity(session->log,session->powl_activity_key,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::multi_align_petri(it->second,*alignment_log,o); response.set_content(minera::petri_multi_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
+  try { static const std::set<std::string> allowed = {"miner", "variant", "exponent", "marking_limit", "max_states", "initial_marking", "final_marking", "activity_attribute"}; for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown Petri multi-alignment parameter: " + key); } const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_petri_multi_alignment_params(lookup,present); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(session->log,o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::multi_align_petri(it->second,*alignment_log,o); response.set_content(minera::petri_multi_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
 }
 
 void handle_reduce_process_tree(const httplib::Request& request, httplib::Response& response) {
@@ -5364,13 +5423,28 @@ void handle_align_dfg(const httplib::Request& request, httplib::Response& respon
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
   try {
+    static const std::set<std::string> allowed = {
+        "dfg_variant", "variant", "dfg_max_states", "dfg_max_time_ms",
+        "max_visited_states", "max_time_ms", "dfg_activity_attribute",
+        "dfg_timestamp_attribute", "dfg_sync_cost", "dfg_sync_costs",
+        "dfg_model_move_cost", "dfg_model_move_costs", "dfg_model_cost",
+        "dfg_log_move_cost", "dfg_log_move_costs", "dfg_log_cost",
+        "dfg_internal_log_move_cost", "dfg_internal_log_move_costs",
+        "dfg_internal_cost", "sync_cost", "sync_costs", "model_move_cost",
+        "model_costs", "log_move_cost", "log_costs", "internal_log_move_cost",
+        "internal_costs", "projection"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown DFG alignment parameter: " + key);
+    }
     const auto lookup = [&](std::string_view n) { const auto key=std::string(n); if (request.has_param(key)) return request.get_param_value(key); if (request.has_file(key)) return request.get_file_value(key).content; return std::string{}; };
     const auto present = [&](std::string_view n) { const auto key=std::string(n); return request.has_param(key) || request.has_file(key); };
     auto options = minera::parse_dfg_alignment_params(lookup, present);
     const auto projection = present("projection") ? lookup("projection") : std::string("none");
     if (projection != "none" && projection != "log" && projection != "metrics") throw std::invalid_argument("projection expects none, log, or metrics");
-    minera::DfgStatisticalOptions dopt; dopt.window = 1; const auto dfg = minera::discover_frequency_dfg(session->log, dopt);
-    std::map<std::string,std::uint64_t> starts, ends; for (const auto& t:session->log.traces) if(!t.events.empty()){++starts[t.events.front().activity];++ends[t.events.back().activity];}
+    minera::DfgStatisticalOptions dopt; dopt.window = 1; dopt.activity_attribute = options.activity_attribute; dopt.timestamp_attribute = options.timestamp_attribute; const auto dfg = minera::discover_frequency_dfg(session->log, dopt);
+    std::map<std::string,std::uint64_t> starts, ends; for (const auto& t:session->log.traces) if(!t.events.empty()){ const auto* first = minera::dfg_event_field_value(t.events.front(), options.activity_attribute); const auto* last = minera::dfg_event_field_value(t.events.back(), options.activity_attribute); if (!first || !last) throw std::invalid_argument("DFG alignment: event is missing activity attribute '" + options.activity_attribute + "'"); ++starts[*first];++ends[*last]; }
     const auto result = minera::align_log_on_dfg(session->log, dfg, starts, ends, options);
     if (projection == "log") { const auto projected = minera::project_log_on_dfg(session->log, dfg, starts, ends, options); response.set_content(minera::dfg_alignment_json(result, nullptr, &projected), "application/json"); }
     else if (projection == "metrics") { const auto metrics = minera::project_alignments_on_dfg(session->log, dfg, starts, ends, options); response.set_content(minera::dfg_alignment_json(result, &metrics), "application/json"); }
@@ -5382,6 +5456,16 @@ void handle_align_edit_distance(const httplib::Request& request, httplib::Respon
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
   try {
+    static const std::set<std::string> allowed = {
+        "edit_variant", "variant", "anti", "perform_anti_alignment",
+        "deviation_cost", "edit_deviation_cost", "edit_activity_attribute",
+        "edit_timestamp_attribute", "projection"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown edit-distance parameter: " + key);
+    }
     if (!request.is_multipart_form_data() || !request.has_file("reference_log")) throw std::invalid_argument("missing form field: reference_log");
     const auto& file = request.get_file_value("reference_log");
     std::stringstream input(file.content);
@@ -5392,7 +5476,7 @@ void handle_align_edit_distance(const httplib::Request& request, httplib::Respon
     const auto projection = present("projection") ? lookup("projection") : std::string("none");
     if (projection != "none" && projection != "log") throw std::invalid_argument("projection expects none or log");
     const auto result = minera::align_edit_distance(session->log, reference, options);
-    if (projection == "log") { const auto projected = minera::project_log_on_alignments(session->log, result); response.set_content(minera::edit_distance_json(result, options.perform_anti_alignment, &projected), "application/json"); }
+    if (projection == "log") { const auto projected = minera::project_log_on_alignments(session->log, result, options); response.set_content(minera::edit_distance_json(result, options.perform_anti_alignment, &projected), "application/json"); }
     else response.set_content(minera::edit_distance_json(result, options.perform_anti_alignment), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }

@@ -1,15 +1,26 @@
 #include "minera/declare.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <map>
 #include <optional>
 #include <set>
+#include <stdexcept>
 #include <tuple>
 #include <unordered_map>
 
 namespace minera {
 namespace {
+
+void validate_activity_key(std::string_view activity_key) {
+  if (activity_key.empty() ||
+      std::all_of(activity_key.begin(), activity_key.end(), [](char value) {
+        return std::isspace(static_cast<unsigned char>(value)) != 0;
+      })) {
+    throw std::invalid_argument("declare: activity selector must not be blank");
+  }
+}
 
 const std::vector<std::string>& families() {
   static const std::vector<std::string> value = {
@@ -237,10 +248,105 @@ Statuses evaluate(const std::vector<std::string>& trace,
   return result;
 }
 
-std::set<std::string> default_activities(const EventLog& log) {
+const std::string* first_class_value(
+    const std::string& value, FirstClassAttributeState state) {
+  if (state == FirstClassAttributeState::kNull) return nullptr;
+  if (state != FirstClassAttributeState::kMissing || !value.empty())
+    return &value;
+  return nullptr;
+}
+
+bool matches_source(std::string_view source_key,
+                    const std::optional<EventAttribute>& attribute,
+                    std::string_view selector) {
+  return (!source_key.empty() && source_key == selector) ||
+         (attribute && attribute->key == selector);
+}
+
+const std::string* resolve_event_field(const Event& event,
+                                       std::string_view selector) {
+  const auto resolve = [](const std::string& value,
+                          FirstClassAttributeState state,
+                          const std::optional<EventAttribute>& attribute)
+      -> const std::string* {
+    if (state == FirstClassAttributeState::kNull) return nullptr;
+    if (const auto* selected = first_class_value(value, state))
+      return selected;
+    if (attribute && !attribute->is_null) return &attribute->value;
+    return nullptr;
+  };
+
+  const bool activity = selector == "concept:name" || selector == "activity" ||
+                        matches_source(event.activity_source_key,
+                                       event.activity_attribute, selector);
+  if (activity)
+    return resolve(event.activity, event.activity_state,
+                   event.activity_attribute);
+
+  const bool timestamp = selector == "time:timestamp" ||
+                         selector == "timestamp" ||
+                         matches_source(event.timestamp_source_key,
+                                        event.timestamp_attribute, selector);
+  if (timestamp)
+    return resolve(event.timestamp, event.timestamp_state,
+                   event.timestamp_attribute);
+
+  const bool resource = selector == "org:resource" || selector == "resource" ||
+                        matches_source(event.resource_source_key,
+                                       event.resource_attribute, selector);
+  if (resource)
+    return resolve(event.resource, event.resource_state,
+                   event.resource_attribute);
+
+  const bool lifecycle = selector == "lifecycle:transition" ||
+                         selector == "lifecycle" ||
+                         matches_source(event.lifecycle_source_key,
+                                        event.lifecycle_attribute, selector);
+  if (lifecycle)
+    return resolve(event.lifecycle, event.lifecycle_state,
+                   event.lifecycle_attribute);
+
+  const bool case_id = selector == "case:concept:name" ||
+                       selector == "case:id" || selector == "case_id" ||
+                       selector == "case" ||
+                       (!event.case_id_source_key.empty() &&
+                        event.case_id_source_key == selector);
+  if (case_id)
+    return first_class_value(event.case_id, event.case_id_state);
+
+  for (const auto& attribute : event.attributes)
+    if (attribute.key == selector)
+      return attribute.is_null ? nullptr : &attribute.value;
+  return nullptr;
+}
+
+std::string selected_activity(const Event& event, std::string_view activity_key) {
+  validate_activity_key(activity_key);
+  if (const auto* value = resolve_event_field(event, activity_key)) return *value;
+  throw std::invalid_argument(
+      "declare: event activity selector is missing or null: '" +
+      std::string(activity_key) + "'");
+}
+
+std::vector<std::vector<std::string>> selected_traces(const EventLog& log,
+                                                       std::string_view activity_key) {
+  validate_activity_key(activity_key);
+  std::vector<std::vector<std::string>> result;
+  result.reserve(log.traces.size());
+  for (const auto& trace : log.traces) {
+    auto& selected = result.emplace_back();
+    selected.reserve(trace.events.size());
+    for (const auto& event : trace.events)
+      selected.push_back(selected_activity(event, activity_key));
+  }
+  return result;
+}
+
+std::set<std::string> default_activities(
+    const std::vector<std::vector<std::string>>& traces) {
   std::set<std::string> result;
-  for (const auto& trace : log.traces)
-    for (const auto& event : trace.events) result.insert(event.activity);
+  for (const auto& trace : traces)
+    result.insert(trace.begin(), trace.end());
   return result;
 }
 
@@ -248,11 +354,11 @@ std::set<std::string> to_set(const std::vector<std::string>& values) {
   return std::set<std::string>(values.begin(), values.end());
 }
 
-std::vector<std::string> project(const Trace& trace,
+std::vector<std::string> project(const std::vector<std::string>& trace,
                                  const std::set<std::string>& activities) {
   std::vector<std::string> result;
-  for (const auto& e : trace.events)
-    if (activities.contains(e.activity)) result.push_back(e.activity);
+  for (const auto& activity : trace)
+    if (activities.contains(activity)) result.push_back(activity);
   return result;
 }
 
@@ -285,9 +391,10 @@ std::size_t DeclareModel::size() const noexcept {
 }
 
 DeclareModel discover_declare(const EventLog& log, const DeclareDiscoveryOptions& options) {
+  const auto selected = selected_traces(log, options.activity_key);
   const auto activities = options.considered_activities.has_value()
                               ? to_set(*options.considered_activities)
-                              : default_activities(log);
+                              : default_activities(selected);
   std::set<std::string> allowed;
   if (!options.allowed_templates.has_value())
     allowed.insert(families().begin(), families().end());
@@ -297,7 +404,7 @@ DeclareModel discover_declare(const EventLog& log, const DeclareDiscoveryOptions
   if (activities.empty() || log.traces.empty()) return model;
 
   std::map<std::vector<std::string>, int> projected;
-  for (const auto& trace : log.traces) ++projected[project(trace, activities)];
+  for (const auto& trace : selected) ++projected[project(trace, activities)];
   std::vector<Statuses> rows;
   std::vector<int> weights;
   for (const auto& [trace, count] : projected) {
@@ -387,21 +494,38 @@ DeclareConformance check_declare_conformance(const std::vector<std::string>& tra
 
 std::vector<DeclareConformance> check_declare_conformance(const EventLog& log,
                                                           const DeclareModel& model) {
+  return check_declare_conformance(log, model, DeclareConformanceOptions{});
+}
+
+std::vector<DeclareConformance> check_declare_conformance(
+    const EventLog& log, const DeclareModel& model,
+    const DeclareConformanceOptions& options) {
+  validate_activity_key(options.activity_key);
   std::vector<DeclareConformance> result;
   result.reserve(log.traces.size());
   for (const auto& trace : log.traces) {
     std::vector<std::string> activities;
-    for (const auto& event : trace.events) activities.push_back(event.activity);
+    activities.reserve(trace.events.size());
+    for (const auto& event : trace.events)
+      activities.push_back(selected_activity(event, options.activity_key));
     result.push_back(check_declare_conformance(activities, model));
   }
   return result;
 }
 
 DeclareConformance check_declare_conformance(const Trace& trace,
-                                             const DeclareModel& model) {
+                                              const DeclareModel& model) {
+  return check_declare_conformance(trace, model, DeclareConformanceOptions{});
+}
+
+DeclareConformance check_declare_conformance(
+    const Trace& trace, const DeclareModel& model,
+    const DeclareConformanceOptions& options) {
+  validate_activity_key(options.activity_key);
   std::vector<std::string> activities;
   activities.reserve(trace.events.size());
-  for (const auto& event : trace.events) activities.push_back(event.activity);
+  for (const auto& event : trace.events)
+    activities.push_back(selected_activity(event, options.activity_key));
   return check_declare_conformance(activities, model);
 }
 

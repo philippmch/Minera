@@ -45,6 +45,9 @@ struct EditDistanceOptions {
   // Standard move cost. It is deliberately configurable for callers
   // that need a different scale, but must remain finite and positive.
   std::uint64_t deviation_cost = 10000;
+  // Event fields used for source/target variants and projected timestamps.
+  std::string activity_attribute = "concept:name";
+  std::string timestamp_attribute = "time:timestamp";
 };
 
 struct EditDistanceAlignment {
@@ -95,5 +98,12 @@ struct EditDistanceAlignment {
 [[nodiscard]] EventLog project_log_on_alignments(
     const EventLog& source,
     const std::vector<EditDistanceAlignment>& alignments);
+
+// Selector-aware overload.  The two-argument overload above remains the
+// source-compatible conventional-key wrapper.
+[[nodiscard]] EventLog project_log_on_alignments(
+    const EventLog& source,
+    const std::vector<EditDistanceAlignment>& alignments,
+    EditDistanceOptions options);
 
 }  // namespace minera

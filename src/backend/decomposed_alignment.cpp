@@ -1,7 +1,10 @@
 #include "minera/decomposed_alignment.hpp"
 
+#include "minera/dfg_variants.hpp"
+
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -9,6 +12,7 @@
 #include <numeric>
 #include <queue>
 #include <set>
+#include <stdexcept>
 #include <tuple>
 #include <unordered_map>
 
@@ -16,6 +20,26 @@ namespace minera {
 namespace {
 
 constexpr std::size_t npos = static_cast<std::size_t>(-1);
+
+void validate_selector(std::string_view selector) {
+  if (selector.empty() || std::all_of(selector.begin(), selector.end(),
+                                      [](unsigned char c) {
+                                        return std::isspace(c) != 0;
+                                      })) {
+    throw std::invalid_argument(
+        "decomposed alignment activity selector must not be blank");
+  }
+}
+
+std::string selected_activity(const Event& event,
+                              std::string_view selector) {
+  const auto* value = dfg_event_field_value(event, selector);
+  if (value == nullptr)
+    throw std::invalid_argument(
+        "decomposed alignment: missing or null activity " +
+        std::string(selector));
+  return *value;
+}
 
 struct SearchNode { std::vector<std::size_t> marking; std::size_t pos = 0; };
 struct SearchKey {
@@ -246,6 +270,7 @@ double move_cost(const DecomposedAlignmentMove& m,const DecomposedAlignmentOptio
 } // namespace
 
 DecomposedAlignmentResult align_decomposed(const EventLog& log,const PetriNet& net,const DecomposedAlignmentOptions& o){
+  validate_selector(o.activity_attribute);
   DecomposedAlignmentResult out; out.trace_count=log.trace_count();
   if (o.clear_cache) out.diagnostics.note = "component and row caches are per-call; clear_cache has no persistent cache to clear";
   if(!valid(o)||o.variant!=DecomposedAlignmentVariant::kRecomposMaximal||o.max_states==0||o.max_total_states==0){out.complete=false;return out;}
@@ -269,10 +294,10 @@ DecomposedAlignmentResult align_decomposed(const EventLog& log,const PetriNet& n
   // Empty trace computes the standard best-worst cost using the decomposed model.
   // BWC is a whole-net replay metric; it is not used to generate result moves.
   std::vector<std::size_t> all_places(net.place_count()), all_trans(net.transitions().size()); std::iota(all_places.begin(),all_places.end(),0); std::iota(all_trans.begin(),all_trans.end(),0);
-  auto full_local=make_local(net,all_places,all_trans,initial,final); auto bw_search=search(full_local,{},o,deadline,out.diagnostics); if(!bw_search.found){out.complete=false;out.timed_out=bw_search.timed_out;out.exhausted=bw_search.exhausted; for(const auto& src:log.traces){DecomposedAlignmentTrace row; row.complete=false; row.timed_out=bw_search.timed_out; row.exhausted=bw_search.exhausted; for(const auto&e:src.events) row.activities.push_back(e.activity); out.traces.push_back(std::move(row));} return out;} double bw=bw_search.cost; out.best_worst_cost=bw;
+  auto full_local=make_local(net,all_places,all_trans,initial,final); auto bw_search=search(full_local,{},o,deadline,out.diagnostics); if(!bw_search.found){out.complete=false;out.timed_out=bw_search.timed_out;out.exhausted=bw_search.exhausted; for(const auto& src:log.traces){DecomposedAlignmentTrace row; row.complete=false; row.timed_out=bw_search.timed_out; row.exhausted=bw_search.exhausted; for(const auto&e:src.events) row.activities.push_back(selected_activity(e, o.activity_attribute)); out.traces.push_back(std::move(row));} return out;} double bw=bw_search.cost; out.best_worst_cost=bw;
   using VecHash=std::function<std::size_t(const std::vector<std::string>&)>; std::unordered_map<std::vector<std::string>,DecomposedAlignmentTrace,VecHash> row_cache(0,[](const auto&v){std::size_t h=0;for(const auto&s:v)for(unsigned char c:s)h=h*131+c;return h;});
   double total_worst=0; std::size_t total_states=bw_search.visited; bool global_state_abort = total_states > o.max_total_states; if (global_state_abort) { out.complete=false; out.exhausted=true; } std::unordered_map<std::string,SearchResult> component_cache;
-  for(const auto& src:log.traces){ std::vector<std::string> names; for(const auto&e:src.events) names.push_back(e.activity);
+  for(const auto& src:log.traces){ std::vector<std::string> names; names.reserve(src.events.size()); for(const auto&e:src.events) names.push_back(selected_activity(e, o.activity_attribute));
     const double trace_worst = trace_worst_cost(bw, names, o);
     const auto trace_started = std::chrono::steady_clock::now();
     auto trace_deadline = deadline;

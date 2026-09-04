@@ -514,6 +514,10 @@ export interface MinerOptions {
   logSkeletonNoiseThreshold?: number;
   /** Selected log-skeleton constraint families; all six is the default. */
   logSkeletonConstraints?: string[];
+  /** Event field used as the log-skeleton activity label. */
+  logSkeletonActivityAttribute?: string;
+  /** Event field used as the Declare activity label for discovery/conformance. */
+  declareActivityAttribute?: string;
   /** Classic Declare discovery controls. */
   declareConsideredActivities?: string[];
   declareAllowedTemplates?: string[];
@@ -1083,6 +1087,25 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     if (!value) throw new Error("tokenReplayActivityAttribute must not be empty");
     add("token_replay_activity_attribute", value);
   }
+  const addMineSelector = (
+    optionName: string,
+    fieldName: string,
+    value: string | undefined,
+    defaultValue: string,
+  ) => {
+    if (value === undefined) return;
+    const normalized = value.trim();
+    if (!normalized) throw new Error(`${optionName} must not be empty`);
+    if (normalized !== defaultValue) add(fieldName, normalized);
+  };
+  addMineSelector(
+    "logSkeletonActivityAttribute", "log_skeleton_activity_attribute",
+    options.logSkeletonActivityAttribute, "concept:name",
+  );
+  addMineSelector(
+    "declareActivityAttribute", "declare_activity_attribute",
+    options.declareActivityAttribute, "concept:name",
+  );
   if (
     options.logSkeletonNoiseThreshold !== undefined &&
     Number.isFinite(options.logSkeletonNoiseThreshold) &&
@@ -1154,13 +1177,17 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   const selectedLogSkeletonConstraints = options.logSkeletonConstraints?.filter(
     (name) => allLogSkeletonConstraints.includes(name),
   );
-  if (
-    selectedLogSkeletonConstraints &&
-    selectedLogSkeletonConstraints.length > 0 &&
-    (selectedLogSkeletonConstraints.length !== allLogSkeletonConstraints.length ||
-      allLogSkeletonConstraints.some((name) => !selectedLogSkeletonConstraints.includes(name)))
-  ) {
-    add("log_skeleton_constraints", selectedLogSkeletonConstraints.join(","));
+  if (selectedLogSkeletonConstraints !== undefined) {
+    if (options.logSkeletonConstraints!.length === 0) {
+      // An explicit empty list is meaningful to conformance; retain its
+      // presence rather than silently selecting all six native families.
+      add("log_skeleton_constraints", "");
+    } else if (selectedLogSkeletonConstraints.length > 0 && (
+      selectedLogSkeletonConstraints.length !== allLogSkeletonConstraints.length ||
+      allLogSkeletonConstraints.some((name) => !selectedLogSkeletonConstraints.includes(name))
+    )) {
+      add("log_skeleton_constraints", selectedLogSkeletonConstraints.join(","));
+    }
   }
 
   const selectedDeclareTemplates = options.declareAllowedTemplates?.filter(
@@ -1168,11 +1195,18 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   );
   if (options.declareConsideredActivities?.length)
     add("declare_considered_activities", options.declareConsideredActivities.join(","));
-  if (
-    selectedDeclareTemplates && selectedDeclareTemplates.length > 0 &&
-    (selectedDeclareTemplates.length !== DECLARE_TEMPLATES.length ||
-      DECLARE_TEMPLATES.some((name) => !selectedDeclareTemplates.includes(name)))
-  ) add("declare_allowed_templates", selectedDeclareTemplates.join(","));
+  if (selectedDeclareTemplates !== undefined) {
+    if (options.declareAllowedTemplates!.length === 0) {
+      // An explicit empty list disables Declare template checks. Preserve the
+      // present-but-empty wire field so it is not confused with the default.
+      add("declare_allowed_templates", "");
+    } else if (selectedDeclareTemplates.length > 0 && (
+      selectedDeclareTemplates.length !== DECLARE_TEMPLATES.length ||
+      DECLARE_TEMPLATES.some((name) => !selectedDeclareTemplates.includes(name))
+    )) {
+      add("declare_allowed_templates", selectedDeclareTemplates.join(","));
+    }
+  }
   const declareRatio = (value: number | undefined) =>
     value !== undefined && Number.isFinite(value) && value >= 0 && value <= 1
       ? String(value)
@@ -1707,7 +1741,15 @@ function encodeCostMap(map?: Record<string, number>): string | undefined {
 export function dfgAlignmentQuery(options: DfgAlignmentOptions = {}): string {
   const q = new URLSearchParams();
   const add = (name: string, value: unknown) => { if (value !== undefined && value !== null && value !== "") q.set(name, String(value)); };
+  const addSelector = (name: string, value: string | undefined) => {
+    if (value === undefined) return;
+    const selector = value.trim();
+    if (!selector) throw new Error(`${name} must not be empty`);
+    q.set(name, selector);
+  };
   add("dfg_variant", options.variant);
+  addSelector("dfg_activity_attribute", options.activity_attribute);
+  addSelector("dfg_timestamp_attribute", options.timestamp_attribute);
   const maxStates = options.max_states;
   const maxTimeMs = options.max_time_ms;
   if (typeof maxStates === "number" && Number.isInteger(maxStates) && maxStates > 0) add("dfg_max_states", maxStates);
@@ -1734,7 +1776,15 @@ export async function alignDfg(options: DfgAlignmentOptions = {}): Promise<DfgAl
 /** Stable form serialization for edit-distance alignment controls. */
 export function editDistanceFormEntries(options: EditDistanceOptions = {}): Array<[string, string]> {
   const entries: Array<[string, string]> = [];
+  const addSelector = (name: string, value: string | undefined) => {
+    if (value === undefined) return;
+    const selector = value.trim();
+    if (!selector) throw new Error(`${name} must not be empty`);
+    entries.push([name, selector]);
+  };
   if (options.variant) entries.push(["edit_variant", options.variant]);
+  addSelector("edit_activity_attribute", options.activity_attribute);
+  addSelector("edit_timestamp_attribute", options.timestamp_attribute);
   if (options.anti !== undefined) entries.push(["anti", String(options.anti)]);
   const deviationCost = options.deviation_cost;
   if (typeof deviationCost === "number" && Number.isInteger(deviationCost) && deviationCost > 0) entries.push(["deviation_cost", String(deviationCost)]);
@@ -2057,6 +2107,7 @@ export async function evaluateEmd(reference: File, options: EmdOptions = {}): Pr
 
 export const DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS: Required<ProcessTreeAlignmentOptions> = {
   variant: "SEARCH_GRAPH_PT",
+  activity_attribute: "concept:name",
   max_states: 0,
   max_time_ms: 0,
   max_total_time_ms: 0,
@@ -2099,10 +2150,14 @@ export function processTreeAlignmentQuery(options: ProcessTreeAlignmentOptions =
   }
   if (options.use_global_cache !== undefined && typeof options.use_global_cache !== "boolean") throw new Error("pt_alignment_use_global_cache must be boolean");
   if (options.clear_cache !== undefined && typeof options.clear_cache !== "boolean") throw new Error("pt_alignment_clear_cache must be boolean");
+  const activityAttribute = options.activity_attribute;
+  if (activityAttribute !== undefined && !activityAttribute.trim())
+    throw new Error("pt_alignment_activity_attribute must not be empty");
 
   const query = new URLSearchParams();
   const add = (name: string, value: unknown) => { if (value !== undefined && value !== null && value !== "") query.set(name, String(value)); };
   if (variant !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.variant) add("pt_alignment_variant", variant);
+  if (activityAttribute !== undefined) add("pt_alignment_activity_attribute", activityAttribute.trim());
   if (options.max_states !== undefined && options.max_states !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.max_states) add("pt_alignment_max_states", options.max_states);
   if (options.max_time_ms !== undefined && options.max_time_ms !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.max_time_ms) add("pt_alignment_max_time_ms", options.max_time_ms);
   if (options.max_total_time_ms !== undefined && options.max_total_time_ms !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.max_total_time_ms) add("pt_alignment_max_total_time_ms", options.max_total_time_ms);
@@ -2176,6 +2231,9 @@ function checkedOptions(options: Record<string, unknown>, integerKeys: string[] 
 export function decomposedAlignmentQuery(options: DecomposedAlignmentOptions = {}): string {
   const o: Record<string, unknown> = { ...options, variant: options.variant ?? "recompos_maximal" };
   checkedOptions(o, ["max_states", "max_total_states"]);
+  if (options.activity_attribute !== undefined && !options.activity_attribute.trim())
+    throw new Error("activity_attribute must not be empty");
+  if (options.activity_attribute !== undefined) o.activity_attribute = options.activity_attribute.trim();
   if (typeof o.max_states === "number" && o.max_states < 1) throw new Error("max_states must be positive");
   if (typeof o.max_total_states === "number" && o.max_total_states < 1) throw new Error("max_total_states must be positive");
   return advancedQuery(o);
@@ -2183,6 +2241,9 @@ export function decomposedAlignmentQuery(options: DecomposedAlignmentOptions = {
 export function petriAntiAlignmentQuery(options: PetriAntiAlignmentOptions = {}): string {
   const o: Record<string, unknown> = { ...options, variant: options.variant ?? "version_discounted_a_star" };
   checkedOptions(o, ["marking_limit", "max_states"]);
+  if (options.activity_attribute !== undefined && !options.activity_attribute.trim())
+    throw new Error("activity_attribute must not be empty");
+  if (options.activity_attribute !== undefined) o.activity_attribute = options.activity_attribute.trim();
   if (typeof o.marking_limit === "number" && o.marking_limit < 1) throw new Error("marking_limit must be positive");
   if (typeof o.exponent === "number" && o.exponent <= 1) throw new Error("exponent must be greater than 1");
   return advancedQuery(o);
@@ -2190,6 +2251,9 @@ export function petriAntiAlignmentQuery(options: PetriAntiAlignmentOptions = {})
 export function petriMultiAlignmentQuery(options: PetriMultiAlignmentOptions = {}): string {
   const o: Record<string, unknown> = { ...options, variant: options.variant ?? "version_discounted_a_star" };
   checkedOptions(o, ["marking_limit", "max_states"]);
+  if (options.activity_attribute !== undefined && !options.activity_attribute.trim())
+    throw new Error("activity_attribute must not be empty");
+  if (options.activity_attribute !== undefined) o.activity_attribute = options.activity_attribute.trim();
   if (typeof o.marking_limit === "number" && o.marking_limit < 1) throw new Error("marking_limit must be positive");
   if (typeof o.exponent === "number" && o.exponent <= 1) throw new Error("exponent must be greater than 1");
   return advancedQuery(o);
@@ -6846,6 +6910,8 @@ export interface OcelConformanceOptions {
   otg_theta_codeath?: number;
   ocdfg_theta_activity?: number;
   ocdfg_theta_flow?: number;
+  ocdfg_activity_attribute?: string;
+  ocdfg_object_type_attribute?: string;
 }
 
 export function ocelConformanceQuery(options: OcelConformanceOptions = {}): string {
@@ -6867,6 +6933,12 @@ export function ocelConformanceQuery(options: OcelConformanceOptions = {}): stri
   }
   const add = (name: string, value: number | string | undefined) => {
     if (value !== undefined) query.set(name, String(value));
+  };
+  const addSelector = (name: string, value: string | undefined) => {
+    if (value === undefined) return;
+    const selector = value.trim();
+    if (!selector) throw new Error(`${name} must not be empty`);
+    query.set(name, selector);
   };
   add("variant", options.variant);
   add("real", options.real);
@@ -6890,6 +6962,8 @@ export function ocelConformanceQuery(options: OcelConformanceOptions = {}): stri
   addRelationThreshold("otg_theta_codeath", options.otg_theta_codeath);
   add("ocdfg_theta_activity", options.ocdfg_theta_activity);
   add("ocdfg_theta_flow", options.ocdfg_theta_flow);
+  addSelector("ocdfg_activity_attribute", options.ocdfg_activity_attribute);
+  addSelector("ocdfg_object_type_attribute", options.ocdfg_object_type_attribute);
   return query.toString();
 }
 

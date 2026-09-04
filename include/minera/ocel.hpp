@@ -245,6 +245,10 @@ struct OcdfgConformanceOptions {
   double beta = 1.0;
   double gamma = 1.0;
   double delta = 1.0;
+  // Direct OCEL inputs use these selectors for the discovery projection.
+  // Empty selectors retain the canonical activity and object-type fields.
+  std::string activity_attribute;
+  std::string object_type_attribute;
 };
 
 struct OcdfgConformanceResult {

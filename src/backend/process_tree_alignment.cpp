@@ -1,6 +1,9 @@
 #include "minera/process_tree_alignment.hpp"
 
+#include "minera/dfg_variants.hpp"
+
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <functional>
@@ -12,6 +15,7 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
 #include <tuple>
 #include <unordered_map>
 
@@ -20,6 +24,26 @@ namespace {
 using Op = ProcessTreeOperator;
 using Clock = std::chrono::steady_clock;
 constexpr std::size_t kMaxInclusiveChildren = 12;
+
+void validate_selector(std::string_view selector) {
+  if (selector.empty() || std::all_of(selector.begin(), selector.end(),
+                                      [](unsigned char c) {
+                                        return std::isspace(c) != 0;
+                                      })) {
+    throw std::invalid_argument(
+        "process-tree alignment activity selector must not be blank");
+  }
+}
+
+std::string selected_activity(const Event& event,
+                              std::string_view selector) {
+  const auto* value = dfg_event_field_value(event, selector);
+  if (value == nullptr)
+    throw std::invalid_argument(
+        "process-tree alignment: missing or null activity " +
+        std::string(selector));
+  return *value;
+}
 
 struct Expr;
 using EP = std::shared_ptr<const Expr>;
@@ -453,6 +477,7 @@ struct RecursiveAligner {
 ProcessTreeAlignmentResult align_process_tree(
     const EventLog& log, const ProcessTree& tree,
     ProcessTreeAlignmentOptions options) {
+  validate_selector(options.activity_attribute);
   switch (options.variant) {
     case ProcessTreeAlignmentVariant::kSearchGraphPt:
     case ProcessTreeAlignmentVariant::kDynamicProgramming:
@@ -496,7 +521,9 @@ ProcessTreeAlignmentResult align_process_tree(
 
   for (const auto& trace : log.traces) {
     ProcessTreeTraceAlignment row;
-    for (const auto& event : trace.events) row.trace.push_back(event.activity);
+    row.trace.reserve(trace.events.size());
+    for (const auto& event : trace.events)
+      row.trace.push_back(selected_activity(event, options.activity_attribute));
 
     if (!total_deadline_reached && options.max_total_time_seconds > 0.0 &&
         std::chrono::duration<double>(Clock::now() - total_start).count() >=

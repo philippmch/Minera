@@ -92,6 +92,40 @@ int main() {
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
 
+  // Both discounted Petri families read the selected generic activity field.
+  EventLog selected;
+  Trace selected_trace;
+  Event selected_event{"", "ignored"};
+  selected_event.attributes.push_back({"phase", "a"});
+  selected_trace.events.push_back(std::move(selected_event));
+  selected.traces.push_back(std::move(selected_trace));
+  PetriAntiAlignmentOptions selected_anti = ao;
+  selected_anti.activity_attribute = "phase";
+  const auto selected_anti_result = anti_align_petri(net, selected, selected_anti);
+  assert(selected_anti_result.activities == std::vector<std::string>{"b"});
+  PetriMultiAlignmentOptions selected_multi = mo;
+  selected_multi.activity_attribute = "phase";
+  const auto selected_multi_result = multi_align_petri(net, selected, selected_multi);
+  assert(selected_multi_result.activities == std::vector<std::string>{"a"});
+  PetriAntiAlignmentOptions missing_anti = selected_anti;
+  missing_anti.activity_attribute = "missing-phase";
+  threw = false;
+  try { (void)anti_align_petri(net, selected, missing_anti); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  PetriMultiAlignmentOptions missing_multi = selected_multi;
+  missing_multi.activity_attribute = "\t";
+  threw = false;
+  try { (void)multi_align_petri(net, selected, missing_multi); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  EventLog null_selected = selected;
+  null_selected.traces.front().events.front().attributes.front().is_null = true;
+  threw = false;
+  try { (void)multi_align_petri(net, null_selected, selected_multi); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+
   // Pinned label conventions: prefix handling recognizes exact tau and
   // n*-labels, while modeled cells additionally recognize *skip*.  Ordinary
   // precision/max-distance deletion recognizes all tau/skip substrings.

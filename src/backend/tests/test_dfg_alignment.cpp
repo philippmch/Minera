@@ -124,5 +124,90 @@ int main() {
 
   DfgFrequency bad{{{"a", "b"},1},{{"c", "d"},1}};
   threw=false; try { (void)align_trace_on_dfg({},bad,s,e); } catch(const std::invalid_argument&) { threw=true; } assert(threw);
+
+  // Activity and timestamp selectors are applied to both alignment words and
+  // projected model events.  Generic typed cells remain selected metadata,
+  // while a newly materialized label is represented as text.
+  EventLog selected_log;
+  Trace selected_trace;
+  Event selected_event{"1", "ignored", "canonical-time"};
+  selected_event.attributes.push_back({"phase", "a", AttributeKind::kInt});
+  selected_event.attributes.back().typed_value = std::int64_t{1};
+  selected_event.attributes.push_back(
+      {"when", "2026-01-01T00:00:00Z", AttributeKind::kDate});
+  selected_event.attributes.back().typed_value =
+      NativeDate{"2026-01-01T00:00:00.000Z"};
+  selected_trace.events.push_back(std::move(selected_event));
+  selected_log.traces.push_back(std::move(selected_trace));
+  DfgAlignmentOptions selected_options;
+  selected_options.activity_attribute = "phase";
+  selected_options.timestamp_attribute = "when";
+  const auto selected_alignment = align_log_on_dfg(
+      selected_log, d, s, e, selected_options);
+  assert(selected_alignment.alignments.size() == 1 &&
+         selected_alignment.alignments.front().cost == 10000.0);
+  const auto selected_projection = project_log_on_dfg(
+      selected_log, d, s, e, selected_options);
+  assert(selected_projection.traces.front().events.size() == 2);
+  const auto& selected_sync = selected_projection.traces.front().events[0];
+  const auto& selected_model = selected_projection.traces.front().events[1];
+  assert(selected_sync.attribute("phase") &&
+         *selected_sync.attribute("phase") == "a" &&
+         selected_sync.attributes.size() >= 3 &&
+         selected_sync.attributes[0].key == "phase" &&
+         selected_sync.attributes[0].kind == AttributeKind::kInt &&
+         std::get<std::int64_t>(selected_sync.attributes[0].typed_value) == 1 &&
+         selected_sync.attributes[1].key == "when" &&
+         selected_sync.attributes[1].kind == AttributeKind::kDate &&
+         std::get<NativeDate>(selected_sync.attributes[1].typed_value).value ==
+             "2026-01-01T00:00:00.000Z");
+  assert(selected_model.activity == "b" &&
+         selected_model.attribute("phase") &&
+         *selected_model.attribute("phase") == "b");
+  assert(selected_model.activity_source_key == "phase" &&
+         selected_model.activity_attribute &&
+         selected_model.activity_attribute->kind == AttributeKind::kString);
+  assert(selected_model.attribute("when") &&
+         *selected_model.attribute("when") == "2026-01-01T00:00:00Z");
+  assert(selected_model.timestamp_source_key == "when" &&
+         selected_model.timestamp_attribute &&
+         selected_model.timestamp_attribute->kind == AttributeKind::kDate);
+  // Conventional timestamp-less logs retain the historical projection
+  // behavior, while a custom selector is validated when it is requested.
+  EventLog timestamp_less;
+  Trace timestamp_less_trace;
+  timestamp_less_trace.events.push_back(Event{"c", "a"});
+  timestamp_less.traces.push_back(std::move(timestamp_less_trace));
+  const auto timestamp_less_projection =
+      project_log_on_dfg(timestamp_less, d, s, e);
+  assert(timestamp_less_projection.traces.front().events.size() == 2 &&
+         timestamp_less_projection.traces.front().events[0].timestamp.empty() &&
+         timestamp_less_projection.traces.front().events[1].timestamp.empty());
+  DfgAlignmentOptions missing_timestamp = selected_options;
+  missing_timestamp.timestamp_attribute = "missing-when";
+  threw = false;
+  try {
+    (void)project_log_on_dfg(timestamp_less, d, s, e, missing_timestamp);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  DfgAlignmentOptions missing_selector = selected_options;
+  missing_selector.activity_attribute = "does-not-exist";
+  threw = false;
+  try { (void)align_log_on_dfg(selected_log, d, s, e, missing_selector); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  EventLog null_selected = selected_log;
+  null_selected.traces.front().events.front().attributes.front().is_null = true;
+  threw = false;
+  try { (void)align_log_on_dfg(null_selected, d, s, e, selected_options); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  selected_options.activity_attribute = "  ";
+  threw = false;
+  try { (void)align_log_on_dfg(selected_log, d, s, e, selected_options); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
   return 0;
 }

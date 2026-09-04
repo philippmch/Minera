@@ -262,5 +262,128 @@ int main() {
   assert(typed_xes.find(
              "<date key=\"when.value\" value=\"2026-01-01T00:00:00.000Z\"/>") !=
          std::string::npos);
+
+  // A non-default activity key drives source/target variants, and the same
+  // selected generic cells are materialized on inserted model events.
+  EventLog selected_source;
+  Trace selected_source_trace;
+  Event selected_source_event{"s", "ignored", "canonical"};
+  selected_source_event.attributes.push_back(
+      {"phase", "a", AttributeKind::kInt});
+  selected_source_event.attributes.back().typed_value = std::int64_t{1};
+  selected_source_event.attributes.push_back(
+      {"when", "2026-02-01T00:00:00Z", AttributeKind::kDate});
+  selected_source_event.attributes.back().typed_value =
+      NativeDate{"2026-02-01T00:00:00.000Z"};
+  selected_source_trace.events.push_back(std::move(selected_source_event));
+  selected_source.traces.push_back(std::move(selected_source_trace));
+  EventLog selected_target;
+  Trace selected_target_trace;
+  Event selected_target_a{"t", "ignored", "canonical"};
+  selected_target_a.attributes.push_back({"phase", "a"});
+  selected_target_a.attributes.push_back({"when", "target-a"});
+  Event selected_target_b{"t", "ignored", "canonical"};
+  selected_target_b.attributes.push_back({"phase", "b"});
+  selected_target_b.attributes.push_back({"when", "target-b"});
+  selected_target_trace.events.push_back(std::move(selected_target_a));
+  selected_target_trace.events.push_back(std::move(selected_target_b));
+  selected_target.traces.push_back(std::move(selected_target_trace));
+  EditDistanceOptions selected_options;
+  selected_options.activity_attribute = "phase";
+  selected_options.timestamp_attribute = "when";
+  const auto selected_alignments =
+      align_edit_distance(selected_source, selected_target, selected_options);
+  assert(selected_alignments.size() == 1 &&
+         selected_alignments.front().target_variant ==
+             std::vector<std::string>({"a", "b"}));
+  const auto selected_projection = project_log_on_alignments(
+      selected_source, selected_alignments, selected_options);
+  assert(selected_projection.traces.front().events.size() == 2);
+  const auto& selected_sync = selected_projection.traces.front().events[0];
+  const auto& selected_inserted = selected_projection.traces.front().events[1];
+  assert(selected_sync.attribute("phase") &&
+         *selected_sync.attribute("phase") == "a" &&
+         selected_sync.attributes.size() >= 3 &&
+         selected_sync.attributes[0].key == "phase" &&
+         selected_sync.attributes[0].kind == AttributeKind::kInt &&
+         std::get<std::int64_t>(selected_sync.attributes[0].typed_value) == 1 &&
+         selected_sync.attributes[1].key == "when" &&
+         selected_sync.attributes[1].kind == AttributeKind::kDate &&
+         std::get<NativeDate>(selected_sync.attributes[1].typed_value).value ==
+             "2026-02-01T00:00:00.000Z");
+  assert(selected_sync.timestamp_source_key == "when" &&
+         selected_sync.timestamp_attribute &&
+         selected_sync.timestamp_attribute->kind == AttributeKind::kDate &&
+         std::get<NativeDate>(selected_sync.timestamp_attribute->typed_value).value ==
+             "2026-02-01T00:00:00.000Z");
+  assert(selected_inserted.activity == "b" &&
+         selected_inserted.attribute("phase") &&
+         *selected_inserted.attribute("phase") == "b");
+  assert(selected_inserted.activity_source_key == "phase" &&
+         selected_inserted.activity_attribute &&
+         selected_inserted.activity_attribute->kind == AttributeKind::kString);
+  assert(selected_inserted.attribute("when") &&
+         *selected_inserted.attribute("when") ==
+             "2026-02-01T00:00:00Z");
+  assert(selected_inserted.timestamp_source_key == "when" &&
+         selected_inserted.timestamp_attribute &&
+         selected_inserted.timestamp_attribute->kind == AttributeKind::kDate);
+  const auto selected_variant_projection = project_log_on_variant(
+      selected_source, {"a", "b"}, selected_options);
+  assert(selected_variant_projection.traces.front().events.size() == 2 &&
+         selected_variant_projection.traces.front().events[1].attribute("phase") &&
+         *selected_variant_projection.traces.front().events[1].attribute("phase") ==
+             "b");
+  EventLog timestamp_less;
+  Trace timestamp_less_trace;
+  timestamp_less_trace.events.push_back(Event{"c", "a"});
+  timestamp_less.traces.push_back(std::move(timestamp_less_trace));
+  const auto timestamp_less_alignments = align_edit_distance(
+      timestamp_less, selected_target);
+  const auto timestamp_less_projection = project_log_on_alignments(
+      timestamp_less, timestamp_less_alignments);
+  assert(timestamp_less_projection.traces.front().events.size() == 2 &&
+         timestamp_less_projection.traces.front().events[0].timestamp.empty() &&
+         timestamp_less_projection.traces.front().events[1].timestamp.empty());
+  EditDistanceOptions missing_timestamp = selected_options;
+  missing_timestamp.timestamp_attribute = "missing-when";
+  threw = false;
+  try {
+    (void)project_log_on_alignments(selected_source, selected_alignments,
+                                    missing_timestamp);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  EditDistanceOptions missing_activity = selected_options;
+  missing_activity.activity_attribute = "missing-phase";
+  threw = false;
+  try {
+    (void)align_edit_distance(selected_source, selected_target,
+                              missing_activity);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  EditDistanceOptions blank_selector = selected_options;
+  blank_selector.activity_attribute = " ";
+  threw = false;
+  try {
+    (void)align_edit_distance(selected_source, selected_target,
+                              blank_selector);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  EventLog null_activity = selected_source;
+  null_activity.traces.front().events.front().attributes.front().is_null = true;
+  threw = false;
+  try {
+    (void)align_edit_distance(null_activity, selected_target,
+                              selected_options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
   return 0;
 }

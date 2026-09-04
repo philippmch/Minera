@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <string_view>
 
 using namespace minera;
 
@@ -14,7 +15,11 @@ EventLog log(std::initializer_list<std::initializer_list<const char*>> traces) {
   for (auto values : traces) {
     Trace trace;
     trace.case_id = std::to_string(result.traces.size());
-    for (const auto* value : values) trace.events.push_back(Event{trace.case_id, value, {}, {}, order++});
+    for (const auto* value : values) {
+      Event event{trace.case_id, value, {}, {}, order++};
+      event.activity_state = FirstClassAttributeState::kPresent;
+      trace.events.push_back(std::move(event));
+    }
     result.traces.push_back(std::move(trace));
   }
   return result;
@@ -277,6 +282,242 @@ void missing_exactly_one_activity_does_not_create_empty_occurrences() {
   assert(!absent.is_fit);
   assert(absent.no_dev_total == 1);
 }
+
+EventLog attribute_activity_log(bool include_missing = false, bool include_null = false) {
+  EventLog result;
+  Trace trace;
+  trace.case_id = "0";
+  Event first{"0", "ignored"};
+  first.attributes.push_back(EventAttribute{"kind", "A"});
+  Event second{"0", "ignored"};
+  if (include_missing) {
+    second.attributes.push_back(EventAttribute{"other", "B"});
+  } else if (include_null) {
+    second.attributes.push_back(
+        EventAttribute{"kind", "", AttributeKind::kString, true});
+  } else {
+    second.attributes.push_back(EventAttribute{"kind", "B"});
+  }
+  trace.events = {std::move(first), std::move(second)};
+  result.traces.push_back(std::move(trace));
+  return result;
+}
+
+EventLog projected_activity_log() {
+  auto result = attribute_activity_log();
+  for (auto& event : result.traces[0].events) {
+    const auto value = *event.attribute("kind");
+    event.activity = value;
+    event.activity_state = FirstClassAttributeState::kPresent;
+    event.activity_source_key = "kind";
+    event.activity_attribute = EventAttribute{"kind", value};
+    event.attributes.clear();
+  }
+  return result;
+}
+
+EventLog first_class_activity_log(std::string_view selector,
+                                  bool missing = false, bool null_value = false) {
+  EventLog result;
+  Trace trace;
+  trace.case_id = "0";
+  const bool resource_field = selector == "org:resource" ||
+                              selector == "resource" || selector == "worker";
+  const bool timestamp_field = selector == "time:timestamp" ||
+                               selector == "timestamp" || selector == "when";
+  const bool lifecycle_field = selector == "lifecycle:transition" ||
+                               selector == "lifecycle" || selector == "phase";
+  for (const char* value : {"A", "B"}) {
+    Event event{"0", "ignored"};
+    if (resource_field) {
+      event.resource_source_key = selector == "worker" ? "worker" : "";
+      event.resource = missing || null_value ? "" : value;
+      event.resource_state = missing
+                                 ? FirstClassAttributeState::kMissing
+                                 : (null_value ? FirstClassAttributeState::kNull
+                                               : FirstClassAttributeState::kPresent);
+      if (selector == "worker" && !missing)
+        event.resource_attribute = EventAttribute{
+            "worker", missing || null_value ? "" : value,
+            AttributeKind::kString, null_value};
+    } else if (timestamp_field) {
+      event.timestamp_source_key = selector == "when" ? "when" : "";
+      event.timestamp = missing || null_value ? "" : value;
+      event.timestamp_state = missing
+                                  ? FirstClassAttributeState::kMissing
+                                  : (null_value ? FirstClassAttributeState::kNull
+                                                : FirstClassAttributeState::kPresent);
+      if (selector == "when" && !missing)
+        event.timestamp_attribute = EventAttribute{
+            "when", missing || null_value ? "" : value,
+            AttributeKind::kString, null_value};
+    } else if (lifecycle_field) {
+      event.lifecycle_source_key = selector == "phase" ? "phase" : "";
+      event.lifecycle = missing || null_value ? "" : value;
+      event.lifecycle_state = missing
+                                  ? FirstClassAttributeState::kMissing
+                                  : (null_value ? FirstClassAttributeState::kNull
+                                                : FirstClassAttributeState::kPresent);
+      if (selector == "phase" && !missing)
+        event.lifecycle_attribute = EventAttribute{
+            "phase", missing || null_value ? "" : value,
+            AttributeKind::kString, null_value};
+    }
+    trace.events.push_back(std::move(event));
+  }
+  result.traces.push_back(std::move(trace));
+  return result;
+}
+
+void custom_activity_selector_is_strict() {
+  DeclareDiscoveryOptions discovery;
+  discovery.activity_key = "kind";
+  discovery.allowed_templates = {kDeclareExistence};
+  discovery.has_min_support_ratio = true;
+  discovery.has_min_confidence_ratio = true;
+  const auto custom_model = discover_declare(attribute_activity_log(), discovery);
+  assert(custom_model.rules.at(kDeclareExistence).size() == 2);
+  assert(custom_model.rules.at(kDeclareExistence)[0].first == "A");
+  assert(custom_model.rules.at(kDeclareExistence)[1].first == "B");
+  const auto projected_model = discover_declare(projected_activity_log(), discovery);
+  assert(projected_model.rules.at(kDeclareExistence).size() == 2);
+
+  DeclareConformanceOptions conformance;
+  conformance.activity_key = "kind";
+  assert(check_declare_conformance(attribute_activity_log().traces[0],
+                                   custom_model, conformance)
+             .is_fit);
+  const auto event_log_result = check_declare_conformance(
+      attribute_activity_log(), custom_model, conformance);
+  assert(event_log_result.size() == 1 && event_log_result[0].is_fit);
+
+  bool missing_threw = false;
+  try {
+    (void)discover_declare(attribute_activity_log(true), discovery);
+  } catch (const std::invalid_argument&) {
+    missing_threw = true;
+  }
+  assert(missing_threw);
+  missing_threw = false;
+  try {
+    (void)check_declare_conformance(attribute_activity_log(true).traces[0],
+                                    custom_model, conformance);
+  } catch (const std::invalid_argument&) {
+    missing_threw = true;
+  }
+  assert(missing_threw);
+  missing_threw = false;
+  try {
+    (void)check_declare_conformance(attribute_activity_log(true), custom_model,
+                                    conformance);
+  } catch (const std::invalid_argument&) {
+    missing_threw = true;
+  }
+  assert(missing_threw);
+
+  bool null_threw = false;
+  try {
+    (void)discover_declare(attribute_activity_log(false, true), discovery);
+  } catch (const std::invalid_argument&) {
+    null_threw = true;
+  }
+  assert(null_threw);
+}
+
+void blank_activity_selectors_reject_empty_inputs() {
+  DeclareDiscoveryOptions discovery;
+  discovery.activity_key = " \t ";
+  bool threw = false;
+  try {
+    (void)discover_declare(EventLog{}, discovery);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  DeclareConformanceOptions conformance;
+  conformance.activity_key = "\t";
+  threw = false;
+  try {
+    (void)check_declare_conformance(EventLog{}, DeclareModel{}, conformance);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  threw = false;
+  try {
+    (void)check_declare_conformance(Trace{}, DeclareModel{}, conformance);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+void first_class_activity_selectors_are_supported() {
+  for (const std::string selector : {"org:resource", "time:timestamp",
+                                     "lifecycle:transition", "worker", "when",
+                                     "phase"}) {
+    DeclareDiscoveryOptions discovery;
+    discovery.activity_key = selector;
+    discovery.allowed_templates = {kDeclareExistence};
+    discovery.has_min_support_ratio = true;
+    discovery.has_min_confidence_ratio = true;
+    const auto selected = first_class_activity_log(selector);
+    const auto model = discover_declare(selected, discovery);
+    assert(model.rules.at(kDeclareExistence).size() == 2);
+    DeclareConformanceOptions conformance;
+    conformance.activity_key = selector;
+    assert(check_declare_conformance(selected.traces[0], model, conformance)
+               .is_fit);
+    const auto log_result =
+        check_declare_conformance(selected, model, conformance);
+    assert(log_result.size() == 1 && log_result[0].is_fit);
+  }
+
+  DeclareDiscoveryOptions discovery;
+  discovery.activity_key = "org:resource";
+  discovery.allowed_templates = {kDeclareExistence};
+  bool threw = false;
+  try {
+    (void)discover_declare(first_class_activity_log("org:resource", true),
+                           discovery);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)discover_declare(first_class_activity_log("org:resource", false, true),
+                           discovery);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  DeclareConformanceOptions conformance;
+  conformance.activity_key = "org:resource";
+  const auto model = discover_declare(first_class_activity_log("org:resource"),
+                                      discovery);
+  threw = false;
+  try {
+    (void)check_declare_conformance(
+        first_class_activity_log("org:resource", true).traces[0], model,
+        conformance);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)check_declare_conformance(
+        first_class_activity_log("org:resource", false, true), model,
+        conformance);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
 }  // namespace
 
 int main() {
@@ -290,5 +531,8 @@ int main() {
   threshold_edge_values_follow_positive_predicates();
   conformance_deviation_order_is_fixed();
   missing_exactly_one_activity_does_not_create_empty_occurrences();
+  custom_activity_selector_is_strict();
+  blank_activity_selectors_reject_empty_inputs();
+  first_class_activity_selectors_are_supported();
   std::cout << "declare tests passed\n";
 }

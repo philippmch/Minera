@@ -63,6 +63,8 @@ struct ProcessTreeAlignmentOptions {
   bool use_global_cache = false;
   std::size_t batch_size = 1000;
   bool clear_cache = true;
+  // Event field used to construct alignment words.
+  std::string activity_attribute = "concept:name";
 };
 
 struct ProcessTreeTraceAlignment {
