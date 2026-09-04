@@ -212,6 +212,7 @@ void exact_matching_accepts_equal_boundaries_and_large_populations() {
   const auto equality = discover_correlation_miner(equal, options);
   assert_near(equality.precede_succeed_probability.at(kAB), 0.0);
   assert_near(equality.duration_matrix.at(kAB), 0.0);
+  assert_near(equality.duration_matrix.at(kBA), 0.0);
 
   EventLog large;
   std::vector<Event> events;
@@ -226,6 +227,7 @@ void exact_matching_accepts_equal_boundaries_and_large_populations() {
   const auto result = discover_correlation_miner(large, options);
   assert_near(result.precede_succeed_probability.at(kAB), 1.0);
   assert_near(result.duration_matrix.at(kAB), 100.0);
+  assert_near(result.duration_matrix.at(kBA), 0.0);
 }
 
 void custom_interval_key_is_used_and_timestamp_errors_are_strict() {

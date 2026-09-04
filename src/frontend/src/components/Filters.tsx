@@ -103,6 +103,34 @@ export function temporalValidationMessage(input: {
   return null;
 }
 
+/** Correlation selectors require names once at least one variant is enabled. */
+export function correlationValidationMessage(input: {
+  enabled: boolean;
+  activityAttribute: string;
+  timestampAttribute: string;
+  startTimestampAttribute: string;
+  caseIdAttribute: string;
+  traceEnabled: boolean;
+  splitEnabled: boolean;
+  sampleSize: string;
+}): string | null {
+  if (!input.enabled) return null;
+  if (!input.activityAttribute.trim())
+    return "Correlation activity attribute must not be empty.";
+  if (!input.timestampAttribute.trim())
+    return "Correlation timestamp attribute must not be empty.";
+  if (input.traceEnabled && !input.caseIdAttribute.trim())
+    return "Correlation case-id attribute must not be empty.";
+  if (input.splitEnabled) {
+    const raw = input.sampleSize.trim();
+    const value = Number(raw);
+    if (!raw || !Number.isSafeInteger(value) || value <= 0)
+      return "Correlation split sample size must be a positive safe integer.";
+  }
+  // An empty start selector intentionally requests the completion selector.
+  return null;
+}
+
 /** Segment endpoints are a pair: a half-configured extraction is invalid. */
 export function segmentValidationMessage(input: {
   betweenStart: string;
@@ -715,8 +743,14 @@ export function Filters({
   ] as const;
   const [correlationVariants, setCorrelationVariants] =
     useState<Set<string>>(new Set());
+  const [correlationActivityAttribute, setCorrelationActivityAttribute] =
+    useState("concept:name");
+  const [correlationTimestampAttribute, setCorrelationTimestampAttribute] =
+    useState("time:timestamp");
   const [correlationStartTimestampAttribute,
     setCorrelationStartTimestampAttribute] = useState("");
+  const [correlationCaseIdAttribute, setCorrelationCaseIdAttribute] =
+    useState("case:concept:name");
   const [correlationExactTimeMatching,
     setCorrelationExactTimeMatching] = useState(false);
   const [correlationSampleSize, setCorrelationSampleSize] =
@@ -1034,6 +1068,16 @@ export function Filters({
     indexAttribute: footprintsIndexAttribute,
     initialMarking: footprintsInitialMarking,
   });
+  const correlationValidationError = correlationValidationMessage({
+    enabled: correlationVariants.size > 0,
+    activityAttribute: correlationActivityAttribute,
+    timestampAttribute: correlationTimestampAttribute,
+    startTimestampAttribute: correlationStartTimestampAttribute,
+    caseIdAttribute: correlationCaseIdAttribute,
+    traceEnabled: correlationVariants.has("trace_based"),
+    splitEnabled: correlationSplitOptionsActive,
+    sampleSize: correlationSampleSize,
+  });
   const selectorValidationError =
     !logSkeletonActivityAttribute.trim()
       ? "Log skeleton activity attribute must not be empty."
@@ -1049,7 +1093,8 @@ export function Filters({
         relativeAttributeValidationError || attributeOccurrenceValidationError ||
         variantCoverageValidationError || repetitionValidationError ||
         caseGroupingValidationError || powlValidationError ||
-        footprintsValidationError || selectorValidationError) return;
+        footprintsValidationError || correlationValidationError ||
+        selectorValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
     const removeLifecycleList = lifecycles.filter((l) =>
@@ -1359,15 +1404,30 @@ export function Filters({
           ? true : undefined,
       correlationVariants:
         correlationVariants.size > 0 ? [...correlationVariants] : undefined,
+      correlationActivityAttribute:
+        correlationVariants.size > 0 &&
+        correlationActivityAttribute.trim() !== "concept:name"
+          ? correlationActivityAttribute.trim() || undefined
+          : undefined,
+      correlationTimestampAttribute:
+        correlationVariants.size > 0 &&
+        correlationTimestampAttribute.trim() !== "time:timestamp"
+          ? correlationTimestampAttribute.trim() || undefined
+          : undefined,
       correlationStartTimestampAttribute:
         correlationVariants.size > 0
           ? correlationStartTimestampAttribute.trim() || undefined
+          : undefined,
+      correlationCaseIdAttribute:
+        correlationVariants.size > 0 &&
+        correlationCaseIdAttribute.trim() !== "case:concept:name"
+          ? correlationCaseIdAttribute.trim() || undefined
           : undefined,
       correlationExactTimeMatching:
         correlationExactOptionsActive && correlationExactTimeMatching
           ? true : undefined,
       correlationSampleSize: correlationSplitOptionsActive
-        ? toInt(correlationSampleSize) : undefined,
+        ? Number(correlationSampleSize.trim()) : undefined,
       temporalActivityAttribute:
         temporalActivityAttribute.trim() !== "concept:name"
           ? temporalActivityAttribute.trim() || undefined : undefined,
@@ -1576,7 +1636,10 @@ export function Filters({
     setDfgCaseAttributes("concept:name");
     setDfgReturnNodeAttributes(false);
     setCorrelationVariants(new Set());
+    setCorrelationActivityAttribute("concept:name");
+    setCorrelationTimestampAttribute("time:timestamp");
     setCorrelationStartTimestampAttribute("");
+    setCorrelationCaseIdAttribute("case:concept:name");
     setCorrelationExactTimeMatching(false);
     setCorrelationSampleSize("100000");
     setTemporalActivityAttribute("concept:name");
@@ -2591,6 +2654,32 @@ export function Filters({
                 </button>;
               })}
             </div>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Correlation activity attribute</span>
+              <input type="text" placeholder="concept:name"
+                value={correlationActivityAttribute}
+                disabled={correlationVariants.size === 0}
+                onChange={(event) =>
+                  setCorrelationActivityAttribute(event.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Correlation completion timestamp attribute</span>
+              <input type="text" placeholder="time:timestamp"
+                value={correlationTimestampAttribute}
+                disabled={correlationVariants.size === 0}
+                onChange={(event) =>
+                  setCorrelationTimestampAttribute(event.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Correlation case-id attribute</span>
+              <input type="text" placeholder="case:concept:name"
+                value={correlationCaseIdAttribute}
+                disabled={correlationVariants.size === 0}
+                onChange={(event) =>
+                  setCorrelationCaseIdAttribute(event.target.value)} />
+            </label>
           </div>
           <div className="filters-row">
             <label className="filters-field">
@@ -4031,11 +4120,12 @@ export function Filters({
             relativeAttributeValidationError || attributeOccurrenceValidationError ||
             variantCoverageValidationError || repetitionValidationError ||
             caseGroupingValidationError || powlValidationError ||
-            footprintsValidationError || selectorValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError || footprintsValidationError || selectorValidationError}</p>
+            footprintsValidationError || correlationValidationError ||
+            selectorValidationError) && (
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError || footprintsValidationError || correlationValidationError || selectorValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError || footprintsValidationError || selectorValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError || footprintsValidationError || correlationValidationError || selectorValidationError)}>
               Apply
             </button>
             <button

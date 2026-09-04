@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alphaOptionsFromForm, alphaSettingsAreDirty, attributeOccurrenceValidationMessage, caseGroupingValidationMessage, footprintsValidationMessage, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
+import { alphaOptionsFromForm, alphaSettingsAreDirty, attributeOccurrenceValidationMessage, caseGroupingValidationMessage, correlationValidationMessage, footprintsValidationMessage, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
 
 const valid = {
   spectrumConfigured: true,
@@ -12,6 +12,48 @@ const valid = {
   overlap: false,
   overlapEpsilon: "0.00001",
 };
+
+describe("correlation selector validation", () => {
+  const selectors = {
+    enabled: true,
+    activityAttribute: "concept:name",
+    timestampAttribute: "time:timestamp",
+    startTimestampAttribute: "",
+    caseIdAttribute: "case:concept:name",
+    traceEnabled: false,
+    splitEnabled: false,
+    sampleSize: "100000",
+  };
+
+  it("accepts defaults and an empty start selector fallback", () => {
+    expect(correlationValidationMessage(selectors)).toBeNull();
+    expect(correlationValidationMessage({ ...selectors, enabled: false,
+      activityAttribute: "", timestampAttribute: "", caseIdAttribute: "" })).toBeNull();
+  });
+
+  it("rejects blank required selectors", () => {
+    expect(correlationValidationMessage({ ...selectors, activityAttribute: " " }))
+      .toMatch(/activity/);
+    expect(correlationValidationMessage({ ...selectors, timestampAttribute: "\t" }))
+      .toMatch(/timestamp/);
+    expect(correlationValidationMessage({ ...selectors, traceEnabled: true,
+      caseIdAttribute: "  " }))
+      .toMatch(/case-id/);
+    expect(correlationValidationMessage({ ...selectors, caseIdAttribute: "  " }))
+      .toBeNull();
+  });
+
+  it("validates the enabled split sample size exactly", () => {
+    for (const sampleSize of ["", "0", "-1", "2.5", "9007199254740992", "junk"]) {
+      expect(correlationValidationMessage({ ...selectors, splitEnabled: true,
+        sampleSize })).toMatch(/sample size/);
+    }
+    expect(correlationValidationMessage({ ...selectors, splitEnabled: true,
+      sampleSize: "2" })).toBeNull();
+    expect(correlationValidationMessage({ ...selectors, splitEnabled: false,
+      sampleSize: "junk" })).toBeNull();
+  });
+});
 
 describe("temporal filter validation", () => {
   it("accepts active defaults and ignores dependent values when inactive", () => {

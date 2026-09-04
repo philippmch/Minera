@@ -2888,14 +2888,30 @@ MineParams parse_mine_params(const FieldLookup& field,
     }
   };
   parse_correlation_variants();
-  if (const auto value = field("correlation_start_timestamp_attribute");
-      present ? present("correlation_start_timestamp_attribute")
-              : !value.empty()) {
-    // With FieldPresence an explicit empty value is meaningful: it asks the
-    // miner to use its own fallback attribute rather than the request parser's
-    // default. The legacy lookup overload still treats empty as omitted.
-    params.correlation.start_timestamp_attribute = value;
-  }
+  // Correlation selectors are presence-aware.  The activity, completion, and
+  // case-id selectors are required names whenever supplied; an empty start
+  // selector is the one intentional exception and means "use completion".
+  // Keeping this validation here makes multipart and query requests obey the
+  // same contract before an input adapter is invoked.
+  const auto parse_correlation_selector = [&](std::string_view field_name,
+                                              std::string& destination,
+                                              bool allow_empty) {
+    const auto value = field(field_name);
+    if (!(present ? present(field_name) : !value.empty())) return;
+    destination = trim_text(value);
+    if (!allow_empty && destination.empty()) {
+      throw std::invalid_argument(std::string(field_name) +
+                                  ": expected a non-empty attribute name");
+    }
+  };
+  parse_correlation_selector("correlation_activity_attribute",
+                            params.correlation.activity_attribute, false);
+  parse_correlation_selector("correlation_timestamp_attribute",
+                            params.correlation.timestamp_attribute, false);
+  parse_correlation_selector("correlation_start_timestamp_attribute",
+                            params.correlation.start_timestamp_attribute, true);
+  parse_correlation_selector("correlation_case_id_attribute",
+                            params.correlation.case_id_attribute, false);
   if (const auto value = field("correlation_exact_time_matching");
       present ? present("correlation_exact_time_matching") : !value.empty()) {
     params.correlation.exact_time_matching =

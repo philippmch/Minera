@@ -279,11 +279,25 @@ const std::string* dfg_event_field_value(const Event& event,
         matches_source(event.activity_source_key, selector)) {
       if (event.activity_attribute &&
           !event.activity_attribute->is_null &&
+          event.activity_attribute->first_class_state !=
+              FirstClassAttributeState::kNull &&
           (selector.empty() || selector == event.activity_attribute->key ||
            matches_source(event.activity_source_key, selector))) {
         return &event.activity_attribute->value;
       }
     }
+  }
+  // Some adapters retain the selected activity cell only in its typed
+  // projection metadata. Honor its own key/source spelling before consulting
+  // potentially stale generic attributes.
+  if (event.activity_attribute &&
+      (event.activity_attribute->key == selector ||
+       event.activity_attribute->first_class_source_key == selector)) {
+    if (event.activity_attribute->is_null ||
+        event.activity_attribute->first_class_state ==
+            FirstClassAttributeState::kNull)
+      return nullptr;
+    return &event.activity_attribute->value;
   }
 
   if (selector == "time:timestamp" || selector == "timestamp" ||
@@ -291,26 +305,60 @@ const std::string* dfg_event_field_value(const Event& event,
     if (const auto* value =
             first_class(event.timestamp, event.timestamp_state))
       return value;
-    if (event.timestamp_attribute && !event.timestamp_attribute->is_null)
+    if (event.timestamp_attribute && !event.timestamp_attribute->is_null &&
+        event.timestamp_attribute->first_class_state !=
+            FirstClassAttributeState::kNull)
       return &event.timestamp_attribute->value;
+  }
+  if (event.timestamp_attribute &&
+      (event.timestamp_attribute->key == selector ||
+       event.timestamp_attribute->first_class_source_key == selector)) {
+    if (event.timestamp_attribute->is_null ||
+        event.timestamp_attribute->first_class_state ==
+            FirstClassAttributeState::kNull)
+      return nullptr;
+    return &event.timestamp_attribute->value;
   }
   if (selector == "org:resource" || selector == "resource" ||
       matches_source(event.resource_source_key, selector)) {
     if (const auto* value = first_class(event.resource, event.resource_state))
       return value;
-    if (event.resource_attribute && !event.resource_attribute->is_null)
+    if (event.resource_attribute && !event.resource_attribute->is_null &&
+        event.resource_attribute->first_class_state !=
+            FirstClassAttributeState::kNull)
       return &event.resource_attribute->value;
+  }
+  if (event.resource_attribute &&
+      (event.resource_attribute->key == selector ||
+       event.resource_attribute->first_class_source_key == selector)) {
+    if (event.resource_attribute->is_null ||
+        event.resource_attribute->first_class_state ==
+            FirstClassAttributeState::kNull)
+      return nullptr;
+    return &event.resource_attribute->value;
   }
   if (selector == "lifecycle:transition" || selector == "lifecycle" ||
       matches_source(event.lifecycle_source_key, selector)) {
     if (const auto* value =
             first_class(event.lifecycle, event.lifecycle_state))
       return value;
-    if (event.lifecycle_attribute && !event.lifecycle_attribute->is_null)
+    if (event.lifecycle_attribute && !event.lifecycle_attribute->is_null &&
+        event.lifecycle_attribute->first_class_state !=
+            FirstClassAttributeState::kNull)
       return &event.lifecycle_attribute->value;
   }
+  if (event.lifecycle_attribute &&
+      (event.lifecycle_attribute->key == selector ||
+       event.lifecycle_attribute->first_class_source_key == selector)) {
+    if (event.lifecycle_attribute->is_null ||
+        event.lifecycle_attribute->first_class_state ==
+            FirstClassAttributeState::kNull)
+      return nullptr;
+    return &event.lifecycle_attribute->value;
+  }
   if (selector == "case:concept:name" || selector == "case_id" ||
-      selector == "case" || matches_source(event.case_id_source_key, selector)) {
+      selector == "case:id" || selector == "case" ||
+      matches_source(event.case_id_source_key, selector)) {
     if (const auto* value = first_class(event.case_id, event.case_id_state))
       return value;
   }

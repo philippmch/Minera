@@ -2205,19 +2205,29 @@ incoming and outgoing marginals and the same objective. Frequency edges retain
 their raw correlation duration, including zero-duration forced reverse and
 self edges.
 
-The configurable interval-start attribute, exact-match toggle, and split
-sample size are available through the native API, strict request parser, CLI,
-local server, deterministic JSON, and frontend. Missing or malformed configured
-starts and malformed completion timestamps fail explicitly. The native
-TRACE_BASED path honors a configured start key; this fixes the pinned EventLog
-wrapper's dropped-parameter defect while retaining the intended algorithm.
-Dataframe and Polars paths are adapters to these same semantics.
+Activity, completion timestamp, interval start, and case-id selectors are
+available through the native API, strict request parser, CLI, local server,
+deterministic JSON, and frontend, together with the exact-match toggle and
+split sample size. Canonical aliases, imported first-class source spellings,
+and ordinary attributes resolve consistently. An omitted or empty start
+selector uses the selected completion field. Required missing, null, blank, or
+malformed values fail explicitly.
 
-Focused regressions cover canonical classic/trace/split fixtures, raw split
-chunk order, forced reverse and self edges, one-sided greedy matching, equal
-interval boundaries, exact matching above 25 events, custom interval keys,
-strict timestamp errors, empty and single-activity logs, complete diagnostic
-matrices, deterministic ties, and balanced transportation marginals.
+Event logs and flat event streams preserve their flattened source order before
+CLASSIC_SPLIT creates chunks. Eager and lazy tables first order rows by
+completion and start, then retain stable source order for ties. TRACE_BASED
+keeps native trace boundaries and groups flat inputs by the selected case id;
+each case is ordered independently. All four input forms are also available
+through the generic event-data dispatcher. The native TRACE_BASED path honors
+every selector rather than dropping configured trace parameters.
+
+Focused regressions cover canonical classic/trace/split fixtures, raw and
+table-ordered split chunks, all eager/lazy/stream/log adapters, custom
+activity/completion/start/case selectors, first-class source metadata, missing
+and null cells, forced reverse and self edges, one-sided greedy matching, equal
+interval boundaries, exact matching above 25 events, strict timestamp errors,
+empty and single-activity logs, complete diagnostic matrices, projected-label
+JSON ids and counts, deterministic ties, and balanced transportation marginals.
 
 ## Performance-spectrum and batch parity evidence
 

@@ -100,7 +100,10 @@ void parse_mine_params_defaults_when_empty() {
       fields({{"alpha_variant", "plus"}}));
   assert(explicit_plus.alpha.short_loops);
   assert(params.correlation_variants.empty());
+  assert(params.correlation.activity_attribute == "concept:name");
+  assert(params.correlation.timestamp_attribute == "time:timestamp");
   assert(params.correlation.start_timestamp_attribute.empty());
+  assert(params.correlation.case_id_attribute == "case:concept:name");
   assert(!params.correlation.exact_time_matching);
   assert(params.correlation.sample_size == 100000);
   assert(params.spectrum_activities.empty());
@@ -904,13 +907,19 @@ void random_tree_params_contract() {
 void parse_mine_params_maps_correlation_options() {
   const auto params = minera::parse_mine_params(fields({
       {"correlation_variants", "trace_based, classic, classic,classic_split"},
+      {"correlation_activity_attribute", " event_kind "},
+      {"correlation_timestamp_attribute", " finished_at "},
       {"correlation_start_timestamp_attribute", "started_at"},
+      {"correlation_case_id_attribute", " case_ref "},
       {"correlation_exact_time_matching", "1"},
       {"correlation_sample_size", "42"},
   }));
   assert((params.correlation_variants ==
           std::vector<std::string>{"classic", "classic_split", "trace_based"}));
+  assert(params.correlation.activity_attribute == "event_kind");
+  assert(params.correlation.timestamp_attribute == "finished_at");
   assert(params.correlation.start_timestamp_attribute == "started_at");
+  assert(params.correlation.case_id_attribute == "case_ref");
   assert(params.correlation.exact_time_matching);
   assert(params.correlation.sample_size == 42);
 }
@@ -935,6 +944,9 @@ void parse_mine_params_preserves_explicit_empty_correlation_timestamp() {
 void parse_mine_params_rejects_invalid_correlation_options() {
   for (const auto& item : {
            std::pair{"correlation_variants", "classic,bogus"},
+           std::pair{"correlation_activity_attribute", " "},
+           std::pair{"correlation_timestamp_attribute", "\t"},
+           std::pair{"correlation_case_id_attribute", ""},
            std::pair{"correlation_exact_time_matching", "yes"},
            std::pair{"correlation_sample_size", "0"},
            std::pair{"correlation_sample_size", "-1"},

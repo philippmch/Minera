@@ -6,12 +6,15 @@
 #include <functional>
 #include <limits>
 #include <map>
+#include <optional>
 #include <queue>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+#include "minera/directly_follows_graph.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -30,6 +33,501 @@ struct PreparedEvent {
 
 using PreparedEvents = std::vector<PreparedEvent>;
 using GroupedEvents = std::map<std::string, PreparedEvents>;
+
+struct PreparedInput {
+  PreparedEvents raw_flat;
+  std::vector<PreparedEvents> traces;
+};
+
+enum class SelectorRole { kActivity, kTimestamp, kCaseId };
+
+std::string require_selector(std::string_view selector,
+                             std::string_view description) {
+  if (selector.empty() ||
+      selector.find_first_not_of(" \t\r\n") == std::string_view::npos) {
+    throw std::invalid_argument("correlation miner " + std::string(description) +
+                                " selector must not be blank");
+  }
+  return std::string(selector);
+}
+
+bool is_alias(SelectorRole role, std::string_view selector) {
+  switch (role) {
+    case SelectorRole::kActivity:
+      return selector == "concept:name" || selector == "activity";
+    case SelectorRole::kTimestamp:
+      return selector == "time:timestamp" || selector == "timestamp";
+    case SelectorRole::kCaseId:
+      return selector == "case:concept:name" || selector == "case_id" ||
+             selector == "case:id" || selector == "case";
+  }
+  return false;
+}
+
+std::vector<std::string_view> aliases(SelectorRole role) {
+  switch (role) {
+    case SelectorRole::kActivity:
+      return {"concept:name", "activity"};
+    case SelectorRole::kTimestamp:
+      return {"time:timestamp", "timestamp"};
+    case SelectorRole::kCaseId:
+      return {"case:concept:name", "case_id", "case:id", "case"};
+  }
+  return {};
+}
+
+bool role_matches(const EventAttribute& field, SelectorRole role) {
+  switch (role) {
+    case SelectorRole::kActivity:
+      return field.first_class_role == FirstClassAttributeRole::kActivity;
+    case SelectorRole::kTimestamp:
+      return field.first_class_role == FirstClassAttributeRole::kTimestamp;
+    case SelectorRole::kCaseId:
+      return field.first_class_role == FirstClassAttributeRole::kCaseId;
+  }
+  return false;
+}
+
+const EventAttribute* role_field(const std::vector<EventAttribute>& fields,
+                                 SelectorRole role) {
+  const auto found = std::find_if(
+      fields.begin(), fields.end(),
+      [&](const auto& field) { return role_matches(field, role); });
+  return found == fields.end() ? nullptr : &*found;
+}
+
+const EventAttribute* source_field(const std::vector<EventAttribute>& fields,
+                                   std::string_view selector,
+                                   SelectorRole role) {
+  const auto found = std::find_if(
+      fields.begin(), fields.end(), [&](const auto& field) {
+        return role_matches(field, role) &&
+               field.first_class_source_key == selector;
+      });
+  return found == fields.end() ? nullptr : &*found;
+}
+
+const EventAttribute* exact_field(const std::vector<EventAttribute>& fields,
+                                  std::string_view selector) {
+  const auto found = std::find_if(
+      fields.begin(), fields.end(),
+      [&](const auto& field) { return field.key == selector; });
+  return found == fields.end() ? nullptr : &*found;
+}
+
+const EventAttribute* select_flat_field(const std::vector<EventAttribute>& fields,
+                                        std::string_view selector,
+                                        SelectorRole role) {
+  if (selector.empty()) return nullptr;
+
+  // A source spelling attached to a first-class field is stronger than a
+  // stale generic field carrying the same key.
+  if (const auto* selected = source_field(fields, selector, role))
+    return selected;
+
+  // Canonical aliases select the role projection before considering ordinary
+  // columns. This keeps a custom first-class source key usable after a flat
+  // conversion has removed its canonical spelling.
+  if (is_alias(role, selector)) {
+    if (const auto* selected = role_field(fields, role)) return selected;
+    for (const auto alias : aliases(role)) {
+      if (const auto* selected = exact_field(fields, alias)) return selected;
+    }
+  }
+  return exact_field(fields, selector);
+}
+
+const EventAttribute* event_attribute(const Event& event,
+                                      std::string_view selector) {
+  const auto found = std::find_if(
+      event.attributes.begin(), event.attributes.end(),
+      [&](const auto& field) { return field.key == selector; });
+  return found == event.attributes.end() ? nullptr : &*found;
+}
+
+std::string require_value(const EventAttribute* field,
+                          std::string_view description,
+                          std::string_view selector) {
+  if (field == nullptr || field->is_null ||
+      field->first_class_state == FirstClassAttributeState::kNull) {
+    throw std::invalid_argument("correlation miner " + std::string(description) +
+                                " selector '" + std::string(selector) +
+                                "' is missing or null");
+  }
+  if (field->value.empty() ||
+      field->value.find_first_not_of(" \t\r\n") == std::string::npos) {
+    throw std::invalid_argument("correlation miner " + std::string(description) +
+                                " selector '" + std::string(selector) +
+                                "' is blank");
+  }
+  return field->value;
+}
+
+std::optional<std::string> first_class_value(
+    std::string_view value, FirstClassAttributeState state,
+    const std::optional<EventAttribute>& metadata,
+    std::string_view selector, std::string_view description) {
+  if (state == FirstClassAttributeState::kNull)
+    throw std::invalid_argument("correlation miner " + std::string(description) +
+                                " selector '" + std::string(selector) +
+                                "' is null");
+  if (state != FirstClassAttributeState::kMissing || !value.empty()) {
+    if (value.empty() ||
+        value.find_first_not_of(" \t\r\n") == std::string_view::npos)
+      throw std::invalid_argument("correlation miner " +
+                                  std::string(description) + " selector '" +
+                                  std::string(selector) + "' is blank");
+    return std::string(value);
+  }
+  if (metadata && !metadata->is_null && !metadata->value.empty() &&
+      metadata->value.find_first_not_of(" \t\r\n") != std::string_view::npos)
+    return metadata->value;
+  return std::nullopt;
+}
+
+std::string selected_event_value(const Event& event, std::string_view selector,
+                                 SelectorRole role,
+                                 std::string_view description) {
+  const auto canonical = is_alias(role, selector);
+  const auto source_matches = [&](std::string_view source) {
+    return !source.empty() && source == selector;
+  };
+  if (role == SelectorRole::kActivity &&
+      (canonical || source_matches(event.activity_source_key))) {
+    if (const auto value = first_class_value(
+            event.activity, event.activity_state, event.activity_attribute,
+            selector, description))
+      return *value;
+  }
+  if (role == SelectorRole::kTimestamp &&
+      (canonical || source_matches(event.timestamp_source_key))) {
+    if (const auto value = first_class_value(
+            event.timestamp, event.timestamp_state, event.timestamp_attribute,
+            selector, description))
+      return *value;
+  }
+  if (role == SelectorRole::kCaseId &&
+      (canonical || source_matches(event.case_id_source_key))) {
+    if (const auto value = first_class_value(
+            event.case_id, event.case_id_state, std::nullopt, selector,
+            description))
+      return *value;
+  }
+  if (role == SelectorRole::kActivity) {
+    if (selector == "time:timestamp" || selector == "timestamp" ||
+        source_matches(event.timestamp_source_key)) {
+      if (const auto value = first_class_value(
+              event.timestamp, event.timestamp_state,
+              event.timestamp_attribute, selector, description))
+        return *value;
+    }
+    if (selector == "org:resource" || selector == "resource" ||
+        source_matches(event.resource_source_key)) {
+      if (const auto value = first_class_value(
+              event.resource, event.resource_state, event.resource_attribute,
+              selector, description))
+        return *value;
+    }
+    if (selector == "lifecycle:transition" || selector == "lifecycle" ||
+        source_matches(event.lifecycle_source_key)) {
+      if (const auto value = first_class_value(
+              event.lifecycle, event.lifecycle_state,
+              event.lifecycle_attribute, selector, description))
+        return *value;
+    }
+    if (selector == "case:concept:name" || selector == "case_id" ||
+        selector == "case:id" || selector == "case" ||
+        source_matches(event.case_id_source_key)) {
+      if (const auto value = first_class_value(
+              event.case_id, event.case_id_state, std::nullopt, selector,
+              description))
+        return *value;
+    }
+  }
+
+  // A custom first-class source may be represented only by its retained
+  // selected attribute after a transformation. Honor that metadata before
+  // falling back to the ordinary attribute vector.
+  const std::optional<EventAttribute>* metadata = nullptr;
+  if (role == SelectorRole::kActivity) metadata = &event.activity_attribute;
+  if (role == SelectorRole::kTimestamp) metadata = &event.timestamp_attribute;
+  if (metadata && *metadata &&
+      ((*metadata)->key == selector ||
+       (*metadata)->first_class_source_key == selector))
+    return require_value(&**metadata, description, selector);
+
+  if (role == SelectorRole::kActivity) {
+    for (const auto* projected : {&event.timestamp_attribute,
+                                  &event.resource_attribute,
+                                  &event.lifecycle_attribute}) {
+      if (*projected &&
+          ((*projected)->key == selector ||
+           (*projected)->first_class_source_key == selector))
+        return require_value(&**projected, description, selector);
+    }
+  }
+
+  if (const auto* field = event_attribute(event, selector))
+    return require_value(field, description, selector);
+  throw std::invalid_argument("correlation miner " + std::string(description) +
+                              " selector '" + std::string(selector) +
+                              "' is missing");
+}
+
+std::string selected_flat_case(const std::vector<EventAttribute>& fields,
+                               std::string_view selector) {
+  return require_value(
+      select_flat_field(fields, selector, SelectorRole::kCaseId), "case-id",
+      selector);
+}
+
+double selected_timestamp(const std::vector<EventAttribute>& fields,
+                          std::string_view selector,
+                          std::string_view description) {
+  const auto raw = require_value(
+      select_flat_field(fields, selector, SelectorRole::kTimestamp),
+      description, selector);
+  const auto parsed = parse_timestamp(raw);
+  if (!parsed)
+    throw std::invalid_argument("correlation miner " + std::string(description) +
+                                " selector '" + std::string(selector) +
+                                "' contains an invalid timestamp");
+  return *parsed;
+}
+
+double selected_event_timestamp(const Event& event, std::string_view selector,
+                                std::string_view description) {
+  const auto raw = selected_event_value(event, selector,
+                                        SelectorRole::kTimestamp, description);
+  const auto parsed = parse_timestamp(raw);
+  if (!parsed)
+    throw std::invalid_argument("correlation miner " + std::string(description) +
+                                " selector '" + std::string(selector) +
+                                "' contains an invalid timestamp");
+  return *parsed;
+}
+
+std::string completion_selector(const CorrelationMinerOptions& options) {
+  return require_selector(options.timestamp_attribute, "completion timestamp");
+}
+
+std::optional<std::string> start_selector(
+    const CorrelationMinerOptions& options) {
+  if (options.start_timestamp_attribute.empty()) return std::nullopt;
+  return require_selector(options.start_timestamp_attribute, "start timestamp");
+}
+
+PreparedEvent prepare_event(const Event& event,
+                            std::string_view activity_key,
+                            std::string_view completion_key,
+                            const std::optional<std::string>& start_key,
+                            std::size_t input_index) {
+  const auto activity = selected_event_value(
+      event, activity_key, SelectorRole::kActivity, "activity");
+  const auto complete = selected_event_timestamp(
+      event, completion_key, "completion timestamp");
+  const auto start = start_key
+                         ? selected_event_timestamp(event, *start_key,
+                                                    "start timestamp")
+                         : complete;
+  return {activity, start, complete, input_index};
+}
+
+PreparedEvent prepare_flat_record(
+    const EventRecord& record, std::string_view activity_key,
+    std::string_view completion_key,
+    const std::optional<std::string>& start_key,
+    std::size_t input_index) {
+  const auto activity = require_value(
+      select_flat_field(record.fields, activity_key, SelectorRole::kActivity),
+      "activity", activity_key);
+  const auto complete = selected_timestamp(
+      record.fields, completion_key, "completion timestamp");
+  const auto start = start_key
+                         ? selected_timestamp(record.fields, *start_key,
+                                              "start timestamp")
+                         : complete;
+  return {activity, start, complete, input_index};
+}
+
+PreparedEvent prepare_flat_row(
+    const EventTable& table, const EventTable::Row& row,
+    std::string_view activity_key, std::string_view completion_key,
+    const std::optional<std::string>& start_key, std::size_t input_index) {
+  std::vector<EventAttribute> fields;
+  fields.reserve(table.columns.size());
+  for (std::size_t index = 0; index < row.size(); ++index) {
+    if (!row[index]) continue;
+    auto field = *row[index];
+    // The table column name is authoritative for source selectors. This also
+    // makes manually assembled rows behave like imported rows whose cell key
+    // was normalized by the adapter.
+    field.key = table.columns[index];
+    fields.push_back(std::move(field));
+  }
+  return prepare_flat_record(
+      EventRecord{std::move(fields)}, activity_key, completion_key, start_key,
+      input_index);
+}
+
+PreparedInput prepare_event_log(const EventLog& log,
+                                const CorrelationMinerOptions& options) {
+  const auto activity_key = require_selector(options.activity_attribute,
+                                             "activity");
+  const auto completion_key = completion_selector(options);
+  const auto start_key = start_selector(options);
+  PreparedInput prepared;
+  prepared.raw_flat.reserve(log.event_count());
+  prepared.traces.reserve(log.traces.size());
+
+  for (std::size_t trace_index = 0; trace_index < log.traces.size();
+       ++trace_index) {
+    const auto& trace = log.traces[trace_index];
+    PreparedEvents prepared_trace;
+    prepared_trace.reserve(trace.events.size());
+    // Native traces are already the case boundaries. The case selector is a
+    // flat-input concern and must not merge two native traces accidentally.
+    for (const auto& event : trace.events) {
+      auto prepared_event = prepare_event(
+          event, activity_key, completion_key, start_key,
+          prepared.raw_flat.size());
+      prepared.raw_flat.push_back(prepared_event);
+      prepared_trace.push_back(std::move(prepared_event));
+    }
+    prepared.traces.push_back(std::move(prepared_trace));
+  }
+  return prepared;
+}
+
+PreparedInput prepare_event_stream(const EventStream& stream,
+                                   const CorrelationMinerOptions& options) {
+  const auto activity_key = require_selector(options.activity_attribute,
+                                             "activity");
+  const auto completion_key = completion_selector(options);
+  const auto start_key = start_selector(options);
+  PreparedInput prepared;
+  prepared.raw_flat.reserve(stream.events.size());
+  if (options.variant == CorrelationVariant::kTraceBased) {
+    const auto case_key = require_selector(options.case_id_attribute,
+                                           "case-id");
+    std::map<std::string, std::size_t> groups;
+    for (std::size_t row_index = 0; row_index < stream.events.size();
+         ++row_index) {
+      const auto& record = stream.events[row_index];
+      const auto case_id = selected_flat_case(record.fields, case_key);
+      auto [found, inserted] = groups.emplace(case_id, prepared.traces.size());
+      if (inserted) prepared.traces.emplace_back();
+      auto event = prepare_flat_record(record, activity_key, completion_key,
+                                       start_key, row_index);
+      prepared.raw_flat.push_back(event);
+      prepared.traces[found->second].push_back(std::move(event));
+    }
+  } else {
+    for (std::size_t row_index = 0; row_index < stream.events.size();
+         ++row_index) {
+      prepared.raw_flat.push_back(prepare_flat_record(
+          stream.events[row_index], activity_key, completion_key, start_key,
+          row_index));
+    }
+  }
+  return prepared;
+}
+
+bool table_declares_selector(const EventTable& table,
+                             std::string_view selector,
+                             SelectorRole role) {
+  const auto has_column = [&](std::string_view name) {
+    return std::find(table.columns.begin(), table.columns.end(), name) !=
+           table.columns.end();
+  };
+  if (has_column(selector)) return true;
+  if (!is_alias(role, selector)) return false;
+  const auto role_aliases = aliases(role);
+  return std::any_of(role_aliases.begin(), role_aliases.end(), has_column);
+}
+
+void validate_empty_table_schema(
+    const EventTable& table, std::string_view activity_key,
+    std::string_view completion_key,
+    const std::optional<std::string>& start_key,
+    const CorrelationMinerOptions& options) {
+  const auto require_column = [&](std::string_view selector,
+                                  SelectorRole role,
+                                  std::string_view description) {
+    if (!table_declares_selector(table, selector, role)) {
+      throw std::invalid_argument(
+          "correlation miner " + std::string(description) + " selector '" +
+          std::string(selector) + "' is missing from the empty table schema");
+    }
+  };
+  require_column(activity_key, SelectorRole::kActivity, "activity");
+  require_column(completion_key, SelectorRole::kTimestamp,
+                 "completion timestamp");
+  if (start_key)
+    require_column(*start_key, SelectorRole::kTimestamp, "start timestamp");
+  if (options.variant == CorrelationVariant::kTraceBased) {
+    const auto case_key = require_selector(options.case_id_attribute,
+                                           "case-id");
+    require_column(case_key, SelectorRole::kCaseId, "case-id");
+  }
+}
+
+PreparedInput prepare_event_table(const EventTable& table,
+                                  const CorrelationMinerOptions& options) {
+  table.validate();
+  const auto activity_key = require_selector(options.activity_attribute,
+                                             "activity");
+  const auto completion_key = completion_selector(options);
+  const auto start_key = start_selector(options);
+  if (table.rows.empty())
+    validate_empty_table_schema(table, activity_key, completion_key,
+                                start_key, options);
+  PreparedInput prepared;
+  prepared.raw_flat.reserve(table.rows.size());
+  if (options.variant == CorrelationVariant::kTraceBased) {
+    const auto case_key = require_selector(options.case_id_attribute,
+                                           "case-id");
+    std::map<std::string, std::size_t> groups;
+    for (std::size_t row_index = 0; row_index < table.rows.size();
+         ++row_index) {
+      const auto& row = table.rows[row_index];
+      std::vector<EventAttribute> fields;
+      fields.reserve(table.columns.size());
+      for (std::size_t index = 0; index < row.size(); ++index) {
+        if (!row[index]) continue;
+        auto field = *row[index];
+        field.key = table.columns[index];
+        fields.push_back(std::move(field));
+      }
+      const auto case_id = selected_flat_case(fields, case_key);
+      auto [found, inserted] = groups.emplace(case_id, prepared.traces.size());
+      if (inserted) prepared.traces.emplace_back();
+      auto event = prepare_flat_record(
+          EventRecord{std::move(fields)}, activity_key, completion_key,
+          start_key, row_index);
+      prepared.raw_flat.push_back(event);
+      prepared.traces[found->second].push_back(std::move(event));
+    }
+  } else {
+    for (std::size_t row_index = 0; row_index < table.rows.size();
+         ++row_index) {
+      prepared.raw_flat.push_back(prepare_flat_row(
+          table, table.rows[row_index], activity_key, completion_key, start_key,
+          row_index));
+    }
+  }
+  if (options.variant == CorrelationVariant::kClassicSplit) {
+    std::stable_sort(prepared.raw_flat.begin(), prepared.raw_flat.end(),
+                     [](const auto& left, const auto& right) {
+                       if (left.complete != right.complete)
+                         return left.complete < right.complete;
+                       if (left.start != right.start)
+                         return left.start < right.start;
+                       return left.input_index < right.input_index;
+                     });
+  }
+  return prepared;
+}
 
 struct PairStatistics {
   double precede_succeed_probability = 0.0;
@@ -136,13 +634,13 @@ double exact_duration(const PreparedEvents& source,
   for (std::size_t row = 1; row <= row_count; ++row) {
     column_match[0] = row;
     std::size_t current_column = 0;
-    std::vector<double> minimum(column_count + 1,
-                                kInvalidMatchingCost);
+    const double infinity = std::numeric_limits<double>::infinity();
+    std::vector<double> minimum(column_count + 1, infinity);
     std::vector<bool> used(column_count + 1, false);
     do {
       used[current_column] = true;
       const std::size_t current_row = column_match[current_column];
-      double delta = kInvalidMatchingCost;
+      double delta = infinity;
       std::size_t next_column = 0;
       for (std::size_t column = 1; column <= column_count; ++column) {
         if (used[column]) continue;
@@ -394,8 +892,8 @@ std::vector<std::vector<std::int64_t>> solve_transportation(
 
 }  // namespace
 
-CorrelationMinerResult discover_correlation_miner(
-    const EventLog& log, const CorrelationMinerOptions& options) {
+CorrelationMinerResult discover_prepared(
+    const PreparedInput& input, const CorrelationMinerOptions& options) {
   if (options.variant == CorrelationVariant::kClassicSplit &&
       options.sample_size == 0) {
     throw std::invalid_argument(
@@ -404,47 +902,11 @@ CorrelationMinerResult discover_correlation_miner(
 
   CorrelationMinerResult result;
   result.variant = options.variant;
-  PreparedEvents raw_flat;
-  raw_flat.reserve(log.event_count());
-  std::vector<PreparedEvents> prepared_traces;
-  prepared_traces.reserve(log.traces.size());
-  std::size_t input_index = 0;
-  for (const auto& trace : log.traces) {
-    PreparedEvents prepared_trace;
-    prepared_trace.reserve(trace.events.size());
-    for (const auto& event : trace.events) {
-      const auto complete = parse_timestamp(event.timestamp);
-      if (!complete) {
-        throw std::invalid_argument(
-            "correlation miner: invalid completion timestamp");
-      }
-      double start = *complete;
-      if (!options.start_timestamp_attribute.empty()) {
-        const auto* start_text =
-            event.attribute(options.start_timestamp_attribute);
-        if (start_text == nullptr) {
-          throw std::invalid_argument(
-              "correlation miner: missing start timestamp attribute '" +
-              options.start_timestamp_attribute + "'");
-        }
-        const auto parsed_start = parse_timestamp(*start_text);
-        if (!parsed_start) {
-          throw std::invalid_argument(
-              "correlation miner: invalid start timestamp attribute '" +
-              options.start_timestamp_attribute + "'");
-        }
-        start = *parsed_start;
-      }
-      prepared_trace.push_back(
-          {event.activity, start, *complete, input_index++});
-    }
-    if (options.variant == CorrelationVariant::kTraceBased) {
-      std::stable_sort(prepared_trace.begin(), prepared_trace.end(),
-                       event_less);
-    }
-    raw_flat.insert(raw_flat.end(), prepared_trace.begin(),
-                    prepared_trace.end());
-    prepared_traces.push_back(std::move(prepared_trace));
+  const auto& raw_flat = input.raw_flat;
+  auto prepared_traces = input.traces;
+  if (options.variant == CorrelationVariant::kTraceBased) {
+    for (auto& trace : prepared_traces)
+      std::stable_sort(trace.begin(), trace.end(), event_less);
   }
   if (raw_flat.empty()) return result;
 
@@ -467,6 +929,8 @@ CorrelationMinerResult discover_correlation_miner(
     occurrences[index] =
         static_cast<std::int64_t>(
             global_groups.at(activities[index]).size());
+    result.activity_counts[activities[index]] =
+        static_cast<std::uint64_t>(occurrences[index]);
   }
   std::vector<std::vector<double>> probability(
       activity_count,
@@ -488,8 +952,7 @@ CorrelationMinerResult discover_correlation_miner(
     }
   } else if (options.variant == CorrelationVariant::kClassicSplit) {
     const std::size_t chunk_count =
-        (raw_flat.size() + options.sample_size - 1) /
-        options.sample_size;
+        1 + (raw_flat.size() - 1) / options.sample_size;
     for (std::size_t source = 0; source < activity_count; ++source) {
       for (std::size_t target = 0; target < activity_count; ++target) {
         if (source == target) continue;
@@ -572,6 +1035,54 @@ CorrelationMinerResult discover_correlation_miner(
     }
   }
   return result;
+}
+
+CorrelationMinerResult discover_correlation_miner(
+    const EventLog& log, const CorrelationMinerOptions& options) {
+  return discover_prepared(prepare_event_log(log, options), options);
+}
+
+CorrelationMinerResult discover_correlation_miner(
+    const EventStream& stream, const CorrelationMinerOptions& options) {
+  return discover_prepared(prepare_event_stream(stream, options), options);
+}
+
+CorrelationMinerResult discover_correlation_miner(
+    const EventTable& table, const CorrelationMinerOptions& options) {
+  return discover_prepared(prepare_event_table(table, options), options);
+}
+
+CorrelationMinerResult discover_correlation_miner(
+    const LazyEventTable& table, const CorrelationMinerOptions& options) {
+  if (!table.valid())
+    throw std::invalid_argument("correlation miner lazy table is invalid");
+  return discover_correlation_miner(table.materialize(), options);
+}
+
+CorrelationMinerResult discover_correlation_miner(
+    const EventDataView& data, const CorrelationMinerOptions& options) {
+  switch (data.kind()) {
+    case EventDataKind::kEventLog:
+      return discover_correlation_miner(*data.log(), options);
+    case EventDataKind::kEventStream:
+      return discover_correlation_miner(*data.stream(), options);
+    case EventDataKind::kEventTable:
+      return discover_correlation_miner(*data.table(), options);
+    case EventDataKind::kLazyEventTable:
+      return discover_correlation_miner(*data.lazy_table(), options);
+  }
+  throw std::invalid_argument("correlation miner: invalid input kind");
+}
+
+void register_correlation_activities(
+    DirectlyFollowsGraph& graph,
+    const CorrelationVariantsAnalysis& analyses) {
+  for (const auto& named : analyses.variants) {
+    for (const auto& [activity, count] : named.analysis.activity_counts) {
+      (void)count;
+      graph.ensure_activity(activity);
+    }
+  }
 }
 
 }  // namespace minera

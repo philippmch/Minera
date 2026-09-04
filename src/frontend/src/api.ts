@@ -564,7 +564,14 @@ export interface MinerOptions {
   dfgReturnNodeAttributes?: boolean;
   /** Optional correlation-mining analyses. */
   correlationVariants?: string[];
+  /** Event field used as the correlation activity label. */
+  correlationActivityAttribute?: string;
+  /** Event field used as the correlation completion timestamp. */
+  correlationTimestampAttribute?: string;
+  /** Optional event field used as the correlation start timestamp. */
   correlationStartTimestampAttribute?: string;
+  /** Event field used as the correlation case identifier. */
+  correlationCaseIdAttribute?: string;
   correlationExactTimeMatching?: boolean;
   correlationSampleSize?: number;
   /** Temporal-profile discovery settings (profile discovery is always included). */
@@ -1430,11 +1437,25 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     ? correlationNames.filter((name) =>
         options.correlationVariants?.includes(name))
     : [];
+  const correlationSelectors: Array<[string, string | undefined, string, boolean]> = [
+    ["correlation_activity_attribute", options.correlationActivityAttribute, "concept:name", false],
+    ["correlation_timestamp_attribute", options.correlationTimestampAttribute, "time:timestamp", false],
+    ["correlation_start_timestamp_attribute", options.correlationStartTimestampAttribute, "", true],
+    ["correlation_case_id_attribute", options.correlationCaseIdAttribute, "case:concept:name", false],
+  ];
   if (selectedCorrelation.length) {
+    const traceEnabled = selectedCorrelation.includes("trace_based");
+    for (const [name, raw, , allowEmpty] of correlationSelectors) {
+      if (raw === undefined) continue;
+      const value = raw.trim();
+      if (!allowEmpty && !value &&
+          (name !== "correlation_case_id_attribute" || traceEnabled))
+        throw new Error(`${name} must not be empty`);
+    }
     add("correlation_variants", selectedCorrelation.join(","));
-    const startAttribute = options.correlationStartTimestampAttribute?.trim();
-    if (startAttribute) {
-      add("correlation_start_timestamp_attribute", startAttribute);
+    for (const [name, raw, defaultValue] of correlationSelectors) {
+      const value = raw?.trim();
+      if (value && value !== defaultValue) add(name, value);
     }
     const exactCapable =
       selectedCorrelation.includes("classic") ||
@@ -1442,14 +1463,16 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     if (exactCapable && options.correlationExactTimeMatching) {
       add("correlation_exact_time_matching", "true");
     }
-    if (
-      selectedCorrelation.includes("classic_split") &&
-      options.correlationSampleSize !== undefined &&
-      Number.isInteger(options.correlationSampleSize) &&
-      options.correlationSampleSize > 0 &&
-      options.correlationSampleSize !== 100000
-    ) {
-      add("correlation_sample_size", String(options.correlationSampleSize));
+    if (selectedCorrelation.includes("classic_split") &&
+        options.correlationSampleSize !== undefined) {
+      const sampleSize = options.correlationSampleSize;
+      if (!Number.isSafeInteger(sampleSize) || sampleSize <= 0) {
+        throw new Error(
+          "correlationSampleSize must be a positive safe integer",
+        );
+      }
+      if (sampleSize !== 100000)
+        add("correlation_sample_size", String(sampleSize));
     }
   }
 
