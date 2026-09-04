@@ -2077,12 +2077,25 @@ MineParams parse_mine_params(const FieldLookup& field,
                           params.inductive.timestamp_key);
   parse_inductive_selector("inductive_case_id_key",
                           params.inductive.case_id_key);
-  if (const auto value = field("alpha_variant"); !value.empty()) {
+  if (supplied("alpha_variant")) {
+    const auto value = trim_text(field("alpha_variant"));
     if (value != "classic" && value != "plus") {
       throw std::invalid_argument("alpha_variant: expected classic or plus, got '" +
                                   value + "'");
     }
     params.alpha.short_loops = value == "plus";
+  }
+  if (supplied("alpha_activity_attribute")) {
+    const auto value = trim_text(field("alpha_activity_attribute"));
+    if (value.empty()) {
+      throw std::invalid_argument(
+          "alpha_activity_attribute: expected a non-empty name");
+    }
+    params.alpha.activity_attribute = value;
+  }
+  if (supplied("alpha_remove_unconnected")) {
+    params.alpha.remove_unconnected = parse_boolean(
+        field("alpha_remove_unconnected"), "alpha_remove_unconnected");
   }
   if (const auto value = field("heuristic_variant"); !value.empty()) {
     if (value == "classic")

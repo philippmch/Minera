@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attributeOccurrenceValidationMessage, caseGroupingValidationMessage, footprintsValidationMessage, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
+import { alphaOptionsFromForm, alphaSettingsAreDirty, attributeOccurrenceValidationMessage, caseGroupingValidationMessage, footprintsValidationMessage, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
 
 const valid = {
   spectrumConfigured: true,
@@ -255,6 +255,37 @@ describe("Inductive control contract", () => {
     expect(inductiveSettingsAreDirty({ ...defaults, sortEventsByTimestamp: true })).toBe(true);
     expect(inductiveSettingsAreDirty({ ...defaults, multiprocessing: true })).toBe(true);
     expect(inductiveSettingsAreDirty({ ...defaults, activityKey: "phase" })).toBe(true);
+  });
+});
+
+describe("Alpha control contract", () => {
+  it("elides defaults and trims a custom activity field", () => {
+    expect(alphaOptionsFromForm({
+      activityAttribute: "concept:name",
+      removeUnconnected: false,
+    })).toEqual({
+      alphaActivityAttribute: undefined,
+      alphaRemoveUnconnected: undefined,
+    });
+    expect(alphaOptionsFromForm({
+      activityAttribute: " phase ",
+      removeUnconnected: true,
+    })).toEqual({
+      alphaActivityAttribute: "phase",
+      alphaRemoveUnconnected: true,
+    });
+  });
+
+  it("marks only effective Alpha changes active", () => {
+    expect(alphaSettingsAreDirty({
+      activityAttribute: " ", removeUnconnected: false,
+    })).toBe(false);
+    expect(alphaSettingsAreDirty({
+      activityAttribute: "phase", removeUnconnected: false,
+    })).toBe(true);
+    expect(alphaSettingsAreDirty({
+      activityAttribute: "concept:name", removeUnconnected: true,
+    })).toBe(true);
   });
 });
 

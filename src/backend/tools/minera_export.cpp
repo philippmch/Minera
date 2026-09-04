@@ -341,6 +341,7 @@ minera::FootprintsDiscoveryOptions footprints_discovery_options(
 
 minera::FootprintsAnalysis analyze_footprints(
     const minera::EventLog& log, const minera::DirectlyFollowsGraph& graph,
+    const minera::EventLog& alpha_log,
     const minera::ProcessTree& tree, const minera::PowlNode& powl,
     const minera::PetriNet& inductive_net, const minera::PetriNet& alpha_net,
     const minera::PetriNet& heuristic_net, const minera::PetriNet& powl_net,
@@ -349,12 +350,13 @@ minera::FootprintsAnalysis analyze_footprints(
   analysis.model = options.model;
   analysis.strict = options.strict;
   const auto discovery_options = footprints_discovery_options(options);
+  const auto& selected_log = options.model == "alpha" ? alpha_log : log;
   analysis.activity_attribute = discovery_options.activity_attribute;
   analysis.case_id_attribute = discovery_options.case_id_attribute;
   analysis.trace_case_ids = minera::resolve_footprints_case_ids(
-      log, discovery_options.case_id_attribute);
+      selected_log, discovery_options.case_id_attribute);
   const auto projected_log =
-      minera::prepare_footprints_event_log(log, discovery_options);
+      minera::prepare_footprints_event_log(selected_log, discovery_options);
   const auto projected_graph =
       minera::discover_directly_follows_graph(projected_log);
   std::optional<minera::Footprint> log_footprint;
@@ -398,7 +400,7 @@ minera::FootprintsAnalysis analyze_footprints(
   if (options.discovery_variants.contains("entire_dataframe")) {
     if (!dataframe) {
       dataframe =
-          minera::prepare_footprints_event_table(log, discovery_options);
+          minera::prepare_footprints_event_table(selected_log, discovery_options);
     }
     analysis.entire_dataframe = minera::discover_footprints(
         *dataframe, discovery_options);
@@ -406,7 +408,7 @@ minera::FootprintsAnalysis analyze_footprints(
   if (options.discovery_variants.contains("polars_lazyframes")) {
     if (!lazy_dataframe) {
       lazy_dataframe =
-          minera::prepare_footprints_lazy_table(log, discovery_options);
+          minera::prepare_footprints_lazy_table(selected_log, discovery_options);
     }
     analysis.polars_lazyframes = minera::discover_footprints(
         *lazy_dataframe, discovery_options);
@@ -601,6 +603,8 @@ int usage(const char* program) {
                "                            the directly-follows graph alone,\n"
                "                            scaling to huge logs)\n"
                "  --alpha-variant <id>      classic (default) or plus (short loops)\n"
+               "  --alpha-activity-attribute <name> Event field used as activity\n"
+               "  --alpha-remove-unconnected <bool> Drop unconnected Alpha transitions\n"
                "  --heuristic-variant <id>  classic (default) or plusplus\n"
                "                            (interval/eventual-follow semantics)\n"
                "  --heuristic-activity-attribute <name>\n"
@@ -4682,6 +4686,24 @@ int main(int argc, char** argv) {
       const std::string_view variant = value;
       if (variant != "classic" && variant != "plus") return usage(argv[0]);
       alpha_options.short_loops = variant == "plus";
+    } else if (arg == "--alpha-activity-attribute") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto selector = trim_text(value);
+      if (selector.empty()) {
+        std::cerr << "error: --alpha-activity-attribute expects a non-empty name\n";
+        return 2;
+      }
+      alpha_options.activity_attribute = selector;
+    } else if (arg == "--alpha-remove-unconnected") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        alpha_options.remove_unconnected = parse_boolean(value, arg);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
     } else if (arg == "--heuristic-variant") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -6539,6 +6561,12 @@ int main(int argc, char** argv) {
           minera::align_process_tree(inductive_log, tree, pt_alignment_options);
     }
     const auto net = minera::discover_petri_net(log, alpha_options);
+    const auto alpha_log =
+        minera::normalize_alpha_event_log(log, alpha_options);
+    register_activity_selector_values(graph, log,
+                                      alpha_options.activity_attribute);
+    for (const auto& activity : net.activities())
+      graph.ensure_activity(activity);
     const auto heuristics =
         minera::discover_heuristics_net(log, heuristic_options);
     const auto powl = minera::discover_powl(log, powl_options);
@@ -6615,7 +6643,9 @@ int main(int argc, char** argv) {
         const auto& fit_log =
             stochastic_map_miner == "powl"
                 ? powl_log
-                : stochastic_map_miner == "inductive" ? inductive_log : log;
+                : stochastic_map_miner == "inductive"
+                      ? inductive_log
+                      : stochastic_map_miner == "alpha" ? alpha_log : log;
         const auto report = minera::fit_stochastic_map_with_report(
             fit_log, *selected, stochastic_map_params.fit);
         stochastic_map_net = *selected;
@@ -6658,7 +6688,7 @@ int main(int argc, char** argv) {
     register_activity_selector_values(
         graph, log, footprints_options.activity_attribute);
     const auto footprints =
-        analyze_footprints(log, graph, tree, powl,
+        analyze_footprints(log, graph, alpha_log, tree, powl,
                            inductive_net, net,
                            heuristic_net, powl_net, footprints_options);
     if (!no_alignments && log.traces.size() > 1000) {
@@ -6669,6 +6699,7 @@ int main(int argc, char** argv) {
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
       const bool is_powl = id == "powl";
       const bool is_inductive = id == "inductive";
+      const bool is_alpha = id == "alpha";
       auto replay_options = token_replay_options;
       if (id == "heuristic" &&
           replay_options.activity_attribute == "concept:name") {
@@ -6686,6 +6717,9 @@ int main(int argc, char** argv) {
       if (is_inductive) {
         conformance_log = &inductive_log;
         alignment_log = &inductive_log;
+      } else if (is_alpha) {
+        conformance_log = &alpha_log;
+        alignment_log = &alpha_log;
       } else if (is_powl) {
         replay_powl_log = project_powl_activity(
             log, replay_options.activity_attribute, powl_options.timestamp_key,
@@ -6701,10 +6735,12 @@ int main(int argc, char** argv) {
            minera::check_conformance(*conformance_log, petri, replay_options),
            is_powl ? minera::check_footprints(powl_log, petri)
            : is_inductive ? minera::check_footprints(inductive_log, petri)
-                          : minera::check_footprints(log, petri),
+           : is_alpha ? minera::check_footprints(alpha_log, petri)
+                      : minera::check_footprints(log, petri),
            no_alignments ? std::optional<minera::AlignmentResult>{}
                          : std::optional<minera::AlignmentResult>(
-                               (is_powl || is_inductive || alignment_option_used)
+                               (is_powl || is_inductive || is_alpha ||
+                                alignment_option_used)
                                    ? minera::check_alignment(
                                          *alignment_log, petri,
                                          model_alignment_options)
@@ -6760,10 +6796,12 @@ int main(int argc, char** argv) {
                   << compare_petri_miner << "'\n";
         return 2;
       }
-      const auto selector = compare_petri_activity_attribute.empty() &&
-                                    compare_petri_miner == "powl"
-                                ? powl_options.activity_key
-                                : compare_petri_activity_attribute;
+      auto selector = compare_petri_activity_attribute.empty() &&
+                              compare_petri_miner == "powl"
+                          ? powl_options.activity_key
+                          : compare_petri_activity_attribute;
+      if (selector.empty() && compare_petri_miner == "alpha")
+        selector = alpha_options.activity_attribute;
       auto reference = [&]() {
         if (is_xes_path(compare_petri_reference)) {
           minera::XesImportOptions reference_options;
@@ -6805,6 +6843,14 @@ int main(int argc, char** argv) {
             minera::prepare_inductive_event_log(reference, inductive_options);
         comparison_log = &inductive_log;
         reference = std::move(*normalized_comparison_log);
+      } else if (compare_petri_miner == "alpha") {
+        auto alpha_projection_options = alpha_options;
+        alpha_projection_options.activity_attribute = selector;
+        normalized_comparison_log =
+            minera::normalize_alpha_event_log(log, alpha_projection_options);
+        comparison_log = &*normalized_comparison_log;
+        reference = minera::normalize_alpha_event_log(
+            reference, alpha_projection_options);
       }
       const auto comparison = minera::compare_petri_usage(
           *model_it->second, *comparison_log, reference, comparison_options);
@@ -6847,7 +6893,9 @@ int main(int argc, char** argv) {
           const auto& analysis_log =
               request.miner == "powl"
                   ? powl_log
-                  : request.miner == "inductive" ? inductive_log : log;
+                  : request.miner == "inductive"
+                        ? inductive_log
+                        : request.miner == "alpha" ? alpha_log : log;
           if (request.trace_index >= analysis_log.traces.size()) {
             std::cerr << "error: --petri-analysis-trace-index out of range\n";
             return 2;
@@ -6912,7 +6960,9 @@ int main(int argc, char** argv) {
         const auto& evaluation_log =
             miner == "powl"
                 ? powl_log
-                : miner == "inductive" ? inductive_log : log;
+                : miner == "inductive"
+                      ? inductive_log
+                      : miner == "alpha" ? alpha_log : log;
         minera::ModelEvaluation result;
         result.miner = miner;
         switch (evaluation_params->family) {
@@ -6971,6 +7021,8 @@ int main(int argc, char** argv) {
         decision_log = &*projected_decision_log;
       } else if (decisions_miner == "inductive") {
         decision_log = &inductive_log;
+      } else if (decisions_miner == "alpha") {
+        decision_log = &alpha_log;
       }
       decisions = minera::mine_decisions(*decision_log, *selected,
                                          decision_options);
@@ -7003,6 +7055,8 @@ int main(int argc, char** argv) {
         decision_log = &*projected_decision_log;
       } else if (decision_tables_miner == "inductive") {
         decision_log = &inductive_log;
+      } else if (decision_tables_miner == "alpha") {
+        decision_log = &alpha_log;
       }
       decision_tables =
           minera::mine_decision_tables(*decision_log, *selected, table_options);
@@ -7013,7 +7067,7 @@ int main(int argc, char** argv) {
     // Frequency/performance annotations for every miner's Petri-net view —
     // the inductive net fits by construction, so its overlay always has data
     // even when the alpha net (the classic view) fits nothing of a real log.
-    const auto petri_decoration = minera::decorate_model(log, net);
+    const auto petri_decoration = minera::decorate_model(alpha_log, net);
     const auto inductive_decoration =
         minera::decorate_model(inductive_log, inductive_net);
     const auto heuristic_decoration = minera::decorate_model(
@@ -7049,7 +7103,9 @@ int main(int argc, char** argv) {
     const minera::EventLog* advanced_log =
         advanced_petri_miner == "powl"
             ? &powl_log
-            : advanced_petri_miner == "inductive" ? &inductive_log : &log;
+            : advanced_petri_miner == "inductive"
+                  ? &inductive_log
+                  : advanced_petri_miner == "alpha" ? &alpha_log : &log;
     std::optional<minera::EventLog> decomposed_powl_log;
     std::optional<minera::EventLog> petri_powl_log;
     const minera::EventLog* decomposed_alignment_log = advanced_log;
@@ -7111,6 +7167,8 @@ int main(int argc, char** argv) {
       } else if (playout_miner == "inductive" ||
                  playout_miner == "monte_carlo") {
         simulation_log = &inductive_log;
+      } else if (playout_miner == "alpha") {
+        simulation_log = &alpha_log;
       }
       const auto body = minera::monte_carlo_json(
           minera::monte_carlo(*simulation_log, *selected, effective_options));
@@ -7361,6 +7419,8 @@ int main(int argc, char** argv) {
             log, powl_options.activity_key, powl_options.timestamp_key,
             powl_options.case_id_key);
         fit_log = &*projected_playout_log;
+      } else if (model_miner == "alpha") {
+        fit_log = &alpha_log;
       }
       if (selected != nullptr && petri_playout_mode == "extensive") {
         if (basic_playout_fields.contains("traces"))
@@ -7458,6 +7518,8 @@ int main(int argc, char** argv) {
           }
         } else if (model_miner == "inductive") {
           fit_log = &inductive_log;
+        } else if (model_miner == "alpha") {
+          fit_log = &alpha_log;
         }
         generated = minera::monte_carlo(*fit_log, *selected, effective_options).log;
       } else if (stochastic) {

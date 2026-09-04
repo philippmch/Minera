@@ -263,6 +263,9 @@ struct MinedSession {
   // model. Model-specific replay must use this alphabet rather than the
   // original upload's first-class activity field.
   minera::EventLog inductive_log;
+  // Exact activity projection used to discover the Alpha model. Keeping it in
+  // the session makes on-demand conformance use the same alphabet as mining.
+  minera::EventLog alpha_log;
   minera::DirectlyFollowsGraph graph;
   std::unordered_map<std::string, minera::PetriNet> nets;  // miner id -> net
   minera::ProcessTree tree;  // the inductive model, for on-demand BPMN export
@@ -270,6 +273,7 @@ struct MinedSession {
   std::string dataset;       // uploaded file name, echoed into XES exports
   minera::TokenReplayOptions token_replay;
   minera::InductiveMinerOptions inductive_options;
+  std::string alpha_activity_attribute = "concept:name";
   std::string powl_activity_key = "concept:name";
   std::string powl_timestamp_key = "time:timestamp";
   std::string powl_case_id_key = "case:concept:name";
@@ -279,7 +283,7 @@ const minera::EventLog& cached_model_log(const MinedSession& session,
                                          std::string_view miner) {
   return miner == "inductive" || miner == "process_tree"
              ? session.inductive_log
-             : session.log;
+             : miner == "alpha" ? session.alpha_log : session.log;
 }
 
 // A selector is deliberately request-scoped: the cached inductive model and
@@ -498,6 +502,7 @@ minera::FootprintsDiscoveryOptions footprints_discovery_options(
 
 minera::FootprintsAnalysis analyze_footprints(
     const minera::EventLog& log, const minera::DirectlyFollowsGraph& graph,
+    const minera::EventLog& alpha_log,
     const minera::ProcessTree& tree, const minera::PowlNode& powl,
     const minera::PetriNet& inductive_net, const minera::PetriNet& alpha_net,
     const minera::PetriNet& heuristic_net, const minera::PetriNet& powl_net,
@@ -506,12 +511,13 @@ minera::FootprintsAnalysis analyze_footprints(
   analysis.model = options.model;
   analysis.strict = options.strict;
   const auto discovery_options = footprints_discovery_options(options);
+  const auto& selected_log = options.model == "alpha" ? alpha_log : log;
   analysis.activity_attribute = discovery_options.activity_attribute;
   analysis.case_id_attribute = discovery_options.case_id_attribute;
   analysis.trace_case_ids = minera::resolve_footprints_case_ids(
-      log, discovery_options.case_id_attribute);
+      selected_log, discovery_options.case_id_attribute);
   const auto projected_log =
-      minera::prepare_footprints_event_log(log, discovery_options);
+      minera::prepare_footprints_event_log(selected_log, discovery_options);
   const auto projected_graph =
       minera::discover_directly_follows_graph(projected_log);
   std::optional<minera::Footprint> log_footprint;
@@ -555,7 +561,7 @@ minera::FootprintsAnalysis analyze_footprints(
   if (options.discovery_variants.contains("entire_dataframe")) {
     if (!dataframe) {
       dataframe =
-          minera::prepare_footprints_event_table(log, discovery_options);
+          minera::prepare_footprints_event_table(selected_log, discovery_options);
     }
     analysis.entire_dataframe = minera::discover_footprints(
         *dataframe, discovery_options);
@@ -563,7 +569,7 @@ minera::FootprintsAnalysis analyze_footprints(
   if (options.discovery_variants.contains("polars_lazyframes")) {
     if (!lazy_dataframe) {
       lazy_dataframe =
-          minera::prepare_footprints_lazy_table(log, discovery_options);
+          minera::prepare_footprints_lazy_table(selected_log, discovery_options);
     }
     analysis.polars_lazyframes = minera::discover_footprints(
         *lazy_dataframe, discovery_options);
@@ -800,6 +806,12 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto inductive_graph =
         minera::discover_directly_follows_graph(inductive_log);
     const auto net = minera::discover_petri_net(log, params.alpha);
+    const auto alpha_log =
+        minera::normalize_alpha_event_log(log, params.alpha);
+    register_activity_selector_values(graph, log,
+                                      params.alpha.activity_attribute);
+    for (const auto& activity : net.activities())
+      graph.ensure_activity(activity);
     const auto heuristics = minera::discover_heuristics_net(log, params.heuristic);
     const auto powl = minera::discover_powl(log, params.powl);
     register_powl_labels(graph, powl);
@@ -814,7 +826,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     register_activity_selector_values(
         graph, log, params.footprints.activity_attribute);
     const auto footprints =
-        analyze_footprints(log, graph, tree, powl,
+        analyze_footprints(log, graph, alpha_log, tree, powl,
                            inductive_net, net,
                            heuristic_net, powl_net, params.footprints);
     const auto performance = minera::compute_performance_metrics(log, graph);
@@ -873,6 +885,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
       const bool is_powl = id == "powl";
       const bool is_inductive = id == "inductive";
+      const bool is_alpha = id == "alpha";
       auto replay_options = params.token_replay;
       if (id == "heuristic" &&
           replay_options.activity_attribute == "concept:name") {
@@ -884,6 +897,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       std::optional<minera::EventLog> projected_powl_log;
       const minera::EventLog* conformance_log =
           is_inductive ? &inductive_log : &log;
+      if (is_alpha) conformance_log = &alpha_log;
       if (is_powl) {
         projected_powl_log = project_powl_activity(
             log, replay_options.activity_attribute, params.powl.timestamp_key,
@@ -901,6 +915,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                                           : is_inductive
                                                 ? minera::check_footprints(
                                                       inductive_log, petri)
+                                                : is_alpha
+                                                      ? minera::check_footprints(
+                                                            alpha_log, petri)
                                                 : minera::check_footprints(log,
                                                                           petri),
                                       std::nullopt};
@@ -911,7 +928,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
 
     // Frequency/performance annotations for every miner's Petri-net view:
     // one more token replay per net, cheap enough to compute up front.
-    const auto petri_decoration = minera::decorate_model(log, net);
+    const auto petri_decoration = minera::decorate_model(alpha_log, net);
     const auto inductive_decoration =
         minera::decorate_model(inductive_log, inductive_net);
     const auto heuristic_decoration = minera::decorate_model(
@@ -953,6 +970,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     auto session = std::make_shared<MinedSession>();
     session->log = log;
     session->inductive_log = inductive_log;
+    session->alpha_log = alpha_log;
     session->graph = graph;
     session->nets.emplace("inductive", inductive_net);
     session->nets.emplace("alpha", net);
@@ -963,6 +981,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     session->dataset = dataset;
     session->token_replay = params.token_replay;
     session->inductive_options = params.inductive;
+    session->alpha_activity_attribute = params.alpha.activity_attribute;
     session->powl_activity_key = params.powl.activity_key;
     session->powl_timestamp_key = params.powl.timestamp_key;
     session->powl_case_id_key = params.powl.case_id_key;
@@ -4995,6 +5014,8 @@ void handle_compare_petri(const httplib::Request& request,
     }
     if (miner == "powl" && comparison_options.activity_attribute.empty())
       comparison_options.activity_attribute = session->powl_activity_key;
+    if (miner == "alpha" && comparison_options.activity_attribute.empty())
+      comparison_options.activity_attribute = session->alpha_activity_attribute;
     comparison_options.walk_through_hidden_trans = comparison_bool(
         "walk_through_hidden_trans",
         comparison_options.walk_through_hidden_trans);
@@ -5034,6 +5055,9 @@ void handle_compare_petri(const httplib::Request& request,
             session->inductive_options.timestamp_key;
         reference_options.activity_column =
             session->inductive_options.activity_key;
+      } else if (miner == "alpha") {
+        reference_options.activity_column =
+            session->alpha_activity_attribute;
       }
       if (!selector.empty() && selector != "activity")
         reference_options.activity_column = selector;
@@ -5042,6 +5066,12 @@ void handle_compare_petri(const httplib::Request& request,
     if (miner == "inductive") {
       reference = minera::prepare_inductive_event_log(
           reference, session->inductive_options);
+    } else if (miner == "alpha") {
+      minera::AlphaMinerOptions alpha_projection_options;
+      alpha_projection_options.activity_attribute =
+          comparison_options.activity_attribute;
+      reference = minera::normalize_alpha_event_log(
+          reference, alpha_projection_options);
     }
     if (source_log.trace_count() > kMaxComparisonTraces ||
         source_log.event_count() > kMaxComparisonEvents ||

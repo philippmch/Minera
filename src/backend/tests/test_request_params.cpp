@@ -90,6 +90,8 @@ void parse_mine_params_defaults_when_empty() {
   assert(!params.inductive.disable_fallthroughs);
   assert(!params.inductive.multiprocessing);
   assert(!params.alpha.short_loops);  // classic Alpha is the default variant
+  assert(params.alpha.activity_attribute == "concept:name");
+  assert(!params.alpha.remove_unconnected);
   assert(params.powl.activity_key == "concept:name");
   assert(params.powl.timestamp_key == "time:timestamp");
   assert(params.powl.case_id_key == "case:concept:name");
@@ -1367,6 +1369,49 @@ void parse_mine_params_rejects_invalid_xes_options() {
     threw = true;
   }
   assert(threw);
+}
+
+void parse_mine_params_maps_alpha_options_and_presence() {
+  const auto params = minera::parse_mine_params(fields({
+      {"alpha_variant", "plus"},
+      {"alpha_activity_attribute", " phase "},
+      {"alpha_remove_unconnected", "true"},
+  }));
+  assert(params.alpha.short_loops);
+  assert(params.alpha.activity_attribute == "phase");
+  assert(params.alpha.remove_unconnected);
+
+  const std::map<std::string, std::string> explicit_empty_variant = {
+      {"alpha_variant", ""}};
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(
+        fields(explicit_empty_variant),
+        [](std::string_view name) {
+          return name == "alpha_variant";
+        });
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  for (const auto& item : {
+           std::pair{"alpha_activity_attribute", "  "},
+           std::pair{"alpha_remove_unconnected", "yes"},
+           std::pair{"alpha_variant", "unknown"},
+       }) {
+    const std::map<std::string, std::string> values{{item}};
+    threw = false;
+    try {
+      (void)minera::parse_mine_params(
+          fields(values), [&](std::string_view name) {
+            return values.contains(std::string(name));
+          });
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
 }
 
 void parse_mine_params_rejects_variant_and_endpoint_filter_errors() {
@@ -4594,6 +4639,7 @@ int main() {
   parse_mine_params_rejects_an_unknown_attribute_mode();
   parse_mine_params_rejects_a_malformed_succession();
   parse_mine_params_rejects_an_unknown_alpha_variant();
+  parse_mine_params_maps_alpha_options_and_presence();
   parse_mine_params_rejects_an_unknown_inductive_variant();
   parse_mine_params_rejects_invalid_inductive_options();
   parse_mine_params_accepts_infrequent_inductive_variant();

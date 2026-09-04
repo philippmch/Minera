@@ -3,12 +3,15 @@
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
+#include <optional>
 #include <set>
 #include <string>
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include "minera/dfg_variants.hpp"
 
 namespace minera {
 namespace {
@@ -129,10 +132,55 @@ bool all_causal(const ActivitySet& a, const ActivitySet& b, const Footprint& fp)
   return true;
 }
 
+const std::string& selected_activity(const Event& event,
+                                     std::string_view selector) {
+  const auto selected = selector.empty() ? std::string_view("concept:name")
+                                         : selector;
+  const bool canonical_selector = selected == "concept:name" ||
+                                  selected == "activity";
+  if (canonical_selector) {
+    // The canonical projection remains authoritative even when an adapter did
+    // not retain a source spelling.  A stale retained cell must not turn a
+    // null or genuinely missing first-class value into an activity label.
+    if (event.activity_state == FirstClassAttributeState::kNull ||
+        (event.activity_state == FirstClassAttributeState::kMissing &&
+         event.activity.empty())) {
+      throw std::invalid_argument(
+          "Alpha: event is missing activity attribute '" +
+          std::string(selected) + "'");
+    }
+    return event.activity;
+  }
+  // A custom first-class projection is authoritative for its source key.
+  // Do this before consulting the retained attribute copy: adapters may keep
+  // that copy for round-tripping even after the projected cell changes.
+  if (!event.activity_source_key.empty() &&
+      event.activity_source_key == selected) {
+    if (event.activity_state == FirstClassAttributeState::kNull ||
+        (event.activity_state == FirstClassAttributeState::kMissing &&
+         event.activity.empty())) {
+      throw std::invalid_argument(
+          "Alpha: event is missing activity attribute '" +
+          std::string(selected) + "'");
+    }
+    return event.activity;
+  }
+  if (event.activity_attribute && event.activity_attribute->key == selected) {
+    if (!event.activity_attribute->is_null) return event.activity_attribute->value;
+    throw std::invalid_argument(
+        "Alpha: event is missing activity attribute '" +
+        std::string(selected) + "'");
+  }
+  if (const auto* value = dfg_event_field_value(event, selected)) return *value;
+  throw std::invalid_argument(
+      "Alpha: event is missing activity attribute '" +
+      std::string(selected) + "'");
+}
+
 std::vector<Place> maximal_places(const Footprint& fp);
 
 PetriNet build_classic_net(const std::vector<std::string>& names,
-                           const Footprint& fp) {
+                           const Footprint& fp, bool remove_unconnected) {
   PetriNet net;
   net.set_activities(names);
   const std::size_t source = net.add_place();
@@ -153,6 +201,10 @@ PetriNet build_classic_net(const std::vector<std::string>& names,
   }
 
   for (std::size_t activity = 0; activity < n; ++activity) {
+    if (remove_unconnected && inputs[activity].empty() &&
+        outputs[activity].empty()) {
+      continue;
+    }
     net.add_transition(activity, std::move(inputs[activity]),
                        std::move(outputs[activity]));
   }
@@ -231,9 +283,25 @@ std::vector<Place> maximal_places(const Footprint& fp) {
 
 }  // namespace
 
+EventLog normalize_alpha_event_log(const EventLog& event_log,
+                                   const AlphaMinerOptions& options) {
+  EventLog normalized = event_log;
+  const std::string selector = options.activity_attribute.empty()
+                                   ? "concept:name"
+                                   : options.activity_attribute;
+  for (auto& trace : normalized.traces) {
+    for (auto& event : trace.events) {
+      event.activity = selected_activity(event, selector);
+      event.activity_state = FirstClassAttributeState::kPresent;
+    }
+  }
+  return normalized;
+}
+
 PetriNet discover_petri_net(const EventLog& log,
                             const AlphaMinerOptions& options) {
-  const IdLog ids = intern_log(log);
+  const EventLog normalized = normalize_alpha_event_log(log, options);
+  const IdLog ids = intern_log(normalized);
   const std::size_t n = ids.names.size();
 
   // Alpha+ first sets aside the length-one-loop activities (those that directly
@@ -241,7 +309,8 @@ PetriNet discover_petri_net(const EventLog& log,
   // search runs on the log read without them, and each is re-attached to the
   // place between its neighbours afterwards.
   const Footprint full = build_footprint(ids, nullptr, options.short_loops);
-  if (!options.short_loops) return build_classic_net(ids.names, full);
+  if (!options.short_loops)
+    return build_classic_net(ids.names, full, false);
   std::vector<bool> loops(n, false);
   bool any_loop = false;
   if (options.short_loops) {
@@ -250,71 +319,190 @@ PetriNet discover_petri_net(const EventLog& log,
       any_loop |= loops[a];
     }
   }
-  const Footprint reduced =
-      any_loop ? build_footprint(ids, &loops, true) : Footprint{};
-  const Footprint& fp = any_loop ? reduced : full;
+  // With no length-one loops Alpha+ is intentionally identical to classic
+  // Alpha, including its activity ordering and transition wiring.
+  if (!any_loop)
+    return build_classic_net(ids.names, full, options.remove_unconnected);
+
+  // Build the enhanced footprint with explicit boundary activities. They take
+  // part in the same maximal-pair search as ordinary activities. Whether the
+  // corresponding hidden transitions can be collapsed is decided only after
+  // loop arcs have been attached.
+  const std::size_t artificial_start = n;
+  const std::size_t artificial_end = n + 1;
+  IdLog boundary_log;
+  boundary_log.names = ids.names;
+  boundary_log.names.resize(n + 2);
+  boundary_log.traces.reserve(ids.traces.size());
+  for (const auto& trace : ids.traces) {
+    std::vector<std::size_t> sequence;
+    sequence.reserve(trace.size() + 2);
+    sequence.push_back(artificial_start);
+    sequence.insert(sequence.end(), trace.begin(), trace.end());
+    sequence.push_back(artificial_end);
+    boundary_log.traces.push_back(std::move(sequence));
+  }
+  auto boundary_exclude = loops;
+  boundary_exclude.resize(n + 2, false);
+  const std::vector<Place> boundary_pairs = maximal_places(
+      build_footprint(boundary_log, &boundary_exclude, true));
+
+  // Aggregate the immediate non-loop predecessors and successors for every
+  // length-one-loop label. Distinct adjacent loop labels intentionally do not
+  // become one another's context.
+  std::vector<ActivitySet> predecessors(n);
+  std::vector<ActivitySet> successors(n);
+  const auto insert_sorted = [](ActivitySet& values, std::size_t value) {
+    const auto at = std::lower_bound(values.begin(), values.end(), value);
+    if (at == values.end() || *at != value) values.insert(at, value);
+  };
+  for (const auto& trace : boundary_log.traces) {
+    for (std::size_t i = 1; i < trace.size(); ++i) {
+      const auto before = trace[i - 1];
+      const auto after = trace[i];
+      const bool before_is_loop = before < n && loops[before];
+      const bool after_is_loop = after < n && loops[after];
+      if (!before_is_loop && after_is_loop)
+        insert_sorted(predecessors[after], before);
+      if (before_is_loop && !after_is_loop)
+        insert_sorted(successors[before], after);
+    }
+  }
+
+  // Re-attach a loop only when one maximal place contains its full aggregated
+  // predecessor/successor difference. Boundary and interior contexts are not
+  // matched independently; a relation either qualifies as a whole or the
+  // visible transition remains unconnected.
+  std::vector<std::vector<std::size_t>> loop_pairs(n);
+  for (std::size_t t = 0; t < n; ++t) {
+    if (!loops[t]) continue;
+    if (predecessors[t].empty() || successors[t].empty()) continue;
+    ActivitySet before_only;
+    ActivitySet after_only;
+    std::set_difference(predecessors[t].begin(), predecessors[t].end(),
+                        successors[t].begin(), successors[t].end(),
+                        std::back_inserter(before_only));
+    std::set_difference(successors[t].begin(), successors[t].end(),
+                        predecessors[t].begin(), predecessors[t].end(),
+                        std::back_inserter(after_only));
+    for (std::size_t pair_index = 0; pair_index < boundary_pairs.size();
+         ++pair_index) {
+      const auto& candidate = boundary_pairs[pair_index];
+      if (!is_subset(before_only, candidate.first) ||
+          !is_subset(after_only, candidate.second)) {
+        continue;
+      }
+      loop_pairs[t].push_back(pair_index);
+    }
+  }
+
+  std::vector<std::vector<std::size_t>> transition_inputs(n + 2);
+  std::vector<std::vector<std::size_t>> transition_outputs(n + 2);
+  std::vector<std::size_t> pair_loop_arcs(boundary_pairs.size(), 0);
+  for (std::size_t pair_index = 0; pair_index < boundary_pairs.size();
+       ++pair_index) {
+    for (const auto from : boundary_pairs[pair_index].first)
+      transition_outputs[from].push_back(pair_index);
+    for (const auto to : boundary_pairs[pair_index].second)
+      transition_inputs[to].push_back(pair_index);
+  }
+  for (const auto& attachments : loop_pairs) {
+    for (const auto pair_index : attachments) ++pair_loop_arcs[pair_index];
+  }
+
+  // The initial hidden boundary is removable only when it has one target
+  // place and no other transition (including a reconstructed loop) enters
+  // that place.
+  bool collapse_initial = transition_outputs[artificial_start].size() == 1;
+  std::size_t initial_pair = 0;
+  if (collapse_initial) {
+    initial_pair = transition_outputs[artificial_start].front();
+    collapse_initial =
+        boundary_pairs[initial_pair].first.size() +
+            pair_loop_arcs[initial_pair] ==
+        1;
+  }
+
+  // The final hidden boundary is removable only for one exclusive source
+  // place whose incoming transitions do not branch elsewhere. When removed,
+  // those transitions are wired directly to the workflow sink.
+  bool collapse_final = transition_inputs[artificial_end].size() == 1;
+  std::size_t final_pair = 0;
+  if (collapse_final) {
+    final_pair = transition_inputs[artificial_end].front();
+    collapse_final =
+        boundary_pairs[final_pair].second.size() +
+            pair_loop_arcs[final_pair] ==
+        1;
+    if (collapse_final) {
+      for (const auto from : boundary_pairs[final_pair].first) {
+        if ((from == artificial_start && collapse_initial) ||
+            transition_outputs[from].size() > 1) {
+          collapse_final = false;
+          break;
+        }
+      }
+    }
+  }
 
   PetriNet net;
   net.set_activities(ids.names);
-  const std::size_t source = net.add_place();
+  std::optional<std::size_t> outer_source;
+  if (!collapse_initial) outer_source = net.add_place();
+  std::vector<std::optional<std::size_t>> pair_places(boundary_pairs.size());
+  for (std::size_t pair_index = 0; pair_index < boundary_pairs.size();
+       ++pair_index) {
+    if (collapse_final && pair_index == final_pair) continue;
+    pair_places[pair_index] = net.add_place();
+  }
   const std::size_t sink = net.add_place();
+  const std::size_t source =
+      collapse_initial ? *pair_places[initial_pair] : *outer_source;
   net.set_source(source);
   net.set_sink(sink);
 
-  // Accumulate each activity's input and output places, then emit one
-  // transition per activity. The source feeds every start activity; every end
-  // activity drains into the sink.
-  std::vector<std::vector<std::size_t>> inputs(n);
-  std::vector<std::vector<std::size_t>> outputs(n);
-  for (const auto start : fp.starts) inputs[start].push_back(source);
-  for (const auto end : fp.ends) outputs[end].push_back(sink);
+  const auto input_places = [&](std::size_t transition) {
+    std::vector<std::size_t> places;
+    for (const auto pair_index : transition_inputs[transition]) {
+      if (collapse_final && pair_index == final_pair) continue;
+      places.push_back(*pair_places[pair_index]);
+    }
+    return places;
+  };
+  const auto output_places = [&](std::size_t transition) {
+    std::vector<std::size_t> places;
+    for (const auto pair_index : transition_outputs[transition]) {
+      if (collapse_final && pair_index == final_pair)
+        places.push_back(sink);
+      else
+        places.push_back(*pair_places[pair_index]);
+    }
+    return places;
+  };
 
-  std::vector<std::pair<Place, std::size_t>> placed;
-  for (auto& pair : maximal_places(fp)) {
-    const std::size_t place = net.add_place();
-    for (const auto from : pair.first) outputs[from].push_back(place);
-    for (const auto to : pair.second) inputs[to].push_back(place);
-    placed.emplace_back(std::move(pair), place);
+  if (!collapse_initial) {
+    net.add_transition(std::nullopt, {*outer_source},
+                       output_places(artificial_start));
   }
-
-  // Re-attach each length-one loop t as a self loop on the place between its
-  // neighbours A = {a | a > t} and B = {b | t > b} (other loops excluded): t
-  // borrows the token and puts it back, leaving the surrounding flow intact.
-  // On a well-formed log (A, B) is exactly one of the discovered places; on a
-  // noisy one, fall back to the largest place nested inside the pair.
-  for (std::size_t t = 0; any_loop && t < n; ++t) {
-    if (!loops[t]) continue;
-    ActivitySet a_side;
-    ActivitySet b_side;
-    for (std::size_t other = 0; other < n; ++other) {
-      if (loops[other]) continue;
-      if (full.follows[other][t]) a_side.push_back(other);
-      if (full.follows[t][other]) b_side.push_back(other);
-    }
-    const std::pair<Place, std::size_t>* best = nullptr;
-    for (const auto& candidate : placed) {
-      if (candidate.first.first == a_side && candidate.first.second == b_side) {
-        best = &candidate;
-        break;
-      }
-      if (!is_subset(candidate.first.first, a_side) ||
-          !is_subset(candidate.first.second, b_side)) {
-        continue;
-      }
-      const auto span = [](const Place& place) {
-        return place.first.size() + place.second.size();
-      };
-      if (!best || span(candidate.first) > span(best->first)) best = &candidate;
-    }
-    if (best) {
-      inputs[t].push_back(best->second);
-      outputs[t].push_back(best->second);
-    }
+  if (!collapse_final) {
+    net.add_transition(std::nullopt, input_places(artificial_end), {sink});
   }
 
   for (std::size_t activity = 0; activity < n; ++activity) {
-    net.add_transition(activity, std::move(inputs[activity]),
-                       std::move(outputs[activity]));
+    std::vector<std::size_t> inputs;
+    std::vector<std::size_t> outputs;
+    if (loops[activity]) {
+      for (const auto pair_index : loop_pairs[activity]) {
+        inputs.push_back(*pair_places[pair_index]);
+        outputs.push_back(*pair_places[pair_index]);
+      }
+    } else {
+      inputs = input_places(activity);
+      outputs = output_places(activity);
+    }
+    if (options.remove_unconnected && inputs.empty() && outputs.empty())
+      continue;
+    net.add_transition(activity, std::move(inputs), std::move(outputs));
   }
   return net;
 }
@@ -325,7 +513,8 @@ PetriNet discover_petri_net(const DirectlyFollowsGraph& graph,
     throw std::invalid_argument(
         "Alpha: Alpha+ requires event-log trace context; direct graph input supports classic only");
   }
-  return build_classic_net(graph.activities(), footprint_from_graph(graph));
+  return build_classic_net(graph.activities(), footprint_from_graph(graph),
+                           false);
 }
 
 }  // namespace minera

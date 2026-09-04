@@ -446,6 +446,10 @@ export interface MinerOptions {
   inductiveCaseIdKey?: string;
   /** "classic" (default) is the textbook Alpha; "plus" handles short loops. */
   alphaVariant?: "plus" | "classic";
+  /** Event field used as the Alpha activity label. */
+  alphaActivityAttribute?: string;
+  /** Remove visible Alpha transitions that cannot be connected to a place. */
+  alphaRemoveUnconnected?: boolean;
   /** Heuristic Miner algorithm variant (classic by default). */
   heuristicVariant?: "classic" | "plusplus";
   /** Event field used as the heuristic activity label. */
@@ -922,6 +926,13 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     if (normalized !== defaultValue) add(wireName, normalized);
   }
   if (options.alphaVariant) add("alpha_variant", options.alphaVariant);
+  if (options.alphaActivityAttribute !== undefined) {
+    const value = options.alphaActivityAttribute.trim();
+    if (!value) throw new Error("alphaActivityAttribute must not be empty");
+    if (value !== "concept:name") add("alpha_activity_attribute", value);
+  }
+  if (options.alphaRemoveUnconnected === true)
+    add("alpha_remove_unconnected", "true");
   if (options.heuristicVariant && options.heuristicVariant !== "classic")
     add("heuristic_variant", options.heuristicVariant);
   if (options.heuristicActivityAttribute !== undefined) {

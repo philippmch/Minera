@@ -48,6 +48,30 @@ describe("Inductive request options", () => {
   });
 });
 
+describe("Alpha request options", () => {
+  it("serializes custom activity fields and removal explicitly", () => {
+    expect(mineFormEntries({
+      alphaVariant: "plus",
+      alphaActivityAttribute: " phase ",
+      alphaRemoveUnconnected: true,
+    })).toEqual([
+      ["alpha_variant", "plus"],
+      ["alpha_activity_attribute", "phase"],
+      ["alpha_remove_unconnected", "true"],
+    ]);
+  });
+
+  it("elides Alpha defaults and rejects a blank activity field", () => {
+    expect(mineFormEntries({
+      alphaVariant: "classic",
+      alphaActivityAttribute: "concept:name",
+      alphaRemoveUnconnected: false,
+    })).toEqual([["alpha_variant", "classic"]]);
+    expect(() => mineFormEntries({ alphaActivityAttribute: "  " }))
+      .toThrow(/alphaActivityAttribute/);
+  });
+});
+
 describe("Footprints request options", () => {
   it("serializes every discovery and conformance selector", () => {
     expect(mineFormEntries({
