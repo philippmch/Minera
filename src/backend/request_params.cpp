@@ -883,7 +883,8 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
     }
     return value;
   };
-  // Family selection is optional and defaults to replay fitness.  The
+  // Family selection is optional and defaults to the complete composite
+  // evaluation.  The
   // selected family does not gate parsing of the remaining fields below.
   if (supplied("evaluation_family")) {
     const auto value = require("evaluation_family");
@@ -914,6 +915,26 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
     params.precision_options.activity_attribute = value;
     params.generalization_options.activity_attribute = value;
     params.composite_options.activity_attribute = value;
+  }
+  if (supplied("evaluation_case_id_attribute")) {
+    const auto value = trim_text(require("evaluation_case_id_attribute"));
+    if (value.empty()) {
+      throw std::invalid_argument(
+          "evaluation_case_id_attribute: expected a non-empty name");
+    }
+    params.replay_fitness_options.case_id_attribute = value;
+    params.precision_options.case_id_attribute = value;
+    params.generalization_options.case_id_attribute = value;
+    params.composite_options.case_id_attribute = value;
+  }
+  if (supplied("evaluation_max_rows_to_materialize")) {
+    const auto value = parse_nonnegative_size(
+        require("evaluation_max_rows_to_materialize"),
+        "evaluation_max_rows_to_materialize");
+    params.replay_fitness_options.max_rows_to_materialize = value;
+    params.precision_options.max_rows_to_materialize = value;
+    params.generalization_options.max_rows_to_materialize = value;
+    params.composite_options.max_rows_to_materialize = value;
   }
   if (supplied("evaluation_token_replay_variant")) {
     const auto value = require("evaluation_token_replay_variant");

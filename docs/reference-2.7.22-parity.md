@@ -138,7 +138,7 @@ are reconciled.
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete** — view-based transition systems cover sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, occurrence data, flat and trace inputs, and explicit activity/case selectors; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and the additional DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings, backed by exact selector and module contracts |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum log/dataframe/lazyframe connected and disconnected projections; batches | **Complete** — strict native temporal discovery and permissive bundled analysis, all six canonical spectrum projections with adapter-specific sampling and timestamp behavior, all three batch adapters and five classifications, and every activity/resource/time/case/event selector have registered native plus production integration contracts |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis (including the configurable generated index-column contract), OCDFG metrics (explicit total-object associations plus separate event-couple and total-object performance projections), annotated and unannotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics and custom scalar activity/object-type selectors, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; SAW weight distributions retain per-event transition multiplicity (including final routing) and merged-net arc ownership decorations; broader object-centric schema and visualization coverage remains |
-| Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Partial (implemented core; proof pending)** — dynamic marked-net soundness dispatch, marked token/alignment/decomposed fitness, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, normalized composite fitness/precision/generalization/simplicity weights with F-score, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, frontend adapters, and a registered native evaluator contract suite cover the exposed settings and externally supplied comparison logs |
+| Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Partial (independent distance and DFG-precision modules complete)** — the stochastic-language distance selector and standalone DFG precision evaluator now have registered implementation and contract proofs, including their flat/lazy input and option semantics; the shared replay, alignment-precision, generalization, simplicity, and composite packages remain partial while their downstream conformance dependencies are audited variation by variation |
 | Label splitting | contextual | **Partial (implemented core; proof pending)** — deterministic native contextual splitting with token-aware contexts, weighted greedy-modularity clustering, strict edge thresholds, custom classifiers/targets, JSON/CLI/local-server/frontend adapters, and focused regressions for weighted gains, zero-edge graphs, zero-gain merges, and deterministic ties |
 | Merging | case relations | **Partial (implemented core; proof pending)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Complete** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) have native/JSON/CLI/server/frontend adapters; focused contracts prove LOG/PANDAS adapters, custom selectors, diagnostics, common role records, and all eight SNA selectors |
@@ -1690,6 +1690,18 @@ defaults. Dimensions and token signs are validated before evaluation, including
 for empty logs, and native callers receive explicit unsupported-variation
 results instead of silently falling through to another evaluator.
 
+The same evaluators also accept grouped logs, event streams, eager tables, lazy
+tables, and the tagged event-data view. Activity and case selectors use exact
+field, retained source, then canonical-alias precedence; an explicitly requested
+case field replaces any stale first-class grouping role. Lazy and grouped inputs
+honor the same optional materialization cap. Token- and alignment-replay summary
+functions can aggregate already-computed trace records without rerunning the
+model: absent records are excluded, token fit counts follow the explicit fit
+flag, alignment fit counts require unit fitness, and alignment log fitness uses
+the summed cost and best-worst denominator (including the nonempty zero-
+denominator result). Checked aggregation rejects invalid values and counter
+overflow without publishing a partially updated result.
+
 Replay fitness and precision share a selectable activity field and forward or
 backwards token replay. Forward token fitness can choose whether unknown activities
 affect fitness. Alignment fitness defaults to less-memory Dijkstra with
@@ -1709,8 +1721,11 @@ negative values. Its structural arc count includes ordinary, reset, inhibitor,
 and output arcs; extended Cardoso likewise treats all three input-arc kinds as
 structural outgoing choices. Results have standalone and embedded
 JSON forms, active-variation replay details, explicit completion/exhaustion
-state, and finite-or-null metrics. Composite results include the four component
-scores, normalized weights, weighted average, and F-score. The CLI evaluates every built-in Petri model
+state, and finite-or-null metrics. Replay summaries include both stable native
+fields and the established token/alignment spellings. Composite results place
+the complete token replay-fitness dictionary under `fitness`, retain an additive
+`fitness_score`, expose both weighted-average spellings, and include the other
+three component scores, normalized weights, and F-score. The CLI evaluates every built-in Petri model
 and an optional imported model; the local server evaluates any cached model and
 accepts multipart reference logs. The frontend exposes the complete option set,
 discovers models from actual nets as well as embedded results, and guards
@@ -1721,19 +1736,18 @@ exercises every evaluator variation, automatic dispatch, activity selectors,
 prefix rules, simplicity structure, composite aggregation, and both distance
 execution modes.
 
-Earth-mover evaluation retains the historical `EXACT` selector as the
-backwards-compatible default and also exposes `PYEMD`. The explicit variant
-uses normalized Levenshtein trace costs with the same dependency-free exact
-transport solver. Duplicate trace keys are consolidated in stable order;
-invalid weights, non-finite costs, empty positive-mass inputs, and unequal
-masses under strict mode are rejected deterministically. Normalized unequal
-masses are reported through the result's `normalized` flag, and the selected
-variant is retained in standalone and embedded JSON. The `use_fast_emd`
-compatibility setting is available through native options, the local server,
-CLI, request query, and frontend controls; native builds preserve the same
-deterministic transport result when the accelerated runtime is unavailable.
-Equal-mass detection uses the standard relative-plus-absolute near-equality
-tolerance; the fallback path retains its strict equal-total precondition.
+Earth-mover evaluation defaults to `PYEMD`; the historical native `EXACT`
+selector remains an explicit compatibility extension. Both languages share a
+sorted union alphabet with one Unicode code point per activity, so encoded
+distance callbacks remain collision-free beyond 256 activities. The default
+cost is normalized Levenshtein distance over those encoded trace strings, and
+the deterministic transportation solver reproduces the canonical distribution
+fixtures while retaining arbitrarily small positive mass. Duplicate trace keys
+are consolidated; invalid weights or costs and one-sided zero mass are rejected
+deterministically. The accelerated setting normalizes unequal positive totals,
+whereas strict or fallback execution retains the equal-total precondition;
+normalization is reported in the result. The selected variant and execution
+mode are carried through native, JSON, CLI, server, and typed frontend contracts.
 
 ## Token-replay parity evidence
 
@@ -1962,7 +1976,10 @@ modules are complete with distinct machine-checked proofs.
 DFG precision evidence: `evaluate_dfg_precision` builds weighted observed
 prefix observations, admits only prefixes reachable through the supplied start
 and directly-follows maps, and computes escaping versus activated transitions
-with deterministic counters. The standalone `minera_dfg_precision` command,
+with deterministic counters. Its default activity selector is `concept:name`;
+grouped logs, event streams, eager tables, lazy tables, and tagged event-data
+views share exact/source/alias selector precedence, requested-case authority,
+and a checked row-materialization cap. The standalone `minera_dfg_precision` command,
 cached-log `POST /api/dfg-precision`, and typed frontend request/response guard
 share the `DFG_PRECISION` envelope; custom activity attributes and malformed
 model/log inputs are validated by focused tests.

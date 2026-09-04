@@ -295,7 +295,7 @@ describe("evaluation adapters", () => {
       simplicity_initial_marking: [1, 0],
       simplicity_final_marking: [0, 1],
     })).toBe("evaluation_family=simplicity&fitness_variant=alignment_based&precision_variant=automaton_after_align&precision_use_task_ids=true&precision_max_states=200&generalization_variant=generalization_token&simplicity_variant=extended_cyclomatic&simplicity_arc_degree_k=2.5&simplicity_max_states=300&simplicity_initial_marking=1%2C0&simplicity_final_marking=0%2C1");
-    expect(evaluationQuery()).toBe("evaluation_family=replay_fitness");
+    expect(evaluationQuery()).toBe("evaluation_family=composite");
     expect(new URLSearchParams(evaluationQuery({
       process_tree_variant: "transition_bordered",
     })).get("process_tree_variant")).toBe("transition_bordered");
@@ -308,6 +308,8 @@ describe("evaluation adapters", () => {
       evaluation_family: "replay_fitness",
       fitness_variant: "alignment_based",
       evaluation_activity_attribute: " phase ",
+      evaluation_case_id_attribute: " case:id ",
+      evaluation_max_rows_to_materialize: 78,
       evaluation_initial_marking: [0, 2, 0],
       evaluation_final_marking: [0, 0, 2],
       evaluation_token_replay_variant: "forward",
@@ -326,6 +328,8 @@ describe("evaluation adapters", () => {
     }));
     expect(Object.fromEntries(alignment)).toMatchObject({
       evaluation_activity_attribute: "phase",
+      evaluation_case_id_attribute: "case:id",
+      evaluation_max_rows_to_materialize: "78",
       evaluation_initial_marking: "0,2,0",
       evaluation_final_marking: "0,0,2",
       evaluation_token_replay_variant: "forward",
@@ -406,6 +410,9 @@ describe("evaluation adapters", () => {
     expect(evaluationQuery({ evaluation_family: "composite", fitness_weight: 0 })).toContain("fitness_weight=0");
     expect(() => evaluationQuery({ fitness_weight: Number.NaN })).toThrow(/finite/);
     expect(() => evaluationQuery({ evaluation_activity_attribute: " " })).toThrow(/empty/);
+    expect(() => evaluationQuery({ evaluation_case_id_attribute: " " })).toThrow(/empty/);
+    expect(() => evaluationQuery({ evaluation_max_rows_to_materialize: -1 })).toThrow(/non-negative integer/);
+    expect(evaluationQuery({ evaluation_max_rows_to_materialize: 0 })).toContain("evaluation_max_rows_to_materialize=0");
     expect(() => evaluationQuery({ evaluation_token_replay_variant: "reverse" as "forward" })).toThrow(/invalid/);
     expect(() => evaluationQuery({ evaluation_alignment_max_states: 0 })).toThrow(/positive integer/);
     expect(() => evaluationQuery({ evaluation_alignment_exponent: 2 })).toThrow(/discounted/);
@@ -423,12 +430,35 @@ describe("evaluation adapters", () => {
       fscore: 2 / 3, weights: { fitness: 0.25, precision: 0.25, simplicity: 0.25, generalization: 0.25 },
     }};
     expect(isModelEvaluation(composite)).toBe(true);
+    expect(isModelEvaluation({ miner: "alpha", composite: {
+      ...composite.composite, metrics_average_weight: undefined,
+      metricsAverageWeight: 0.625,
+    }})).toBe(true);
+    expect(isModelEvaluation({ miner: "alpha", composite: {
+      ...composite.composite, metricsAverageWeight: 0.5,
+    }})).toBe(false);
+    const nestedFitness = {
+      computed: true, exhausted: false, error: null, variant: "token_based",
+      fitness: 1, log_fitness: 1, average_trace_fitness: 1,
+      percentage_of_fitting_traces: 100, perc_fit_traces: 100,
+      fitting_traces: 2, trace_count: 2, total_cost: 0,
+    };
+    expect(isModelEvaluation({ miner: "alpha", composite: {
+      ...composite.composite, fitness: nestedFitness, fitness_score: 1,
+    }})).toBe(true);
+    expect(isModelEvaluation({ miner: "alpha", composite: {
+      ...composite.composite, fitness: nestedFitness,
+    }})).toBe(true);
+    expect(isModelEvaluation({ miner: "alpha", composite: {
+      ...composite.composite, fitness: nestedFitness, fitness_score: 0.5,
+    }})).toBe(false);
     expect(isModelEvaluation({ ...composite, simplicity: { computed: true } })).toBe(false);
     expect(isModelEvaluation({ miner: "alpha", replay_fitness: {}, composite: composite.composite })).toBe(false);
   });
 
   it("serializes strict stochastic-language controls", () => {
-    expect(emdQuery({ normalize_masses: false, strict_equal_mass: true })).toBe("normalize_masses=false&strict_equal_mass=true");
+    expect(emdQuery()).toBe("emd_variant=pyemd");
+    expect(emdQuery({ normalize_masses: false, strict_equal_mass: true })).toBe("emd_variant=pyemd&normalize_masses=false&strict_equal_mass=true");
     expect(emdQuery({ emd_variant: "pyemd", normalize_masses: true, use_fast_emd: false })).toBe("emd_variant=pyemd&normalize_masses=true&use_fast_emd=false");
     expect(() => emdQuery({ emd_variant: "bogus" as "pyemd" })).toThrow(/invalid/);
     expect(() => emdQuery({ normalize_masses: "yes" as unknown as boolean })).toThrow(/boolean/);

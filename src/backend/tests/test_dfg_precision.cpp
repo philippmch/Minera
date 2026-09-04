@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <initializer_list>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -35,7 +36,58 @@ DfgCleanAnalysis model(
   return result;
 }
 
+EventStream flat_stream() {
+  EventStream stream;
+  for (const auto& row : {std::pair{"case-a", "A"},
+                          std::pair{"case-a", "B"},
+                          std::pair{"case-b", "A"},
+                          std::pair{"case-b", "C"}}) {
+    EventRecord record;
+    record.fields.push_back({"case_id", row.first, AttributeKind::kString});
+    record.fields.push_back({"label", row.second, AttributeKind::kString});
+    stream.events.push_back(std::move(record));
+  }
+  return stream;
+}
+
+EventTable flat_table() {
+  EventTable table;
+  table.columns = {"case_id", "label"};
+  for (const auto& row : {std::pair{"case-a", "A"},
+                          std::pair{"case-a", "B"},
+                          std::pair{"case-b", "A"},
+                          std::pair{"case-b", "C"}}) {
+    EventTable::Row values;
+    values.emplace_back(
+        EventAttribute{"case_id", row.first, AttributeKind::kString});
+    values.emplace_back(
+        EventAttribute{"label", row.second, AttributeKind::kString});
+    table.rows.push_back(std::move(values));
+  }
+  return table;
+}
+
+LazyEventTable flat_lazy_table() {
+  return LazyEventTable(
+      {"case_id", "label"},
+      [](const LazyEventTable::RowConsumer& consume) {
+        for (const auto& row : {std::pair{"case-a", "A"},
+                                std::pair{"case-a", "B"},
+                                std::pair{"case-b", "A"},
+                                std::pair{"case-b", "C"}}) {
+          LazyEventTable::Row values;
+          values.emplace_back(
+              EventAttribute{"case_id", row.first, AttributeKind::kString});
+          values.emplace_back(
+              EventAttribute{"label", row.second, AttributeKind::kString});
+          consume(values);
+        }
+      },
+      {}, {}, 4);
+}
+
 int main() {
+  assert(DfgPrecisionOptions{}.activity_attribute == "concept:name");
   const auto precise = model({{"A", "B"}, {"A", "C"}}, {"A"}, {"B", "C"});
   const auto perfect = evaluate_dfg_precision(log({{"A", "B"}, {"A", "C"}}), precise);
   assert(perfect.computed && perfect.precision == 1.0);
@@ -88,6 +140,91 @@ int main() {
     (void)evaluate_dfg_precision(log({{"A"}}), precise,
                                  DfgPrecisionOptions{"missing"});
   } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  DfgPrecisionOptions adapter_options;
+  adapter_options.activity_attribute = "label";
+  adapter_options.case_id_attribute = "case_id";
+  const auto stream_result =
+      evaluate_dfg_precision(flat_stream(), precise, adapter_options);
+  const auto table_result =
+      evaluate_dfg_precision(flat_table(), precise, adapter_options);
+  const auto lazy = flat_lazy_table();
+  const auto lazy_result =
+      evaluate_dfg_precision(lazy, precise, adapter_options);
+  assert(stream_result.computed && table_result.computed &&
+         lazy_result.computed && stream_result.precision == 1.0 &&
+         table_result.precision == 1.0 && lazy_result.precision == 1.0);
+
+  // A stream can carry a first-class activity under a canonical key while
+  // retaining the caller's source spelling. The requested source selector
+  // must still win, and the requested case field must drive grouping.
+  auto projected = flat_stream();
+  for (auto& record : projected.events) {
+    auto& activity = record.fields[1];
+    activity.key = "renamed_label";
+    activity.first_class_role = FirstClassAttributeRole::kActivity;
+    activity.first_class_state = FirstClassAttributeState::kPresent;
+    activity.first_class_source_key = "label";
+    record.fields.push_back(
+        {"concept:name", "wrong", AttributeKind::kString});
+    auto& case_field = record.fields[0];
+    case_field.first_class_role = FirstClassAttributeRole::kCaseId;
+    case_field.first_class_state = FirstClassAttributeState::kPresent;
+    case_field.first_class_source_key = "case_id";
+  }
+  const auto projected_result =
+      evaluate_dfg_precision(projected, precise, adapter_options);
+  assert(projected_result.computed && projected_result.precision == 1.0);
+
+  auto exact_activity = flat_stream();
+  for (auto& record : exact_activity.events) {
+    record.fields[1].key = "activity";
+    record.fields.push_back(
+        {"concept:name", "wrong", AttributeKind::kString});
+  }
+  auto exact_options = adapter_options;
+  exact_options.activity_attribute = "activity";
+  const auto exact_result =
+      evaluate_dfg_precision(exact_activity, precise, exact_options);
+  assert(exact_result.computed && exact_result.precision == 1.0);
+
+  auto alternate_case = flat_stream();
+  for (std::size_t index = 0; index < alternate_case.events.size(); ++index) {
+    auto& old_case = alternate_case.events[index].fields[0];
+    old_case.value = "legacy-case";
+    old_case.first_class_role = FirstClassAttributeRole::kCaseId;
+    old_case.first_class_state = FirstClassAttributeState::kPresent;
+    old_case.first_class_source_key = "legacy_case";
+    alternate_case.events[index].fields.push_back(
+        {"new_case", index < 2 ? "case-a" : "case-b",
+         AttributeKind::kString});
+  }
+  adapter_options.case_id_attribute = "new_case";
+  const auto alternate_result =
+      evaluate_dfg_precision(alternate_case, precise, adapter_options);
+  assert(alternate_result.computed && alternate_result.precision == 1.0 &&
+         alternate_result.allowed_prefix_occurrences == 4);
+  adapter_options.case_id_attribute = "case_id";
+
+  auto conflicting = flat_stream();
+  conflicting.events.front().fields.push_back(
+      {"label", "A", AttributeKind::kString});
+  threw = false;
+  try {
+    (void)evaluate_dfg_precision(conflicting, precise, adapter_options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  adapter_options.max_rows_to_materialize = 3;
+  threw = false;
+  try {
+    (void)evaluate_dfg_precision(lazy, precise, adapter_options);
+  } catch (const std::length_error&) {
     threw = true;
   }
   assert(threw);

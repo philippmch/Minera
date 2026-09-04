@@ -6162,6 +6162,8 @@ void json_export_carries_evaluation_contract() {
   const auto fj = minera::replay_fitness_json(fitness);
   assert(fj.find("\"variant\": \"alignment_based\"") != std::string::npos);
   assert(fj.find("\"percentage_of_fitting_traces\": 50") != std::string::npos);
+  assert(fj.find("\"percFitTraces\": 50") != std::string::npos);
+  assert(fj.find("\"averageFitness\": 0.8") != std::string::npos);
   assert(fj.find("bad \\\"quote\\\"") != std::string::npos);
   assert(fj.find("token_replay") == std::string::npos);
 
@@ -6199,7 +6201,7 @@ void json_export_carries_evaluation_contract() {
   emd.normalized = true;
   emd.error = "distance unavailable";
   const auto ej = minera::emd_json(emd);
-  assert(ej.find("\"variant\": \"exact\"") != std::string::npos);
+  assert(ej.find("\"variant\": \"pyemd\"") != std::string::npos);
   assert(ej.find("\"distance\": null") != std::string::npos);
   assert(ej.find("\"computed\": false") != std::string::npos);
   assert(ej.find("\"normalized\": true") != std::string::npos);
@@ -6212,6 +6214,38 @@ void json_export_carries_evaluation_contract() {
   assert(mj.find("\"miner\": \"miner \\\"one\\\"\"") != std::string::npos);
   assert(mj.find("replay_fitness") != std::string::npos);
 
+  minera::CompositeEvaluationResult composite;
+  composite.fitness = 0.9;
+  composite.precision = 0.8;
+  composite.generalization = 0.7;
+  composite.simplicity = 0.6;
+  composite.metrics_average_weight = 0.75;
+  composite.fscore = 0.8;
+  composite.fitness_details.fitness = 0.9;
+  composite.fitness_details.log_fitness = 0.9;
+  composite.fitness_details.average_trace_fitness = 0.9;
+  composite.fitness_details.percentage_fit_traces = 100.0;
+  composite.fitness_details.fitting_traces = 2;
+  composite.fitness_details.trace_count = 2;
+  composite.fitness_score = 0.9;
+  composite.fitness_weight = 0.25;
+  composite.precision_weight = 0.25;
+  composite.simplicity_weight = 0.25;
+  composite.generalization_weight = 0.25;
+  minera::ModelEvaluation composite_model;
+  composite_model.miner = "composite";
+  composite_model.composite = composite;
+  const auto composite_json =
+      minera::model_evaluation_json(composite_model);
+  assert(composite_json.find("\"fitness\": {\"variant\": \"token_based\"") !=
+         std::string::npos);
+  assert(composite_json.find("\"fitness_score\": 0.9") !=
+         std::string::npos);
+  assert(composite_json.find("\"metrics_average_weight\": 0.75") !=
+         std::string::npos);
+  assert(composite_json.find("\"metricsAverageWeight\": 0.75") !=
+         std::string::npos);
+
   minera::EventLog log;
   log.traces.push_back({"case", {{"case", "A"}}});
   const auto graph = minera::discover_directly_follows_graph(log);
@@ -6221,6 +6255,8 @@ void json_export_carries_evaluation_contract() {
   fitness.variant = minera::ReplayFitnessVariant::TOKEN_BASED;
   const auto token_detail = minera::replay_fitness_json(fitness, &graph);
   assert(token_detail.find("\"token_replay\":") != std::string::npos);
+  assert(token_detail.find("\"perc_fit_traces\": 50") !=
+         std::string::npos);
   assert(token_detail.find("\"alignments\":") == std::string::npos);
   precision.variant = minera::PrecisionVariant::ETCONFORMANCE_TOKEN;
   const auto token_precision = minera::precision_json(precision, &graph);
@@ -6228,8 +6264,13 @@ void json_export_carries_evaluation_contract() {
   assert(token_precision.find("\"alignments\":") == std::string::npos);
   precision.variant = minera::PrecisionVariant::ALIGN_ETCONFORMANCE;
   const auto alignment_precision = minera::precision_json(precision, &graph);
-  assert(alignment_precision.find("\"alignments\":") != std::string::npos);
+  assert(alignment_precision.find("\"alignments\":") == std::string::npos);
   assert(alignment_precision.find("\"token_replay\":") == std::string::npos);
+  precision.alignment_detail_present = true;
+  const auto populated_alignment_precision =
+      minera::precision_json(precision, &graph);
+  assert(populated_alignment_precision.find("\"alignments\":") !=
+         std::string::npos);
   const std::vector<minera::ModelEvaluation> evaluations{model};
   const auto embedded = minera::analysis_json(
       "evaluation", log, graph,

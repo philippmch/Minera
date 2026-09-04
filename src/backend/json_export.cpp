@@ -1661,6 +1661,18 @@ void write_replay_fitness(std::ostream& out, const ReplayFitnessResult& result,
   write_finite_or_null(out, result.average_trace_fitness);
   out << ", \"percentage_of_fitting_traces\": ";
   write_finite_or_null(out, result.percentage_fit_traces);
+  // Keep each evaluator's established compatibility spelling additive to the
+  // stable Minera fields. Token replay uses snake_case; alignment evaluation
+  // uses camelCase for its two historical summary keys.
+  if (result.variant == ReplayFitnessVariant::TOKEN_BASED) {
+    out << ", \"perc_fit_traces\": ";
+    write_finite_or_null(out, result.percentage_fit_traces);
+  } else if (result.variant == ReplayFitnessVariant::ALIGNMENT_BASED) {
+    out << ", \"percFitTraces\": ";
+    write_finite_or_null(out, result.percentage_fit_traces);
+    out << ", \"averageFitness\": ";
+    write_finite_or_null(out, result.average_trace_fitness);
+  }
   out << ", \"fitting_traces\": " << result.fitting_traces
       << ", \"trace_count\": " << result.trace_count
       << ", \"total_cost\": ";
@@ -1713,7 +1725,8 @@ void write_precision(std::ostream& out, const PrecisionResult& result,
     write_conformance(out, result.token_result, *graph);
   } else if (graph != nullptr &&
              (result.variant == PrecisionVariant::ALIGN_ETCONFORMANCE ||
-              result.variant == PrecisionVariant::AUTOMATON_AFTER_ALIGN)) {
+              result.variant == PrecisionVariant::AUTOMATON_AFTER_ALIGN) &&
+             result.alignment_detail_present) {
     out << ", \"alignments\": ";
     write_alignments(out, result.alignment_result, *graph);
   }
@@ -1760,13 +1773,17 @@ void write_simplicity(std::ostream& out, const SimplicityResult& result) {
       << result.strongly_connected_components << '}';
 }
 
-void write_composite(std::ostream& out,
-                     const CompositeEvaluationResult& result) {
+void write_composite(std::ostream& out, const CompositeEvaluationResult& result,
+                     const DirectlyFollowsGraph* graph) {
   out << "{\"computed\": " << (result.computed ? "true" : "false")
       << ", \"error\": ";
   if (result.error.empty()) out << "null";
   else write_json_string(out, result.error);
+  // The public composite contract keeps the complete replay-fitness record
+  // under fitness and exposes the historical scalar separately.
   out << ", \"fitness\": ";
+  write_replay_fitness(out, result.fitness_details, graph);
+  out << ", \"fitness_score\": ";
   write_finite_or_null(out, result.fitness);
   out << ", \"precision\": ";
   write_finite_or_null(out, result.precision);
@@ -1775,6 +1792,8 @@ void write_composite(std::ostream& out,
   out << ", \"simplicity\": ";
   write_finite_or_null(out, result.simplicity);
   out << ", \"metrics_average_weight\": ";
+  write_finite_or_null(out, result.metrics_average_weight);
+  out << ", \"metricsAverageWeight\": ";
   write_finite_or_null(out, result.metrics_average_weight);
   out << ", \"fscore\": ";
   write_finite_or_null(out, result.fscore);
@@ -1848,7 +1867,7 @@ void write_model_evaluation(std::ostream& out, const ModelEvaluation& result,
   }
   if (result.composite) {
     field("composite", [&](std::ostream& stream) {
-      write_composite(stream, *result.composite);
+      write_composite(stream, *result.composite, graph);
     });
   }
   out << '}';

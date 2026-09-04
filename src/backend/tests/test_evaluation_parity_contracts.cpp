@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <limits>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -270,6 +271,7 @@ void precision_align_etconformance_contract() {
       PrecisionVariant::ALIGN_ETCONFORMANCE);
   assert(result.computed);
   assert(result.variant == PrecisionVariant::ALIGN_ETCONFORMANCE);
+  assert(!result.alignment_detail_present);
   assert(close_to(result.precision, 2.0 / 3.0));
 }
 
@@ -281,6 +283,7 @@ void precision_automaton_after_align_contract() {
   assert(result.variant == PrecisionVariant::AUTOMATON_AFTER_ALIGN);
   assert(result.alignment_result.variant ==
          AlignmentVariant::kDijkstraLessMemory);
+  assert(result.alignment_detail_present);
   assert(close_to(result.precision, 1.0));
 }
 
@@ -579,6 +582,9 @@ void composite_default_contract() {
   assert(close_to(result.generalization_weight, 0.25));
   assert(close_to(result.simplicity_weight, 0.25));
   assert(close_to(result.fitness, fitness.log_fitness));
+  assert(close_to(result.fitness_score, result.fitness));
+  assert(result.fitness_details.computed);
+  assert(close_to(result.fitness_details.log_fitness, fitness.log_fitness));
   assert(close_to(result.precision, precision.precision));
   assert(close_to(result.generalization, generalization.generalization));
   assert(close_to(result.simplicity, simplicity.simplicity));
@@ -592,6 +598,349 @@ void composite_default_contract() {
                                            denominator
                                      : 0.0;
   assert(close_to(result.fscore, expected_fscore));
+}
+
+EventStream flat_evaluation_stream() {
+  EventStream stream;
+  for (const auto& row : {std::pair{"case-1", "A"},
+                          std::pair{"case-1", "B"},
+                          std::pair{"case-2", "A"},
+                          std::pair{"case-2", "B"}}) {
+    EventRecord record;
+    record.fields.push_back({"case_id", row.first, AttributeKind::kString});
+    record.fields.push_back({"phase", row.second, AttributeKind::kString});
+    stream.events.push_back(std::move(record));
+  }
+  return stream;
+}
+
+EventTable flat_evaluation_table() {
+  EventTable table;
+  table.columns = {"case_id", "phase"};
+  for (const auto& row : {std::pair{"case-1", "A"},
+                          std::pair{"case-1", "B"},
+                          std::pair{"case-2", "A"},
+                          std::pair{"case-2", "B"}}) {
+    EventTable::Row values;
+    values.emplace_back(
+        EventAttribute{"case_id", row.first, AttributeKind::kString});
+    values.emplace_back(
+        EventAttribute{"phase", row.second, AttributeKind::kString});
+    table.rows.push_back(std::move(values));
+  }
+  return table;
+}
+
+LazyEventTable lazy_evaluation_table() {
+  return LazyEventTable(
+      {"case_id", "phase"},
+      [](const LazyEventTable::RowConsumer& consume) {
+        for (const auto& row : {std::pair{"case-1", "A"},
+                                std::pair{"case-1", "B"},
+                                std::pair{"case-2", "A"},
+                                std::pair{"case-2", "B"}}) {
+          LazyEventTable::Row values;
+          values.emplace_back(
+              EventAttribute{"case_id", row.first, AttributeKind::kString});
+          values.emplace_back(
+              EventAttribute{"phase", row.second, AttributeKind::kString});
+          consume(values);
+        }
+      },
+      {}, {}, 4);
+}
+
+void evaluation_event_data_adapters_contract() {
+  ReplayFitnessOptions fitness_options;
+  fitness_options.activity_attribute = "phase";
+  fitness_options.case_id_attribute = "case_id";
+  PrecisionOptions precision_options;
+  precision_options.activity_attribute = "phase";
+  precision_options.case_id_attribute = "case_id";
+  GeneralizationOptions generalization_options;
+  generalization_options.activity_attribute = "phase";
+  generalization_options.case_id_attribute = "case_id";
+  CompositeEvaluationOptions composite_options;
+  composite_options.activity_attribute = "phase";
+  composite_options.case_id_attribute = "case_id";
+
+  const auto stream = flat_evaluation_stream();
+  const auto table = flat_evaluation_table();
+  const auto lazy = lazy_evaluation_table();
+  const auto net = sequence_net();
+  assert(evaluate_replay_fitness(stream, net,
+                                 ReplayFitnessVariant::TOKEN_BASED,
+                                 fitness_options)
+             .fitness == 1.0);
+  assert(evaluate_precision(table, net, PrecisionVariant::ETCONFORMANCE_TOKEN,
+                            precision_options)
+             .precision == 1.0);
+  assert(evaluate_generalization(
+             lazy, net, GeneralizationVariant::GENERALIZATION_TOKEN,
+             generalization_options)
+             .computed);
+  const auto composite = evaluate_composite(lazy, net, composite_options);
+  assert(composite.computed && composite.fitness == 1.0 &&
+         composite.fitness_details.trace_count == 2);
+
+  auto alternate_case = flat_evaluation_stream();
+  for (std::size_t index = 0; index < alternate_case.events.size(); ++index) {
+    auto& old_case = alternate_case.events[index].fields[0];
+    old_case.value = "legacy-case";
+    old_case.first_class_role = FirstClassAttributeRole::kCaseId;
+    old_case.first_class_state = FirstClassAttributeState::kPresent;
+    old_case.first_class_source_key = "legacy_case";
+    alternate_case.events[index].fields.push_back(
+        {"new_case", index < 2 ? "case-1" : "case-2",
+         AttributeKind::kString});
+    auto& activity = alternate_case.events[index].fields[1];
+    activity.key = "renamed_phase";
+    activity.first_class_role = FirstClassAttributeRole::kActivity;
+    activity.first_class_state = FirstClassAttributeState::kPresent;
+    activity.first_class_source_key = "phase";
+    alternate_case.events[index].fields.push_back(
+        {"concept:name", "wrong", AttributeKind::kString});
+  }
+  fitness_options.case_id_attribute = "new_case";
+  const auto alternate = evaluate_replay_fitness(
+      alternate_case, net, ReplayFitnessVariant::TOKEN_BASED,
+      fitness_options);
+  assert(alternate.computed && alternate.trace_count == 2 &&
+         alternate.fitness == 1.0);
+
+  auto exact_activity = flat_evaluation_stream();
+  for (auto& record : exact_activity.events) {
+    record.fields[1].key = "activity";
+    record.fields.push_back(
+        {"concept:name", "wrong", AttributeKind::kString});
+  }
+  auto exact_options = fitness_options;
+  exact_options.activity_attribute = "activity";
+  exact_options.case_id_attribute = "case_id";
+  const auto exact = evaluate_replay_fitness(
+      exact_activity, net, ReplayFitnessVariant::TOKEN_BASED, exact_options);
+  assert(exact.computed && exact.fitness == 1.0);
+
+  fitness_options.case_id_attribute = "case_id";
+  fitness_options.max_rows_to_materialize = 3;
+  bool threw = false;
+  try {
+    (void)evaluate_replay_fitness(lazy, net, ReplayFitnessVariant::TOKEN_BASED,
+                                  fitness_options);
+  } catch (const std::length_error&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    const auto grouped = log({{"A", "B"}});
+    ReplayFitnessOptions grouped_options;
+    grouped_options.max_rows_to_materialize = 1;
+    (void)evaluate_replay_fitness(grouped, net,
+                                  ReplayFitnessVariant::TOKEN_BASED,
+                                  grouped_options);
+  } catch (const std::length_error&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+void precomputed_replay_aggregation_contract() {
+  const std::vector<PrecomputedTokenReplay> token_results{
+      PrecomputedTokenReplay{true, false, true, 1.0, 0, 4, 0, 4, {2, 1}, {}},
+      PrecomputedTokenReplay{true, false, false, 0.5, 1, 4, 1, 4, {1, 2}, {}}};
+  const auto token = evaluate_replay_fitness(token_results);
+  assert(token.computed && token.trace_count == 2 && token.fitting_traces == 1);
+  assert(close_to(token.average_trace_fitness, 0.75));
+  assert(close_to(token.fitness, 0.875));
+  assert(close_to(token.token_result.fitness, token.fitness));
+  assert(token.token_result.transition_frequencies ==
+         std::vector<std::uint64_t>({3, 3}));
+  const auto disagreement = evaluate_replay_fitness(
+      std::vector<PrecomputedTokenReplay>{
+          PrecomputedTokenReplay{true, false, false, 1.0, 0, 1, 0, 1, {}, {}}});
+  assert(disagreement.computed && disagreement.fitting_traces == 0);
+  const auto token_zero_denominator = evaluate_replay_fitness(
+      std::vector<PrecomputedTokenReplay>{
+          PrecomputedTokenReplay{true, false, true, 1.0, 0, 0, 0, 0, {}, {}}});
+  assert(token_zero_denominator.computed &&
+         token_zero_denominator.average_trace_fitness == 0.0 &&
+         token_zero_denominator.percentage_fit_traces == 0.0 &&
+         token_zero_denominator.log_fitness == 0.0);
+  PrecomputedTokenReplay token_aliases;
+  token_aliases.trace_is_fit = true;
+  token_aliases.trace_fitness = 1.0;
+  token_aliases.consumed = 2;
+  token_aliases.produced = 2;
+  const auto token_alias_result = evaluate_replay_fitness(
+      std::vector<PrecomputedTokenReplay>{token_aliases});
+  assert(token_alias_result.computed && token_alias_result.fitness == 1.0 &&
+         token_alias_result.token_result.consumed == 2 &&
+         token_alias_result.token_result.produced == 2);
+  PrecomputedTokenReplay near_overflow;
+  near_overflow.produced_tokens = std::numeric_limits<std::uint64_t>::max();
+  near_overflow.consumed_tokens = 1;
+  near_overflow.trace_fitness = 1.0;
+  near_overflow.trace_is_fit = true;
+  PrecomputedTokenReplay overflow_tail;
+  overflow_tail.produced_tokens = 1;
+  overflow_tail.consumed_tokens = 1;
+  overflow_tail.trace_fitness = 1.0;
+  const auto overflow = evaluate_replay_fitness(
+      std::vector<PrecomputedTokenReplay>{near_overflow, overflow_tail});
+  assert(!overflow.computed && overflow.token_result.produced == 0 &&
+         overflow.token_result.trace_count == 0);
+
+  const std::vector<PrecomputedAlignmentReplay> alignment_results{
+      PrecomputedAlignmentReplay{true, false, false, 0.5, 2.0, 4.0, {}},
+      PrecomputedAlignmentReplay{false, true, false, 0.0, 0.0, 0.0,
+                                 "unfinished"},
+      PrecomputedAlignmentReplay{true, false, false, 1.0, 0.0, 0.0, {}}};
+  const auto alignment = evaluate_replay_fitness(alignment_results);
+  assert(alignment.computed && alignment.trace_count == 2 &&
+         alignment.fitting_traces == 1);
+  assert(close_to(alignment.average_trace_fitness, 0.75));
+  assert(close_to(alignment.fitness, 0.5));
+  assert(alignment.alignment_result.variants.size() == 2);
+
+  const auto zero_denominator = evaluate_replay_fitness(
+      std::vector<PrecomputedAlignmentReplay>{
+          PrecomputedAlignmentReplay{true, false, false, 0.0, 0.0, 0.0, {}}});
+  assert(zero_denominator.computed && zero_denominator.trace_count == 1 &&
+         zero_denominator.fitness == 1.0);
+  const auto empty = evaluate_replay_fitness(
+      std::vector<PrecomputedAlignmentReplay>{});
+  assert(empty.computed && empty.trace_count == 0 && empty.fitness == 0.0);
+  const auto negative_log_fitness = evaluate_replay_fitness(
+      std::vector<PrecomputedAlignmentReplay>{
+          PrecomputedAlignmentReplay{true, false, false, 0.0, 6.0, 4.0, {}}});
+  assert(negative_log_fitness.computed &&
+         close_to(negative_log_fitness.log_fitness, -0.5));
+  const double largest = std::numeric_limits<double>::max();
+  const auto alignment_overflow = evaluate_replay_fitness(
+      std::vector<PrecomputedAlignmentReplay>{
+          PrecomputedAlignmentReplay{true, false, false, 0.0, largest,
+                                     largest, {}},
+          PrecomputedAlignmentReplay{true, false, false, 0.0, largest,
+                                     largest, {}}});
+  assert(!alignment_overflow.computed &&
+         alignment_overflow.alignment_result.variants.empty() &&
+         alignment_overflow.trace_count == 0);
+
+  // Serialized alignment payloads commonly use `bwc` for the denominator;
+  // the native aggregator accepts that alias when the descriptive field is
+  // left at its default.
+  PrecomputedAlignmentReplay alias_bwc;
+  alias_bwc.fitness = 0.5;
+  alias_bwc.cost = 1.0;
+  alias_bwc.bwc = 2.0;
+  const auto alias_result = evaluate_replay_fitness(
+      std::vector<PrecomputedAlignmentReplay>{alias_bwc});
+  assert(alias_result.computed && close_to(alias_result.fitness, 0.5) &&
+         alias_result.alignment_result.variants.front().worst_cost == 2.0);
+}
+
+void emd_encoding_and_mass_contract() {
+  StochasticLanguage model{{{{"a", "b", "d", "e"}, 0.49},
+                            {{"a", "d", "b", "e"}, 0.49},
+                            {{"a", "c", "d", "e"}, 0.01},
+                            {{"a", "d", "c", "e"}, 0.01}},
+                           1.0};
+  const auto language = [](std::initializer_list<WeightedTrace> traces) {
+    StochasticLanguage result;
+    result.traces.assign(traces.begin(), traces.end());
+    for (const auto& trace : result.traces) result.total_mass += trace.weight;
+    return result;
+  };
+  const auto l1 = language({{{"a", "b", "d", "e"}, 0.49},
+                            {{"a", "d", "b", "e"}, 0.49},
+                            {{"a", "c", "d", "e"}, 0.01},
+                            {{"a", "d", "c", "e"}, 0.01}});
+  const auto l2 = language({{{"a", "b", "e"}, 0.5},
+                            {{"a", "b", "d", "e"}, 0.245},
+                            {{"a", "d", "b", "e"}, 0.245},
+                            {{"a", "c", "d", "e"}, 0.005},
+                            {{"a", "d", "c", "e"}, 0.005}});
+  const auto l3 = language({{{"a", "b", "d", "e"}, 0.489},
+                            {{"a", "d", "b", "e"}, 0.489},
+                            {{"a", "c", "d", "e"}, 0.01},
+                            {{"a", "d", "c", "e"}, 0.01},
+                            {{"a", "b", "e"}, 0.002}});
+  const auto l4 = language({{{"a", "b", "d", "e"}, 0.5},
+                            {{"a", "d", "b", "e"}, 0.5}});
+  const auto l5 = language({{{"a", "c", "d", "e"}, 0.5},
+                            {{"a", "d", "c", "e"}, 0.5}});
+  assert(close_to(evaluate_emd(model, l1).distance, 0.0));
+  assert(close_to(evaluate_emd(model, l2).distance, 0.1275));
+  assert(close_to(evaluate_emd(model, l3).distance, 0.0005));
+  assert(close_to(evaluate_emd(model, l4).distance, 0.005));
+  assert(close_to(evaluate_emd(model, l5).distance, 0.245));
+
+  StochasticLanguage left{{{{"only-left"}, 0.5}, {{"shared"}, 0.5}}, 1.0};
+  StochasticLanguage right{{{{"only-right"}, 0.5}, {{"shared"}, 0.5}}, 1.0};
+  std::size_t callback_calls = 0;
+  bool saw_distinct_union_symbols = false;
+  EmdOptions callback_options;
+  callback_options.encoded_distance =
+      [&](const std::u32string& a, const std::u32string& b) {
+        ++callback_calls;
+        if (!a.empty() && !b.empty() && a.front() != b.front())
+          saw_distinct_union_symbols = true;
+        return 0.0;
+      };
+  const auto callback_result = evaluate_emd(left, right, callback_options);
+  assert(callback_result.computed && callback_calls != 0 &&
+         saw_distinct_union_symbols);
+
+  std::vector<std::string> many_activities;
+  for (std::size_t i = 0; i < 260; ++i)
+    many_activities.push_back("activity-" + std::to_string(i));
+  StochasticLanguage wide{{{many_activities, 1.0}}, 1.0};
+  std::size_t encoded_length = 0;
+  char32_t maximum_symbol = 0;
+  callback_options.encoded_distance =
+      [&](const std::u32string& a, const std::u32string& b) {
+        encoded_length = a.size();
+        for (const auto symbol : a) maximum_symbol = std::max(maximum_symbol, symbol);
+        assert(a == b);
+        return 0.0;
+      };
+  assert(evaluate_emd(wide, wide, callback_options).computed);
+  assert(encoded_length == 260 && maximum_symbol > 255);
+
+  StochasticLanguage unequal{{{{"A"}, 1.0}}, 1.0};
+  StochasticLanguage double_mass{{{{"A"}, 2.0}}, 2.0};
+  const auto normalized = evaluate_emd(unequal, double_mass);
+  assert(normalized.computed && normalized.normalized && normalized.distance == 0.0);
+  callback_options.encoded_distance = {};
+  callback_options.use_fast_emd = false;
+  assert(!evaluate_emd(unequal, double_mass, callback_options).computed);
+  callback_options.use_fast_emd = true;
+  callback_options.normalize_masses = false;
+  assert(!evaluate_emd(unequal, double_mass, callback_options).computed);
+  callback_options.normalize_masses = true;
+  StochasticLanguage zero_left{{{{"zero"}, 0.0}}, 0.0};
+  StochasticLanguage zero_right{{{{"other"}, 0.0}}, 0.0};
+  assert(evaluate_emd(zero_left, zero_right).computed &&
+         evaluate_emd(zero_left, zero_right).distance == 0.0);
+  assert(evaluate_emd(StochasticLanguage{}, StochasticLanguage{}).distance == 0.0);
+  StochasticLanguage tiny_left{{{{"tiny-left"}, 1e-15}}, 1e-15};
+  StochasticLanguage tiny_right{{{{"tiny-right"}, 1e-15}}, 1e-15};
+  const auto tiny = evaluate_emd(tiny_left, tiny_right);
+  assert(tiny.computed && std::abs(tiny.distance - 1e-15) < 1e-24);
+
+  const double largest_mass = std::numeric_limits<double>::max();
+  StochasticLanguage huge_left{{{{"huge-left"}, largest_mass}}, largest_mass};
+  StochasticLanguage huge_right{{{{"huge-right"}, largest_mass}}, largest_mass};
+  EmdOptions overflowing_cost;
+  overflowing_cost.encoded_distance =
+      [largest_mass](const std::u32string&, const std::u32string&) {
+        return largest_mass;
+      };
+  const auto overflow =
+      evaluate_emd(huge_left, huge_right, overflowing_cost);
+  assert(!overflow.computed &&
+         overflow.error == "transportation cost overflow");
 }
 
 void emd_pyemd_contract() {
@@ -679,7 +1028,10 @@ int main() {
   simplicity_extended_cardoso_contract();
   simplicity_extended_cyclomatic_contract();
   composite_default_contract();
+  evaluation_event_data_adapters_contract();
+  precomputed_replay_aggregation_contract();
   emd_pyemd_contract();
+  emd_encoding_and_mass_contract();
   process_tree_evaluation_overloads_contract();
   return 0;
 }

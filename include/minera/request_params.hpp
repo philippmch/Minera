@@ -221,7 +221,9 @@ enum class EvaluationFamily {
 };
 
 struct EvaluationParams {
-  EvaluationFamily family = EvaluationFamily::kReplayFitness;
+  // The public dispatcher computes the complete metric bundle by default.
+  // Individual families remain available through an explicit selector.
+  EvaluationFamily family = EvaluationFamily::kComposite;
   ReplayFitnessVariant replay_fitness_variant = ReplayFitnessVariant::AUTO;
   ReplayFitnessOptions replay_fitness_options;
   PrecisionVariant precision_variant = PrecisionVariant::AUTO;
