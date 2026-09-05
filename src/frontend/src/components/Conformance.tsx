@@ -1266,7 +1266,8 @@ export function TokenReplayDiagnostics({ traces }: { traces?: TokenReplayTraceDi
                   <dt>Problem transition IDs</dt><dd>{replayDiagnosticList(trace.transitions_with_problems)}</dd>
                   <dt>Enabled transition IDs</dt><dd>{replayDiagnosticList(trace.enabled_transitions)}</dd>
                   <dt>Unknown event indices</dt><dd>{replayDiagnosticList(trace.unknown_event_indices)}</dd>
-                  <dt>Unknown activity labels</dt><dd>{replayDiagnosticList(trace.unknown_activities)}</dd>
+                  <dt>Unknown activity labels</dt><dd>{replayDiagnosticList(trace.unknown_activities.map(
+                    (label, index) => trace.unknown_activity_is_null?.[index] ? "(null)" : label))}</dd>
                   <dt>Reached marking (tokens by place index, before final consumption)</dt><dd>{replayDiagnosticList(trace.reached_marking)}</dd>
                 </dl>
               </details>
@@ -1417,7 +1418,8 @@ function TokenReplay({
                   </div>
                   <div className="variant-steps">
                     {variant.activities.map((activityId, i) => {
-                      const name = variant.activity_names?.[i] ??
+                      const name = variant.null_activity_indices?.includes(i) ? "(null)" :
+                        variant.activity_names?.[i] ??
                         (activityId === null ? "?" : data.activities[activityId]?.name ?? "?");
                       return (
                         <Fragment key={i}>

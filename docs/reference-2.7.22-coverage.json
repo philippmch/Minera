@@ -1123,6 +1123,8 @@
         "src/backend/tools/minera_server.cpp",
         "src/backend/tests/test_token_replay_diagnostics.cpp",
         "src/backend/tests/test_token_replay_transport.cpp",
+        "src/backend/token_replay_event_data.cpp",
+        "src/backend/tests/test_token_replay_event_data.cpp",
         "src/frontend/src/api.ts",
         "src/frontend/src/types.ts",
         "src/frontend/src/components/Filters.tsx",

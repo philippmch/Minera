@@ -17,6 +17,11 @@ const render = (traces?: TokenReplayTraceDiagnostics[]) =>
   renderToStaticMarkup(createElement(TokenReplayDiagnostics, { traces }));
 
 describe("per-case token replay diagnostics", () => {
+  it("identifies explicit null unknown labels without confusing empty strings", () => {
+    const html = render([{ ...trace(), unknown_activities: ["", ""],
+      unknown_event_indices: [0, 1], unknown_activity_is_null: [true, false] }]);
+    expect(html).toContain("Unknown activity labels</dt><dd>(null), ");
+  });
   it("does not show a panel for older or non-opt-in exports", () => {
     expect(render()).toBe("");
     expect(render([])).toContain("Diagnostics were requested, but there are no source traces.");

@@ -1139,6 +1139,11 @@ void write_token_replay_trace(std::ostream& out,
     if (i) out << ", ";
     write_json_string(out, trace.unknown_activities[i]);
   }
+  out << "], \"unknown_activity_is_null\": [";
+  for (std::size_t i = 0; i < trace.unknown_activity_is_null.size(); ++i) {
+    if (i) out << ", ";
+    out << (trace.unknown_activity_is_null[i] ? "true" : "false");
+  }
   out << "], \"places\": [";
   for (std::size_t i = 0; i < trace.places.size(); ++i) {
     if (i) out << ", ";
@@ -1174,7 +1179,10 @@ void write_conformance(std::ostream& out,
     out << "{\"activities\": [";
     for (std::size_t j = 0; j < variants[i].activities.size(); ++j) {
       // Resolve names to the activity ids used elsewhere in the document.
-      const auto id = graph.activity_id(variants[i].activities[j]);
+      const bool is_null = std::find(variants[i].null_activity_indices.begin(),
+                                    variants[i].null_activity_indices.end(), j) !=
+                           variants[i].null_activity_indices.end();
+      const auto id = is_null ? std::nullopt : graph.activity_id(variants[i].activities[j]);
       if (id) out << *id;
       else out << "null";
       out << (j + 1 < variants[i].activities.size() ? ", " : "");
@@ -1184,7 +1192,16 @@ void write_conformance(std::ostream& out,
       write_json_string(out, variants[i].activities[j]);
       out << (j + 1 < variants[i].activities.size() ? ", " : "");
     }
-    out << "], \"count\": " << variants[i].count
+    out << ']';
+    if (!variants[i].null_activity_indices.empty()) {
+      out << ", \"null_activity_indices\": [";
+      for (std::size_t j = 0; j < variants[i].null_activity_indices.size(); ++j) {
+        if (j) out << ", ";
+        out << variants[i].null_activity_indices[j];
+      }
+      out << ']';
+    }
+    out << ", \"count\": " << variants[i].count
         << ", \"fitness\": " << variants[i].fitness << '}'
         << (i + 1 < variants.size() ? ", " : "");
   }

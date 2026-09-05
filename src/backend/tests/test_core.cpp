@@ -1194,16 +1194,20 @@ void conformance_is_perfect_for_every_operator() {
 }
 
 void conformance_counts_unmodeled_activities() {
-  // The model knows only a and b; a trace carrying an unseen activity z cannot
-  // be replayed cleanly and must register a deviation.
+  // Unknown events are not model token moves. The optional strict policy
+  // marks their trace unfit without altering token accounting or fitness.
   const auto model_log = log_from_variants({{"a", "b"}});
   const auto tree = minera::discover_process_tree(model_log);
 
   const auto foreign = log_from_variants({{"a", "z", "b"}});
   const auto conformance = minera::check_conformance(foreign, tree);
-  assert(conformance.missing > 0);
-  assert(conformance.fitness < 1.0);
-  assert(conformance.fitting_traces == 0);
+  assert(conformance.missing == 0 && conformance.fitness == 1.0);
+  assert(conformance.fitting_traces == 1);
+  minera::TokenReplayOptions options;
+  options.consider_activities_not_in_model_in_fitness = true;
+  const auto strict = minera::check_conformance(foreign, tree, options);
+  assert(strict.fitting_traces == 0 && strict.fitness == conformance.fitness);
+  assert(strict.missing == conformance.missing && strict.consumed == conformance.consumed);
 }
 
 void conformance_penalizes_a_deviating_trace() {
@@ -1316,7 +1320,8 @@ void backwards_replay_ignores_unknown_and_interrupts_duplicate_labels() {
   const auto backwards = minera::check_conformance(unknown, tree, options);
   const auto forward = minera::check_conformance(unknown, tree);
   assert(backwards.fitting_traces == 1 && backwards.missing == 0);
-  assert(forward.fitting_traces == 0 && forward.missing > 0);
+  // Unknown labels do not consume or create model tokens in either variation.
+  assert(forward.fitting_traces == 1 && forward.missing == 0);
 
   minera::PetriNet duplicate;
   const auto source = duplicate.add_place();

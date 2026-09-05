@@ -1339,19 +1339,22 @@ describe("mineFormEntries", () => {
     expect(hasActiveMinerOptions({
       tokenReplayConsiderRemainingInFitness: true,
       tokenReplayTryToReachFinalMarkingThroughHidden: true,
-      tokenReplayConsiderActivitiesNotInModelInFitness: true,
+      tokenReplayConsiderActivitiesNotInModelInFitness: false,
       tokenReplayWalkThroughHiddenTransitions: true,
       tokenReplayIncludeTraceDiagnostics: false,
     })).toBe(false);
     for (const key of [
       "tokenReplayConsiderRemainingInFitness",
       "tokenReplayTryToReachFinalMarkingThroughHidden",
-      "tokenReplayConsiderActivitiesNotInModelInFitness",
       "tokenReplayWalkThroughHiddenTransitions",
     ] as const) {
       expect(hasActiveMinerOptions({ [key]: false })).toBe(true);
     }
     expect(hasActiveMinerOptions({ tokenReplayIncludeTraceDiagnostics: true })).toBe(true);
+    expect(hasActiveMinerOptions({ tokenReplayConsiderActivitiesNotInModelInFitness: true })).toBe(true);
+    expect(hasActiveMinerOptions({ tokenReplayMaxRowsToMaterialize: 0 })).toBe(true);
+    expect(hasActiveMinerOptions({ tokenReplayCaseIdAttribute: "group" })).toBe(true);
+    expect(hasActiveMinerOptions({ tokenReplayCaseIdAttribute: "case:concept:name" })).toBe(false);
     expect(mineFormEntries({
       tokenReplayVariant: "backwards",
       tokenReplayStopImmediatelyUnfit: true,

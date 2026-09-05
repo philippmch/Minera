@@ -7,6 +7,7 @@
 #include <functional>
 #include <chrono>
 #include <limits>
+#include <map>
 #include <optional>
 #include <queue>
 #include <set>
@@ -101,6 +102,17 @@ bool valid_token_replay_variant(TokenReplayVariant variant) {
   return false;
 }
 
+void validate_token_replay_event_limit(const EventLog& log,
+                                     const TokenReplayOptions& options) {
+  if (!options.max_rows_to_materialize) return;
+  std::size_t available = *options.max_rows_to_materialize;
+  for (const auto& trace : log.traces) {
+    if (trace.events.size() > available)
+      throw std::length_error("token replay input exceeds max_rows_to_materialize");
+    available -= trace.events.size();
+  }
+}
+
 bool valid_alignment_variant(AlignmentVariant variant) {
   switch (variant) {
     case AlignmentVariant::kStateEquationAStar:
@@ -160,9 +172,19 @@ class Replayer {
     std::uint64_t consumed = 0;
     std::uint64_t missing = 0;
     std::uint64_t remaining = 0;
+    std::uint64_t missing_before_final_check = 0;
+    bool has_unknown_activity = false;
+    bool forward_replay = false;
     std::vector<TokenReplayPlaceDiagnostics> places;
 
+    [[nodiscard]] bool forward_fitting(const TokenReplayOptions& options) const {
+      return missing_before_final_check == 0 &&
+          (!options.consider_remaining_in_fitness || remaining == 0) &&
+          (!options.consider_activities_not_in_model_in_fitness || !has_unknown_activity);
+    }
+
     [[nodiscard]] double fitness() const {
+      if (forward_replay && (consumed == 0 || produced == 0)) return 1.0;
       const double consume_term = consumed == 0 ? 0.0 : double(missing) / double(consumed);
       const double produce_term = produced == 0 ? 0.0 : double(remaining) / double(produced);
       return 0.5 * (1.0 - consume_term) + 0.5 * (1.0 - produce_term);
@@ -181,6 +203,7 @@ class Replayer {
       TokenReplayTraceDiagnostics* diagnostics = nullptr) const {
     Marking marking = initial_marking();
     Counts counts;
+    counts.forward_replay = true;
     counts.places.resize(net_.place_count());
     for (std::size_t place = 0; place < initial_.size(); ++place) {
       const auto tokens = static_cast<std::uint64_t>(initial_[place]);
@@ -191,18 +214,11 @@ class Replayer {
     for (const auto& step : trace) {
       if (diagnostics) ++diagnostics->replayed_events;
       if (!step || transitions_by_activity_[*step].empty()) {
+        counts.has_unknown_activity = true;
         if (diagnostics)
           diagnostics->unknown_event_indices.push_back(diagnostics->replayed_events - 1);
-        if (options.consider_activities_not_in_model_in_fitness) {
-          // An activity the model has no transition for is a log-move
-          // deviation only when the selected replay contract includes it.
-          ++counts.missing;
-          ++counts.consumed;
-          if (options.stop_immediately_unfit) {
-            if (diagnostics) diagnostics->replay_stopped = true;
-            break;
-          }
-        }
+        // Unknown labels never change the marking or token counters. Their
+        // optional fit classification is applied after replay, without stopping.
         continue;
       }
       const Step& result = cached_step(marking, *step,
@@ -249,6 +265,7 @@ class Replayer {
         for (const std::size_t t : finish.fired) ++(*executions)[t];
       }
     }
+    counts.missing_before_final_check = counts.missing;
     if (diagnostics) diagnostics->reached_marking = marking;
     for (std::size_t place = 0; place < marking.size(); ++place) {
       const auto required = static_cast<std::uint64_t>(final_[place]);
@@ -935,6 +952,7 @@ struct Variant {
   std::vector<std::optional<std::size_t>> ids;  // std::nullopt = absent activity
   std::vector<std::string> names;
   std::uint64_t count = 0;
+  std::vector<std::size_t> null_activity_indices;
 };
 
 bool standard_activity_attribute(std::string_view key) {
@@ -948,6 +966,70 @@ std::string selected_activity(const Event& event,
   throw std::invalid_argument(
       "conformance: event is missing activity attribute '" +
       std::string(activity_attribute) + "'");
+}
+
+std::optional<std::string> selected_replay_activity(
+    const Event& event, std::string_view selector) {
+  if (selector.empty()) selector = "concept:name";
+  const EventAttribute* selected = nullptr;
+  int priority = 0;
+  std::size_t matches = 0;
+  for (const auto& attribute : event.attributes) {
+    const int candidate = attribute.key == selector ? 3
+        : !attribute.first_class_source_key.empty() &&
+          attribute.first_class_source_key == selector ? 2 : 0;
+    if (candidate == 0 || candidate < priority) continue;
+    if (candidate > priority) {
+      selected = &attribute;
+      priority = candidate;
+      matches = 1;
+    } else {
+      ++matches;
+    }
+  }
+  if (matches > 1)
+    throw std::invalid_argument("conformance: duplicate selected activity attribute");
+  if (selected) {
+    if (selected->first_class_role != FirstClassAttributeRole::kNone &&
+        selected->first_class_state == FirstClassAttributeState::kMissing)
+      throw std::invalid_argument("conformance: selected activity attribute is missing");
+    if (selected->is_null ||
+        selected->first_class_state == FirstClassAttributeState::kNull)
+      return std::nullopt;
+    return selected->value;
+  }
+  if (standard_activity_attribute(selector) ||
+      (!event.activity_source_key.empty() && event.activity_source_key == selector)) {
+    if (event.activity_state == FirstClassAttributeState::kNull) return std::nullopt;
+    if (event.has_activity()) return event.activity;
+  }
+  throw std::invalid_argument("conformance: event is missing activity attribute '" +
+                              std::string(selector) + "'");
+}
+
+std::vector<Variant> collect_replay_variants(
+    const EventLog& log, const Replayer& resolver, std::string_view selector) {
+  std::vector<Variant> variants;
+  std::map<std::vector<std::optional<std::string>>, std::size_t> index;
+  for (const auto& trace : log.traces) {
+    std::vector<std::optional<std::string>> key;
+    Variant variant;
+    for (const auto& event : trace.events) {
+      auto activity = selected_replay_activity(event, selector);
+      if (!activity) variant.null_activity_indices.push_back(variant.names.size());
+      variant.ids.push_back(activity ? resolver.activity_id(*activity) : std::nullopt);
+      variant.names.push_back(activity.value_or(""));
+      key.push_back(std::move(activity));
+    }
+    const auto [it, inserted] = index.emplace(std::move(key), variants.size());
+    if (inserted) {
+      variant.count = 1;
+      variants.push_back(std::move(variant));
+    } else {
+      ++variants[it->second].count;
+    }
+  }
+  return variants;
 }
 
 // `resolver.activity_id(name)` maps an activity name to its model id (or
@@ -2624,6 +2706,7 @@ FootprintResult check_footprints(const EventLog& event_log,
 ConformanceResult check_conformance(const EventLog& event_log,
                                     const PetriNet& net,
                                     TokenReplayOptions options) {
+  validate_token_replay_event_limit(event_log, options);
   if (!valid_token_replay_variant(options.variant)) {
     throw std::invalid_argument("unsupported token replay variant");
   }
@@ -2631,7 +2714,7 @@ ConformanceResult check_conformance(const EventLog& event_log,
   const std::string activity_attribute =
       options.activity_attribute.empty() ? "concept:name"
                                          : options.activity_attribute;
-  const auto variants = collect_variants(event_log, replayer,
+  const auto variants = collect_replay_variants(event_log, replayer,
                                           activity_attribute);
 
   ConformanceResult result;
@@ -2664,14 +2747,13 @@ ConformanceResult check_conformance(const EventLog& event_log,
     result.remaining += counts.remaining * variant.count;
     const bool fitting = backwards
                              ? backwards_outcome->fitting
-                             : (counts.missing == 0 &&
-                                (!options.consider_remaining_in_fitness ||
-                                 counts.remaining == 0));
+                             : counts.forward_fitting(options);
     if (fitting) {
       result.fitting_traces += variant.count;
     }
     result.variants.push_back(
-        VariantConformance{variant.names, variant.count, counts.fitness()});
+        VariantConformance{variant.names, variant.count, counts.fitness(),
+                           variant.null_activity_indices});
   }
 
   if (result.consumed > 0 || result.produced > 0) {
@@ -2704,12 +2786,14 @@ ConformanceResult check_conformance(const EventLog& event_log,
 ConformanceResult check_conformance(const EventLog& event_log,
                                     const ProcessTree& tree,
                                     TokenReplayOptions options) {
+  validate_token_replay_event_limit(event_log, options);
   return check_conformance(event_log, to_petri_net(tree), options);
 }
 
 TokenReplayDiagnostics replay_token_diagnostics(
     const EventLog& event_log, const PetriNet& net,
     TokenReplayOptions options) {
+  validate_token_replay_event_limit(event_log, options);
   if (!valid_token_replay_variant(options.variant)) {
     throw std::invalid_argument("unsupported token replay variant");
   }
@@ -2725,8 +2809,8 @@ TokenReplayDiagnostics replay_token_diagnostics(
     std::vector<std::optional<std::size_t>> ids;
     ids.reserve(trace.events.size());
     for (const auto& event : trace.events) {
-      const auto activity = selected_activity(event, activity_attribute);
-      ids.push_back(replayer.activity_id(activity));
+      const auto activity = selected_replay_activity(event, activity_attribute);
+      ids.push_back(activity ? replayer.activity_id(*activity) : std::nullopt);
     }
 
     std::vector<std::uint64_t> executions(net.transitions().size(), 0);
@@ -2752,9 +2836,7 @@ TokenReplayDiagnostics replay_token_diagnostics(
     }
     const bool fitting = backwards
                              ? backwards_outcome->fitting
-                             : (counts.missing == 0 &&
-                                (!options.consider_remaining_in_fitness ||
-                                 counts.remaining == 0));
+                             : counts.forward_fitting(options);
     if (fitting) ++result.fitting_traces;
   }
   return result;
@@ -2762,6 +2844,7 @@ TokenReplayDiagnostics replay_token_diagnostics(
 
 std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
     const EventLog& event_log, const PetriNet& net, TokenReplayOptions options) {
+  validate_token_replay_event_limit(event_log, options);
   if (!valid_token_replay_variant(options.variant))
     throw std::invalid_argument("unsupported token replay variant");
   const Replayer replayer(net, options.initial_marking, options.final_marking);
@@ -2775,10 +2858,10 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
     row.trace_index = result.size();
     row.case_id = trace.case_id;
     std::vector<std::optional<std::size_t>> ids;
-    std::vector<std::string> names;
+    std::vector<std::optional<std::string>> names;
     for (const auto& event : trace.events) {
-      names.push_back(selected_activity(event, activity_attribute));
-      ids.push_back(replayer.activity_id(names.back()));
+      names.push_back(selected_replay_activity(event, activity_attribute));
+      ids.push_back(names.back() ? replayer.activity_id(*names.back()) : std::nullopt);
     }
     Replayer::Counts counts;
     if (options.variant == TokenReplayVariant::kBackwards) {
@@ -2789,8 +2872,7 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
       counts = std::move(outcome.counts);
     } else {
       counts = replayer.replay(ids, nullptr, options, &row);
-      row.trace_is_fit = counts.missing == 0 &&
-          (!options.consider_remaining_in_fitness || counts.remaining == 0);
+      row.trace_is_fit = counts.forward_fitting(options);
     }
     row.trace_fitness = counts.fitness();
     row.produced = counts.produced;
@@ -2799,8 +2881,10 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
     row.remaining = counts.remaining;
     row.places = std::move(counts.places);
     row.enabled_transitions = replayer.enabled_transition_ids(row.reached_marking);
-    for (const auto index : row.unknown_event_indices)
-      row.unknown_activities.push_back(names[index]);
+    for (const auto index : row.unknown_event_indices) {
+      row.unknown_activities.push_back(names[index].value_or(""));
+      row.unknown_activity_is_null.push_back(!names[index]);
+    }
     result.push_back(std::move(row));
   }
   return result;

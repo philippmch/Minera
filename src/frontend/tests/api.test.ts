@@ -15,6 +15,13 @@ import { alignModel, alignmentQuery, decideModel, decisionMiningQuery,
   requestDecisionTables } from "../src/api";
 
 describe("Token replay policy request options", () => {
+  it("serializes flat case selectors and exact event caps", () => {
+    expect(mineFormEntries({ tokenReplayCaseIdAttribute: " group ", tokenReplayMaxRowsToMaterialize: 0 }))
+      .toEqual([["token_replay_case_id_attribute", "group"], ["token_replay_max_rows_to_materialize", "0"]]);
+    expect(() => mineFormEntries({ tokenReplayCaseIdAttribute: " " })).toThrow(/must not be empty/);
+    for (const value of [-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
+      expect(() => mineFormEntries({ tokenReplayMaxRowsToMaterialize: value })).toThrow(/safe integer/);
+  });
   const policies = [
     ["tokenReplayConsiderRemainingInFitness", "token_replay_consider_remaining_in_fitness"],
     ["tokenReplayTryToReachFinalMarkingThroughHidden", "token_replay_try_to_reach_final_marking_through_hidden"],

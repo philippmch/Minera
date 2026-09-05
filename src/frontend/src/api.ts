@@ -519,6 +519,8 @@ export interface MinerOptions {
   tokenReplayConsiderActivitiesNotInModelInFitness?: boolean;
   tokenReplayWalkThroughHiddenTransitions?: boolean;
   tokenReplayIncludeTraceDiagnostics?: boolean;
+  tokenReplayCaseIdAttribute?: string;
+  tokenReplayMaxRowsToMaterialize?: number;
   /** Event field used to form token-replay variants. */
   tokenReplayActivityAttribute?: string;
   /** Classic log-skeleton noise threshold (default 0). */
@@ -1130,6 +1132,17 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     const value = options.tokenReplayActivityAttribute.trim();
     if (!value) throw new Error("tokenReplayActivityAttribute must not be empty");
     add("token_replay_activity_attribute", value);
+  }
+  if (options.tokenReplayCaseIdAttribute !== undefined) {
+    const value = options.tokenReplayCaseIdAttribute.trim();
+    if (!value) throw new Error("tokenReplayCaseIdAttribute must not be empty");
+    add("token_replay_case_id_attribute", value);
+  }
+  if (options.tokenReplayMaxRowsToMaterialize !== undefined) {
+    const value = options.tokenReplayMaxRowsToMaterialize;
+    if (!Number.isSafeInteger(value) || value < 0)
+      throw new Error("tokenReplayMaxRowsToMaterialize must be a non-negative safe integer");
+    add("token_replay_max_rows_to_materialize", String(value));
   }
   const addMineSelector = (
     optionName: string,

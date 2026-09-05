@@ -130,7 +130,10 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       options.tokenReplayStopImmediatelyUnfit === true ||
       options.tokenReplayConsiderRemainingInFitness === false ||
       options.tokenReplayTryToReachFinalMarkingThroughHidden === false ||
-      options.tokenReplayConsiderActivitiesNotInModelInFitness === false ||
+      options.tokenReplayConsiderActivitiesNotInModelInFitness === true ||
+      options.tokenReplayMaxRowsToMaterialize !== undefined ||
+      Boolean(options.tokenReplayCaseIdAttribute?.trim() &&
+        options.tokenReplayCaseIdAttribute.trim() !== "case:concept:name") ||
       options.tokenReplayWalkThroughHiddenTransitions === false ||
       options.tokenReplayIncludeTraceDiagnostics === true ||
       Boolean(options.tokenReplayActivityAttribute?.trim() &&

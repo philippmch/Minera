@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { alphaValidationMessage } from "../../src/components/Filters";
+import { alphaValidationMessage, tokenReplayInputOptionsFromForm, tokenReplayInputValidationMessage } from "../../src/components/Filters";
 import { TOKEN_REPLAY_POLICY_DEFAULTS, TokenReplayPolicyControls, tokenReplayPolicyOptionsFromForm,
   tokenReplayPoliciesAreDirty } from "../../src/components/Filters";
 import { alphaOptionsFromForm, alphaSettingsAreDirty, attributeOccurrenceValidationMessage, caseGroupingValidationMessage, correlationValidationMessage, footprintsValidationMessage, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
@@ -45,16 +45,28 @@ describe("token replay policy controls", () => {
     const changed = {
       tokenReplayConsiderRemainingInFitness: false,
       tokenReplayTryToReachFinalMarkingThroughHidden: false,
-      tokenReplayConsiderActivitiesNotInModelInFitness: false,
+      tokenReplayConsiderActivitiesNotInModelInFitness: true,
       tokenReplayWalkThroughHiddenTransitions: false,
       tokenReplayIncludeTraceDiagnostics: true,
     };
     expect(tokenReplayPolicyOptionsFromForm(changed)).toEqual(changed);
     expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayConsiderRemainingInFitness).toBe(true);
     expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayTryToReachFinalMarkingThroughHidden).toBe(true);
-    expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayConsiderActivitiesNotInModelInFitness).toBe(true);
+    expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayConsiderActivitiesNotInModelInFitness).toBe(false);
     expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayWalkThroughHiddenTransitions).toBe(true);
     expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayIncludeTraceDiagnostics).toBe(false);
+  });
+});
+
+describe("token replay input settings", () => {
+  it("retains zero event cap and rejects invalid or unsafe integers", () => {
+    expect(tokenReplayInputOptionsFromForm("  ")).toEqual({});
+    expect(tokenReplayInputOptionsFromForm("0")).toEqual({ tokenReplayMaxRowsToMaterialize: 0 });
+    expect(tokenReplayInputOptionsFromForm(" 25 ")).toEqual({ tokenReplayMaxRowsToMaterialize: 25 });
+    for (const value of ["-1", "0.5", "NaN", "Infinity", "9007199254740992"]) {
+      expect(tokenReplayInputValidationMessage(value)).not.toBeNull();
+      expect(() => tokenReplayInputOptionsFromForm(value)).toThrow(/event cap/);
+    }
   });
 });
 
