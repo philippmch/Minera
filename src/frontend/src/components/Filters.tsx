@@ -19,12 +19,25 @@ import { type CaseAttributeStat, type EventAttributeStat } from "../types";
 export const TOKEN_REPLAY_POLICY_DEFAULTS = {
   tokenReplayConsiderRemainingInFitness: true,
   tokenReplayTryToReachFinalMarkingThroughHidden: true,
-  tokenReplayConsiderActivitiesNotInModelInFitness: true,
+  tokenReplayConsiderActivitiesNotInModelInFitness: false,
   tokenReplayWalkThroughHiddenTransitions: true,
   tokenReplayIncludeTraceDiagnostics: false,
 };
 
 type TokenReplayPolicies = typeof TOKEN_REPLAY_POLICY_DEFAULTS;
+
+export function tokenReplayInputValidationMessage(cap: string): string | null {
+  const value = cap.trim();
+  if (value && (!Number.isSafeInteger(Number(value)) || Number(value) < 0))
+    return "Token replay event cap must be a non-negative safe integer.";
+  return null;
+}
+
+export function tokenReplayInputOptionsFromForm(cap: string): MinerOptions {
+  const error = tokenReplayInputValidationMessage(cap);
+  if (error) throw new Error(error);
+  return cap.trim() ? { tokenReplayMaxRowsToMaterialize: Number(cap) } : {};
+}
 
 export function tokenReplayPolicyOptionsFromForm(input: TokenReplayPolicies): MinerOptions {
   return Object.fromEntries(
@@ -45,12 +58,12 @@ export function TokenReplayPolicyControls({ variant, policies, onChange }: {
 }) {
   const backwards = variant === "backwards";
   return <>
-    {backwards && <p className="conf-inline-note">Remaining-token fit classification, unknown-activity fitness, and final-marking routing policies apply only to forward replay and are ignored in backwards replay. Their settings are retained when switching back.</p>}
+    {backwards && <p className="conf-inline-note">Final-state fit classification, unknown-activity classification, and final-marking routing policies apply only to forward replay and are ignored in backwards replay. Their settings are retained when switching back.</p>}
     <div className="filters-row">
       {([
         ["tokenReplayConsiderRemainingInFitness", "Require no remaining tokens for a fitting trace", true],
         ["tokenReplayTryToReachFinalMarkingThroughHidden", "Reach final marking through hidden transitions", true],
-        ["tokenReplayConsiderActivitiesNotInModelInFitness", "Count unknown activities in fitness", true],
+        ["tokenReplayConsiderActivitiesNotInModelInFitness", "Treat unknown activities as an unfit trace", true],
         ["tokenReplayWalkThroughHiddenTransitions", "Walk through hidden transitions", false],
         ["tokenReplayIncludeTraceDiagnostics", "Include per-trace replay diagnostics", false],
       ] as const).map(([key, label, forwardOnly]) => (
@@ -717,6 +730,7 @@ export function Filters({
     useState("concept:name");
   const [tokenReplayPolicies, setTokenReplayPolicies] =
     useState({ ...TOKEN_REPLAY_POLICY_DEFAULTS });
+  const [tokenReplayMaxRows, setTokenReplayMaxRows] = useState("");
   const logSkeletonFamilies = [
     ["equivalence", "Equivalence"],
     ["always_after", "Always-after"],
@@ -1154,11 +1168,12 @@ export function Filters({
     sampleSize: correlationSampleSize,
   });
   const selectorValidationError =
-    !logSkeletonActivityAttribute.trim()
+    tokenReplayInputValidationMessage(tokenReplayMaxRows) ||
+    (!logSkeletonActivityAttribute.trim()
       ? "Log skeleton activity attribute must not be empty."
       : !declareActivityAttribute.trim()
         ? "Declare activity attribute must not be empty."
-        : null;
+        : null);
 
   const apply = () => {
     if (temporalValidationError || ltlValidationError || segmentValidationError ||
@@ -1400,6 +1415,7 @@ export function Filters({
       tokenReplayActivityAttribute:
         tokenReplayActivityAttribute.trim() || undefined,
       ...tokenReplayPolicyOptionsFromForm(tokenReplayPolicies),
+      ...tokenReplayInputOptionsFromForm(tokenReplayMaxRows),
       logSkeletonNoiseThreshold: toLogSkeletonNoise(logSkeletonNoiseThreshold),
       logSkeletonActivityAttribute:
         logSkeletonActivityAttribute.trim() !== "concept:name"
@@ -1683,6 +1699,7 @@ export function Filters({
     setTokenReplayStopImmediatelyUnfit(false);
     setTokenReplayActivityAttribute("concept:name");
     setTokenReplayPolicies({ ...TOKEN_REPLAY_POLICY_DEFAULTS });
+    setTokenReplayMaxRows("");
     setLogSkeletonNoiseThreshold("");
     setLogSkeletonActivityAttribute("concept:name");
     setLogSkeletonConstraints(new Set(logSkeletonFamilies.map(([name]) => name)));
@@ -1897,7 +1914,7 @@ export function Filters({
   const tokenReplayDirty =
     tokenReplayVariant !== "forward" || tokenReplayStopImmediatelyUnfit ||
     tokenReplayActivityAttribute.trim() !== "concept:name" ||
-    tokenReplayPoliciesAreDirty(tokenReplayPolicies);
+    tokenReplayPoliciesAreDirty(tokenReplayPolicies) || Boolean(tokenReplayMaxRows.trim());
   const logSkeletonDirty =
     logSkeletonNoiseThreshold !== "" ||
     logSkeletonConstraints.size !== logSkeletonFamilies.length ||
@@ -2124,6 +2141,11 @@ export function Filters({
 
           <TokenReplayPolicyControls variant={tokenReplayVariant} policies={tokenReplayPolicies}
             onChange={(key, value) => setTokenReplayPolicies((current) => ({ ...current, [key]: value }))} />
+          <label className="filters-field">
+            <span>Token replay event cap</span>
+            <input type="number" min={0} step={1} placeholder="unlimited"
+              value={tokenReplayMaxRows} onChange={(event) => setTokenReplayMaxRows(event.target.value)} />
+          </label>
 
           <div className="filters-row">
             <label className="filters-field">

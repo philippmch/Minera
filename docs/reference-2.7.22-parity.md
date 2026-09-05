@@ -123,7 +123,7 @@ are reconciled.
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Partial (implemented core; proof pending)** — the explicit `BOSE` selector covers relation-count features, seeded permutation windows, ranked/capped drift boundaries, boundary-partitioned result logs, optional timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Partial (implemented core; proof pending)** — all six variants are explicitly selectable; less-memory Dijkstra with legacy unit costs is the generic default, with named event activity fields available at replay time |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors |
-| Conformance: replay | forward token replay and backwards token replay | **Partial (detailed diagnostics and policy surfaces implemented)** — forward replay remains the default; both variations now expose per-source-case token counters, ordered silent/visible firings, problem transitions, unknown-event positions, reached markings, and enabled-transition IDs; hidden routing, forward-only fitness classification/final routing/unknown-activity policies, immediate stop, and opt-in trace detail are exposed through strict request/CLI/frontend controls and model-conformance JSON; exact replay routing and duration/root-cause support contracts remain pending |
+| Conformance: replay | forward token replay and backwards token replay | **Partial (diagnostics, input adapters, and policy surfaces implemented)** — forward replay remains the default; grouped/stream/eager/lazy replay preserves null activities, typed case identity, selector precedence, adapter-specific case ordering, and event caps; both variations expose per-case counters, ordered silent/visible firings, problem transitions, unknown-event positions, reached markings, and enabled-transition IDs; forward unknown-event classification and final-demand accounting have executable contracts, while exact routing/flood-cleaning and duration/root-cause support remain pending |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance add trace/log/flat adapters, strict activity and case selectors, exact empty/subset family-selection behavior, typed per-case diagnostics, and distinct registered proofs |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both `VERSION_DISCOUNTED_A_STAR` algorithms preserve the asymmetric discounted recurrence, complete model-transition runs, raw ordinary-distance borders, deterministic longer-run ties, exact marking-limit boundaries, objectives, precision/distance diagnostics, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters, with distinct registered proofs |
@@ -224,7 +224,7 @@ markings, and agreement with existing aggregate/per-place results.
 variations and in their precision-prefix traversal. Forward final routing remains
 independent. The three existing forward policies are now exposed end-to-end:
 remaining-token fit classification, final hidden routing, and unknown-activity
-fitness penalties. Disabling remaining-token classification does not change the
+fit classification. Disabling remaining-token classification does not change the
 numeric token-fitness formula. Backwards replay retains its legacy behavior:
 unknown labels are ignored, no final hidden routing occurs, and remaining tokens
 make a trace unfit. The UI disables these three forward-only controls for that
@@ -236,15 +236,42 @@ as complete.
 Pinned black-box checks confirm pre-consumption reached markings, silent-closure
 enabled sets even when visible-event routing is disabled, independent forward
 final routing, and the negative numeric fitness possible after immediate stop.
-Known native compatibility gaps remain explicit: unknown forward activities use
-the existing default numeric missing/consumed penalty, while the reference
-ignores them by default and its opt-in penalty affects fit classification only;
-the native remaining-token toggle does not also suppress final-token shortages
-from fit classification. Forward duplicate-label tie selection and replay
-flood-cleaning/exhaustive-exploration controls still require reconciliation.
+Forward unknown events are ignored by default and never change token counters,
+numeric fitness, or immediate-stop behavior. The explicit opt-in policy makes
+their trace unfit while retaining the same replay. Fitting classification uses
+event-input shortages and, optionally, remaining tokens, independently of final
+token-demand shortages; a final demand of two tokens reached with one can thus
+report fit while retaining one missing token in the counters. Forward per-trace fitness
+is one when either token denominator is zero, while aggregate evaluation retains
+its separately tested zero-denominator contract. These corrected behaviors are
+shared by compact, detailed, per-place, and token-evaluation entry points.
+Forward duplicate-label tie selection and replay flood-cleaning/exhaustive-
+exploration controls still require reconciliation.
 The backwards hidden-walk toggle is a native extension; the pinned legacy
 variation ignores that parameter. Duration and root-cause diagnostic projections,
-trace/event identity maps, and flat-input replay adapters remain separate work.
+and trace/event identity maps remain separate work.
+
+Token replay flat-input evidence: `normalize_token_replay_event_log` and the
+three replay API families accept `EventDataView`, streams, eager tables, and lazy
+tables. Streams retain first-seen cases, including one group for present null
+case IDs; tables sort numeric case keys before string keys and drop null cases.
+Within-case events always retain source order and no timestamp column is
+required. Typed numeric and string case IDs remain distinct. Empty tables still
+validate required case/activity columns; empty streams are valid. Missing stream
+selectors are rejected, while null activity cells retain their original event
+position as unknown labels. Actual empty-string activity labels remain visible
+model values. Null-aware variant keys and companion JSON markers prevent null,
+empty-string, and embedded-separator labels from collapsing together.
+
+Exact selected keys outrank retained source-key metadata and canonical aliases,
+independent of field order. Nulls shadow lower-priority aliases and missing
+transported selectors are rejected. Grouped inputs keep their explicit trace
+boundaries; case selection applies only to flat data. Public normalization keeps
+user metadata and unrelated event fields intact. A hard materialization cap
+applies to every shape and all three APIs, including lazy scans, and is exposed
+through request/CLI/frontend settings with explicit zero preserved. Backwards
+table replay normalizes through grouped data as a native extension beyond the
+pinned low-level backwards dispatcher input domain.
 
 Alpha discovery defaults evidence: omitted `alpha_variant` selects classic
 Alpha across native options, strict requests, CLI, and frontend. Named

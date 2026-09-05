@@ -5,8 +5,10 @@
 #include <optional>
 #include <unordered_map>
 #include <string>
+#include <type_traits>
 #include <vector>
 
+#include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/process_tree.hpp"
@@ -17,7 +19,10 @@ namespace minera {
 struct VariantConformance {
   std::vector<std::string> activities;  // activity names, in trace order
   std::uint64_t count = 0;              // traces collapsing to this variant
-  double fitness = 1.0;                 // token-replay fitness in [0, 1]
+  double fitness = 1.0;                 // token-replay fitness; early stop can be negative
+  // Null labels use an empty display string; these offsets distinguish them
+  // from actual empty-string activities.
+  std::vector<std::size_t> null_activity_indices;
 };
 
 // Per-place counters include the final-marking check.
@@ -44,6 +49,7 @@ struct TokenReplayTraceDiagnostics {
   std::vector<std::size_t> enabled_transitions;
   std::vector<std::size_t> unknown_event_indices;
   std::vector<std::string> unknown_activities;
+  std::vector<bool> unknown_activity_is_null;
   // State after optional final routing, before final tokens are consumed.
   std::vector<int> reached_marking;
   std::vector<TokenReplayPlaceDiagnostics> places;
@@ -59,7 +65,7 @@ struct TokenReplayTraceDiagnostics {
 // behaviour, judged by how evenly replay exercises its transitions?), and
 // simplicity (is the net itself lean, judged by its mean arc degree?).
 struct ConformanceResult {
-  double fitness = 1.0;         // log-level replay fitness in [0, 1]
+  double fitness = 1.0;         // log-level token fitness; early stop can be negative
   double precision = 1.0;       // escaping-edges precision in [0, 1]
   double generalization = 1.0;  // token-replay generalization in [0, 1]
   double simplicity = 1.0;      // inverse arc-degree simplicity in (0, 1]
@@ -98,12 +104,12 @@ struct TokenReplayOptions {
   // "concept:name" and "activity" use Event::activity; other names resolve
   // through Event::attribute.
   std::string activity_attribute = "concept:name";
-  // These policy controls default to the long-standing generic conformance
-  // behavior. Evaluators override them when their metric defines a stricter
-  // replay contract.
+  // Fitting classification is separate from the numeric token-fitness formula.
+  // Unknown activities do not change token counters; the opt-in policy marks
+  // a trace unfit when an unknown activity is encountered.
   bool consider_remaining_in_fitness = true;
   bool try_to_reach_final_marking_through_hidden = true;
-  bool consider_activities_not_in_model_in_fitness = true;
+  bool consider_activities_not_in_model_in_fitness = false;
   // The three policies above apply to forward replay. Backwards replay keeps
   // its legacy contract: unknown labels are ignored, no final routing occurs,
   // and remaining tokens always make the trace unfit.
@@ -116,6 +122,10 @@ struct TokenReplayOptions {
   // remains independent; the backwards variation never routes at trace end.
   bool walk_through_hidden_transitions = true;
   bool include_trace_diagnostics = false;
+  // Flat input case selector. Already grouped Trace boundaries remain authoritative.
+  std::string case_id_attribute = "case:concept:name";
+  // Hard input event cap; exceeding it raises length_error, never truncates.
+  std::optional<std::size_t> max_rows_to_materialize;
 };
 
 // Per-place token accounting for a replayed log.  The four counters use the
@@ -160,6 +170,43 @@ struct TokenReplayDiagnostics {
 [[nodiscard]] std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
     const EventLog& event_log, const PetriNet& net,
     TokenReplayOptions options = {});
+
+// Flat replay projection does not require timestamps or reorder case events.
+[[nodiscard]] EventLog normalize_token_replay_event_log(
+    const EventDataView& data, const TokenReplayOptions& options = {});
+[[nodiscard]] ConformanceResult check_conformance(
+    const EventDataView& data, const PetriNet& net, TokenReplayOptions options = {});
+[[nodiscard]] ConformanceResult check_conformance(
+    const EventDataView& data, const ProcessTree& tree, TokenReplayOptions options = {});
+[[nodiscard]] std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
+    const EventDataView& data, const PetriNet& net, TokenReplayOptions options = {});
+[[nodiscard]] TokenReplayDiagnostics replay_token_diagnostics(
+    const EventDataView& data, const PetriNet& net, TokenReplayOptions options = {});
+
+template <typename Input>
+concept FlatTokenReplayInput = std::is_same_v<Input, EventStream> ||
+    std::is_same_v<Input, EventTable> || std::is_same_v<Input, LazyEventTable>;
+
+template <FlatTokenReplayInput Input>
+[[nodiscard]] inline ConformanceResult check_conformance(
+    const Input& data, const PetriNet& net, TokenReplayOptions options = {}) {
+  return check_conformance(EventDataView(data), net, options);
+}
+template <FlatTokenReplayInput Input>
+[[nodiscard]] inline ConformanceResult check_conformance(
+    const Input& data, const ProcessTree& tree, TokenReplayOptions options = {}) {
+  return check_conformance(EventDataView(data), tree, options);
+}
+template <FlatTokenReplayInput Input>
+[[nodiscard]] inline std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
+    const Input& data, const PetriNet& net, TokenReplayOptions options = {}) {
+  return replay_token_traces(EventDataView(data), net, options);
+}
+template <FlatTokenReplayInput Input>
+[[nodiscard]] inline TokenReplayDiagnostics replay_token_diagnostics(
+    const Input& data, const PetriNet& net, TokenReplayOptions options = {}) {
+  return replay_token_diagnostics(EventDataView(data), net, options);
+}
 
 // Footprint (directly-follows relation) conformance between a log and a model.
 // The footprint of each is the set of ordered activity pairs (a, b) where b can

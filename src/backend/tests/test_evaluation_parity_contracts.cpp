@@ -208,7 +208,8 @@ void replay_fitness_token_contract() {
       log({{"A", "B", "X"}}), net, ReplayFitnessVariant::TOKEN_BASED,
       include_unknown);
   assert(penalized.computed && penalized.fitting_traces == 0);
-  assert(penalized.fitness < with_unknown.fitness);
+  // Unknown labels affect the boolean policy only, never numeric token counts.
+  assert(penalized.fitness == with_unknown.fitness);
 }
 
 void replay_fitness_backwards_token_contract() {

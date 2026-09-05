@@ -712,13 +712,13 @@ void replay_fitness_excludes_unknown_activities_by_default() {
   const auto included = evaluate_replay_fitness(
       l, n, ReplayFitnessVariant::TOKEN_BASED, include_unknown);
   assert(included.computed && included.trace_count == 2);
-  assert(included.fitness < excluded.fitness);
+  // The opt-in policy changes fit classification, not token fitness.
+  assert(included.fitness == excluded.fitness);
   assert(included.fitting_traces == 1);
 
-  // The lower-level conformance API intentionally retains its deviation
-  // accounting and therefore still penalizes the unknown events.
+  // The generic API uses the same default: unknown labels are not token moves.
   const auto generic = check_conformance(l, n);
-  assert(generic.fitness < excluded.fitness && generic.fitting_traces == 1);
+  assert(generic.fitness == excluded.fitness && generic.fitting_traces == 2);
 }
 
 void composite_evaluation_uses_equal_and_custom_weights() {

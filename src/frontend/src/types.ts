@@ -2927,6 +2927,8 @@ export interface VariantConformance {
   activity_names?: string[];
   count: number;
   fitness: number;
+  /** Null labels use empty display strings but never match empty-string activities. */
+  null_activity_indices?: number[];
 }
 
 export interface TokenReplayTraceDiagnostics {
@@ -2949,11 +2951,13 @@ export interface TokenReplayTraceDiagnostics {
   reached_marking: number[];
   unknown_event_indices: number[];
   unknown_activities: string[];
+  /** Parallel to unknown_activities; absent in older exports. */
+  unknown_activity_is_null?: boolean[];
   places: OcpnTokenReplayPlaceDiagnostics[];
 }
 
 export interface Conformance {
-  /** Token-replay fitness in [0, 1]: does the model reproduce the log? */
+  /** Token fitness; immediate-stop replay can produce a negative value. */
   fitness: number;
   /** Escaping-edges precision in [0, 1]: how much extra behavior the model allows. */
   precision: number;

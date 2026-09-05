@@ -623,6 +623,16 @@ TokenReplayOptions parse_token_replay_params(const FieldLookup& field,
     if (options.activity_attribute.empty()) throw std::invalid_argument(
         "token_replay_activity_attribute: expected a non-empty name");
   }
+  if (supplied("token_replay_case_id_attribute")) {
+    options.case_id_attribute = trim_text(field("token_replay_case_id_attribute"));
+    if (options.case_id_attribute.empty()) throw std::invalid_argument(
+        "token_replay_case_id_attribute: expected a non-empty name");
+  }
+  if (supplied("token_replay_max_rows_to_materialize")) {
+    options.max_rows_to_materialize = parse_nonnegative_size(
+        field("token_replay_max_rows_to_materialize"),
+        "token_replay_max_rows_to_materialize");
+  }
   for (const auto& [name, destination] : {
            std::pair<std::string_view, bool*>{
                "token_replay_stop_immediately_unfit", &options.stop_immediately_unfit},

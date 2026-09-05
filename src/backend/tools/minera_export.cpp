@@ -1121,6 +1121,8 @@ int usage(const char* program) {
                "                            Use silent routing between visible events\n"
                "  --token-replay-include-trace-diagnostics <bool>\n"
                "                            Include per-case replay details in JSON\n"
+               "  --token-replay-case-id-attribute <name> Flat-input case selector\n"
+               "  --token-replay-max-rows-to-materialize <n> Replay event cap\n"
                "  --token-replay-stop-immediately-unfit\n"
                "                            Stop a backwards replay trace at its\n"
                "                            first event that cannot be enabled\n"
@@ -2063,6 +2065,24 @@ int main(int argc, char** argv) {
     if (powl_parse == PowlCliParseStatus::kInvalid) return 2;
     if (powl_parse == PowlCliParseStatus::kMissingValue)
       return usage(argv[0]);
+    if (arg == "--token-replay-max-rows-to-materialize" ||
+        arg == "--token-replay-case-id-attribute") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        if (arg == "--token-replay-max-rows-to-materialize")
+          token_replay_options.max_rows_to_materialize = parse_nonnegative_size(value, arg);
+        else {
+          token_replay_options.case_id_attribute = trim_text(value);
+          if (token_replay_options.case_id_attribute.empty())
+            throw std::invalid_argument("--token-replay-case-id-attribute expects a non-empty name");
+        }
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      continue;
+    }
     bool* replay_policy = nullptr;
     for (const auto& [name, destination] : {
              std::pair<std::string_view, bool*>{
