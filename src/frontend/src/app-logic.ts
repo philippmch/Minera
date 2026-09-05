@@ -83,6 +83,7 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       Boolean(options.alphaActivityAttribute?.trim() &&
         options.alphaActivityAttribute.trim() !== "concept:name") ||
       options.alphaRemoveUnconnected === true ||
+      options.alphaMaxRowsToMaterialize !== undefined ||
       (options.heuristicVariant && options.heuristicVariant !== "classic") ||
       (options.heuristicActivityAttribute &&
         options.heuristicActivityAttribute.trim() !== "concept:name") ||

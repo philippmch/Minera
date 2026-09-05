@@ -608,6 +608,7 @@ int usage(const char* program) {
                "  --alpha-variant <id>      classic (default) or plus (short loops)\n"
                "  --alpha-activity-attribute <name> Event field used as activity\n"
                "  --alpha-remove-unconnected <bool> Drop unconnected Alpha transitions\n"
+               "  --alpha-max-rows-to-materialize <n> Alpha input event cap\n"
                "  --heuristic-variant <id>  classic (default) or plusplus\n"
                "                            (interval/eventual-follow semantics)\n"
                "  --heuristic-activity-attribute <name>\n"
@@ -4724,11 +4725,16 @@ int main(int argc, char** argv) {
         return 2;
       }
       alpha_options.activity_attribute = selector;
-    } else if (arg == "--alpha-remove-unconnected") {
+    } else if (arg == "--alpha-max-rows-to-materialize" ||
+               arg == "--alpha-remove-unconnected") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       try {
-        alpha_options.remove_unconnected = parse_boolean(value, arg);
+        if (arg == "--alpha-max-rows-to-materialize") {
+          alpha_options.max_rows_to_materialize = parse_nonnegative_size(value, arg);
+        } else {
+          alpha_options.remove_unconnected = parse_boolean(value, arg);
+        }
       } catch (const std::invalid_argument& error) {
         std::cerr << "error: " << error.what() << '\n';
         return 2;

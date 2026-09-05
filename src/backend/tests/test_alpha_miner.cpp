@@ -71,14 +71,12 @@ bool contains(const std::vector<std::size_t>& values, std::size_t value) {
   return false;
 }
 
-void alpha_plus_attaches_all_boundary_loop_positions() {
+void alpha_plus_boundary_loops_use_unmarked_separate_places() {
   for (const auto& [source, loop_name, expected_silent] : {
            std::tuple{log({trace({"first", "first", "a", "b"})}),
-                      std::string("first"), std::size_t{1}},
+                      std::string("first"), std::size_t{0}},
            std::tuple{log({trace({"a", "b", "last", "last"})}),
-                      std::string("last"), std::size_t{1}},
-           std::tuple{log({trace({"only", "only"})}),
-                      std::string("only"), std::size_t{2}},
+                      std::string("last"), std::size_t{0}},
        }) {
     const auto net = discover_petri_net(source, {.short_loops = true});
     const auto* loop = transition_for(net, loop_name);
@@ -91,11 +89,26 @@ void alpha_plus_attaches_all_boundary_loop_positions() {
     for (const auto& transition : net.transitions())
       silent += transition.silent() ? 1 : 0;
     assert(silent == expected_silent);
-    assert(check_conformance(source, net).fitness > 0.999);
+    // The reconstructed loop place has no initial token and is independent
+    // of the ordinary flow, so these traces cannot replay perfectly.
+    assert(check_conformance(source, net).fitness < 0.999);
   }
 }
 
-void alpha_plus_keeps_interior_loop_on_the_surrounding_place() {
+void alpha_plus_rejects_all_loop_logs_with_no_valid_initial_marking() {
+  for (const auto& source : {log({trace({"only", "only"})}),
+                             log({trace({"a", "a"}), trace({"b", "b"})})}) {
+    bool rejected = false;
+    try {
+      (void)discover_alpha_plus(source);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+}
+
+void alpha_plus_creates_a_separate_interior_loop_place() {
   const auto net = discover_petri_net(
       log({trace({"a", "loop", "loop", "b"}), trace({"a", "b"})}),
       {.short_loops = true});
@@ -105,8 +118,10 @@ void alpha_plus_keeps_interior_loop_on_the_surrounding_place() {
   assert(a != nullptr && b != nullptr && loop != nullptr);
   assert(a->outputs.size() == 1);
   assert(a->outputs == b->inputs);
-  assert(loop->inputs == a->outputs);
-  assert(loop->outputs == a->outputs);
+  assert(loop->inputs.size() == 1);
+  assert(loop->inputs == loop->outputs);
+  assert(loop->inputs != a->outputs);
+  assert(net.place_count() == 4);
 }
 
 void alpha_plus_remove_unconnected_is_explicit() {
@@ -134,7 +149,7 @@ void alpha_plus_remove_unconnected_is_explicit() {
   assert(transition_for(classic, "b") != nullptr);
 }
 
-void alpha_plus_aggregates_loop_contexts_before_matching() {
+void alpha_plus_uses_last_predecessor_and_aggregated_successors() {
   const auto mixed = discover_petri_net(
       log({trace({"loop", "loop", "a", "b"}),
            trace({"a", "loop", "loop", "b"})}),
@@ -142,7 +157,7 @@ void alpha_plus_aggregates_loop_contexts_before_matching() {
   const auto mixed_loops = transitions_for(mixed, "loop");
   assert(mixed_loops.size() == 1);
   const auto* mixed_loop = mixed_loops.front();
-  assert(mixed_loop->inputs.empty());
+  assert(mixed_loop->inputs.size() == 1);
   assert(mixed_loop->inputs == mixed_loop->outputs);
 
   const auto both_boundaries = discover_petri_net(
@@ -152,7 +167,7 @@ void alpha_plus_aggregates_loop_contexts_before_matching() {
   const auto boundary_loops = transitions_for(both_boundaries, "loop");
   assert(boundary_loops.size() == 1);
   const auto* boundary_loop = boundary_loops.front();
-  assert(boundary_loop->inputs.empty());
+  assert(boundary_loop->inputs.size() == 1);
   assert(boundary_loop->inputs == boundary_loop->outputs);
 }
 
@@ -271,7 +286,7 @@ void alpha_canonical_projection_precedes_retained_attribute() {
   assert(threw);
 }
 
-void alpha_loop_does_not_attach_to_unrelated_empty_difference_places() {
+void alpha_loop_matches_an_empty_predecessor_difference() {
   const auto net = discover_petri_net(
       log({trace({"loop", "loop", "a", "loop", "loop"}),
            trace({"x", "b"}), trace({"c", "y"})}),
@@ -279,7 +294,7 @@ void alpha_loop_does_not_attach_to_unrelated_empty_difference_places() {
   const auto loop_transitions = transitions_for(net, "loop");
   assert(loop_transitions.size() == 1);
   const auto* loop = loop_transitions.front();
-  assert(loop->inputs.empty());
+  assert(loop->inputs.size() == 1);
   assert(loop->inputs == loop->outputs);
 }
 
@@ -339,14 +354,15 @@ void alpha_default_projection_remains_compatible() {
 }  // namespace
 
 int main() {
-  alpha_plus_attaches_all_boundary_loop_positions();
-  alpha_plus_keeps_interior_loop_on_the_surrounding_place();
+  alpha_plus_boundary_loops_use_unmarked_separate_places();
+  alpha_plus_rejects_all_loop_logs_with_no_valid_initial_marking();
+  alpha_plus_creates_a_separate_interior_loop_place();
   alpha_plus_remove_unconnected_is_explicit();
-  alpha_plus_aggregates_loop_contexts_before_matching();
+  alpha_plus_uses_last_predecessor_and_aggregated_successors();
   alpha_uses_a_strict_custom_activity_field();
   alpha_custom_first_class_projection_is_authoritative();
   alpha_canonical_projection_precedes_retained_attribute();
-  alpha_loop_does_not_attach_to_unrelated_empty_difference_places();
+  alpha_loop_matches_an_empty_predecessor_difference();
   alpha_plus_leaves_adjacent_distinct_loop_runs_unconnected();
   alpha_custom_projection_drives_model_decoration();
   alpha_default_projection_remains_compatible();

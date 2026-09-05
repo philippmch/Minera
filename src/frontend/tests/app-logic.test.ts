@@ -14,6 +14,11 @@ import {
 import { DECLARE_TEMPLATES, isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriAnalysisDiagnosticsFragment, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, isRandomTreeResult, isModelEvaluation, type EdgeStat, type MineraExport, type Trace } from "../src/types";
 
 describe("native alignment adapters", () => {
+  it("marks an Alpha event cap active even when it is zero", () => {
+    expect(hasActiveMinerOptions({ alphaMaxRowsToMaterialize: 0 })).toBe(true);
+    expect(hasActiveMinerOptions({ alphaMaxRowsToMaterialize: 25 })).toBe(true);
+    expect(hasActiveMinerOptions({ alphaMaxRowsToMaterialize: undefined })).toBe(false);
+  });
   it("serializes the complete XES import contract", () => {
     expect(mineFormEntries({
       xesVariant: "iterparse_20",

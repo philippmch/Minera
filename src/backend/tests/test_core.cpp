@@ -1024,8 +1024,8 @@ void alpha_miner_classic_drops_short_loop_activities() {
 
 void alpha_plus_attaches_a_length_one_loop() {
   // t repeats directly between a and b, so classic Alpha sees t > t and can
-  // never place it. Alpha+ mines the net without t, then re-attaches t as a
-  // self loop on the place between its neighbours a and b.
+  // never place it. Alpha+ mines the net without t, then creates a separate
+  // self-loop place for t while retaining the original a-to-b place.
   const auto net = minera::discover_petri_net(
       log_from_variants({{"a", "t", "t", "b"}, {"a", "b"}}),
       {.short_loops = true});
@@ -1033,11 +1033,11 @@ void alpha_plus_attaches_a_length_one_loop() {
   const auto* b = transition_for(net, "b");
   const auto* t = transition_for(net, "t");
   assert(a && b && t);
-  // The surrounding flow is the plain a -> b sequence net.
-  assert(net.place_count() == 3);
+  // The ordinary flow and loop place are distinct components.
+  assert(net.place_count() == 4);
   assert(a->outputs.size() == 1 && a->outputs == b->inputs);
-  // t borrows the token from that middle place and puts it straight back.
-  assert(t->inputs == a->outputs && t->outputs == a->outputs);
+  assert(t->inputs.size() == 1 && t->inputs == t->outputs);
+  assert(t->inputs != a->outputs);
 }
 
 void alpha_plus_discovers_a_length_two_loop() {
@@ -1056,18 +1056,32 @@ void alpha_plus_discovers_a_length_two_loop() {
 }
 
 void alpha_plus_matches_classic_without_short_loops() {
-  // On a short-loop-free log the plus relations collapse to the classic ones,
-  // so both variants must produce the same net.
+  // This structured log permits both artificial boundaries to collapse.
+  // Compare wiring independent of place numbering after that cleanup.
   const auto log = log_from_variants(
       {{"a", "b", "c", "e"}, {"a", "c", "b", "e"}, {"a", "d", "e"}});
   const auto plus = minera::discover_petri_net(log, {.short_loops = true});
   const auto classic = minera::discover_petri_net(log, {.short_loops = false});
   assert(plus.place_count() == classic.place_count());
   assert(plus.transitions().size() == classic.transitions().size());
-  for (std::size_t i = 0; i < plus.transitions().size(); ++i) {
-    assert(plus.transitions()[i].inputs == classic.transitions()[i].inputs);
-    assert(plus.transitions()[i].outputs == classic.transitions()[i].outputs);
-  }
+  const auto shape = [](const minera::PetriNet& net) {
+    using PlaceShape = std::tuple<bool, bool, std::vector<std::size_t>,
+                                 std::vector<std::size_t>>;
+    std::vector<PlaceShape> result;
+    for (std::size_t p = 0; p < net.place_count(); ++p) {
+      std::vector<std::size_t> before;
+      std::vector<std::size_t> after;
+      for (const auto& transition : net.transitions()) {
+        assert(transition.activity);
+        if (contains(transition.outputs, p)) before.push_back(*transition.activity);
+        if (contains(transition.inputs, p)) after.push_back(*transition.activity);
+      }
+      result.emplace_back(p == net.source(), p == net.sink(), before, after);
+    }
+    std::sort(result.begin(), result.end());
+    return result;
+  };
+  assert(shape(plus) == shape(classic));
 }
 
 void alpha_miner_handles_an_empty_log() {

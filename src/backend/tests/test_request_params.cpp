@@ -1388,10 +1388,17 @@ void parse_mine_params_maps_alpha_options_and_presence() {
       {"alpha_variant", "plus"},
       {"alpha_activity_attribute", " phase "},
       {"alpha_remove_unconnected", "true"},
+      {"alpha_max_rows_to_materialize", "12"},
   }));
   assert(params.alpha.short_loops);
   assert(params.alpha.activity_attribute == "phase");
   assert(params.alpha.remove_unconnected);
+  assert(params.alpha.max_rows_to_materialize == 12);
+  const auto zero_cap = minera::parse_mine_params(fields({
+      {"alpha_max_rows_to_materialize", "0"},
+  }));
+  assert(zero_cap.alpha.max_rows_to_materialize == 0);
+  assert(!minera::parse_mine_params(fields({})).alpha.max_rows_to_materialize);
 
   const std::map<std::string, std::string> explicit_empty_variant = {
       {"alpha_variant", ""}};
@@ -1411,6 +1418,9 @@ void parse_mine_params_maps_alpha_options_and_presence() {
            std::pair{"alpha_activity_attribute", "  "},
            std::pair{"alpha_remove_unconnected", "yes"},
            std::pair{"alpha_variant", "unknown"},
+           std::pair{"alpha_max_rows_to_materialize", "-1"},
+           std::pair{"alpha_max_rows_to_materialize", "1.5"},
+           std::pair{"alpha_max_rows_to_materialize", "18446744073709551616"},
        }) {
     const std::map<std::string, std::string> values{{item}};
     threw = false;

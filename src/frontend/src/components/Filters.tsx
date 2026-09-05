@@ -438,24 +438,40 @@ export function inductiveSettingsAreDirty(input: InductiveSettingsForm): boolean
 export interface AlphaSettingsForm {
   activityAttribute: string;
   removeUnconnected: boolean;
+  maxRowsToMaterialize?: string;
+}
+
+export function alphaValidationMessage(input: AlphaSettingsForm): string | null {
+  const text = input.maxRowsToMaterialize?.trim();
+  if (!text) return null;
+  const cap = Number(text);
+  return !Number.isSafeInteger(cap) || cap < 0
+    ? "Alpha event cap must be a non-negative safe integer."
+    : null;
 }
 
 /** Converts the visible Alpha controls while eliding backend defaults. */
 export function alphaOptionsFromForm(
   input: AlphaSettingsForm,
-): Pick<MinerOptions, "alphaActivityAttribute" | "alphaRemoveUnconnected"> {
+): Pick<MinerOptions, "alphaActivityAttribute" | "alphaRemoveUnconnected" | "alphaMaxRowsToMaterialize"> {
+  const cap = input.maxRowsToMaterialize?.trim();
+  const parsedCap = cap ? Number(cap) : undefined;
+  const validationError = alphaValidationMessage(input);
+  if (validationError) throw new Error(validationError);
   return {
     alphaActivityAttribute:
       input.activityAttribute.trim() !== "concept:name"
         ? input.activityAttribute.trim() || undefined
         : undefined,
     alphaRemoveUnconnected: input.removeUnconnected || undefined,
+    ...(parsedCap === undefined ? {} : { alphaMaxRowsToMaterialize: parsedCap }),
   };
 }
 
 /** Reports whether an Alpha control differs from its effective default. */
 export function alphaSettingsAreDirty(input: AlphaSettingsForm): boolean {
   return input.removeUnconnected ||
+    Boolean(input.maxRowsToMaterialize?.trim()) ||
     (input.activityAttribute.trim() || "concept:name") !== "concept:name";
 }
 
@@ -594,6 +610,7 @@ export function Filters({
   const [alphaActivityAttribute, setAlphaActivityAttribute] =
     useState("concept:name");
   const [alphaRemoveUnconnected, setAlphaRemoveUnconnected] = useState(false);
+  const [alphaMaxRowsToMaterialize, setAlphaMaxRowsToMaterialize] = useState("");
   const [heuristicVariant, setHeuristicVariant] =
     useState<"classic" | "plusplus">("classic");
   const [heuristicActivityAttribute, setHeuristicActivityAttribute] =
@@ -1052,6 +1069,11 @@ export function Filters({
     timestampGrouping,
     timestampGroupingSeparator,
   });
+  const alphaValidationError = alphaValidationMessage({
+    activityAttribute: alphaActivityAttribute,
+    removeUnconnected: alphaRemoveUnconnected,
+    maxRowsToMaterialize: alphaMaxRowsToMaterialize,
+  });
   const powlValidationError = powlValidationMessage({
     filteringThreshold: powlFilteringThreshold,
     orderFrequencyRatio: powlOrderFrequencyRatio,
@@ -1092,7 +1114,7 @@ export function Filters({
         numericAttributeValidationError || topActivitiesValidationError ||
         relativeAttributeValidationError || attributeOccurrenceValidationError ||
         variantCoverageValidationError || repetitionValidationError ||
-        caseGroupingValidationError || powlValidationError ||
+        caseGroupingValidationError || alphaValidationError || powlValidationError ||
         footprintsValidationError || correlationValidationError ||
         selectorValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
@@ -1261,6 +1283,7 @@ export function Filters({
       ...alphaOptionsFromForm({
         activityAttribute: alphaActivityAttribute,
         removeUnconnected: alphaRemoveUnconnected,
+        maxRowsToMaterialize: alphaMaxRowsToMaterialize,
       }),
       heuristicVariant:
         heuristicVariant !== "classic" ? heuristicVariant : undefined,
@@ -1580,6 +1603,7 @@ export function Filters({
     setAlphaVariant("classic");
     setAlphaActivityAttribute("concept:name");
     setAlphaRemoveUnconnected(false);
+    setAlphaMaxRowsToMaterialize("");
     setHeuristicVariant("classic");
     setDependencyThreshold("");
     setAndThreshold("");
@@ -1785,6 +1809,7 @@ export function Filters({
     alphaSettingsAreDirty({
       activityAttribute: alphaActivityAttribute,
       removeUnconnected: alphaRemoveUnconnected,
+      maxRowsToMaterialize: alphaMaxRowsToMaterialize,
     }) ||
     heuristicVariant !== "classic" ||
     heuristicActivityAttribute.trim() !== "concept:name" ||
@@ -3470,6 +3495,17 @@ export function Filters({
               />
               <span>Alpha: remove unconnected transitions</span>
             </label>
+            <label className="filters-field">
+              <span>Alpha: event cap</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                placeholder="unlimited"
+                value={alphaMaxRowsToMaterialize}
+                onChange={(e) => setAlphaMaxRowsToMaterialize(e.target.value)}
+              />
+            </label>
           </div>
           <div className="filters-row">
             <label className="filters-field">
@@ -4119,13 +4155,13 @@ export function Filters({
             numericAttributeValidationError || topActivitiesValidationError ||
             relativeAttributeValidationError || attributeOccurrenceValidationError ||
             variantCoverageValidationError || repetitionValidationError ||
-            caseGroupingValidationError || powlValidationError ||
+            caseGroupingValidationError || alphaValidationError || powlValidationError ||
             footprintsValidationError || correlationValidationError ||
             selectorValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError || footprintsValidationError || correlationValidationError || selectorValidationError}</p>
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || alphaValidationError || powlValidationError || footprintsValidationError || correlationValidationError || selectorValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError || footprintsValidationError || correlationValidationError || selectorValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || alphaValidationError || powlValidationError || footprintsValidationError || correlationValidationError || selectorValidationError)}>
               Apply
             </button>
             <button

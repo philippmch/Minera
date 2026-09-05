@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { alphaValidationMessage } from "../../src/components/Filters";
 import { alphaOptionsFromForm, alphaSettingsAreDirty, attributeOccurrenceValidationMessage, caseGroupingValidationMessage, correlationValidationMessage, footprintsValidationMessage, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
 
 const valid = {
@@ -301,6 +302,24 @@ describe("Inductive control contract", () => {
 });
 
 describe("Alpha control contract", () => {
+  it("retains a zero event cap and validates cap input", () => {
+    const defaults = { activityAttribute: "concept:name", removeUnconnected: false };
+    expect(alphaOptionsFromForm({ ...defaults, maxRowsToMaterialize: " 0 " }))
+      .toMatchObject({ alphaMaxRowsToMaterialize: 0 });
+    expect(alphaSettingsAreDirty({ ...defaults, maxRowsToMaterialize: "0" }))
+      .toBe(true);
+    expect(alphaSettingsAreDirty({ ...defaults, maxRowsToMaterialize: " " }))
+      .toBe(false);
+    for (const cap of ["-1", "1.5", "Infinity", "invalid", "9007199254740992"])
+      expect(() => alphaOptionsFromForm({ ...defaults, maxRowsToMaterialize: cap }))
+        .toThrow(/Alpha event cap/);
+    for (const cap of ["-1", "1.5", "Infinity", "invalid", "9007199254740992"])
+      expect(alphaValidationMessage({ ...defaults, maxRowsToMaterialize: cap }))
+        .toMatch(/Alpha event cap/);
+    for (const cap of [undefined, "", " ", "0", "25"])
+      expect(alphaValidationMessage({ ...defaults, maxRowsToMaterialize: cap }))
+        .toBeNull();
+  });
   it("elides defaults and trims a custom activity field", () => {
     expect(alphaOptionsFromForm({
       activityAttribute: "concept:name",

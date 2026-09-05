@@ -49,6 +49,15 @@ describe("Inductive request options", () => {
 });
 
 describe("Alpha request options", () => {
+  it("keeps an explicit zero event cap and rejects invalid caps", () => {
+    expect(mineFormEntries({ alphaMaxRowsToMaterialize: 0 }))
+      .toEqual([["alpha_max_rows_to_materialize", "0"]]);
+    expect(mineFormEntries({ alphaMaxRowsToMaterialize: 12 }))
+      .toEqual([["alpha_max_rows_to_materialize", "12"]]);
+    for (const value of [-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
+      expect(() => mineFormEntries({ alphaMaxRowsToMaterialize: value }))
+        .toThrow(/alphaMaxRowsToMaterialize/);
+  });
   it("serializes custom activity fields and removal explicitly", () => {
     expect(mineFormEntries({
       alphaVariant: "plus",
