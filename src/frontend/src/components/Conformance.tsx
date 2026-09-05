@@ -11,6 +11,7 @@ import {
   type DecisionPoint,
   type MineraExport,
   type ModelConformance,
+  type TokenReplayTraceDiagnostics,
   type DfgAlignmentOptions,
   type DfgAlignmentResult,
   type EditDistanceOptions,
@@ -1230,6 +1231,54 @@ function ProcessTreeResultView({ result }: { result: ProcessTreeAlignmentResult 
 
 // Token-replay results: quality gauges, the token tally, and per-variant
 // deviation. Rendered when the "token-replay" method is selected.
+function replayDiagnosticList(values: readonly (string | number)[]): string {
+  if (values.length === 0) return "none";
+  const shown = values.slice(0, 100).join(", ");
+  return values.length > 100 ? `${shown} … (${numberFormat.format(values.length - 100)} more omitted)` : shown;
+}
+
+export function TokenReplayDiagnostics({ traces }: { traces?: TokenReplayTraceDiagnostics[] }) {
+  if (traces === undefined) return null;
+  const visible = traces.slice(0, 30);
+  return (
+    <section className="panel conf-panel">
+      <div className="panel-head">
+        <h2>Per-case replay diagnostics</h2>
+        <span className="panel-meta">{numberFormat.format(traces.length)} source traces</span>
+      </div>
+      <p className="conf-inline-note">Source trace and event indices are zero-based. Transition IDs are model-local, including hidden transitions.</p>
+      {visible.length === 0 ? <p className="conf-allfit">Diagnostics were requested, but there are no source traces.</p> : (
+        <ol className="variant-list">
+          {visible.map((trace) => (
+            <li className="variant" key={trace.trace_index}>
+              <div className="variant-top">
+                <strong>Source trace #{trace.trace_index} · Case {trace.case_id || "(empty ID)"}</strong>
+                <span className={`conf-pill ${trace.trace_is_fit ? "good" : "poor"}`}>
+                  {trace.trace_is_fit ? "fit" : "unfit"} · fitness {percent(trace.trace_fitness)}
+                </span>
+              </div>
+              <p>Produced {numberFormat.format(trace.produced)} · Consumed {numberFormat.format(trace.consumed)} · Missing {numberFormat.format(trace.missing)} · Remaining {numberFormat.format(trace.remaining)}</p>
+              <details>
+                <summary>Firing, problem, and unknown-event details</summary>
+                <p>{numberFormat.format(trace.replayed_events)} replayed events · {trace.replay_stopped ? "replay stopped early" : "replay completed"}</p>
+                <dl>
+                  <dt>Fired transition IDs (firing order)</dt><dd>{replayDiagnosticList(trace.activated_transitions)}</dd>
+                  <dt>Problem transition IDs</dt><dd>{replayDiagnosticList(trace.transitions_with_problems)}</dd>
+                  <dt>Enabled transition IDs</dt><dd>{replayDiagnosticList(trace.enabled_transitions)}</dd>
+                  <dt>Unknown event indices</dt><dd>{replayDiagnosticList(trace.unknown_event_indices)}</dd>
+                  <dt>Unknown activity labels</dt><dd>{replayDiagnosticList(trace.unknown_activities)}</dd>
+                  <dt>Reached marking (tokens by place index, before final consumption)</dt><dd>{replayDiagnosticList(trace.reached_marking)}</dd>
+                </dl>
+              </details>
+            </li>
+          ))}
+        </ol>
+      )}
+      {traces.length > visible.length && <p className="conf-inline-note">Showing the first 30 source traces; {numberFormat.format(traces.length - visible.length)} diagnostic rows omitted.</p>}
+    </section>
+  );
+}
+
 function TokenReplay({
   data,
   conformance,
@@ -1331,6 +1380,8 @@ function TokenReplay({
           ))}
         </div>
       </section>
+
+      <TokenReplayDiagnostics traces={conformance.trace_diagnostics} />
 
       <section className="panel conf-panel">
         <div className="panel-head">

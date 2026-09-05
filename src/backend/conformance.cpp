@@ -177,7 +177,8 @@ class Replayer {
   [[nodiscard]] Counts replay(
       const std::vector<std::optional<std::size_t>>& trace,
       std::vector<std::uint64_t>* executions = nullptr,
-      const TokenReplayOptions& options = {}) const {
+      const TokenReplayOptions& options = {},
+      TokenReplayTraceDiagnostics* diagnostics = nullptr) const {
     Marking marking = initial_marking();
     Counts counts;
     counts.places.resize(net_.place_count());
@@ -188,21 +189,32 @@ class Replayer {
     }
 
     for (const auto& step : trace) {
+      if (diagnostics) ++diagnostics->replayed_events;
       if (!step || transitions_by_activity_[*step].empty()) {
+        if (diagnostics)
+          diagnostics->unknown_event_indices.push_back(diagnostics->replayed_events - 1);
         if (options.consider_activities_not_in_model_in_fitness) {
           // An activity the model has no transition for is a log-move
           // deviation only when the selected replay contract includes it.
           ++counts.missing;
           ++counts.consumed;
-          if (options.stop_immediately_unfit) break;
+          if (options.stop_immediately_unfit) {
+            if (diagnostics) diagnostics->replay_stopped = true;
+            break;
+          }
         }
         continue;
       }
-      const Step& result = cached_step(marking, *step);
+      const Step& result = cached_step(marking, *step,
+                                      options.walk_through_hidden_transitions);
       if (result.missing != 0 && options.stop_immediately_unfit) {
         // Immediate-stop replay records the first blocked known activity as a
         // deviation without weak-firing its transition.
         ++counts.missing;
+        if (diagnostics) {
+          diagnostics->replay_stopped = true;
+          diagnostics->transitions_with_problems.push_back(result.fired.back());
+        }
         break;
       }
       marking = result.marking;
@@ -210,6 +222,12 @@ class Replayer {
       counts.consumed += result.consumed;
       counts.missing += result.missing;
       add_place_counts(counts.places, result.places);
+      if (diagnostics) {
+        diagnostics->activated_transitions.insert(
+            diagnostics->activated_transitions.end(), result.fired.begin(), result.fired.end());
+        if (result.missing != 0)
+          diagnostics->transitions_with_problems.push_back(result.fired.back());
+      }
       if (executions) {
         for (const std::size_t t : result.fired) ++(*executions)[t];
       }
@@ -224,10 +242,14 @@ class Replayer {
       counts.consumed += finish.consumed;
       counts.missing += finish.missing;
       add_place_counts(counts.places, finish.places);
+      if (diagnostics)
+        diagnostics->activated_transitions.insert(
+            diagnostics->activated_transitions.end(), finish.fired.begin(), finish.fired.end());
       if (executions) {
         for (const std::size_t t : finish.fired) ++(*executions)[t];
       }
     }
+    if (diagnostics) diagnostics->reached_marking = marking;
     for (std::size_t place = 0; place < marking.size(); ++place) {
       const auto required = static_cast<std::uint64_t>(final_[place]);
       counts.consumed += required;
@@ -261,7 +283,9 @@ class Replayer {
   [[nodiscard]] BackwardsOutcome replay_backwards(
       const std::vector<std::optional<std::size_t>>& trace,
       std::vector<std::uint64_t>* executions = nullptr,
-      bool stop_immediately_unfit = false) const {
+      bool stop_immediately_unfit = false,
+      bool walk_through_hidden_transitions = true,
+      TokenReplayTraceDiagnostics* diagnostics = nullptr) const {
     Marking marking = initial_marking();
     BackwardsOutcome outcome;
     auto& counts = outcome.counts;
@@ -273,8 +297,13 @@ class Replayer {
     }
 
     for (const auto& step : trace) {
+      if (diagnostics) ++diagnostics->replayed_events;
       // The deprecated variation silently discards labels absent from the net.
-      if (!step || transitions_by_activity_[*step].empty()) continue;
+      if (!step || transitions_by_activity_[*step].empty()) {
+        if (diagnostics)
+          diagnostics->unknown_event_indices.push_back(diagnostics->replayed_events - 1);
+        continue;
+      }
       const auto& targets = transitions_by_activity_[*step];
       bool fired_any = false;
       for (const std::size_t t : targets) {
@@ -283,6 +312,7 @@ class Replayer {
         if (enabled(marking, t)) {
           fire(marking, t, counts);
           if (executions) ++(*executions)[t];
+          if (diagnostics) diagnostics->activated_transitions.push_back(t);
           fired_any = true;
         }
       }
@@ -292,25 +322,37 @@ class Replayer {
 
       if (targets.size() != 1) {
         outcome.fitting = false;  // ambiguous duplicate label: interrupt trace
+        if (diagnostics) diagnostics->replay_stopped = true;
         break;
       }
 
       const std::size_t visible = targets.front();
-      const auto path = reverse_silent_path(marking, visible);
+      const auto path = walk_through_hidden_transitions
+                            ? reverse_silent_path(marking, visible)
+                            : std::nullopt;
       if (path) {
         for (const std::size_t s : *path) {
           fire(marking, s, counts);
           if (executions) ++(*executions)[s];
+          if (diagnostics) diagnostics->activated_transitions.push_back(s);
         }
         fire(marking, visible, counts);
         if (executions) ++(*executions)[visible];
+        if (diagnostics) diagnostics->activated_transitions.push_back(visible);
       } else {
         // No route: weak-fire the unique visible transition, creating any
         // missing inputs and retaining the deviation for fitness.
         fire(marking, visible, counts);
         if (executions) ++(*executions)[visible];
+        if (diagnostics) {
+          diagnostics->activated_transitions.push_back(visible);
+          diagnostics->transitions_with_problems.push_back(visible);
+        }
         outcome.fitting = false;
-        if (stop_immediately_unfit) break;
+        if (stop_immediately_unfit) {
+          if (diagnostics) diagnostics->replay_stopped = true;
+          break;
+        }
       }
     }
 
@@ -335,6 +377,7 @@ class Replayer {
     }
     if (counts.missing != 0 || counts.remaining != 0) outcome.fitting = false;
     outcome.marking = marking;
+    if (diagnostics) diagnostics->reached_marking = marking;
     return outcome;
   }
 
@@ -381,10 +424,11 @@ class Replayer {
   // full replay would. Lets the precision pass extend a parent prefix's
   // marking by one step instead of replaying every prefix from scratch.
   [[nodiscard]] bool advance(
-      Marking& marking, std::optional<std::size_t> activity) const {
+      Marking& marking, std::optional<std::size_t> activity,
+      bool walk_through_hidden_transitions = true) const {
     // Activities absent from the model are ignored by evaluator replay.
     if (!activity || transitions_by_activity_[*activity].empty()) return true;
-    const auto& step = cached_step(marking, *activity);
+    const auto& step = cached_step(marking, *activity, walk_through_hidden_transitions);
     marking = step.marking;
     return step.missing == 0;
   }
@@ -473,6 +517,17 @@ class Replayer {
     return acts;
   }
 
+  [[nodiscard]] std::vector<std::size_t> enabled_transition_ids(
+      const Marking& marking) const {
+    std::vector<std::size_t> result;
+    for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
+      if (!net_.transitions()[t].silent() &&
+          silent_path(marking, [&](const Marking& m) { return enabled(m, t); }))
+        result.push_back(t);
+    }
+    return result;
+  }
+
  private:
   // One replay step's outcome — the marking it leads to and the token
   // bookkeeping it added. Replay is a deterministic function of the marking
@@ -498,15 +553,18 @@ class Replayer {
   };
 
   [[nodiscard]] const Step& cached_step(const Marking& marking,
-                                        std::size_t activity) const {
+                                        std::size_t activity,
+                                        bool walk_through_hidden_transitions = true) const {
+    auto& cache = walk_through_hidden_transitions ? step_cache_ : direct_step_cache_;
     const auto [it, inserted] =
-        step_cache_.try_emplace(std::make_pair(marking, activity));
+        cache.try_emplace(std::make_pair(marking, activity));
     if (inserted) {
       Step& step = it->second;
       step.marking = marking;
       Counts counts;
       const auto& targets = transitions_by_activity_[activity];
-      route_silently(step.marking, targets, counts, &step.fired);
+      if (walk_through_hidden_transitions)
+        route_silently(step.marking, targets, counts, &step.fired);
       const std::size_t chosen = pick_enabled(step.marking, targets);
       fire(step.marking, chosen, counts);
       step.fired.push_back(chosen);
@@ -865,7 +923,7 @@ class Replayer {
   std::vector<std::vector<std::size_t>> transitions_by_activity_;
   std::vector<std::size_t> silent_transitions_;
   mutable std::unordered_map<std::pair<Marking, std::size_t>, Step, StepKeyHash>
-      step_cache_;
+      step_cache_, direct_step_cache_;
   mutable std::unordered_map<Marking, Step, MarkingHash> finish_cache_;
   bool place_closure_exact_ = false;
   std::vector<std::vector<std::size_t>> place_enables_;
@@ -925,7 +983,8 @@ std::vector<Variant> collect_variants(const EventLog& log,
 double compute_precision(const std::vector<Variant>& variants,
                          const Replayer& replayer,
                          TokenReplayVariant replay_variant,
-                         bool stop_immediately_unfit) {
+                         bool stop_immediately_unfit,
+                         bool walk_through_hidden_transitions) {
   // Prefix automaton as a trie: each node is a distinct prefix and records how
   // many traces pass through it and which activities they go on to take.
   // Activities absent from the model all collapse onto one edge key, matching
@@ -993,7 +1052,8 @@ double compute_precision(const std::vector<Variant>& variants,
     score(nodes.front(), replayer.initial_marking());
     for (std::size_t index = 1; index < nodes.size(); ++index) {
       const auto outcome = replayer.replay_backwards(
-          nodes[index].prefix, nullptr, stop_immediately_unfit);
+          nodes[index].prefix, nullptr, stop_immediately_unfit,
+          walk_through_hidden_transitions);
       if (outcome.fitting) score(nodes[index], outcome.marking);
     }
   } else {
@@ -1021,7 +1081,8 @@ double compute_precision(const std::vector<Variant>& variants,
         const bool fitting = replayer.advance(
             next, edge == kAbsent
                       ? std::nullopt
-                      : std::optional<std::size_t>(edge));
+                      : std::optional<std::size_t>(edge),
+            walk_through_hidden_transitions);
         stack.push_back({child, std::move(next), fitting});
       }
     }
@@ -2587,7 +2648,8 @@ ConformanceResult check_conformance(const EventLog& event_log,
     const auto backwards_outcome =
         backwards ? std::optional<Replayer::BackwardsOutcome>(
                         replayer.replay_backwards(variant.ids, &variant_executions,
-                                                  options.stop_immediately_unfit))
+                                                  options.stop_immediately_unfit,
+                                                  options.walk_through_hidden_transitions))
                   : std::nullopt;
     const auto counts = backwards
                             ? backwards_outcome->counts
@@ -2621,10 +2683,13 @@ ConformanceResult check_conformance(const EventLog& event_log,
   }
 
   result.precision = compute_precision(
-      variants, replayer, options.variant, options.stop_immediately_unfit);
+      variants, replayer, options.variant, options.stop_immediately_unfit,
+      options.walk_through_hidden_transitions);
   result.generalization = compute_generalization(executions);
   result.transition_frequencies = executions;
   result.simplicity = compute_simplicity(net);
+  if (options.include_trace_diagnostics)
+    result.trace_diagnostics = replay_token_traces(event_log, net, options);
 
   // Surface the least-fitting variants first; break ties by frequency so the
   // most impactful deviations lead.
@@ -2669,7 +2734,8 @@ TokenReplayDiagnostics replay_token_diagnostics(
     const auto backwards_outcome =
         backwards
             ? std::optional<Replayer::BackwardsOutcome>(replayer.replay_backwards(
-                  ids, &executions, options.stop_immediately_unfit))
+                  ids, &executions, options.stop_immediately_unfit,
+                  options.walk_through_hidden_transitions))
             : std::nullopt;
     const auto counts = backwards
                             ? backwards_outcome->counts
@@ -2690,6 +2756,52 @@ TokenReplayDiagnostics replay_token_diagnostics(
                                 (!options.consider_remaining_in_fitness ||
                                  counts.remaining == 0));
     if (fitting) ++result.fitting_traces;
+  }
+  return result;
+}
+
+std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
+    const EventLog& event_log, const PetriNet& net, TokenReplayOptions options) {
+  if (!valid_token_replay_variant(options.variant))
+    throw std::invalid_argument("unsupported token replay variant");
+  const Replayer replayer(net, options.initial_marking, options.final_marking);
+  const auto activity_attribute = options.activity_attribute.empty()
+                                      ? std::string("concept:name")
+                                      : options.activity_attribute;
+  std::vector<TokenReplayTraceDiagnostics> result;
+  result.reserve(event_log.traces.size());
+  for (const auto& trace : event_log.traces) {
+    TokenReplayTraceDiagnostics row;
+    row.trace_index = result.size();
+    row.case_id = trace.case_id;
+    std::vector<std::optional<std::size_t>> ids;
+    std::vector<std::string> names;
+    for (const auto& event : trace.events) {
+      names.push_back(selected_activity(event, activity_attribute));
+      ids.push_back(replayer.activity_id(names.back()));
+    }
+    Replayer::Counts counts;
+    if (options.variant == TokenReplayVariant::kBackwards) {
+      auto outcome = replayer.replay_backwards(
+          ids, nullptr, options.stop_immediately_unfit,
+          options.walk_through_hidden_transitions, &row);
+      row.trace_is_fit = outcome.fitting;
+      counts = std::move(outcome.counts);
+    } else {
+      counts = replayer.replay(ids, nullptr, options, &row);
+      row.trace_is_fit = counts.missing == 0 &&
+          (!options.consider_remaining_in_fitness || counts.remaining == 0);
+    }
+    row.trace_fitness = counts.fitness();
+    row.produced = counts.produced;
+    row.consumed = counts.consumed;
+    row.missing = counts.missing;
+    row.remaining = counts.remaining;
+    row.places = std::move(counts.places);
+    row.enabled_transitions = replayer.enabled_transition_ids(row.reached_marking);
+    for (const auto index : row.unknown_event_indices)
+      row.unknown_activities.push_back(names[index]);
+    result.push_back(std::move(row));
   }
   return result;
 }

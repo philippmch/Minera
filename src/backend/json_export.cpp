@@ -1107,6 +1107,50 @@ void write_heuristics_net(std::ostream& out,
   out << '}';
 }
 
+void write_token_replay_trace(std::ostream& out,
+                              const TokenReplayTraceDiagnostics& trace) {
+  out << "{\"trace_index\": " << trace.trace_index << ", \"case_id\": ";
+  write_json_string(out, trace.case_id);
+  out << ", \"trace_is_fit\": " << (trace.trace_is_fit ? "true" : "false")
+      << ", \"trace_fitness\": " << trace.trace_fitness
+      << ", \"produced\": " << trace.produced
+      << ", \"consumed\": " << trace.consumed
+      << ", \"missing\": " << trace.missing
+      << ", \"remaining\": " << trace.remaining
+      << ", \"replay_stopped\": " << (trace.replay_stopped ? "true" : "false")
+      << ", \"replayed_events\": " << trace.replayed_events;
+  const auto numbers = [&](std::string_view name, const auto& values) {
+    out << ", ";
+    write_json_string(out, name);
+    out << ": [";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i) out << ", ";
+      out << values[i];
+    }
+    out << ']';
+  };
+  numbers("activated_transitions", trace.activated_transitions);
+  numbers("transitions_with_problems", trace.transitions_with_problems);
+  numbers("enabled_transitions", trace.enabled_transitions);
+  numbers("reached_marking", trace.reached_marking);
+  numbers("unknown_event_indices", trace.unknown_event_indices);
+  out << ", \"unknown_activities\": [";
+  for (std::size_t i = 0; i < trace.unknown_activities.size(); ++i) {
+    if (i) out << ", ";
+    write_json_string(out, trace.unknown_activities[i]);
+  }
+  out << "], \"places\": [";
+  for (std::size_t i = 0; i < trace.places.size(); ++i) {
+    if (i) out << ", ";
+    const auto& place = trace.places[i];
+    out << "{\"missing\": " << place.missing
+        << ", \"remaining\": " << place.remaining
+        << ", \"consumed\": " << place.consumed
+        << ", \"produced\": " << place.produced << '}';
+  }
+  out << "]}";
+}
+
 void write_conformance(std::ostream& out,
                        const ConformanceResult& conformance,
                        const DirectlyFollowsGraph& graph) {
@@ -1144,7 +1188,16 @@ void write_conformance(std::ostream& out,
         << ", \"fitness\": " << variants[i].fitness << '}'
         << (i + 1 < variants.size() ? ", " : "");
   }
-  out << "]}";
+  out << ']';
+  if (conformance.trace_diagnostics) {
+    out << ", \"trace_diagnostics\": [";
+    for (std::size_t i = 0; i < conformance.trace_diagnostics->size(); ++i) {
+      if (i) out << ", ";
+      write_token_replay_trace(out, (*conformance.trace_diagnostics)[i]);
+    }
+    out << ']';
+  }
+  out << '}';
 }
 
 std::string_view move_type_name(AlignmentMoveType type) {

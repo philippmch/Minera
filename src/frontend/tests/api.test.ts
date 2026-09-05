@@ -14,6 +14,33 @@ import { alignModel, alignmentQuery, decideModel, decisionMiningQuery,
   decisionTablesQuery, evaluateModel, evaluationQuery,
   requestDecisionTables } from "../src/api";
 
+describe("Token replay policy request options", () => {
+  const policies = [
+    ["tokenReplayConsiderRemainingInFitness", "token_replay_consider_remaining_in_fitness"],
+    ["tokenReplayTryToReachFinalMarkingThroughHidden", "token_replay_try_to_reach_final_marking_through_hidden"],
+    ["tokenReplayConsiderActivitiesNotInModelInFitness", "token_replay_consider_activities_not_in_model_in_fitness"],
+    ["tokenReplayWalkThroughHiddenTransitions", "token_replay_walk_through_hidden_transitions"],
+    ["tokenReplayIncludeTraceDiagnostics", "token_replay_include_trace_diagnostics"],
+  ] as const;
+
+  it("omits unspecified policies and preserves each explicit true or false", () => {
+    expect(mineFormEntries({})).toEqual([]);
+    for (const [key, parameter] of policies) {
+      for (const value of [true, false]) {
+        expect(mineFormEntries({ [key]: value })).toEqual([[parameter, String(value)]]);
+      }
+    }
+  });
+
+  it("rejects nonboolean policy values without truthiness coercion", () => {
+    for (const [key] of policies) {
+      for (const value of ["false", "true", "", 0, 1, null, [], {}]) {
+        expect(() => mineFormEntries({ [key]: value } as never)).toThrow(`${key} must be a boolean`);
+      }
+    }
+  });
+});
+
 describe("Inductive request options", () => {
   it("serializes enabled switches and custom selectors", () => {
     expect(mineFormEntries({

@@ -128,6 +128,11 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
           options.powlCaseIdKey.trim() !== "case:concept:name") ||
       (options.tokenReplayVariant && options.tokenReplayVariant !== "forward") ||
       options.tokenReplayStopImmediatelyUnfit === true ||
+      options.tokenReplayConsiderRemainingInFitness === false ||
+      options.tokenReplayTryToReachFinalMarkingThroughHidden === false ||
+      options.tokenReplayConsiderActivitiesNotInModelInFitness === false ||
+      options.tokenReplayWalkThroughHiddenTransitions === false ||
+      options.tokenReplayIncludeTraceDiagnostics === true ||
       Boolean(options.tokenReplayActivityAttribute?.trim() &&
         options.tokenReplayActivityAttribute.trim() !== "concept:name") ||
       options.logSkeletonNoiseThreshold !== undefined &&

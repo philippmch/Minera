@@ -16,6 +16,57 @@ import {
 } from "../types";
 import { type CaseAttributeStat, type EventAttributeStat } from "../types";
 
+export const TOKEN_REPLAY_POLICY_DEFAULTS = {
+  tokenReplayConsiderRemainingInFitness: true,
+  tokenReplayTryToReachFinalMarkingThroughHidden: true,
+  tokenReplayConsiderActivitiesNotInModelInFitness: true,
+  tokenReplayWalkThroughHiddenTransitions: true,
+  tokenReplayIncludeTraceDiagnostics: false,
+};
+
+type TokenReplayPolicies = typeof TOKEN_REPLAY_POLICY_DEFAULTS;
+
+export function tokenReplayPolicyOptionsFromForm(input: TokenReplayPolicies): MinerOptions {
+  return Object.fromEntries(
+    (Object.keys(TOKEN_REPLAY_POLICY_DEFAULTS) as (keyof TokenReplayPolicies)[])
+      .filter((key) => input[key] !== TOKEN_REPLAY_POLICY_DEFAULTS[key])
+      .map((key) => [key, input[key]]),
+  );
+}
+
+export function tokenReplayPoliciesAreDirty(input: TokenReplayPolicies): boolean {
+  return Object.keys(tokenReplayPolicyOptionsFromForm(input)).length > 0;
+}
+
+export function TokenReplayPolicyControls({ variant, policies, onChange }: {
+  variant: "forward" | "backwards";
+  policies: TokenReplayPolicies;
+  onChange: (key: keyof TokenReplayPolicies, value: boolean) => void;
+}) {
+  const backwards = variant === "backwards";
+  return <>
+    {backwards && <p className="conf-inline-note">Remaining-token fit classification, unknown-activity fitness, and final-marking routing policies apply only to forward replay and are ignored in backwards replay. Their settings are retained when switching back.</p>}
+    <div className="filters-row">
+      {([
+        ["tokenReplayConsiderRemainingInFitness", "Require no remaining tokens for a fitting trace", true],
+        ["tokenReplayTryToReachFinalMarkingThroughHidden", "Reach final marking through hidden transitions", true],
+        ["tokenReplayConsiderActivitiesNotInModelInFitness", "Count unknown activities in fitness", true],
+        ["tokenReplayWalkThroughHiddenTransitions", "Walk through hidden transitions", false],
+        ["tokenReplayIncludeTraceDiagnostics", "Include per-trace replay diagnostics", false],
+      ] as const).map(([key, label, forwardOnly]) => (
+        <label className="filters-field" key={key}>
+          <span>{label}</span>
+          <select value={String(policies[key])} disabled={backwards && forwardOnly}
+            onChange={(event) => onChange(key, event.target.value === "true")}>
+            <option value="true">yes{TOKEN_REPLAY_POLICY_DEFAULTS[key] ? " (default)" : ""}</option>
+            <option value="false">no{!TOKEN_REPLAY_POLICY_DEFAULTS[key] ? " (default)" : ""}</option>
+          </select>
+        </label>
+      ))}
+    </div>
+  </>;
+}
+
 interface FiltersProps {
   /** Activity names from the original, unfiltered log. */
   activities: string[];
@@ -664,6 +715,8 @@ export function Filters({
   ] = useState(false);
   const [tokenReplayActivityAttribute, setTokenReplayActivityAttribute] =
     useState("concept:name");
+  const [tokenReplayPolicies, setTokenReplayPolicies] =
+    useState({ ...TOKEN_REPLAY_POLICY_DEFAULTS });
   const logSkeletonFamilies = [
     ["equivalence", "Equivalence"],
     ["always_after", "Always-after"],
@@ -1346,6 +1399,7 @@ export function Filters({
         tokenReplayStopImmediatelyUnfit || undefined,
       tokenReplayActivityAttribute:
         tokenReplayActivityAttribute.trim() || undefined,
+      ...tokenReplayPolicyOptionsFromForm(tokenReplayPolicies),
       logSkeletonNoiseThreshold: toLogSkeletonNoise(logSkeletonNoiseThreshold),
       logSkeletonActivityAttribute:
         logSkeletonActivityAttribute.trim() !== "concept:name"
@@ -1628,6 +1682,7 @@ export function Filters({
     setTokenReplayVariant("forward");
     setTokenReplayStopImmediatelyUnfit(false);
     setTokenReplayActivityAttribute("concept:name");
+    setTokenReplayPolicies({ ...TOKEN_REPLAY_POLICY_DEFAULTS });
     setLogSkeletonNoiseThreshold("");
     setLogSkeletonActivityAttribute("concept:name");
     setLogSkeletonConstraints(new Set(logSkeletonFamilies.map(([name]) => name)));
@@ -1841,7 +1896,8 @@ export function Filters({
     powlCaseIdKey.trim() !== "case:concept:name";
   const tokenReplayDirty =
     tokenReplayVariant !== "forward" || tokenReplayStopImmediatelyUnfit ||
-    tokenReplayActivityAttribute.trim() !== "concept:name";
+    tokenReplayActivityAttribute.trim() !== "concept:name" ||
+    tokenReplayPoliciesAreDirty(tokenReplayPolicies);
   const logSkeletonDirty =
     logSkeletonNoiseThreshold !== "" ||
     logSkeletonConstraints.size !== logSkeletonFamilies.length ||
@@ -2065,6 +2121,9 @@ export function Filters({
               />
             </label>
           </div>
+
+          <TokenReplayPolicyControls variant={tokenReplayVariant} policies={tokenReplayPolicies}
+            onChange={(key, value) => setTokenReplayPolicies((current) => ({ ...current, [key]: value }))} />
 
           <div className="filters-row">
             <label className="filters-field">

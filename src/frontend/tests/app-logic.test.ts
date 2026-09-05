@@ -1336,6 +1336,22 @@ describe("mineFormEntries", () => {
   });
 
   it("maps non-default token-replay settings", () => {
+    expect(hasActiveMinerOptions({
+      tokenReplayConsiderRemainingInFitness: true,
+      tokenReplayTryToReachFinalMarkingThroughHidden: true,
+      tokenReplayConsiderActivitiesNotInModelInFitness: true,
+      tokenReplayWalkThroughHiddenTransitions: true,
+      tokenReplayIncludeTraceDiagnostics: false,
+    })).toBe(false);
+    for (const key of [
+      "tokenReplayConsiderRemainingInFitness",
+      "tokenReplayTryToReachFinalMarkingThroughHidden",
+      "tokenReplayConsiderActivitiesNotInModelInFitness",
+      "tokenReplayWalkThroughHiddenTransitions",
+    ] as const) {
+      expect(hasActiveMinerOptions({ [key]: false })).toBe(true);
+    }
+    expect(hasActiveMinerOptions({ tokenReplayIncludeTraceDiagnostics: true })).toBe(true);
     expect(mineFormEntries({
       tokenReplayVariant: "backwards",
       tokenReplayStopImmediatelyUnfit: true,

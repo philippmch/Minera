@@ -1112,7 +1112,25 @@
         }
       ],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/conformance.hpp",
+        "src/backend/conformance.cpp",
+        "include/minera/request_params.hpp",
+        "src/backend/request_params.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_token_replay_diagnostics.cpp",
+        "src/backend/tests/test_token_replay_transport.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/types.ts",
+        "src/frontend/src/components/Filters.tsx",
+        "src/frontend/src/components/Conformance.tsx",
+        "src/frontend/tests/api.test.ts",
+        "src/frontend/tests/components/Filters.test.ts",
+        "src/frontend/tests/components/TokenReplayDiagnostics.test.ts"
+      ]
     },
     {
       "package": "algo.connectors",

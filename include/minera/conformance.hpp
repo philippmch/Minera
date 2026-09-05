@@ -20,6 +20,38 @@ struct VariantConformance {
   double fitness = 1.0;                 // token-replay fitness in [0, 1]
 };
 
+// Per-place counters include the final-marking check.
+struct TokenReplayPlaceDiagnostics {
+  std::uint64_t missing = 0;
+  std::uint64_t remaining = 0;
+  std::uint64_t consumed = 0;
+  std::uint64_t produced = 0;
+};
+
+struct TokenReplayTraceDiagnostics {
+  std::size_t trace_index = 0;
+  std::string case_id;
+  bool trace_is_fit = true;
+  double trace_fitness = 1.0;
+  std::uint64_t produced = 0;
+  std::uint64_t consumed = 0;
+  std::uint64_t missing = 0;
+  std::uint64_t remaining = 0;
+  std::vector<std::size_t> activated_transitions;
+  // Weak-fired visible transitions, or the blocked transition when forward
+  // immediate-stop prevents firing. Repeated problems retain replay order.
+  std::vector<std::size_t> transitions_with_problems;
+  std::vector<std::size_t> enabled_transitions;
+  std::vector<std::size_t> unknown_event_indices;
+  std::vector<std::string> unknown_activities;
+  // State after optional final routing, before final tokens are consumed.
+  std::vector<int> reached_marking;
+  std::vector<TokenReplayPlaceDiagnostics> places;
+  bool replay_stopped = false;
+  // Examined events, including an event that causes immediate stopping.
+  std::size_t replayed_events = 0;
+};
+
 // Conformance of an event log against a discovered model: the four standard
 // quality dimensions. Token-based replay fitness (does the model reproduce the
 // log?), escaping-edges precision (does the model allow much more than the
@@ -47,6 +79,7 @@ struct ConformanceResult {
   // "concept:name" and "activity" use Event::activity; other names resolve
   // through Event::attribute.
   std::string activity_attribute = "concept:name";
+  std::optional<std::vector<TokenReplayTraceDiagnostics>> trace_diagnostics;
 };
 
 // Token-replay implementation variation. FORWARD is the modern replay used
@@ -71,24 +104,24 @@ struct TokenReplayOptions {
   bool consider_remaining_in_fitness = true;
   bool try_to_reach_final_marking_through_hidden = true;
   bool consider_activities_not_in_model_in_fitness = true;
+  // The three policies above apply to forward replay. Backwards replay keeps
+  // its legacy contract: unknown labels are ignored, no final routing occurs,
+  // and remaining tokens always make the trace unfit.
   // Empty vectors select the workflow-net defaults (one token at source and
   // one token at sink). Explicit markings must match the net's place count
   // and contain only non-negative token counts.
   std::vector<int> initial_marking;
   std::vector<int> final_marking;
+  // Controls routing before visible events in both variations. Final routing
+  // remains independent; the backwards variation never routes at trace end.
+  bool walk_through_hidden_transitions = true;
+  bool include_trace_diagnostics = false;
 };
 
 // Per-place token accounting for a replayed log.  The four counters use the
 // same forced-firing semantics as ConformanceResult: missing tokens are
 // created when an input is unavailable, while remaining tokens are measured
 // after the final-marking check.
-struct TokenReplayPlaceDiagnostics {
-  std::uint64_t missing = 0;
-  std::uint64_t remaining = 0;
-  std::uint64_t consumed = 0;
-  std::uint64_t produced = 0;
-};
-
 struct TokenReplayDiagnostics {
   std::uint64_t trace_count = 0;
   std::uint64_t fitting_traces = 0;
@@ -118,6 +151,13 @@ struct TokenReplayDiagnostics {
 // diagnostics.  The default variation matches check_conformance's forward
 // replay; callers may request the backwards variation when needed.
 [[nodiscard]] TokenReplayDiagnostics replay_token_diagnostics(
+    const EventLog& event_log, const PetriNet& net,
+    TokenReplayOptions options = {});
+
+// One row per source trace, preserving duplicate cases and event order.
+// Enabled transition ids are visible steps reachable through silent routing
+// from reached_marking, subject to the replay engine's silent-search bound.
+[[nodiscard]] std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
     const EventLog& event_log, const PetriNet& net,
     TokenReplayOptions options = {});
 

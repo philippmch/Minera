@@ -2929,6 +2929,29 @@ export interface VariantConformance {
   fitness: number;
 }
 
+export interface TokenReplayTraceDiagnostics {
+  /** Zero-based source trace position, retained even for duplicate case IDs. */
+  trace_index: number;
+  case_id: string;
+  trace_is_fit: boolean;
+  trace_fitness: number;
+  produced: number;
+  consumed: number;
+  missing: number;
+  remaining: number;
+  replay_stopped: boolean;
+  replayed_events: number;
+  /** Model-local transition IDs, including silent transitions, in firing order. */
+  activated_transitions: number[];
+  transitions_with_problems: number[];
+  enabled_transitions: number[];
+  /** Tokens per model place before final-marking consumption. */
+  reached_marking: number[];
+  unknown_event_indices: number[];
+  unknown_activities: string[];
+  places: OcpnTokenReplayPlaceDiagnostics[];
+}
+
 export interface Conformance {
   /** Token-replay fitness in [0, 1]: does the model reproduce the log? */
   fitness: number;
@@ -2948,6 +2971,8 @@ export interface Conformance {
   variants: VariantConformance[];
   /** Event field used to form replay variants; absent in older exports. */
   activity_attribute?: string;
+  /** Opt-in per-case replay details in source trace order, not variant order. */
+  trace_diagnostics?: TokenReplayTraceDiagnostics[];
 }
 
 /** One move of an optimal alignment between a trace and the model. */

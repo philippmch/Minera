@@ -1,6 +1,62 @@
 import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { alphaValidationMessage } from "../../src/components/Filters";
+import { TOKEN_REPLAY_POLICY_DEFAULTS, TokenReplayPolicyControls, tokenReplayPolicyOptionsFromForm,
+  tokenReplayPoliciesAreDirty } from "../../src/components/Filters";
 import { alphaOptionsFromForm, alphaSettingsAreDirty, attributeOccurrenceValidationMessage, caseGroupingValidationMessage, correlationValidationMessage, footprintsValidationMessage, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
+
+describe("token replay policy controls", () => {
+  it("disables only forward-only policies backwards without changing retained values", () => {
+    const policies = { ...TOKEN_REPLAY_POLICY_DEFAULTS, tokenReplayConsiderRemainingInFitness: false };
+    const render = (variant: "forward" | "backwards") => renderToStaticMarkup(
+      createElement(TokenReplayPolicyControls, { variant, policies, onChange: () => {} }),
+    );
+    const backwards = render("backwards");
+    expect(backwards.match(/disabled=""/g)).toHaveLength(3);
+    expect(backwards).toContain("ignored in backwards replay");
+    expect(backwards).toContain("Require no remaining tokens for a fitting trace");
+    const labels = backwards.match(/<label[\s\S]*?<\/label>/g)!;
+    expect(labels[0]).toContain('<option value="false" selected="">');
+    expect(labels[3]).not.toContain("disabled");
+    expect(labels[4]).not.toContain("disabled");
+    const forward = render("forward");
+    expect(forward).not.toContain("disabled");
+    expect(forward).not.toContain("ignored in backwards replay");
+    expect(forward.match(/<label[\s\S]*?<\/label>/g)![0]).toContain('<option value="false" selected="">');
+    expect(policies.tokenReplayConsiderRemainingInFitness).toBe(false);
+  });
+
+  it("keeps defaults implicit and clears dirty state on reset", () => {
+    const defaults = { ...TOKEN_REPLAY_POLICY_DEFAULTS };
+    expect(tokenReplayPolicyOptionsFromForm(defaults)).toEqual({});
+    expect(tokenReplayPoliciesAreDirty(defaults)).toBe(false);
+    for (const key of Object.keys(defaults) as (keyof typeof defaults)[]) {
+      const changed = { ...defaults, [key]: !defaults[key] };
+      expect(tokenReplayPoliciesAreDirty(changed)).toBe(true);
+      expect(tokenReplayPolicyOptionsFromForm(changed)).toEqual({ [key]: !defaults[key] });
+      Object.assign(changed, TOKEN_REPLAY_POLICY_DEFAULTS);
+      expect(tokenReplayPoliciesAreDirty(changed)).toBe(false);
+      expect(tokenReplayPolicyOptionsFromForm(changed)).toEqual({});
+    }
+  });
+
+  it("applies disabled fitness/navigation policies together with requested diagnostics", () => {
+    const changed = {
+      tokenReplayConsiderRemainingInFitness: false,
+      tokenReplayTryToReachFinalMarkingThroughHidden: false,
+      tokenReplayConsiderActivitiesNotInModelInFitness: false,
+      tokenReplayWalkThroughHiddenTransitions: false,
+      tokenReplayIncludeTraceDiagnostics: true,
+    };
+    expect(tokenReplayPolicyOptionsFromForm(changed)).toEqual(changed);
+    expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayConsiderRemainingInFitness).toBe(true);
+    expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayTryToReachFinalMarkingThroughHidden).toBe(true);
+    expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayConsiderActivitiesNotInModelInFitness).toBe(true);
+    expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayWalkThroughHiddenTransitions).toBe(true);
+    expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayIncludeTraceDiagnostics).toBe(false);
+  });
+});
 
 const valid = {
   spectrumConfigured: true,
