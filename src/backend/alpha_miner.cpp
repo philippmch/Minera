@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "minera/dfg_variants.hpp"
+#include "minera/alpha_relations.hpp"
 
 namespace minera {
 namespace {
@@ -63,12 +64,14 @@ IdLog intern_log(const EventLog& log) {
 struct Footprint {
   std::vector<std::vector<bool>> follows;   // follows[a][b]: a directly precedes b
   std::vector<std::vector<bool>> two_loop;  // two_loop[a][b]: "a b a" occurs
+  std::vector<std::vector<bool>> classic_causal;
   std::set<std::size_t> starts;
   std::set<std::size_t> ends;
   bool short_loops = false;
 
   [[nodiscard]] std::size_t size() const { return follows.size(); }
   [[nodiscard]] bool causal(std::size_t a, std::size_t b) const {
+    if (!short_loops) return classic_causal[a][b];
     if (!follows[a][b]) return false;
     if (!follows[b][a]) return true;
     // Succession in both directions: concurrency for the classic miner, but a
@@ -77,9 +80,30 @@ struct Footprint {
     return short_loops && two_loop[a][b] && two_loop[b][a];
   }
   [[nodiscard]] bool choice(std::size_t a, std::size_t b) const {
+    if (short_loops) {
+      const bool a_outgoing = std::any_of(follows[a].begin(), follows[a].end(),
+                                         [](bool value) { return value; });
+      const bool b_outgoing = std::any_of(follows[b].begin(), follows[b].end(),
+                                         [](bool value) { return value; });
+      if (a_outgoing != b_outgoing) return false;
+    }
     return !follows[a][b] && !follows[b][a];
   }
 };
+
+void set_classic_relations(Footprint& fp,
+                           const std::vector<std::string>& names,
+                           const DfgFrequency& graph) {
+  const auto abstraction = make_alpha_classic_abstraction(graph);
+  const auto n = names.size();
+  fp.classic_causal.assign(n, std::vector<bool>(n));
+  for (std::size_t a = 0; a < n; ++a) {
+    for (std::size_t b = 0; b < n; ++b) {
+      fp.classic_causal[a][b] =
+          abstraction.causal.contains({names[a], names[b]});
+    }
+  }
+}
 
 // Builds the footprint over the interned log. Activities marked in `exclude`
 // (the Alpha+ length-one-loop removal) are read as absent from every trace.
@@ -92,6 +116,7 @@ Footprint build_footprint(const IdLog& log, const std::vector<bool>* exclude,
   if (short_loops) fp.two_loop.assign(n, std::vector<bool>(n, false));
 
   std::vector<std::size_t> sequence;
+  DfgFrequency graph;
   for (const auto& trace : log.traces) {
     sequence.clear();
     for (const auto id : trace) {
@@ -102,11 +127,14 @@ Footprint build_footprint(const IdLog& log, const std::vector<bool>* exclude,
     fp.ends.insert(sequence.back());
     for (std::size_t i = 1; i < sequence.size(); ++i) {
       fp.follows[sequence[i - 1]][sequence[i]] = true;
+      if (!short_loops)
+        graph[{log.names[sequence[i - 1]], log.names[sequence[i]]}] = 1;
       if (short_loops && i >= 2 && sequence[i - 2] == sequence[i]) {
         fp.two_loop[sequence[i]][sequence[i - 1]] = true;
       }
     }
   }
+  if (!short_loops) set_classic_relations(fp, log.names, graph);
   return fp;
 }
 
@@ -216,10 +244,12 @@ Footprint footprint_from_graph(const DirectlyFollowsGraph& graph) {
   const auto& names = graph.activities();
   const std::size_t n = names.size();
   fp.follows.assign(n, std::vector<bool>(n, false));
+  DfgFrequency frequency;
   for (const auto& edge : graph.edges()) {
     if (edge.source >= n || edge.target >= n)
       throw std::invalid_argument("Alpha: graph edge activity id is out of range");
     fp.follows[edge.source][edge.target] = true;
+    frequency[{names[edge.source], names[edge.target]}] = edge.count;
   }
   for (std::size_t activity = 0; activity < n; ++activity) {
     if (graph.start_activity_count(names[activity]) != 0)
@@ -227,6 +257,7 @@ Footprint footprint_from_graph(const DirectlyFollowsGraph& graph) {
     if (graph.end_activity_count(names[activity]) != 0)
       fp.ends.insert(activity);
   }
+  set_classic_relations(fp, names, frequency);
   return fp;
 }
 
@@ -285,6 +316,14 @@ std::vector<Place> maximal_places(const Footprint& fp) {
 
 EventLog normalize_alpha_event_log(const EventLog& event_log,
                                    const AlphaMinerOptions& options) {
+  if (options.max_rows_to_materialize) {
+    std::size_t rows = 0;
+    for (const auto& trace : event_log.traces) {
+      if (trace.events.size() > *options.max_rows_to_materialize - rows)
+        throw std::length_error("Alpha: event row materialization limit exceeded");
+      rows += trace.events.size();
+    }
+  }
   EventLog normalized = event_log;
   const std::string selector = options.activity_attribute.empty()
                                    ? "concept:name"
@@ -298,36 +337,36 @@ EventLog normalize_alpha_event_log(const EventLog& event_log,
   return normalized;
 }
 
-PetriNet discover_petri_net(const EventLog& log,
-                            const AlphaMinerOptions& options) {
+PetriNet discover_alpha_classic(const EventLog& log,
+                                const AlphaMinerOptions& options) {
   const EventLog normalized = normalize_alpha_event_log(log, options);
   const IdLog ids = intern_log(normalized);
   const std::size_t n = ids.names.size();
-
-  // Alpha+ first sets aside the length-one-loop activities (those that directly
-  // follow themselves): they can never sit on a valid place, so the place
-  // search runs on the log read without them, and each is re-attached to the
-  // place between its neighbours afterwards.
-  const Footprint full = build_footprint(ids, nullptr, options.short_loops);
-  if (!options.short_loops)
-    return build_classic_net(ids.names, full, false);
-  std::vector<bool> loops(n, false);
-  bool any_loop = false;
-  if (options.short_loops) {
-    for (std::size_t a = 0; a < n; ++a) {
-      loops[a] = full.follows[a][a];
-      any_loop |= loops[a];
-    }
+  Footprint footprint = build_footprint(ids, nullptr, false);
+  const auto endpoints = alpha_log_endpoints(normalized);
+  footprint.starts.clear();
+  footprint.ends.clear();
+  for (std::size_t activity = 0; activity < n; ++activity) {
+    if (endpoints.starts.contains(ids.names[activity])) footprint.starts.insert(activity);
+    if (endpoints.ends.contains(ids.names[activity])) footprint.ends.insert(activity);
   }
-  // With no length-one loops Alpha+ is intentionally identical to classic
-  // Alpha, including its activity ordering and transition wiring.
-  if (!any_loop)
-    return build_classic_net(ids.names, full, options.remove_unconnected);
+  return build_classic_net(ids.names, footprint, false);
+}
 
-  // Build the enhanced footprint with explicit boundary activities. They take
-  // part in the same maximal-pair search as ordinary activities. Whether the
-  // corresponding hidden transitions can be collapsed is decided only after
-  // loop arcs have been attached.
+PetriNet discover_alpha_plus(const EventLog& log,
+                             const AlphaMinerOptions& options) {
+  const EventLog normalized = normalize_alpha_event_log(log, options);
+  const IdLog ids = intern_log(normalized);
+  const std::size_t n = ids.names.size();
+  const Footprint full = build_footprint(ids, nullptr, true);
+  if (ids.traces.empty() || n == 0)
+    throw std::invalid_argument("Alpha+: an event-bearing log is required");
+  std::vector<bool> loops(n, false);
+  for (std::size_t a = 0; a < n; ++a) loops[a] = full.follows[a][a];
+
+  // Include artificial boundaries in the maximal-pair search even when no
+  // one-loops occur. Cleanup below tests whether their surrounding flow
+  // permits removing the corresponding hidden transitions.
   const std::size_t artificial_start = n;
   const std::size_t artificial_end = n + 1;
   IdLog boundary_log;
@@ -347,9 +386,8 @@ PetriNet discover_petri_net(const EventLog& log,
   const std::vector<Place> boundary_pairs = maximal_places(
       build_footprint(boundary_log, &boundary_exclude, true));
 
-  // Aggregate the immediate non-loop predecessors and successors for every
-  // length-one-loop label. Distinct adjacent loop labels intentionally do not
-  // become one another's context.
+  // Retain the last immediate non-loop predecessor of each loop label while
+  // accumulating all immediate non-loop successors, in original trace order.
   std::vector<ActivitySet> predecessors(n);
   std::vector<ActivitySet> successors(n);
   const auto insert_sorted = [](ActivitySet& values, std::size_t value) {
@@ -363,16 +401,14 @@ PetriNet discover_petri_net(const EventLog& log,
       const bool before_is_loop = before < n && loops[before];
       const bool after_is_loop = after < n && loops[after];
       if (!before_is_loop && after_is_loop)
-        insert_sorted(predecessors[after], before);
+        predecessors[after] = {before};
       if (before_is_loop && !after_is_loop)
         insert_sorted(successors[before], after);
     }
   }
 
-  // Re-attach a loop only when one maximal place contains its full aggregated
-  // predecessor/successor difference. Boundary and interior contexts are not
-  // matched independently; a relation either qualifies as a whole or the
-  // visible transition remains unconnected.
+  // Every maximal pair containing both context differences contributes its
+  // own fresh loop place. Empty differences participate in the subset tests.
   std::vector<std::vector<std::size_t>> loop_pairs(n);
   for (std::size_t t = 0; t < n; ++t) {
     if (!loops[t]) continue;
@@ -398,7 +434,6 @@ PetriNet discover_petri_net(const EventLog& log,
 
   std::vector<std::vector<std::size_t>> transition_inputs(n + 2);
   std::vector<std::vector<std::size_t>> transition_outputs(n + 2);
-  std::vector<std::size_t> pair_loop_arcs(boundary_pairs.size(), 0);
   for (std::size_t pair_index = 0; pair_index < boundary_pairs.size();
        ++pair_index) {
     for (const auto from : boundary_pairs[pair_index].first)
@@ -406,21 +441,13 @@ PetriNet discover_petri_net(const EventLog& log,
     for (const auto to : boundary_pairs[pair_index].second)
       transition_inputs[to].push_back(pair_index);
   }
-  for (const auto& attachments : loop_pairs) {
-    for (const auto pair_index : attachments) ++pair_loop_arcs[pair_index];
-  }
-
   // The initial hidden boundary is removable only when it has one target
-  // place and no other transition (including a reconstructed loop) enters
-  // that place.
+  // place and no other transition enters that place.
   bool collapse_initial = transition_outputs[artificial_start].size() == 1;
   std::size_t initial_pair = 0;
   if (collapse_initial) {
     initial_pair = transition_outputs[artificial_start].front();
-    collapse_initial =
-        boundary_pairs[initial_pair].first.size() +
-            pair_loop_arcs[initial_pair] ==
-        1;
+    collapse_initial = boundary_pairs[initial_pair].first.size() == 1;
   }
 
   // The final hidden boundary is removable only for one exclusive source
@@ -430,14 +457,13 @@ PetriNet discover_petri_net(const EventLog& log,
   std::size_t final_pair = 0;
   if (collapse_final) {
     final_pair = transition_inputs[artificial_end].front();
-    collapse_final =
-        boundary_pairs[final_pair].second.size() +
-            pair_loop_arcs[final_pair] ==
-        1;
+    collapse_final = boundary_pairs[final_pair].second.size() == 1;
+    if (collapse_final && collapse_initial && initial_pair == final_pair)
+      throw std::invalid_argument(
+          "Alpha+: boundary cleanup leaves no valid initial marking");
     if (collapse_final) {
       for (const auto from : boundary_pairs[final_pair].first) {
-        if ((from == artificial_start && collapse_initial) ||
-            transition_outputs[from].size() > 1) {
+        if (transition_outputs[from].size() > 1) {
           collapse_final = false;
           break;
         }
@@ -460,6 +486,15 @@ PetriNet discover_petri_net(const EventLog& log,
       collapse_initial ? *pair_places[initial_pair] : *outer_source;
   net.set_source(source);
   net.set_sink(sink);
+  // Each qualifying loop context receives a fresh place carrying only the
+  // loop's self-arcs. The original maximal-pair place retains its own wiring.
+  std::vector<std::vector<std::size_t>> loop_places(n);
+  for (std::size_t activity = 0; activity < n; ++activity) {
+    for (const auto pair_index : loop_pairs[activity]) {
+      (void)pair_index;
+      loop_places[activity].push_back(net.add_place());
+    }
+  }
 
   const auto input_places = [&](std::size_t transition) {
     std::vector<std::size_t> places;
@@ -492,10 +527,8 @@ PetriNet discover_petri_net(const EventLog& log,
     std::vector<std::size_t> inputs;
     std::vector<std::size_t> outputs;
     if (loops[activity]) {
-      for (const auto pair_index : loop_pairs[activity]) {
-        inputs.push_back(*pair_places[pair_index]);
-        outputs.push_back(*pair_places[pair_index]);
-      }
+      inputs = loop_places[activity];
+      outputs = inputs;
     } else {
       inputs = input_places(activity);
       outputs = output_places(activity);
@@ -507,6 +540,12 @@ PetriNet discover_petri_net(const EventLog& log,
   return net;
 }
 
+PetriNet discover_petri_net(const EventLog& log,
+                            const AlphaMinerOptions& options) {
+  return options.short_loops ? discover_alpha_plus(log, options)
+                             : discover_alpha_classic(log, options);
+}
+
 PetriNet discover_petri_net(const DirectlyFollowsGraph& graph,
                             const AlphaMinerOptions& options) {
   if (options.short_loops) {
@@ -515,6 +554,57 @@ PetriNet discover_petri_net(const DirectlyFollowsGraph& graph,
   }
   return build_classic_net(graph.activities(), footprint_from_graph(graph),
                            false);
+}
+
+PetriNet discover_petri_net(
+    const DfgFrequency& graph,
+    const std::map<std::string, std::uint64_t>& starts,
+    const std::map<std::string, std::uint64_t>& ends,
+    const AlphaMinerOptions& options) {
+  if (options.short_loops)
+    throw std::invalid_argument(
+        "Alpha: Alpha+ requires event-log trace context; direct graph input supports classic only");
+  std::set<std::string> labels;
+  for (const auto& [edge, frequency] : graph) {
+    (void)frequency;
+    labels.insert(edge.first);
+    labels.insert(edge.second);
+  }
+  for (const auto& [label, frequency] : starts) {
+    (void)frequency;
+    labels.insert(label);
+  }
+  for (const auto& [label, frequency] : ends) {
+    (void)frequency;
+    labels.insert(label);
+  }
+  const std::vector<std::string> names(labels.begin(), labels.end());
+  Footprint footprint;
+  footprint.follows.assign(names.size(), std::vector<bool>(names.size()));
+  for (std::size_t a = 0; a < names.size(); ++a) {
+    if (starts.contains(names[a])) footprint.starts.insert(a);
+    if (ends.contains(names[a])) footprint.ends.insert(a);
+    for (std::size_t b = 0; b < names.size(); ++b)
+      footprint.follows[a][b] = graph.contains({names[a], names[b]});
+  }
+  set_classic_relations(footprint, names, graph);
+  return build_classic_net(names, footprint, false);
+}
+
+PetriNet discover_petri_net(const DfgFrequency& graph,
+                            const AlphaMinerOptions& options) {
+  const auto endpoints = infer_alpha_endpoints(graph);
+  std::map<std::string, std::uint64_t> starts;
+  std::map<std::string, std::uint64_t> ends;
+  for (const auto& activity : endpoints.starts) starts.emplace(activity, 1);
+  for (const auto& activity : endpoints.ends) ends.emplace(activity, 1);
+  return discover_petri_net(graph, starts, ends, options);
+}
+
+PetriNet discover_petri_net(const DfgCleanAnalysis& graph,
+                            const AlphaMinerOptions& options) {
+  return discover_petri_net(graph.graph, graph.start_activities,
+                            graph.end_activities, options);
 }
 
 }  // namespace minera

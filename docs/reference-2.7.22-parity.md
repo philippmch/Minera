@@ -47,15 +47,15 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 42
-complete and 44 partial dispatcher rows, plus 190 complete and 197 partial
+adapter, integration, or missing are complete. The current manifest records 44
+complete and 42 partial dispatcher rows, plus 194 complete and 193 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
 DFG, causal and correlation discovery, 26-module Inductive discovery, 31-module
 POWL discovery, 13-module footprints discovery/conformance, and the 19-module
 temporal/behavioral adapter stack, plus discounted anti-/multi-alignment and
 classic Declare/log-skeleton discovery and conformance, with distinct
-registered tests; 241 coverage units still require exact proof.
+registered tests; 235 coverage units still require exact proof.
 A release may
 additionally run the strict gate:
 
@@ -128,7 +128,7 @@ are reconciled.
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both `VERSION_DISCOUNTED_A_STAR` algorithms preserve the asymmetric discounted recurrence, complete model-transition runs, raw ordinary-distance borders, deterministic longer-run ties, exact marking-limit boundaries, objectives, precision/distance diagnostics, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters, with distinct registered proofs |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, strict direct-OCDFG activity/object-type selectors, and cross-family envelope rejection; broader OCEL schema coverage remains |
-| Discovery: Alpha | classic and Alpha+ | **Partial (implemented core; proof pending)** — event-log and direct-DFG classic entry points are available; Alpha+ adds deterministic source, sink, interior, and loop-only length-one-loop handling, aggregated predecessor/successor reconstruction, plus-only disconnected-transition cleanup, and a strict selectable activity field through native, JSON, CLI, local-server, frontend, and downstream model-log adapters |
+| Discovery: Alpha | classic and Alpha+ | **Partial (classic, abstraction, and endpoint modules complete)** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ has independently checked boundary, short-loop, last-predecessor, fresh-place, and cleanup behavior, while reserved boundary-label collisions and the hardened invalid-marking domain remain explicitly outside its complete claim |
 | Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Partial (implemented core; proof pending)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
@@ -201,19 +201,58 @@ marking contains only its initial marking. Native, request, standalone CLI,
 local-server, and typed frontend helpers expose the same JSON contract.
 
 Alpha discovery defaults evidence: omitted `alpha_variant` selects classic
-Alpha consistently across native options, strict request parsing, CLI, and the
-frontend. The short-loop-aware Alpha+ implementation remains available through
-an explicit `plus` selection. Its length-one-loop reconstruction covers leading,
-trailing, interior, and loop-only traces. Each loop label aggregates all of its
-non-loop predecessors and successors before one all-or-nothing maximal-place
-match; boundary and interior observations are not attached independently.
-The optional disconnected-transition cleanup applies only to Alpha+, including
-its no-loop fast path. The strict activity-field projection used for discovery
-is cached and reused for conformance, footprints, alignment, decoration,
-comparison, evaluation, decision mining, stochastic fitting, analysis, and
-playout routes. Focused native, request, and frontend regressions cover the new
-contracts; the row remains partial pending the remaining adapter and differential
-proof work.
+Alpha across native options, strict requests, CLI, and frontend. Named
+`discover_alpha_classic` and `discover_alpha_plus` implementations back the
+ordinary dispatcher. Classic supports grouped logs, streams, eager/lazy tables,
+the internal graph, and sparse weighted maps with inferred or explicit
+start/end maps. Explicit empty boundary maps suppress inference. Zero-valued
+edge keys retain their labels and endpoint topology, but only positive forward
+frequencies with absent/zero reverse frequencies create causal relations.
+Reciprocal keys determine the parallel relation, including zero-valued keys.
+The independently tested relation abstraction and endpoint helpers are used by
+production discovery.
+
+Streams and Alpha+ tables retain first-seen cases and source event order.
+Classic tables derive edges from a stable case/start/completion ordering and
+derive boundaries independently from the original first/last nonnull activity
+per case. Nullable activities interrupt adjacency; null cases contribute no
+model labels. Exact selected columns outrank retained source names and aliases,
+including missing cells. Completion and explicit start columns are required
+even with sorting disabled. An omitted start selector uses an existing
+`start_timestamp` column or synthesizes it from completion; a null existing
+start sorts last. Native date cells retain their typed lexical fallback.
+The eager and lazy contracts share case/activity/time/start selectors, optional
+row caps, and native case/time sorting controls. Normalization preserves source
+order and is not a substitute for the classic table's separate edge and boundary
+observations. Grouped and stream selectors remain strict.
+
+Alpha+ always processes synthetic boundaries, including logs without short
+loops. Its unrelated-set rule distinguishes activities with and without
+outgoing relation keys. For each removed length-one-loop label, the last
+observed non-loop predecessor replaces earlier predecessors; successors are
+accumulated. Every maximal pair containing the predecessor/successor set
+differences creates a separate, unmarked loop-only place; it does not attach
+that loop to the existing ordinary flow place. Empty differences may qualify
+multiple places. Leading, trailing, interior, adjacent, two-loop, mixed-empty,
+and no-short-loop boundary fixtures are independently checked against an
+executable snapshot of the pinned commit. Place membership in markings is
+checked by identity, since distinct reference places may share displayed names.
+
+An empty Alpha+ log or a boundary reduction that leaves a stale initial marking
+raises `std::invalid_argument` in Minera. This includes all-loop/empty-only logs
+and cases where loop removal creates a new self-following surviving activity.
+Minera also isolates its internal boundary identities from visible activity
+labels. These hardened error and reserved-label behaviors are documented
+differences; the enhanced variant and its dispatcher remain partial. Its
+optional cleanup removes only completely disconnected visible transitions.
+
+The strict discovery projection is reused for conformance, footprints,
+alignment, decoration, comparison, evaluation, decision mining, stochastic
+fitting, analysis, and playout. `alpha_max_rows_to_materialize`, CLI
+`--alpha-max-rows-to-materialize`, and the frontend event-cap control enforce
+the same hard cap, including explicit zero. Registered Alpha contract and
+event-data suites, existing core regressions, request tests, and frontend
+validation cover this checkpoint.
 
 Random-tree generation evidence: the native generator exposes both the
 `BASIC` strategy and the seeded, bounded `PTANDLOGGENERATOR` strategy. The

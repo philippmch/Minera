@@ -1259,7 +1259,69 @@
         }
       ],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/alpha_miner.hpp",
+        "include/minera/alpha_relations.hpp",
+        "src/backend/alpha_miner.cpp",
+        "src/backend/alpha_relations.cpp",
+        "src/backend/alpha_event_data.cpp",
+        "src/backend/tests/test_alpha_parity_contracts.cpp",
+        "src/backend/tests/test_alpha_miner.cpp",
+        "src/backend/tests/test_alpha_event_data.cpp"
+      ],
+      "proofs": {
+        "ALPHA_VERSION_CLASSIC": {
+          "selector": "ALPHA_VERSION_CLASSIC",
+          "binding": {
+            "selector": "ALPHA_VERSION_CLASSIC",
+            "modules": [
+              "algo.discovery.alpha.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "ALPHA_VERSION_CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/alpha_miner.hpp",
+              "symbol": "discover_alpha_classic"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_alpha_parity_contracts.cpp",
+              "executable": "minera_alpha_parity_contracts_tests",
+              "case": "classic_place_choice_does_not_require_matching_outgoing_presence"
+            }
+          ]
+        },
+        "ALPHA_VERSION_PLUS": {
+          "selector": "ALPHA_VERSION_PLUS",
+          "binding": {
+            "selector": "ALPHA_VERSION_PLUS",
+            "modules": [
+              "algo.discovery.alpha.variants.plus"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "ALPHA_VERSION_PLUS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/alpha_miner.hpp",
+              "symbol": "discover_alpha_plus"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_alpha_parity_contracts.cpp",
+              "executable": "minera_alpha_parity_contracts_tests",
+              "case": "plus_interior_one_loop_has_a_fresh_self_only_place"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.discovery.batches",
@@ -7050,8 +7112,34 @@
       "owner": "algo.discovery.alpha",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/alpha_miner.hpp",
+        "include/minera/alpha_relations.hpp",
+        "src/backend/alpha_miner.cpp",
+        "src/backend/alpha_relations.cpp",
+        "src/backend/alpha_event_data.cpp",
+        "src/backend/tests/test_alpha_parity_contracts.cpp",
+        "src/backend/tests/test_alpha_miner.cpp",
+        "src/backend/tests/test_alpha_event_data.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.alpha.data_structures.alpha_classic_abstraction",
+        "implementation": [
+          {
+            "path": "include/minera/alpha_relations.hpp",
+            "symbol": "make_alpha_classic_abstraction"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_alpha_parity_contracts.cpp",
+            "executable": "minera_alpha_parity_contracts_tests",
+            "case": "classic_abstraction_retains_weighted_and_key_relations"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.alpha.utils.endpoints",
@@ -7059,8 +7147,34 @@
       "owner": "algo.discovery.alpha",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/alpha_miner.hpp",
+        "include/minera/alpha_relations.hpp",
+        "src/backend/alpha_miner.cpp",
+        "src/backend/alpha_relations.cpp",
+        "src/backend/alpha_event_data.cpp",
+        "src/backend/tests/test_alpha_parity_contracts.cpp",
+        "src/backend/tests/test_alpha_miner.cpp",
+        "src/backend/tests/test_alpha_event_data.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.alpha.utils.endpoints",
+        "implementation": [
+          {
+            "path": "include/minera/alpha_relations.hpp",
+            "symbol": "alpha_log_endpoints"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_alpha_parity_contracts.cpp",
+            "executable": "minera_alpha_parity_contracts_tests",
+            "case": "alpha_endpoints_distinguish_log_order_and_graph_keys"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.alpha.variants.classic",
@@ -7073,8 +7187,34 @@
           "selector": "ALPHA_VERSION_CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/alpha_miner.hpp",
+        "include/minera/alpha_relations.hpp",
+        "src/backend/alpha_miner.cpp",
+        "src/backend/alpha_relations.cpp",
+        "src/backend/alpha_event_data.cpp",
+        "src/backend/tests/test_alpha_parity_contracts.cpp",
+        "src/backend/tests/test_alpha_miner.cpp",
+        "src/backend/tests/test_alpha_event_data.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.alpha.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/alpha_miner.hpp",
+            "symbol": "discover_alpha_classic"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_alpha_parity_contracts.cpp",
+            "executable": "minera_alpha_parity_contracts_tests",
+            "case": "classic_place_choice_does_not_require_matching_outgoing_presence"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.alpha.variants.plus",
@@ -7088,7 +7228,33 @@
         }
       ],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/alpha_miner.hpp",
+        "include/minera/alpha_relations.hpp",
+        "src/backend/alpha_miner.cpp",
+        "src/backend/alpha_relations.cpp",
+        "src/backend/alpha_event_data.cpp",
+        "src/backend/tests/test_alpha_parity_contracts.cpp",
+        "src/backend/tests/test_alpha_miner.cpp",
+        "src/backend/tests/test_alpha_event_data.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.alpha.variants.plus",
+        "implementation": [
+          {
+            "path": "include/minera/alpha_miner.hpp",
+            "symbol": "discover_alpha_plus"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_alpha_parity_contracts.cpp",
+            "executable": "minera_alpha_parity_contracts_tests",
+            "case": "plus_interior_one_loop_has_a_fresh_self_only_place"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.batches.utils.detection",

@@ -2118,6 +2118,11 @@ MineParams parse_mine_params(const FieldLookup& field,
     params.alpha.remove_unconnected = parse_boolean(
         field("alpha_remove_unconnected"), "alpha_remove_unconnected");
   }
+  if (supplied("alpha_max_rows_to_materialize")) {
+    params.alpha.max_rows_to_materialize = parse_nonnegative_size(
+        field("alpha_max_rows_to_materialize"),
+        "alpha_max_rows_to_materialize");
+  }
   if (const auto value = field("heuristic_variant"); !value.empty()) {
     if (value == "classic")
       params.heuristic.variant = HeuristicMinerVariant::kClassic;

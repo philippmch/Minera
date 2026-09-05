@@ -450,6 +450,8 @@ export interface MinerOptions {
   alphaActivityAttribute?: string;
   /** Remove visible Alpha transitions that cannot be connected to a place. */
   alphaRemoveUnconnected?: boolean;
+  /** Hard event cap for Alpha discovery; omitted means unlimited. */
+  alphaMaxRowsToMaterialize?: number;
   /** Heuristic Miner algorithm variant (classic by default). */
   heuristicVariant?: "classic" | "plusplus";
   /** Event field used as the heuristic activity label. */
@@ -940,6 +942,12 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   }
   if (options.alphaRemoveUnconnected === true)
     add("alpha_remove_unconnected", "true");
+  if (options.alphaMaxRowsToMaterialize !== undefined) {
+    const value = options.alphaMaxRowsToMaterialize;
+    if (!Number.isSafeInteger(value) || value < 0)
+      throw new Error("alphaMaxRowsToMaterialize must be a non-negative safe integer");
+    add("alpha_max_rows_to_materialize", String(value));
+  }
   if (options.heuristicVariant && options.heuristicVariant !== "classic")
     add("heuristic_variant", options.heuristicVariant);
   if (options.heuristicActivityAttribute !== undefined) {
