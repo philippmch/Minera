@@ -123,7 +123,7 @@ are reconciled.
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Partial (implemented core; proof pending)** — the explicit `BOSE` selector covers relation-count features, seeded permutation windows, ranked/capped drift boundaries, boundary-partitioned result logs, optional timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Partial (implemented core; proof pending)** — all six variants are explicitly selectable; less-memory Dijkstra with legacy unit costs is the generic default, with named event activity fields available at replay time |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors |
-| Conformance: replay | forward token replay and backwards token replay | **Partial (implemented core; proof pending)** — forward replay remains the default; the backwards variation, reverse silent routing, weak firing, duplicate-label behavior, immediate-stop option, and named event activity selector are selectable |
+| Conformance: replay | forward token replay and backwards token replay | **Partial (detailed diagnostics and policy surfaces implemented)** — forward replay remains the default; both variations now expose per-source-case token counters, ordered silent/visible firings, problem transitions, unknown-event positions, reached markings, and enabled-transition IDs; hidden routing, forward-only fitness classification/final routing/unknown-activity policies, immediate stop, and opt-in trace detail are exposed through strict request/CLI/frontend controls and model-conformance JSON; exact replay routing and duration/root-cause support contracts remain pending |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance add trace/log/flat adapters, strict activity and case selectors, exact empty/subset family-selection behavior, typed per-case diagnostics, and distinct registered proofs |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both `VERSION_DISCOUNTED_A_STAR` algorithms preserve the asymmetric discounted recurrence, complete model-transition runs, raw ordinary-distance borders, deterministic longer-run ties, exact marking-limit boundaries, objectives, precision/distance diagnostics, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters, with distinct registered proofs |
@@ -199,6 +199,52 @@ initial/final markings, seeds, and step bounds respected. The marking reached
 after the final allowed firing is included; a case that begins at its final
 marking contains only its initial marking. Native, request, standalone CLI,
 local-server, and typed frontend helpers expose the same JSON contract.
+
+Token replay diagnostics evidence: `replay_token_traces` returns one row per
+source trace, retaining its source index and case ID even when cases share the
+same activity variant or duplicate identifiers. The record includes token and
+per-place counters, fitting classification and numeric fitness, the ordered
+transition IDs fired (including silent routing), problem-transition IDs, unknown
+event offsets and labels, examined-event count, early-stop state, and the reached
+marking before final-token consumption. Enabled-transition IDs describe visible
+transitions reachable through silent routing from that marking; this discovery
+uses the existing bounded silent search and is not a completeness guarantee on
+unbounded or unusually deep models.
+
+`include_trace_diagnostics` optionally attaches these records to ordinary model
+conformance without changing the default compact export or variant aggregation.
+The shared JSON writer carries the records for discovered and imported models;
+the cached server uses the same parsed policy options. The frontend presents
+source-ordered case rows with expandable details and explicit display limits.
+The native, request/JSON, and static-render suites cover duplicate cases, empty
+logs/traces, weak firing, unknown-event positions, early stopping, explicit
+markings, and agreement with existing aggregate/per-place results.
+
+`walk_through_hidden_transitions` controls routing before visible events in both
+variations and in their precision-prefix traversal. Forward final routing remains
+independent. The three existing forward policies are now exposed end-to-end:
+remaining-token fit classification, final hidden routing, and unknown-activity
+fitness penalties. Disabling remaining-token classification does not change the
+numeric token-fitness formula. Backwards replay retains its legacy behavior:
+unknown labels are ignored, no final hidden routing occurs, and remaining tokens
+make a trace unfit. The UI disables these three forward-only controls for that
+variation. All Boolean request values are validated, including explicitly empty
+values; supplied false values survive frontend serialization. These additions
+do not certify either replay variation or its duration/root-cause support modules
+as complete.
+
+Pinned black-box checks confirm pre-consumption reached markings, silent-closure
+enabled sets even when visible-event routing is disabled, independent forward
+final routing, and the negative numeric fitness possible after immediate stop.
+Known native compatibility gaps remain explicit: unknown forward activities use
+the existing default numeric missing/consumed penalty, while the reference
+ignores them by default and its opt-in penalty affects fit classification only;
+the native remaining-token toggle does not also suppress final-token shortages
+from fit classification. Forward duplicate-label tie selection and replay
+flood-cleaning/exhaustive-exploration controls still require reconciliation.
+The backwards hidden-walk toggle is a native extension; the pinned legacy
+variation ignores that parameter. Duration and root-cause diagnostic projections,
+trace/event identity maps, and flat-input replay adapters remain separate work.
 
 Alpha discovery defaults evidence: omitted `alpha_variant` selects classic
 Alpha across native options, strict requests, CLI, and frontend. Named

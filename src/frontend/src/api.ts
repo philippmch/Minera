@@ -514,6 +514,11 @@ export interface MinerOptions {
   /** Reference-compatible token-replay variation used for model conformance. */
   tokenReplayVariant?: "forward" | "backwards";
   tokenReplayStopImmediatelyUnfit?: boolean;
+  tokenReplayConsiderRemainingInFitness?: boolean;
+  tokenReplayTryToReachFinalMarkingThroughHidden?: boolean;
+  tokenReplayConsiderActivitiesNotInModelInFitness?: boolean;
+  tokenReplayWalkThroughHiddenTransitions?: boolean;
+  tokenReplayIncludeTraceDiagnostics?: boolean;
   /** Event field used to form token-replay variants. */
   tokenReplayActivityAttribute?: string;
   /** Classic log-skeleton noise threshold (default 0). */
@@ -1108,6 +1113,19 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("token_replay_variant", options.tokenReplayVariant);
   if (options.tokenReplayStopImmediatelyUnfit)
     add("token_replay_stop_immediately_unfit", "true");
+  for (const [key, parameter] of [
+    ["tokenReplayConsiderRemainingInFitness", "token_replay_consider_remaining_in_fitness"],
+    ["tokenReplayTryToReachFinalMarkingThroughHidden", "token_replay_try_to_reach_final_marking_through_hidden"],
+    ["tokenReplayConsiderActivitiesNotInModelInFitness", "token_replay_consider_activities_not_in_model_in_fitness"],
+    ["tokenReplayWalkThroughHiddenTransitions", "token_replay_walk_through_hidden_transitions"],
+    ["tokenReplayIncludeTraceDiagnostics", "token_replay_include_trace_diagnostics"],
+  ] as const) {
+    const value = options[key];
+    if (value !== undefined) {
+      if (typeof value !== "boolean") throw new Error(`${key} must be a boolean`);
+      add(parameter, String(value));
+    }
+  }
   if (options.tokenReplayActivityAttribute !== undefined) {
     const value = options.tokenReplayActivityAttribute.trim();
     if (!value) throw new Error("tokenReplayActivityAttribute must not be empty");

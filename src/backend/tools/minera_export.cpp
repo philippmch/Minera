@@ -1111,6 +1111,16 @@ int usage(const char* program) {
                "  --process-tree-reduction-activity-key <name>\n"
                "  --token-replay-variant <id> Token replay: forward (default)\n"
                "                            or backwards\n"
+               "  --token-replay-consider-remaining-in-fitness <bool>\n"
+               "                            Include leftover tokens in fit classification\n"
+               "  --token-replay-try-to-reach-final-marking-through-hidden <bool>\n"
+               "                            Route silently to the final marking\n"
+               "  --token-replay-consider-activities-not-in-model-in-fitness <bool>\n"
+               "                            Count unknown activities as deviations\n"
+               "  --token-replay-walk-through-hidden-transitions <bool>\n"
+               "                            Use silent routing between visible events\n"
+               "  --token-replay-include-trace-diagnostics <bool>\n"
+               "                            Include per-case replay details in JSON\n"
                "  --token-replay-stop-immediately-unfit\n"
                "                            Stop a backwards replay trace at its\n"
                "                            first event that cannot be enabled\n"
@@ -2053,6 +2063,26 @@ int main(int argc, char** argv) {
     if (powl_parse == PowlCliParseStatus::kInvalid) return 2;
     if (powl_parse == PowlCliParseStatus::kMissingValue)
       return usage(argv[0]);
+    bool* replay_policy = nullptr;
+    for (const auto& [name, destination] : {
+             std::pair<std::string_view, bool*>{
+                 "--token-replay-consider-remaining-in-fitness", &token_replay_options.consider_remaining_in_fitness},
+             {"--token-replay-try-to-reach-final-marking-through-hidden", &token_replay_options.try_to_reach_final_marking_through_hidden},
+             {"--token-replay-consider-activities-not-in-model-in-fitness", &token_replay_options.consider_activities_not_in_model_in_fitness},
+             {"--token-replay-walk-through-hidden-transitions", &token_replay_options.walk_through_hidden_transitions},
+             {"--token-replay-include-trace-diagnostics", &token_replay_options.include_trace_diagnostics}}) {
+      if (arg == name) replay_policy = destination;
+    }
+    if (replay_policy) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try { *replay_policy = parse_boolean(value, arg); }
+      catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      continue;
+    }
     if (arg == "--alignment-activity-attribute" ||
         arg == "--token-replay-activity-attribute") {
       const auto* value = next();

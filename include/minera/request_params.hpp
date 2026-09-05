@@ -453,6 +453,12 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ProcessTreeAlignmentOptions parse_process_tree_alignment_params(
     const FieldLookup& field, const FieldPresence& present);
 
+// Replay policy parsing shared by mining and headless replay requests.
+[[nodiscard]] TokenReplayOptions parse_token_replay_params(
+    const FieldLookup& field);
+[[nodiscard]] TokenReplayOptions parse_token_replay_params(
+    const FieldLookup& field, const FieldPresence& present);
+
 // Builds the discovery options from a mine request's form fields. The
 // single-callback overload treats absent and empty fields alike, preserving the
 // original defaults. With FieldPresence, explicitly present empty Declare list
