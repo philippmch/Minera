@@ -1270,6 +1270,14 @@ export function TokenReplayDiagnostics({ traces }: { traces?: TokenReplayTraceDi
                     (label, index) => trace.unknown_activity_is_null?.[index] ? "(null)" : label))}</dd>
                   <dt>Reached marking (tokens by place index, before final consumption)</dt><dd>{replayDiagnosticList(trace.reached_marking)}</dd>
                 </dl>
+                {trace.event_diagnostics && <>
+                  <h3>Source-event firings</h3>
+                  <p>Final hidden routing is included in the trace firing list only.</p>
+                  <ul>{trace.event_diagnostics.slice(0, 100).map((event) => (
+                    <li key={event.event_index}>Event #{event.event_index} · Fired: {replayDiagnosticList(event.activated_transitions)} · Problems: {replayDiagnosticList(event.transitions_with_problems)}</li>
+                  ))}</ul>
+                  {trace.event_diagnostics.length > 100 && <p>{numberFormat.format(trace.event_diagnostics.length - 100)} event records omitted.</p>}
+                </>}
               </details>
             </li>
           ))}

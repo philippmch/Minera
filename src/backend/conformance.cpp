@@ -212,7 +212,10 @@ class Replayer {
     }
 
     for (const auto& step : trace) {
-      if (diagnostics) ++diagnostics->replayed_events;
+      if (diagnostics) {
+        diagnostics->event_diagnostics.push_back({diagnostics->replayed_events, {}, {}});
+        ++diagnostics->replayed_events;
+      }
       if (!step || transitions_by_activity_[*step].empty()) {
         counts.has_unknown_activity = true;
         if (diagnostics)
@@ -230,6 +233,7 @@ class Replayer {
         if (diagnostics) {
           diagnostics->replay_stopped = true;
           diagnostics->transitions_with_problems.push_back(result.fired.back());
+          diagnostics->event_diagnostics.back().transitions_with_problems.push_back(result.fired.back());
         }
         break;
       }
@@ -241,8 +245,11 @@ class Replayer {
       if (diagnostics) {
         diagnostics->activated_transitions.insert(
             diagnostics->activated_transitions.end(), result.fired.begin(), result.fired.end());
-        if (result.missing != 0)
+        diagnostics->event_diagnostics.back().activated_transitions = result.fired;
+        if (result.missing != 0) {
           diagnostics->transitions_with_problems.push_back(result.fired.back());
+          diagnostics->event_diagnostics.back().transitions_with_problems.push_back(result.fired.back());
+        }
       }
       if (executions) {
         for (const std::size_t t : result.fired) ++(*executions)[t];
@@ -314,7 +321,10 @@ class Replayer {
     }
 
     for (const auto& step : trace) {
-      if (diagnostics) ++diagnostics->replayed_events;
+      if (diagnostics) {
+        diagnostics->event_diagnostics.push_back({diagnostics->replayed_events, {}, {}});
+        ++diagnostics->replayed_events;
+      }
       // The deprecated variation silently discards labels absent from the net.
       if (!step || transitions_by_activity_[*step].empty()) {
         if (diagnostics)
@@ -329,7 +339,10 @@ class Replayer {
         if (enabled(marking, t)) {
           fire(marking, t, counts);
           if (executions) ++(*executions)[t];
-          if (diagnostics) diagnostics->activated_transitions.push_back(t);
+          if (diagnostics) {
+            diagnostics->activated_transitions.push_back(t);
+            diagnostics->event_diagnostics.back().activated_transitions.push_back(t);
+          }
           fired_any = true;
         }
       }
@@ -351,11 +364,17 @@ class Replayer {
         for (const std::size_t s : *path) {
           fire(marking, s, counts);
           if (executions) ++(*executions)[s];
-          if (diagnostics) diagnostics->activated_transitions.push_back(s);
+          if (diagnostics) {
+            diagnostics->activated_transitions.push_back(s);
+            diagnostics->event_diagnostics.back().activated_transitions.push_back(s);
+          }
         }
         fire(marking, visible, counts);
         if (executions) ++(*executions)[visible];
-        if (diagnostics) diagnostics->activated_transitions.push_back(visible);
+        if (diagnostics) {
+          diagnostics->activated_transitions.push_back(visible);
+          diagnostics->event_diagnostics.back().activated_transitions.push_back(visible);
+        }
       } else {
         // No route: weak-fire the unique visible transition, creating any
         // missing inputs and retaining the deviation for fitness.
@@ -364,6 +383,8 @@ class Replayer {
         if (diagnostics) {
           diagnostics->activated_transitions.push_back(visible);
           diagnostics->transitions_with_problems.push_back(visible);
+          diagnostics->event_diagnostics.back().activated_transitions.push_back(visible);
+          diagnostics->event_diagnostics.back().transitions_with_problems.push_back(visible);
         }
         outcome.fitting = false;
         if (stop_immediately_unfit) {

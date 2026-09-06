@@ -1881,6 +1881,26 @@ regressions cover perfect replay, multi-step silent routing, forced missing
 tokens, immediate stop, unknown labels, duplicate labels, weighted arcs, and
 empty logs.
 
+Per-case replay diagnostics now retain one event record for every examined
+source event. Each record carries its zero-based event position, ordered
+silent/visible firings, and problem transitions. Unknown events retain empty
+records; unexamined events after stopping have no record. Forward immediate
+stop records the blocked transition without claiming it fired, while backwards
+weak firing retains both the firing and its problem. Backwards duplicate-label
+firings share the source event that triggered them. Final silent routing stays
+in the trace-level firing list because it has no source event.
+
+Native contracts check that concatenated event firings form a prefix of the
+trace firing list and that event problems reproduce the complete trace problem
+list, including repeated deviations. JSON exports and the frontend expose the
+same records, preserve older exports without them, and disclose the 100-event
+display cap. The September 6 checkpoint passed all 146 Release CTest suites,
+563 frontend tests, the production frontend build, and the pinned structural
+audit with its verifier self-test. These records prepare the duration and
+root-cause support work; they do not complete those modules or establish exact
+forward routing/flood-cleaning parity. The 235 incomplete coverage units remain
+unchanged.
+
 ## Decision-mining evidence
 
 Decision mining now has a guarded data-Petri-net projection in addition to the

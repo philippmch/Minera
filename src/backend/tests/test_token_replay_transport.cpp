@@ -120,6 +120,7 @@ void replay_diagnostics_json_contract() {
   assert(json.find("\"case_id\": \"case\\\"one\"") != std::string::npos);
   assert(json.find("\"trace_is_fit\": true") != std::string::npos);
   assert(json.find("\"activated_transitions\": [0]") != std::string::npos);
+  assert(json.find("\"event_diagnostics\": [{\"event_index\": 0, \"activated_transitions\": [0], \"transitions_with_problems\": []}]") != std::string::npos);
   assert(json.find("\"reached_marking\": [0, 1]") != std::string::npos);
   assert(json.find("\"unknown_activities\": []") != std::string::npos);
   assert(json.find("\"places\": [{") != std::string::npos);
