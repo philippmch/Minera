@@ -2931,6 +2931,13 @@ export interface VariantConformance {
   null_activity_indices?: number[];
 }
 
+export interface TokenReplayEventDiagnostics {
+  event_index: number;
+  /** Pre-event routing and visible firings; final routing has no source event. */
+  activated_transitions: number[];
+  transitions_with_problems: number[];
+}
+
 export interface TokenReplayTraceDiagnostics {
   /** Zero-based source trace position, retained even for duplicate case IDs. */
   trace_index: number;
@@ -2953,6 +2960,8 @@ export interface TokenReplayTraceDiagnostics {
   unknown_activities: string[];
   /** Parallel to unknown_activities; absent in older exports. */
   unknown_activity_is_null?: boolean[];
+  /** One record per examined event; absent in older exports. */
+  event_diagnostics?: TokenReplayEventDiagnostics[];
   places: OcpnTokenReplayPlaceDiagnostics[];
 }
 

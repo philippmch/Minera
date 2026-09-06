@@ -1134,6 +1134,16 @@ void write_token_replay_trace(std::ostream& out,
   numbers("enabled_transitions", trace.enabled_transitions);
   numbers("reached_marking", trace.reached_marking);
   numbers("unknown_event_indices", trace.unknown_event_indices);
+  out << ", \"event_diagnostics\": [";
+  for (std::size_t i = 0; i < trace.event_diagnostics.size(); ++i) {
+    if (i) out << ", ";
+    const auto& event = trace.event_diagnostics[i];
+    out << "{\"event_index\": " << event.event_index;
+    numbers("activated_transitions", event.activated_transitions);
+    numbers("transitions_with_problems", event.transitions_with_problems);
+    out << '}';
+  }
+  out << ']';
   out << ", \"unknown_activities\": [";
   for (std::size_t i = 0; i < trace.unknown_activities.size(); ++i) {
     if (i) out << ", ";

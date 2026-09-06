@@ -1,5 +1,6 @@
 #include "minera/conformance.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <iostream>
@@ -53,6 +54,22 @@ void consistent(const EventLog& log, const PetriNet& net, TokenReplayOptions opt
   std::vector<std::uint64_t> fired(net.transitions().size());
   std::vector<TokenReplayPlaceDiagnostics> totals(net.place_count());
   for (const auto& row : rows) {
+    assert(row.event_diagnostics.size() == row.replayed_events);
+    assert(row.replayed_events <= log.traces[row.trace_index].events.size());
+    std::vector<std::size_t> event_firings, event_problems;
+    for (std::size_t index = 0; index < row.event_diagnostics.size(); ++index) {
+      const auto& event = row.event_diagnostics[index];
+      assert(event.event_index == index);
+      event_firings.insert(event_firings.end(), event.activated_transitions.begin(),
+                          event.activated_transitions.end());
+      event_problems.insert(event_problems.end(), event.transitions_with_problems.begin(),
+                           event.transitions_with_problems.end());
+    }
+    assert(event_problems == row.transitions_with_problems);
+    assert(event_firings.size() <= row.activated_transitions.size());
+    assert(std::equal(event_firings.begin(), event_firings.end(), row.activated_transitions.begin()));
+    for (std::size_t i = event_firings.size(); i < row.activated_transitions.size(); ++i)
+      assert(!net.transitions()[row.activated_transitions[i]].activity);
     produced += row.produced;
     consumed += row.consumed;
     missing += row.missing;
@@ -84,6 +101,13 @@ void consistent(const EventLog& log, const PetriNet& net, TokenReplayOptions opt
     assert((*attached.trace_diagnostics)[i].case_id == rows[i].case_id);
     assert((*attached.trace_diagnostics)[i].activated_transitions == rows[i].activated_transitions);
     assert((*attached.trace_diagnostics)[i].reached_marking == rows[i].reached_marking);
+    const auto& events = (*attached.trace_diagnostics)[i].event_diagnostics;
+    assert(events.size() == rows[i].event_diagnostics.size());
+    for (std::size_t e = 0; e < events.size(); ++e) {
+      assert(events[e].event_index == rows[i].event_diagnostics[e].event_index);
+      assert(events[e].activated_transitions == rows[i].event_diagnostics[e].activated_transitions);
+      assert(events[e].transitions_with_problems == rows[i].event_diagnostics[e].transitions_with_problems);
+    }
   }
 }
 
@@ -450,6 +474,86 @@ void replay_selector_priority_and_missing_state() {
   assert(replay_token_traces(log, sequential(), options).front().unknown_activity_is_null.front());
 }
 
+void event_records_preserve_routing_and_source_positions() {
+  const auto net = sequential(true);
+  const auto log = log_of({{"unknown", "a", "unknown", "b"}, {}});
+  for (const auto variant : {TokenReplayVariant::kForward, TokenReplayVariant::kBackwards}) {
+    TokenReplayOptions options;
+    options.variant = variant;
+    const auto rows = replay_token_traces(log, net, options);
+    const auto& events = rows[0].event_diagnostics;
+    assert(events.size() == 4);
+    assert(events[0].activated_transitions.empty() && events[0].transitions_with_problems.empty());
+    assert((events[1].activated_transitions == std::vector<std::size_t>{0, 1}));
+    assert(events[2].activated_transitions.empty() && events[2].transitions_with_problems.empty());
+    assert((events[3].activated_transitions == std::vector<std::size_t>{2}));
+    assert(rows[0].activated_transitions.size() ==
+           (variant == TokenReplayVariant::kForward ? 4 : 3));
+    assert(rows[1].event_diagnostics.empty());
+    consistent(log, net, options);
+  }
+  // A silent-only completion has no source event to which it can be assigned.
+  PetriNet silent;
+  silent.add_place();
+  silent.add_place();
+  silent.set_source(0);
+  silent.set_sink(1);
+  silent.add_transition(std::nullopt, {0}, {1});
+  const auto row = replay_token_traces(log_of({{}}), silent).front();
+  assert((row.activated_transitions == std::vector<std::size_t>{0}));
+  assert(row.event_diagnostics.empty() && row.replayed_events == 0);
+  consistent(log_of({{}}), silent, {});
+}
+
+void event_records_preserve_repeated_problems_and_stop_boundaries() {
+  const auto net = sequential();
+  const auto log = log_of({{"unknown", "b", "b", "a"}});
+  for (const auto variant : {TokenReplayVariant::kForward, TokenReplayVariant::kBackwards}) {
+    for (const bool stop : {false, true}) {
+      TokenReplayOptions options;
+      options.variant = variant;
+      options.stop_immediately_unfit = stop;
+      const auto row = replay_token_traces(log, net, options).front();
+      assert(row.event_diagnostics.size() == (stop ? 2 : 4));
+      assert(row.event_diagnostics[0].activated_transitions.empty());
+      assert(row.event_diagnostics[0].transitions_with_problems.empty());
+      assert((row.event_diagnostics[1].transitions_with_problems == std::vector<std::size_t>{1}));
+      if (stop && variant == TokenReplayVariant::kForward)
+        assert(row.event_diagnostics[1].activated_transitions.empty());
+      else
+        assert((row.event_diagnostics[1].activated_transitions == std::vector<std::size_t>{1}));
+      if (!stop) {
+        assert((row.event_diagnostics[2].activated_transitions == std::vector<std::size_t>{1}));
+        assert((row.event_diagnostics[2].transitions_with_problems == std::vector<std::size_t>{1}));
+        assert((row.event_diagnostics[3].activated_transitions == std::vector<std::size_t>{0}));
+        assert(row.event_diagnostics[3].transitions_with_problems.empty());
+      }
+      consistent(log, net, options);
+    }
+  }
+}
+
+void backward_event_records_group_duplicate_firings_and_ambiguity() {
+  PetriNet net;
+  net.set_activities({"a"});
+  for (int i = 0; i < 3; ++i) net.add_place();
+  net.set_source(0);
+  net.set_sink(2);
+  net.add_transition(0, {0}, {1});
+  net.add_transition(0, {1}, {2});
+  TokenReplayOptions options;
+  options.variant = TokenReplayVariant::kBackwards;
+  const auto log = log_of({{"a", "a", "unknown"}});
+  const auto row = replay_token_traces(log, net, options).front();
+  assert(row.replay_stopped && row.event_diagnostics.size() == 2);
+  assert((row.event_diagnostics[0].activated_transitions == std::vector<std::size_t>{0, 1}));
+  assert(row.event_diagnostics[0].transitions_with_problems.empty());
+  assert(row.event_diagnostics[1].activated_transitions.empty());
+  assert(row.event_diagnostics[1].transitions_with_problems.empty());
+  assert(row.unknown_event_indices.empty());  // The third event was never examined.
+  consistent(log, net, options);
+}
+
 void replay_variant_keys_are_unambiguous() {
   auto log = log_of({{"a", "b"}, {"a"}, {"a", "b"}});
   log.traces[1].events[0].activity = std::string("a") + '\x1f' + "b";
@@ -479,5 +583,8 @@ int main() {
   null_activity_is_unknown_not_an_empty_label();
   replay_variant_keys_are_unambiguous();
   replay_selector_priority_and_missing_state();
+  event_records_preserve_routing_and_source_positions();
+  event_records_preserve_repeated_problems_and_stop_boundaries();
+  backward_event_records_group_duplicate_firings_and_ambiguity();
   std::cout << "Token replay diagnostics tests passed\n";
 }

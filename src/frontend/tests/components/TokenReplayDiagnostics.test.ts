@@ -17,6 +17,24 @@ const render = (traces?: TokenReplayTraceDiagnostics[]) =>
   renderToStaticMarkup(createElement(TokenReplayDiagnostics, { traces }));
 
 describe("per-case token replay diagnostics", () => {
+  it("ties ordered firings and blocked transitions to source events", () => {
+    const html = render([{ ...trace(), event_diagnostics: [
+      { event_index: 0, activated_transitions: [91, 4], transitions_with_problems: [] },
+      { event_index: 1, activated_transitions: [], transitions_with_problems: [8] },
+    ] }]);
+    expect(html).toContain("Event #0 · Fired: 91, 4 · Problems: none");
+    expect(html).toContain("Event #1 · Fired: none · Problems: 8");
+    expect(html).toContain("Final hidden routing is included in the trace firing list only.");
+    expect(render([trace()])).not.toContain("Source-event firings");
+  });
+  it("caps event records without silently truncating the display", () => {
+    const html = render([{ ...trace(), event_diagnostics: Array.from({ length: 102 }, (_, event_index) => ({
+      event_index, activated_transitions: [], transitions_with_problems: [],
+    })) }]);
+    expect(html).toContain("Event #99 ·");
+    expect(html).not.toContain("Event #100 ·");
+    expect(html).toContain("2 event records omitted.");
+  });
   it("identifies explicit null unknown labels without confusing empty strings", () => {
     const html = render([{ ...trace(), unknown_activities: ["", ""],
       unknown_event_indices: [0, 1], unknown_activity_is_null: [true, false] }]);

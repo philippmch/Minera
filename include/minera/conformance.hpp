@@ -33,6 +33,14 @@ struct TokenReplayPlaceDiagnostics {
   std::uint64_t produced = 0;
 };
 
+// Transitions examined for one source event. Silent pre-event routing precedes
+// visible firings; final-marking routing belongs only to the trace-level list.
+struct TokenReplayEventDiagnostics {
+  std::size_t event_index = 0;
+  std::vector<std::size_t> activated_transitions;
+  std::vector<std::size_t> transitions_with_problems;
+};
+
 struct TokenReplayTraceDiagnostics {
   std::size_t trace_index = 0;
   std::string case_id;
@@ -56,6 +64,8 @@ struct TokenReplayTraceDiagnostics {
   bool replay_stopped = false;
   // Examined events, including an event that causes immediate stopping.
   std::size_t replayed_events = 0;
+  // One row per examined event, including unknown labels and blocked events.
+  std::vector<TokenReplayEventDiagnostics> event_diagnostics;
 };
 
 // Conformance of an event log against a discovered model: the four standard
