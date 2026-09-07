@@ -89,9 +89,16 @@
     "numeric_values": "The representation helper retains infinity, NaN, and finite values outside float32 range. Null numeric values remain invalid. Classifier fitting rejects infinity and float32 overflow.",
     "balanced_example": {"fit": [1], "problem": [8, 8, 8, 8, 8], "log_values": [1, 1, 1, 1, 1, 8, 8, 8, 8, 8]}
   },
+  "typed_unknown_activity_keys": {
+    "numeric_equivalence": {"key": 1, "activities": [1, true, 1.0, "1", "safe"], "baseline_costs": [4, 5]},
+    "nan_identity": "A shared NaN key excludes the shared scalar activity; independently constructed NaN activities remain baseline rows.",
+    "date_equivalence": "Equal aware datetime instants match despite different offsets; their string spelling remains a baseline activity.",
+    "nested_activity": "A list-valued activity remains a baseline row for a scalar unknown key; it does not cause a hashability error.",
+    "transport": "Optional activity_attribute carries typed scalar metadata beside legacy activity and activity_is_null fields."
+  },
   "remaining_contracts": [
     "The standalone log helper shares nested dictionary/list objects in the pinned runtime; native EventLog currently copies nested values and cannot expose those mutations across rows.",
-    "Unknown-activity dictionary keys retain runtime type: integer 1, boolean True, null, and tuple labels exclude matching typed activities while their string spellings remain baseline rows. Native cohorts currently expose only string/null activity keys.",
+    "Tuple-valued unknown-activity keys remain unsupported by native scalar activity cells.",
     "Native scalar replacement must use assignment or emplace to renew NaN alias identity; mutation through a raw mutable variant reference does not renew it.",
     "Legacy backwards replay diagnostic context production is a native extension."
   ]

@@ -56,7 +56,11 @@ Contexts indexed_contexts(TraceCohortIndex& index,
   return result;
 }
 
-struct ActivityValue { bool present = false; std::optional<std::string> value; };
+struct ActivityValue { bool present = false; EventAttribute value; };
+ActivityValue selected_activity(EventAttribute value) {
+  if (value.first_class_state == FirstClassAttributeState::kNull) value.is_null = true;
+  return {true, std::move(value)};
+}
 ActivityValue activity_value(const Event& event, const std::string& key) {
   const EventAttribute* selected = nullptr;
   int priority = 0;
@@ -77,8 +81,7 @@ ActivityValue activity_value(const Event& event, const std::string& key) {
   if (selected) {
     if (selected->first_class_role != FirstClassAttributeRole::kNone &&
         selected->first_class_state == FirstClassAttributeState::kMissing) return {};
-    return {true, selected->is_null || selected->first_class_state == FirstClassAttributeState::kNull
-                      ? std::nullopt : std::optional<std::string>(selected->value)};
+    return selected_activity(*selected);
   }
   if (key == "concept:name" || key == "activity" ||
       (!event.activity_source_key.empty() && key == event.activity_source_key) ||
@@ -86,25 +89,57 @@ ActivityValue activity_value(const Event& event, const std::string& key) {
        (key == event.activity_attribute->key ||
         (!event.activity_attribute->first_class_source_key.empty() &&
          key == event.activity_attribute->first_class_source_key)))) {
-    if (event.activity_state == FirstClassAttributeState::kNull) return {true, std::nullopt};
+    if (event.activity_state == FirstClassAttributeState::kNull) {
+      EventAttribute value;
+      value.is_null = true;
+      return selected_activity(std::move(value));
+    }
     if (event.activity_attribute) {
       if (event.activity_state == FirstClassAttributeState::kMissing ||
           (event.activity_attribute->first_class_role != FirstClassAttributeRole::kNone &&
            event.activity_attribute->first_class_state == FirstClassAttributeState::kMissing)) return {};
-      return {true, event.activity_attribute->is_null ||
-                    event.activity_attribute->first_class_state == FirstClassAttributeState::kNull
-                    ? std::nullopt : std::optional<std::string>(event.activity_attribute->value)};
+      return selected_activity(*event.activity_attribute);
     }
-    if (event.has_activity()) return {true, event.activity};
+    if (event.has_activity()) return selected_activity(EventAttribute{key, event.activity});
   }
   return {};
 }
 
-bool contains_key(const Trace& trace, const std::set<std::optional<std::string>>& keys,
+EventAttribute cohort_key(const TokenReplayUnknownRootCauseCohort& cohort) {
+  auto value = cohort.activity_attribute ? selected_activity(*cohort.activity_attribute).value
+      : selected_activity(EventAttribute{"", cohort.activity, AttributeKind::kString, cohort.activity_is_null}).value;
+  (void)root_cause_scalar_keys_equal(value, value);
+  return value;
+}
+
+class ActivityKeyIndex {
+ public:
+  std::optional<std::size_t> find(const EventAttribute& value) const {
+    const auto fingerprint = root_cause_scalar_key_fingerprint(value);
+    const auto bucket = buckets_.find(fingerprint);
+    if (bucket == buckets_.end()) return std::nullopt;
+    for (const auto index : bucket->second)
+      if (root_cause_scalar_keys_equal(values_[index], value)) return index;
+    return std::nullopt;
+  }
+  std::size_t insert(EventAttribute value) {
+    if (const auto found = find(value)) return *found;
+    const auto index = values_.size();
+    buckets_[root_cause_scalar_key_fingerprint(value)].push_back(index);
+    values_.push_back(std::move(value));
+    return index;
+  }
+ private:
+  std::vector<EventAttribute> values_;
+  std::unordered_map<std::string, std::vector<std::size_t>> buckets_;
+};
+
+bool contains_key(const Trace& trace, const ActivityKeyIndex& keys,
                   const std::string& selector) {
   for (const auto& event : trace.events) {
     const auto activity = activity_value(event, selector);
-    if (activity.present && keys.contains(activity.value)) return true;
+    if (activity.present && activity.value.container == AttributeContainerKind::kScalar && activity.value.children.empty())
+      if (keys.find(activity.value)) return true;
   }
   return false;
 }
@@ -180,25 +215,31 @@ std::vector<TokenReplayUnknownRootCauseDiagnostics> token_replay_unknown_root_ca
     const EventLog& log, const std::vector<TokenReplayUnknownRootCauseCohort>& cohorts,
     const TokenReplayOptions& options) {
   const auto selector = options.activity_attribute.empty() ? std::string("concept:name") : options.activity_attribute;
-  std::set<std::optional<std::string>> keys;
+  ActivityKeyIndex keys;
   for (const auto& cohort : cohorts)
-    keys.insert(cohort.activity_is_null ? std::nullopt : std::optional<std::string>(cohort.activity));
+    keys.insert(cohort_key(cohort));
   std::vector<TokenReplayUnknownRootCauseDiagnostics> result;
+  std::vector<std::optional<bool>> baseline_eligible(log.traces.size());
   TraceCohortIndex index(log);
   for (const auto& cohort : cohorts) {
     const auto problematic = indexed_contexts(index, cohort.problem_contexts);
     if (problematic.empty()) continue;
     std::vector<RootCauseObservation> fit, problem;
     for (std::size_t i = 0; i < log.traces.size(); ++i) {
-      if (problematic.contains(i) || contains_key(log.traces[i], keys, selector)) continue;
-      if (log.traces[i].events.empty()) continue;
+      if (problematic.contains(i)) continue;
+      if (!baseline_eligible[i].has_value())
+        baseline_eligible[i] = !log.traces[i].events.empty() && !contains_key(log.traces[i], keys, selector);
+      if (!*baseline_eligible[i]) continue;
       fit.push_back({i, log.traces[i].events.back()});
     }
     for (const auto& [index, observation] : problematic) problem.push_back(observation);
     if (auto model = fit_root_cause_model(fit, problem, options.root_cause, "containing")) {
       TokenReplayUnknownRootCauseDiagnostics row;
       static_cast<RootCauseModel&>(row) = std::move(*model);
-      row.activity = cohort.activity; row.activity_is_null = cohort.activity_is_null;
+      const auto key = cohort_key(cohort);
+      row.activity = cohort.activity_attribute ? key.is_null ? "" : root_cause_attribute_category(key) : cohort.activity;
+      row.activity_is_null = key.is_null;
+      row.activity_attribute = cohort.activity_attribute ? std::optional<EventAttribute>(key) : std::nullopt;
       result.push_back(std::move(row));
     }
   }
@@ -210,7 +251,9 @@ TokenReplayRootCauseDiagnostics compute_token_replay_root_cause_diagnostics(
     const std::vector<TokenReplayTraceDiagnostics>& traces,
     const TokenReplayOptions& options) {
   std::map<std::size_t, TokenReplayTransitionRootCauseCohort> transitions;
-  std::map<std::optional<std::string>, TokenReplayUnknownRootCauseCohort> unknown;
+  std::vector<TokenReplayUnknownRootCauseCohort> unknown;
+  ActivityKeyIndex unknown_index;
+  const auto selector = options.activity_attribute.empty() ? std::string("concept:name") : options.activity_attribute;
   for (const auto& trace : traces) {
     if (trace.trace_index >= log.traces.size())
       throw std::out_of_range("root cause: diagnostic trace index out of range");
@@ -232,19 +275,26 @@ TokenReplayRootCauseDiagnostics compute_token_replay_root_cause_diagnostics(
       if (trace.unknown_event_indices[i] >= trace.replayed_events || i >= trace.unknown_activities.size())
         throw std::out_of_range("root cause: unknown event identity out of range");
       const bool is_null = i < trace.unknown_activity_is_null.size() && trace.unknown_activity_is_null[i];
-      const auto key = is_null ? std::nullopt : std::optional<std::string>(trace.unknown_activities[i]);
-      auto& cohort = unknown[key]; cohort.activity = key.value_or(""); cohort.activity_is_null = is_null;
-      cohort.problem_contexts.push_back({trace.trace_index, context});
+      auto selected = activity_value(log.traces[trace.trace_index].events[trace.unknown_event_indices[i]], selector);
+      if (!selected.present)
+        selected = selected_activity(EventAttribute{selector, trace.unknown_activities[i], AttributeKind::kString, is_null});
+      const auto group = unknown_index.insert(selected.value);
+      if (group == unknown.size()) {
+        TokenReplayUnknownRootCauseCohort cohort;
+        cohort.activity = selected.value.is_null ? "" : root_cause_attribute_category(selected.value);
+        cohort.activity_is_null = selected.value.is_null;
+        cohort.activity_attribute = std::move(selected.value);
+        unknown.push_back(std::move(cohort));
+      }
+      unknown[group].problem_contexts.push_back({trace.trace_index, context});
     }
   }
   std::vector<TokenReplayTransitionRootCauseCohort> transition_cohorts;
   for (auto& [key, cohort] : transitions) transition_cohorts.push_back(std::move(cohort));
-  std::vector<TokenReplayUnknownRootCauseCohort> unknown_cohorts;
-  for (auto& [key, cohort] : unknown) unknown_cohorts.push_back(std::move(cohort));
   TokenReplayRootCauseDiagnostics result;
   result.options = options.root_cause;
   result.transitions = token_replay_transition_root_cause_diagnostics(log, transition_cohorts, options.root_cause);
-  result.unknown_activities = token_replay_unknown_root_cause_diagnostics(log, unknown_cohorts, options);
+  result.unknown_activities = token_replay_unknown_root_cause_diagnostics(log, unknown, options);
   return result;
 }
 }  // namespace minera

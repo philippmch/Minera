@@ -24,6 +24,8 @@
 namespace minera {
 namespace {
 
+void write_attribute_detail(std::ostream& out, const EventAttribute& attribute);
+
 void write_json_string(std::ostream& out, std::string_view value) {
   out << '"';
   for (const char c : value) {
@@ -1298,6 +1300,10 @@ void write_token_replay_root_cause(
     write_json_string(out, row.activity);
     out << ", \"activity_is_null\": " << (row.activity_is_null ? "true" : "false");
     write_root_cause_model(out, row);
+    if (row.activity_attribute) {
+      out << ", \"activity_attribute\": ";
+      write_attribute_detail(out, *row.activity_attribute);
+    }
     out << '}';
   }
   out << "]}";

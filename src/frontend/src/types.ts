@@ -3011,6 +3011,7 @@ export interface TokenReplayRootCauseDiagnostics {
   unknown_activities: Array<TokenReplayRootCauseModel & {
     activity: string;
     activity_is_null: boolean;
+    activity_attribute?: LogConversionAttributeDetail;
   }>;
 }
 

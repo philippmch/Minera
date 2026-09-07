@@ -269,6 +269,11 @@ void replay_root_cause_json_contract() {
   assert(start != std::string::npos && std::stod(json.substr(start + data_prefix.size())) == value);
   assert(json.find("[0, null]") != std::string::npos);
   assert(json.find("nan") == std::string::npos && json.find("Infinity") == std::string::npos);
+  diagnostics.unknown_activities[0].activity_attribute = minera::EventAttribute{
+      "concept:name", "1", minera::AttributeKind::kInt};
+  diagnostics.unknown_activities[0].activity_attribute->typed_value = std::int64_t{1};
+  const auto typed_json = minera::imported_model_json(model, graph);
+  assert(typed_json.find("\"activity_attribute\": {\"key\":\"concept:name\",\"value\":\"1\",\"kind\":\"int\",\"container\":\"scalar\",\"null\":false,\"typed_value\":1}") != std::string::npos);
   diagnostics.transitions.clear();
   diagnostics.unknown_activities.clear();
   assert(minera::imported_model_json(model, graph).find("\"transitions\": [], \"unknown_activities\": []") != std::string::npos);

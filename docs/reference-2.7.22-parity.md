@@ -315,9 +315,17 @@ not. Nested values use the same rule; event values retain stringified equality.
 Serialized formats do not encode shared scalar identity.
 Scalar replacement uses assignment or `emplace`; mutation through a raw mutable
 variant reference cannot renew alias identity and remains outside this contract.
-The support module remains **partial**: unknown-activity dictionary keys can be
-typed values whose string spellings remain distinct baseline activities, while
-native cohorts currently expose string/null keys. Adding these encoding
+Unknown-activity cohorts now retain typed scalar keys through the optional
+`activity_attribute` cell, including JSON output. Numeric/bool equivalents,
+aware datetime instants, and shared NaNs use typed membership; string spellings
+remain distinct baseline activities. Integrated diagnostics recover typed keys
+from the original unknown events. Lists encountered as activities remain
+baseline values for scalar keys.
+Typed key buckets verify equality after fingerprint lookup, and baseline
+eligibility is cached across classifiers. The UI includes scalar type labels
+so same-spelling typed keys remain distinguishable.
+The support module remains **partial**: tuple-valued unknown keys are not yet
+represented. Adding these encoding
 contracts also leaves nested mutation aliasing in the standalone log helper
 unresolved: the reference shares nested objects, while native logs copy them.
 These contracts do not certify either replay variation.
