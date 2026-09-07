@@ -34,6 +34,12 @@
     "boolean_categories": ["False", "True"],
     "typed_float_category": "2.0",
     "duplicate_numeric_selectors": {"selectors": ["cost", "cost"], "value": 8, "row": [0, 8]},
+    "categorical_feature_collisions": {
+      "duplicate_selectors": {"string_attributes": ["g", "g"], "numeric_attributes": [], "fit": [{"g": "a"}], "problem": [{"g": "b"}], "feature_names": ["event:g@a", "event:g@b", "event:g@a", "event:g@b"], "data": [[0, 0, 1, 0], [0, 0, 0, 1]], "target": [0, 1]},
+      "delimiter_collision": {"string_attributes": ["g", "g@x"], "numeric_attributes": [], "fit": [{"g": "x@y", "g@x": "y"}], "problem": [{"g": "z", "g@x": "z"}], "feature_names": ["event:g@x@y", "event:g@z", "event:g@x@y", "event:g@x@z"], "data": [[0, 0, 1, 0], [0, 1, 0, 1]], "target": [0, 1]},
+      "categorical_numeric_collision": {"string_attributes": ["g"], "numeric_attributes": ["g@x"], "fit": [{"g": "x", "g@x": 2}], "problem": [{"g": "y", "g@x": 8}], "feature_names": ["event:g@x", "event:g@y", "event:g@x"], "data": [[0, 0, 2], [0, 1, 8]], "target": [0, 1]},
+      "literal_missing_markers": {"string_attributes": ["g"], "numeric_attributes": [], "fit": [{}, {"g": null}], "problem": [{"g": "UNDEFINED"}, {"g": "None"}], "feature_names": ["event:g@None", "event:g@UNDEFINED"], "data": [[0, 1], [1, 0], [0, 1], [1, 0]], "target": [0, 0, 1, 1]}
+    },
     "numeric_strings": {"1_000": 1000, "1e-400": 0, "  +2.5  ": 2.5},
     "numeric_rejections": ["0x1p2", "missing", "null", "infinity", "float32 overflow"],
     "numeric_nan": "accepted; native JSON represents matrix NaN as null"
@@ -74,7 +80,18 @@
     "reference_cohort_target": [0, 0, 1],
     "native_transport": "Copies and in-memory stream/table conversions preserve scalar identity. Serialized formats do not encode shared scalar identity."
   },
+  "standalone_helpers": {
+    "log": "One copied event dictionary per trace, fit cohort then problem cohort, empty trace attributes. Top-level keys mutate independently; nested dictionary/list objects remain shared with the input and repeated rows.",
+    "one_sided_without_multiplier": {"numeric_data": [[1]], "numeric_features": ["event:v"], "zero_selector_data": [[]]},
+    "empty_without_multiplier": {"numeric_data": [], "numeric_features": ["event:v"], "categorical_features": []},
+    "two_sided_zero_selectors": {"data": [[], []], "feature_names": []},
+    "multiplier_with_either_cohort_empty": "ZeroDivisionError; native helper reports std::domain_error.",
+    "numeric_values": "The representation helper retains infinity, NaN, and finite values outside float32 range. Null numeric values remain invalid. Classifier fitting rejects infinity and float32 overflow.",
+    "balanced_example": {"fit": [1], "problem": [8, 8, 8, 8, 8], "log_values": [1, 1, 1, 1, 1, 8, 8, 8, 8, 8]}
+  },
   "remaining_contracts": [
+    "The standalone log helper shares nested dictionary/list objects in the pinned runtime; native EventLog currently copies nested values and cannot expose those mutations across rows.",
+    "Unknown-activity dictionary keys retain runtime type: integer 1, boolean True, null, and tuple labels exclude matching typed activities while their string spellings remain baseline rows. Native cohorts currently expose only string/null activity keys.",
     "Native scalar replacement must use assignment or emplace to renew NaN alias identity; mutation through a raw mutable variant reference does not renew it.",
     "Legacy backwards replay diagnostic context production is a native extension."
   ]

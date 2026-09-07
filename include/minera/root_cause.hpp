@@ -21,6 +21,32 @@ struct RootCauseObservation {
   Event context;
 };
 
+struct RootCauseRepresentation {
+  std::vector<std::string> feature_names;
+  std::vector<std::vector<double>> data;
+  std::vector<int> target;
+  std::vector<std::size_t> source_trace_indices;
+};
+
+// Copy each supplied context into its own otherwise empty trace. Fit contexts
+// precede problem contexts. Optional balancing repeats the complete smaller
+// cohort floor(larger/smaller) times; balancing an empty cohort throws
+// std::domain_error. Without balancing, empty/one-sided cohorts are valid.
+[[nodiscard]] EventLog build_root_cause_log(
+    const std::vector<RootCauseObservation>& fit,
+    const std::vector<RootCauseObservation>& problem,
+    bool enable_multiplier = false);
+
+// Encode the same cohort order without training. No selectors produce empty
+// rows. Empty cohorts retain requested numeric column names. Infinity and
+// values beyond float32 range are preserved; missing/null selected numeric
+// attributes still throw std::invalid_argument. Balancing follows the log
+// builder's empty-cohort rule. Targets are 0 for fit and 1 for problem.
+[[nodiscard]] RootCauseRepresentation build_root_cause_representation(
+    const std::vector<RootCauseObservation>& fit,
+    const std::vector<RootCauseObservation>& problem,
+    const RootCauseOptions& options);
+
 struct RootCauseTreeNode {
   int feature_index = -1;
   double threshold = -2.0;

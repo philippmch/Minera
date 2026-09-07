@@ -389,9 +389,14 @@ double number_for(const Event& event, const std::string& key) {
   else if (value->kind == AttributeKind::kBoolean && (value->value == "true" || value->value == "false"))
     result = value->value == "true" ? 1.0 : 0.0;
   else result = decimal_number(value->value, key);
-  if (std::isinf(result) || std::isinf(static_cast<float>(result)))
-    throw std::invalid_argument("root cause: numeric attribute outside float32 range: " + key);
   return result;
+}
+
+std::array<std::size_t, 2> cohort_repeats(std::size_t fit, std::size_t problem, bool enabled) {
+  if (!enabled) return {1, 1};
+  if (fit == 0 || problem == 0)
+    throw std::domain_error("root cause: cannot balance an empty cohort");
+  return {std::max(std::size_t{1}, problem / fit), std::max(std::size_t{1}, fit / problem)};
 }
 
 using Counts = std::array<std::size_t, 2>;
@@ -490,17 +495,31 @@ std::string root_cause_attribute_category(const EventAttribute& attribute) {
   return attribute_category(attribute, false);
 }
 
-std::optional<RootCauseModel> fit_root_cause_model(
+EventLog build_root_cause_log(
     const std::vector<RootCauseObservation>& fit,
     const std::vector<RootCauseObservation>& problem,
-    const RootCauseOptions& options, const std::string& problem_class) {
-  if (fit.empty() || problem.empty()) return std::nullopt;
-  if (options.string_attributes.empty() && options.numeric_attributes.empty())
-    throw std::invalid_argument("root cause: select at least one attribute");
-  RootCauseModel model;
-  model.classes = {"fit", problem_class};
-  model.fit_count = fit.size();
-  model.problem_count = problem.size();
+    bool enable_multiplier) {
+  const auto repeats = cohort_repeats(fit.size(), problem.size(), enable_multiplier);
+  EventLog result;
+  const auto append = [&](const auto& cohort, std::size_t copies) {
+    for (std::size_t copy = 0; copy < copies; ++copy)
+      for (const auto& observation : cohort) {
+        Trace trace;
+        trace.events.push_back(observation.context);
+        result.traces.push_back(std::move(trace));
+      }
+  };
+  append(fit, repeats[0]);
+  append(problem, repeats[1]);
+  return result;
+}
+
+RootCauseRepresentation build_root_cause_representation(
+    const std::vector<RootCauseObservation>& fit,
+    const std::vector<RootCauseObservation>& problem,
+    const RootCauseOptions& options) {
+  const auto repeats = cohort_repeats(fit.size(), problem.size(), options.enable_multiplier);
+  RootCauseRepresentation model;
   std::vector<std::vector<std::string>> categories;
   for (const auto& key : options.string_attributes) {
     std::set<std::string> values;
@@ -532,8 +551,31 @@ std::optional<RootCauseModel> fit_root_cause_model(
         model.source_trace_indices.push_back(cohort[i].trace_index);
       }
   };
-  append(fit, 0, options.enable_multiplier ? std::max(std::size_t{1}, problem.size() / fit.size()) : 1);
-  append(problem, 1, options.enable_multiplier ? std::max(std::size_t{1}, fit.size() / problem.size()) : 1);
+  append(fit, 0, repeats[0]);
+  append(problem, 1, repeats[1]);
+  return model;
+}
+
+std::optional<RootCauseModel> fit_root_cause_model(
+    const std::vector<RootCauseObservation>& fit,
+    const std::vector<RootCauseObservation>& problem,
+    const RootCauseOptions& options, const std::string& problem_class) {
+  if (fit.empty() || problem.empty()) return std::nullopt;
+  if (options.string_attributes.empty() && options.numeric_attributes.empty())
+    throw std::invalid_argument("root cause: select at least one attribute");
+  auto representation = build_root_cause_representation(fit, problem, options);
+  for (const auto& row : representation.data)
+    for (const auto value : row)
+      if (std::isinf(value) || std::isinf(static_cast<float>(value)))
+        throw std::invalid_argument("root cause: numeric attribute outside float32 range");
+  RootCauseModel model;
+  model.feature_names = std::move(representation.feature_names);
+  model.data = std::move(representation.data);
+  model.target = std::move(representation.target);
+  model.source_trace_indices = std::move(representation.source_trace_indices);
+  model.classes = {"fit", problem_class};
+  model.fit_count = fit.size();
+  model.problem_count = problem.size();
   std::vector<std::size_t> rows(model.data.size());
   std::iota(rows.begin(), rows.end(), std::size_t{0});
   Trainer(model).grow(rows, 0);

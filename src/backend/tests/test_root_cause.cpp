@@ -136,6 +136,100 @@ void test_encoding() {
   assert((custom->feature_names == std::vector<std::string>{"event:performer@UNDEFINED", "event:performer@alice"}));
 }
 
+void test_categorical_feature_collisions() {
+  const auto observation = [](std::initializer_list<minera::EventAttribute> attributes) {
+    RootCauseObservation result;
+    result.context.attributes = attributes;
+    return result;
+  };
+  const auto check = [](const std::optional<minera::RootCauseModel>& model,
+                        const std::vector<std::string>& names,
+                        const std::vector<std::vector<double>>& data,
+                        const std::vector<int>& target) {
+    assert(model);
+    assert(model->feature_names == names);
+    assert(model->data == data);
+    assert(model->target == target);
+    assert((model->classes == std::vector<std::string>{"fit", "underfed"}));
+  };
+  check(fit_root_cause_model({observation({{"g", "a"}})}, {observation({{"g", "b"}})}, {{"g", "g"}, {}}),
+        {"event:g@a", "event:g@b", "event:g@a", "event:g@b"},
+        {{0, 0, 1, 0}, {0, 0, 0, 1}}, {0, 1});
+  check(fit_root_cause_model({observation({{"g", "x@y"}, {"g@x", "y"}})},
+                            {observation({{"g", "z"}, {"g@x", "z"}})}, {{"g", "g@x"}, {}}),
+        {"event:g@x@y", "event:g@z", "event:g@x@y", "event:g@x@z"},
+        {{0, 0, 1, 0}, {0, 1, 0, 1}}, {0, 1});
+  check(fit_root_cause_model({observation({{"g", "x"}, {"g@x", "2"}})},
+                            {observation({{"g", "y"}, {"g@x", "8"}})}, {{"g"}, {"g@x"}}),
+        {"event:g@x", "event:g@y", "event:g@x"},
+        {{0, 0, 2}, {0, 1, 8}}, {0, 1});
+  minera::EventAttribute null{"g", "ignored"};
+  null.is_null = true;
+  check(fit_root_cause_model({observation({}), observation({null})},
+                            {observation({{"g", "UNDEFINED"}}), observation({{"g", "None"}})}, {{"g"}, {}}),
+        {"event:g@None", "event:g@UNDEFINED"},
+        {{0, 1}, {1, 0}, {0, 1}, {1, 0}}, {0, 0, 1, 1});
+}
+
+void test_public_root_cause_helpers() {
+  using minera::build_root_cause_log;
+  using minera::build_root_cause_representation;
+  const std::vector<RootCauseObservation> fit{numeric(1, 7), numeric(2, 9)};
+  const std::vector<RootCauseObservation> problem{numeric(7, 11), numeric(8, 13), numeric(9, 15), numeric(10, 17), numeric(11, 19)};
+  RootCauseOptions options{{}, {"cost"}, true};
+  const auto representation = build_root_cause_representation(fit, problem, options);
+  assert((representation.feature_names == std::vector<std::string>{"event:cost"}));
+  assert((representation.data == std::vector<std::vector<double>>{{1}, {2}, {1}, {2}, {7}, {8}, {9}, {10}, {11}}));
+  assert((representation.target == std::vector<int>{0, 0, 0, 0, 1, 1, 1, 1, 1}));
+  assert((representation.source_trace_indices == std::vector<std::size_t>{7, 9, 7, 9, 11, 13, 15, 17, 19}));
+  const auto trained = fit_root_cause_model(fit, problem, options);
+  assert(trained->feature_names == representation.feature_names && trained->data == representation.data);
+  assert(trained->target == representation.target && trained->source_trace_indices == representation.source_trace_indices);
+  auto detached = build_root_cause_log(fit, problem, true);
+  assert(detached.traces.size() == 9);
+  for (std::size_t row = 0; row < detached.traces.size(); ++row) {
+    const auto& trace = detached.traces[row];
+    assert(trace.events.size() == 1 && trace.case_id.empty() && trace.attributes.empty() && trace.properties.empty());
+    assert(std::get<double>(trace.events[0].attributes[0].typed_value) == representation.data[row][0]);
+  }
+  detached.traces[0].events[0].attributes[0].typed_value = 99.0;
+  assert(std::get<double>(fit[0].context.attributes[0].typed_value) == 1);
+  assert(std::get<double>(detached.traces[2].events[0].attributes[0].typed_value) == 1);
+  assert(build_root_cause_log({}, {}).traces.empty());
+  assert(build_root_cause_log({}, fit).traces.size() == 2);
+  assert(build_root_cause_log(fit, {}).traces.size() == 2);
+  const auto no_features = build_root_cause_representation(fit, {}, {});
+  assert(no_features.feature_names.empty());
+  assert((no_features.data == std::vector<std::vector<double>>{{}, {}}));
+  assert((no_features.target == std::vector<int>{0, 0}));
+  assert((no_features.source_trace_indices == std::vector<std::size_t>{7, 9}));
+  const auto only_problem = build_root_cause_representation({}, fit, {{}, {"cost"}});
+  assert((only_problem.data == std::vector<std::vector<double>>{{1}, {2}}));
+  assert((only_problem.target == std::vector<int>{1, 1}));
+  const auto empty = build_root_cause_representation({}, {}, {{"group"}, {"cost", "cost"}});
+  assert((empty.feature_names == std::vector<std::string>{"event:cost", "event:cost"}));
+  assert(empty.data.empty() && empty.target.empty() && empty.source_trace_indices.empty());
+  const auto collision = build_root_cause_representation({categorical("a")}, {categorical("b")}, {{"group", "group"}, {}});
+  assert((collision.feature_names == std::vector<std::string>{"event:group@a", "event:group@b", "event:group@a", "event:group@b"}));
+  assert((collision.data == std::vector<std::vector<double>>{{0, 0, 1, 0}, {0, 0, 0, 1}}));
+  const auto unbounded = build_root_cause_representation(
+      {numeric(std::numeric_limits<double>::infinity()), numeric(1e39), numeric(std::numeric_limits<double>::quiet_NaN())}, {}, {{}, {"cost"}});
+  assert(std::isinf(unbounded.data[0][0]) && unbounded.data[1][0] == 1e39 && std::isnan(unbounded.data[2][0]));
+  auto null = numeric(1);
+  null.context.attributes[0].is_null = true;
+  rejects([&] { (void)build_root_cause_representation({null}, {}, {{}, {"cost"}}); });
+  for (const bool both_empty : {false, true}) {
+    bool rejected_log = false, rejected_representation = false;
+    const std::vector<RootCauseObservation> cohort = both_empty ? std::vector<RootCauseObservation>{} : fit;
+    try { (void)build_root_cause_log({}, cohort, true); }
+    catch (const std::domain_error&) { rejected_log = true; }
+    try { (void)build_root_cause_representation({}, cohort, options); }
+    catch (const std::domain_error&) { rejected_representation = true; }
+    assert(rejected_log && rejected_representation);
+    assert(!fit_root_cause_model({}, cohort, options));
+  }
+}
+
 void test_equivalent_feature_choices() {
   std::array<bool, 2> seen{};
   for (int trial = 0; trial < 256; ++trial) {
@@ -651,6 +745,8 @@ int main() {
   test_trace_equivalence();
   test_numeric_tree();
   test_encoding();
+  test_categorical_feature_collisions();
+  test_public_root_cause_helpers();
   test_equivalent_feature_choices();
   test_missing_route_order();
   test_balancing();
