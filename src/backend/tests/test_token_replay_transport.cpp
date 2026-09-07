@@ -32,6 +32,8 @@ void replay_policy_request_contract() {
   assert(!defaults.max_rows_to_materialize);
   assert(defaults.walk_through_hidden_transitions);
   assert(!defaults.include_trace_diagnostics);
+  assert(!defaults.include_duration_diagnostics);
+  assert(defaults.timestamp_attribute == "time:timestamp");
   const Fields configured{
       {"token_replay_variant", "backwards"},
       {"token_replay_activity_attribute", " phase "},
@@ -41,6 +43,8 @@ void replay_policy_request_contract() {
       {"token_replay_consider_activities_not_in_model_in_fitness", "false"},
       {"token_replay_walk_through_hidden_transitions", "false"},
       {"token_replay_include_trace_diagnostics", "true"},
+      {"token_replay_include_duration_diagnostics", "true"},
+      {"token_replay_timestamp_attribute", " completed_at "},
       {"token_replay_case_id_attribute", " group "},
       {"token_replay_max_rows_to_materialize", "0"}};
   const auto options = minera::parse_token_replay_params(lookup(configured), presence(configured));
@@ -50,11 +54,14 @@ void replay_policy_request_contract() {
   assert(!options.try_to_reach_final_marking_through_hidden);
   assert(!options.consider_activities_not_in_model_in_fitness);
   assert(!options.walk_through_hidden_transitions && options.include_trace_diagnostics);
+  assert(options.include_duration_diagnostics && options.timestamp_attribute == "completed_at");
   assert(options.case_id_attribute == "group");
   assert(options.max_rows_to_materialize && *options.max_rows_to_materialize == 0);
   const auto mine = minera::parse_mine_params(lookup(configured), presence(configured));
   assert(mine.token_replay_activity_attribute_supplied);
   assert(mine.token_replay.include_trace_diagnostics);
+  assert(mine.token_replay.include_duration_diagnostics);
+  assert(mine.token_replay.timestamp_attribute == "completed_at");
   assert(!mine.token_replay.walk_through_hidden_transitions);
   assert(!mine.token_replay.consider_remaining_in_fitness);
 
@@ -63,10 +70,12 @@ void replay_policy_request_contract() {
          "token_replay_try_to_reach_final_marking_through_hidden",
          "token_replay_consider_activities_not_in_model_in_fitness",
          "token_replay_walk_through_hidden_transitions", "token_replay_include_trace_diagnostics",
+         "token_replay_include_duration_diagnostics", "token_replay_timestamp_attribute",
          "token_replay_case_id_attribute", "token_replay_max_rows_to_materialize"}) {
     for (const auto* value : {"", "  ", "invalid"}) {
       if ((std::string_view(name) == "token_replay_activity_attribute" ||
-           std::string_view(name) == "token_replay_case_id_attribute") &&
+           std::string_view(name) == "token_replay_case_id_attribute" ||
+           std::string_view(name) == "token_replay_timestamp_attribute") &&
           std::string_view(value) == "invalid") continue;
       const Fields fields{{name, value}};
       bool rejected = false;
@@ -130,6 +139,63 @@ void replay_diagnostics_json_contract() {
   model.token_replay = minera::check_conformance(log, net, options);
   assert(minera::imported_model_json(model, graph).find("\"trace_diagnostics\": []") != std::string::npos);
 }
+void replay_duration_json_contract() {
+  minera::PetriNet net;
+  net.set_activities({"A", "B"});
+  for (int i = 0; i < 3; ++i) net.add_place();
+  net.set_source(0);
+  net.set_sink(2);
+  net.add_transition(0, {0}, {1});
+  net.add_transition(1, {1}, {2});
+  minera::EventLog log;
+  const auto append = [&](std::initializer_list<std::pair<const char*, const char*>> steps) {
+    minera::Trace trace;
+    trace.case_id = "shared-case-id";
+    for (const auto& [activity, timestamp] : steps) {
+      minera::Event event;
+      event.activity = activity;
+      event.attributes.push_back({"finished", timestamp});
+      trace.events.push_back(std::move(event));
+    }
+    log.traces.push_back(std::move(trace));
+  };
+  append({{"A", "2026-01-01T00:00:00Z"}, {"B", "2026-01-01T00:00:10Z"}});
+  append({{"B", "2026-01-01T00:00:00Z"}, {"B", "2026-01-01T00:00:30Z"}});
+  append({{"A", "2026-01-01T00:00:00Z"}, {"X", "2026-01-01T00:00:20Z"},
+          {"B", "2026-01-01T00:00:40Z"}});
+  minera::DirectlyFollowsGraph graph;
+  graph.ensure_activity("A");
+  graph.ensure_activity("B");
+  minera::ModelConformance model;
+  model.miner = "imported";
+  model.token_replay = minera::check_conformance(log, net);
+  assert(minera::imported_model_json(model, graph).find("duration_diagnostics") == std::string::npos);
+  minera::TokenReplayOptions options;
+  options.include_duration_diagnostics = true;
+  options.timestamp_attribute = "finished";
+  model.token_replay = minera::check_conformance(log, net, options);
+  assert(!model.token_replay.trace_diagnostics);
+  const auto json = minera::imported_model_json(model, graph);
+  assert(json.find("\"duration_diagnostics\": {\"timestamp_attribute\": \"finished\"") != std::string::npos);
+  assert(json.find("\"transition_index\": 1, \"fit_count\": 2, \"problem_count\": 1, \"fit_median_seconds\": 25, \"problem_median_seconds\": 30, \"relative_throughput\": 1.2") != std::string::npos);
+  assert(json.find("\"fit_trace_indices\": [0, 2], \"problem_trace_indices\": [1]") != std::string::npos);
+  assert(json.find("\"activity\": \"X\", \"activity_is_null\": false, \"fit_count\": 2, \"problem_count\": 1, \"fit_median_seconds\": 20, \"problem_median_seconds\": 40, \"relative_throughput\": 2") != std::string::npos);
+  auto& comparison = model.token_replay.duration_diagnostics->transitions.front();
+  comparison.fit_median_seconds = 0.12345678912345678;
+  comparison.relative_throughput = 8.0 / 3.0;
+  const auto precise = minera::imported_model_json(model, graph);
+  for (const auto& [key, expected] : {
+      std::pair<std::string, double>{"\"fit_median_seconds\": ", comparison.fit_median_seconds},
+      {"\"relative_throughput\": ", comparison.relative_throughput}}) {
+    const auto position = precise.find(key);
+    assert(position != std::string::npos);
+    assert(std::stod(precise.substr(position + key.size())) == expected);
+  }
+  log.traces.clear();
+  model.token_replay = minera::check_conformance(log, net, options);
+  assert(minera::imported_model_json(model, graph).find("\"transitions\": [], \"unknown_activities\": []") != std::string::npos);
+}
+
 void replay_null_labels_survive_json() {
   minera::PetriNet net;
   net.set_activities({""});
@@ -162,5 +228,6 @@ void replay_null_labels_survive_json() {
 int main() {
   replay_policy_request_contract();
   replay_diagnostics_json_contract();
+  replay_duration_json_contract();
   replay_null_labels_survive_json();
 }

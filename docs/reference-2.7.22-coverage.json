@@ -6951,8 +6951,22 @@
       "owner": "algo.conformance.tokenreplay",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/conformance.hpp",
+        "src/backend/token_replay_duration.cpp",
+        "src/backend/tests/test_token_replay_duration.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.tokenreplay.diagnostics.duration_diagnostics",
+        "implementation": [
+          { "path": "src/backend/token_replay_duration.cpp", "symbol": "compute_token_replay_duration_diagnostics" }
+        ],
+        "tests": [
+          { "path": "src/backend/tests/test_token_replay_duration.cpp", "executable": "minera_token_replay_duration_tests", "case": "integration_contracts" }
+        ]
+      }
     },
     {
       "module": "algo.conformance.tokenreplay.diagnostics.root_cause_analysis",

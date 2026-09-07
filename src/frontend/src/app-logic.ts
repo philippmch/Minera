@@ -136,6 +136,9 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
         options.tokenReplayCaseIdAttribute.trim() !== "case:concept:name") ||
       options.tokenReplayWalkThroughHiddenTransitions === false ||
       options.tokenReplayIncludeTraceDiagnostics === true ||
+      options.tokenReplayIncludeDurationDiagnostics === true ||
+      Boolean(options.tokenReplayTimestampAttribute?.trim() &&
+        options.tokenReplayTimestampAttribute.trim() !== "time:timestamp") ||
       Boolean(options.tokenReplayActivityAttribute?.trim() &&
         options.tokenReplayActivityAttribute.trim() !== "concept:name") ||
       options.logSkeletonNoiseThreshold !== undefined &&

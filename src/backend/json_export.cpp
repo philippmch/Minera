@@ -1166,6 +1166,54 @@ void write_token_replay_trace(std::ostream& out,
   out << "]}";
 }
 
+void write_token_replay_duration_comparison(
+    std::ostream& out, const TokenReplayDurationComparison& comparison) {
+  const auto previous_precision = out.precision(std::numeric_limits<double>::max_digits10);
+  const auto indices = [&](std::string_view name, const auto& values) {
+    out << ", ";
+    write_json_string(out, name);
+    out << ": [";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i) out << ", ";
+      out << values[i];
+    }
+    out << ']';
+  };
+  out << ", \"fit_count\": " << comparison.fit_count
+      << ", \"problem_count\": " << comparison.problem_count
+      << ", \"fit_median_seconds\": " << comparison.fit_median_seconds
+      << ", \"problem_median_seconds\": " << comparison.problem_median_seconds
+      << ", \"relative_throughput\": " << comparison.relative_throughput;
+  indices("fit_trace_indices", comparison.fit_trace_indices);
+  indices("problem_trace_indices", comparison.problem_trace_indices);
+  out.precision(previous_precision);
+}
+
+void write_token_replay_duration(std::ostream& out,
+                                const TokenReplayDurationDiagnostics& diagnostics) {
+  out << "{\"timestamp_attribute\": ";
+  write_json_string(out, diagnostics.timestamp_attribute);
+  out << ", \"transitions\": [";
+  for (std::size_t i = 0; i < diagnostics.transitions.size(); ++i) {
+    if (i) out << ", ";
+    const auto& row = diagnostics.transitions[i];
+    out << "{\"transition_index\": " << row.transition_index;
+    write_token_replay_duration_comparison(out, row);
+    out << '}';
+  }
+  out << "], \"unknown_activities\": [";
+  for (std::size_t i = 0; i < diagnostics.unknown_activities.size(); ++i) {
+    if (i) out << ", ";
+    const auto& row = diagnostics.unknown_activities[i];
+    out << "{\"activity\": ";
+    write_json_string(out, row.activity);
+    out << ", \"activity_is_null\": " << (row.activity_is_null ? "true" : "false");
+    write_token_replay_duration_comparison(out, row);
+    out << '}';
+  }
+  out << "]}";
+}
+
 void write_conformance(std::ostream& out,
                        const ConformanceResult& conformance,
                        const DirectlyFollowsGraph& graph) {
@@ -1223,6 +1271,10 @@ void write_conformance(std::ostream& out,
       write_token_replay_trace(out, (*conformance.trace_diagnostics)[i]);
     }
     out << ']';
+  }
+  if (conformance.duration_diagnostics) {
+    out << ", \"duration_diagnostics\": ";
+    write_token_replay_duration(out, *conformance.duration_diagnostics);
   }
   out << '}';
 }

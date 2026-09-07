@@ -22,21 +22,32 @@ export const TOKEN_REPLAY_POLICY_DEFAULTS = {
   tokenReplayConsiderActivitiesNotInModelInFitness: false,
   tokenReplayWalkThroughHiddenTransitions: true,
   tokenReplayIncludeTraceDiagnostics: false,
+  tokenReplayIncludeDurationDiagnostics: false,
 };
 
 type TokenReplayPolicies = typeof TOKEN_REPLAY_POLICY_DEFAULTS;
 
-export function tokenReplayInputValidationMessage(cap: string): string | null {
+export function tokenReplayInputValidationMessage(
+  cap: string, timestampAttribute = "time:timestamp", includeDurationDiagnostics = false,
+): string | null {
   const value = cap.trim();
   if (value && (!Number.isSafeInteger(Number(value)) || Number(value) < 0))
     return "Token replay event cap must be a non-negative safe integer.";
+  if (includeDurationDiagnostics && !timestampAttribute.trim())
+    return "Token replay timestamp attribute must not be empty.";
   return null;
 }
 
-export function tokenReplayInputOptionsFromForm(cap: string): MinerOptions {
-  const error = tokenReplayInputValidationMessage(cap);
+export function tokenReplayInputOptionsFromForm(
+  cap: string, timestampAttribute = "time:timestamp", includeDurationDiagnostics = false,
+): MinerOptions {
+  const error = tokenReplayInputValidationMessage(cap, timestampAttribute, includeDurationDiagnostics);
   if (error) throw new Error(error);
-  return cap.trim() ? { tokenReplayMaxRowsToMaterialize: Number(cap) } : {};
+  return {
+    ...(cap.trim() ? { tokenReplayMaxRowsToMaterialize: Number(cap) } : {}),
+    ...(includeDurationDiagnostics && timestampAttribute.trim() !== "time:timestamp"
+      ? { tokenReplayTimestampAttribute: timestampAttribute.trim() } : {}),
+  };
 }
 
 export function tokenReplayPolicyOptionsFromForm(input: TokenReplayPolicies): MinerOptions {
@@ -66,6 +77,7 @@ export function TokenReplayPolicyControls({ variant, policies, onChange }: {
         ["tokenReplayConsiderActivitiesNotInModelInFitness", "Treat unknown activities as an unfit trace", true],
         ["tokenReplayWalkThroughHiddenTransitions", "Walk through hidden transitions", false],
         ["tokenReplayIncludeTraceDiagnostics", "Include per-trace replay diagnostics", false],
+        ["tokenReplayIncludeDurationDiagnostics", "Include replay duration diagnostics", false],
       ] as const).map(([key, label, forwardOnly]) => (
         <label className="filters-field" key={key}>
           <span>{label}</span>
@@ -731,6 +743,7 @@ export function Filters({
   const [tokenReplayPolicies, setTokenReplayPolicies] =
     useState({ ...TOKEN_REPLAY_POLICY_DEFAULTS });
   const [tokenReplayMaxRows, setTokenReplayMaxRows] = useState("");
+  const [tokenReplayTimestampAttribute, setTokenReplayTimestampAttribute] = useState("time:timestamp");
   const logSkeletonFamilies = [
     ["equivalence", "Equivalence"],
     ["always_after", "Always-after"],
@@ -1168,7 +1181,8 @@ export function Filters({
     sampleSize: correlationSampleSize,
   });
   const selectorValidationError =
-    tokenReplayInputValidationMessage(tokenReplayMaxRows) ||
+    tokenReplayInputValidationMessage(tokenReplayMaxRows, tokenReplayTimestampAttribute,
+      tokenReplayPolicies.tokenReplayIncludeDurationDiagnostics) ||
     (!logSkeletonActivityAttribute.trim()
       ? "Log skeleton activity attribute must not be empty."
       : !declareActivityAttribute.trim()
@@ -1415,7 +1429,8 @@ export function Filters({
       tokenReplayActivityAttribute:
         tokenReplayActivityAttribute.trim() || undefined,
       ...tokenReplayPolicyOptionsFromForm(tokenReplayPolicies),
-      ...tokenReplayInputOptionsFromForm(tokenReplayMaxRows),
+      ...tokenReplayInputOptionsFromForm(tokenReplayMaxRows, tokenReplayTimestampAttribute,
+        tokenReplayPolicies.tokenReplayIncludeDurationDiagnostics),
       logSkeletonNoiseThreshold: toLogSkeletonNoise(logSkeletonNoiseThreshold),
       logSkeletonActivityAttribute:
         logSkeletonActivityAttribute.trim() !== "concept:name"
@@ -1700,6 +1715,7 @@ export function Filters({
     setTokenReplayActivityAttribute("concept:name");
     setTokenReplayPolicies({ ...TOKEN_REPLAY_POLICY_DEFAULTS });
     setTokenReplayMaxRows("");
+    setTokenReplayTimestampAttribute("time:timestamp");
     setLogSkeletonNoiseThreshold("");
     setLogSkeletonActivityAttribute("concept:name");
     setLogSkeletonConstraints(new Set(logSkeletonFamilies.map(([name]) => name)));
@@ -2141,6 +2157,12 @@ export function Filters({
 
           <TokenReplayPolicyControls variant={tokenReplayVariant} policies={tokenReplayPolicies}
             onChange={(key, value) => setTokenReplayPolicies((current) => ({ ...current, [key]: value }))} />
+          <label className="filters-field">
+            <span>Token replay timestamp attribute</span>
+            <input value={tokenReplayTimestampAttribute} placeholder="time:timestamp"
+              disabled={!tokenReplayPolicies.tokenReplayIncludeDurationDiagnostics}
+              onChange={(event) => setTokenReplayTimestampAttribute(event.target.value)} />
+          </label>
           <label className="filters-field">
             <span>Token replay event cap</span>
             <input type="number" min={0} step={1} placeholder="unlimited"

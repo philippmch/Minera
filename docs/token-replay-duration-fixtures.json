@@ -1,0 +1,449 @@
+{
+  "target": {
+    "tag": "2.7.22",
+    "commit": "0715c31f3f1d85924107d6aa5329806db69df899"
+  },
+  "method": "Independent headless calls to the pinned runtime; no implementation source used. Timestamps below are seconds from a fixed UTC instant. Cohort positions refer to distinct source traces.",
+  "scalar_cases": [
+    {
+      "event_seconds": [],
+      "error": true
+    },
+    {
+      "event_seconds": [
+        null
+      ],
+      "error": true
+    },
+    {
+      "event_seconds": [
+        0
+      ],
+      "duration_seconds": 0
+    },
+    {
+      "event_seconds": [
+        0,
+        30,
+        10
+      ],
+      "duration_seconds": 10
+    },
+    {
+      "event_seconds": [
+        30,
+        0
+      ],
+      "duration_seconds": -30
+    },
+    {
+      "event_seconds": [
+        0,
+        null,
+        10
+      ],
+      "duration_seconds": 10
+    }
+  ],
+  "median_cases": [
+    {
+      "case_durations": [],
+      "error": true
+    },
+    {
+      "case_durations": [
+        10
+      ],
+      "median_seconds": 10
+    },
+    {
+      "case_durations": [
+        10,
+        20
+      ],
+      "median_seconds": 15
+    },
+    {
+      "case_durations": [
+        30,
+        10,
+        20
+      ],
+      "median_seconds": 20
+    },
+    {
+      "case_durations": [
+        0,
+        -10,
+        20,
+        80
+      ],
+      "median_seconds": 10
+    }
+  ],
+  "cohort_cases": [
+    {
+      "name": "transition_baseline_ignores_supplied_fit_membership",
+      "labels": [
+        "B",
+        "B",
+        "B",
+        "B"
+      ],
+      "durations": [
+        10,
+        30,
+        80,
+        100
+      ],
+      "transition_label": "B",
+      "problem_indices": [
+        2
+      ],
+      "supplied_fit_indices": [],
+      "expected": {
+        "fit_indices": [
+          0,
+          1,
+          3
+        ],
+        "fit_median_seconds": 30,
+        "problem_median_seconds": 80,
+        "relative_throughput": 2.6666666666666665
+      }
+    },
+    {
+      "name": "transition_problem_membership_wins_overlap",
+      "labels": [
+        "B",
+        "B",
+        "B",
+        "B"
+      ],
+      "durations": [
+        10,
+        30,
+        80,
+        100
+      ],
+      "transition_label": "B",
+      "problem_indices": [
+        0,
+        2
+      ],
+      "supplied_fit_indices": [
+        0,
+        1
+      ],
+      "expected": {
+        "fit_indices": [
+          1,
+          3
+        ],
+        "fit_median_seconds": 65,
+        "problem_median_seconds": 45,
+        "relative_throughput": 0.6923076923076923
+      }
+    },
+    {
+      "name": "transition_baseline_requires_label",
+      "labels": [
+        "B",
+        "C",
+        "B",
+        "C"
+      ],
+      "durations": [
+        10,
+        30,
+        80,
+        100
+      ],
+      "transition_label": "B",
+      "problem_indices": [
+        2
+      ],
+      "expected": {
+        "fit_indices": [
+          0
+        ],
+        "fit_median_seconds": 10,
+        "problem_median_seconds": 80,
+        "relative_throughput": 8
+      }
+    },
+    {
+      "name": "problem_membership_trusted_without_label",
+      "labels": [
+        "B",
+        "C",
+        "B",
+        "C"
+      ],
+      "durations": [
+        10,
+        30,
+        80,
+        100
+      ],
+      "transition_label": "B",
+      "problem_indices": [
+        1
+      ],
+      "expected": {
+        "fit_indices": [
+          0,
+          2
+        ],
+        "fit_median_seconds": 45,
+        "problem_median_seconds": 30,
+        "relative_throughput": 0.6666666666666666
+      }
+    },
+    {
+      "name": "unknown_baseline_excludes_every_diagnostic_key",
+      "labels": [
+        "B",
+        "B",
+        "X",
+        "Y"
+      ],
+      "durations": [
+        10,
+        30,
+        80,
+        100
+      ],
+      "unknown_cohorts": {
+        "X": [
+          2
+        ],
+        "Y": [
+          3
+        ]
+      },
+      "expected": {
+        "X": {
+          "fit_indices": [
+            0,
+            1
+          ],
+          "fit_median_seconds": 20,
+          "problem_median_seconds": 80,
+          "relative_throughput": 4
+        },
+        "Y": {
+          "fit_indices": [
+            0,
+            1
+          ],
+          "fit_median_seconds": 20,
+          "problem_median_seconds": 100,
+          "relative_throughput": 5
+        }
+      }
+    },
+    {
+      "name": "empty_unknown_cohort_still_excludes_its_label",
+      "labels": [
+        "B",
+        "B",
+        "X",
+        "Y"
+      ],
+      "durations": [
+        10,
+        30,
+        80,
+        100
+      ],
+      "unknown_cohorts": {
+        "X": [
+          2
+        ],
+        "Y": []
+      },
+      "expected": {
+        "X": {
+          "fit_indices": [
+            0,
+            1
+          ],
+          "fit_median_seconds": 20,
+          "problem_median_seconds": 80,
+          "relative_throughput": 4
+        }
+      }
+    },
+    {
+      "name": "unknown_membership_does_not_exclude_other_rows_without_matching_labels",
+      "labels": [
+        "B",
+        "B",
+        "B",
+        "B"
+      ],
+      "durations": [
+        10,
+        30,
+        80,
+        100
+      ],
+      "unknown_cohorts": {
+        "X": [
+          2
+        ],
+        "Y": [
+          3
+        ]
+      },
+      "expected": {
+        "X": {
+          "fit_indices": [
+            0,
+            1,
+            3
+          ],
+          "fit_median_seconds": 30,
+          "problem_median_seconds": 80,
+          "relative_throughput": 2.6666666666666665
+        },
+        "Y": {
+          "fit_indices": [
+            0,
+            1,
+            2
+          ],
+          "fit_median_seconds": 30,
+          "problem_median_seconds": 100,
+          "relative_throughput": 3.3333333333333335
+        }
+      }
+    },
+    {
+      "name": "zero_fit_median",
+      "labels": [
+        "B",
+        "B"
+      ],
+      "durations": [
+        0,
+        30
+      ],
+      "transition_label": "B",
+      "problem_indices": [
+        1
+      ],
+      "expected": {
+        "fit_indices": [
+          0
+        ],
+        "fit_median_seconds": 0,
+        "problem_median_seconds": 30,
+        "relative_throughput": 0
+      }
+    },
+    {
+      "name": "negative_fit_median",
+      "labels": [
+        "B",
+        "B"
+      ],
+      "durations": [
+        -10,
+        30
+      ],
+      "transition_label": "B",
+      "problem_indices": [
+        1
+      ],
+      "expected": {
+        "fit_indices": [
+          0
+        ],
+        "fit_median_seconds": -10,
+        "problem_median_seconds": 30,
+        "relative_throughput": 0
+      }
+    },
+    {
+      "name": "explicit_null_differs_from_missing",
+      "labels": [
+        null,
+        null,
+        {
+          "missing": true
+        }
+      ],
+      "durations": [
+        10,
+        30,
+        80
+      ],
+      "transition_label": null,
+      "problem_indices": [
+        1
+      ],
+      "expected": {
+        "fit_indices": [
+          0
+        ],
+        "fit_median_seconds": 10,
+        "problem_median_seconds": 30,
+        "relative_throughput": 3
+      }
+    },
+    {
+      "name": "unknown_null_leaves_missing_activity_in_baseline",
+      "labels": [
+        null,
+        null,
+        {
+          "missing": true
+        }
+      ],
+      "durations": [
+        10,
+        30,
+        80
+      ],
+      "unknown_cohorts": [
+        {
+          "activity": null,
+          "problem_indices": [
+            1
+          ]
+        }
+      ],
+      "expected": [
+        {
+          "activity": null,
+          "fit_indices": [
+            2
+          ],
+          "fit_median_seconds": 80,
+          "problem_median_seconds": 30,
+          "relative_throughput": 0.375
+        }
+      ]
+    }
+  ],
+  "selector_contracts": [
+    {
+      "family": "both_cohort_helpers",
+      "generic_filter_parameter": "pm4py:param:attribute_key",
+      "activity_replay_parameter_ignored": "pm4py:param:activity_key",
+      "native_equivalent": "TokenReplayOptions.activity_attribute"
+    },
+    {
+      "family": "both_cohort_helpers",
+      "timestamp_parameter": "pm4py:param:timestamp_key",
+      "native_equivalent": "TokenReplayOptions.timestamp_attribute"
+    },
+    {
+      "family": "both_cohort_helpers",
+      "condition": "Empty problem cohort or no eligible baseline cases",
+      "result": "comparison omitted"
+    }
+  ]
+}

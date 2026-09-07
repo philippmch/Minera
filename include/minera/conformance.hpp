@@ -68,6 +68,43 @@ struct TokenReplayTraceDiagnostics {
   std::vector<TokenReplayEventDiagnostics> event_diagnostics;
 };
 
+struct TokenReplayDurationComparison {
+  std::vector<std::size_t> fit_trace_indices;
+  std::vector<std::size_t> problem_trace_indices;
+  std::size_t fit_count = 0;
+  std::size_t problem_count = 0;
+  double fit_median_seconds = 0.0;
+  double problem_median_seconds = 0.0;
+  double relative_throughput = 0.0;
+};
+
+struct TokenReplayTransitionDurationDiagnostics : TokenReplayDurationComparison {
+  std::size_t transition_index = 0;
+};
+
+struct TokenReplayUnknownActivityDurationDiagnostics : TokenReplayDurationComparison {
+  std::string activity;
+  bool activity_is_null = false;
+};
+
+struct TokenReplayDurationDiagnostics {
+  std::string timestamp_attribute = "time:timestamp";
+  std::vector<TokenReplayTransitionDurationDiagnostics> transitions;
+  std::vector<TokenReplayUnknownActivityDurationDiagnostics> unknown_activities;
+};
+
+struct TokenReplayTransitionDurationCohort {
+  std::size_t transition_index = 0;
+  std::optional<std::string> activity;
+  std::vector<std::size_t> problem_trace_indices;
+};
+
+struct TokenReplayUnknownActivityDurationCohort {
+  std::string activity;
+  bool activity_is_null = false;
+  std::vector<std::size_t> problem_trace_indices;
+};
+
 // Conformance of an event log against a discovered model: the four standard
 // quality dimensions. Token-based replay fitness (does the model reproduce the
 // log?), escaping-edges precision (does the model allow much more than the
@@ -96,6 +133,7 @@ struct ConformanceResult {
   // through Event::attribute.
   std::string activity_attribute = "concept:name";
   std::optional<std::vector<TokenReplayTraceDiagnostics>> trace_diagnostics;
+  std::optional<TokenReplayDurationDiagnostics> duration_diagnostics;
 };
 
 // Token-replay implementation variation. FORWARD is the modern replay used
@@ -136,7 +174,37 @@ struct TokenReplayOptions {
   std::string case_id_attribute = "case:concept:name";
   // Hard input event cap; exceeding it raises length_error, never truncates.
   std::optional<std::size_t> max_rows_to_materialize;
+  bool include_duration_diagnostics = false;
+  std::string timestamp_attribute = "time:timestamp";
 };
+
+// Seconds between the first and last source-order events. Empty traces and
+// missing/null/invalid endpoint timestamps fail; intermediate events are not read.
+[[nodiscard]] double token_replay_case_duration(
+    const Trace& trace, const std::string& timestamp_attribute = "time:timestamp");
+// Repeated indices retain their weight. An empty selection fails.
+[[nodiscard]] double token_replay_median_case_duration(
+    const EventLog& log, const std::vector<std::size_t>& trace_indices,
+    const std::string& timestamp_attribute = "time:timestamp");
+// Cohort membership is by source trace index, deduplicated before comparison.
+// The baseline contains traces with the selected activity matching the transition
+// label, excluding that row's problem cohort. Missing activities never match null.
+// Rows with an empty side are omitted; nonpositive baseline medians give ratio 0.
+[[nodiscard]] std::vector<TokenReplayTransitionDurationDiagnostics>
+token_replay_transition_duration_diagnostics(
+    const EventLog& log, const std::vector<TokenReplayTransitionDurationCohort>& cohorts,
+    const TokenReplayOptions& options = {});
+// Baselines exclude traces containing any supplied activity key (even keys with
+// empty problem cohorts), then exclude the current row's problem trace indices.
+// activity_attribute selects the generic field used for both cohort filters.
+[[nodiscard]] std::vector<TokenReplayUnknownActivityDurationDiagnostics>
+token_replay_unknown_activity_duration_diagnostics(
+    const EventLog& log, const std::vector<TokenReplayUnknownActivityDurationCohort>& cohorts,
+    const TokenReplayOptions& options = {});
+[[nodiscard]] TokenReplayDurationDiagnostics compute_token_replay_duration_diagnostics(
+    const EventLog& log, const PetriNet& net,
+    const std::vector<TokenReplayTraceDiagnostics>& traces,
+    const TokenReplayOptions& options = {});
 
 // Per-place token accounting for a replayed log.  The four counters use the
 // same forced-firing semantics as ConformanceResult: missing tokens are

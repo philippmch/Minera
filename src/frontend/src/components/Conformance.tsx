@@ -12,6 +12,7 @@ import {
   type MineraExport,
   type ModelConformance,
   type TokenReplayTraceDiagnostics,
+  type TokenReplayDurationDiagnostics,
   type DfgAlignmentOptions,
   type DfgAlignmentResult,
   type EditDistanceOptions,
@@ -1288,6 +1289,73 @@ export function TokenReplayDiagnostics({ traces }: { traces?: TokenReplayTraceDi
   );
 }
 
+export function TokenReplayDurationDiagnosticsView({ diagnostics }: {
+  diagnostics?: TokenReplayDurationDiagnostics;
+}) {
+  if (diagnostics === undefined) return null;
+  const groups = [
+    {
+      caption: "Transition duration comparisons",
+      identity: "Transition ID",
+      fitLabel: "Label present, no reported problem",
+      problemLabel: "Problem execution",
+      rows: diagnostics.transitions.slice(0, 100).map((row) => ({
+        ...row, label: `Transition #${row.transition_index}`,
+      })),
+      total: diagnostics.transitions.length,
+    },
+    {
+      caption: "Unknown activity duration comparisons",
+      identity: "Unknown activity",
+      fitLabel: "Free of unknown labels",
+      problemLabel: "Containing activity",
+      rows: diagnostics.unknown_activities.slice(0, 100).map((row) => ({
+        ...row, label: row.activity_is_null ? "(null activity)" :
+          row.activity === "" ? "(empty string)" : JSON.stringify(row.activity),
+      })),
+      total: diagnostics.unknown_activities.length,
+    },
+  ];
+  return <section className="panel conf-panel">
+    <div className="panel-head"><h2>Replay duration diagnostics</h2>
+      <span className="panel-meta">Case durations in seconds</span></div>
+    <p className="conf-inline-note">Timestamp attribute: <code>{diagnostics.timestamp_attribute}</code>.
+      Transition comparisons group cases containing the transition's label with no reported problem for that transition
+      against cases with a reported problem for it. The baseline does not require a recorded firing.
+      Unknown activity comparisons group cases containing that activity against cases free of all observed unknown labels.
+      Durations describe whole cases and may be negative. Transition IDs are model-local.
+      Duration ratio is the problem cohort median divided by the baseline median;
+      it is 0 when the baseline median is zero or negative.</p>
+    {groups.every((group) => group.total === 0)
+      ? <p className="conf-allfit">Duration diagnostics were requested, but there are no comparisons.</p>
+      : groups.map((group) => <Fragment key={group.caption}>
+        {group.total === 0 ? <p className="conf-inline-note">{group.caption}: no comparisons.</p> : <>
+          <table className="activity-table deviation-table">
+            <caption>{group.caption}</caption>
+            <thead><tr>
+              <th scope="col">{group.identity}</th>
+              <th scope="col" className="num">{group.fitLabel} cases</th>
+              <th scope="col" className="num">{group.problemLabel} cases</th>
+              <th scope="col" className="num">{group.fitLabel} median (seconds)</th>
+              <th scope="col" className="num">{group.problemLabel} median (seconds)</th>
+              <th scope="col" className="num">Duration ratio</th>
+            </tr></thead>
+            <tbody>{group.rows.map((row, index) => <tr key={index}>
+              <th scope="row">{row.label}</th>
+              <td className="num">{numberFormat.format(row.fit_count)}</td>
+              <td className="num">{numberFormat.format(row.problem_count)}</td>
+              <td className="num">{numberFormat.format(row.fit_median_seconds)}</td>
+              <td className="num">{numberFormat.format(row.problem_median_seconds)}</td>
+              <td className="num">{numberFormat.format(row.relative_throughput)}×</td>
+            </tr>)}</tbody>
+          </table>
+          {group.total > group.rows.length && <p className="conf-inline-note">{group.caption}: showing the first 100;
+            {" "}{numberFormat.format(group.total - group.rows.length)} comparison rows omitted.</p>}
+        </>}
+      </Fragment>)}
+  </section>;
+}
+
 function TokenReplay({
   data,
   conformance,
@@ -1391,6 +1459,7 @@ function TokenReplay({
       </section>
 
       <TokenReplayDiagnostics traces={conformance.trace_diagnostics} />
+      <TokenReplayDurationDiagnosticsView diagnostics={conformance.duration_diagnostics} />
 
       <section className="panel conf-panel">
         <div className="panel-head">

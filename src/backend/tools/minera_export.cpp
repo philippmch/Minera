@@ -1121,6 +1121,9 @@ int usage(const char* program) {
                "                            Use silent routing between visible events\n"
                "  --token-replay-include-trace-diagnostics <bool>\n"
                "                            Include per-case replay details in JSON\n"
+               "  --token-replay-include-duration-diagnostics <bool>\n"
+               "                            Compare case durations by replay deviation\n"
+               "  --token-replay-timestamp-attribute <name> Case-duration timestamp field\n"
                "  --token-replay-case-id-attribute <name> Flat-input case selector\n"
                "  --token-replay-max-rows-to-materialize <n> Replay event cap\n"
                "  --token-replay-stop-immediately-unfit\n"
@@ -2066,16 +2069,20 @@ int main(int argc, char** argv) {
     if (powl_parse == PowlCliParseStatus::kMissingValue)
       return usage(argv[0]);
     if (arg == "--token-replay-max-rows-to-materialize" ||
-        arg == "--token-replay-case-id-attribute") {
+        arg == "--token-replay-case-id-attribute" ||
+        arg == "--token-replay-timestamp-attribute") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       try {
         if (arg == "--token-replay-max-rows-to-materialize")
           token_replay_options.max_rows_to_materialize = parse_nonnegative_size(value, arg);
         else {
-          token_replay_options.case_id_attribute = trim_text(value);
-          if (token_replay_options.case_id_attribute.empty())
-            throw std::invalid_argument("--token-replay-case-id-attribute expects a non-empty name");
+          auto& selector = arg == "--token-replay-case-id-attribute"
+                               ? token_replay_options.case_id_attribute
+                               : token_replay_options.timestamp_attribute;
+          selector = trim_text(value);
+          if (selector.empty())
+            throw std::invalid_argument(std::string(arg) + " expects a non-empty name");
         }
       } catch (const std::invalid_argument& error) {
         std::cerr << "error: " << error.what() << '\n';
@@ -2090,7 +2097,8 @@ int main(int argc, char** argv) {
              {"--token-replay-try-to-reach-final-marking-through-hidden", &token_replay_options.try_to_reach_final_marking_through_hidden},
              {"--token-replay-consider-activities-not-in-model-in-fitness", &token_replay_options.consider_activities_not_in_model_in_fitness},
              {"--token-replay-walk-through-hidden-transitions", &token_replay_options.walk_through_hidden_transitions},
-             {"--token-replay-include-trace-diagnostics", &token_replay_options.include_trace_diagnostics}}) {
+             {"--token-replay-include-trace-diagnostics", &token_replay_options.include_trace_diagnostics},
+             {"--token-replay-include-duration-diagnostics", &token_replay_options.include_duration_diagnostics}}) {
       if (arg == name) replay_policy = destination;
     }
     if (replay_policy) {
