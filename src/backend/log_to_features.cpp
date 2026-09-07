@@ -1060,6 +1060,12 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   double origin = std::numeric_limits<double>::infinity();
   struct TypedCategories {
     std::vector<EventAttribute> values;
+    std::vector<EventAttribute> lookup_keys;
+    EventAttribute tuple_nan = [] {
+      EventAttribute value{"", "", AttributeKind::kFloat};
+      value.typed_value = std::numeric_limits<double>::quiet_NaN();
+      return value;
+    }();
     std::unordered_map<std::string, std::vector<std::size_t>> buckets;
     std::size_t insert(const EventAttribute& value) {
       auto normalized = value;
@@ -1076,12 +1082,31 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       normalize_null(normalize_null, normalized);
       if (!root_cause_key_is_hashable(normalized))
         throw std::invalid_argument("log_to_features: unhashable temporal category");
-      auto& candidates = buckets[root_cause_scalar_key_fingerprint(normalized)];
+      auto lookup = normalized;
+      const auto normalize_tuple_nan = [&](auto&& self, EventAttribute& tuple) -> void {
+        if (tuple.container != AttributeContainerKind::kTuple) return;
+        for (auto& child : tuple.children) {
+          if (child.container == AttributeContainerKind::kTuple) {
+            self(self, child);
+            continue;
+          }
+          if (child.is_null || child.container != AttributeContainerKind::kScalar ||
+              !child.children.empty() || child.kind == AttributeKind::kBytes) continue;
+          const auto* number = std::get_if<double>(&child.typed_value);
+          if ((number && std::isnan(*number)) ||
+              (!number && child.kind == AttributeKind::kFloat &&
+               std::holds_alternative<std::monostate>(child.typed_value) &&
+               std::isnan(native_attribute_number(child)))) child = tuple_nan;
+        }
+      };
+      normalize_tuple_nan(normalize_tuple_nan, lookup);
+      auto& candidates = buckets[root_cause_scalar_key_fingerprint(lookup)];
       for (const auto candidate : candidates)
-        if (root_cause_scalar_keys_equal(values[candidate], normalized))
+        if (root_cause_scalar_keys_equal(lookup_keys[candidate], lookup))
           return candidate;
       const auto index = values.size();
       values.push_back(std::move(normalized));
+      lookup_keys.push_back(std::move(lookup));
       candidates.push_back(index);
       return index;
     }

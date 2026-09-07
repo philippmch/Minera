@@ -3220,7 +3220,14 @@ equal null prefixes, and differing lengths. Group compatibility is checked
 separately from endpoint tie comparisons: strings and null members can coexist
 with otherwise comparable tuple groups, while incompatible numeric, date, byte,
 or nested sequence positions reject at the observed grouping stage. Resource
-compatibility remains bucket-local; activity grouping only uses typed equality.
+compatibility remains bucket-local; activity grouping does not impose ordering.
+Temporal category lookup merges distinct NaN objects along tuple-only nesting,
+including nested tuples used as case identifiers. NaN remains distinct from null.
+Frozen-set boundaries retain identity-sensitive NaN equality, whether the frozen
+set contains a tuple or appears inside one. Separate lookup keys preserve the
+original category representatives and native input attributes; shared key
+equality outside temporal extraction is unchanged. Equal nested null tuples
+continue to merge.
 Calendar EventLog projections infer numeric promotion independently for selected
 activity, resource, and case-ID columns across the entire log. Float or missing
 cells promote eligible integer columns to float64 before category grouping;
