@@ -329,8 +329,11 @@ const std::string* resolve_event_field(const Event& event,
   const bool case_alias = selector == "case:concept:name" ||
                           selector == "case:id" || selector == "case_id" ||
                           selector == "case";
-  if (case_source || case_alias)
-    consider(case_source ? 2 : 1,
+  // A trace id can share its source spelling with an event activity in XES.
+  // Preserve case selectors as a fallback without mixing trace provenance
+  // into competing event-field candidates, including null event values.
+  if ((case_source || case_alias) && candidates.empty())
+    consider(0,
              first_class_value(event.case_id, event.case_id_state));
 
   if (candidates.size() > 1)

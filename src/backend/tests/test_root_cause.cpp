@@ -157,6 +157,12 @@ void test_missing_and_errors() {
   invalid.context.attributes[0].typed_value = std::monostate{};
   invalid.context.attributes[0].value = "3tail";
   rejects([&] { (void)fit_root_cause_model({invalid}, {numeric(2)}, options); });
+  invalid.context.attributes[0].value = "1";
+  invalid.context.attributes[0].typed_value = minera::NativeDate{"2026-01-02T00:00:00Z"};
+  rejects([&] { (void)fit_root_cause_model({invalid}, {numeric(2)}, options); });
+  invalid.context.attributes[0].typed_value = std::monostate{};
+  invalid.context.attributes[0].kind = minera::AttributeKind::kDate;
+  rejects([&] { (void)fit_root_cause_model({invalid}, {numeric(2)}, options); });
   const auto nan = numeric(std::numeric_limits<double>::quiet_NaN());
   const auto model = fit_root_cause_model({nan, numeric(2)}, {numeric(8), numeric(9)}, options);
   assert(std::isnan(model->data[0][0]));
@@ -232,6 +238,86 @@ void test_first_class_encoding() {
   rejects([&] { (void)fit_root_cause_model({missing_numeric}, {numeric(8)}, {{}, {"cost"}}); });
 }
 
+void test_extended_categories() {
+  const auto encode = [](minera::EventAttribute attribute) {
+    RootCauseObservation observation;
+    attribute.key = "group";
+    observation.context.attributes.push_back(std::move(attribute));
+    const auto model = fit_root_cause_model({observation}, {categorical("other")}, {{"group"}, {}});
+    const auto column = std::find(model->data[0].begin(), model->data[0].end(), 1.0);
+    assert(column != model->data[0].end());
+    return model->feature_names[static_cast<std::size_t>(column - model->data[0].begin())].substr(12);
+  };
+  minera::EventAttribute parent{"group", "parent"};
+  parent.children = {{"n", "002", minera::AttributeKind::kInt}, {"b", "true", minera::AttributeKind::kBoolean}};
+  assert(encode(parent) == "{'value': 'parent', 'children': {'n': 2, 'b': True}}");
+  parent.children.push_back({"n", "3", minera::AttributeKind::kInt});
+  assert(encode(parent) == "{'value': 'parent', 'children': {'n': 3, 'b': True}}");
+  parent.container = minera::AttributeContainerKind::kList;
+  parent.children = {{"x", "hello"}, {"n", "2", minera::AttributeKind::kInt}, {"x", "again"}};
+  assert(encode(parent) == "{'value': None, 'children': [('x', 'hello'), ('n', 2), ('x', 'again')]}");
+  auto nested = parent;
+  parent.container = minera::AttributeContainerKind::kContainer;
+  parent.children = {nested};
+  assert(encode(parent) == "{'value': None, 'children': {'group': {'value': None, 'children': [('x', 'hello'), ('n', 2), ('x', 'again')]}}}");
+  parent.container = minera::AttributeContainerKind::kList;
+  parent.children.clear();
+  assert(encode(parent) == "{'value': None, 'children': []}");
+  parent.container = minera::AttributeContainerKind::kContainer;
+  assert(encode(parent) == "{'value': None, 'children': {}}");
+
+  minera::EventAttribute quoted{"group", "a'b"};
+  assert(encode(quoted) == "a'b");
+  quoted.children = {{"key", "a'b"}, {"both", "a'\"b"}, {"control", "\t\n\r\\\b\x7f"}};
+  assert(encode(quoted) == "{'value': \"a'b\", 'children': {'key': \"a'b\", 'both': 'a\\\'\"b', 'control': '\\t\\n\\r\\\\\\x08\\x7f'}}");
+  quoted.value = "unicode";
+  quoted.children = {{"print", "\xc3\xa9\xf0\x9f\x98\x80"}, {"hidden", "\xc2\xa0\xe2\x80\x8b\xf3\xa0\x80\x81"}};
+  assert(encode(quoted) == "{'value': 'unicode', 'children': {'print': '\xc3\xa9\xf0\x9f\x98\x80', 'hidden': '\\xa0\\u200b\\U000e0001'}}");
+  for (const auto& invalid : {std::string("\xc0\xaf"), std::string("\xed\xa0\x80"), std::string("\xf4\x90\x80\x80"), std::string("\xe2\x80")}) {
+    quoted.children[0].value = invalid;
+    rejects([&] { (void)encode(quoted); });
+  }
+
+  assert(encode({"group", "+002", minera::AttributeKind::kInt}) == "2");
+  assert(encode({"group", " +000184467440737095516160000 ", minera::AttributeKind::kInt}) == "184467440737095516160000");
+  assert(encode({"group", "-000184467440737095516160000", minera::AttributeKind::kInt}) == "-184467440737095516160000");
+  assert(encode({"group", "-000", minera::AttributeKind::kInt}) == "0");
+  for (const auto* invalid : {"+", "1.0", "1e2", "1 2", "0x10"})
+    rejects([&] { (void)encode({"group", invalid, minera::AttributeKind::kInt}); });
+  assert(encode({"group", "2e0", minera::AttributeKind::kFloat}) == "2.0");
+  assert(encode({"group", "0", minera::AttributeKind::kBoolean}) == "False");
+  for (const auto& [text, direct, nested_text] : std::vector<std::array<std::string, 3>>{
+           {"2026-01-02T03:04:05.123456+02:30", "2026-01-02 03:04:05.123456+02:30", "datetime.datetime(2026, 1, 2, 3, 4, 5, 123456, tzinfo=datetime.timezone(datetime.timedelta(seconds=9000)))"},
+           {"2026-01-02T03:04:05.123456Z", "2026-01-02 03:04:05.123456+00:00", "datetime.datetime(2026, 1, 2, 3, 4, 5, 123456, tzinfo=datetime.timezone.utc)"},
+           {"2026-01-02T03:04:00.000000-02:30", "2026-01-02 03:04:00-02:30", "datetime.datetime(2026, 1, 2, 3, 4, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=77400)))"},
+           {"2026-01-02T03:04:00.000001", "2026-01-02 03:04:00.000001", "datetime.datetime(2026, 1, 2, 3, 4, 0, 1)"},
+           {"2026-01-02T03:04:00+15:00", "2026-01-02 03:04:00+15:00", "datetime.datetime(2026, 1, 2, 3, 4, tzinfo=datetime.timezone(datetime.timedelta(seconds=54000)))"},
+           {"2026-01-02T03:04:00+01:02:03", "2026-01-02 03:04:00+01:02:03", "datetime.datetime(2026, 1, 2, 3, 4, tzinfo=datetime.timezone(datetime.timedelta(seconds=3723)))"},
+           {"2026-01-02T03:04:00-01:02:03.000005", "2026-01-02 03:04:00-01:02:03.000005", "datetime.datetime(2026, 1, 2, 3, 4, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=82676, microseconds=999995)))"},
+           {"2026-01-02T03:04:00+00:00:00.000005", "2026-01-02 03:04:00+00:00:00.000005", "datetime.datetime(2026, 1, 2, 3, 4, tzinfo=datetime.timezone(datetime.timedelta(microseconds=5)))"},
+           {"2026-01-02T03:04:00+23:59:59.999999", "2026-01-02 03:04:00+23:59:59.999999", "datetime.datetime(2026, 1, 2, 3, 4, tzinfo=datetime.timezone(datetime.timedelta(seconds=86399, microseconds=999999)))"},
+           {"2026-01-02T03:04:00-23:59:59.999999", "2026-01-02 03:04:00-23:59:59.999999", "datetime.datetime(2026, 1, 2, 3, 4, tzinfo=datetime.timezone(datetime.timedelta(days=-1, microseconds=1)))"},
+           {"2026-01-02T03:04:00+000000.000000", "2026-01-02 03:04:00+00:00", "datetime.datetime(2026, 1, 2, 3, 4, tzinfo=datetime.timezone.utc)"},
+           {"2026-01-02", "2026-01-02 00:00:00", "datetime.datetime(2026, 1, 2, 0, 0)"}}) {
+    minera::EventAttribute date{"group", text, minera::AttributeKind::kDate};
+    assert(encode(date) == direct);
+    date.typed_value = minera::NativeDate{text};
+    assert(encode(date) == direct);
+    parent.children = {date};
+    assert(encode(parent) == "{'value': None, 'children': {'group': " + nested_text + "}}");
+  }
+  rejects([&] { (void)encode({"group", "2026-02-30T00:00:00Z", minera::AttributeKind::kDate}); });
+  for (const auto* offset : {"+24:00", "-24:00:00", "+01:60", "+01:02:60", "+01:02:03.",
+                            "+1:00", "+01:", "+01:02:", "+01:0203", "Ztail", "+01:02:03.x"})
+    rejects([&] { (void)encode({"group", std::string("2026-01-02T03:04:00") + offset, minera::AttributeKind::kDate}); });
+  auto number = numeric(2);
+  number.context.attributes[0].children = {{"nested", "value"}};
+  rejects([&] { (void)fit_root_cause_model({number}, {numeric(8)}, {{}, {"cost"}}); });
+  number.context.attributes[0].children.clear();
+  number.context.attributes[0].container = minera::AttributeContainerKind::kList;
+  rejects([&] { (void)fit_root_cause_model({number}, {numeric(8)}, {{}, {"cost"}}); });
+}
+
 void test_numeric_string_syntax() {
   const RootCauseOptions options{{}, {"cost"}};
   const auto from_text = [](const std::string& text) {
@@ -247,6 +333,13 @@ void test_numeric_string_syntax() {
     assert(model->data[0][0] == expected);
     assert(std::signbit(model->data[0][0]) == std::signbit(expected));
   }
+  for (const auto& [text, expected] : std::vector<std::pair<std::string, double>>{
+           {"\xef\xbc\x91\xef\xbc\x92.\xef\xbc\x95", 12.5},
+           {"\xc2\xa0\xd9\xa2.\xd9\xa5\xc2\xa0", 2.5},
+           {"\xd9\xa1_\xd9\xa2.\xd9\xa3" "e\xd9\xa2", 1230}})
+    assert(fit_root_cause_model({from_text(text)}, {numeric(8)}, options)->data[0][0] == expected);
+  for (const auto& invalid : {std::string("\xe2\x80\x8b") + "1", std::string("\x1c") + "\xd9\xa1", std::string("\xc0\xaf")})
+    rejects([&] { (void)fit_root_cause_model({from_text(invalid)}, {numeric(8)}, options); });
   for (const auto* text : {"nan", "+NaN", "-NAN"})
     assert(std::isnan(fit_root_cause_model({from_text(text)}, {numeric(8)}, options)->data[0][0]));
   for (const auto* text : {"0x1p2", "0x10", "_1", "1_", "1__0", "1_.0", "1._0",
@@ -281,6 +374,7 @@ int main() {
   test_missing_and_errors();
   test_numeric_string_syntax();
   test_first_class_encoding();
+  test_extended_categories();
   test_depth_and_interactions();
   std::cout << "Root cause tests passed\n";
 }

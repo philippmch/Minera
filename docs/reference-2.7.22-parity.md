@@ -270,9 +270,21 @@ Training uses float32 comparisons while exported matrices retain doubles;
 NaN values use learned missing routes and serialize as null. Missing-only cuts
 have an explicit flag so tree JSON stays finite. Equal-score cuts use a stable
 native feature/threshold ordering rather than the runtime's unseeded choice.
-The support module remains **partial**: nested categorical values and categorical
-date/other scalar formatting need further parity work. Adding a usable tree and
-its adapters does not close those contracts or either replay variation.
+Recursive categorical values now preserve ordered scalar children, dictionary
+replacement order, list duplicates, typed scalar representations, and nested
+string escaping using Unicode 14 data. Date categories preserve microseconds
+and explicit timezone offsets, including offset seconds; nested dates retain
+their structured datetime representation. Numeric strings normalize Unicode
+decimal digits and non-ASCII whitespace, while numeric containers and scalar
+values carrying children are rejected. Native XES integration tests cover the
+shared imported nested-value contract; importer-specific date normalization and
+unsupported elements remain separate from direct helper behavior.
+Standard XES trace and event `concept:name` provenance no longer collide in
+log-skeleton and DECLARE event selection, allowing nested-XES diagnostics to traverse the
+normal analysis pipeline while genuine event-field ambiguity still fails.
+The support module remains **partial** while unseeded tree-choice equivalence
+and remaining context/input boundaries are audited. Adding these encoding
+contracts does not certify either replay variation.
 
 Token replay flat-input evidence: `normalize_token_replay_event_log` and the
 three replay API families accept `EventDataView`, streams, eager tables, and lazy

@@ -280,6 +280,47 @@ void first_class_activity_selectors_are_supported() {
   assert(threw);
 }
 
+void case_provenance_does_not_shadow_event_activity() {
+  auto log = make_log({{"A", "B"}});
+  auto& trace = log.traces.front();
+  trace.case_id = "case-one";
+  trace.case_id_source_key = "concept:name";
+  trace.case_id_state = FirstClassAttributeState::kPresent;
+  for (auto& event : trace.events) {
+    event.case_id = trace.case_id;
+    event.case_id_source_key = trace.case_id_source_key;
+    event.case_id_state = FirstClassAttributeState::kPresent;
+    event.activity_source_key = "concept:name";
+    event.activity_state = FirstClassAttributeState::kPresent;
+    event.activity_attribute = EventAttribute{"concept:name", event.activity};
+  }
+  const auto model = discover_log_skeleton(log);
+  assert(has(model.directly_follows, "A", "B"));
+  assert(model.activ_freq.contains("A") && model.activ_freq.contains("B"));
+  assert(!model.activ_freq.contains("case-one"));
+
+  LogSkeletonOptions options;
+  options.activity_key = "case_id";
+  const auto case_alias = discover_log_skeleton(log, options);
+  assert(case_alias.activ_freq.size() == 1);
+  assert(case_alias.activ_freq.at("case-one") == std::vector<std::size_t>{2});
+  for (auto& event : trace.events) event.case_id_source_key = "batch";
+  options.activity_key = "batch";
+  assert(discover_log_skeleton(log, options).activ_freq == case_alias.activ_freq);
+
+  // Two actual event fields sharing a selector remain an ambiguity.
+  options.activity_key = "concept:name";
+  for (auto& event : trace.events) {
+    event.resource = "worker";
+    event.resource_source_key = "concept:name";
+    event.resource_state = FirstClassAttributeState::kPresent;
+  }
+  bool rejected = false;
+  try { (void)discover_log_skeleton(log, options); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+}
+
 void activity_selector_precedence_and_ambiguity_are_strict() {
   const auto collision_log = [](bool exact_attribute, bool exact_null,
                                 bool ambiguous_source) {
@@ -754,6 +795,7 @@ int main() {
   thresholds_use_binary64_arithmetic();
   first_class_activity_selectors_are_supported();
   activity_selector_precedence_and_ambiguity_are_strict();
+  case_provenance_does_not_shadow_event_activity();
   flat_inputs_variants_and_diagnostics_are_equivalent();
   custom_flat_selectors_have_precedence_and_group_cases();
 }
