@@ -1302,19 +1302,90 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     arrival_order.push_back(i);
     finish_order.push_back(i);
   }
-  const bool scalar_case_order = temporal_frequency &&
-      std::all_of(case_categories.values.begin(), case_categories.values.end(), [](const auto& value) {
-        return native_scalar_order_kind(value) != NativeScalarOrderKind::kUnsupported;
-      });
+  const auto supports_case_order = [&](auto&& self, const EventAttribute& value) -> bool {
+    if (absent_attribute(value)) return true;
+    if (missing_category(value)) return false;
+    if (value.container == AttributeContainerKind::kTuple)
+      return std::all_of(value.children.begin(), value.children.end(),
+          [&](const auto& child) { return self(self, child); });
+    return native_scalar_order_kind(value) != NativeScalarOrderKind::kUnsupported;
+  };
+  const auto compare_case_keys = [](auto&& self, const EventAttribute& left,
+                                   const EventAttribute& right) -> int {
+    if (root_cause_scalar_keys_equal(left, right)) return 0;
+    if (left.container == AttributeContainerKind::kTuple && right.container == AttributeContainerKind::kTuple) {
+      for (std::size_t i = 0; i < std::min(left.children.size(), right.children.size()); ++i) {
+        const auto comparison = self(self, left.children[i], right.children[i]);
+        if (comparison != 0) return comparison;
+      }
+      return left.children.size() < right.children.size() ? -1 : 1;
+    }
+    if (left.container == AttributeContainerKind::kTuple || right.container == AttributeContainerKind::kTuple ||
+        absent_attribute(left) || absent_attribute(right))
+      throw std::invalid_argument("log_to_features: incompatible temporal case ordering types");
+    return native_scalar_key_compare(left, right);
+  };
+  const bool ordered_case_keys = temporal_frequency &&
+      std::all_of(case_categories.values.begin(), case_categories.values.end(),
+          [&](const auto& value) { return supports_case_order(supports_case_order, value); });
+  const auto validate_tuple_group = [&](const auto& values, const auto& value_of) {
+    std::vector<const EventAttribute*> ordered;
+    bool have_tuple = false;
+    for (const auto& value : values) {
+      const auto& cell = value_of(value);
+      if (!supports_case_order(supports_case_order, cell)) return;
+      have_tuple = have_tuple || cell.container == AttributeContainerKind::kTuple;
+      ordered.push_back(&cell);
+    }
+    if (!have_tuple) return;
+    const auto compare_group = [](auto&& self, const EventAttribute& left,
+                                  const EventAttribute& right) -> int {
+      if (root_cause_scalar_keys_equal(left, right)) return 0;
+      const auto rank = [](const EventAttribute& cell) {
+        if (absent_attribute(cell)) return 2;
+        return native_scalar_order_kind(cell) == NativeScalarOrderKind::kString ? 1 : 0;
+      };
+      const auto left_rank = rank(left), right_rank = rank(right);
+      if (left_rank != right_rank) return left_rank < right_rank ? -1 : 1;
+      const auto sequence = [](const EventAttribute& cell) {
+        if (cell.container == AttributeContainerKind::kTuple) return cell.children;
+        std::vector<EventAttribute> children;
+        for (const unsigned char byte : decode_bytes_attribute(cell)) {
+          EventAttribute child{"", "", AttributeKind::kInt};
+          child.typed_value = static_cast<std::int64_t>(byte);
+          children.push_back(std::move(child));
+        }
+        return children;
+      };
+      const bool left_tuple = left.container == AttributeContainerKind::kTuple;
+      const bool right_tuple = right.container == AttributeContainerKind::kTuple;
+      if (left_tuple || right_tuple) {
+        if ((!left_tuple && native_scalar_order_kind(left) != NativeScalarOrderKind::kBytes) ||
+            (!right_tuple && native_scalar_order_kind(right) != NativeScalarOrderKind::kBytes))
+          throw std::invalid_argument("log_to_features: incompatible temporal tuple grouping types");
+        const auto left_children = sequence(left), right_children = sequence(right);
+        for (std::size_t i = 0; i < std::min(left_children.size(), right_children.size()); ++i) {
+          const auto comparison = self(self, left_children[i], right_children[i]);
+          if (comparison != 0) return comparison;
+        }
+        return left_children.size() < right_children.size() ? -1 : left_children.size() > right_children.size() ? 1 : 0;
+      }
+      return native_scalar_key_compare(left, right);
+    };
+    std::sort(ordered.begin(), ordered.end(), [&](const auto* left, const auto* right) {
+      return compare_group(compare_group, *left, *right) < 0;
+    });
+  };
   if (temporal_frequency) {
     validate_scalar_group(case_categories.values, native_scalar_order_kind);
+    validate_tuple_group(case_categories.values, [](const EventAttribute& value) -> const EventAttribute& { return value; });
   }
   auto case_less = [&](std::size_t lhs, std::size_t rhs, bool by_finish) {
     const double a = by_finish ? cases[lhs].finish : cases[lhs].start;
     const double b = by_finish ? cases[rhs].finish : cases[rhs].start;
     if (a != b) return a < b;
-    if (scalar_case_order)
-      return native_scalar_key_compare(case_categories.values[lhs], case_categories.values[rhs]) < 0;
+    if (ordered_case_keys)
+      return compare_case_keys(compare_case_keys, case_categories.values[lhs], case_categories.values[rhs]) < 0;
     if (!temporal_frequency && log.traces[lhs].case_id != log.traces[rhs].case_id)
       return log.traces[lhs].case_id < log.traces[rhs].case_id;
     return lhs < rhs;
@@ -1511,6 +1582,10 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     if (temporal_frequency)
       validate_scalar_group(resources, [&](const std::string& id) {
         return native_scalar_order_kind(resource_categories.values.at(static_cast<std::size_t>(std::stoull(id))));
+      });
+    if (temporal_frequency)
+      validate_tuple_group(resources, [&](const std::string& id) -> const EventAttribute& {
+        return resource_categories.values.at(static_cast<std::size_t>(std::stoull(id)));
       });
     double average_waiting = 0.0, average_sojourn = 0.0, average_service = 0.0;
     std::size_t arrival_count = 0, finish_count = 0, waiting_count = 0, sojourn_count = 0, service_count = 0;

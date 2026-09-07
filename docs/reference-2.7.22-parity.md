@@ -3194,8 +3194,8 @@ and missing values are excluded from category sets. Within valid cases, rework
 counts events with absent activities; resource means include cases without resources.
 Missing
 entire selected columns and eventless calendar inputs reject. Mutable categories
-reject instead of being converted to strings. Container-valued resource ordering,
-nested container factorization and ordering, explicit dataframe dtype handling,
+reject instead of being converted to strings. Nested container factorization,
+frozen-set and NaN-containing container ordering, explicit dataframe dtype handling,
 metric-column collisions, and named-zone calendar behavior still need
 further behavioral alignment.
 Calendar cases group by typed selected identifiers across native trace boundaries.
@@ -3214,6 +3214,13 @@ when their metric endpoints differ. Incompatible non-string scalar case groups
 reject during group ordering, before temporal aggregation. Scalar resource groups
 apply the same compatibility check within each populated bucket; incompatible
 types in separate buckets remain valid, as do mixed strings and numeric resources.
+Comparable tuple case identifiers use recursive lexicographic ordering for tied
+arrival and finish endpoints, including nested tuples, exact numeric members,
+equal null prefixes, and differing lengths. Group compatibility is checked
+separately from endpoint tie comparisons: strings and null members can coexist
+with otherwise comparable tuple groups, while incompatible numeric, date, byte,
+or nested sequence positions reject at the observed grouping stage. Resource
+compatibility remains bucket-local; activity grouping only uses typed equality.
 Calendar EventLog projections infer numeric promotion independently for selected
 activity, resource, and case-ID columns across the entire log. Float or missing
 cells promote eligible integer columns to float64 before category grouping;
