@@ -354,6 +354,7 @@ EventTable project_csv_event_table(const EventTable& source,
     std::size_t source_row = 0;
     std::size_t encounter = 0;
     const Event* event = nullptr;
+    const Trace* trace = nullptr;
   };
 
   std::vector<Candidate> candidates;
@@ -366,7 +367,7 @@ EventTable project_csv_event_table(const EventTable& source,
             "CSV table projection event provenance is outside the source "
             "table");
       }
-      candidates.push_back({event.input_order, encounter++, &event});
+      candidates.push_back({event.input_order, encounter++, &event, &trace});
     }
   }
   // Importer-created traces are timestamp ordered, while flat correlation
@@ -383,13 +384,13 @@ EventTable project_csv_event_table(const EventTable& source,
   result.rows.clear();
   result.rows.reserve(candidates.size());
 
-  const auto first_class_value = [](const Event& event,
+  const auto first_class_value = [](const Event& event, const Trace& trace,
                                     FirstClassAttributeRole role)
       -> std::tuple<std::string, FirstClassAttributeState,
                     const std::optional<EventAttribute>*> {
     switch (role) {
       case FirstClassAttributeRole::kCaseId:
-        return {event.case_id, event.case_id_state, nullptr};
+        return {event.case_id, event.case_id_state, &trace.case_id_attribute};
       case FirstClassAttributeRole::kActivity:
         return {event.activity, event.activity_state,
                 &event.activity_attribute};
@@ -417,7 +418,7 @@ EventTable project_csv_event_table(const EventTable& source,
                             ? source_cell->first_class_role
                             : FirstClassAttributeRole::kNone;
       if (role != FirstClassAttributeRole::kNone) {
-        const auto [value, state, metadata] = first_class_value(event, role);
+        const auto [value, state, metadata] = first_class_value(event, *candidate.trace, role);
         if (!source_cell && state == FirstClassAttributeState::kMissing)
           continue;
 
@@ -440,6 +441,14 @@ EventTable project_csv_event_table(const EventTable& source,
           replacement.typed_value = (*metadata)->typed_value;
           replacement.container = (*metadata)->container;
           replacement.children = (*metadata)->children;
+        } else if (!source_cell || source_cell->value != replacement.value ||
+                   source_cell->is_null != replacement.is_null) {
+          // A transformed projection without matching typed metadata is a new
+          // scalar string; the previous cell's payload no longer describes it.
+          replacement.kind = AttributeKind::kString;
+          replacement.typed_value = std::monostate{};
+          replacement.container = AttributeContainerKind::kScalar;
+          replacement.children.clear();
         }
         row[index] = std::move(replacement);
         continue;
