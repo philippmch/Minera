@@ -3190,13 +3190,24 @@ custom feature schemas and ordinary attribute selectors. Fixed-width projections
 retain their explicit schema and interval metrics. Calendar activity and resource
 categories preserve typed equality, including numeric/bool collisions, distinct
 strings, bytes, and ordinary immutable containers. Empty strings count; null, NaN,
-and missing values are excluded from category sets. Rework still counts every event, including events
-with absent activities, and resource means include cases without resources. Missing
+and missing values are excluded from category sets. Within valid cases, rework
+counts events with absent activities; resource means include cases without resources.
+Missing
 entire selected columns and eventless calendar inputs reject. Mutable categories
 reject instead of being converted to strings. Heterogeneous resource ordering,
-nested container factorization, duplicate case identifiers,
+nested container factorization, non-string case-key ordering,
 metric-column collisions, and timezone-sensitive calendar behavior still need
 further behavioral alignment.
+Calendar cases group by typed selected identifiers across native trace boundaries.
+The omitted key selects projected trace identifiers (`case:concept:name`), while
+an explicit `concept:name` selects event activities. Trace attributes project with
+a `case:` prefix and override conflicting event cells; unprefixed custom keys
+select event attributes. Missing, null, and NaN IDs keep their bucket events but
+do not contribute to case aggregates. A populated bucket without a valid case
+has an empty-string rework cell and zero case means; missing entire ID columns
+and logs without any valid ID reject. Trace feature identifier defaults remain
+`concept:name`, independently of the calendar default. String case IDs break
+equal arrival/finish-time ties lexically, independently of trace encounter order.
 The feature variations remain partial, including inference and extra-feature
 contracts that have not received complete behavioral coverage.
 

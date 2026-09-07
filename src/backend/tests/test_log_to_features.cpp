@@ -10,6 +10,17 @@
 
 using namespace minera;
 
+static bool operator==(const TemporalFeatureCell& cell, double expected) {
+  return std::holds_alternative<double>(cell) && std::get<double>(cell) == expected;
+}
+
+static bool operator==(const std::vector<TemporalFeatureCell>& row,
+                       const std::vector<double>& expected) {
+  return row.size() == expected.size() &&
+      std::equal(row.begin(), row.end(), expected.begin(),
+                 [](const auto& cell, double value) { return cell == value; });
+}
+
 static bool operator==(const LogToFeaturesCell& cell, double expected) {
   return std::holds_alternative<double>(cell) && std::get<double>(cell) == expected;
 }
@@ -797,7 +808,7 @@ static void temporal_calendar_grid_uses_origin_and_fills_empty_periods() {
       assert(result.temporal_rows[i].values[2] == counts[i]);
       if (counts[i] == 0)
         assert(std::all_of(result.temporal_rows[i].values.begin(), result.temporal_rows[i].values.end(),
-                           [](double value) { return value == 0; }));
+                           [](const auto& value) { return value == 0; }));
     }
   };
   check("2024-01-01T12:00:00Z", "2024-01-03T12:00:00Z", "D",
@@ -846,6 +857,7 @@ static void temporal_calendar_grid_uses_origin_and_fills_empty_periods() {
 static void temporal_calendar_metrics_use_completions_and_canonical_schema() {
   EventLog log;
   Trace trace;
+  trace.case_id = "c";
   trace.events = {
       timed_event("c", "A", "1970-01-01T00:00:00Z", "1970-01-01T00:00:10Z", 0),
       timed_event("c", "B", "1970-01-01T00:00:20Z", "1970-01-01T00:00:40Z", 1)};
@@ -939,6 +951,7 @@ static void temporal_calendar_categories_preserve_typed_equality_and_presence() 
     return event;
   };
   Trace first;
+  first.case_id = "c";
   first.events = {event_with({"", "true", AttributeKind::kBoolean}),
       event_with({"", "1", AttributeKind::kInt}), event_with({"", "1.0", AttributeKind::kFloat}),
       event_with({"", "1", AttributeKind::kString})};
@@ -1025,6 +1038,113 @@ static void temporal_calendar_categories_preserve_typed_equality_and_presence() 
   log.traces = {Trace{"c", {Event{"c", "", "1970-01-01T00:00:00Z", ""}}}};
   const auto fixed = log_to_features(log, options);
   assert(fixed.temporal_rows[0].values[0] == 0 && fixed.temporal_rows[0].values[1] == 1);
+}
+
+static void temporal_calendar_groups_selected_typed_case_identifiers() {
+  EventLog log;
+  log.traces = {Trace{"same", {Event{"same", "A", "1970-01-01T00:00:10Z", "r1"}}},
+                Trace{"same", {Event{"same", "B", "1970-01-01T00:00:30Z", "r2"}}}};
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq = "D";
+  const std::vector<double> merged{2,2,2,0,0,20,20,0,0,1,2,1,2};
+  const std::vector<double> separate{2,2,2,10,10,0,0,0,0,1,1,2,1};
+  assert(log_to_features(log, options).temporal_rows[0].values == merged);
+  for (auto& trace : log.traces) {
+    trace.case_id_attribute = EventAttribute{"concept:name", "stale", AttributeKind::kInt};
+    trace.case_id_attribute->typed_value = std::int64_t{42};
+    trace.case_id_state = FirstClassAttributeState::kPresent;
+  }
+  assert(log_to_features(log, options).temporal_rows[0].values == merged);
+  options.case_id_key = "concept:name";
+  assert(log_to_features(log, options).temporal_rows[0].values == separate);
+  for (std::size_t i = 0; i < log.traces.size(); ++i) {
+    auto& trace = log.traces[i];
+    trace.attributes = {{"group", "shared"}, {"case:id", "double-prefixed"}};
+    trace.events[0].attributes = {{"group", std::to_string(i)},
+                                  {"case:group", std::to_string(i)},
+                                  {"case:concept:name", std::to_string(i)}};
+  }
+  options.case_id_key = "case:concept:name";
+  assert(log_to_features(log, options).temporal_rows[0].values == merged);
+  options.case_id_key = "case:group";
+  assert(log_to_features(log, options).temporal_rows[0].values == merged);
+  options.case_id_key = "group";
+  assert(log_to_features(log, options).temporal_rows[0].values == separate);
+  options.case_id_key = "case:case:id";
+  assert(log_to_features(log, options).temporal_rows[0].values == merged);
+  const auto rejects = [&] {
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  options.case_id_key = "case:id";
+  rejects();
+
+  options.case_id_key = "case:group";
+  log.traces.clear();
+  for (auto value : std::vector<EventAttribute>{{"group", "true", AttributeKind::kBoolean},
+           {"group", "1", AttributeKind::kInt}, {"group", "1.0", AttributeKind::kFloat},
+           {"group", "1", AttributeKind::kString}}) {
+    Trace trace{"unused", {Event{"unused", "A", "1970-01-01T00:00:00Z", "r"}}};
+    trace.attributes = {value};
+    log.traces.push_back(trace);
+  }
+  auto result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[11] == 2 && result.temporal_rows[0].values[10] == 2);
+  assert(result.temporal_rows[0].values[8] == 2);
+  options.case_id_key = "group";
+  log.traces = {Trace{"unused", {Event{"unused", "A", "1970-01-01T00:00:00Z", "r"},
+                                  Event{"unused", "A", "1970-01-02T00:00:00Z", "r"},
+                                  Event{"unused", "A", "1970-01-02T00:00:00Z", "r"},
+                                  Event{"unused", "A", "1970-01-02T00:00:00Z", "r"}}}};
+  log.traces[0].events[0].attributes = {{"group", "valid"}};
+  log.traces[0].events[1].attributes = {{"group", "", AttributeKind::kString, true}};
+  log.traces[0].events[3].attributes = {{"group", "NaN", AttributeKind::kFloat}};
+  result = log_to_features(log, options);
+  assert(result.temporal_rows.size() == 2);
+  const auto& no_case = result.temporal_rows[1].values;
+  assert(no_case[0] == 1 && no_case[1] == 1 && no_case[2] == 3);
+  for (std::size_t i = 3; i < no_case.size(); ++i)
+    if (i == 8) assert(std::get<std::string>(no_case[i]).empty());
+    else assert(no_case[i] == 0);
+  assert(log_to_features_json(result).find("\"\",0,0,0,0]") != std::string::npos);
+  auto malformed = result;
+  malformed.temporal_rows[1].values[0] = std::string{};
+  bool json_rejected = false;
+  try { (void)log_to_features_json(malformed); }
+  catch (const std::invalid_argument&) { json_rejected = true; }
+  assert(json_rejected);
+  log.traces[0].events.erase(log.traces[0].events.begin());
+  rejects();
+  for (auto& event : log.traces[0].events) event.attributes.clear();
+  rejects();
+}
+
+static void temporal_calendar_string_case_ties_use_lexical_order() {
+  const std::vector<Trace> traces{
+      Trace{"c", {Event{"c", "A", "1970-01-01T00:00:00Z", "r"}}},
+      Trace{"z", {Event{"z", "A", "1970-01-01T00:00:10Z", "r"},
+                   Event{"z", "A", "1970-01-01T00:00:20Z", "r"}}},
+      Trace{"a", {Event{"a", "A", "1970-01-01T00:00:10Z", "r"},
+                   Event{"a", "A", "1970-01-01T00:00:30Z", "r"}}}};
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq = "10s";
+  std::vector<std::size_t> order{0,1,2};
+  do {
+    EventLog log;
+    for (const auto i : order) log.traces.push_back(traces[i]);
+    const auto result = log_to_features(log, options);
+    assert(result.temporal_rows.size() == 4);
+    const std::vector<double> arrivals{0,5,0,10};
+    const std::vector<double> finishes{0,15,20,10};
+    for (std::size_t i = 0; i < result.temporal_rows.size(); ++i) {
+      assert(result.temporal_rows[i].values[3] == arrivals[i]);
+      assert(result.temporal_rows[i].values[4] == finishes[i]);
+    }
+  } while (std::next_permutation(order.begin(), order.end()));
 }
 
 static void temporal_calendar_frequency_uses_period_boundaries() {
@@ -1594,6 +1714,8 @@ static void trace_default_schema_infers_complete_trace_presence() {
 }
 
 int main() {
+  temporal_calendar_string_case_ties_use_lexical_order();
+  temporal_calendar_groups_selected_typed_case_identifiers();
   temporal_calendar_categories_preserve_typed_equality_and_presence();
   temporal_calendar_rates_ignore_empty_traces();
   temporal_calendar_means_weight_distinct_cases_equally();
