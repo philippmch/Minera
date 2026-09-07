@@ -48,14 +48,15 @@ test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
 adapter, integration, or missing are complete. The current manifest records 44
-complete and 42 partial dispatcher rows, plus 194 complete and 193 partial
+complete and 42 partial dispatcher rows, plus 195 complete and 192 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
 DFG, causal and correlation discovery, 26-module Inductive discovery, 31-module
 POWL discovery, 13-module footprints discovery/conformance, and the 19-module
 temporal/behavioral adapter stack, plus discounted anti-/multi-alignment and
 classic Declare/log-skeleton discovery and conformance, with distinct
-registered tests; 235 coverage units still require exact proof.
+registered tests, plus the replay-duration diagnostic support module;
+234 coverage units still require exact proof.
 A release may
 additionally run the strict gate:
 
@@ -123,7 +124,7 @@ are reconciled.
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Partial (implemented core; proof pending)** — the explicit `BOSE` selector covers relation-count features, seeded permutation windows, ranked/capped drift boundaries, boundary-partitioned result logs, optional timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Partial (implemented core; proof pending)** — all six variants are explicitly selectable; less-memory Dijkstra with legacy unit costs is the generic default, with named event activity fields available at replay time |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors |
-| Conformance: replay | forward token replay and backwards token replay | **Partial (diagnostics, input adapters, and policy surfaces implemented)** — forward replay remains the default; grouped/stream/eager/lazy replay preserves null activities, typed case identity, selector precedence, adapter-specific case ordering, and event caps; both variations expose per-case counters, ordered silent/visible firings, problem transitions, unknown-event positions, reached markings, and enabled-transition IDs; forward unknown-event classification and final-demand accounting have executable contracts, while exact routing/flood-cleaning and duration/root-cause support remain pending |
+| Conformance: replay | forward token replay and backwards token replay | **Partial (duration support complete; replay proof pending)** — forward replay remains the default; grouped/stream/eager/lazy replay preserves null activities, typed case identity, selector precedence, adapter-specific case ordering, and event caps; both variations expose per-case counters, ordered silent/visible firings, event-level problems, unknown-event positions, reached markings, and enabled-transition IDs; duration cohorts have independent support proofs and native/JSON/CLI/server/frontend adapters, while exact routing/flood-cleaning and root-cause support remain pending |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance add trace/log/flat adapters, strict activity and case selectors, exact empty/subset family-selection behavior, typed per-case diagnostics, and distinct registered proofs |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both `VERSION_DISCOUNTED_A_STAR` algorithms preserve the asymmetric discounted recurrence, complete model-transition runs, raw ordinary-distance borders, deterministic longer-run ties, exact marking-limit boundaries, objectives, precision/distance diagnostics, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters, with distinct registered proofs |
@@ -230,8 +231,8 @@ unknown labels are ignored, no final hidden routing occurs, and remaining tokens
 make a trace unfit. The UI disables these three forward-only controls for that
 variation. All Boolean request values are validated, including explicitly empty
 values; supplied false values survive frontend serialization. These additions
-do not certify either replay variation or its duration/root-cause support modules
-as complete.
+do not certify either replay variation or its root-cause support module as
+complete. Duration diagnostics have separate support-module proofs below.
 
 Pinned black-box checks confirm pre-consumption reached markings, silent-closure
 enabled sets even when visible-event routing is disabled, independent forward
@@ -248,8 +249,9 @@ shared by compact, detailed, per-place, and token-evaluation entry points.
 Forward duplicate-label tie selection and replay flood-cleaning/exhaustive-
 exploration controls still require reconciliation.
 The backwards hidden-walk toggle is a native extension; the pinned legacy
-variation ignores that parameter. Duration and root-cause diagnostic projections,
-and trace/event identity maps remain separate work.
+variation ignores that parameter. Root-cause diagnostic projections and remaining
+trace/event identity-map compatibility remain separate work. Duration support is
+covered independently from the still-partial replay algorithms.
 
 Token replay flat-input evidence: `normalize_token_replay_event_log` and the
 three replay API families accept `EventDataView`, streams, eager tables, and lazy
@@ -1899,7 +1901,60 @@ display cap. The September 6 checkpoint passed all 146 Release CTest suites,
 audit with its verifier self-test. These records prepare the duration and
 root-cause support work; they do not complete those modules or establish exact
 forward routing/flood-cleaning parity. The 235 incomplete coverage units remain
-unchanged.
+unchanged at that checkpoint.
+
+## Replay-duration support evidence
+
+The duration support module now has independent native implementations for case
+duration, median case duration, transition cohorts, and unknown-activity cohorts.
+The observed contracts are recorded in `docs/token-replay-duration-fixtures.json`
+and exercised by the registered `minera_token_replay_duration_tests` executable.
+Public API descriptions identify these four operations and their timestamp
+parameter; pinned 2.7.22 black-box calls establish the edge behavior independently
+of implementation source ([API documentation](https://pm4py-source.readthedocs.io/en/latest/pm4py.algo.conformance.tokenreplay.diagnostics.html)).
+
+Case duration is the last event's timestamp minus the first event's timestamp in
+source order, with fractional seconds and negative values retained. Interior
+timestamps do not affect it. Empty cases, missing/null/invalid endpoint timestamps,
+and empty median inputs fail explicitly. Medians use the ordinary middle value
+or arithmetic mean of the two middle values. The standalone median helper
+preserves repeated samples; cohort membership deduplicates repeated trace indices
+while keeping distinct log occurrences, including duplicate case identifiers.
+
+Transition comparison baselines contain every case with the selected transition
+label except cases in that transition's supplied problem cohort. They do not
+depend on recorded fitting firings or a supplied fit list. Supplied problem
+membership remains authoritative even when the case lacks the transition label.
+Unknown-activity baselines contain cases with none of the supplied diagnostic
+labels, including labels whose own problem cohort is empty; each row additionally
+excludes its own problem cases. Other rows' problem membership alone does not
+exclude a case. A row is omitted when either cohort is empty. Both helpers return
+problem median divided by fit median only when the fit median is positive, and
+zero otherwise. Missing activity values do not match explicit null labels.
+
+The generic filter-attribute parameter and timestamp parameter have native
+equivalents in `TokenReplayOptions.activity_attribute` and `timestamp_attribute`.
+Standalone cohort APIs accept explicit source-index memberships, so the support
+contract can be tested independently of the replay routing algorithms. The
+integrated adapter builds memberships from examined replay events and measures
+the complete source case even when replay stops early. Its source-index lists,
+counts, medians, and ratio retain distinct null and empty-string activity labels.
+
+`include_duration_diagnostics` is off by default. The native result, shared JSON
+writer, CLI flags, cached local-server conformance, and typed frontend controls
+carry the same optional result. Duration and trace-detail opt-ins are independent;
+enabling either does not change replay metrics. The frontend reports comparison
+counts and medians, explains the zero-ratio rule, accepts older exports, and
+discloses its table display caps. This closes one support-module record and leaves
+234 incomplete coverage units. It does not complete either replay variation,
+root-cause analysis, or downstream evaluation packages that still depend on exact
+replay behavior.
+
+This checkpoint passed all 147 Release CTest suites and 570 frontend tests,
+the production frontend build, and headless CLI/local-server checks for both
+replay directions, imported models, a custom timestamp selector, opt-in payloads,
+and rejected malformed options. Windows error dialogs were suppressed and builds
+used no more than two workers.
 
 ## Decision-mining evidence
 

@@ -628,6 +628,11 @@ TokenReplayOptions parse_token_replay_params(const FieldLookup& field,
     if (options.case_id_attribute.empty()) throw std::invalid_argument(
         "token_replay_case_id_attribute: expected a non-empty name");
   }
+  if (supplied("token_replay_timestamp_attribute")) {
+    options.timestamp_attribute = trim_text(field("token_replay_timestamp_attribute"));
+    if (options.timestamp_attribute.empty()) throw std::invalid_argument(
+        "token_replay_timestamp_attribute: expected a non-empty name");
+  }
   if (supplied("token_replay_max_rows_to_materialize")) {
     options.max_rows_to_materialize = parse_nonnegative_size(
         field("token_replay_max_rows_to_materialize"),
@@ -640,7 +645,8 @@ TokenReplayOptions parse_token_replay_params(const FieldLookup& field,
            {"token_replay_try_to_reach_final_marking_through_hidden", &options.try_to_reach_final_marking_through_hidden},
            {"token_replay_consider_activities_not_in_model_in_fitness", &options.consider_activities_not_in_model_in_fitness},
            {"token_replay_walk_through_hidden_transitions", &options.walk_through_hidden_transitions},
-           {"token_replay_include_trace_diagnostics", &options.include_trace_diagnostics}}) {
+           {"token_replay_include_trace_diagnostics", &options.include_trace_diagnostics},
+           {"token_replay_include_duration_diagnostics", &options.include_duration_diagnostics}}) {
     if (supplied(name)) *destination = parse_boolean(field(name), name);
   }
   return options;

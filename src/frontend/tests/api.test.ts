@@ -15,6 +15,13 @@ import { alignModel, alignmentQuery, decideModel, decisionMiningQuery,
   requestDecisionTables } from "../src/api";
 
 describe("Token replay policy request options", () => {
+  it("trims duration timestamp selectors and rejects blank or nonstring values", () => {
+    expect(mineFormEntries({ tokenReplayTimestampAttribute: " completed_at " }))
+      .toEqual([["token_replay_timestamp_attribute", "completed_at"]]);
+    expect(() => mineFormEntries({ tokenReplayTimestampAttribute: " \t " })).toThrow(/must not be empty/);
+    for (const value of [null, 1, true, [], {}])
+      expect(() => mineFormEntries({ tokenReplayTimestampAttribute: value } as never)).toThrow(/must be a string/);
+  });
   it("serializes flat case selectors and exact event caps", () => {
     expect(mineFormEntries({ tokenReplayCaseIdAttribute: " group ", tokenReplayMaxRowsToMaterialize: 0 }))
       .toEqual([["token_replay_case_id_attribute", "group"], ["token_replay_max_rows_to_materialize", "0"]]);
@@ -28,6 +35,7 @@ describe("Token replay policy request options", () => {
     ["tokenReplayConsiderActivitiesNotInModelInFitness", "token_replay_consider_activities_not_in_model_in_fitness"],
     ["tokenReplayWalkThroughHiddenTransitions", "token_replay_walk_through_hidden_transitions"],
     ["tokenReplayIncludeTraceDiagnostics", "token_replay_include_trace_diagnostics"],
+    ["tokenReplayIncludeDurationDiagnostics", "token_replay_include_duration_diagnostics"],
   ] as const;
 
   it("omits unspecified policies and preserves each explicit true or false", () => {

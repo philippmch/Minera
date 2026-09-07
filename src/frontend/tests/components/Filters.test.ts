@@ -20,6 +20,9 @@ describe("token replay policy controls", () => {
     expect(labels[0]).toContain('<option value="false" selected="">');
     expect(labels[3]).not.toContain("disabled");
     expect(labels[4]).not.toContain("disabled");
+    expect(labels[5]).toContain("Include replay duration diagnostics");
+    expect(labels[5]).not.toContain("disabled");
+    expect(labels[5]).toContain('<option value="false" selected="">no (default)</option>');
     const forward = render("forward");
     expect(forward).not.toContain("disabled");
     expect(forward).not.toContain("ignored in backwards replay");
@@ -48,6 +51,7 @@ describe("token replay policy controls", () => {
       tokenReplayConsiderActivitiesNotInModelInFitness: true,
       tokenReplayWalkThroughHiddenTransitions: false,
       tokenReplayIncludeTraceDiagnostics: true,
+      tokenReplayIncludeDurationDiagnostics: true,
     };
     expect(tokenReplayPolicyOptionsFromForm(changed)).toEqual(changed);
     expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayConsiderRemainingInFitness).toBe(true);
@@ -55,10 +59,23 @@ describe("token replay policy controls", () => {
     expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayConsiderActivitiesNotInModelInFitness).toBe(false);
     expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayWalkThroughHiddenTransitions).toBe(true);
     expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayIncludeTraceDiagnostics).toBe(false);
+    expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayIncludeDurationDiagnostics).toBe(false);
   });
 });
 
 describe("token replay input settings", () => {
+  it("only applies custom duration timestamps when enabled and preserves implicit defaults", () => {
+    expect(tokenReplayInputOptionsFromForm("", "time:timestamp", true)).toEqual({});
+    expect(tokenReplayInputOptionsFromForm("", " completed_at ", true))
+      .toEqual({ tokenReplayTimestampAttribute: "completed_at" });
+    expect(tokenReplayInputOptionsFromForm("", "completed_at", false)).toEqual({});
+    expect(tokenReplayInputOptionsFromForm("", " ", false)).toEqual({});
+    expect(tokenReplayInputValidationMessage("", " ", true)).toMatch(/timestamp attribute/);
+    expect(() => tokenReplayInputOptionsFromForm("", " ", true)).toThrow(/timestamp attribute/);
+    expect(tokenReplayInputOptionsFromForm("0", "completed_at", true)).toEqual({
+      tokenReplayMaxRowsToMaterialize: 0, tokenReplayTimestampAttribute: "completed_at",
+    });
+  });
   it("retains zero event cap and rejects invalid or unsafe integers", () => {
     expect(tokenReplayInputOptionsFromForm("  ")).toEqual({});
     expect(tokenReplayInputOptionsFromForm("0")).toEqual({ tokenReplayMaxRowsToMaterialize: 0 });

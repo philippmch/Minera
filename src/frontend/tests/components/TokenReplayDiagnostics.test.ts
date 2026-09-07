@@ -1,8 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { TokenReplayDiagnostics } from "../../src/components/Conformance";
-import type { TokenReplayTraceDiagnostics } from "../../src/types";
+import { TokenReplayDiagnostics, TokenReplayDurationDiagnosticsView } from "../../src/components/Conformance";
+import type { TokenReplayTraceDiagnostics, TokenReplayDurationDiagnostics } from "../../src/types";
 
 const trace = (trace_index = 0): TokenReplayTraceDiagnostics => ({
   trace_index, case_id: "shared-case", trace_is_fit: false, trace_fitness: 0.75,
@@ -15,6 +15,79 @@ const trace = (trace_index = 0): TokenReplayTraceDiagnostics => ({
 
 const render = (traces?: TokenReplayTraceDiagnostics[]) =>
   renderToStaticMarkup(createElement(TokenReplayDiagnostics, { traces }));
+
+const comparison = {
+  fit_trace_indices: [1, 3], problem_trace_indices: [7], fit_count: 2, problem_count: 1,
+  fit_median_seconds: 10.5, problem_median_seconds: -5.25, relative_throughput: -0.5,
+};
+const renderDurations = (diagnostics?: TokenReplayDurationDiagnostics) =>
+  renderToStaticMarkup(createElement(TokenReplayDurationDiagnosticsView, { diagnostics }));
+
+describe("token replay duration comparisons", () => {
+  it("keeps older exports unchanged and distinguishes an empty opt-in result", () => {
+    expect(renderDurations()).toBe("");
+    const html = renderDurations({ timestamp_attribute: "time:timestamp", transitions: [], unknown_activities: [] });
+    expect(html).toContain("Duration diagnostics were requested, but there are no comparisons.");
+    expect(html).not.toContain("<table");
+  });
+
+  it("renders accessible transition cohorts, signed seconds and duration ratios", () => {
+    const html = renderDurations({ timestamp_attribute: "completed_at", transitions: [
+      { ...comparison, transition_index: 17 },
+    ], unknown_activities: [] });
+    expect(html).toContain("<caption>Transition duration comparisons</caption>");
+    expect(html).toContain('<th scope="row">Transition #17</th>');
+    expect(html).toContain('<th scope="col" class="num">Label present, no reported problem cases</th>');
+    expect(html).toContain('<th scope="col" class="num">Problem execution median (seconds)</th>');
+    expect(html).toContain('<td class="num">2</td><td class="num">1</td>');
+    expect(html).toContain('<td class="num">10.5</td><td class="num">-5.25</td>');
+    expect(html).toContain('<td class="num">-0.5×</td>');
+    expect(html).toContain("<code>completed_at</code>");
+    expect(html).toContain("Unknown activity duration comparisons: no comparisons.");
+    expect(html).toContain("cases with a reported problem for it");
+    expect(html).toContain("The baseline does not require a recorded firing.");
+  });
+
+  it("shows the supplied zero ratio for zero and negative baseline medians", () => {
+    for (const fit_median_seconds of [0, -10]) {
+      const html = renderDurations({ timestamp_attribute: "time:timestamp", transitions: [
+        { ...comparison, transition_index: 1, fit_median_seconds, relative_throughput: 0 },
+      ], unknown_activities: [] });
+      expect(html).toContain(`<td class="num">${fit_median_seconds}</td>`);
+      expect(html).toContain('<td class="num">0×</td>');
+      expect(html).toContain("it is 0 when the baseline median is zero or negative.");
+    }
+  });
+
+  it("distinguishes null, empty and literal activity labels and explains the unknown baseline", () => {
+    const html = renderDurations({ timestamp_attribute: "time:timestamp", transitions: [],
+      unknown_activities: [
+        { ...comparison, activity: "", activity_is_null: true },
+        { ...comparison, activity: "", activity_is_null: false },
+        { ...comparison, activity: "<missing-step>", activity_is_null: false },
+      ] });
+    expect(html).toContain('<th scope="row">(null activity)</th>');
+    expect(html).toContain('<th scope="row">(empty string)</th>');
+    expect(html).toContain("&lt;missing-step&gt;");
+    expect(html).not.toContain("<missing-step>");
+    expect(html).toContain("cases free of all observed unknown labels");
+    expect(html).toContain("Containing activity cases");
+  });
+
+  it("bounds both comparison tables and reports exact omitted counts", () => {
+    const html = renderDurations({ timestamp_attribute: "time:timestamp",
+      transitions: Array.from({ length: 102 }, (_, transition_index) => ({ ...comparison, transition_index })),
+      unknown_activities: Array.from({ length: 103 }, (_, index) => ({ ...comparison,
+        activity: `unknown-${index}`, activity_is_null: false })),
+    });
+    expect(html).toContain("Transition #99");
+    expect(html).not.toContain("Transition #100");
+    expect(html).toContain("unknown-99");
+    expect(html).not.toContain("unknown-100");
+    expect(html).toContain("2 comparison rows omitted.");
+    expect(html).toContain("3 comparison rows omitted.");
+  });
+});
 
 describe("per-case token replay diagnostics", () => {
   it("ties ordered firings and blocked transitions to source events", () => {

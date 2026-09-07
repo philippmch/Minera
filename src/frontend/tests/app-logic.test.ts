@@ -1351,6 +1351,11 @@ describe("mineFormEntries", () => {
       expect(hasActiveMinerOptions({ [key]: false })).toBe(true);
     }
     expect(hasActiveMinerOptions({ tokenReplayIncludeTraceDiagnostics: true })).toBe(true);
+    expect(hasActiveMinerOptions({ tokenReplayIncludeDurationDiagnostics: true })).toBe(true);
+    expect(hasActiveMinerOptions({ tokenReplayIncludeDurationDiagnostics: false })).toBe(false);
+    expect(hasActiveMinerOptions({ tokenReplayTimestampAttribute: " completed_at " })).toBe(true);
+    expect(hasActiveMinerOptions({ tokenReplayTimestampAttribute: " time:timestamp " })).toBe(false);
+    expect(hasActiveMinerOptions({ tokenReplayTimestampAttribute: " " })).toBe(false);
     expect(hasActiveMinerOptions({ tokenReplayConsiderActivitiesNotInModelInFitness: true })).toBe(true);
     expect(hasActiveMinerOptions({ tokenReplayMaxRowsToMaterialize: 0 })).toBe(true);
     expect(hasActiveMinerOptions({ tokenReplayCaseIdAttribute: "group" })).toBe(true);

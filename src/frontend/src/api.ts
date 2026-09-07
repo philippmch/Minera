@@ -519,6 +519,8 @@ export interface MinerOptions {
   tokenReplayConsiderActivitiesNotInModelInFitness?: boolean;
   tokenReplayWalkThroughHiddenTransitions?: boolean;
   tokenReplayIncludeTraceDiagnostics?: boolean;
+  tokenReplayIncludeDurationDiagnostics?: boolean;
+  tokenReplayTimestampAttribute?: string;
   tokenReplayCaseIdAttribute?: string;
   tokenReplayMaxRowsToMaterialize?: number;
   /** Event field used to form token-replay variants. */
@@ -1121,6 +1123,7 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     ["tokenReplayConsiderActivitiesNotInModelInFitness", "token_replay_consider_activities_not_in_model_in_fitness"],
     ["tokenReplayWalkThroughHiddenTransitions", "token_replay_walk_through_hidden_transitions"],
     ["tokenReplayIncludeTraceDiagnostics", "token_replay_include_trace_diagnostics"],
+    ["tokenReplayIncludeDurationDiagnostics", "token_replay_include_duration_diagnostics"],
   ] as const) {
     const value = options[key];
     if (value !== undefined) {
@@ -1132,6 +1135,13 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     const value = options.tokenReplayActivityAttribute.trim();
     if (!value) throw new Error("tokenReplayActivityAttribute must not be empty");
     add("token_replay_activity_attribute", value);
+  }
+  if (options.tokenReplayTimestampAttribute !== undefined) {
+    if (typeof options.tokenReplayTimestampAttribute !== "string")
+      throw new Error("tokenReplayTimestampAttribute must be a string");
+    const value = options.tokenReplayTimestampAttribute.trim();
+    if (!value) throw new Error("tokenReplayTimestampAttribute must not be empty");
+    add("token_replay_timestamp_attribute", value);
   }
   if (options.tokenReplayCaseIdAttribute !== undefined) {
     const value = options.tokenReplayCaseIdAttribute.trim();

@@ -2965,6 +2965,25 @@ export interface TokenReplayTraceDiagnostics {
   places: OcpnTokenReplayPlaceDiagnostics[];
 }
 
+export interface TokenReplayDurationComparison {
+  fit_trace_indices: number[];
+  problem_trace_indices: number[];
+  fit_count: number;
+  problem_count: number;
+  fit_median_seconds: number;
+  problem_median_seconds: number;
+  relative_throughput: number;
+}
+
+export interface TokenReplayDurationDiagnostics {
+  timestamp_attribute: string;
+  transitions: Array<TokenReplayDurationComparison & { transition_index: number }>;
+  unknown_activities: Array<TokenReplayDurationComparison & {
+    activity: string;
+    activity_is_null: boolean;
+  }>;
+}
+
 export interface Conformance {
   /** Token fitness; immediate-stop replay can produce a negative value. */
   fitness: number;
@@ -2986,6 +3005,8 @@ export interface Conformance {
   activity_attribute?: string;
   /** Opt-in per-case replay details in source trace order, not variant order. */
   trace_diagnostics?: TokenReplayTraceDiagnostics[];
+  /** Opt-in case-duration comparisons for transition and unknown-activity cohorts. */
+  duration_diagnostics?: TokenReplayDurationDiagnostics;
 }
 
 /** One move of an optimal alignment between a trace and the model. */
