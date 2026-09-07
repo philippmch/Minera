@@ -264,6 +264,17 @@ event; forward replay observations share the final accumulated context of
 examined known activities. Blocked unfired transitions have no root-cause
 observations. These diagnostics leave replay metrics unchanged.
 
+Standalone `build_root_cause_log` and `build_root_cause_representation` helpers
+also expose preprocessing independently of classifier fitting. Without balancing,
+they accept empty and one-sided cohorts; zero selectors produce empty rows, and
+an empty input retains requested numeric columns. Log rows contain copied single
+events with empty trace attributes. Balancing repeats complete
+cohorts and rejects either empty cohort. Representation extraction retains
+infinities and doubles outside float32 range; classifier fitting separately
+rejects those values. Categorical duplicate selectors, rendered-name collisions,
+numeric overwrites of colliding categorical columns, and literal missing/null
+category markers now have independent full-matrix fixtures.
+
 Independent examples are recorded in `docs/token-replay-root-cause-fixtures.json`
 and exercised by the registered classifier, replay-cohort, and transport tests.
 Training uses float32 comparisons while exported matrices retain doubles;
@@ -304,9 +315,12 @@ not. Nested values use the same rule; event values retain stringified equality.
 Serialized formats do not encode shared scalar identity.
 Scalar replacement uses assignment or `emplace`; mutation through a raw mutable
 variant reference cannot renew alias identity and remains outside this contract.
-The support module remains **partial** while remaining context/input boundaries
-are audited. Adding these encoding
-contracts does not certify either replay variation.
+The support module remains **partial**: unknown-activity dictionary keys can be
+typed values whose string spellings remain distinct baseline activities, while
+native cohorts currently expose string/null keys. Adding these encoding
+contracts also leaves nested mutation aliasing in the standalone log helper
+unresolved: the reference shares nested objects, while native logs copy them.
+These contracts do not certify either replay variation.
 
 Token replay flat-input evidence: `normalize_token_replay_event_log` and the
 three replay API families accept `EventDataView`, streams, eager tables, and lazy
