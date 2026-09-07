@@ -622,20 +622,40 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     return out;
   }
   if (options.variant == LogToFeaturesVariant::TRACE_BASED) {
+    const auto instant = [](const Event& event, const std::string& key, bool required) {
+      const auto cell = event_feature_cell(event, key);
+      if (!cell) {
+        if (required) throw std::invalid_argument("log_to_features: missing timestamp");
+        return std::numeric_limits<double>::quiet_NaN();
+      }
+      if (absent_attribute(*cell) || cell->container != AttributeContainerKind::kScalar ||
+          !cell->children.empty() || cell->kind == AttributeKind::kBytes)
+        throw std::invalid_argument("log_to_features: invalid timestamp attribute");
+      const auto* date = std::get_if<NativeDate>(&cell->typed_value);
+      if (!date && !std::holds_alternative<std::monostate>(cell->typed_value))
+        throw std::invalid_argument("log_to_features: timestamp must be a date");
+      const auto parsed = parse_timestamp(date ? date->value : cell->value);
+      if (!parsed || !std::isfinite(*parsed))
+        throw std::invalid_argument("log_to_features: invalid or non-finite timestamp");
+      return *parsed;
+    };
     const auto activities = categories_for_events(log, options.activity_key);
     std::set<std::pair<std::string, std::string>> observed_direct_paths;
     std::set<std::pair<std::string, std::string>> observed_indirect_paths;
+    const bool indirect_paths_enabled = options.enable_indirect_paths_times_last_occ ||
+        (options.enable_all_extra_features && !options.enable_indirect_paths_times_last_occ_supplied);
     for (const auto& trace : log.traces) {
       for (std::size_t i = 1; i < trace.events.size(); ++i) {
         observed_direct_paths.emplace(
             value_for(trace.events[i - 1], options.activity_key),
             value_for(trace.events[i], options.activity_key));
       }
-      for (std::size_t i = 0; i + 2 < trace.events.size(); ++i) {
-        observed_indirect_paths.emplace(
-            value_for(trace.events[i], options.activity_key),
-            value_for(trace.events[i + 2], options.activity_key));
-      }
+      if (indirect_paths_enabled) for (std::size_t i = 0; i + 2 < trace.events.size(); ++i)
+        for (std::size_t j = i + 2; j < trace.events.size(); ++j) {
+          observed_indirect_paths.emplace(
+              value_for(trace.events[i], options.activity_key),
+              value_for(trace.events[j], options.activity_key));
+        }
     }
     std::vector<std::string> names;
     auto add_name = [&](std::string name) {
@@ -680,7 +700,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     const bool first_times = options.enable_times_from_first_occurrence || (all_extra && !options.enable_times_from_first_occurrence_supplied);
     const bool last_times = options.enable_times_from_last_occurrence || (all_extra && !options.enable_times_from_last_occurrence_supplied);
     const bool direct_paths = options.enable_direct_paths_times_last_occ || (all_extra && !options.enable_direct_paths_times_last_occ_supplied);
-    const bool indirect_paths = options.enable_indirect_paths_times_last_occ || (all_extra && !options.enable_indirect_paths_times_last_occ_supplied);
+    const bool indirect_paths = indirect_paths_enabled;
     const bool wip = options.enable_work_in_progress || (all_extra && !options.enable_work_in_progress_supplied);
     const bool workload = options.enable_resource_workload || (all_extra && !options.enable_resource_workload_supplied);
     const bool indexes = options.enable_first_last_activity_index || (all_extra && !options.enable_first_last_activity_index_supplied);
@@ -700,10 +720,18 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       for (const auto& [from, to] : observed_indirect_paths)
         add_name("indirectPathPerformanceLastOcc@@" + from + "##" + to);
     if (wip) add_name("@@work_in_progress");
+    const auto resource_value = [&](const Event& event) -> std::optional<std::string> {
+      const auto attribute = numeric_cell(event, options.resource_key);
+      if (!attribute) return std::nullopt;
+      if (!native_string_cell(*attribute))
+        throw std::invalid_argument("log_to_features: workload resource must be a string");
+      return attribute->value;
+    };
     std::set<std::string> resources;
-    for (const auto& t : log.traces) for (const auto& e : t.events) resources.insert(value_for(e, options.resource_key));
-    for (const auto& r : resources) if (!r.empty()) {
-      if (workload) add_name("resource_workload@@" + r);
+    if (workload) {
+      for (const auto& t : log.traces) for (const auto& e : t.events)
+        if (const auto resource = resource_value(e)) resources.insert(*resource);
+      for (const auto& resource : resources) add_name("resource_workload@@" + resource);
     }
     if (indexes) for (const auto& a : activities) {
       add_name("firstIndexAct@@" + a); add_name("lastIndexAct@@" + a);
@@ -739,18 +767,21 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         resource_intervals;
     for (std::size_t ti = 0; ti < log.traces.size(); ++ti) {
       const auto& trace = log.traces[ti];
-      if (trace.events.empty() || !(wip || workload)) continue;
+      if (!(wip || workload)) continue;
+      if (trace.events.empty()) {
+        if (workload) throw std::invalid_argument("log_to_features: workload requires nonempty traces");
+        continue;
+      }
       auto& interval = case_intervals[ti];
-      interval.start = path_start(trace.events.front());
-      interval.finish = instant(trace.events.back(), options.timestamp_key, false);
+      interval.start = path_start(trace.events.front(), true) - options.epsilon;
+      interval.finish = instant(trace.events.back(), options.timestamp_key, true) + options.epsilon;
       interval.valid = std::isfinite(interval.start) &&
                        std::isfinite(interval.finish) &&
-                       interval.start <= interval.finish;
-      for (const auto& event : trace.events) {
-        const auto resource = value_for(event, options.resource_key);
-        if (!resource.empty()) interval.resources.insert(resource);
-      }
-      if (!interval.valid) continue;
+                       interval.start < interval.finish;
+      if (!interval.valid)
+        throw std::invalid_argument("log_to_features: workload interval must have positive length");
+      if (workload) for (const auto& event : trace.events)
+        if (const auto resource = resource_value(event)) interval.resources.insert(*resource);
       for (const auto& resource : interval.resources)
         resource_intervals[resource].emplace_back(interval.start,
                                                    interval.finish);
@@ -764,11 +795,8 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         set(names[i], options.default_not_present);
       std::map<std::string, int> count; std::map<std::string, std::size_t> first, last;
       std::set<std::string> seen;
-      std::map<std::string, int> resource_count;
       for (std::size_t i = 0; i < t.events.size(); ++i) {
         const auto& e = t.events[i]; const auto a = value_for(e, options.activity_key); ++count[a]; if (!seen.count(a)) first[a] = i; last[a] = i; seen.insert(a);
-        const auto r = value_for(e, options.resource_key);
-        if (!r.empty()) ++resource_count[r];
       }
       for (const auto& [a,c] : count) if (indexes) { set("firstIndexAct@@"+a, static_cast<double>(first[a])); set("lastIndexAct@@"+a, static_cast<double>(last[a])); }
       for (const auto& n : event_strings) {
@@ -799,7 +827,6 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       }
       for (const auto& n : case_numbers)
         if (index.contains("trace:" + n)) set_core("trace:"+n,numeric_trace_value(t,n));
-      for (const auto& [r, c] : resource_count) if (workload) set("resource_workload@@" + r, static_cast<double>(c));
       if ((first_times || last_times) && !t.events.empty()) {
         const auto first_finish = instant(t.events.front(), options.timestamp_key, true);
         const auto last_start = path_start(t.events.back(), true);
@@ -832,22 +859,23 @@ LogToFeaturesResult log_to_features(const EventLog& log,
               start - finish);
       }
       if (indirect_paths)
-        for (std::size_t i = 0; i + 2 < t.events.size(); ++i) {
-          const auto from = value_for(t.events[i], options.activity_key);
-          const auto to = value_for(t.events[i + 2], options.activity_key);
-          const auto finish = instant(t.events[i], options.timestamp_key, false);
-          const auto start = path_start(t.events[i + 2]);
-          if (std::isfinite(finish) && std::isfinite(start) && start > finish)
-            set("indirectPathPerformanceLastOcc@@" + from + "##" + to,
-                start - finish);
-        }
+        for (std::size_t i = 0; i + 2 < t.events.size(); ++i)
+          for (std::size_t j = i + 2; j < t.events.size(); ++j) {
+            const auto from = value_for(t.events[i], options.activity_key);
+            const auto to = value_for(t.events[j], options.activity_key);
+            const auto finish = instant(t.events[i], options.timestamp_key, false);
+            const auto start = path_start(t.events[j]);
+            if (std::isfinite(finish) && std::isfinite(start) && start > finish)
+              set("indirectPathPerformanceLastOcc@@" + from + "##" + to,
+                  start - finish);
+          }
       if (wip) {
         const auto& interval = case_intervals[trace_index];
         if (interval.valid) {
           std::size_t overlapping = 0;
           for (const auto& other : case_intervals) {
-            if (other.valid && other.start <= interval.finish + options.epsilon &&
-                other.finish + options.epsilon >= interval.start)
+            if (other.valid && other.start < interval.finish &&
+                other.finish > interval.start)
               ++overlapping;
           }
           set("@@work_in_progress", static_cast<double>(overlapping));
@@ -861,8 +889,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
             if (found == resource_intervals.end()) continue;
             std::size_t overlapping = 0;
             for (const auto& other : found->second) {
-              if (other.first <= interval.finish + options.epsilon &&
-                  other.second + options.epsilon >= interval.start)
+              if (other.first < interval.finish && other.second > interval.start)
                 ++overlapping;
             }
             set("resource_workload@@" + resource,
@@ -873,15 +900,17 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       if (max_concurrent || max_per_activity) {
         int general = 0;
         std::map<std::string, int> per_activity;
+        if (max_per_activity)
+          for (const auto& activity : activities)
+            set("@@max_concurrent_activities_like_" + activity, 0.0);
         for (std::size_t i = 0; i + 1 < t.events.size(); ++i) {
-          const auto finish = instant(t.events[i], options.timestamp_key, false);
-          if (!std::isfinite(finish)) continue;
+          const auto finish = instant(t.events[i], options.timestamp_key, true);
           const auto activity = value_for(t.events[i], options.activity_key);
           int active = 0;
           int same_activity = 0;
           for (std::size_t j = i + 1; j < t.events.size(); ++j) {
-            const auto start = path_start(t.events[j]);
-            if (!std::isfinite(start) || start > finish + options.epsilon)
+            const auto start = path_start(t.events[j], true);
+            if (start > finish)
               break;
             ++active;
             if (value_for(t.events[j], options.activity_key) == activity)
