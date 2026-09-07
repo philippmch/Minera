@@ -24,15 +24,20 @@ struct ActivityValue { bool present = false; std::optional<std::string> value; }
 ActivityValue activity_value(const Event& event, const std::string& key) {
   const EventAttribute* selected = nullptr;
   int priority = 0;
+  std::size_t selected_count = 0;
   for (const auto& attribute : event.attributes) {
     const int candidate = attribute.key == key ? 2
         : !attribute.first_class_source_key.empty() && attribute.first_class_source_key == key ? 1 : 0;
     if (!candidate || candidate < priority) continue;
-    if (candidate == priority)
-      throw std::invalid_argument("root cause: duplicate selected activity attribute");
-    selected = &attribute;
-    priority = candidate;
+    if (candidate == priority) ++selected_count;
+    else {
+      selected = &attribute;
+      priority = candidate;
+      selected_count = 1;
+    }
   }
+  if (selected_count > 1)
+    throw std::invalid_argument("root cause: duplicate selected activity attribute");
   if (selected) {
     if (selected->first_class_role != FirstClassAttributeRole::kNone &&
         selected->first_class_state == FirstClassAttributeState::kMissing) return {};
@@ -40,12 +45,21 @@ ActivityValue activity_value(const Event& event, const std::string& key) {
                       ? std::nullopt : std::optional<std::string>(selected->value)};
   }
   if (key == "concept:name" || key == "activity" ||
-      (!event.activity_source_key.empty() && key == event.activity_source_key)) {
+      (!event.activity_source_key.empty() && key == event.activity_source_key) ||
+      (event.activity_attribute &&
+       (key == event.activity_attribute->key ||
+        (!event.activity_attribute->first_class_source_key.empty() &&
+         key == event.activity_attribute->first_class_source_key)))) {
     if (event.activity_state == FirstClassAttributeState::kNull) return {true, std::nullopt};
+    if (event.activity_attribute) {
+      if (event.activity_state == FirstClassAttributeState::kMissing ||
+          (event.activity_attribute->first_class_role != FirstClassAttributeRole::kNone &&
+           event.activity_attribute->first_class_state == FirstClassAttributeState::kMissing)) return {};
+      return {true, event.activity_attribute->is_null ||
+                    event.activity_attribute->first_class_state == FirstClassAttributeState::kNull
+                    ? std::nullopt : std::optional<std::string>(event.activity_attribute->value)};
+    }
     if (event.has_activity()) return {true, event.activity};
-    if (event.activity_attribute)
-      return {true, event.activity_attribute->is_null ? std::nullopt
-                       : std::optional<std::string>(event.activity_attribute->value)};
   }
   return {};
 }
@@ -139,8 +153,7 @@ std::vector<TokenReplayUnknownRootCauseDiagnostics> token_replay_unknown_root_ca
     std::vector<RootCauseObservation> fit, problem;
     for (std::size_t i = 0; i < log.traces.size(); ++i) {
       if (problematic.contains(i) || contains_key(log.traces[i], keys, selector)) continue;
-      if (log.traces[i].events.empty())
-        throw std::invalid_argument("root cause: baseline trace has no final event");
+      if (log.traces[i].events.empty()) continue;
       fit.push_back({i, log.traces[i].events.back()});
     }
     for (const auto& [index, observation] : problematic) problem.push_back(observation);

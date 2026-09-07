@@ -73,6 +73,50 @@ void cohort_contracts() {
   unknown = token_replay_unknown_root_cause_diagnostics(log,
       {{"X",false,{{1,event("", "99")}}}}, replay);
   require(unknown[0].data[0][0] == 1, "direct helper accepts baseline missing activity");
+  log.traces = {trace({event("a", "1")}), Trace{}, trace({event("X", "8")})};
+  unknown = token_replay_unknown_root_cause_diagnostics(log,
+      {{"X",false,{{2,event("", "8")}}}}, replay);
+  require(unknown.size() == 1 && unknown[0].source_trace_indices == std::vector<std::size_t>({0,2}),
+          "empty baseline traces are omitted");
+  log.traces[0].events.clear();
+  require(token_replay_unknown_root_cause_diagnostics(log,
+      {{"X",false,{{2,event("", "8")}}}}, replay).empty(),
+      "empty-only baseline omits model before encoding");
+  log.traces = {trace({event("a", "1")}), Trace{}};
+  unknown = token_replay_unknown_root_cause_diagnostics(log,
+      {{"X",false,{{1,event("", "8")}}}}, replay);
+  require(unknown.size() == 1 && unknown[0].source_trace_indices == std::vector<std::size_t>({0,1}),
+          "explicit problem context may belong to an empty trace");
+  log.traces = {trace({event("X", "1")}), trace({event("a", "2")}), trace({event("X", "8")})};
+  auto& projected = log.traces[0].events[0];
+  projected.activity_state = FirstClassAttributeState::kPresent;
+  projected.activity_attribute = EventAttribute{"task", "X"};
+  projected.activity_attribute->first_class_role = FirstClassAttributeRole::kActivity;
+  unknown = token_replay_unknown_root_cause_diagnostics(log,
+      {{"X",false,{{2,event("", "8")}}}}, replay);
+  require(unknown[0].source_trace_indices == std::vector<std::size_t>({0,1,2}),
+          "missing retained activity cell does not exclude baseline using stale projection");
+  projected.activity_attribute->first_class_state = FirstClassAttributeState::kNull;
+  unknown = token_replay_unknown_root_cause_diagnostics(log,
+      {{"",true,{{2,event("", "8")}}}}, replay);
+  require(unknown[0].source_trace_indices == std::vector<std::size_t>({1,2}),
+          "null retained activity cell excludes null unknown baseline");
+  projected.activity_attribute->first_class_state = FirstClassAttributeState::kPresent;
+  replay.activity_attribute = "task";
+  unknown = token_replay_unknown_root_cause_diagnostics(log,
+      {{"X",false,{{2,event("", "8")}}}}, replay);
+  require(unknown[0].source_trace_indices == std::vector<std::size_t>({1,2}),
+          "retained activity key resolves custom selector without source projection");
+  for (const auto* key : {"shadow-one", "shadow-two"}) {
+    EventAttribute alias{key, "ignored"};
+    alias.first_class_source_key = "task";
+    projected.attributes.push_back(alias);
+  }
+  projected.attributes.push_back({"task", "X"});
+  unknown = token_replay_unknown_root_cause_diagnostics(log,
+      {{"X",false,{{2,event("", "8")}}}}, replay);
+  require(unknown[0].source_trace_indices == std::vector<std::size_t>({1,2}),
+          "exact activity key overrides duplicate lower-priority aliases");
 }
 void integration_contracts() {
   EventLog log;

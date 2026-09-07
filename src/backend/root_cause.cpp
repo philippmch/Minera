@@ -9,6 +9,7 @@
 #include <limits>
 #include <map>
 #include <numeric>
+#include <random>
 #include <set>
 #include <stdexcept>
 #include <utility>
@@ -41,11 +42,22 @@ std::optional<EventAttribute> value_for(const Event& event,
       value.is_null = true;
     return value;
   };
-  for (const auto& value : event.attributes)
-    if (value.key == key) return cell_value(value);
-  for (const auto& value : event.attributes)
-    if (!value.first_class_source_key.empty() && value.first_class_source_key == key)
-      return cell_value(value);
+  const EventAttribute* selected = nullptr;
+  int selected_priority = 0;
+  std::size_t selected_count = 0;
+  for (const auto& value : event.attributes) {
+    const int priority = value.key == key ? 2
+        : !value.first_class_source_key.empty() && value.first_class_source_key == key ? 1 : 0;
+    if (priority == 0 || priority < selected_priority) continue;
+    if (priority > selected_priority) {
+      selected = &value;
+      selected_priority = priority;
+      selected_count = 1;
+    } else ++selected_count;
+  }
+  if (selected_count > 1)
+    throw std::invalid_argument("root cause: ambiguous selected attribute: " + key);
+  if (selected) return cell_value(*selected);
   const auto projected = [&](const std::string& value,
                              FirstClassAttributeState state,
                              const std::optional<EventAttribute>& stored)
@@ -59,17 +71,19 @@ std::optional<EventAttribute> value_for(const Event& event,
     result.is_null = state == FirstClassAttributeState::kNull;
     return result;
   };
-  const auto matches = [&](const std::string& source, std::string_view canonical,
-                           std::string_view alias) {
-    return key == canonical || key == alias || (!source.empty() && key == source);
+  const auto matches = [&](const std::string& source, const std::optional<EventAttribute>& stored,
+                           std::string_view canonical, std::string_view alias) {
+    return key == canonical || key == alias || (!source.empty() && key == source) ||
+           (stored && (stored->key == key ||
+                       (!stored->first_class_source_key.empty() && stored->first_class_source_key == key)));
   };
-  if (matches(event.activity_source_key, "concept:name", "activity"))
+  if (matches(event.activity_source_key, event.activity_attribute, "concept:name", "activity"))
     return projected(event.activity, event.activity_state, event.activity_attribute);
-  if (matches(event.resource_source_key, "org:resource", "resource"))
+  if (matches(event.resource_source_key, event.resource_attribute, "org:resource", "resource"))
     return projected(event.resource, event.resource_state, event.resource_attribute);
-  if (matches(event.timestamp_source_key, "time:timestamp", "timestamp"))
+  if (matches(event.timestamp_source_key, event.timestamp_attribute, "time:timestamp", "timestamp"))
     return projected(event.timestamp, event.timestamp_state, event.timestamp_attribute);
-  if (matches(event.lifecycle_source_key, "lifecycle:transition", "lifecycle"))
+  if (matches(event.lifecycle_source_key, event.lifecycle_attribute, "lifecycle:transition", "lifecycle"))
     return projected(event.lifecycle, event.lifecycle_state, event.lifecycle_attribute);
   return std::nullopt;
 }
@@ -400,7 +414,10 @@ class Trainer {
     int best_feature = -1;
     double best_threshold = 0;
     bool best_missing_left = false;
-    for (std::size_t feature = 0; feature < model_.feature_names.size(); ++feature) {
+    std::vector<std::size_t> feature_order(model_.feature_names.size());
+    std::iota(feature_order.begin(), feature_order.end(), std::size_t{0});
+    std::shuffle(feature_order.begin(), feature_order.end(), random_);
+    for (const auto feature : feature_order) {
       std::vector<std::pair<float, int>> values;
       Counts missing{};
       for (const auto row : rows) {
@@ -417,7 +434,7 @@ class Trainer {
         for (std::size_t c = 0; c < 2; ++c) destination[c] += missing[c];
         if (l[0] + l[1] == 0 || r[0] + r[1] == 0) return;
         const double score = purity(l) + purity(r);
-        if (score > best_score + 1e-12) {
+        if (score > best_score) {
           best_score = score;
           best_feature = static_cast<int>(feature);
           best_threshold = threshold;
@@ -425,15 +442,22 @@ class Trainer {
                                   ? l[0] + l[1] > r[0] + r[1] : missing_left;
         }
       };
-      for (std::size_t i = 0; i < values.size(); ++i) {
-        ++left[values[i].second];
-        --right[values[i].second];
-        if (i + 1 == values.size()) {
-          if (missing[0] + missing[1] > 0) consider(std::numeric_limits<double>::infinity(), false);
-        } else if (values[i + 1].first > values[i].first + 1e-7f) {
-          const double threshold = static_cast<double>(values[i].first) / 2 + static_cast<double>(values[i + 1].first) / 2;
-          consider(threshold, false);
-          if (missing[0] + missing[1] > 0) consider(threshold, true);
+      // Search every missing-right cut before any missing-left cut. Within
+      // each route the lowest threshold wins equal-score ties.
+      for (const bool missing_left : {false, true}) {
+        if (missing_left && missing[0] + missing[1] == 0) break;
+        left = {};
+        right = {node.class_counts[0] - missing[0], node.class_counts[1] - missing[1]};
+        for (std::size_t i = 0; i < values.size(); ++i) {
+          ++left[values[i].second];
+          --right[values[i].second];
+          if (i + 1 == values.size()) {
+            if (!missing_left && missing[0] + missing[1] > 0)
+              consider(std::numeric_limits<double>::infinity(), false);
+          } else if (values[i + 1].first > values[i].first + 1e-7f) {
+            const double threshold = static_cast<double>(values[i].first) / 2 + static_cast<double>(values[i + 1].first) / 2;
+            consider(threshold, missing_left);
+          }
         }
       }
     }
@@ -456,6 +480,7 @@ class Trainer {
   }
  private:
   RootCauseModel& model_;
+  std::mt19937 random_{std::random_device{}()};
 };
 
 }  // namespace
