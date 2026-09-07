@@ -778,6 +778,71 @@ static void default_trace_selection_validates_all_candidate_hashability() {
   assert((explicit_list.trace_rows == std::vector<std::vector<double>>{{0,1}, {1,0}}));
 }
 
+static void temporal_calendar_grid_uses_origin_and_fills_empty_periods() {
+  const auto check = [](const std::string& first, const std::string& last,
+                        const std::string& frequency, const std::vector<std::string>& labels,
+                        const std::vector<double>& counts) {
+    EventLog log;
+    log.traces = {Trace{"a", {Event{"a", "A", first, "r"}}},
+                  Trace{"b", {Event{"b", "B", last, "r"}}}};
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = frequency;
+    options.default_not_present = -7;
+    const auto result = log_to_features(log, options);
+    assert(result.feature_names.size() == 13);
+    assert(result.temporal_rows.size() == labels.size());
+    for (std::size_t i = 0; i < labels.size(); ++i) {
+      assert(result.temporal_rows[i].timestamp == *parse_timestamp(labels[i]));
+      assert(result.temporal_rows[i].values[2] == counts[i]);
+      if (counts[i] == 0)
+        assert(std::all_of(result.temporal_rows[i].values.begin(), result.temporal_rows[i].values.end(),
+                           [](double value) { return value == 0; }));
+    }
+  };
+  check("2024-01-01T12:00:00Z", "2024-01-03T12:00:00Z", "D",
+      {"2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z", "2024-01-03T00:00:00Z"}, {1,0,1});
+  check("2024-01-01T12:00:00Z", "2024-01-08T12:00:00Z", "2D",
+      {"2024-01-01T00:00:00Z", "2024-01-03T00:00:00Z", "2024-01-05T00:00:00Z", "2024-01-07T00:00:00Z"}, {1,0,0,1});
+  check("2024-01-01T12:00:00Z", "2024-01-08T12:00:00Z", "2W",
+      {"2024-01-07T00:00:00Z", "2024-01-21T00:00:00Z"}, {1,1});
+  check("2024-01-02T03:00:00Z", "2024-01-03T10:00:00Z", "7h",
+      {"2024-01-02T00:00:00Z", "2024-01-02T07:00:00Z", "2024-01-02T14:00:00Z", "2024-01-02T21:00:00Z", "2024-01-03T04:00:00Z"}, {1,0,0,0,1});
+  check("2024-02-15T12:00:00Z", "2024-08-20T12:00:00Z", "2ME",
+      {"2024-02-29T00:00:00Z", "2024-04-30T00:00:00Z", "2024-06-30T00:00:00Z", "2024-08-31T00:00:00Z"}, {1,0,0,1});
+  check("2024-02-15T12:00:00Z", "2024-08-20T12:00:00Z", "2MS",
+      {"2024-02-01T00:00:00Z", "2024-04-01T00:00:00Z", "2024-06-01T00:00:00Z", "2024-08-01T00:00:00Z"}, {1,0,0,1});
+  check("2024-02-15T12:00:00Z", "2024-08-20T12:00:00Z", "2QE",
+      {"2024-03-31T00:00:00Z", "2024-09-30T00:00:00Z"}, {1,1});
+  check("2024-02-15T12:00:00Z", "2024-08-20T12:00:00Z", "2QS",
+      {"2024-01-01T00:00:00Z", "2024-07-01T00:00:00Z"}, {1,1});
+  check("2024-02-15T12:00:00Z", "2024-08-20T12:00:00Z", "2YE", {"2024-12-31T00:00:00Z"}, {2});
+  check("2024-02-15T12:00:00Z", "2024-08-20T12:00:00Z", "2YS", {"2024-01-01T00:00:00Z"}, {2});
+  check("2024-02-29T23:59:59Z", "2024-03-01T00:00:00Z", "ME",
+      {"2024-02-29T00:00:00Z", "2024-03-31T00:00:00Z"}, {1,1});
+  check("2024-01-07T23:59:59Z", "2024-01-08T00:00:00Z", "W",
+      {"2024-01-07T00:00:00Z", "2024-01-14T00:00:00Z"}, {1,1});
+  check("2024-01-02T06:59:59Z", "2024-01-02T07:00:00Z", "7h",
+      {"2024-01-02T00:00:00Z", "2024-01-02T07:00:00Z"}, {1,1});
+  EventLog log;
+  log.traces = {Trace{"a", {Event{"a", "A", "2024-01-01T00:00:00Z"}}},
+                Trace{"b", {Event{"b", "B", "2024-01-08T00:00:00Z"}}}};
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq.clear();
+  options.window_seconds = 86400;
+  assert(log_to_features(log, options).temporal_rows.size() == 2);
+  for (const auto& frequency : {"9223372036854775807D", "9223372036854775807QE",
+                                 "9223372036854775807ME"}) {
+    options.grouper_freq = frequency;
+    log.traces.back().events[0].timestamp = "2024-02-08T00:00:00Z";
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
+}
+
 static void temporal_calendar_frequency_uses_period_boundaries() {
   EventLog log;
   Trace first;
@@ -1345,6 +1410,7 @@ static void trace_default_schema_infers_complete_trace_presence() {
 }
 
 int main() {
+  temporal_calendar_grid_uses_origin_and_fills_empty_periods();
   default_trace_selection_validates_all_candidate_hashability();
   default_trace_strings_have_fixed_cardinality_limit();
   default_trace_selection_ignores_custom_core_schema();

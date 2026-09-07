@@ -450,7 +450,7 @@ std::int64_t epoch_seconds(std::chrono::sys_days day) {
   return duration_cast<seconds>(day.time_since_epoch()).count();
 }
 
-std::int64_t temporal_bucket_label(double seconds,
+std::int64_t natural_temporal_bucket_label(double seconds,
                                    const TemporalFrequency& frequency) {
   using namespace std::chrono;
   const auto calendar = utc_calendar(seconds);
@@ -517,6 +517,80 @@ std::int64_t temporal_bucket_label(double seconds,
     }
   }
   throw std::invalid_argument("log_to_features: invalid temporal frequency");
+}
+
+std::int64_t temporal_frequency_span(const TemporalFrequency& frequency) {
+  std::int64_t scale = 1;
+  switch (frequency.unit) {
+    case TemporalFrequencyUnit::kSecond: break;
+    case TemporalFrequencyUnit::kMinute: scale = 60; break;
+    case TemporalFrequencyUnit::kHour: scale = 3600; break;
+    case TemporalFrequencyUnit::kDay: scale = 86400; break;
+    case TemporalFrequencyUnit::kWeek: scale = 604800; break;
+    case TemporalFrequencyUnit::kMonth: break;
+    case TemporalFrequencyUnit::kQuarter: scale = 3; break;
+    case TemporalFrequencyUnit::kYear: scale = 12; break;
+  }
+  if (frequency.multiple > std::numeric_limits<std::int64_t>::max() / scale)
+    throw std::invalid_argument("log_to_features: temporal frequency overflows calendar range");
+  return frequency.multiple * scale;
+}
+
+std::int64_t temporal_month_label(std::int64_t month_index, bool label_start) {
+  using namespace std::chrono;
+  const auto year_value = floor_division(month_index, 12);
+  if (year_value < static_cast<int>(year::min()) || year_value > static_cast<int>(year::max()))
+    throw std::invalid_argument("log_to_features: temporal label outside calendar range");
+  const auto month_value = static_cast<unsigned>(month_index - year_value * 12 + 1);
+  const year_month date{year{static_cast<int>(year_value)}, month{month_value}};
+  return epoch_seconds(label_start ? sys_days{date / day{1}} : sys_days{date / last});
+}
+
+std::int64_t temporal_bucket_label(double seconds, const TemporalFrequency& frequency,
+                                   double origin) {
+  auto natural = frequency;
+  natural.multiple = 1;
+  const auto span = temporal_frequency_span(frequency);
+  if (frequency.unit <= TemporalFrequencyUnit::kDay) {
+    const auto anchor = epoch_seconds(calendar_day(utc_calendar(origin)));
+    const auto offset = static_cast<std::int64_t>(std::floor(seconds)) - anchor;
+    return anchor + floor_division(offset, span) * span;
+  }
+  const auto first = natural_temporal_bucket_label(origin, natural);
+  const auto current = natural_temporal_bucket_label(seconds, natural);
+  if (frequency.unit == TemporalFrequencyUnit::kWeek) {
+    const auto delta = current - first;
+    const auto steps = delta / span + (delta % span != 0);
+    if (steps > std::numeric_limits<std::int64_t>::max() / span ||
+        (first > 0 && steps * span > std::numeric_limits<std::int64_t>::max() - first))
+      throw std::invalid_argument("log_to_features: temporal label overflows calendar range");
+    return first + steps * span;
+  }
+  const auto month_index = [](std::int64_t label) {
+    const auto calendar = utc_calendar(static_cast<double>(label));
+    return static_cast<std::int64_t>(calendar.tm_year + 1900) * 12 + calendar.tm_mon;
+  };
+  const auto first_month = month_index(first);
+  const auto delta = month_index(current) - first_month;
+  const auto steps = delta / span + (!frequency.label_start && delta % span != 0);
+  if (steps > std::numeric_limits<std::int64_t>::max() / span ||
+      (first_month > 0 && steps * span > std::numeric_limits<std::int64_t>::max() - first_month))
+    throw std::invalid_argument("log_to_features: temporal label overflows calendar range");
+  return temporal_month_label(first_month + steps * span, frequency.label_start);
+}
+
+std::int64_t next_temporal_bucket_label(std::int64_t label, const TemporalFrequency& frequency) {
+  const auto span = temporal_frequency_span(frequency);
+  if (frequency.unit <= TemporalFrequencyUnit::kWeek) {
+    if (label > std::numeric_limits<std::int64_t>::max() - span)
+      throw std::invalid_argument("log_to_features: temporal grid overflows calendar range");
+    return label + span;
+  }
+  const auto calendar = utc_calendar(static_cast<double>(label));
+  const auto month_index = static_cast<std::int64_t>(calendar.tm_year + 1900) * 12 + calendar.tm_mon;
+  if (month_index > std::numeric_limits<std::int64_t>::max() - span)
+    throw std::invalid_argument("log_to_features: temporal grid overflows calendar range");
+  return temporal_month_label(month_index + span, frequency.label_start);
 }
 
 }  // namespace
@@ -1044,7 +1118,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   std::map<long long, double> bucket_timestamps;
   for (const auto& event : events) {
     if (temporal_frequency) {
-      const auto label = temporal_bucket_label(event.start, *temporal_frequency);
+      const auto label = temporal_bucket_label(event.start, *temporal_frequency, origin);
       buckets[label].push_back(&event);
       bucket_timestamps[label] = static_cast<double>(label);
     } else {
@@ -1055,11 +1129,22 @@ LogToFeaturesResult log_to_features(const EventLog& log,
           origin + static_cast<double>(bucket) * options.window_seconds;
     }
   }
+  if (temporal_frequency) {
+    const auto last_label = buckets.rbegin()->first;
+    for (auto label = buckets.begin()->first; label < last_label;) {
+      const auto next = next_temporal_bucket_label(label, *temporal_frequency);
+      if (next <= label || next > last_label)
+        throw std::invalid_argument("log_to_features: inconsistent temporal grid");
+      buckets.try_emplace(next);
+      bucket_timestamps[next] = static_cast<double>(next);
+      label = next;
+    }
+  }
   std::unordered_map<std::string,std::size_t> index; for (std::size_t i=0;i<out.feature_names.size();++i) index[out.feature_names[i]]=i;
   for (const auto& [bucket, bucket_events] : buckets) {
     TemporalFeatureRow row;
     row.timestamp = bucket_timestamps.at(bucket);
-    row.values.assign(out.feature_names.size(), options.default_not_present);
+    row.values.assign(out.feature_names.size(), temporal_frequency && bucket_events.empty() ? 0.0 : options.default_not_present);
     auto add = [&](const std::string& name, double value) {
       if (const auto it = index.find(name); it != index.end()) row.values[it->second] = value;
     };
