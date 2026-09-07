@@ -510,7 +510,140 @@ static void numeric_features_resolve_first_class_cells_and_inference() {
   }
 }
 
+static void event_schema_respects_typed_selection_and_explicit_empty_lists() {
+  auto log = fixture();
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::EVENT_BASED;
+  const auto inferred = log_to_features(log, options);
+  assert((inferred.feature_names == std::vector<std::string>{
+      "event:amount", "event:concept:name@A", "event:concept:name@B"}));
+  assert((inferred.event_rows[0] == std::vector<std::vector<double>>{{2.5, 1, 0}, {3, 0, 1}}));
+  auto projected = log;
+  for (auto& event : projected.traces[0].events) {
+    event.activity_source_key = "task";
+    event.timestamp_state = FirstClassAttributeState::kPresent;
+    event.timestamp_attribute = EventAttribute{"time:timestamp", event.activity, AttributeKind::kString};
+  }
+  const auto projected_result = log_to_features(projected, options);
+  assert((projected_result.feature_names == std::vector<std::string>{
+      "event:amount", "event:task@A", "event:task@B", "event:time:timestamp@A", "event:time:timestamp@B"}));
+  assert((projected_result.event_rows[0][0] == std::vector<double>{2.5, 1, 0, 1, 0}));
+  auto projection_collision = log;
+  for (auto& event : projection_collision.traces[0].events) {
+    event.timestamp.clear();
+    event.resource_source_key = "time:timestamp";
+    event.resource_state = FirstClassAttributeState::kPresent;
+    event.resource_attribute = EventAttribute{"time:timestamp", "17", AttributeKind::kInt};
+  }
+  LogToFeaturesOptions projection_options;
+  projection_options.variant = LogToFeaturesVariant::EVENT_BASED;
+  projection_options.feature_names = {"event:time:timestamp"};
+  const auto resource_collision = log_to_features(projection_collision, projection_options);
+  assert((resource_collision.event_rows[0] == std::vector<std::vector<double>>{{17}, {17}}));
+  for (auto& event : projection_collision.traces[0].events)
+    event.activity_source_key = "time:timestamp";
+  projection_options.feature_names = {"event:time:timestamp@A", "event:time:timestamp@B"};
+  const auto activity_collision = log_to_features(projection_collision, projection_options);
+  assert((activity_collision.event_rows[0] == std::vector<std::vector<double>>{{1, 0}, {0, 1}}));
+  options.event_string_attributes_supplied = true;
+  auto result = log_to_features(log, options);
+  assert((result.feature_names == std::vector<std::string>{"event:amount"}));
+  options.event_numeric_attributes_supplied = true;
+  result = log_to_features(log, options);
+  assert(result.feature_names.empty() && result.event_rows[0].size() == 2 && result.event_rows[0][0].empty());
+  options.event_string_attributes_supplied = false;
+  result = log_to_features(log, options);
+  assert((result.feature_names == std::vector<std::string>{"event:concept:name@A", "event:concept:name@B"}));
+  options.feature_names_supplied = true;
+  result = log_to_features(log, options);
+  assert(result.feature_names.empty() && result.event_rows[0][0].empty());
+  options.feature_names_supplied = false;
+  options.event_numeric_attributes_supplied = false;
+  options.case_string_attributes = {"segment"};
+  options.case_numeric_attributes = {"missing"};
+  options.activity_key = "not_selected";
+  options.timestamp_key = "not_selected";
+  options.resource_key = "not_selected";
+  log.traces[0].events[0].timestamp = "not a timestamp";
+  assert(log_to_features(log, options).feature_names == inferred.feature_names);
+
+  options.event_string_attributes = {"kind"};
+  options.event_numeric_attributes_supplied = true;
+  options.min_num_different_string_values = 1;
+  const auto partial = log_to_features(log, options);
+  assert((partial.feature_names == std::vector<std::string>{"event:kind@x"}));
+  assert((partial.event_rows[0] == std::vector<std::vector<double>>{{1}, {0}}));
+  for (const auto& invalid : std::vector<EventAttribute>{
+           {"kind", "x", AttributeKind::kString, true},
+           {"kind", "x", AttributeKind::kInt}, make_bytes_attribute("kind", "x")}) {
+    log.traces[0].events[1].attributes.push_back(invalid);
+    assert(log_to_features(log, options).event_rows == partial.event_rows);
+    log.traces[0].events[1].attributes.pop_back();
+  }
+  EventAttribute nested{"kind", "x", AttributeKind::kString};
+  nested.container = AttributeContainerKind::kTuple;
+  log.traces[0].events[1].attributes.push_back(nested);
+  assert(log_to_features(log, options).event_rows == partial.event_rows);
+  log.traces[0].events[1].attributes.pop_back();
+  log.traces.push_back(Trace{"empty", {}});
+  options.default_not_present = -9;
+  const auto padded = log_to_features(log, options);
+  assert((padded.event_rows[1] == std::vector<std::vector<double>>{{0}, {0}}));
+  assert(padded.event_rows[0] == partial.event_rows[0]);
+  options.min_num_different_string_values = 2;
+  assert(log_to_features(log, options).feature_names.empty());
+  options.min_num_different_string_values = 0;
+  options.max_num_different_string_values = 0;
+  assert(log_to_features(log, options).feature_names.empty());
+
+  options.event_string_attributes.clear();
+  options.event_string_attributes_supplied = true;
+  options.feature_names = {"event:amount", "event:amount", "", "unknown", "event:kind@x"};
+  const auto direct = log_to_features(log, options);
+  assert(direct.feature_names == options.feature_names);
+  assert((direct.event_rows[0][0] == std::vector<double>{2.5, 0, 0, 0, 1}));
+  assert((direct.event_rows[0][1] == std::vector<double>{3, 0, 0, 0, 0}));
+  assert(!log_to_features_json(direct).empty());
+  log.traces[0].events[1].attributes = {{"amount", "2.5", AttributeKind::kString}};
+  options.feature_names = {"event:amount", "event:amount@2.5"};
+  const auto mixed = log_to_features(log, options);
+  assert((mixed.event_rows[0] == std::vector<std::vector<double>>{{2.5, 0}, {0, 1}}));
+  options.feature_names.clear();
+
+  EventLog collision;
+  collision.traces.push_back(Trace{"collision", {Event{"collision", "A"}}});
+  auto& collision_attributes = collision.traces[0].events[0].attributes;
+  collision_attributes = {{"v", "x", AttributeKind::kString},
+                          {"v@x", "7", AttributeKind::kInt}};
+  LogToFeaturesOptions collision_options;
+  collision_options.variant = LogToFeaturesVariant::EVENT_BASED;
+  collision_options.event_string_attributes = {"v"};
+  collision_options.event_numeric_attributes = {"v@x"};
+  collision_options.min_num_different_string_values = 1;
+  for (int order = 0; order < 2; ++order) {
+    const auto automatic = log_to_features(collision, collision_options);
+    assert((automatic.feature_names == std::vector<std::string>{"event:v@x", "event:v@x"}));
+    assert((automatic.event_rows[0][0] == std::vector<double>{7, 0}));
+    collision_options.feature_names = {"event:v@x"};
+    assert((log_to_features(collision, collision_options).event_rows[0][0] == std::vector<double>{7}));
+    collision_options.feature_names = {"event:v@x", "event:v@x"};
+    assert((log_to_features(collision, collision_options).event_rows[0][0] == std::vector<double>{7, 0}));
+    collision_options.feature_names.clear();
+    std::reverse(collision_attributes.begin(), collision_attributes.end());
+  }
+
+  bool rejected = false;
+  try { (void)log_to_features(EventLog{}, options); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+  EventLog empty_trace;
+  empty_trace.traces.push_back(Trace{});
+  const auto empty = log_to_features(empty_trace, options);
+  assert(empty.feature_names.empty() && empty.event_rows.size() == 1 && empty.event_rows[0].empty());
+}
+
 int main() {
+  event_schema_respects_typed_selection_and_explicit_empty_lists();
   numeric_features_resolve_first_class_cells_and_inference();
   event_numeric_attributes_require_complete_native_columns();
   explicit_trace_numeric_attributes_retain_native_values();

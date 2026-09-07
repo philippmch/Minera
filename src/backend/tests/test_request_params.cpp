@@ -4182,6 +4182,40 @@ void parse_monte_carlo_params_bounds_supplied_maps_before_accumulation() {
 }
 
 void log_to_features_params_contract() {
+  const std::map<std::string, std::string> explicit_empty{
+      {"features_variant", "event_based"}, {"features_event_string_attributes", ""},
+      {"feature_event_numeric_attributes", ""}, {"features_feature_names", ""}};
+  const auto lookup = [&](std::string_view key) {
+    const auto it = explicit_empty.find(std::string(key));
+    return it == explicit_empty.end() ? std::string{} : it->second;
+  };
+  const auto present = [&](std::string_view key) { return explicit_empty.contains(std::string(key)); };
+  const auto empty_lists = minera::parse_log_to_features_params(lookup, present);
+  assert(empty_lists.event_string_attributes_supplied && empty_lists.event_string_attributes.empty());
+  assert(empty_lists.event_numeric_attributes_supplied && empty_lists.event_numeric_attributes.empty());
+  assert(empty_lists.feature_names_supplied && empty_lists.feature_names.empty());
+  const auto exact_schema = minera::parse_log_to_features_params(
+      [](std::string_view key) { return key == "features_variant" ? std::string("event_based") : key == "features_feature_names" ? std::string(R"(\e, event:n ,a\,b,\\e)") : std::string{}; },
+      [](std::string_view key) { return key == "features_variant" || key == "features_feature_names"; });
+  assert((exact_schema.feature_names == std::vector<std::string>{"", " event:n ", "a,b", R"(\e)"}));
+  for (const auto& invalid : {R"(x\e)", R"(\ex)", R"(\q)", R"(x\)"}) {
+    bool rejected = false;
+    try {
+      (void)minera::parse_log_to_features_params(
+          [&](std::string_view key) { return key == "features_variant" ? std::string("event_based") : key == "features_feature_names" ? std::string(invalid) : std::string{}; },
+          [](std::string_view key) { return key == "features_variant" || key == "features_feature_names"; });
+    } catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
+  const auto no_presence = minera::parse_log_to_features_params(lookup);
+  assert(!no_presence.event_string_attributes_supplied && !no_presence.event_numeric_attributes_supplied && !no_presence.feature_names_supplied);
+  const auto omitted = minera::parse_log_to_features_params(fields({{"features_variant", "event_based"}}));
+  assert(!omitted.event_string_attributes_supplied && !omitted.event_numeric_attributes_supplied);
+  const auto plural_empty = minera::parse_log_to_features_params(
+      [](std::string_view key) { return key == "features_variant" ? std::string("event_based") : key == "feature_event_numeric_attributes" ? std::string("cost") : std::string{}; },
+      [](std::string_view key) { return key == "features_variant" || key == "features_event_numeric_attributes" || key == "feature_event_numeric_attributes"; });
+  assert(plural_empty.event_numeric_attributes_supplied && plural_empty.event_numeric_attributes.empty());
+
   const auto parsed = minera::parse_log_to_features_params(fields({
       {"features_variant", "temporal"},
       {"features_activity_key", "concept:name"},
