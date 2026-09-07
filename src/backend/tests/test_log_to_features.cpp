@@ -948,6 +948,56 @@ static void temporal_calendar_fiscal_month_anchors() {
   }
 }
 
+struct BusinessScenario {
+  std::string frequency;
+  std::size_t input;
+  bool single_case, rejects;
+  std::vector<FiscalExpected> rows;
+};
+#include "fixtures/temporal_business_calendar.inc"
+
+static void temporal_calendar_business_days_and_periods() {
+  assert(business_scenarios.size() == 269);
+  for (const auto& scenario : business_scenarios) {
+    EventLog log;
+    if (scenario.single_case) log.traces = {Trace{"c", {}}};
+    const auto& dates = business_inputs.at(scenario.input);
+    for (std::size_t i = 0; i < dates.size(); ++i) {
+      const auto id = scenario.single_case ? "c" : std::to_string(i);
+      Event event{id, "A", dates[i], "r"};
+      if (scenario.single_case) log.traces[0].events.push_back(event);
+      else log.traces.push_back(Trace{id, {event}});
+    }
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = scenario.frequency;
+    const auto require = [&](bool value, const std::string& detail) {
+      if (value) return;
+      const auto message = "Business calendar " + scenario.frequency + ", input " +
+          std::to_string(scenario.input) + ": " + detail;
+      std::fprintf(stderr, "%s\n", message.c_str()); std::fflush(stderr);
+      throw std::runtime_error(message);
+    };
+    bool rejected = false;
+    try {
+      const auto result = log_to_features(log, options);
+      require(!scenario.rejects, "expected rejection");
+      require(result.temporal_rows.size() == scenario.rows.size(), "row count");
+      for (std::size_t i = 0; i < scenario.rows.size(); ++i) {
+        const auto& actual = result.temporal_rows[i];
+        const auto& expected = scenario.rows[i];
+        require(actual.timestamp == expected.timestamp, "timestamp " + std::to_string(i));
+        require(actual.values.size() == 13, "cell count");
+        for (std::size_t j = 0; j < 13; ++j)
+          require(std::holds_alternative<double>(actual.values[j]) &&
+                      std::abs(std::get<double>(actual.values[j]) - expected.values[j]) <= 1e-9,
+                  "row " + std::to_string(i) + ", column " + std::to_string(j));
+      }
+    } catch (const std::invalid_argument&) { rejected = true; }
+    require(rejected == scenario.rejects, "rejection status");
+  }
+}
+
 static void temporal_calendar_grid_uses_origin_and_fills_empty_periods() {
   const auto check = [](const std::string& first, const std::string& last,
                         const std::string& frequency, const std::vector<std::string>& labels,
@@ -2893,6 +2943,7 @@ int main() {
   temporal_calendar_uses_selected_column_timezone();
   temporal_calendar_grid_uses_origin_and_fills_empty_periods();
   temporal_calendar_fiscal_month_anchors();
+  temporal_calendar_business_days_and_periods();
   default_trace_selection_validates_all_candidate_hashability();
   default_trace_strings_have_fixed_cardinality_limit();
   default_trace_selection_ignores_custom_core_schema();

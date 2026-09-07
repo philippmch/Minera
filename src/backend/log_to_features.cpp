@@ -338,6 +338,7 @@ struct TemporalFrequency {
   bool label_start = false;
   int week_end_day = 0;  // std::tm convention: Sunday = 0.
   int period_start_month = 0;
+  bool business = false;
 };
 
 std::string uppercase_ascii(std::string value) {
@@ -365,8 +366,12 @@ TemporalFrequency parse_temporal_frequency(const std::string& raw) {
     const auto alias = raw.substr(alias_begin);
     const auto upper = uppercase_ascii(alias);
     if (upper.starts_with("QE-") || upper.starts_with("QS-") ||
-        upper.starts_with("YE-") || upper.starts_with("YS-")) {
-      if (alias != upper)
+        upper.starts_with("YE-") || upper.starts_with("YS-") ||
+        upper.starts_with("BQE-") || upper.starts_with("BQS-") ||
+        upper.starts_with("BYE-") || upper.starts_with("BYS-") ||
+        upper == "B" || upper == "BME" || upper == "BMS" || upper == "BQE" ||
+        upper == "BQS" || upper == "BYE" || upper == "BYS") {
+      if (alias != upper && upper != "B")
         throw std::invalid_argument("log_to_features: fiscal temporal frequency must use uppercase aliases");
       std::size_t position = !raw.empty() && raw.front() == '+' ? 1 : 0;
       const auto digits_begin = position;
@@ -401,14 +406,23 @@ TemporalFrequency parse_temporal_frequency(const std::string& raw) {
         "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
     const auto base = suffix.substr(0, separator);
     const auto month = std::find(months.begin(), months.end(), suffix.substr(separator + 1));
-    if ((base != "QE" && base != "QS" && base != "YE" && base != "YS") || month == months.end())
+    if ((base != "QE" && base != "QS" && base != "YE" && base != "YS" &&
+         base != "BQE" && base != "BQS" && base != "BYE" && base != "BYS") || month == months.end())
       throw std::invalid_argument("log_to_features: invalid fiscal temporal frequency");
     fiscal_month = static_cast<int>(month - months.begin());
     suffix = base;
   }
   TemporalFrequency result;
   result.multiple = multiple;
-  if (suffix == "S" || suffix == "SEC" || suffix == "SECOND" ||
+  if (suffix == "BME" || suffix == "BMS" || suffix == "BQE" || suffix == "BQS" ||
+      suffix == "BYE" || suffix == "BYS") {
+    result.business = true;
+    suffix.erase(0, 1);
+  }
+  if (suffix == "B") {
+    result.unit = TemporalFrequencyUnit::kDay;
+    result.business = true;
+  } else if (suffix == "S" || suffix == "SEC" || suffix == "SECOND" ||
       suffix == "SECONDS") {
     result.unit = TemporalFrequencyUnit::kSecond;
   } else if (suffix == "T" || suffix == "MIN" || suffix == "MINS" ||
@@ -492,7 +506,26 @@ std::int64_t epoch_seconds(std::chrono::sys_days day) {
   return duration_cast<seconds>(day.time_since_epoch()).count();
 }
 
-std::int64_t temporal_month_label(std::int64_t month_index, bool label_start);
+std::int64_t temporal_month_label(std::int64_t month_index, bool label_start, bool business = false);
+
+std::int64_t business_day_ordinal(std::int64_t day_index) {
+  const auto week = floor_division(day_index - 4, 7);
+  const auto weekday = day_index - 4 - week * 7;
+  return week * 5 + std::min<std::int64_t>(weekday, 4);
+}
+
+std::int64_t business_day_label(std::int64_t ordinal) {
+  using namespace std::chrono;
+  const auto week = floor_division(ordinal, 5);
+  auto weekday = ordinal % 5;
+  if (weekday < 0) weekday += 5;
+  const long double day_index = 4.0L + static_cast<long double>(week) * 7 + weekday;
+  const auto minimum = sys_days{year::min() / January / day{1}}.time_since_epoch().count();
+  const auto maximum = sys_days{year::max() / December / day{31}}.time_since_epoch().count();
+  if (day_index < minimum || day_index > maximum)
+    throw std::invalid_argument("log_to_features: business day label outside calendar range");
+  return epoch_seconds(sys_days{days{static_cast<days::rep>(day_index)}});
+}
 
 std::int64_t natural_temporal_bucket_label(double seconds,
                                    const TemporalFrequency& frequency) {
@@ -539,11 +572,16 @@ std::int64_t natural_temporal_bucket_label(double seconds,
           month_index - frequency.period_start_month, months_per_period * frequency.multiple);
       const auto first_month =
           period * months_per_period * frequency.multiple + frequency.period_start_month;
-      const auto label_month = frequency.label_start
+      auto label_month = frequency.label_start
                                    ? first_month
                                    : first_month +
                                          months_per_period * frequency.multiple - 1;
-      return temporal_month_label(label_month, frequency.label_start);
+      if (frequency.business) {
+        const auto label = temporal_month_label(label_month, frequency.label_start, true);
+        if (frequency.label_start && epoch_seconds(date) < label) label_month -= months_per_period;
+        if (!frequency.label_start && epoch_seconds(date) > label) label_month += months_per_period;
+      }
+      return temporal_month_label(label_month, frequency.label_start, frequency.business);
     }
   }
   throw std::invalid_argument("log_to_features: invalid temporal frequency");
@@ -566,18 +604,29 @@ std::int64_t temporal_frequency_span(const TemporalFrequency& frequency) {
   return frequency.multiple * scale;
 }
 
-std::int64_t temporal_month_label(std::int64_t month_index, bool label_start) {
+std::int64_t temporal_month_label(std::int64_t month_index, bool label_start, bool business) {
   using namespace std::chrono;
   const auto year_value = floor_division(month_index, 12);
   if (year_value < static_cast<int>(year::min()) || year_value > static_cast<int>(year::max()))
     throw std::invalid_argument("log_to_features: temporal label outside calendar range");
   const auto month_value = static_cast<unsigned>(month_index - year_value * 12 + 1);
   const year_month date{year{static_cast<int>(year_value)}, month{month_value}};
-  return epoch_seconds(label_start ? sys_days{date / day{1}} : sys_days{date / last});
+  auto label = label_start ? sys_days{date / day{1}} : sys_days{date / last};
+  if (business) {
+    const auto weekday = std::chrono::weekday{label}.c_encoding();
+    if (weekday == 0) label += days{label_start ? 1 : -2};
+    if (weekday == 6) label += days{label_start ? 2 : -1};
+  }
+  return epoch_seconds(label);
 }
 
 std::int64_t temporal_bucket_label(double seconds, const TemporalFrequency& frequency,
                                    double origin) {
+  if (frequency.business && frequency.unit == TemporalFrequencyUnit::kDay) {
+    const auto first = business_day_ordinal(epoch_seconds(calendar_day(utc_calendar(origin))) / 86400);
+    const auto current = business_day_ordinal(epoch_seconds(calendar_day(utc_calendar(seconds))) / 86400);
+    return business_day_label(first + floor_division(current - first, frequency.multiple) * frequency.multiple);
+  }
   auto natural = frequency;
   natural.multiple = 1;
   const auto span = temporal_frequency_span(frequency);
@@ -606,10 +655,16 @@ std::int64_t temporal_bucket_label(double seconds, const TemporalFrequency& freq
   if (steps > std::numeric_limits<std::int64_t>::max() / span ||
       (first_month > 0 && steps * span > std::numeric_limits<std::int64_t>::max() - first_month))
     throw std::invalid_argument("log_to_features: temporal label overflows calendar range");
-  return temporal_month_label(first_month + steps * span, frequency.label_start);
+  return temporal_month_label(first_month + steps * span, frequency.label_start, frequency.business);
 }
 
 std::int64_t next_temporal_bucket_label(std::int64_t label, const TemporalFrequency& frequency) {
+  if (frequency.business && frequency.unit == TemporalFrequencyUnit::kDay) {
+    const auto ordinal = business_day_ordinal(label / 86400);
+    if (ordinal > 0 && frequency.multiple > std::numeric_limits<std::int64_t>::max() - ordinal)
+      throw std::invalid_argument("log_to_features: business day grid overflows calendar range");
+    return business_day_label(ordinal + frequency.multiple);
+  }
   const auto span = temporal_frequency_span(frequency);
   if (frequency.unit <= TemporalFrequencyUnit::kWeek) {
     if (label > std::numeric_limits<std::int64_t>::max() - span)
@@ -620,7 +675,7 @@ std::int64_t next_temporal_bucket_label(std::int64_t label, const TemporalFreque
   const auto month_index = static_cast<std::int64_t>(calendar.tm_year + 1900) * 12 + calendar.tm_mon;
   if (month_index > std::numeric_limits<std::int64_t>::max() - span)
     throw std::invalid_argument("log_to_features: temporal grid overflows calendar range");
-  return temporal_month_label(month_index + span, frequency.label_start);
+  return temporal_month_label(month_index + span, frequency.label_start, frequency.business);
 }
 
 template <typename Less>
