@@ -3187,8 +3187,15 @@ multipliers. Period
 starts and ends follow the selected fiscal month; multiple periods advance from
 the first natural label for the input, including fixed-offset and pre-epoch
 dates. Permanent public oracles cover all month anchors and one-, two-, and
-three-period groupings. Business-day/month calendars, semi-month and week-of-month
-offsets, subsecond bins, and complete frequency-alias acceptance remain open.
+three-period groupings. Weekday-based business frequencies cover `B`, `BME`,
+`BMS`, `BQE`, `BQS`, `BYE`, and `BYS`, including fiscal quarter/year anchors and
+positive multipliers. Business-day bins roll weekends back to Friday. Business
+period ends use the last weekday and send subsequent weekend events to the next
+period; starts use the first weekday and retain earlier weekend events in the
+previous period. Empty grids advance through business labels from the first
+observed bucket, preserving local fixed offsets and pre-epoch dates.
+Custom business calendars, semi-month and week-of-month offsets, subsecond bins,
+and complete frequency-alias acceptance remain open.
 Fixed-width windows remain a separate native projection. Calendar metrics use completion-time case spans:
 configured start timestamps control grouping only, default service time is zero,
 and waiting time equals sojourn time. Means use distinct cases rather than event
