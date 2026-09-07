@@ -1031,6 +1031,10 @@ describe("isProfileClusteringResult", () => {
 });
 
 describe("isLogToFeaturesResult", () => {
+  it("retains explicit event schema names and zero-width rows", () => {
+    expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "event_based", feature_names: ["event:v", "event:v", ""], event_rows: [[[12, 0, 0]]] })).toBe(true);
+    expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "event_based", feature_names: [], event_rows: [[[], []]] })).toBe(true);
+  });
   it("accepts only explicit nonfinite numeric spellings", () => {
     const result = { family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: ["v"] };
     for (const value of ["NaN", "Infinity", "-Infinity"]) {

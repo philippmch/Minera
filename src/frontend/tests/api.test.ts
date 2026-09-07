@@ -1844,6 +1844,15 @@ describe("Monte Carlo API", () => {
 });
 
 describe("log-to-features API", () => {
+  it("preserves exact event schema elements", () => {
+    const query = new URLSearchParams(logToFeaturesQuery({ features_variant: "event_based", features_feature_names: ["", " event:n ", "a,b", "\\e"] }));
+    expect(query.get("features_feature_names")).toBe("\\e, event:n ,a\\,b,\\\\e");
+  });
+  it("preserves explicitly empty event lists and schemas", () => {
+    expect(logToFeaturesQuery({})).toBe("");
+    expect(logToFeaturesQuery({ features_event_string_attributes: [], features_event_numeric_attributes: [], features_feature_names: [], features_variant: "event_based" }))
+      .toBe("features_event_numeric_attributes=&features_event_string_attributes=&features_feature_names=&features_variant=event_based");
+  });
   it("encodes deterministic sorted options and escaped lists", () => {
     expect(logToFeaturesQuery({ features_event_attributes: ["a,b", "x"], features_variant: "event_based" }))
       .toBe("features_event_attributes=a%5C%2Cb%2Cx&features_variant=event_based");

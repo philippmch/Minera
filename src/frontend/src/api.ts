@@ -5443,7 +5443,9 @@ export function logToFeaturesQuery(options: LogToFeaturesOptions = {}): string {
   const encode = (s: string) => s.replaceAll("\\", "\\\\").replaceAll(",", "\\,");
   for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b))) {
     if (value === undefined) continue;
-    query.set(key, Array.isArray(value) ? value.map(encode).join(",") : String(value));
+    query.set(key, Array.isArray(value) ? value.map((entry) =>
+      key === "features_feature_names" && options.features_variant === "event_based" && entry === ""
+        ? "\\e" : encode(entry)).join(",") : String(value));
   }
   return query.toString();
 }

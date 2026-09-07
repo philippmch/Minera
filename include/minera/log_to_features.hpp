@@ -71,6 +71,11 @@ struct LogToFeaturesOptions {
   // rows are sized to it (unknown names are filled with default_not_present).
   std::vector<std::string> feature_names;
   double default_not_present = 0.0;
+  // EVENT_BASED distinguishes an omitted list (infer) from an explicit empty
+  // list (select no columns). Nonempty lists are always explicit.
+  bool event_string_attributes_supplied = false;
+  bool event_numeric_attributes_supplied = false;
+  bool feature_names_supplied = false;
 };
 
 struct TemporalFeatureRow {

@@ -4891,22 +4891,47 @@ LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
   }
   if (supplied("default_not_present"))
     params.default_not_present = parse_finite_double(require("default_not_present"), key_for("default_not_present"));
-  const auto parse_list = [&](std::string_view suffix, std::vector<std::string>& out) {
+  const auto parse_list = [&](std::string_view suffix, std::vector<std::string>& out, bool allow_empty = false) {
     if (!supplied(suffix)) return;
     const auto k = key_for(suffix);
+    if (allow_empty && field(k).empty()) { out.clear(); return; }
     try { out = split_target_activities(require(suffix)); }
     catch (const std::invalid_argument& e) {
       throw std::invalid_argument(k + ": " + e.what());
     }
     if (out.empty()) throw std::invalid_argument(k + ": expected a non-empty list");
   };
-  parse_list("event_string_attributes", params.event_string_attributes);
-  parse_list("event_numeric_attributes", params.event_numeric_attributes);
+  params.event_string_attributes_supplied = supplied("event_string_attributes");
+  params.event_numeric_attributes_supplied = supplied("event_numeric_attributes");
+  params.feature_names_supplied = supplied("feature_names");
+  const bool event_based = params.variant == LogToFeaturesVariant::EVENT_BASED;
+  parse_list("event_string_attributes", params.event_string_attributes, event_based);
+  parse_list("event_numeric_attributes", params.event_numeric_attributes, event_based);
   parse_list("case_string_attributes", params.case_string_attributes);
   parse_list("case_numeric_attributes", params.case_numeric_attributes);
   parse_list("event_attributes", params.event_attributes);
   parse_list("case_attributes", params.case_attributes);
-  parse_list("feature_names", params.feature_names);
+  if (event_based && params.feature_names_supplied) {
+    const auto text = field(key_for("feature_names"));
+    if (!text.empty()) {
+      std::string token;
+      bool escaped = false, empty_name = false;
+      const auto flush = [&]() { params.feature_names.push_back(token); token.clear(); empty_name = false; };
+      for (const char ch : text) {
+        if (escaped) {
+          if (ch == 'e' && token.empty() && !empty_name) empty_name = true;
+          else if ((ch == ',' || ch == '\\') && !empty_name) token += ch;
+          else throw std::invalid_argument("features_feature_names: invalid escape");
+          escaped = false;
+        } else if (ch == ',') flush();
+        else if (empty_name) throw std::invalid_argument("features_feature_names: empty-name escape must occupy its own element");
+        else if (ch == '\\') escaped = true;
+        else token += ch;
+      }
+      if (escaped) throw std::invalid_argument("features_feature_names: dangling escape");
+      flush();
+    }
+  } else parse_list("feature_names", params.feature_names);
   parse_list("event_successor_attributes", params.event_successor_attributes);
   auto assign_bool = [&](std::string_view suffix, bool& out) {
     if (supplied(suffix)) out = parse_boolean(require(suffix), key_for(suffix));

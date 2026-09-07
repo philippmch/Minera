@@ -163,6 +163,54 @@ bool complete_numeric_event_attribute(const EventLog& log, const std::string& ke
   return present;
 }
 
+bool native_string_cell(const EventAttribute& attribute) {
+  return !absent_attribute(attribute) &&
+         attribute.container == AttributeContainerKind::kScalar &&
+         attribute.children.empty() &&
+         std::holds_alternative<std::monostate>(attribute.typed_value) &&
+         (attribute.kind == AttributeKind::kString || attribute.kind == AttributeKind::kId);
+}
+
+std::optional<EventAttribute> event_feature_cell(const Event& event, const std::string& key) {
+  auto cell = native_event_attribute(event, key);
+  const auto matches_projection = [&](const std::string& source,
+                                      const std::optional<EventAttribute>& stored,
+                                      const char* canonical, const char* alias) {
+    return key == canonical || key == alias || (!source.empty() && key == source) ||
+           (stored && (stored->key == key ||
+                       (!stored->first_class_source_key.empty() && stored->first_class_source_key == key)));
+  };
+  // Unretained timestamp text is the native date projection. Retained cells
+  // carry their own type, including deliberately string-valued timestamps.
+  if (cell && !event.timestamp_attribute &&
+      !matches_projection(event.activity_source_key, event.activity_attribute, "concept:name", "activity") &&
+      !matches_projection(event.resource_source_key, event.resource_attribute, "org:resource", "resource") &&
+      (key == "time:timestamp" || key == "timestamp" ||
+       (!event.timestamp_source_key.empty() && key == event.timestamp_source_key)) &&
+      std::none_of(event.attributes.begin(), event.attributes.end(), [&](const auto& value) {
+        return value.key == key || value.first_class_source_key == key;
+      })) cell->kind = AttributeKind::kDate;
+  return cell;
+}
+
+std::vector<std::string> event_feature_keys(const EventLog& log) {
+  std::set<std::string> keys;
+  for (const auto& trace : log.traces) for (const auto& event : trace.events) {
+    for (const auto& attribute : event.attributes) keys.insert(attribute.key);
+    const auto add = [&](const std::string& source, const std::optional<EventAttribute>& stored,
+                         const char* canonical) {
+      keys.insert(!source.empty() ? source
+          : stored && !stored->first_class_source_key.empty() ? stored->first_class_source_key
+          : stored && !stored->key.empty() ? stored->key : std::string(canonical));
+    };
+    add(event.activity_source_key, event.activity_attribute, "concept:name");
+    add(event.timestamp_source_key, event.timestamp_attribute, "time:timestamp");
+    add(event.resource_source_key, event.resource_attribute, "org:resource");
+    add(event.lifecycle_source_key, event.lifecycle_attribute, "lifecycle:transition");
+  }
+  return {keys.begin(), keys.end()};
+}
+
 double numeric_attribute_value(const Event& event, const std::string& key,
                                double fallback) {
   if (const auto attribute = numeric_cell(event, key))
@@ -196,22 +244,6 @@ std::vector<std::string> categories_for_events(const EventLog& log,
   std::set<std::string> values;
   for (const auto& t : log.traces)
     for (const auto& e : t.events) values.insert(value_for(e, key));
-  return {values.begin(), values.end()};
-}
-
-std::vector<std::string> categories_for_attr(const EventLog& log,
-                                             const std::string& key,
-                                             bool case_level) {
-  std::set<std::string> values;
-  for (const auto& t : log.traces) {
-    if (case_level) {
-      if (const auto* a = attr_for(t, key)) values.insert(a->value);
-    } else {
-      for (const auto& e : t.events)
-        if (event_attribute_present(e, key))
-          values.insert(event_attribute_value(e, key));
-    }
-  }
   return {values.begin(), values.end()};
 }
 
@@ -491,8 +523,10 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     throw std::invalid_argument("log_to_features: epsilon must be finite and non-negative");
   if (options.min_num_different_string_values > options.max_num_different_string_values)
     throw std::invalid_argument("log_to_features: string cardinality bounds are inverted");
-  validate_names(options.event_string_attributes, "event_string_attributes");
-  validate_names(options.event_numeric_attributes, "event_numeric_attributes");
+  if (options.variant != LogToFeaturesVariant::EVENT_BASED) {
+    validate_names(options.event_string_attributes, "event_string_attributes");
+    validate_names(options.event_numeric_attributes, "event_numeric_attributes");
+  }
   validate_names(options.case_string_attributes, "case_string_attributes");
   validate_names(options.case_numeric_attributes, "case_numeric_attributes");
   validate_names(options.event_attributes, "event_attributes");
@@ -533,67 +567,68 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   }
 
   if (options.variant == LogToFeaturesVariant::EVENT_BASED) {
+    if (log.traces.empty())
+      throw std::invalid_argument("log_to_features: event-based extraction requires a trace");
+    const auto candidates = event_feature_keys(log);
+    if (options.event_string_attributes.empty() && options.event_attributes.empty())
+      event_strings = options.event_string_attributes_supplied ? std::vector<std::string>{} : candidates;
+    if (options.event_numeric_attributes.empty() && options.event_attributes.empty())
+      event_numbers = options.event_numeric_attributes_supplied ? std::vector<std::string>{} : candidates;
     std::erase_if(event_numbers, [&](const std::string& key) {
       return !complete_numeric_event_attribute(log, key);
     });
+    std::map<std::string, std::set<std::string>> string_values;
+    for (const auto& key : event_strings) {
+      std::set<std::string> values;
+      for (const auto& trace : log.traces) for (const auto& event : trace.events) {
+        const auto cell = event_feature_cell(event, key);
+        if (cell && native_string_cell(*cell)) values.insert(cell->value);
+      }
+      if (!values.empty() && values.size() >= options.min_num_different_string_values &&
+          values.size() <= options.max_num_different_string_values)
+        string_values.emplace(key, std::move(values));
+    }
     std::vector<std::string> names;
-    const auto activities = categories_for_events(log, options.activity_key);
-    for (const auto& x : activities) names.push_back("activity:" + x);
-    for (const auto& n : event_strings) {
-      const auto values = categories_for_attr(log, n, false);
-      if (!within_cardinality(values, options)) continue;
-      for (const auto& x : values) names.push_back("event:" + n + "@" + x);
-    }
-    for (const auto& n : case_strings) {
-      const auto values = categories_for_attr(log, n, true);
-      if (!within_cardinality(values, options)) continue;
-      for (const auto& x : values) names.push_back("case:" + n + "=" + x);
-    }
-    for (const auto& n : event_numbers) names.push_back("event:" + n);
-    for (const auto& n : case_numbers) names.push_back("case:" + n);
-    names.push_back("timestamp");
+    for (const auto& [key, values] : string_values)
+      for (const auto& value : values) names.push_back("event:" + key + "@" + value);
+    for (const auto& key : event_numbers) names.push_back("event:" + key);
     std::sort(names.begin(), names.end());
-    if (options.feature_names.empty()) out.feature_names = names;
-    else validate_names(out.feature_names, "feature_names");
+    if (options.feature_names.empty() && !options.feature_names_supplied) out.feature_names = names;
     std::unordered_map<std::string, std::size_t> index;
-    for (std::size_t i = 0; i < out.feature_names.size(); ++i) index[out.feature_names[i]] = i;
+    for (std::size_t i = 0; i < out.feature_names.size(); ++i) index.emplace(out.feature_names[i], i);
     std::size_t max_events = 0;
     for (const auto& trace : log.traces) max_events = std::max(max_events, trace.events.size());
-    for (const auto& t : log.traces) {
+    for (const auto& trace : log.traces) {
       std::vector<std::vector<double>> rows;
-      for (const auto& e : t.events) {
-        std::vector<double> row(out.feature_names.size(), options.default_not_present);
-        auto set = [&](const std::string& n, double v) { if (auto i = index.find(n); i != index.end()) row[i->second] = v; };
-        set("activity:" + value_for(e, options.activity_key), 1.0);
-        for (const auto& n : event_strings) {
-          const auto values = categories_for_attr(log, n, false);
-          if (within_cardinality(values, options))
-            if (const auto* attribute = attr_for(e, n))
-              set("event:" + n + "@" + attribute->value, 1.0);
+      for (const auto& event : trace.events) {
+        std::vector<double> row(out.feature_names.size(), 0.0);
+        const auto set = [&](const std::string& name, double value) {
+          if (const auto found = index.find(name); found != index.end()) row[found->second] = value;
+        };
+        for (const auto& key : candidates) {
+          const auto cell = event_feature_cell(event, key);
+          if (!cell) continue;
+          if (native_string_cell(*cell)) set("event:" + key + "@" + cell->value, 1.0);
+          else if (native_numeric_cell(*cell) && index.contains("event:" + key))
+            set("event:" + key, static_cast<float>(native_attribute_number(*cell)));
         }
-        for (const auto& n : case_strings) {
-          const auto values = categories_for_attr(log, n, true);
-          if (within_cardinality(values, options))
-            if (const auto* attribute = attr_for(t, n))
-              set("case:" + n + "=" + attribute->value, 1.0);
+        // Explicit lists can use native aliases that are not stored keys.
+        for (const auto& key : event_strings) {
+          if (std::binary_search(candidates.begin(), candidates.end(), key)) continue;
+          const auto cell = event_feature_cell(event, key);
+          if (cell && native_string_cell(*cell)) set("event:" + key + "@" + cell->value, 1.0);
         }
-        for (const auto& n : event_numbers)
-          if (numeric_cell(e, n))
-            set("event:" + n, static_cast<float>(numeric_attribute_value(e, n, options.default_not_present)));
-        for (const auto& n : case_numbers) if (const auto a = numeric_cell(t, n)) set("case:" + n, native_attribute_number(*a));
-        if (const auto p = parse_timestamp(value_for(e, options.timestamp_key)); p && std::isfinite(*p)) set("timestamp", *p);
-        else if (!value_for(e, options.timestamp_key).empty()) throw std::invalid_argument("log_to_features: invalid timestamp");
+        for (const auto& key : event_numbers) {
+          if (std::binary_search(candidates.begin(), candidates.end(), key)) continue;
+          set("event:" + key, static_cast<float>(numeric_attribute_value(event, key, 0.0)));
+        }
         rows.push_back(std::move(row));
       }
-      // Event-based consumers receive a rectangular trace/event tensor.  The
-      // trailing rows are neutral zero vectors and never represent events.
-      while (rows.size() < max_events)
-        rows.emplace_back(out.feature_names.size(), 0.0);
+      while (rows.size() < max_events) rows.emplace_back(out.feature_names.size(), 0.0);
       out.event_rows.push_back(std::move(rows));
     }
     return out;
   }
-
   if (options.variant == LogToFeaturesVariant::TRACE_BASED) {
     const auto activities = categories_for_events(log, options.activity_key);
     std::set<std::pair<std::string, std::string>> observed_direct_paths;

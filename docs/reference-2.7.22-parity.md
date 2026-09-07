@@ -3067,6 +3067,24 @@ Feature extraction supports event, trace, and temporal projections with
 categorical and numeric selectors, explicit schemas, activity and succession
 representations, trace timing and concurrency families, calendar or fixed
 windows, workload features, and strict cardinality and numeric controls.
+Event-based schemas infer ordinary typed event attributes, including retained
+activity/resource fields under their source keys, without injecting activity,
+timestamp, or case columns. Categorical selection collects only string values;
+missing/null/non-string rows remain zero. Cardinality bounds apply to inferred
+and explicitly selected categorical groups. Omitted categorical/numeric lists
+infer their group, whereas explicitly empty lists suppress it. Native supplied
+flags and presence-aware CLI/server parsing preserve that distinction. Event
+feature-name request lists preserve whitespace and use `\e` for an empty name;
+the existing escaped comma/backslash syntax still represents literal characters.
+The frontend emits this encoding, distinguishing an empty schema from a schema
+containing an empty-name column.
+An explicit event feature schema replaces inference and directly encodes each
+event's actual numeric/string values, independent of selection lists and
+cardinality. Schema order, duplicate names, and empty/unknown names are retained;
+only the first duplicate column is populated. Numeric/categorical name collisions
+retain duplicate generated columns with the numeric value in the first column.
+Rows and padding use zero, independent of the default-not-present option. An
+empty log raises; a log containing an empty trace retains its zero-event tensor.
 Numeric event columns require a present native numeric scalar in every event;
 Boolean values qualify, while strings, bytes, nulls, missing values, and
 containers exclude the column. Event numeric cells use float32 precision.
@@ -3077,8 +3095,9 @@ accepted, and null/container values are rejected. A selected event numeric
 attribute must occur in every trace, and selected trace numeric attributes must
 be present; an empty log still yields an empty matrix.
 Result serialization enforces one row family per variation, rectangular
-matrices, unique non-empty feature names, aligned case identifiers, and finite
-temporal coordinates. Finite numeric cells use round-trip precision. Native
+matrices, aligned case identifiers, and finite temporal coordinates. Trace and
+temporal schemas retain their unique non-empty name validation; event schemas
+preserve the explicit-name behavior above. Finite numeric cells use round-trip precision. Native
 NaN and infinities survive extraction; JSON encodes them as the exact strings
 `NaN`, `Infinity`, and `-Infinity`, accepted by the typed frontend result guard.
 These numeric contracts do not certify the broader feature schema and inference
