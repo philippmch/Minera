@@ -14,6 +14,7 @@
 #include <unordered_map>
 
 #include "minera/timestamp.hpp"
+#include "root_cause_trace_key.hpp"
 
 namespace minera {
 namespace {
@@ -113,47 +114,66 @@ bool is_numeric_kind(AttributeKind k) {
          k == AttributeKind::kBoolean;
 }
 
-double parse_number(const std::string& s, double fallback, bool* ok = nullptr) {
-  if (s.empty()) {
-    if (ok) *ok = false;
-    return fallback;
-  }
-  double x = 0.0;
-  try {
-    std::size_t n = 0;
-    x = std::stod(s, &n);
-    if (n != s.size() || !std::isfinite(x)) throw std::invalid_argument("bad");
-  } catch (...) {
-    if (ok) *ok = false;
-    return fallback;
-  }
-  if (ok) *ok = true;
-  return x;
+std::optional<EventAttribute> numeric_cell(const Event& event, const std::string& key) {
+  return native_event_attribute(event, key);
 }
 
-double checked_number(const std::string& s, double fallback) {
-  if (s == "true" || s == "TRUE" || s == "True") return 1.0;
-  if (s == "false" || s == "FALSE" || s == "False") return 0.0;
-  bool ok = false;
-  const double value = parse_number(s, fallback, &ok);
-  if (!ok) throw std::invalid_argument("log_to_features: invalid or non-finite numeric attribute");
-  return value;
+std::optional<EventAttribute> numeric_cell(const Trace& trace, const std::string& key) {
+  if (key == "activity" && trace.case_id_source_key != key &&
+      (!trace.case_id_attribute || (trace.case_id_attribute->key != key &&
+       trace.case_id_attribute->first_class_source_key != key)) &&
+      std::none_of(trace.attributes.begin(), trace.attributes.end(), [&](const auto& value) {
+        return value.key == key || value.first_class_source_key == key;
+      })) return std::nullopt;
+  Event context;
+  context.attributes = trace.attributes;
+  context.activity = trace.case_id;
+  context.activity_state = trace.case_id_state;
+  context.activity_attribute = trace.case_id_attribute;
+  context.activity_source_key = key == "case_id" || key == "case:concept:name"
+                                    ? key : trace.case_id_source_key;
+  return native_event_attribute(context, key);
+}
+
+bool absent_attribute(const EventAttribute& attribute) {
+  return attribute.is_null || attribute.first_class_state == FirstClassAttributeState::kNull ||
+         (attribute.first_class_role != FirstClassAttributeRole::kNone &&
+          attribute.first_class_state == FirstClassAttributeState::kMissing);
+}
+
+bool native_numeric_cell(const EventAttribute& attribute) {
+  if (absent_attribute(attribute) ||
+      attribute.container != AttributeContainerKind::kScalar ||
+      !attribute.children.empty() || attribute.kind == AttributeKind::kBytes ||
+      attribute.kind == AttributeKind::kDate ||
+      std::holds_alternative<NativeDate>(attribute.typed_value)) return false;
+  if (!std::holds_alternative<std::monostate>(attribute.typed_value)) return true;
+  return is_numeric_kind(attribute.kind);
+}
+
+bool complete_numeric_event_attribute(const EventLog& log, const std::string& key) {
+  bool present = false;
+  for (const auto& trace : log.traces) {
+    for (const auto& event : trace.events) {
+      const auto attribute = numeric_cell(event, key);
+      if (!attribute || !native_numeric_cell(*attribute)) return false;
+      present = true;
+    }
+  }
+  return present;
 }
 
 double numeric_attribute_value(const Event& event, const std::string& key,
                                double fallback) {
-  if (const auto* attribute = attr_for(event, key))
-    return checked_number(attribute->value, fallback);
-  const auto value = event_attribute_value(event, key);
-  return value.empty() ? fallback : checked_number(value, fallback);
+  if (const auto attribute = numeric_cell(event, key))
+    return native_attribute_number(*attribute);
+  return fallback;
 }
 
-double numeric_trace_value(const Trace& trace, const std::string& key,
-                           double fallback) {
-  if (const auto* attribute = attr_for(trace, key))
-    return checked_number(attribute->value, fallback);
-  const auto value = trace_attribute_value(trace, key);
-  return value.empty() ? fallback : checked_number(value, fallback);
+double numeric_trace_value(const Trace& trace, const std::string& key) {
+  if (const auto attribute = numeric_cell(trace, key))
+    return native_attribute_number(*attribute);
+  throw std::invalid_argument("log_to_features: trace has no numeric trace attribute: " + key);
 }
 
 void append_unique(std::vector<std::string>& out,
@@ -212,7 +232,7 @@ std::vector<std::string> inferred_event_attributes(const EventLog& log,
     for (const auto& event : trace.events) {
       std::set<std::string> seen;
       for (const auto& attribute : event.attributes) {
-        if (attribute.is_null || is_numeric_kind(attribute.kind) != numeric ||
+        if (absent_attribute(attribute) || native_numeric_cell(attribute) != numeric ||
             !seen.insert(attribute.key).second)
           continue;
         ++occurrences[attribute.key];
@@ -232,7 +252,7 @@ std::vector<std::string> inferred_trace_attributes(const EventLog& log,
   for (const auto& trace : log.traces) {
     std::set<std::string> seen;
     for (const auto& attribute : trace.attributes) {
-      if (attribute.is_null || is_numeric_kind(attribute.kind) != numeric ||
+      if (absent_attribute(attribute) || native_numeric_cell(attribute) != numeric ||
           !seen.insert(attribute.key).second)
         continue;
       ++occurrences[attribute.key];
@@ -490,13 +510,13 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   for (const auto& n : options.event_attributes) {
     bool numeric = false;
     for (const auto& t : log.traces) for (const auto& e : t.events)
-      if (const auto* a = attr_for(e, n)) { numeric = is_numeric_kind(a->kind); break; }
+      if (const auto* a = attr_for(e, n)) { numeric = native_numeric_cell(*a); break; }
     (numeric ? event_numbers : event_strings).push_back(n);
   }
   for (const auto& n : options.case_attributes) {
     bool numeric = false;
     for (const auto& t : log.traces)
-      if (const auto* a = attr_for(t, n)) { numeric = is_numeric_kind(a->kind); break; }
+      if (const auto* a = attr_for(t, n)) { numeric = native_numeric_cell(*a); break; }
     (numeric ? case_numbers : case_strings).push_back(n);
   }
   append_unique(event_strings, {}); append_unique(event_numbers, {});
@@ -513,6 +533,9 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   }
 
   if (options.variant == LogToFeaturesVariant::EVENT_BASED) {
+    std::erase_if(event_numbers, [&](const std::string& key) {
+      return !complete_numeric_event_attribute(log, key);
+    });
     std::vector<std::string> names;
     const auto activities = categories_for_events(log, options.activity_key);
     for (const auto& x : activities) names.push_back("activity:" + x);
@@ -555,9 +578,9 @@ LogToFeaturesResult log_to_features(const EventLog& log,
               set("case:" + n + "=" + attribute->value, 1.0);
         }
         for (const auto& n : event_numbers)
-          if (event_attribute_present(e, n))
-            set("event:" + n, numeric_attribute_value(e, n, options.default_not_present));
-        for (const auto& n : case_numbers) if (const auto* a = attr_for(t, n)) set("case:" + n, checked_number(a->value, options.default_not_present));
+          if (numeric_cell(e, n))
+            set("event:" + n, static_cast<float>(numeric_attribute_value(e, n, options.default_not_present)));
+        for (const auto& n : case_numbers) if (const auto a = numeric_cell(t, n)) set("case:" + n, native_attribute_number(*a));
         if (const auto p = parse_timestamp(value_for(e, options.timestamp_key)); p && std::isfinite(*p)) set("timestamp", *p);
         else if (!value_for(e, options.timestamp_key).empty()) throw std::invalid_argument("log_to_features: invalid timestamp");
         rows.push_back(std::move(row));
@@ -752,8 +775,20 @@ LogToFeaturesResult log_to_features(const EventLog& log,
           set("@@caseDuration", case_end-case_start);
       }
       set("wip", static_cast<double>(t.events.size()));
-      for (const auto& n : event_numbers) { double value = options.default_not_present; bool found = false; for (const auto& e:t.events) if (event_attribute_present(e,n)) { value = numeric_attribute_value(e,n,options.default_not_present); found = true; } if (found) set("event:"+n,value); }
-      for (const auto& n : case_numbers) if (attr_for(t,n) || !trace_attribute_value(t,n).empty()) set("case:"+n,numeric_trace_value(t,n,options.default_not_present));
+      for (const auto& n : event_numbers) {
+        double value = options.default_not_present;
+        bool found = false;
+        for (const auto& e : t.events) {
+          if (numeric_cell(e, n)) {
+            value = numeric_attribute_value(e, n, options.default_not_present);
+            found = true;
+          }
+        }
+        if (!found)
+          throw std::invalid_argument("log_to_features: trace has no numeric event attribute: " + n);
+        set("event:" + n, value);
+      }
+      for (const auto& n : case_numbers) set("case:"+n,numeric_trace_value(t,n));
       for (const auto& [r, c] : resource_count) if (workload) set("resource_workload@@" + r, static_cast<double>(c));
       for (const auto& [a, first_value] : first_time) {
         if (first_times && std::isfinite(case_start) && std::isfinite(case_end)) { set("startToFirstOcc@@"+a, first_value-case_start); set("firstOccToEnd@@"+a, case_end-first_value); }

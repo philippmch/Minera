@@ -417,8 +417,7 @@ double decimal_number(const std::string& source, const std::string& key) {
   return result;
 }
 
-double number_for(const Event& event, const std::string& key) {
-  const auto value = value_for(event, key);
+double attribute_number(const EventAttribute* value, const std::string& key) {
   if (!value || value->is_null || value->container != AttributeContainerKind::kScalar || !value->children.empty() ||
       value->kind == AttributeKind::kDate ||
       (value->kind != AttributeKind::kBytes && std::holds_alternative<NativeDate>(value->typed_value)))
@@ -442,6 +441,11 @@ double number_for(const Event& event, const std::string& key) {
       throw std::overflow_error("root cause: integer attribute outside float64 range: " + key);
   }
   return result;
+}
+
+double number_for(const Event& event, const std::string& key) {
+  const auto value = value_for(event, key);
+  return attribute_number(value ? &*value : nullptr, key);
 }
 
 std::array<std::size_t, 2> cohort_repeats(std::size_t fit, std::size_t problem, bool enabled) {
@@ -542,6 +546,14 @@ class Trainer {
 };
 
 }  // namespace
+
+double native_attribute_number(const EventAttribute& attribute) {
+  return attribute_number(&attribute, attribute.key);
+}
+
+std::optional<EventAttribute> native_event_attribute(const Event& event, const std::string& key) {
+  return value_for(event, key);
+}
 
 std::string root_cause_attribute_category(const EventAttribute& attribute) {
   return attribute_category(attribute, false);

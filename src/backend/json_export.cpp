@@ -4933,10 +4933,7 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
     if (name.empty() || !unique_features.insert(name).second)
       throw std::invalid_argument("log_to_features: invalid result feature schema");
   const auto valid_row = [&](const std::vector<double>& row) {
-    return row.size() == result.feature_names.size() &&
-           std::all_of(row.begin(), row.end(), [](double value) {
-             return std::isfinite(value);
-           });
+    return row.size() == result.feature_names.size();
   };
   if (result.variant == LogToFeaturesVariant::EVENT_BASED) {
     if (!result.trace_rows.empty() || !result.temporal_rows.empty())
@@ -4961,6 +4958,12 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
         throw std::invalid_argument("log_to_features: invalid temporal result row");
   }
   std::ostringstream out;
+  out << std::setprecision(std::numeric_limits<double>::max_digits10);
+  const auto write_number = [&](double value) {
+    if (std::isnan(value)) write_json_string(out, "NaN");
+    else if (std::isinf(value)) write_json_string(out, value < 0 ? "-Infinity" : "Infinity");
+    else out << value;
+  };
   out << "{\"family\":\"LOG_TO_FEATURES\",\"variant\":";
   write_json_string(out, variant_name());
   out << ",\"feature_names\":[";
@@ -4987,7 +4990,7 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
         out << '[';
         for (std::size_t k = 0; k < result.event_rows[i][j].size(); ++k) {
           if (k) out << ',';
-          out << result.event_rows[i][j][k];
+          write_number(result.event_rows[i][j][k]);
         }
         out << ']';
       }
@@ -5001,7 +5004,7 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
       out << '[';
       for (std::size_t j = 0; j < result.trace_rows[i].size(); ++j) {
         if (j) out << ',';
-        out << result.trace_rows[i][j];
+        write_number(result.trace_rows[i][j]);
       }
       out << ']';
     }
@@ -5014,7 +5017,7 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
       out << "{\"timestamp\":" << row.timestamp << ",\"values\":[";
       for (std::size_t j = 0; j < row.values.size(); ++j) {
         if (j) out << ',';
-        out << row.values[j];
+        write_number(row.values[j]);
       }
       out << "]}";
     }

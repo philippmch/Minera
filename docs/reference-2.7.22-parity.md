@@ -432,9 +432,15 @@ checked by identity, since distinct reference places may share displayed names.
 
 An empty Alpha+ log or a boundary reduction that leaves a stale initial marking
 raises `std::invalid_argument` in Minera. This includes all-loop/empty-only logs
-and cases where loop removal creates a new self-following surviving activity.
+and combinations that collapse both boundaries onto the same removed place.
+A reduced self-loop alone is different: `a,L,L,a` returns two disconnected
+boundary places with silent boundary transitions, matching the pinned runtime.
+Cleanup removes the disconnected visible transitions. Adding a trailing `b`
+retains the boundary-to-`b` connection and an isolated `L` loop place.
 Minera also isolates its internal boundary identities from visible activity
-labels. These hardened error and reserved-label behaviors are documented
+labels; public probes confirm collisions for the reference labels
+`artificial_start` and `artificial_end`, including stale initial markings.
+These error and reserved-label behaviors remain documented
 differences; the enhanced variant and its dispatcher remain partial. Its
 optional cleanup removes only completely disconnected visible transitions.
 
@@ -3061,9 +3067,22 @@ Feature extraction supports event, trace, and temporal projections with
 categorical and numeric selectors, explicit schemas, activity and succession
 representations, trace timing and concurrency families, calendar or fixed
 windows, workload features, and strict cardinality and numeric controls.
-Result serialization enforces one row family per variation, rectangular finite
+Numeric event columns require a present native numeric scalar in every event;
+Boolean values qualify, while strings, bytes, nulls, missing values, and
+containers exclude the column. Event numeric cells use float32 precision.
+Trace numeric selectors convert every present value before retaining the last
+event value, so an earlier invalid value is still an error. Numeric byte values
+are decoded before conversion, Unicode numeric strings and separators are
+accepted, and null/container values are rejected. A selected event numeric
+attribute must occur in every trace, and selected trace numeric attributes must
+be present; an empty log still yields an empty matrix.
+Result serialization enforces one row family per variation, rectangular
 matrices, unique non-empty feature names, aligned case identifiers, and finite
-temporal coordinates.
+temporal coordinates. Finite numeric cells use round-trip precision. Native
+NaN and infinities survive extraction; JSON encodes them as the exact strings
+`NaN`, `Infinity`, and `-Infinity`, accepted by the typed frontend result guard.
+These numeric contracts do not certify the broader feature schema and inference
+variations as complete.
 
 Case- and event-level embeddings support deterministic local encoders and an
 injectable transformer runtime with inferred or explicit dimensions. Model,

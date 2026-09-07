@@ -1031,6 +1031,15 @@ describe("isProfileClusteringResult", () => {
 });
 
 describe("isLogToFeaturesResult", () => {
+  it("accepts only explicit nonfinite numeric spellings", () => {
+    const result = { family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: ["v"] };
+    for (const value of ["NaN", "Infinity", "-Infinity"]) {
+      expect(isLogToFeaturesResult({ ...result, trace_rows: [[value]] })).toBe(true);
+      expect(isLogToFeaturesResult({ ...result, variant: "event_based", event_rows: [[[value]]] })).toBe(true);
+    }
+    for (const value of ["12", "nan", null, NaN, Infinity])
+      expect(isLogToFeaturesResult({ ...result, trace_rows: [[value]] })).toBe(false);
+  });
   it("guards variant-specific rows", () => {
     expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: ["wip"], trace_rows: [[1]] })).toBe(true);
     expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "temporal", feature_names: ["arrivals"], temporal_rows: [{ timestamp: 1, values: [2] }] })).toBe(true);
