@@ -75,7 +75,7 @@ static void observed_path_timing_uses_configured_starts() {
   assert(result.trace_rows.front()[static_cast<std::size_t>(indirect_aa - result.feature_names.begin())] == 25.0);
 }
 
-static void trace_defaults_infer_case_attributes_and_scope_missing_values() {
+static void explicit_trace_attributes_scope_missing_values() {
   EventLog log;
   Trace first;
   first.case_id = "c1";
@@ -108,12 +108,15 @@ static void trace_defaults_infer_case_attributes_and_scope_missing_values() {
   LogToFeaturesOptions options;
   options.variant = LogToFeaturesVariant::TRACE_BASED;
   options.enable_succ_def_representation = false;
+  options.event_string_attributes = {"kind"};
+  options.case_string_attributes = {"segment"};
+  options.case_numeric_attributes = {"priority"};
   const auto result = log_to_features(log, options);
   const auto find_feature = [&](const std::string& name) {
     return std::find(result.feature_names.begin(), result.feature_names.end(), name);
   };
   const auto segment = find_feature("trace:segment@gold");
-  const auto priority = find_feature("case:priority");
+  const auto priority = find_feature("trace:priority");
   const auto undefined = find_feature("event:kind@UNDEFINED");
   const auto kind_x = find_feature("event:kind@x");
   assert(segment != result.feature_names.end());
@@ -237,7 +240,7 @@ static void explicit_trace_numeric_attributes_retain_native_values() {
   options.variant = LogToFeaturesVariant::TRACE_BASED;
   options.event_numeric_attributes = {"value"};
   options.case_numeric_attributes = {"case_value"};
-  options.feature_names = {"event:value", "case:case_value"};
+  options.feature_names = {"event:value", "trace:case_value"};
   options.enable_succ_def_representation = false;
   auto log = fixture();
   log.traces[0].events.resize(1);
@@ -414,7 +417,7 @@ static void numeric_features_resolve_first_class_cells_and_inference() {
   LogToFeaturesOptions options;
   options.event_numeric_attributes = {"resource"};
   options.case_numeric_attributes = {"case_id"};
-  options.feature_names = {"event:resource", "case:case_id"};
+  options.feature_names = {"event:resource", "trace:case_id"};
   EventAttribute native{"worker", "stale", AttributeKind::kInt};
   native.typed_value = std::int64_t{17};
   event.resource = "stale";
@@ -428,7 +431,7 @@ static void numeric_features_resolve_first_class_cells_and_inference() {
   assert(log_to_features(log, options).trace_rows[0] == std::vector<double>({17, 12}));
   options.event_numeric_attributes = {"worker"};
   options.case_numeric_attributes = {"identifier"};
-  options.feature_names = {"event:worker", "case:identifier"};
+  options.feature_names = {"event:worker", "trace:identifier"};
   assert(log_to_features(log, options).trace_rows[0] == std::vector<double>({17, 12}));
   event.resource_attribute = make_bytes_attribute("worker", "23");
   assert(log_to_features(log, options).trace_rows[0][0] == 23);
@@ -458,11 +461,13 @@ static void numeric_features_resolve_first_class_cells_and_inference() {
   rejects();
   trace.case_id = "12";
   options.event_numeric_attributes = {"activity"};
+  options.feature_names = {"event:activity", "trace:identifier"};
   event.activity.clear();
   event.activity_state = FirstClassAttributeState::kPresent;
   rejects();
   event.activity = "5";
   options.case_numeric_attributes = {"activity"};
+  options.feature_names = {"event:activity", "trace:activity"};
   rejects(); // Event activity is not a trace case-id alias.
 
   options.variant = LogToFeaturesVariant::EVENT_BASED;
@@ -481,7 +486,7 @@ static void numeric_features_resolve_first_class_cells_and_inference() {
   inferred_log.traces[0].attributes = {typed};
   const auto inferred = log_to_features(inferred_log);
   assert(std::find(inferred.feature_names.begin(), inferred.feature_names.end(), "event:number") != inferred.feature_names.end());
-  assert(std::find(inferred.feature_names.begin(), inferred.feature_names.end(), "case:number") != inferred.feature_names.end());
+  assert(std::find(inferred.feature_names.begin(), inferred.feature_names.end(), "trace:number") != inferred.feature_names.end());
   typed.kind = AttributeKind::kInt;
   for (const auto kind : {AttributeContainerKind::kList, AttributeContainerKind::kTuple,
                           AttributeContainerKind::kSet, AttributeContainerKind::kFrozenSet}) {
@@ -490,7 +495,7 @@ static void numeric_features_resolve_first_class_cells_and_inference() {
     inferred_log.traces[0].attributes = {typed};
     const auto nested = log_to_features(inferred_log);
     assert(std::find(nested.feature_names.begin(), nested.feature_names.end(), "event:number") == nested.feature_names.end());
-    assert(std::find(nested.feature_names.begin(), nested.feature_names.end(), "case:number") == nested.feature_names.end());
+    assert(std::find(nested.feature_names.begin(), nested.feature_names.end(), "trace:number") == nested.feature_names.end());
   }
   LogToFeaturesOptions inference_options;
   inference_options.min_num_different_string_values = 1;
@@ -642,7 +647,97 @@ static void event_schema_respects_typed_selection_and_explicit_empty_lists() {
   assert(empty.feature_names.empty() && empty.event_rows.size() == 1 && empty.event_rows[0].empty());
 }
 
+static void trace_core_schema_preserves_selection_and_typed_categories() {
+  EventLog log;
+  Trace first{"one", {Event{"one", "A", "invalid timestamp"}, Event{"one", "B"}}};
+  first.attributes = {{"group", "z"}, {"number", "4", AttributeKind::kInt}};
+  first.events[0].attributes = {{"value", ""}, {"number", "2", AttributeKind::kInt}};
+  first.events[1].attributes = {make_bytes_attribute("value", "x"), {"number", "3", AttributeKind::kInt}};
+  Trace second{"two", {Event{"two", "B"}}};
+  second.attributes = {{"group", "a"}, {"number", "7", AttributeKind::kInt}};
+  second.events[0].attributes = {{"value", "", AttributeKind::kString, true}, {"number", "8", AttributeKind::kInt}};
+  log.traces = {first, second};
+  LogToFeaturesOptions options;
+  options.case_string_attributes = {"group"};
+  options.event_string_attributes = {"value"};
+  options.case_numeric_attributes = {"number"};
+  options.event_numeric_attributes = {"number"};
+  options.event_successor_attributes = {"value"};
+  options.enable_succ_def_representation = false;
+  options.min_num_different_string_values = 100;
+  options.default_not_present = -7;
+  const auto result = log_to_features(log, options);
+  assert((result.feature_names == std::vector<std::string>{"trace:group@a", "trace:group@z",
+      "event:value@", "event:value@None", "event:value@b'x'", "trace:number", "event:number",
+      "succession:value@#b'x'", "succession:value@UNDEFINED"}));
+  assert((result.trace_rows == std::vector<std::vector<double>>{
+      {0,1,1,0,1,4,3,1,0}, {1,0,0,1,0,7,8,0,1}}));
+  options.feature_names = {"event:number", "unknown", "event:number", "", "activity_count:A"};
+  const auto duplicate = log_to_features(log, options);
+  assert((duplicate.trace_rows[0] == std::vector<double>{0,0,3,0,0}));
+  assert(log_to_features_json(duplicate).find("\"feature_names\":[\"event:number\",\"unknown\",\"event:number\",\"\",\"activity_count:A\"]") != std::string::npos);
+  options.feature_names.clear();
+  options.feature_names_supplied = true;
+  assert(log_to_features(log, options).trace_rows == std::vector<std::vector<double>>(2));
+  auto invalid_numeric = log;
+  invalid_numeric.traces[0].events[0].attributes.back() = {"number", "bad"};
+  invalid_numeric.traces[0].attributes.back() = {"number", "bad"};
+  assert(log_to_features(invalid_numeric, options).trace_rows == std::vector<std::vector<double>>(2));
+  options = {};
+  options.event_string_attributes_supplied = true;
+  const auto none = log_to_features(log, options);
+  assert(none.feature_names.empty() && none.trace_rows == std::vector<std::vector<double>>(2));
+  options.feature_names = {"event:number", "event:concept:name@A"};
+  assert((log_to_features(log, options).trace_rows[0] == std::vector<double>{0,0}));
+  options = {};
+  options.event_numeric_attributes = {"number", "number"};
+  const auto repeated = log_to_features(log, options);
+  assert((repeated.feature_names == std::vector<std::string>{"event:number", "event:number"}));
+  assert((repeated.trace_rows[0] == std::vector<double>{0,3}));
+  options = {};
+  options.event_string_attributes = {"value"};
+  options.event_successor_attributes = {"value"};
+  log.traces[0].events.insert(log.traces[0].events.begin() + 1, Event{"one", "gap"});
+  log.traces[1].events[0].attributes.clear();
+  const auto gap = log_to_features(log, options);
+  assert((gap.feature_names == std::vector<std::string>{"event:value@", "event:value@UNDEFINED",
+      "event:value@b'x'", "succession:value@UNDEFINED"}));
+  assert((gap.trace_rows == std::vector<std::vector<double>>{{1,0,1,1}, {0,1,0,1}}));
+}
+
+static void trace_default_schema_infers_complete_trace_presence() {
+  auto log = fixture();
+  log.traces[0].events[0].timestamp = "unused invalid timestamp";
+  LogToFeaturesOptions options;
+  options.min_num_different_string_values = 5;
+  options.max_num_different_string_values = 1;
+  const auto result = log_to_features(log, options);
+  assert((result.feature_names == std::vector<std::string>{"trace:segment@gold",
+      "event:concept:name@A", "event:concept:name@B", "event:kind@x", "event:org:resource@r1",
+      "event:amount", "succession:concept:name@A#B"}));
+  assert((result.trace_rows[0] == std::vector<double>{1,1,1,1,1,3,1}));
+  log.traces[0].events[1].attributes.clear();
+  const auto sparse = log_to_features(log, options);
+  const auto amount = std::find(sparse.feature_names.begin(), sparse.feature_names.end(), "event:amount");
+  assert(amount != sparse.feature_names.end());
+  assert(sparse.trace_rows[0][static_cast<std::size_t>(amount - sparse.feature_names.begin())] == 2.5);
+  log.traces.push_back(Trace{"missing", {Event{"missing", "C"}}});
+  const auto missing = log_to_features(log, options);
+  assert(std::find(missing.feature_names.begin(), missing.feature_names.end(), "event:amount") == missing.feature_names.end());
+  assert(std::find(missing.feature_names.begin(), missing.feature_names.end(), "event:kind@x") == missing.feature_names.end());
+  assert(std::find(missing.feature_names.begin(), missing.feature_names.end(), "trace:segment@gold") == missing.feature_names.end());
+  for (auto& trace : log.traces) for (auto& event : trace.events) {
+    event.attributes = {{"boolean", "true", AttributeKind::kBoolean}, make_bytes_attribute("bytes", "x")};
+  }
+  const auto omitted = log_to_features(log, options);
+  assert(std::none_of(omitted.feature_names.begin(), omitted.feature_names.end(), [](const auto& name) {
+    return name.starts_with("event:boolean") || name.starts_with("event:bytes");
+  }));
+}
+
 int main() {
+  trace_default_schema_infers_complete_trace_presence();
+  trace_core_schema_preserves_selection_and_typed_categories();
   event_schema_respects_typed_selection_and_explicit_empty_lists();
   numeric_features_resolve_first_class_cells_and_inference();
   event_numeric_attributes_require_complete_native_columns();
@@ -667,14 +762,15 @@ int main() {
   e.variant = LogToFeaturesVariant::TRACE_BASED;
   const auto tr = log_to_features(log, e);
   assert(tr.trace_rows.size() == 1 && tr.trace_rows[0].size() == tr.feature_names.size());
-  assert(std::find(tr.feature_names.begin(), tr.feature_names.end(), "activity:A") != tr.feature_names.end());
+  assert(std::find(tr.feature_names.begin(), tr.feature_names.end(), "event:kind@x") != tr.feature_names.end());
   e.enable_all_extra_features = true;
   e.add_case_identifier_column = true;
+  e.event_successor_attributes = {"concept:name"};
   const auto rich = log_to_features(log, e);
   assert(rich.case_ids.size() == 1 && rich.case_ids[0] == "c1");
   assert(std::find(rich.feature_names.begin(), rich.feature_names.end(), "@@caseDuration") != rich.feature_names.end());
   assert(std::find(rich.feature_names.begin(), rich.feature_names.end(), "@@max_concurrent_activities_general") != rich.feature_names.end());
-  assert(std::find(rich.feature_names.begin(), rich.feature_names.end(), "succession:activity@A#B") != rich.feature_names.end());
+  assert(std::find(rich.feature_names.begin(), rich.feature_names.end(), "succession:concept:name@A#B") != rich.feature_names.end());
   e.variant = LogToFeaturesVariant::TEMPORAL; e.grouper_freq.clear(); e.window_seconds = 3600;
   const auto tm = log_to_features(log, e);
   assert(tm.temporal_rows.size() == 2 && tm.temporal_rows[0].values.size() == tm.feature_names.size());
@@ -703,7 +799,7 @@ int main() {
   const auto empty_temporal = log_to_features(empty, e);
   assert(empty_temporal.temporal_rows.empty() && !empty_temporal.feature_names.empty());
   observed_path_timing_uses_configured_starts();
-  trace_defaults_infer_case_attributes_and_scope_missing_values();
+  explicit_trace_attributes_scope_missing_values();
   overlap_extras_use_case_intervals_and_other_events();
   temporal_calendar_frequency_uses_period_boundaries();
 }

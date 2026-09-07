@@ -3073,8 +3073,8 @@ timestamp, or case columns. Categorical selection collects only string values;
 missing/null/non-string rows remain zero. Cardinality bounds apply to inferred
 and explicitly selected categorical groups. Omitted categorical/numeric lists
 infer their group, whereas explicitly empty lists suppress it. Native supplied
-flags and presence-aware CLI/server parsing preserve that distinction. Event
-feature-name request lists preserve whitespace and use `\e` for an empty name;
+flags and presence-aware CLI/server parsing preserve that distinction. Event and
+trace feature-name request lists preserve whitespace and use `\e` for an empty name;
 the existing escaped comma/backslash syntax still represents literal characters.
 The frontend emits this encoding, distinguishing an empty schema from a schema
 containing an empty-name column.
@@ -3088,20 +3088,44 @@ empty log raises; a log containing an empty trace retains its zero-event tensor.
 Numeric event columns require a present native numeric scalar in every event;
 Boolean values qualify, while strings, bytes, nulls, missing values, and
 containers exclude the column. Event numeric cells use float32 precision.
-Trace numeric selectors convert every present value before retaining the last
-event value, so an earlier invalid value is still an error. Numeric byte values
-are decoded before conversion, Unicode numeric strings and separators are
+Trace schemas emit trace categorical, event categorical, trace numeric, event
+numeric, and succession groups in that order. Explicit attribute lists preserve
+order and duplicates, with sorted categories within each attribute. Supplying
+any ordinary selection list, including an empty list, disables ordinary default
+inference and its forced activity/succession additions. A succession list alone
+does not select explicit mode. Explicit succession selection ignores the default
+succession flag. Typed categories preserve empty strings and stringify nulls,
+bytes, and containers; absent trace values and traces with no selected event
+value use `UNDEFINED`. Successions require adjacent events with both values
+present; missing events interrupt a pair, and traces without a pair use
+`UNDEFINED`.
+Explicit trace schemas retain duplicate, empty, whitespace, and unknown names;
+only the last duplicate column is populated. They encode only selected groups,
+with zero for unassigned core cells regardless of default-not-present. An empty
+schema retains one empty row per trace. Legacy activity-count, duration, and WIP
+columns are no longer injected; timing and workload extras remain opt-in.
+Core extraction does not parse unused timestamps.
+Trace numeric selectors whose columns occur in the schema convert every present
+value before retaining the last event value, so an earlier invalid value is
+still an error. Columns excluded by an explicit schema skip numeric conversion.
+Numeric byte values are decoded before conversion, Unicode numeric strings and separators are
 accepted, and null/container values are rejected. A selected event numeric
 attribute must occur in every trace, and selected trace numeric attributes must
 be present; an empty log still yields an empty matrix.
 Result serialization enforces one row family per variation, rectangular
-matrices, aligned case identifiers, and finite temporal coordinates. Trace and
-temporal schemas retain their unique non-empty name validation; event schemas
-preserve the explicit-name behavior above. Finite numeric cells use round-trip precision. Native
-NaN and infinities survive extraction; JSON encodes them as the exact strings
+matrices, aligned case identifiers, and finite temporal coordinates. Temporal
+schemas retain unique non-empty name validation; event and trace schemas preserve
+their respective explicit-name behavior above. Finite numeric cells use
+round-trip precision. Native NaN and infinities survive extraction; JSON encodes them as the exact strings
 `NaN`, `Infinity`, and `-Infinity`, accepted by the typed frontend result guard.
-These numeric contracts do not certify the broader feature schema and inference
-variations as complete.
+Homogeneous default trace inference requires an attribute somewhere in every
+trace (event attributes) or on every trace (trace attributes), excludes the
+canonical trace identifier, and omits boolean-only attributes.
+Default trace inference still needs broader proof: mixed-type selection and
+ordinary attribute ordering vary across hash seeds in the pinned runtime.
+Default unhashable-container handling also remains open.
+The feature variations remain partial, including inference and extra-feature
+contracts that have not received complete behavioral coverage.
 
 Case- and event-level embeddings support deterministic local encoders and an
 injectable transformer runtime with inferred or explicit dimensions. Model,
