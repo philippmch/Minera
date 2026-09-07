@@ -740,7 +740,77 @@ void test_trace_equivalence() {
   compare(a, b, true);
 }
 
+void test_shared_context_log() {
+  using namespace minera;
+  Event input;
+  EventAttribute nested{"v", "parent"};
+  nested.children = {{"n", "1", AttributeKind::kInt}};
+  input.attributes = {nested, {"cost", "1"}};
+  auto source = make_shared_root_cause_context(input);
+  std::vector<RootCauseSharedObservation> fit{{3, source}};
+  auto problem = make_shared_root_cause_context(numeric(8).context);
+  std::vector<RootCauseSharedObservation> bad{{7, problem}, {8, problem}};
+  auto log = build_shared_root_cause_log(fit, bad, true);
+  assert(log.contexts.size() == 4);
+  auto object = log.contexts[0].attributes[0].value;
+  object->value = "changed";
+  object->children[0].value->value = "2";
+  assert(source.attributes[0].value->value == "changed");
+  assert(fit[0].context.attributes[0].value->children[0].value->value == "2");
+  assert(log.contexts[1].attributes[0].value == object);
+  // Creating the reference graph is a snapshot of the value-owned Event.
+  assert(input.attributes[0].value == "parent");
+  auto replacement = make_shared_root_cause_context(Event{});
+  replacement.attributes.push_back({"v", std::make_shared<RootCauseSharedValue>()});
+  replacement.attributes[0].value->value = "replacement";
+  log.contexts[0].attributes[0] = replacement.attributes[0];
+  assert(log.contexts[0].attributes[0].value->value == "replacement");
+  assert(log.contexts[1].attributes[0].value->value == "changed");
+  log.contexts[0].attributes.erase(log.contexts[0].attributes.begin() + 1);
+  assert(source.attributes.size() == 2 && log.contexts[1].attributes.size() == 2);
+  const auto snapshot = materialize_root_cause_log(log);
+  assert(snapshot.traces.size() == 4 && snapshot.traces[0].attributes.empty());
+  assert(snapshot.traces[1].events[0].attributes[0].children[0].value == "2");
+  object->children[0].value->value = "3";
+  assert(snapshot.traces[1].events[0].attributes[0].children[0].value == "2");
+  auto matrix = build_shared_root_cause_representation(fit, bad, {{"v"}, {}});
+  assert((matrix.source_trace_indices == std::vector<std::size_t>{3, 7, 8}));
+  assert(std::find(matrix.feature_names.begin(), matrix.feature_names.end(),
+      "event:v@{'value': 'changed', 'children': {'n': 3}}") != matrix.feature_names.end());
+  auto owner = make_shared_root_cause_context(input);
+  auto surviving = build_shared_root_cause_log({{0, owner}}, {});
+  owner = {};
+  assert(materialize_root_cause_log(surviving).traces[0].events[0].attributes[0].value == "parent");
+  assert(build_shared_root_cause_log({}, {}).contexts.empty());
+  bool rejected = false;
+  try { (void)build_shared_root_cause_log(fit, {}, true); }
+  catch (const std::domain_error&) { rejected = true; }
+  assert(rejected);
+  Event projected;
+  projected.resource = "stale";
+  projected.resource_state = FirstClassAttributeState::kPresent;
+  projected.resource_attribute = nested;
+  projected.resource_attribute->key = "org:resource";
+  auto shared_projection = make_shared_root_cause_context(projected);
+  auto projection_log = build_shared_root_cause_log({{0, shared_projection}}, {});
+  projection_log.contexts[0].resource_attribute->value->value = "updated";
+  assert(materialize_root_cause_context(shared_projection).resource_attribute->value == "updated");
+  auto cyclic = make_shared_root_cause_context(input);
+  auto shared_child = cyclic.attributes[0].value->children[0];
+  shared_child.key = "another";
+  cyclic.attributes[0].value->children.push_back(shared_child);
+  auto dag = materialize_root_cause_context(cyclic);
+  assert(dag.attributes[0].children.size() == 2);
+  assert(dag.attributes[0].children[0].value == dag.attributes[0].children[1].value);
+  cyclic.attributes[0].value->children.push_back(cyclic.attributes[0]);
+  rejects([&] { (void)materialize_root_cause_context(cyclic); });
+  cyclic.attributes[0].value->children.pop_back();
+  cyclic.attributes[0].value.reset();
+  rejects([&] { (void)materialize_root_cause_context(cyclic); });
+}
+
 int main() {
+  test_shared_context_log();
   test_native_scalar_identity();
   test_trace_equivalence();
   test_numeric_tree();

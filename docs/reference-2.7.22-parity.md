@@ -326,8 +326,14 @@ eligibility is cached across classifiers. The UI includes scalar type labels
 so same-spelling typed keys remain distinguishable.
 The support module remains **partial**: tuple-valued unknown keys are not yet
 represented. Adding these encoding
-contracts also leaves nested mutation aliasing in the standalone log helper
-unresolved: the reference shares nested objects, while native logs copy them.
+contracts includes a reference-aware helper path: `RootCauseSharedContext` and
+`build_shared_root_cause_log` share entire nested value objects, including parent
+scalar fields and child bindings. Top-level rebinding remains local to each
+context. `build_shared_root_cause_representation` reads current values;
+`materialize_root_cause_log` makes a detached snapshot for existing algorithms
+and serializers. Importing a value-owned `Event` into the shared graph is also
+a snapshot; callers retain shared contexts to observe mutations. Cyclic graphs
+cannot be materialized into tree-shaped native logs.
 These contracts do not certify either replay variation.
 
 Token replay flat-input evidence: `normalize_token_replay_event_log` and the

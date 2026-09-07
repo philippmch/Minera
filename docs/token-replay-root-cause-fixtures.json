@@ -96,8 +96,15 @@
     "nested_activity": "A list-valued activity remains a baseline row for a scalar unknown key; it does not cause a hashability error.",
     "transport": "Optional activity_attribute carries typed scalar metadata beside legacy activity and activity_is_null fields."
   },
+  "shared_context_helpers": {
+    "parent_value_mutation": "Editing the nested dictionary's value field propagates to the input and repeated rows.",
+    "nested_child_mutation": "Editing nested child objects propagates through every shared binding.",
+    "top_level_rebinding": "Replacing one event dictionary binding leaves the input and other rows unchanged.",
+    "native_api": "RootCauseSharedContext and build_shared_root_cause_log preserve reference semantics. make_shared_root_cause_context snapshots a value-owned Event; materialize_root_cause_log creates a detached EventLog snapshot. Encoding reads the current shared values.",
+    "lifetime": "Shared values remain valid after the input context owner is destroyed."
+  },
   "remaining_contracts": [
-    "The standalone log helper shares nested dictionary/list objects in the pinned runtime; native EventLog currently copies nested values and cannot expose those mutations across rows.",
+    "Cyclic shared value graphs cannot be materialized into the native tree-shaped EventLog representation.",
     "Tuple-valued unknown-activity keys remain unsupported by native scalar activity cells.",
     "Native scalar replacement must use assignment or emplace to renew NaN alias identity; mutation through a raw mutable variant reference does not renew it.",
     "Legacy backwards replay diagnostic context production is a native extension."
