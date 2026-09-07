@@ -95,6 +95,13 @@ struct LogToFeaturesOptions {
   bool enable_max_concurrent_events_per_activity_supplied = false;
   // Omitted: concept:name for TRACE; case:concept:name for calendar TEMPORAL.
   std::optional<std::string> case_id_key;
+  // Calendar TEMPORAL destinations for derived event-table columns.
+  std::string arrival_rate = "@@arrival_rate";
+  std::string finish_rate = "@@finish_rate";
+  std::string service_time = "@@service_time";
+  std::string waiting_time = "@@waiting_time";
+  std::string sojourn_time = "@@sojourn_time";
+  std::string diff_start_end = "@@diff_start_end";
 };
 
 // Calendar buckets with events but no valid cases use an empty rework string.

@@ -3232,6 +3232,13 @@ completion cells reject. Missing completion values are ignored when finding case
 time bounds; each valid case must retain at least one completion. Null or missing
 starts exclude events from calendar buckets but preserve their contribution to
 whole-case timing. An entirely missing start column rejects.
+Calendar metric destination options expose arrival, finish, service, waiting,
+sojourn, and per-event difference scratch columns, including empty names. Ordered
+virtual writes let selected category columns and shared metric destinations
+observe overwritten values while preserving native input attributes. Canonical
+output names remain unchanged. Destination collisions with case and date columns
+follow the validated grouping and timing stages; exhaustive collision coverage
+remains open.
 The feature variations remain partial, including inference and extra-feature
 contracts that have not received complete behavioral coverage.
 

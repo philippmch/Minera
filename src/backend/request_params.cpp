@@ -4884,6 +4884,15 @@ LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
   assign_string("timestamp_key", params.timestamp_key);
   assign_string("start_timestamp_key", params.start_timestamp_key);
   assign_string("resource_key", params.resource_key);
+  const auto assign_destination = [&](std::string_view suffix, std::string& out) {
+    if (supplied(suffix)) out = field(key_for(suffix));
+  };
+  assign_destination("arrival_rate", params.arrival_rate);
+  assign_destination("finish_rate", params.finish_rate);
+  assign_destination("service_time", params.service_time);
+  assign_destination("waiting_time", params.waiting_time);
+  assign_destination("sojourn_time", params.sojourn_time);
+  assign_destination("diff_start_end", params.diff_start_end);
   assign_string("grouper_freq", params.grouper_freq);
   if (supplied("window_seconds")) {
     params.window_seconds = parse_finite_double(require("window_seconds"), key_for("window_seconds"));

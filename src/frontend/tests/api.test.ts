@@ -1889,6 +1889,11 @@ describe("log-to-features API", () => {
     expect(() => logToFeaturesQuery({ features_variant: "temporal", features_window_seconds: 60, features_min_num_different_string_values: 3, features_max_num_different_string_values: 2 })).toThrow(/bounds/);
   });
 
+  it("serializes temporal metric destinations including an empty column name", () => {
+    expect(logToFeaturesQuery({ features_variant: "temporal", features_arrival_rate: "arrival", features_finish_rate: "finish", features_service_time: "", features_waiting_time: "wait", features_sojourn_time: "sojourn", features_diff_start_end: "diff" }))
+      .toBe("features_arrival_rate=arrival&features_diff_start_end=diff&features_finish_rate=finish&features_service_time=&features_sojourn_time=sojourn&features_variant=temporal&features_waiting_time=wait");
+  });
+
   it("serializes trace representation and extra feature controls", () => {
     expect(logToFeaturesQuery({
       features_enable_all_extra_features: true,

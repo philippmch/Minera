@@ -1512,6 +1512,132 @@ static void temporal_calendar_missing_completions_are_validated_per_case() {
   assert(result.temporal_rows[0].values[2] == 1);
 }
 
+static void temporal_calendar_metric_destinations_observe_write_order() {
+  EventLog log;
+  log.traces = {Trace{"c", {
+      timed_event("c", "A", "1970-01-01T00:00:00Z", "1970-01-01T00:00:10Z", 0),
+      timed_event("c", "B", "1970-01-01T00:00:20Z", "1970-01-01T00:00:40Z", 1)}}};
+  log.traces[0].events[1].resource = "r2";
+  LogToFeaturesOptions base;
+  base.variant = LogToFeaturesVariant::TEMPORAL;
+  base.grouper_freq = "D";
+  base.start_timestamp_key = "start_time";
+  const auto baseline = log_to_features(log, base);
+  for (auto& event : log.traces[0].events)
+    for (const auto& key : {"@@arrival_rate", "@@finish_rate", "@@service_time", "@@sojourn_time", "@@waiting_time", "@@diff_start_end"})
+      event.attributes.push_back({key, "999", AttributeKind::kInt});
+  const auto original_attributes = log.traces[0].events[0].attributes;
+  assert(log_to_features(log, base).temporal_rows[0].values == baseline.temporal_rows[0].values);
+  auto options = base;
+  options.arrival_rate = "arrival";
+  options.finish_rate = "finish";
+  options.service_time = "";
+  options.sojourn_time = "sojourn";
+  options.waiting_time = "waiting";
+  options.diff_start_end = "difference";
+  assert(log_to_features(log, options).temporal_rows[0].values == baseline.temporal_rows[0].values);
+  options = base;
+  options.activity_key = options.resource_key = "@@service_time";
+  auto result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[0] == 1 && result.temporal_rows[0].values[1] == 1);
+  assert(result.temporal_rows[0].values[8] == 1);
+  options = base;
+  options.service_time = "org:resource";
+  assert(log_to_features(log, options).temporal_rows[0].values[0] == 1);
+  options = base;
+  options.waiting_time = "concept:name";
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[1] == 1 && result.temporal_rows[0].values[8] == 1);
+  options = base;
+  options.service_time = options.sojourn_time = "shared";
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[5] == 0 && result.temporal_rows[0].values[6] == 30 && result.temporal_rows[0].values[7] == 30);
+  options = base;
+  options.service_time = options.waiting_time = "shared";
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[5] == 30 && result.temporal_rows[0].values[6] == 30 && result.temporal_rows[0].values[7] == 30);
+  options = base;
+  options.diff_start_end = options.service_time = "shared";
+  assert(log_to_features(log, options).temporal_rows[0].values == baseline.temporal_rows[0].values);
+  options = base;
+  options.diff_start_end = "case:concept:name";
+  assert(log_to_features(log, options).temporal_rows[0].values == baseline.temporal_rows[0].values);
+  const auto rejects = [&] {
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  for (auto field : {&LogToFeaturesOptions::arrival_rate, &LogToFeaturesOptions::finish_rate,
+                     &LogToFeaturesOptions::service_time, &LogToFeaturesOptions::sojourn_time,
+                     &LogToFeaturesOptions::waiting_time}) {
+    options = base;
+    options.*field = "case:concept:name";
+    rejects();
+    log.traces[0].case_id_attribute = EventAttribute{"concept:name", "stale", AttributeKind::kInt};
+    log.traces[0].case_id_attribute->typed_value = std::int64_t{0};
+    log.traces[0].case_id_state = FirstClassAttributeState::kPresent;
+    rejects();
+    log.traces[0].case_id_attribute.reset();
+  }
+  for (auto field : {&LogToFeaturesOptions::finish_rate, &LogToFeaturesOptions::service_time,
+                     &LogToFeaturesOptions::diff_start_end}) {
+    options = base;
+    options.*field = "time:timestamp";
+    rejects();
+  }
+  options = base;
+  options.service_time = "start_time";
+  rejects();
+  options = base;
+  options.waiting_time = "time:timestamp";
+  assert(log_to_features(log, options).temporal_rows[0].values == baseline.temporal_rows[0].values);
+  assert(log.traces[0].events[0].attributes == original_attributes);
+  options = base;
+  options.arrival_rate = options.finish_rate = "rates";
+  log.traces = {
+      Trace{"a", {timed_event("a", "A", "1970-01-01T00:00:00Z", "1970-01-01T00:00:00Z", 0),
+                  timed_event("a", "B", "1970-01-01T00:00:20Z", "1970-01-01T00:00:20Z", 1)}},
+      Trace{"b", {timed_event("b", "A", "1970-01-01T00:00:40Z", "1970-01-01T00:00:40Z", 0),
+                  timed_event("b", "B", "1970-01-01T00:01:30Z", "1970-01-01T00:01:30Z", 1)}}};
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[3] == 35 && result.temporal_rows[0].values[4] == 35);
+  for (const bool reverse : {false, true}) {
+    log.traces = {
+        Trace{"c1", {Event{"c1", "A", "1970-01-01T00:00:10Z", "r"},
+                     Event{"c1", "A", "1970-01-01T00:00:40Z", "r"}}},
+        Trace{"c2", {Event{"c2", "A", "1970-01-01T00:01:00Z", "r"},
+                     Event{"c2", "A", "1970-01-01T00:01:50Z", "r"}}}};
+    if (reverse) std::reverse(log.traces.begin(), log.traces.end());
+    options = base;
+    options.start_timestamp_key.clear();
+    options.diff_start_end = "case:concept:name";
+    result = log_to_features(log, options);
+    assert((result.temporal_rows[0].values == std::vector<double>{1,1,4,0,0,100,100,0,3,1,4,1,1}));
+    for (auto& trace : log.traces) {
+      const std::vector<std::string> starts = trace.case_id == "c1"
+          ? std::vector<std::string>{"1970-01-01T00:03:20Z", "1970-01-01T00:03:30Z"}
+          : std::vector<std::string>{"1970-01-01T00:00:00Z", "1970-01-01T00:00:01Z"};
+      for (std::size_t i = 0; i < trace.events.size(); ++i)
+        trace.events[i].attributes = {{"start_time", starts[i], AttributeKind::kDate}};
+    }
+    options.start_timestamp_key = "start_time";
+    result = log_to_features(log, options);
+    assert(result.temporal_rows[0].values[3] == 50 && result.temporal_rows[0].values[4] == 70);
+    options.start_timestamp_key.clear();
+    options.diff_start_end = "@@arrival_rate";
+    result = log_to_features(log, options);
+    assert(result.temporal_rows[0].values[3] == 0 && result.temporal_rows[0].values[4] == 35);
+    options.diff_start_end = "@@finish_rate";
+    result = log_to_features(log, options);
+    assert(result.temporal_rows[0].values[3] == 25 && result.temporal_rows[0].values[4] == 0);
+    options.diff_start_end = "@@diff_start_end";
+    options.arrival_rate = "@@diff_start_end";
+    result = log_to_features(log, options);
+    assert(result.temporal_rows[0].values[3] == 0 && result.temporal_rows[0].values[4] == 35);
+  }
+}
+
 static void temporal_calendar_frequency_uses_period_boundaries() {
   EventLog log;
   Trace first;
@@ -2079,6 +2205,7 @@ static void trace_default_schema_infers_complete_trace_presence() {
 }
 
 int main() {
+  temporal_calendar_metric_destinations_observe_write_order();
   temporal_calendar_missing_completions_are_validated_per_case();
   temporal_calendar_timestamps_use_projected_native_dates();
   temporal_calendar_categories_use_projected_trace_columns();
