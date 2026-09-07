@@ -39,6 +39,7 @@ const char* attribute_kind_name(AttributeKind kind) {
     case AttributeKind::kFloat: return "float";
     case AttributeKind::kBoolean: return "boolean";
     case AttributeKind::kId: return "id";
+    case AttributeKind::kBytes: return "bytes";
   }
   return "string";
 }

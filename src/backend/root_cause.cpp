@@ -264,8 +264,26 @@ std::string date_category(std::string text, bool nested) {
   return result + ")";
 }
 
+std::string bytes_category(const EventAttribute& value) {
+  const auto bytes = decode_bytes_attribute(value);
+  const char quote = bytes.find('\'') != std::string::npos && bytes.find('"') == std::string::npos ? '"' : '\'';
+  std::string result = "b";
+  result += quote;
+  constexpr char hex[] = "0123456789abcdef";
+  for (const unsigned char byte : bytes) {
+    if (byte == '\\' || byte == quote) { result += '\\'; result += static_cast<char>(byte); }
+    else if (byte == '\t') result += "\\t";
+    else if (byte == '\n') result += "\\n";
+    else if (byte == '\r') result += "\\r";
+    else if (byte >= 32 && byte < 127) result += static_cast<char>(byte);
+    else { result += "\\x"; result += hex[byte >> 4]; result += hex[byte & 15]; }
+  }
+  return result + quote;
+}
+
 std::string scalar_category(const EventAttribute& value, bool nested) {
   if (value.is_null) return "None";
+  if (value.kind == AttributeKind::kBytes) return bytes_category(value);
   if (const auto* boolean = std::get_if<bool>(&value.typed_value))
     return *boolean ? "True" : "False";
   if (const auto* integer = std::get_if<std::int64_t>(&value.typed_value))
@@ -390,10 +408,18 @@ double decimal_number(const std::string& source, const std::string& key) {
 double number_for(const Event& event, const std::string& key) {
   const auto value = value_for(event, key);
   if (!value || value->is_null || value->container != AttributeContainerKind::kScalar || !value->children.empty() ||
-      value->kind == AttributeKind::kDate || std::holds_alternative<NativeDate>(value->typed_value))
+      value->kind == AttributeKind::kDate ||
+      (value->kind != AttributeKind::kBytes && std::holds_alternative<NativeDate>(value->typed_value)))
     throw std::invalid_argument("root cause: missing or invalid numeric attribute: " + key);
   double result = 0;
-  if (const auto* real = std::get_if<double>(&value->typed_value)) result = *real;
+  if (value->kind == AttributeKind::kBytes) {
+    const auto bytes = decode_bytes_attribute(*value);
+    for (const unsigned char byte : bytes)
+      if (byte >= 128 || byte == 0)
+        throw std::invalid_argument("root cause: invalid numeric byte attribute: " + key);
+    result = decimal_number(bytes, key);
+  }
+  else if (const auto* real = std::get_if<double>(&value->typed_value)) result = *real;
   else if (const auto* integer = std::get_if<std::int64_t>(&value->typed_value)) result = static_cast<double>(*integer);
   else if (const auto* boolean = std::get_if<bool>(&value->typed_value)) result = *boolean ? 1.0 : 0.0;
   else if (value->kind == AttributeKind::kBoolean && (value->value == "true" || value->value == "false"))

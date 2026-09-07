@@ -344,7 +344,18 @@ cannot be flattened into tree-shaped native logs. The shared and ordinary
 encoders use the same matrix construction and balancing logic. Integer values
 outside float64 range raise overflow; equivalent numeric strings may yield
 infinity in the standalone matrix helper.
-The support module remains **partial** while bytes, set, frozenset, and remaining
+Byte-valued attributes use `AttributeKind::kBytes` with hexadecimal octets in
+their text cell, keeping arbitrary binary payloads safe in JSON. Public make/decode
+helpers translate binary strings. Root-cause categories use byte-literal spelling,
+typed byte keys remain distinct from strings and numbers, and numeric byte
+conversion accepts ASCII syntax without Unicode digit/whitespace normalization.
+XES writes byte-literal strings in both exporter variations; native stream/table
+copies and JSON retain the binary type. The UI uses readable byte-key spelling.
+The hexadecimal payload is authoritative even when a stale native scalar remains;
+derived case IDs normalize byte cells to strings. This coverage is scoped to
+root-cause encoding and transport. Byte conversion in other numeric feature
+extractors and changed first-class table projections still requires auditing.
+The support module remains **partial** while set, frozenset, and remaining
 runtime value boundaries are audited.
 These contracts do not certify either replay variation.
 

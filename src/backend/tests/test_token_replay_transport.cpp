@@ -279,6 +279,9 @@ void replay_root_cause_json_contract() {
   const auto tuple_json = minera::imported_model_json(model, graph);
   assert(tuple_json.find("\"container\":\"tuple\"") != std::string::npos);
   assert(tuple_json.find("\"children\":[{\"key\":\"\",\"value\":\"x\"") != std::string::npos);
+  diagnostics.unknown_activities[0].activity_attribute = minera::make_bytes_attribute("task", std::string("\0\xff", 2));
+  const auto bytes_json = minera::imported_model_json(model, graph);
+  assert(bytes_json.find("\"key\":\"task\",\"value\":\"00ff\",\"kind\":\"bytes\"") != std::string::npos);
   diagnostics.transitions.clear();
   diagnostics.unknown_activities.clear();
   assert(minera::imported_model_json(model, graph).find("\"transitions\": [], \"unknown_activities\": []") != std::string::npos);

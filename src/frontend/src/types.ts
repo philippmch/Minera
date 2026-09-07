@@ -715,7 +715,7 @@ export type LogConversionVariant =
   | "TO_NX"
   | "DF_TO_EVENT_LOG_1V"
   | "DF_TO_EVENT_LOG_NV";
-export type LogConversionAttributeKind = "string" | "date" | "int" | "float" | "boolean" | "id";
+export type LogConversionAttributeKind = "string" | "date" | "int" | "float" | "boolean" | "id" | "bytes";
 export type LogConversionContainer = "scalar" | "list" | "container" | "tuple";
 export type LogConversionFirstClassRole =
   | "none" | "case_id" | "activity" | "timestamp" | "resource" | "lifecycle";
@@ -846,7 +846,7 @@ function isLogConversionAttribute(value: unknown): value is LogConversionAttribu
   const candidate = value as Partial<LogConversionAttribute>;
   if (typeof candidate.key !== "string" || typeof candidate.value !== "string" ||
       !("kind" in candidate) ||
-      !(["string", "date", "int", "float", "boolean", "id"] as const)
+      !(["string", "date", "int", "float", "boolean", "id", "bytes"] as const)
         .includes(candidate.kind as LogConversionAttributeKind) ||
       (candidate.container !== undefined &&
        !(["scalar", "list", "container", "tuple"] as const)
@@ -1050,7 +1050,7 @@ function isLogConversionTableCell(value: unknown): value is LogConversionTableCe
   if (isLogConversionAttribute(value)) return true;
   const cell = value as Partial<LogConversionTableCell>;
   return typeof cell.value === "string" &&
-    (["string", "date", "int", "float", "boolean", "id"] as const)
+    (["string", "date", "int", "float", "boolean", "id", "bytes"] as const)
       .includes(cell.kind as LogConversionAttributeKind) &&
     (cell.null === undefined || typeof cell.null === "boolean") &&
     (cell.container === undefined ||
@@ -3525,7 +3525,7 @@ const dfgDataframeMeasures = new Set<DfgDataframeMeasure>([
 ]);
 const dfgDataframeBackends = new Set<DfgDataframeBackend>(["pandas", "polars"]);
 const dfgDataframeKinds = new Set<DfgDataframeAttributeKind>([
-  "string", "date", "int", "float", "boolean", "id",
+  "string", "date", "int", "float", "boolean", "id", "bytes",
 ]);
 const dfgDataframeContainers = new Set<DfgDataframeAttributeContainer>([
   "scalar", "list", "container", "tuple",
@@ -4625,7 +4625,8 @@ export type DfgDataframeAttributeKind =
   | "int"
   | "float"
   | "boolean"
-  | "id";
+  | "id"
+  | "bytes";
 export type DfgDataframeAttributeContainer = "scalar" | "list" | "container" | "tuple";
 export type DfgDataframeAttributeState = "missing" | "present" | "null";
 export type DfgDataframeAttributeRole =

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cmath>
 #include <optional>
+#include <stdexcept>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -19,7 +20,7 @@ namespace minera {
 // projection remains available in value for compatibility with existing
 // consumers; typed_value carries a validated native representation when one
 // is available.
-enum class AttributeKind { kString, kDate, kInt, kFloat, kBoolean, kId };
+enum class AttributeKind { kString, kDate, kInt, kFloat, kBoolean, kId, kBytes };
 
 enum class AttributeContainerKind { kScalar, kList, kContainer, kTuple };
 
@@ -161,6 +162,35 @@ struct EventAttribute {
     return typed_value == other.typed_value;
   }
 };
+
+// Byte cells store hexadecimal octets in value so all JSON transports remain
+// UTF-8 safe. These helpers accept/return the original binary byte sequence.
+inline EventAttribute make_bytes_attribute(std::string key, std::string_view bytes) {
+  EventAttribute result{std::move(key), "", AttributeKind::kBytes};
+  constexpr char hex[] = "0123456789abcdef";
+  result.value.reserve(bytes.size() * 2);
+  for (const unsigned char byte : bytes) {
+    result.value += hex[byte >> 4];
+    result.value += hex[byte & 15];
+  }
+  return result;
+}
+
+inline std::string decode_bytes_attribute(const EventAttribute& attribute) {
+  if (attribute.kind != AttributeKind::kBytes || attribute.value.size() % 2 != 0)
+    throw std::invalid_argument("invalid hexadecimal byte attribute");
+  const auto digit = [](char value) {
+    if (value >= '0' && value <= '9') return value - '0';
+    if (value >= 'a' && value <= 'f') return value - 'a' + 10;
+    if (value >= 'A' && value <= 'F') return value - 'A' + 10;
+    throw std::invalid_argument("invalid hexadecimal byte attribute");
+  };
+  std::string result;
+  result.reserve(attribute.value.size() / 2);
+  for (std::size_t i = 0; i < attribute.value.size(); i += 2)
+    result += static_cast<char>((digit(attribute.value[i]) << 4) | digit(attribute.value[i + 1]));
+  return result;
+}
 
 struct LogExtension {
   std::string name;
@@ -324,7 +354,7 @@ inline void copy_trace_context(const Trace& source, Trace& target) {
 
 // Update a projected trace id and keep its selected first-class attribute in
 // sync.  A derived id (for example, a subcase suffix) is no longer guaranteed
-// to satisfy the source scalar type, so typed numeric/date/boolean metadata is
+// to satisfy the source scalar type, so typed numeric/date/boolean/byte metadata is
 // safely represented as a string rather than leaving a stale native payload.
 inline void set_trace_case_id(Trace& trace, std::string value) {
   trace.case_id = std::move(value);
@@ -343,7 +373,8 @@ inline void set_trace_case_id(Trace& trace, std::string value) {
     if (selected.kind == AttributeKind::kDate ||
         selected.kind == AttributeKind::kInt ||
         selected.kind == AttributeKind::kFloat ||
-        selected.kind == AttributeKind::kBoolean) {
+        selected.kind == AttributeKind::kBoolean ||
+        selected.kind == AttributeKind::kBytes) {
       selected.kind = AttributeKind::kString;
     }
     selected.typed_value = std::monostate{};
