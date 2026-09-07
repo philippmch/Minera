@@ -354,7 +354,7 @@ copies and JSON retain the binary type. The UI uses readable byte-key spelling.
 The hexadecimal payload is authoritative even when a stale native scalar remains;
 derived case IDs normalize byte cells to strings. This coverage is scoped to
 root-cause encoding and transport. Byte conversion in other numeric feature
-extractors and changed first-class table projections still requires auditing.
+extractors still requires auditing.
 Set and frozenset values have distinct native container kinds. Their children
 carry the supplied member iteration order for categorical spelling; typed equal
 members collapse to the first supplied representative. Empty spellings are
@@ -2567,7 +2567,12 @@ present-empty cells in a flat table. After filters, surviving events are
 projected back to those rows by their stable input order and filter-side field
 changes are overlaid, so selected case columns can regroup rows independently
 of importer-created native traces without losing filter effects. XES requests
-retain their native trace boundaries.
+retain their native trace boundaries. Changed first-class cells use matching
+transformed attribute metadata, including selected case metadata from the
+enclosing trace. Without matching metadata, derived projections become scalar
+strings and discard stale native values and children; unchanged cells retain
+their original type. This prevents transformed byte or nested cells from
+retaining an incompatible payload while preserving source columns and roles.
 
 Focused regressions cover canonical classic/trace/split fixtures, raw and
 table-ordered split chunks, all eager/lazy/stream/log adapters, custom

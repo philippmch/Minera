@@ -479,6 +479,89 @@ void filtered_csv_projection_preserves_rows_and_segment_case_ids() {
   assert(threw);
 }
 
+void csv_projection_reconciles_transformed_typed_cells() {
+  CsvImportOptions options;
+  options.case_id_column = "case_ref"; options.activity_column = "phase";
+  options.timestamp_column = "finished";
+  std::istringstream csv("case_ref,phase,finished,extra\none,31,2024-01-01T00:00:00Z,keep\n");
+  const auto imported = import_csv_event_data(csv, options);
+  const auto activity_index = imported.table.column_index("phase");
+  const auto case_index = imported.table.column_index("case_ref");
+  const auto timestamp_index = imported.table.column_index("finished");
+  std::vector<EventAttribute> originals;
+  auto bytes = make_bytes_attribute("phase", "1"); originals.push_back(bytes);
+  auto integer = field("phase", "31", AttributeKind::kInt); integer.typed_value = std::int64_t{31}; originals.push_back(integer);
+  auto date = field("phase", "31", AttributeKind::kDate); date.typed_value = NativeDate{"2024-01-01T00:00:00Z"}; originals.push_back(date);
+  for (const auto container : {AttributeContainerKind::kList, AttributeContainerKind::kContainer,
+                               AttributeContainerKind::kTuple, AttributeContainerKind::kSet, AttributeContainerKind::kFrozenSet}) {
+    auto nested = field("phase", "31"); nested.container = container;
+    nested.children = {field("member", "1", AttributeKind::kInt)}; originals.push_back(nested);
+  }
+  for (auto original : originals) {
+    auto source = imported.table;
+    original.first_class_role = FirstClassAttributeRole::kActivity;
+    original.first_class_state = FirstClassAttributeState::kPresent;
+    original.first_class_source_key = "phase";
+    source.rows[0][activity_index] = original;
+    auto transformed = imported.log;
+    auto& selected = transformed.traces[0].events[0];
+    selected.activity_attribute.reset();
+    const auto unchanged = project_csv_event_table(source, transformed);
+    const auto& preserved = *unchanged.rows[0][activity_index];
+    assert(preserved.kind == original.kind && preserved.container == original.container);
+    assert(preserved.typed_value.index() == original.typed_value.index());
+    assert(preserved.children.size() == original.children.size());
+    selected.activity = "derived";
+    const auto changed = project_csv_event_table(source, transformed);
+    const auto& normalized = *changed.rows[0][activity_index];
+    assert(normalized.value == "derived" && normalized.kind == AttributeKind::kString);
+    assert(std::holds_alternative<std::monostate>(normalized.typed_value));
+    assert(normalized.container == AttributeContainerKind::kScalar && normalized.children.empty());
+    assert(normalized.first_class_role == FirstClassAttributeRole::kActivity &&
+           normalized.first_class_state == FirstClassAttributeState::kPresent &&
+           normalized.first_class_source_key == "phase");
+    assert(changed.columns == source.columns && changed.rows[0].back()->value == "keep");
+    selected.activity = original.value;
+    selected.activity_state = FirstClassAttributeState::kNull;
+    const auto null_table = project_csv_event_table(source, transformed);
+    assert(null_table.rows[0][activity_index]->is_null && null_table.rows[0][activity_index]->kind == AttributeKind::kString);
+    assert(null_table.rows[0][activity_index]->children.empty());
+    selected.activity_state = FirstClassAttributeState::kMissing;
+    const auto missing = project_csv_event_table(source, transformed);
+    assert(missing.rows[0][activity_index]->first_class_state == FirstClassAttributeState::kMissing);
+    assert(missing.rows[0][activity_index]->kind == original.kind);
+  }
+  auto transformed = imported.log;
+  auto& selected = transformed.traces[0].events[0];
+  selected.activity = "3432";
+  selected.activity_attribute = make_bytes_attribute("phase", "42");
+  selected.case_id = "42";
+  transformed.traces[0].case_id = "not-selected";
+  auto case_metadata = field("case_ref", "42", AttributeKind::kInt);
+  case_metadata.typed_value = std::int64_t{42};
+  transformed.traces[0].case_id_attribute = case_metadata;
+  selected.timestamp = "derived-time";
+  const auto replaced = project_csv_event_table(imported.table, transformed);
+  assert(replaced.rows[0][activity_index]->kind == AttributeKind::kBytes);
+  assert(decode_bytes_attribute(*replaced.rows[0][activity_index]) == "42");
+  assert(replaced.rows[0][case_index]->value == "42" && replaced.rows[0][case_index]->kind == AttributeKind::kInt);
+  assert(std::get<std::int64_t>(replaced.rows[0][case_index]->typed_value) == 42);
+  assert(replaced.rows[0][timestamp_index]->kind == AttributeKind::kString);
+  assert(std::holds_alternative<std::monostate>(replaced.rows[0][timestamp_index]->typed_value));
+  selected.activity = "nested";
+  auto nested = field("phase", "nested"); nested.container = AttributeContainerKind::kFrozenSet;
+  nested.children = {field("", "7", AttributeKind::kInt)};
+  selected.activity_attribute = nested;
+  const auto nested_table = project_csv_event_table(imported.table, transformed);
+  assert(nested_table.rows[0][activity_index]->container == AttributeContainerKind::kFrozenSet);
+  assert(nested_table.rows[0][activity_index]->children[0].value == "7");
+  selected.activity_state = FirstClassAttributeState::kNull;
+  nested.is_null = true; selected.activity_attribute = nested;
+  const auto typed_null = project_csv_event_table(imported.table, transformed);
+  assert(typed_null.rows[0][activity_index]->is_null &&
+         typed_null.rows[0][activity_index]->container == AttributeContainerKind::kFrozenSet);
+}
+
 void lazy_inputs_restart_and_all_variants_are_deterministic() {
   const auto table = custom_table();
   const auto lazy = LazyEventTable::from_table(table);
@@ -511,6 +594,7 @@ int main() {
   strict_required_cells_and_timestamps_fail_deterministically();
   native_trace_boundaries_survive_custom_case_selectors();
   filtered_csv_projection_preserves_rows_and_segment_case_ids();
+  csv_projection_reconciles_transformed_typed_cells();
   lazy_inputs_restart_and_all_variants_are_deterministic();
   return 0;
 }
