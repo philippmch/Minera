@@ -3182,8 +3182,14 @@ last observed bucket, with zero metrics for empty buckets. Multi-period ticks
 anchor to the earliest event-start day; weekly and month/quarter/year periods
 anchor to the first natural boundary and advance by their configured multiple.
 Calendar steps preserve leap days and month ends. Fixed-width windows remain a
-separate native projection. Temporal metric formulas, ignored schema options,
-and timezone-sensitive calendar behavior still need further behavioral alignment.
+separate native projection. Calendar metrics use completion-time case spans:
+configured start timestamps control grouping only, default service time is zero,
+and waiting time equals sojourn time. Means use distinct cases rather than event
+weights. Calendar output always uses the canonical thirteen columns, ignoring
+custom feature schemas and ordinary attribute selectors. Fixed-width projections
+retain their explicit schema and interval metrics. Typed/missing resource values,
+empty-only logs, duplicate case identifiers, metric-column collisions, and timezone-sensitive
+calendar behavior still need further behavioral alignment.
 The feature variations remain partial, including inference and extra-feature
 contracts that have not received complete behavioral coverage.
 

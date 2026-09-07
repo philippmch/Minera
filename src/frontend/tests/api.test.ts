@@ -1881,6 +1881,14 @@ describe("log-to-features API", () => {
     vi.unstubAllGlobals();
   });
 
+  it("allows ignored calendar-temporal selectors while preserving fixed-window validation", () => {
+    expect(logToFeaturesQuery({ features_variant: "temporal", features_event_string_attributes: ["", ""], features_case_attributes: [" "] }))
+      .toBe("features_case_attributes=+&features_event_string_attributes=%2C&features_variant=temporal");
+    expect(logToFeaturesQuery({ features_variant: "temporal", features_feature_names: [], features_event_string_attributes: [], features_min_num_different_string_values: 3, features_max_num_different_string_values: 2 }))
+      .toBe("features_event_string_attributes=&features_feature_names=&features_max_num_different_string_values=2&features_min_num_different_string_values=3&features_variant=temporal");
+    expect(() => logToFeaturesQuery({ features_variant: "temporal", features_window_seconds: 60, features_min_num_different_string_values: 3, features_max_num_different_string_values: 2 })).toThrow(/bounds/);
+  });
+
   it("serializes trace representation and extra feature controls", () => {
     expect(logToFeaturesQuery({
       features_enable_all_extra_features: true,
