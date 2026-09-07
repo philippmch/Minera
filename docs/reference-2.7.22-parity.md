@@ -3119,6 +3119,24 @@ Negative values are retained. When no start key is configured, completion is
 also used as start. Only the endpoints and selected occurrences needed by these
 features require timestamps; unused middle events do not trigger conversion.
 Missing activities retain the configured default-not-present value.
+Work-in-progress and resource workload expand the first-start/last-completion
+interval by epsilon at both ends and count strict interval overlaps. Identical
+intervals belonging to different traces remain separate observations. Required
+boundary timestamps must be present, and the expanded start must precede its
+end; unused middle timestamps are ignored. An empty trace keeps the configured
+WIP default but is invalid for resource workload. Workload accepts present string
+resources, including empty strings, omits missing resources, and rejects other
+types. Each resource participates once per trace, and absent-resource columns
+retain the configured default.
+Indirect-path timing considers every later event with at least one intervening
+event, retains the last positive gap per activity pair in input order, and
+preserves defaults when no positive gap is observed.
+Concurrency counts subsequent events in input order, stopping at the first
+start after the anchor completion; epsilon does not relax that comparison.
+General and per-activity columns use zero for empty traces and absent activities.
+Only accessed anchor completions and subsequent starts require timestamps.
+TRACE timing reads preserve authoritative native date values, projection source
+keys, and null/missing state instead of relying on stale lexical projections.
 Trace numeric selectors whose columns occur in the schema convert every present
 value before retaining the last event value, so an earlier invalid value is
 still an error. Columns excluded by an explicit schema skip numeric conversion.

@@ -322,6 +322,36 @@ static void observed_path_timing_uses_configured_starts() {
   assert(result.trace_rows.front()[static_cast<std::size_t>(indirect_aa - result.feature_names.begin())] == 25.0);
 }
 
+static void indirect_paths_include_every_nonadjacent_later_event() {
+  const auto check = [](const std::string& sequence, const std::vector<std::string>& pairs,
+                        const std::vector<double>& expected, bool reverse_last = false) {
+    EventLog log;
+    Trace trace;
+    for (std::size_t i = 0; i < sequence.size(); ++i) {
+      const auto time_index = reverse_last && i + 1 == sequence.size() ? 0 : i;
+      const auto start = std::string(1, static_cast<char>('0' + time_index)) + "0";
+      const auto finish = std::string(1, static_cast<char>('0' + time_index)) + "5";
+      trace.events.push_back(timed_event("c", sequence.substr(i, 1),
+          "1970-01-01T00:00:" + start + "Z", "1970-01-01T00:00:" + finish + "Z", i));
+    }
+    log.traces.push_back(trace);
+    LogToFeaturesOptions options;
+    options.event_string_attributes_supplied = true;
+    options.enable_indirect_paths_times_last_occ = true;
+    options.start_timestamp_key = "start_time";
+    const auto result = log_to_features(log, options);
+    std::vector<std::string> names;
+    for (const auto& pair : pairs) names.push_back("indirectPathPerformanceLastOcc@@" + pair);
+    assert(result.feature_names == names);
+    assert(result.trace_rows[0] == expected);
+  };
+  check("ABCD", {"A##C", "A##D", "B##D"}, {15,25,15});
+  check("ABCDE", {"A##C", "A##D", "A##E", "B##D", "B##E", "C##E"}, {15,25,35,15,25,15});
+  check("ABAB", {"A##A", "A##B", "B##B"}, {15,25,15});
+  check("AAAA", {"A##A"}, {15});
+  check("AAAA", {"A##A"}, {15}, true);
+}
+
 static void explicit_trace_attributes_scope_missing_values() {
   EventLog log;
   Trace first;
@@ -422,6 +452,182 @@ static void overlap_extras_use_case_intervals_and_other_events() {
   assert(result.trace_rows[0][index(concurrent_a)] == 1.0);
   assert(result.trace_rows[1][index(wip)] == 2.0);
   assert(result.trace_rows[1][index(workload)] == 2.0);
+}
+
+static void workload_intervals_and_resource_types_match_exact_boundaries() {
+  const auto make_trace = [](const std::string& start, const std::string& finish,
+                             const std::optional<std::string>& resource) {
+    Trace trace;
+    auto event = timed_event("c", "A", "1970-01-01T00:00:" + start + "Z",
+                              "1970-01-01T00:00:" + finish + "Z", 0);
+    event.resource.clear();
+    if (resource) event.attributes.push_back({"worker", *resource});
+    trace.events.push_back(event);
+    return trace;
+  };
+  EventLog log;
+  log.traces = {make_trace("00", "10", "r"), make_trace("10", "20", "r"),
+      make_trace("20.5", "30", "s"), make_trace("00", "10", "r"),
+      make_trace("40", "50", ""), make_trace("08", "09", std::nullopt)};
+  // Multiple uses of the same resource in one trace count only once.
+  log.traces[0].events.push_back(log.traces[0].events[0]);
+  LogToFeaturesOptions options;
+  options.event_string_attributes_supplied = true;
+  options.enable_work_in_progress = true;
+  options.enable_resource_workload = true;
+  options.resource_key = "worker";
+  options.start_timestamp_key = "start_time";
+  options.default_not_present = -7;
+  options.epsilon = 0;
+  auto result = log_to_features(log, options);
+  assert((result.feature_names == std::vector<std::string>{"@@work_in_progress",
+      "resource_workload@@", "resource_workload@@r", "resource_workload@@s"}));
+  assert((result.trace_rows == std::vector<std::vector<double>>{
+      {3,-7,2,-7}, {1,-7,1,-7}, {1,-7,-7,1}, {3,-7,2,-7}, {1,1,-7,-7}, {3,-7,-7,-7}}));
+  options.epsilon = .25;
+  result = log_to_features(log, options);
+  assert((result.trace_rows == std::vector<std::vector<double>>{
+      {4,-7,3,-7}, {3,-7,3,-7}, {1,-7,-7,1}, {4,-7,3,-7}, {1,1,-7,-7}, {3,-7,-7,-7}}));
+  log.traces[2] = make_trace("20.25", "30", "s");
+  result = log_to_features(log, options);
+  assert(result.trace_rows[1][0] == 4 && result.trace_rows[2][0] == 2);
+  const auto rejects = [&](const EventLog& invalid) {
+    bool rejected = false;
+    try { (void)log_to_features(invalid, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  log.traces = {make_trace("10", "10", "r")};
+  assert((log_to_features(log, options).trace_rows[0] == std::vector<double>{1,1}));
+  options.epsilon = 0;
+  rejects(log);
+  options.epsilon = .25;
+  log.traces = {make_trace("10.25", "10", "r")};
+  assert((log_to_features(log, options).trace_rows[0] == std::vector<double>{1,1}));
+  log.traces = {make_trace("10.5", "10", "r")};
+  rejects(log);
+  log.traces = {make_trace("00", "10", std::nullopt)};
+  log.traces[0].events[0].attributes.clear();
+  rejects(log);
+  log.traces = {make_trace("00", "10", std::nullopt)};
+  log.traces[0].events[0].timestamp.clear();
+  rejects(log);
+  log.traces = {make_trace("00", "10", "r")};
+  log.traces[0].events.push_back(Event{"c", "A"});
+  log.traces[0].events.push_back(log.traces[0].events.front());
+  assert((log_to_features(log, options).trace_rows[0] == std::vector<double>{1,1}));
+  log.traces = {Trace{}};
+  rejects(log);
+  options.enable_resource_workload = false;
+  assert((log_to_features(log, options).trace_rows[0] == std::vector<double>{-7}));
+  options.enable_resource_workload = true;
+  log.traces.clear();
+  assert(log_to_features(log, options).trace_rows.empty());
+
+  log.traces = {make_trace("00", "10", std::nullopt)};
+  const auto rejects_resource = [&](const EventAttribute& attribute) {
+    log.traces[0].events[0].attributes.resize(1);
+    log.traces[0].events[0].attributes.push_back(attribute);
+    rejects(log);
+  };
+  rejects_resource({"worker", "1", AttributeKind::kInt});
+  rejects_resource({"worker", "1.5", AttributeKind::kFloat});
+  rejects_resource({"worker", "true", AttributeKind::kBoolean});
+  rejects_resource({"worker", "", AttributeKind::kString, true});
+  rejects_resource(make_bytes_attribute("worker", "r"));
+  EventAttribute native{"worker", "r"};
+  native.typed_value = std::int64_t{1};
+  rejects_resource(native);
+  native.typed_value = std::monostate{};
+  for (const auto kind : {AttributeContainerKind::kList, AttributeContainerKind::kTuple,
+                          AttributeContainerKind::kSet, AttributeContainerKind::kFrozenSet,
+                          AttributeContainerKind::kContainer}) {
+    native.container = kind;
+    rejects_resource(native);
+  }
+}
+
+static void concurrency_uses_exact_comparison_and_required_accesses() {
+  Trace trace;
+  trace.events = {
+      timed_event("c", "A", "1970-01-01T00:00:00Z", "1970-01-01T00:00:10Z", 0),
+      timed_event("c", "B", "1970-01-01T00:00:10.1Z", "1970-01-01T00:00:20Z", 1)};
+  EventLog log;
+  log.traces = {trace, Trace{}};
+  LogToFeaturesOptions options;
+  options.event_string_attributes_supplied = true;
+  options.start_timestamp_key = "start_time";
+  options.enable_max_concurrent_events = true;
+  options.enable_max_concurrent_events_per_activity = true;
+  options.default_not_present = -7;
+  options.epsilon = 100;
+  auto result = log_to_features(log, options);
+  assert((result.feature_names == std::vector<std::string>{
+      "@@max_concurrent_activities_general", "@@max_concurrent_activities_like_A",
+      "@@max_concurrent_activities_like_B"}));
+  assert((result.trace_rows == std::vector<std::vector<double>>{{0,0,0}, {0,0,0}}));
+  log.traces[0].events[1].attributes[0].value = "1970-01-01T00:00:10Z";
+  assert((log_to_features(log, options).trace_rows[0] == std::vector<double>{1,0,0}));
+  log.traces[0].events[0].attributes.clear();
+  log.traces[0].events[1].timestamp.clear();
+  assert((log_to_features(log, options).trace_rows[0] == std::vector<double>{1,0,0}));
+  const auto rejects = [&] {
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  log.traces[0].events[0].timestamp.clear();
+  rejects();
+  log.traces[0].events[0].timestamp = "1970-01-01T00:00:10Z";
+  log.traces[0].events[1].attributes.clear();
+  rejects();
+  log.traces[0].events.resize(1);
+  log.traces[0].events[0].timestamp.clear();
+  assert((log_to_features(log, options).trace_rows[0] == std::vector<double>{0,0}));
+}
+
+static void trace_extra_timestamps_respect_native_values_and_presence() {
+  Trace trace;
+  auto event = timed_event("c", "A", "stale", "stale", 0);
+  event.attributes[0].typed_value = NativeDate{"1970-01-01T00:00:00Z"};
+  event.timestamp_attribute = EventAttribute{"completed", "stale", AttributeKind::kDate};
+  event.timestamp_attribute->typed_value = NativeDate{"1970-01-01T00:00:10Z"};
+  event.timestamp_source_key = "completed";
+  event.timestamp_state = FirstClassAttributeState::kPresent;
+  trace.events = {event};
+  EventLog log;
+  log.traces = {trace};
+  LogToFeaturesOptions options;
+  options.event_string_attributes_supplied = true;
+  options.start_timestamp_key = "start_time";
+  options.timestamp_key = "completed";
+  options.enable_work_in_progress = true;
+  options.enable_case_duration = true;
+  options.epsilon = 0;
+  assert((log_to_features(log, options).trace_rows[0] == std::vector<double>{10,1}));
+  options.timestamp_key = "time:timestamp";
+  assert((log_to_features(log, options).trace_rows[0] == std::vector<double>{10,1}));
+  const auto rejects = [&] {
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  log.traces[0].events[0].timestamp_state = FirstClassAttributeState::kNull;
+  rejects();
+  log.traces[0].events[0].timestamp_state = FirstClassAttributeState::kMissing;
+  rejects();
+  log.traces[0].events[0] = event;
+  log.traces[0].events[0].attributes[0].is_null = true;
+  rejects();
+  log.traces[0].events[0] = event;
+  log.traces[0].events[0].attributes[0].container = AttributeContainerKind::kTuple;
+  rejects();
+  log.traces[0].events[0] = event;
+  log.traces[0].events[0].attributes[0] = make_bytes_attribute("start_time", "1970-01-01T00:00:00Z");
+  log.traces[0].events[0].attributes[0].typed_value = NativeDate{"1970-01-01T00:00:00Z"};
+  rejects();
 }
 
 static void temporal_calendar_frequency_uses_period_boundaries() {
@@ -984,6 +1190,10 @@ static void trace_default_schema_infers_complete_trace_presence() {
 }
 
 int main() {
+  trace_extra_timestamps_respect_native_values_and_presence();
+  concurrency_uses_exact_comparison_and_required_accesses();
+  indirect_paths_include_every_nonadjacent_later_event();
+  workload_intervals_and_resource_types_match_exact_boundaries();
   trace_identifier_feature_preserves_native_cells();
   occurrence_timing_uses_input_order_and_interval_endpoints();
   extra_features_append_to_custom_core_schema_and_respect_overrides();
