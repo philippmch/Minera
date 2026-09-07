@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 #include "minera/json_export.hpp"
@@ -1233,6 +1234,76 @@ static void temporal_calendar_string_case_ties_use_lexical_order() {
       assert(result.temporal_rows[i].values[4] == finishes[i]);
     }
   } while (std::next_permutation(order.begin(), order.end()));
+}
+
+static void temporal_calendar_tuple_nan_factorization_is_local() {
+  const auto nan = [] {
+    EventAttribute value{"", "stale", AttributeKind::kDate};
+    value.typed_value = std::numeric_limits<double>::quiet_NaN();
+    return value;
+  };
+  const auto wrap = [](EventAttribute child, AttributeContainerKind kind) {
+    EventAttribute value{"selected", ""};
+    value.container = kind;
+    value.children = {std::move(child)};
+    return value;
+  };
+  const auto tuple = [&](EventAttribute child) { return wrap(std::move(child), AttributeContainerKind::kTuple); };
+  const auto frozen = [&](EventAttribute child) { return wrap(std::move(child), AttributeContainerKind::kFrozenSet); };
+  const auto check = [](EventAttribute first, EventAttribute second, double categories) {
+    first.key = second.key = "selected";
+    EventLog log;
+    Event a{"c", "A", "2024-01-01T00:00:00Z", "r"};
+    Event b{"c", "A", "2024-01-01T00:00:20Z", "r"};
+    a.attributes = {first};
+    b.attributes = {second};
+    log.traces = {Trace{"c", {a,b}}};
+    for (const auto scope : {0,1,2}) {
+      LogToFeaturesOptions options;
+      options.variant = LogToFeaturesVariant::TEMPORAL;
+      options.grouper_freq = "D";
+      if (scope == 0) options.activity_key = "selected";
+      if (scope == 1) options.resource_key = "selected";
+      if (scope == 2) options.case_id_key = "selected";
+      const auto result = log_to_features(log, options);
+      const auto& row = result.temporal_rows[0];
+      assert(row.values[scope == 0 ? 1 : scope == 1 ? 0 : 11] == categories);
+      if (scope == 0) assert(row.values[8] == 2 - categories);
+      if (scope == 2) {
+        assert(row.values[5] == (categories == 1 ? 20 : 0));
+        assert(row.values[6] == (categories == 1 ? 20 : 0));
+      }
+    }
+    assert(log.traces[0].events[0].attributes[0] == first);
+    assert(log.traces[0].events[1].attributes[0] == second);
+    const auto same_identity = [](auto&& self, const EventAttribute& original,
+                                  const EventAttribute& retained) -> void {
+      assert(original.typed_value.scalar_identity() == retained.typed_value.scalar_identity());
+      for (std::size_t i = 0; i < original.children.size(); ++i)
+        self(self, original.children[i], retained.children[i]);
+    };
+    same_identity(same_identity, first, log.traces[0].events[0].attributes[0]);
+    same_identity(same_identity, second, log.traces[0].events[1].attributes[0]);
+  };
+  const auto first = nan(), second = nan();
+  assert(!root_cause_scalar_keys_equal(first, second));
+  assert(!root_cause_scalar_keys_equal(tuple(first), tuple(second)));
+  check(tuple(first), tuple(second), 1);
+  check(tuple(first), tuple(first), 1);
+  check(tuple(tuple(first)), tuple(tuple(second)), 1);
+  check(tuple(tuple(tuple(first))), tuple(tuple(tuple(second))), 1);
+  const EventAttribute lexical{"", "NaN", AttributeKind::kFloat};
+  check(tuple(lexical), tuple(second), 1);
+  check(frozen(first), frozen(second), 2);
+  check(frozen(first), frozen(first), 1);
+  check(tuple(frozen(first)), tuple(frozen(second)), 2);
+  check(frozen(tuple(first)), frozen(tuple(second)), 2);
+  EventAttribute null{"", "stale"};
+  null.is_null = true;
+  check(tuple(null), tuple(first), 2);
+  check(tuple(tuple(null)), tuple(tuple(first)), 2);
+  assert(!root_cause_scalar_keys_equal(first, second));
+  assert(!root_cause_scalar_keys_equal(tuple(first), tuple(second)));
 }
 
 static void temporal_calendar_tuple_case_ordering() {
@@ -2527,6 +2598,7 @@ int main() {
   temporal_calendar_timestamps_use_projected_native_dates();
   temporal_calendar_categories_use_projected_trace_columns();
   temporal_calendar_numeric_columns_promote_before_grouping();
+  temporal_calendar_tuple_nan_factorization_is_local();
   temporal_calendar_tuple_case_ordering();
   temporal_calendar_scalar_case_ordering_is_exact();
   temporal_calendar_string_case_ties_use_lexical_order();
