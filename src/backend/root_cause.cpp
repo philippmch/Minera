@@ -514,6 +514,115 @@ EventLog build_root_cause_log(
   return result;
 }
 
+namespace {
+RootCauseSharedBinding share_binding(const EventAttribute& attribute) {
+  auto value = std::make_shared<RootCauseSharedValue>();
+  value->value = attribute.value;
+  value->kind = attribute.kind;
+  value->is_null = attribute.is_null;
+  value->typed_value = attribute.typed_value;
+  value->container = attribute.container;
+  value->first_class_role = attribute.first_class_role;
+  value->first_class_state = attribute.first_class_state;
+  value->first_class_source_key = attribute.first_class_source_key;
+  for (const auto& child : attribute.children)
+    value->children.push_back(share_binding(child));
+  return {attribute.key, std::move(value)};
+}
+
+EventAttribute snapshot_binding(const RootCauseSharedBinding& binding,
+                               std::set<const RootCauseSharedValue*>& active) {
+  if (!binding.value) throw std::invalid_argument("root cause: null shared value handle");
+  const auto* value = binding.value.get();
+  if (!active.insert(value).second)
+    throw std::invalid_argument("root cause: cyclic shared value cannot be materialized");
+  EventAttribute result{binding.key, value->value, value->kind, value->is_null};
+  result.typed_value = value->typed_value;
+  result.container = value->container;
+  result.first_class_role = value->first_class_role;
+  result.first_class_state = value->first_class_state;
+  result.first_class_source_key = value->first_class_source_key;
+  for (const auto& child : value->children)
+    result.children.push_back(snapshot_binding(child, active));
+  active.erase(value);
+  return result;
+}
+}  // namespace
+
+RootCauseSharedContext make_shared_root_cause_context(const Event& event) {
+  RootCauseSharedContext result;
+  result.prototype = event;
+  result.prototype.attributes.clear();
+  for (const auto& attribute : event.attributes)
+    result.attributes.push_back(share_binding(attribute));
+  const auto capture = [](const auto& source, auto& target, auto& prototype) {
+    if (source) target = share_binding(*source);
+    prototype.reset();
+  };
+  capture(event.activity_attribute, result.activity_attribute, result.prototype.activity_attribute);
+  capture(event.timestamp_attribute, result.timestamp_attribute, result.prototype.timestamp_attribute);
+  capture(event.resource_attribute, result.resource_attribute, result.prototype.resource_attribute);
+  capture(event.lifecycle_attribute, result.lifecycle_attribute, result.prototype.lifecycle_attribute);
+  return result;
+}
+
+Event materialize_root_cause_context(const RootCauseSharedContext& context) {
+  Event result = context.prototype;
+  result.attributes.clear();
+  std::set<const RootCauseSharedValue*> active;
+  for (const auto& binding : context.attributes)
+    result.attributes.push_back(snapshot_binding(binding, active));
+  const auto restore = [&](const auto& source, auto& target) {
+    target.reset();
+    if (source) target = snapshot_binding(*source, active);
+  };
+  restore(context.activity_attribute, result.activity_attribute);
+  restore(context.timestamp_attribute, result.timestamp_attribute);
+  restore(context.resource_attribute, result.resource_attribute);
+  restore(context.lifecycle_attribute, result.lifecycle_attribute);
+  return result;
+}
+
+RootCauseSharedLog build_shared_root_cause_log(
+    const std::vector<RootCauseSharedObservation>& fit,
+    const std::vector<RootCauseSharedObservation>& problem,
+    bool enable_multiplier) {
+  const auto repeats = cohort_repeats(fit.size(), problem.size(), enable_multiplier);
+  RootCauseSharedLog result;
+  const auto append = [&](const auto& cohort, std::size_t copies) {
+    for (std::size_t i = 0; i < copies; ++i)
+      for (const auto& observation : cohort) result.contexts.push_back(observation.context);
+  };
+  append(fit, repeats[0]);
+  append(problem, repeats[1]);
+  return result;
+}
+
+EventLog materialize_root_cause_log(const RootCauseSharedLog& log) {
+  EventLog result;
+  for (const auto& context : log.contexts) {
+    Trace trace;
+    trace.events.push_back(materialize_root_cause_context(context));
+    result.traces.push_back(std::move(trace));
+  }
+  return result;
+}
+
+RootCauseRepresentation build_shared_root_cause_representation(
+    const std::vector<RootCauseSharedObservation>& fit,
+    const std::vector<RootCauseSharedObservation>& problem,
+    const RootCauseOptions& options) {
+  // Preserve the balancing error before inspecting any supplied value graph.
+  (void)cohort_repeats(fit.size(), problem.size(), options.enable_multiplier);
+  const auto snapshot = [](const auto& cohort) {
+    std::vector<RootCauseObservation> result;
+    for (const auto& observation : cohort)
+      result.push_back({observation.trace_index, materialize_root_cause_context(observation.context)});
+    return result;
+  };
+  return build_root_cause_representation(snapshot(fit), snapshot(problem), options);
+}
+
 RootCauseRepresentation build_root_cause_representation(
     const std::vector<RootCauseObservation>& fit,
     const std::vector<RootCauseObservation>& problem,

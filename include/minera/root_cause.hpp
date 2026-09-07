@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstddef>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -27,6 +28,59 @@ struct RootCauseRepresentation {
   std::vector<int> target;
   std::vector<std::size_t> source_trace_indices;
 };
+
+struct RootCauseSharedValue;
+struct RootCauseSharedBinding {
+  std::string key;
+  std::shared_ptr<RootCauseSharedValue> value;
+};
+
+// Dictionary bindings are local; nested value objects are shared. Replace a
+// binding's pointer to rebind it, and edit the pointed-to object to mutate it.
+struct RootCauseSharedValue {
+  std::string value;
+  AttributeKind kind = AttributeKind::kString;
+  bool is_null = false;
+  NativeAttributeValue typed_value;
+  AttributeContainerKind container = AttributeContainerKind::kScalar;
+  std::vector<RootCauseSharedBinding> children;
+  FirstClassAttributeRole first_class_role = FirstClassAttributeRole::kNone;
+  FirstClassAttributeState first_class_state = FirstClassAttributeState::kMissing;
+  std::string first_class_source_key;
+};
+
+struct RootCauseSharedContext {
+  // Non-attribute event projections and metadata. Factory-created prototypes
+  // have empty generic and retained attributes; bindings below own those.
+  Event prototype;
+  std::vector<RootCauseSharedBinding> attributes;
+  std::optional<RootCauseSharedBinding> activity_attribute;
+  std::optional<RootCauseSharedBinding> timestamp_attribute;
+  std::optional<RootCauseSharedBinding> resource_attribute;
+  std::optional<RootCauseSharedBinding> lifecycle_attribute;
+};
+struct RootCauseSharedObservation {
+  std::size_t trace_index = 0;
+  RootCauseSharedContext context;
+};
+struct RootCauseSharedLog {
+  // Each context represents one event in an otherwise empty trace.
+  std::vector<RootCauseSharedContext> contexts;
+};
+
+// Importing value-owned events creates a snapshot. Subsequent context copies
+// retain shared value handles, including after the original owner is destroyed.
+[[nodiscard]] RootCauseSharedContext make_shared_root_cause_context(const Event& event);
+[[nodiscard]] Event materialize_root_cause_context(const RootCauseSharedContext& context);
+[[nodiscard]] RootCauseSharedLog build_shared_root_cause_log(
+    const std::vector<RootCauseSharedObservation>& fit,
+    const std::vector<RootCauseSharedObservation>& problem,
+    bool enable_multiplier = false);
+[[nodiscard]] EventLog materialize_root_cause_log(const RootCauseSharedLog& log);
+[[nodiscard]] RootCauseRepresentation build_shared_root_cause_representation(
+    const std::vector<RootCauseSharedObservation>& fit,
+    const std::vector<RootCauseSharedObservation>& problem,
+    const RootCauseOptions& options);
 
 // Copy each supplied context into its own otherwise empty trace. Fit contexts
 // precede problem contexts. Optional balancing repeats the complete smaller
