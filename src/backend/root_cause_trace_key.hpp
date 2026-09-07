@@ -6,6 +6,10 @@
 
 namespace minera {
 
+// Native scalar float conversion, including decimal strings and ASCII bytes.
+// Null, dates, and containers reject; floating nonfinite values are retained.
+double native_attribute_number(const EventAttribute& attribute);
+std::optional<EventAttribute> native_event_attribute(const Event& event, const std::string& key);
 // Private shared attribute representation used by feature encoding and
 // event-value equality. Trace-level values instead retain typed equality.
 std::string root_cause_attribute_category(const EventAttribute& attribute);

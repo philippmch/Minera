@@ -232,7 +232,288 @@ static void temporal_calendar_frequency_uses_period_boundaries() {
   assert(threw);
 }
 
+static void explicit_trace_numeric_attributes_retain_native_values() {
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TRACE_BASED;
+  options.event_numeric_attributes = {"value"};
+  options.case_numeric_attributes = {"case_value"};
+  options.feature_names = {"event:value", "case:case_value"};
+  options.enable_succ_def_representation = false;
+  auto log = fixture();
+  log.traces[0].events.resize(1);
+  const auto check = [&](EventAttribute attribute, double expected) {
+    attribute.key = "value";
+    log.traces[0].events[0].attributes = {attribute};
+    attribute.key = "case_value";
+    log.traces[0].attributes = {attribute};
+    const auto result = log_to_features(log, options);
+    const auto json = log_to_features_json(result);
+    if (std::isnan(expected)) assert(json.find("\"NaN\"") != std::string::npos);
+    if (std::isinf(expected) && expected < 0) assert(json.find("\"-Infinity\"") != std::string::npos);
+    for (double actual : result.trace_rows[0]) {
+      if (std::isnan(expected)) assert(std::isnan(actual));
+      else assert(actual == expected);
+    }
+  };
+  check(make_bytes_attribute("value", "12"), 12);
+  check(make_bytes_attribute("value", " 1_2.5\t"), 12.5);
+  check({"value", "1_2.5", AttributeKind::kString}, 12.5);
+  check({"value", "nan", AttributeKind::kString}, std::nan(""));
+  check({"value", "-Infinity", AttributeKind::kString}, -INFINITY);
+  EventAttribute native{"value", "stale", AttributeKind::kInt};
+  native.typed_value = std::int64_t{16777217};
+  check(native, 16777217);
+  native.kind = AttributeKind::kFloat;
+  native.typed_value = 1.25;
+  check(native, 1.25);
+  native.kind = AttributeKind::kBoolean;
+  native.typed_value = true;
+  check(native, 1);
+  const auto rejects = [&](EventAttribute attribute) {
+    attribute.key = "value";
+    log.traces[0].events[0].attributes = {attribute};
+    log.traces[0].attributes = {{"case_value", "0", AttributeKind::kInt}};
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  rejects({"value", "true", AttributeKind::kString});
+  rejects({"value", "12", AttributeKind::kInt, true});
+  rejects(make_bytes_attribute("value", "1__2"));
+  rejects(make_bytes_attribute("value", std::string("1\0", 2)));
+  rejects(make_bytes_attribute("value", "\xc2\xa0" "1"));
+  EventAttribute nested{"value", "12", AttributeKind::kInt};
+  nested.typed_value = std::int64_t{12};
+  for (const auto kind : {AttributeContainerKind::kTuple,
+                          AttributeContainerKind::kSet,
+                          AttributeContainerKind::kFrozenSet,
+                          AttributeContainerKind::kList,
+                          AttributeContainerKind::kContainer}) {
+    nested.container = kind;
+    rejects(nested);
+  }
+  log.traces[0].events.push_back(Event{"c1", "B"});
+  for (std::size_t position = 0; position < 2; ++position) {
+    log.traces[0].events[position].attributes = {{"value", "bad", AttributeKind::kString}};
+    log.traces[0].events[1 - position].attributes = {make_bytes_attribute("value", "12")};
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
+  log.traces[0].events[0].attributes = {make_bytes_attribute("value", "12")};
+  log.traces[0].events[1].attributes = {{"value", "13", AttributeKind::kInt}};
+  log.traces[0].attributes = {{"case_value", "0", AttributeKind::kInt}};
+  assert(log_to_features(log, options).trace_rows[0][0] == 13);
+  log.traces[0].attributes = {{"case_value", "12", AttributeKind::kInt, true}};
+  bool null_case_rejected = false;
+  try { (void)log_to_features(log, options); }
+  catch (const std::invalid_argument&) { null_case_rejected = true; }
+  assert(null_case_rejected);
+  log.traces[0].attributes.clear();
+  bool missing_case_rejected = false;
+  try { (void)log_to_features(log, options); }
+  catch (const std::invalid_argument&) { missing_case_rejected = true; }
+  assert(missing_case_rejected);
+  log.traces[0].attributes = {{"case_value", "0", AttributeKind::kInt}};
+  for (std::size_t position = 0; position < 2; ++position) {
+    log.traces[0].events[position].attributes.clear();
+    log.traces[0].events[1 - position].attributes = {make_bytes_attribute("value", "12")};
+    const auto result = log_to_features(log, options);
+    assert(result.trace_rows[0] == std::vector<double>({12, 0}));
+  }
+  log.traces.push_back(Trace{"missing", {Event{"missing", "A"}}});
+  for (int order = 0; order < 2; ++order) {
+    bool missing_rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { missing_rejected = true; }
+    assert(missing_rejected);
+    std::reverse(log.traces.begin(), log.traces.end());
+  }
+  log.traces.back().events.clear();
+  bool empty_rejected = false;
+  try { (void)log_to_features(log, options); }
+  catch (const std::invalid_argument&) { empty_rejected = true; }
+  assert(empty_rejected);
+  log.traces.clear();
+  assert(log_to_features(log, options).trace_rows.empty());
+}
+
+static void event_numeric_attributes_require_complete_native_columns() {
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::EVENT_BASED;
+  options.event_numeric_attributes = {"value"};
+  auto log = fixture();
+  EventAttribute integer{"value", "stale", AttributeKind::kInt};
+  integer.typed_value = std::int64_t{16777217};
+  EventAttribute boolean{"value", "stale", AttributeKind::kBoolean};
+  boolean.typed_value = true;
+  log.traces[0].events[0].attributes = {integer};
+  log.traces[0].events[1].attributes = {boolean};
+  const auto feature_index = [](const LogToFeaturesResult& result) {
+    return std::find(result.feature_names.begin(), result.feature_names.end(), "event:value");
+  };
+  auto result = log_to_features(log, options);
+  auto feature = feature_index(result);
+  assert(feature != result.feature_names.end());
+  auto column = static_cast<std::size_t>(feature - result.feature_names.begin());
+  assert(result.event_rows[0][0][column] == 16777216);
+  assert(result.event_rows[0][1][column] == 1);
+  EventAttribute floating{"value", "stale", AttributeKind::kFloat};
+  floating.typed_value = std::nan("");
+  log.traces[0].events[0].attributes = {floating};
+  floating.typed_value = INFINITY;
+  log.traces[0].events[1].attributes = {floating};
+  result = log_to_features(log, options);
+  column = static_cast<std::size_t>(feature_index(result) - result.feature_names.begin());
+  assert(std::isnan(result.event_rows[0][0][column]));
+  assert(std::isinf(result.event_rows[0][1][column]));
+  const auto nonfinite_json = log_to_features_json(result);
+  assert(nonfinite_json.find("\"NaN\"") != std::string::npos);
+  assert(nonfinite_json.find("\"Infinity\"") != std::string::npos);
+  floating.typed_value = 1.23456789;
+  log.traces[0].events[0].attributes = {floating};
+  result = log_to_features(log, options);
+  assert(result.event_rows[0][0][column] == static_cast<double>(static_cast<float>(1.23456789)));
+  assert(log_to_features_json(result).find("1.2345678806304932") != std::string::npos);
+  const auto omitted = [&](const std::vector<EventAttribute>& attributes) {
+    for (std::size_t position = 0; position < 2; ++position) {
+      log.traces[0].events[position].attributes = attributes;
+      log.traces[0].events[1 - position].attributes = {integer};
+      const auto excluded = log_to_features(log, options);
+      assert(feature_index(excluded) == excluded.feature_names.end());
+    }
+  };
+  omitted({make_bytes_attribute("value", "12")});
+  omitted({{"value", "12", AttributeKind::kString}});
+  omitted({{"value", "12", AttributeKind::kInt, true}});
+  omitted({});
+  EventAttribute nested = integer;
+  for (const auto kind : {AttributeContainerKind::kTuple,
+                          AttributeContainerKind::kSet,
+                          AttributeContainerKind::kFrozenSet}) {
+    nested.container = kind;
+    omitted({nested});
+  }
+  // Completeness includes events in other traces, not just the current row.
+  log.traces[0].events[0].attributes = {integer};
+  log.traces[0].events[1].attributes = {boolean};
+  log.traces.push_back(Trace{"other", {Event{"other", "A"}}});
+  result = log_to_features(log, options);
+  assert(feature_index(result) == result.feature_names.end());
+}
+
+static void numeric_features_resolve_first_class_cells_and_inference() {
+  auto log = fixture();
+  log.traces[0].events.resize(1);
+  auto& trace = log.traces[0];
+  auto& event = trace.events[0];
+  event.attributes.clear();
+  trace.attributes.clear();
+  LogToFeaturesOptions options;
+  options.event_numeric_attributes = {"resource"};
+  options.case_numeric_attributes = {"case_id"};
+  options.feature_names = {"event:resource", "case:case_id"};
+  EventAttribute native{"worker", "stale", AttributeKind::kInt};
+  native.typed_value = std::int64_t{17};
+  event.resource = "stale";
+  event.resource_state = FirstClassAttributeState::kPresent;
+  event.resource_source_key = "worker";
+  event.resource_attribute = native;
+  trace.case_id = "stale";
+  trace.case_id_state = FirstClassAttributeState::kPresent;
+  trace.case_id_source_key = "identifier";
+  trace.case_id_attribute = make_bytes_attribute("identifier", "12");
+  assert(log_to_features(log, options).trace_rows[0] == std::vector<double>({17, 12}));
+  options.event_numeric_attributes = {"worker"};
+  options.case_numeric_attributes = {"identifier"};
+  options.feature_names = {"event:worker", "case:identifier"};
+  assert(log_to_features(log, options).trace_rows[0] == std::vector<double>({17, 12}));
+  event.resource_attribute = make_bytes_attribute("worker", "23");
+  assert(log_to_features(log, options).trace_rows[0][0] == 23);
+  event.attributes = {{"worker", "31", AttributeKind::kInt}};
+  assert(log_to_features(log, options).trace_rows[0][0] == 31);
+  event.attributes.clear();
+  const auto rejects = [&] {
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  for (const auto state : {FirstClassAttributeState::kMissing, FirstClassAttributeState::kNull}) {
+    native.first_class_role = FirstClassAttributeRole::kResource;
+    native.first_class_state = state;
+    native.first_class_source_key = "worker";
+    event.attributes = {native};
+    rejects();
+  }
+  event.attributes.clear();
+  event.resource_attribute.reset();
+  event.resource.clear();
+  rejects(); // Present empty resource is a value, not a missing default.
+  event.resource_attribute = make_bytes_attribute("worker", "23");
+  trace.case_id_attribute.reset();
+  trace.case_id.clear();
+  rejects();
+  trace.case_id = "12";
+  options.event_numeric_attributes = {"activity"};
+  event.activity.clear();
+  event.activity_state = FirstClassAttributeState::kPresent;
+  rejects();
+  event.activity = "5";
+  options.case_numeric_attributes = {"activity"};
+  rejects(); // Event activity is not a trace case-id alias.
+
+  options.variant = LogToFeaturesVariant::EVENT_BASED;
+  options.case_numeric_attributes.clear();
+  options.event_numeric_attributes = {"worker"};
+  options.feature_names = {"event:worker"};
+  native.first_class_role = FirstClassAttributeRole::kResource;
+  native.first_class_state = FirstClassAttributeState::kPresent;
+  event.resource_attribute = native;
+  assert(log_to_features(log, options).event_rows[0][0][0] == 17);
+
+  auto inferred_log = fixture();
+  EventAttribute typed{"number", "stale", AttributeKind::kString};
+  typed.typed_value = 7.5;
+  for (auto& entry : inferred_log.traces[0].events) entry.attributes = {typed};
+  inferred_log.traces[0].attributes = {typed};
+  const auto inferred = log_to_features(inferred_log);
+  assert(std::find(inferred.feature_names.begin(), inferred.feature_names.end(), "event:number") != inferred.feature_names.end());
+  assert(std::find(inferred.feature_names.begin(), inferred.feature_names.end(), "case:number") != inferred.feature_names.end());
+  typed.kind = AttributeKind::kInt;
+  for (const auto kind : {AttributeContainerKind::kList, AttributeContainerKind::kTuple,
+                          AttributeContainerKind::kSet, AttributeContainerKind::kFrozenSet}) {
+    typed.container = kind;
+    for (auto& entry : inferred_log.traces[0].events) entry.attributes = {typed};
+    inferred_log.traces[0].attributes = {typed};
+    const auto nested = log_to_features(inferred_log);
+    assert(std::find(nested.feature_names.begin(), nested.feature_names.end(), "event:number") == nested.feature_names.end());
+    assert(std::find(nested.feature_names.begin(), nested.feature_names.end(), "case:number") == nested.feature_names.end());
+  }
+  LogToFeaturesOptions inference_options;
+  inference_options.min_num_different_string_values = 1;
+  typed.container = AttributeContainerKind::kScalar;
+  for (const auto role : {FirstClassAttributeRole::kNone, FirstClassAttributeRole::kResource}) {
+    for (const auto state : {FirstClassAttributeState::kMissing, FirstClassAttributeState::kNull}) {
+      if (role == FirstClassAttributeRole::kNone && state == FirstClassAttributeState::kMissing) continue;
+      typed.first_class_role = role;
+      typed.first_class_state = state;
+      for (auto& entry : inferred_log.traces[0].events) entry.attributes = {typed};
+      inferred_log.traces[0].attributes = {typed};
+      const auto absent = log_to_features(inferred_log, inference_options);
+      assert(std::none_of(absent.feature_names.begin(), absent.feature_names.end(), [](const std::string& name) {
+        return name.find("number") != std::string::npos;
+      }));
+    }
+  }
+}
+
 int main() {
+  numeric_features_resolve_first_class_cells_and_inference();
+  event_numeric_attributes_require_complete_native_columns();
+  explicit_trace_numeric_attributes_retain_native_values();
   const auto log = fixture();
   LogToFeaturesOptions e; e.variant = LogToFeaturesVariant::EVENT_BASED; e.event_numeric_attributes = {"amount"}; e.event_string_attributes = {"kind"}; e.case_string_attributes = {"segment"};
   const auto er = log_to_features(log, e);

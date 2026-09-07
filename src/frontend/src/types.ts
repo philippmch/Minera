@@ -686,14 +686,15 @@ export function isLogToTargetResult(value: unknown): value is LogToTargetResult 
 }
 
 export type LogToFeaturesVariant = "event_based" | "trace_based" | "temporal";
-export interface LogToFeaturesTemporalRow { timestamp: number; values: number[]; }
+export type LogToFeaturesNumber = number | "NaN" | "Infinity" | "-Infinity";
+export interface LogToFeaturesTemporalRow { timestamp: number; values: LogToFeaturesNumber[]; }
 export interface LogToFeaturesResult {
   family: "LOG_TO_FEATURES";
   variant: LogToFeaturesVariant;
   feature_names: string[];
   case_ids?: string[];
-  event_rows?: number[][][];
-  trace_rows?: number[][];
+  event_rows?: LogToFeaturesNumber[][][];
+  trace_rows?: LogToFeaturesNumber[][];
   temporal_rows?: LogToFeaturesTemporalRow[];
 }
 export function isLogToFeaturesResult(value: unknown): value is LogToFeaturesResult {
@@ -702,7 +703,8 @@ export function isLogToFeaturesResult(value: unknown): value is LogToFeaturesRes
   if (c.family !== "LOG_TO_FEATURES" || !(["event_based", "trace_based", "temporal"] as const).includes(c.variant as LogToFeaturesVariant)) return false;
   if (!Array.isArray(c.feature_names) || !c.feature_names.every((x) => typeof x === "string")) return false;
   if (c.case_ids !== undefined && (!Array.isArray(c.case_ids) || !c.case_ids.every((x) => typeof x === "string"))) return false;
-  const rows = (r: unknown): r is number[] => Array.isArray(r) && r.every((x) => typeof x === "number" && Number.isFinite(x));
+  const rows = (r: unknown): r is LogToFeaturesNumber[] => Array.isArray(r) && r.every((x) =>
+    (typeof x === "number" && Number.isFinite(x)) || x === "NaN" || x === "Infinity" || x === "-Infinity");
   if (c.variant === "event_based") return Array.isArray(c.event_rows) && c.event_rows.every((t) => Array.isArray(t) && t.every(rows));
   if (c.variant === "trace_based") return Array.isArray(c.trace_rows) && c.trace_rows.every(rows);
   return Array.isArray(c.temporal_rows) && c.temporal_rows.every((r) => !!r && typeof r === "object" && typeof (r as LogToFeaturesTemporalRow).timestamp === "number" && Number.isFinite((r as LogToFeaturesTemporalRow).timestamp) && rows((r as LogToFeaturesTemporalRow).values));

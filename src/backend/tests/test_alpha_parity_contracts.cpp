@@ -199,6 +199,24 @@ void plus_empty_trace_retains_both_boundaries() {
   assert(net.transitions().size() == 3);
 }
 
+void plus_reduced_self_loops_retain_degenerate_boundaries() {
+  for (const bool remove : {false, true}) {
+    const auto net = discover_alpha_plus(make_log({{"a", "L", "L", "a"}}),
+                                         {.remove_unconnected = remove});
+    const std::multiset<PlaceShape> expected{
+        {true, false, {}, {"<silent>"}}, {false, true, {"<silent>"}, {}}};
+    assert(places(net) == expected);
+    assert(net.transitions().size() == (remove ? 2 : 4));
+    const auto tail = discover_alpha_plus(make_log({{"a", "L", "L", "a", "b"}}),
+                                          {.remove_unconnected = remove});
+    const std::multiset<PlaceShape> tail_expected{
+        {true, false, {}, {"<silent>"}}, {false, true, {"b"}, {}},
+        {false, false, {"L"}, {"L"}}};
+    assert(places(tail) == tail_expected);
+    assert(tail.transitions().size() == (remove ? 3 : 4));
+  }
+}
+
 void plus_rejects_domains_with_no_valid_initial_marking() {
   for (const auto& log : {make_log({}), make_log({{}}),
                          make_log({{"L", "L"}}),
@@ -271,6 +289,7 @@ int main() {
   plus_keeps_an_end_boundary_without_one_loops();
   plus_sharp_preserves_boundary_outgoing_presence();
   plus_empty_trace_retains_both_boundaries();
+  plus_reduced_self_loops_retain_degenerate_boundaries();
   plus_rejects_domains_with_no_valid_initial_marking();
   plus_loop_context_changes_when_trace_order_changes();
   plus_two_loop_uses_bidirectional_causal_places();
