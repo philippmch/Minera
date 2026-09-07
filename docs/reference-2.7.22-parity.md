@@ -3195,7 +3195,7 @@ counts events with absent activities; resource means include cases without resou
 Missing
 entire selected columns and eventless calendar inputs reject. Mutable categories
 reject instead of being converted to strings. Container-valued resource ordering,
-nested container factorization and ordering, mixed numeric dataframe coercion,
+nested container factorization and ordering, explicit dataframe dtype handling,
 metric-column collisions, and timezone-sensitive calendar behavior still need
 further behavioral alignment.
 Calendar cases group by typed selected identifiers across native trace boundaries.
@@ -3214,6 +3214,15 @@ when their metric endpoints differ. Incompatible non-string scalar case groups
 reject during group ordering, before temporal aggregation. Scalar resource groups
 apply the same compatibility check within each populated bucket; incompatible
 types in separate buckets remain valid, as do mixed strings and numeric resources.
+Calendar EventLog projections infer numeric promotion independently for selected
+activity, resource, and case-ID columns across the entire log. Float or missing
+cells promote eligible integer columns to float64 before category grouping;
+integer-only columns preserve exact values. Booleans, strings, and other nonnumeric
+values block promotion. Integers outside the combined signed/unsigned 64-bit range,
+or unsigned-range integers mixed with negative integers, also preserve object values.
+Promotion can merge large adjacent IDs and changes case
+metrics, distinct category counts, and rework consistently without changing the
+native input attributes.
 The feature variations remain partial, including inference and extra-feature
 contracts that have not received complete behavioral coverage.
 
