@@ -3194,8 +3194,8 @@ and missing values are excluded from category sets. Within valid cases, rework
 counts events with absent activities; resource means include cases without resources.
 Missing
 entire selected columns and eventless calendar inputs reject. Mutable categories
-reject instead of being converted to strings. Heterogeneous resource ordering,
-nested container factorization, non-string case-key ordering,
+reject instead of being converted to strings. Container-valued resource ordering,
+nested container factorization and ordering, mixed numeric dataframe coercion,
 metric-column collisions, and timezone-sensitive calendar behavior still need
 further behavioral alignment.
 Calendar cases group by typed selected identifiers across native trace boundaries.
@@ -3206,8 +3206,14 @@ select event attributes. Missing, null, and NaN IDs keep their bucket events but
 do not contribute to case aggregates. A populated bucket without a valid case
 has an empty-string rework cell and zero case means; missing entire ID columns
 and logs without any valid ID reject. Trace feature identifier defaults remain
-`concept:name`, independently of the calendar default. String case IDs break
-equal arrival/finish-time ties lexically, independently of trace encounter order.
+`concept:name`, independently of the calendar default. Scalar case IDs break
+equal arrival/finish-time ties using native numeric, string, byte, or date order.
+Integer ordering preserves values beyond float64 precision. Incompatible scalar
+tie comparisons reject, while mixed strings and other scalar types remain valid
+when their metric endpoints differ. Incompatible non-string scalar case groups
+reject during group ordering, before temporal aggregation. Scalar resource groups
+apply the same compatibility check within each populated bucket; incompatible
+types in separate buckets remain valid, as do mixed strings and numeric resources.
 The feature variations remain partial, including inference and extra-feature
 contracts that have not received complete behavioral coverage.
 

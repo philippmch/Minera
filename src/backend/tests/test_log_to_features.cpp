@@ -1,4 +1,5 @@
 #include "minera/log_to_features.hpp"
+#include "../root_cause_trace_key.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -1088,6 +1089,8 @@ static void temporal_calendar_groups_selected_typed_case_identifiers() {
            {"group", "1", AttributeKind::kInt}, {"group", "1.0", AttributeKind::kFloat},
            {"group", "1", AttributeKind::kString}}) {
     Trace trace{"unused", {Event{"unused", "A", "1970-01-01T00:00:00Z", "r"}}};
+    if (value.kind == AttributeKind::kString)
+      trace.events[0].timestamp = "1970-01-01T00:00:10Z";
     trace.attributes = {value};
     log.traces.push_back(trace);
   }
@@ -1145,6 +1148,122 @@ static void temporal_calendar_string_case_ties_use_lexical_order() {
       assert(result.temporal_rows[i].values[4] == finishes[i]);
     }
   } while (std::next_permutation(order.begin(), order.end()));
+}
+
+static void temporal_calendar_scalar_case_ordering_is_exact() {
+  const auto integer = [](const std::string& value) { return EventAttribute{"id", value, AttributeKind::kInt}; };
+  const auto real = [](double value) {
+    EventAttribute attribute{"id", "stale", AttributeKind::kFloat};
+    attribute.typed_value = value;
+    return attribute;
+  };
+  const auto check = [](EventAttribute baseline, EventAttribute smaller, EventAttribute larger) {
+    std::vector<Trace> traces{
+      Trace{"c", {Event{"c", "A", "1970-01-01T00:00:00Z", "r"}}},
+      Trace{"z", {Event{"z", "A", "1970-01-01T00:00:10Z", "r"}, Event{"z", "A", "1970-01-01T00:00:20Z", "r"}}},
+      Trace{"a", {Event{"a", "A", "1970-01-01T00:00:10Z", "r"}, Event{"a", "A", "1970-01-01T00:00:30Z", "r"}}}};
+    baseline.key = smaller.key = larger.key = "id";
+    traces[0].attributes = {baseline};
+    traces[1].attributes = {larger};
+    traces[2].attributes = {smaller};
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = "10s";
+    options.case_id_key = "case:id";
+    std::vector<std::size_t> order{0,1,2};
+    do {
+      EventLog log;
+      for (const auto i : order) log.traces.push_back(traces[i]);
+      const auto result = log_to_features(log, options);
+      const std::vector<double> arrivals{0,5,0,10}, finishes{0,15,20,10};
+      assert(result.temporal_rows.size() == 4);
+      for (std::size_t i = 0; i < 4; ++i) {
+        assert(result.temporal_rows[i].values[3] == arrivals[i]);
+        assert(result.temporal_rows[i].values[4] == finishes[i]);
+      }
+    } while (std::next_permutation(order.begin(), order.end()));
+  };
+  check(integer("-1"), integer("2"), integer("10"));
+  check(integer("-1"), integer("9007199254740992"), integer("9007199254740993"));
+  check(integer("-100"), integer("-10"), integer("-2"));
+  check(integer("-1"), real(.25), integer("1"));
+  check(integer("-1"), {"id", "false", AttributeKind::kBoolean}, {"id", "true", AttributeKind::kBoolean});
+  check(integer("0"), real(-INFINITY), real(INFINITY));
+  check(make_bytes_attribute("id", ""), make_bytes_attribute("id", "\x7f"), make_bytes_attribute("id", "\x80"));
+  EventAttribute date{"id", "stale", AttributeKind::kDate};
+  date.typed_value = NativeDate{"2000-01-01T00:00:00Z"};
+  auto second_date = date, third_date = date;
+  second_date.typed_value = NativeDate{"2000-01-02T00:00:00Z"};
+  third_date.typed_value = NativeDate{"2000-01-03T00:00:00Z"};
+  check(date, second_date, third_date);
+  assert(native_scalar_key_compare(integer("9007199254740993"), real(9007199254740992.0)) > 0);
+  assert(native_scalar_key_compare(integer("-9007199254740993"), real(-9007199254740992.0)) < 0);
+  assert(native_scalar_key_compare(integer("9007199254740992"), real(9007199254740992.0)) == 0);
+  assert(native_scalar_key_compare(integer("-9007199254740992"), real(-9007199254740992.0)) == 0);
+  assert(native_scalar_key_compare(integer("0"), real(-0.0)) == 0);
+  assert(native_scalar_key_compare(integer("-2"), real(-2.5)) > 0);
+  assert(native_scalar_key_compare(integer("0"), real(-.25)) > 0);
+  assert(native_scalar_key_compare(integer("0"), real(.25)) < 0);
+  assert(native_scalar_key_compare(integer("1" + std::string(310, '0')), real(1e308)) > 0);
+  assert(native_scalar_key_compare(integer("-1" + std::string(310, '0')), real(-1e308)) < 0);
+  assert(native_scalar_key_compare(integer("1" + std::string(310, '0')), real(INFINITY)) < 0);
+  assert(native_scalar_key_compare(integer("-1" + std::string(310, '0')), real(-INFINITY)) > 0);
+  auto offset_date = date;
+  offset_date.typed_value = NativeDate{"2000-01-01T01:00:00+01:00"};
+  assert(native_scalar_key_compare(date, offset_date) == 0);
+  EventAttribute native_integer{"id", "stale", AttributeKind::kString};
+  native_integer.typed_value = std::int64_t{2};
+  assert(native_scalar_key_compare(native_integer, integer("10")) < 0);
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.case_id_key = "case:id";
+  EventLog log;
+  log.traces = {Trace{"a", {Event{"a", "A", "1970-01-01T00:00:00Z", "r"}}},
+                Trace{"b", {Event{"b", "A", "1970-01-01T00:00:10Z", "r"}}}};
+  const auto rejects = [&] {
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  for (const auto& nonstring : {integer("1"), EventAttribute{"id", "true", AttributeKind::kBoolean},
+                                date, make_bytes_attribute("id", "a")}) {
+    log.traces[0].attributes = {nonstring};
+    log.traces[1].attributes = {{"id", "string"}};
+    log.traces[1].events[0].timestamp = "1970-01-01T00:00:10Z";
+    assert(log_to_features(log, options).temporal_rows[0].values[11] == 2);
+    log.traces[1].events[0].timestamp = "1970-01-01T00:00:00Z";
+    rejects();
+    log.traces[1].events[0].timestamp = "1970-01-01T00:00:10Z";
+    log.traces[0].events.push_back(Event{"a", "A", "1970-01-01T00:00:10Z", "r"});
+    rejects();
+    log.traces[0].events.pop_back();
+  }
+  log.traces[1].events[0].timestamp = "1970-01-01T00:00:10Z";
+  for (const auto& pair : std::vector<std::pair<EventAttribute, EventAttribute>>{
+           {integer("1"), make_bytes_attribute("id", "a")}, {date, integer("1")},
+           {date, make_bytes_attribute("id", "a")}}) {
+    log.traces[0].attributes = {pair.first};
+    log.traces[1].attributes = {pair.second};
+    rejects();
+  }
+  options.case_id_key.reset();
+  options.resource_key = "id";
+  options.grouper_freq = "D";
+  for (const auto& pair : std::vector<std::pair<EventAttribute, EventAttribute>>{
+           {integer("1"), make_bytes_attribute("id", "a")}, {date, integer("1")},
+           {date, make_bytes_attribute("id", "a")}}) {
+    log.traces[0].events[0].attributes = {pair.first};
+    log.traces[1].events[0].attributes = {pair.second};
+    log.traces[1].events[0].timestamp = "1970-01-01T00:00:10Z";
+    rejects();
+    log.traces[1].events[0].timestamp = "1970-01-02T00:00:10Z";
+    assert(log_to_features(log, options).temporal_rows.size() == 2);
+  }
+  log.traces[0].events[0].attributes = {integer("1")};
+  log.traces[1].events[0].attributes = {{"id", "string"}};
+  log.traces[1].events[0].timestamp = "1970-01-01T00:00:10Z";
+  assert(log_to_features(log, options).temporal_rows[0].values[0] == 2);
 }
 
 static void temporal_calendar_frequency_uses_period_boundaries() {
@@ -1714,6 +1833,7 @@ static void trace_default_schema_infers_complete_trace_presence() {
 }
 
 int main() {
+  temporal_calendar_scalar_case_ordering_is_exact();
   temporal_calendar_string_case_ties_use_lexical_order();
   temporal_calendar_groups_selected_typed_case_identifiers();
   temporal_calendar_categories_preserve_typed_equality_and_presence();
