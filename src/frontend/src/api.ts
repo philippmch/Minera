@@ -5435,7 +5435,8 @@ export function logToFeaturesQuery(options: LogToFeaturesOptions = {}): string {
   if (options.features_max_num_different_string_values !== undefined &&
       (!Number.isSafeInteger(options.features_max_num_different_string_values) || options.features_max_num_different_string_values < 0))
     throw new Error("features_max_num_different_string_values must be a non-negative integer");
-  if (options.features_min_num_different_string_values !== undefined &&
+  if (options.features_variant !== undefined && options.features_variant !== "trace_based" &&
+      options.features_min_num_different_string_values !== undefined &&
       options.features_max_num_different_string_values !== undefined &&
       options.features_min_num_different_string_values > options.features_max_num_different_string_values)
     throw new Error("features string cardinality bounds are inverted");

@@ -3105,6 +3105,20 @@ with zero for unassigned core cells regardless of default-not-present. An empty
 schema retains one empty row per trace. Legacy activity-count, duration, and WIP
 columns are no longer injected; timing and workload extras remain opt-in.
 Core extraction does not parse unused timestamps.
+Enabled trace extras append their columns after the core schema, including an
+explicitly empty schema. A custom core name that matches an extra remains a
+separate zero-valued column. The enable-all option supplies defaults for numeric
+families; explicit false overrides suppress individual families, and case
+identifiers require their independent option. Generated resource workload
+columns precede activity indexes and concurrency columns.
+Case duration uses the last event completion minus the first event start, with
+zero for an empty trace. Occurrence features follow event order: the start-side
+value is the selected occurrence start minus the first event completion; the
+end-side value is the last event start minus the selected occurrence completion.
+Negative values are retained. When no start key is configured, completion is
+also used as start. Only the endpoints and selected occurrences needed by these
+features require timestamps; unused middle events do not trigger conversion.
+Missing activities retain the configured default-not-present value.
 Trace numeric selectors whose columns occur in the schema convert every present
 value before retaining the last event value, so an earlier invalid value is
 still an error. Columns excluded by an explicit schema skip numeric conversion.
@@ -3123,7 +3137,9 @@ trace (event attributes) or on every trace (trace attributes), excludes the
 canonical trace identifier, and omits boolean-only attributes.
 Default trace inference still needs broader proof: mixed-type selection and
 ordinary attribute ordering vary across hash seeds in the pinned runtime.
-Default unhashable-container handling also remains open.
+Default unhashable-container handling also remains open. Case identifier columns
+still require native and JSON string-cell support; out-of-band case IDs alone
+do not establish parity for that option.
 The feature variations remain partial, including inference and extra-feature
 contracts that have not received complete behavioral coverage.
 

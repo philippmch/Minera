@@ -675,19 +675,17 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     }
     const auto core_feature_count = names.size();
     const bool all_extra = options.enable_all_extra_features;
-    const bool case_duration = all_extra || options.enable_case_duration;
-    const bool case_id = all_extra || options.add_case_identifier_column;
-    const bool first_times = all_extra || options.enable_times_from_first_occurrence;
-    const bool last_times = all_extra || options.enable_times_from_last_occurrence;
-    const bool direct_paths = all_extra || options.enable_direct_paths_times_last_occ;
-    const bool indirect_paths = all_extra || options.enable_indirect_paths_times_last_occ;
-    const bool wip = all_extra || options.enable_work_in_progress;
-    const bool workload = all_extra || options.enable_resource_workload;
-    const bool indexes = all_extra || options.enable_first_last_activity_index;
-    const bool max_concurrent = all_extra || options.enable_max_concurrent_events;
-    const bool max_per_activity = all_extra || options.enable_max_concurrent_events_per_activity;
-    const bool needs_time = case_duration || first_times || last_times || direct_paths ||
-        indirect_paths || wip || workload || max_concurrent || max_per_activity;
+    const bool case_duration = options.enable_case_duration || (all_extra && !options.enable_case_duration_supplied);
+    const bool case_id = options.add_case_identifier_column;
+    const bool first_times = options.enable_times_from_first_occurrence || (all_extra && !options.enable_times_from_first_occurrence_supplied);
+    const bool last_times = options.enable_times_from_last_occurrence || (all_extra && !options.enable_times_from_last_occurrence_supplied);
+    const bool direct_paths = options.enable_direct_paths_times_last_occ || (all_extra && !options.enable_direct_paths_times_last_occ_supplied);
+    const bool indirect_paths = options.enable_indirect_paths_times_last_occ || (all_extra && !options.enable_indirect_paths_times_last_occ_supplied);
+    const bool wip = options.enable_work_in_progress || (all_extra && !options.enable_work_in_progress_supplied);
+    const bool workload = options.enable_resource_workload || (all_extra && !options.enable_resource_workload_supplied);
+    const bool indexes = options.enable_first_last_activity_index || (all_extra && !options.enable_first_last_activity_index_supplied);
+    const bool max_concurrent = options.enable_max_concurrent_events || (all_extra && !options.enable_max_concurrent_events_supplied);
+    const bool max_per_activity = options.enable_max_concurrent_events_per_activity || (all_extra && !options.enable_max_concurrent_events_per_activity_supplied);
     if (case_duration) add_name("@@caseDuration");
     if (case_id) add_name("@@case_id_column");
     if (first_times) for (const auto& a : activities) {
@@ -703,26 +701,32 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       for (const auto& [from, to] : observed_indirect_paths)
         add_name("indirectPathPerformanceLastOcc@@" + from + "##" + to);
     if (wip) add_name("@@work_in_progress");
+    std::set<std::string> resources;
+    for (const auto& t : log.traces) for (const auto& e : t.events) resources.insert(value_for(e, options.resource_key));
+    for (const auto& r : resources) if (!r.empty()) {
+      if (workload) add_name("resource_workload@@" + r);
+    }
     if (indexes) for (const auto& a : activities) {
       add_name("firstIndexAct@@" + a); add_name("lastIndexAct@@" + a);
     }
     if (max_concurrent) add_name("@@max_concurrent_activities_general");
     if (max_per_activity) for (const auto& a : activities)
       add_name("@@max_concurrent_activities_like_" + a);
-    std::set<std::string> resources;
-    for (const auto& t : log.traces) for (const auto& e : t.events) resources.insert(value_for(e, options.resource_key));
-    for (const auto& r : resources) if (!r.empty()) {
-      if (workload) add_name("resource_workload@@" + r);
-    }
-    if (options.feature_names.empty() && !options.feature_names_supplied) out.feature_names = names;
+    if (options.feature_names.empty() && !options.feature_names_supplied)
+      out.feature_names.assign(names.begin(), names.begin() + core_feature_count);
     std::unordered_map<std::string, std::size_t> index;
     for (std::size_t i = 0; i < out.feature_names.size(); ++i) index[out.feature_names[i]] = i;
-    const auto path_start = [&](const Event& event) {
+    std::unordered_map<std::string, std::size_t> extra_index;
+    for (std::size_t i = core_feature_count; i < names.size(); ++i) {
+      extra_index[names[i]] = out.feature_names.size();
+      out.feature_names.push_back(names[i]);
+    }
+    const auto path_start = [&](const Event& event, bool required = false) {
       return instant(event,
                      options.start_timestamp_key.empty()
                          ? options.timestamp_key
                          : options.start_timestamp_key,
-                     false);
+                     required);
     };
     struct CaseInterval {
       double start = std::numeric_limits<double>::quiet_NaN();
@@ -735,7 +739,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         resource_intervals;
     for (std::size_t ti = 0; ti < log.traces.size(); ++ti) {
       const auto& trace = log.traces[ti];
-      if (trace.events.empty() || !needs_time) continue;
+      if (trace.events.empty() || !(wip || workload)) continue;
       auto& interval = case_intervals[ti];
       interval.start = path_start(trace.events.front());
       interval.finish = instant(trace.events.back(), options.timestamp_key, false);
@@ -754,45 +758,30 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     std::size_t trace_index = 0;
     for (const auto& t : log.traces) {
       std::vector<double> row(out.feature_names.size(), 0.0);
-      auto set = [&](const std::string& n, double v) { if (auto i = index.find(n); i != index.end()) row[i->second] = v; };
+      auto set_core = [&](const std::string& n, double v) { if (auto i = index.find(n); i != index.end()) row[i->second] = v; };
+      auto set = [&](const std::string& n, double v) { if (auto i = extra_index.find(n); i != extra_index.end()) row[i->second] = v; };
       for (std::size_t i = core_feature_count; i < names.size(); ++i)
         set(names[i], options.default_not_present);
       std::map<std::string, int> count; std::map<std::string, std::size_t> first, last;
-      std::set<std::string> seen; bool have = false;
-      double case_start = std::numeric_limits<double>::infinity();
-      double case_end = -std::numeric_limits<double>::infinity();
-      std::map<std::string, double> first_time, last_time;
-      std::vector<TimedEvent> timed;
+      std::set<std::string> seen;
       std::map<std::string, int> resource_count;
       for (std::size_t i = 0; i < t.events.size(); ++i) {
         const auto& e = t.events[i]; const auto a = value_for(e, options.activity_key); ++count[a]; if (!seen.count(a)) first[a] = i; last[a] = i; seen.insert(a);
-        const auto text = needs_time ? value_for(e, options.timestamp_key) : std::string{};
-        if (!text.empty()) have = true;
-        const auto start_text = options.start_timestamp_key.empty() ? text : value_for(e, options.start_timestamp_key);
-        const auto start = !needs_time || start_text.empty() ? std::numeric_limits<double>::quiet_NaN() : instant(e, options.start_timestamp_key.empty() ? options.timestamp_key : options.start_timestamp_key, false);
-        const auto finish = text.empty() ? std::numeric_limits<double>::quiet_NaN() : instant(e, options.timestamp_key, false);
-        if (std::isfinite(start) && std::isfinite(finish)) {
-          timed.push_back({&e, finish, start, 0, i});
-          case_start = std::min(case_start, start);
-          case_end = std::max(case_end, finish);
-        }
-        if (std::isfinite(finish)) {
-          if (!first_time.contains(a)) first_time[a] = finish;
-          last_time[a] = finish;
-        }
         const auto r = value_for(e, options.resource_key);
         if (!r.empty()) ++resource_count[r];
       }
       for (const auto& [a,c] : count) if (indexes) { set("firstIndexAct@@"+a, static_cast<double>(first[a])); set("lastIndexAct@@"+a, static_cast<double>(last[a])); }
       for (const auto& n : event_strings) {
         for (const auto& value : event_attribute_values_for_trace(t, n))
-          set("event:" + n + "@" + value, 1.0);
+          set_core("event:" + n + "@" + value, 1.0);
       }
-      for (const auto& n : case_strings) set("trace:"+n+"@"+trace_attribute_value(t,n), 1.0);
-      for (const auto& n : successor_attributes) for (const auto& value : successions(t, n)) set("succession:"+n+"@"+value, 1.0);
-      if (have) {
-        if (case_duration && std::isfinite(case_start) && std::isfinite(case_end))
-          set("@@caseDuration", case_end-case_start);
+      for (const auto& n : case_strings) set_core("trace:"+n+"@"+trace_attribute_value(t,n), 1.0);
+      for (const auto& n : successor_attributes) for (const auto& value : successions(t, n)) set_core("succession:"+n+"@"+value, 1.0);
+      if (case_duration) {
+        const auto duration = t.events.empty() ? 0.0 :
+            instant(t.events.back(), options.timestamp_key, true) -
+            path_start(t.events.front(), true);
+        set("@@caseDuration", duration);
       }
       for (const auto& n : event_numbers) {
         if (!index.contains("event:" + n)) continue;
@@ -806,14 +795,32 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         }
         if (!found)
           throw std::invalid_argument("log_to_features: trace has no numeric event attribute: " + n);
-        set("event:" + n, value);
+        set_core("event:" + n, value);
       }
       for (const auto& n : case_numbers)
-        if (index.contains("trace:" + n)) set("trace:"+n,numeric_trace_value(t,n));
+        if (index.contains("trace:" + n)) set_core("trace:"+n,numeric_trace_value(t,n));
       for (const auto& [r, c] : resource_count) if (workload) set("resource_workload@@" + r, static_cast<double>(c));
-      for (const auto& [a, first_value] : first_time) {
-        if (first_times && std::isfinite(case_start) && std::isfinite(case_end)) { set("startToFirstOcc@@"+a, first_value-case_start); set("firstOccToEnd@@"+a, case_end-first_value); }
-        if (last_times && std::isfinite(case_start) && std::isfinite(case_end)) { const auto last_value = last_time[a]; set("startToLastOcc@@"+a, last_value-case_start); set("lastOccToEnd@@"+a, case_end-last_value); }
+      if ((first_times || last_times) && !t.events.empty()) {
+        const auto first_finish = instant(t.events.front(), options.timestamp_key, true);
+        const auto last_start = path_start(t.events.back(), true);
+        const auto set_occurrence_times = [&](const std::string& activity,
+                                               std::size_t position,
+                                               const std::string& start_name,
+                                               const std::string& end_name) {
+          const auto& event = t.events[position];
+          const auto start = path_start(event, true);
+          const auto finish = instant(event, options.timestamp_key, true);
+          if (std::isfinite(start) && std::isfinite(first_finish))
+            set(start_name + activity, start - first_finish);
+          if (std::isfinite(finish) && std::isfinite(last_start))
+            set(end_name + activity, last_start - finish);
+        };
+        for (const auto& [activity, position] : first) {
+          if (first_times)
+            set_occurrence_times(activity, position, "startToFirstOcc@@", "firstOccToEnd@@");
+          if (last_times)
+            set_occurrence_times(activity, last.at(activity), "startToLastOcc@@", "lastOccToEnd@@");
+        }
       }
       if (direct_paths) for (std::size_t i = 1; i < t.events.size(); ++i) {
         const auto from = value_for(t.events[i - 1], options.activity_key);

@@ -30,6 +30,114 @@ static Event timed_event(const std::string& case_id, const std::string& activity
   return event;
 }
 
+static void occurrence_timing_uses_input_order_and_interval_endpoints() {
+  EventLog log;
+  Trace ordered;
+  ordered.events = {
+      timed_event("ordered", "A", "2024-01-01T00:00:00Z", "2024-01-01T00:00:10Z", 0),
+      timed_event("ordered", "B", "2024-01-01T00:00:15Z", "2024-01-01T00:00:20Z", 1),
+      timed_event("ordered", "A", "2024-01-01T00:00:25Z", "2024-01-01T00:00:30Z", 2)};
+  Trace unsorted;
+  unsorted.events = {
+      timed_event("unsorted", "A", "2024-01-01T00:00:20Z", "2024-01-01T00:00:30Z", 0),
+      timed_event("unsorted", "B", "2024-01-01T00:00:00Z", "2024-01-01T00:00:10Z", 1),
+      timed_event("unsorted", "A", "2024-01-01T00:00:15Z", "2024-01-01T00:00:50Z", 2)};
+  log.traces = {ordered, unsorted, Trace{}};
+  LogToFeaturesOptions options;
+  options.event_string_attributes_supplied = true;
+  options.start_timestamp_key = "start_time";
+  options.enable_case_duration = true;
+  options.enable_times_from_first_occurrence = true;
+  options.enable_times_from_last_occurrence = true;
+  options.default_not_present = -7;
+  const auto result = log_to_features(log, options);
+  assert((result.feature_names == std::vector<std::string>{
+      "@@caseDuration", "startToFirstOcc@@A", "firstOccToEnd@@A",
+      "startToFirstOcc@@B", "firstOccToEnd@@B", "startToLastOcc@@A",
+      "lastOccToEnd@@A", "startToLastOcc@@B", "lastOccToEnd@@B"}));
+  assert((result.trace_rows == std::vector<std::vector<double>>{
+      {30, -10, 15, 5, 5, 15, -5, 5, 5},
+      {30, -10, -15, -30, 5, -15, -35, -30, 5},
+      {0, -7, -7, -7, -7, -7, -7, -7, -7}}));
+  options.start_timestamp_key.clear();
+  const auto completion_starts = log_to_features(log, options);
+  assert((completion_starts.trace_rows[0] == std::vector<double>{20, 0, 20, 10, 10, 20, 0, 10, 10}));
+  assert((completion_starts.trace_rows[1] == std::vector<double>{20, 0, 20, -20, 40, 20, 0, -20, 40}));
+
+  // Only the selected occurrence and boundary timestamps are accessed.
+  options.start_timestamp_key = "start_time";
+  log.traces = {ordered};
+  log.traces[0].events[1] = Event{"ordered", "A", "", "", 1};
+  const auto missing_middle = log_to_features(log, options);
+  assert((missing_middle.trace_rows[0] == std::vector<double>{30, -10, 15, 15, -5}));
+  options.enable_times_from_first_occurrence = false;
+  options.enable_times_from_last_occurrence = false;
+  log.traces[0].events[1].activity = "B";
+  assert(log_to_features(log, options).trace_rows[0][0] == 30);
+  options.enable_times_from_first_occurrence = true;
+  bool rejected = false;
+  try { (void)log_to_features(log, options); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+
+  // A missing first start does not affect last-occurrence times.
+  options.enable_case_duration = false;
+  options.enable_times_from_first_occurrence = false;
+  options.enable_times_from_last_occurrence = true;
+  log.traces[0].events = {ordered.events.front(), ordered.events.back()};
+  log.traces[0].events.front().attributes.clear();
+  assert((log_to_features(log, options).trace_rows[0] == std::vector<double>{15, -5}));
+  // A missing last completion does not affect first-occurrence times.
+  options.enable_times_from_first_occurrence = true;
+  options.enable_times_from_last_occurrence = false;
+  log.traces[0].events.front() = ordered.events.front();
+  log.traces[0].events.back().timestamp.clear();
+  assert((log_to_features(log, options).trace_rows[0] == std::vector<double>{-10, 15}));
+}
+
+static void extra_features_append_to_custom_core_schema_and_respect_overrides() {
+  const auto log = fixture();
+  LogToFeaturesOptions options;
+  options.event_string_attributes_supplied = true;
+  options.feature_names_supplied = true;
+  options.enable_case_duration = true;
+  auto result = log_to_features(log, options);
+  assert(result.feature_names == std::vector<std::string>{"@@caseDuration"});
+  assert(result.trace_rows == std::vector<std::vector<double>>{{3600}});
+  options.feature_names = {"@@caseDuration"};
+  result = log_to_features(log, options);
+  assert((result.feature_names == std::vector<std::string>{"@@caseDuration", "@@caseDuration"}));
+  assert((result.trace_rows == std::vector<std::vector<double>>{{0, 3600}}));
+  options.feature_names.clear();
+  options.enable_case_duration = false;
+  options.enable_all_extra_features = true;
+  result = log_to_features(log, options);
+  assert(result.case_ids.empty());
+  assert((result.feature_names == std::vector<std::string>{
+      "@@caseDuration", "startToFirstOcc@@A", "firstOccToEnd@@A",
+      "startToFirstOcc@@B", "firstOccToEnd@@B", "startToLastOcc@@A",
+      "lastOccToEnd@@A", "startToLastOcc@@B", "lastOccToEnd@@B",
+      "directPathPerformanceLastOcc@@A##B", "@@work_in_progress",
+      "resource_workload@@r1", "firstIndexAct@@A", "lastIndexAct@@A",
+      "firstIndexAct@@B", "lastIndexAct@@B", "@@max_concurrent_activities_general",
+      "@@max_concurrent_activities_like_A", "@@max_concurrent_activities_like_B"}));
+  options.enable_case_duration_supplied = true;
+  options.enable_times_from_first_occurrence_supplied = true;
+  options.enable_times_from_last_occurrence_supplied = true;
+  options.enable_direct_paths_times_last_occ_supplied = true;
+  options.enable_indirect_paths_times_last_occ_supplied = true;
+  options.enable_work_in_progress_supplied = true;
+  options.enable_resource_workload_supplied = true;
+  options.enable_first_last_activity_index_supplied = true;
+  options.enable_max_concurrent_events_supplied = true;
+  options.enable_max_concurrent_events_per_activity_supplied = true;
+  result = log_to_features(log, options);
+  assert(result.feature_names.empty());
+  assert(result.trace_rows == std::vector<std::vector<double>>{{}});
+  options.enable_case_duration = true;
+  assert(log_to_features(log, options).trace_rows == std::vector<std::vector<double>>{{3600}});
+}
+
 static void observed_path_timing_uses_configured_starts() {
   EventLog log;
   Trace paths;
@@ -736,6 +844,8 @@ static void trace_default_schema_infers_complete_trace_presence() {
 }
 
 int main() {
+  occurrence_timing_uses_input_order_and_interval_endpoints();
+  extra_features_append_to_custom_core_schema_and_respect_overrides();
   trace_default_schema_infers_complete_trace_presence();
   trace_core_schema_preserves_selection_and_typed_categories();
   event_schema_respects_typed_selection_and_explicit_empty_lists();
