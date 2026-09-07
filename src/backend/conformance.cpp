@@ -2791,10 +2791,14 @@ ConformanceResult check_conformance(const EventLog& event_log,
   result.generalization = compute_generalization(executions);
   result.transition_frequencies = executions;
   result.simplicity = compute_simplicity(net);
-  if (options.include_trace_diagnostics || options.include_duration_diagnostics) {
+  if (options.include_trace_diagnostics || options.include_duration_diagnostics ||
+      options.include_root_cause_diagnostics) {
     auto traces = replay_token_traces(event_log, net, options);
     if (options.include_duration_diagnostics)
       result.duration_diagnostics = compute_token_replay_duration_diagnostics(
+          event_log, net, traces, options);
+    if (options.include_root_cause_diagnostics)
+      result.root_cause_diagnostics = compute_token_replay_root_cause_diagnostics(
           event_log, net, traces, options);
     if (options.include_trace_diagnostics)
       result.trace_diagnostics = std::move(traces);

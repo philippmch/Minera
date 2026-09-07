@@ -520,6 +520,10 @@ export interface MinerOptions {
   tokenReplayWalkThroughHiddenTransitions?: boolean;
   tokenReplayIncludeTraceDiagnostics?: boolean;
   tokenReplayIncludeDurationDiagnostics?: boolean;
+  tokenReplayIncludeRootCauseDiagnostics?: boolean;
+  tokenReplayRootCauseStringAttributes?: string[];
+  tokenReplayRootCauseNumericAttributes?: string[];
+  tokenReplayRootCauseEnableMultiplier?: boolean;
   tokenReplayTimestampAttribute?: string;
   tokenReplayCaseIdAttribute?: string;
   tokenReplayMaxRowsToMaterialize?: number;
@@ -1124,11 +1128,26 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     ["tokenReplayWalkThroughHiddenTransitions", "token_replay_walk_through_hidden_transitions"],
     ["tokenReplayIncludeTraceDiagnostics", "token_replay_include_trace_diagnostics"],
     ["tokenReplayIncludeDurationDiagnostics", "token_replay_include_duration_diagnostics"],
+    ["tokenReplayIncludeRootCauseDiagnostics", "token_replay_include_root_cause_diagnostics"],
+    ["tokenReplayRootCauseEnableMultiplier", "token_replay_root_cause_enable_multiplier"],
   ] as const) {
     const value = options[key];
     if (value !== undefined) {
       if (typeof value !== "boolean") throw new Error(`${key} must be a boolean`);
       add(parameter, String(value));
+    }
+  }
+  for (const [key, parameter] of [
+    ["tokenReplayRootCauseStringAttributes", "token_replay_root_cause_string_attributes"],
+    ["tokenReplayRootCauseNumericAttributes", "token_replay_root_cause_numeric_attributes"],
+  ] as const) {
+    const values = options[key];
+    if (values !== undefined) {
+      if (!Array.isArray(values) || values.some((value) =>
+        typeof value !== "string" || !value.trim() || /[,\r\n]/.test(value)))
+        throw new Error(`${key} must contain non-empty comma-free attribute names`);
+      const names = values.map((value) => value.trim());
+      add(parameter, names.join(","));
     }
   }
   if (options.tokenReplayActivityAttribute !== undefined) {

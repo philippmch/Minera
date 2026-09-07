@@ -2984,6 +2984,36 @@ export interface TokenReplayDurationDiagnostics {
   }>;
 }
 
+export interface TokenReplayRootCauseModel {
+  fit_count: number;
+  problem_count: number;
+  feature_names: string[];
+  classes: string[];
+  data: Array<Array<number | null>>;
+  target: number[];
+  source_trace_indices: number[];
+  tree: Array<{
+    feature_index: number;
+    threshold: number;
+    left: number;
+    right: number;
+    class_counts: [number, number];
+    missing_go_to_left: boolean;
+    missing_only?: boolean;
+  }>;
+}
+
+export interface TokenReplayRootCauseDiagnostics {
+  string_attributes: string[];
+  numeric_attributes: string[];
+  enable_multiplier: boolean;
+  transitions: Array<TokenReplayRootCauseModel & { transition_index: number }>;
+  unknown_activities: Array<TokenReplayRootCauseModel & {
+    activity: string;
+    activity_is_null: boolean;
+  }>;
+}
+
 export interface Conformance {
   /** Token fitness; immediate-stop replay can produce a negative value. */
   fitness: number;
@@ -3007,6 +3037,7 @@ export interface Conformance {
   trace_diagnostics?: TokenReplayTraceDiagnostics[];
   /** Opt-in case-duration comparisons for transition and unknown-activity cohorts. */
   duration_diagnostics?: TokenReplayDurationDiagnostics;
+  root_cause_diagnostics?: TokenReplayRootCauseDiagnostics;
 }
 
 /** One move of an optimal alignment between a trace and the model. */

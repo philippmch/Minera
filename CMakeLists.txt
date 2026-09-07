@@ -53,6 +53,8 @@ add_library(minera_core
   src/backend/declare_playout.cpp
   src/backend/declare_streaming.cpp
   src/backend/decision_mining.cpp
+  src/backend/root_cause.cpp
+  src/backend/token_replay_root_cause.cpp
   src/backend/decision_replay.cpp
   src/backend/decision_table.cpp
   src/backend/dfg_playout.cpp
@@ -325,6 +327,18 @@ if(MINERA_BUILD_TESTS)
   # test translation units only.
   set(MINERA_TEST_OPTIONS $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>
                           $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG>)
+
+  add_executable(minera_root_cause_tests src/backend/tests/test_root_cause.cpp)
+  target_link_libraries(minera_root_cause_tests PRIVATE minera::core)
+  target_compile_features(minera_root_cause_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_root_cause_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_root_cause_tests COMMAND minera_root_cause_tests)
+
+  add_executable(minera_token_replay_root_cause_tests src/backend/tests/test_token_replay_root_cause.cpp)
+  target_link_libraries(minera_token_replay_root_cause_tests PRIVATE minera::core)
+  target_compile_features(minera_token_replay_root_cause_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_token_replay_root_cause_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_token_replay_root_cause_tests COMMAND minera_token_replay_root_cause_tests)
 
   add_executable(minera_core_tests
     src/backend/tests/test_core.cpp

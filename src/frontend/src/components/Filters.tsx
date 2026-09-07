@@ -23,6 +23,7 @@ export const TOKEN_REPLAY_POLICY_DEFAULTS = {
   tokenReplayWalkThroughHiddenTransitions: true,
   tokenReplayIncludeTraceDiagnostics: false,
   tokenReplayIncludeDurationDiagnostics: false,
+  tokenReplayIncludeRootCauseDiagnostics: false,
 };
 
 type TokenReplayPolicies = typeof TOKEN_REPLAY_POLICY_DEFAULTS;
@@ -78,6 +79,7 @@ export function TokenReplayPolicyControls({ variant, policies, onChange }: {
         ["tokenReplayWalkThroughHiddenTransitions", "Walk through hidden transitions", false],
         ["tokenReplayIncludeTraceDiagnostics", "Include per-trace replay diagnostics", false],
         ["tokenReplayIncludeDurationDiagnostics", "Include replay duration diagnostics", false],
+        ["tokenReplayIncludeRootCauseDiagnostics", "Include replay root-cause diagnostics", false],
       ] as const).map(([key, label, forwardOnly]) => (
         <label className="filters-field" key={key}>
           <span>{label}</span>
@@ -90,6 +92,46 @@ export function TokenReplayPolicyControls({ variant, policies, onChange }: {
       ))}
     </div>
   </>;
+}
+
+export function tokenReplayRootCauseOptionsFromForm(
+  enabled: boolean, strings: string, numerics: string, multiplier = false,
+): MinerOptions {
+  if (!enabled) return {};
+  const parse = (value: string) => {
+    if (!value.trim()) return [];
+    const names = value.split(",").map((name) => name.trim());
+    if (names.some((name) => !name || /[\r\n]/.test(name)))
+      throw new Error("Root-cause attributes must be non-empty comma-separated names.");
+    return names;
+  };
+  const stringAttributes = parse(strings);
+  const numericAttributes = parse(numerics);
+  if (!stringAttributes.length && !numericAttributes.length)
+    throw new Error("Root-cause diagnostics require at least one string or numeric attribute.");
+  return {
+    tokenReplayRootCauseStringAttributes: stringAttributes,
+    tokenReplayRootCauseNumericAttributes: numericAttributes,
+    tokenReplayRootCauseEnableMultiplier: multiplier,
+  };
+}
+
+export function TokenReplayRootCauseControls({ enabled, strings, numerics, multiplier,
+  onStrings, onNumerics, onMultiplier }: {
+  enabled: boolean; strings: string; numerics: string; multiplier: boolean;
+  onStrings: (value: string) => void; onNumerics: (value: string) => void;
+  onMultiplier: (value: boolean) => void;
+}) {
+  return <div className="filters-row">
+    <label className="filters-field"><span>Root-cause string attributes <small>(comma-separated)</small></span>
+      <input disabled={!enabled} value={strings} onChange={(event) => onStrings(event.target.value)} /></label>
+    <label className="filters-field"><span>Root-cause numeric attributes <small>(comma-separated)</small></span>
+      <input disabled={!enabled} value={numerics} onChange={(event) => onNumerics(event.target.value)} /></label>
+    <label className="filters-field"><span>Balance fitting and problem samples</span>
+      <select disabled={!enabled} value={String(multiplier)} onChange={(event) => onMultiplier(event.target.value === "true")}>
+        <option value="true">yes</option><option value="false">no (default)</option>
+      </select></label>
+  </div>;
 }
 
 interface FiltersProps {
@@ -744,6 +786,9 @@ export function Filters({
     useState({ ...TOKEN_REPLAY_POLICY_DEFAULTS });
   const [tokenReplayMaxRows, setTokenReplayMaxRows] = useState("");
   const [tokenReplayTimestampAttribute, setTokenReplayTimestampAttribute] = useState("time:timestamp");
+  const [rootCauseStrings, setRootCauseStrings] = useState("");
+  const [rootCauseNumerics, setRootCauseNumerics] = useState("");
+  const [rootCauseMultiplier, setRootCauseMultiplier] = useState(false);
   const logSkeletonFamilies = [
     ["equivalence", "Equivalence"],
     ["always_after", "Always-after"],
@@ -1180,7 +1225,14 @@ export function Filters({
     splitEnabled: correlationSplitOptionsActive,
     sampleSize: correlationSampleSize,
   });
-  const selectorValidationError =
+  let rootCauseValidationError: string | null = null;
+  try {
+    tokenReplayRootCauseOptionsFromForm(tokenReplayPolicies.tokenReplayIncludeRootCauseDiagnostics,
+      rootCauseStrings, rootCauseNumerics, rootCauseMultiplier);
+  } catch (error) {
+    rootCauseValidationError = (error as Error).message;
+  }
+  const selectorValidationError = rootCauseValidationError ||
     tokenReplayInputValidationMessage(tokenReplayMaxRows, tokenReplayTimestampAttribute,
       tokenReplayPolicies.tokenReplayIncludeDurationDiagnostics) ||
     (!logSkeletonActivityAttribute.trim()
@@ -1429,6 +1481,8 @@ export function Filters({
       tokenReplayActivityAttribute:
         tokenReplayActivityAttribute.trim() || undefined,
       ...tokenReplayPolicyOptionsFromForm(tokenReplayPolicies),
+      ...tokenReplayRootCauseOptionsFromForm(tokenReplayPolicies.tokenReplayIncludeRootCauseDiagnostics,
+        rootCauseStrings, rootCauseNumerics, rootCauseMultiplier),
       ...tokenReplayInputOptionsFromForm(tokenReplayMaxRows, tokenReplayTimestampAttribute,
         tokenReplayPolicies.tokenReplayIncludeDurationDiagnostics),
       logSkeletonNoiseThreshold: toLogSkeletonNoise(logSkeletonNoiseThreshold),
@@ -1716,6 +1770,9 @@ export function Filters({
     setTokenReplayPolicies({ ...TOKEN_REPLAY_POLICY_DEFAULTS });
     setTokenReplayMaxRows("");
     setTokenReplayTimestampAttribute("time:timestamp");
+    setRootCauseStrings("");
+    setRootCauseNumerics("");
+    setRootCauseMultiplier(false);
     setLogSkeletonNoiseThreshold("");
     setLogSkeletonActivityAttribute("concept:name");
     setLogSkeletonConstraints(new Set(logSkeletonFamilies.map(([name]) => name)));
@@ -1928,6 +1985,7 @@ export function Filters({
     powlTimestampKey.trim() !== "time:timestamp" ||
     powlCaseIdKey.trim() !== "case:concept:name";
   const tokenReplayDirty =
+    Boolean(rootCauseStrings.trim() || rootCauseNumerics.trim()) || rootCauseMultiplier ||
     tokenReplayVariant !== "forward" || tokenReplayStopImmediatelyUnfit ||
     tokenReplayActivityAttribute.trim() !== "concept:name" ||
     tokenReplayPoliciesAreDirty(tokenReplayPolicies) || Boolean(tokenReplayMaxRows.trim());
@@ -2157,6 +2215,9 @@ export function Filters({
 
           <TokenReplayPolicyControls variant={tokenReplayVariant} policies={tokenReplayPolicies}
             onChange={(key, value) => setTokenReplayPolicies((current) => ({ ...current, [key]: value }))} />
+          <TokenReplayRootCauseControls enabled={tokenReplayPolicies.tokenReplayIncludeRootCauseDiagnostics}
+            strings={rootCauseStrings} numerics={rootCauseNumerics} multiplier={rootCauseMultiplier}
+            onStrings={setRootCauseStrings} onNumerics={setRootCauseNumerics} onMultiplier={setRootCauseMultiplier} />
           <label className="filters-field">
             <span>Token replay timestamp attribute</span>
             <input value={tokenReplayTimestampAttribute} placeholder="time:timestamp"

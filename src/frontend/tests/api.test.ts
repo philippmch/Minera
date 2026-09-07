@@ -15,6 +15,17 @@ import { alignModel, alignmentQuery, decideModel, decisionMiningQuery,
   requestDecisionTables } from "../src/api";
 
 describe("Token replay policy request options", () => {
+  it("preserves root-cause attribute order and duplicates, trims names and clears explicit empty lists", () => {
+    expect(mineFormEntries({ tokenReplayRootCauseStringAttributes: [" team ", "region", "team"],
+      tokenReplayRootCauseNumericAttributes: [] })).toEqual([
+      ["token_replay_root_cause_string_attributes", "team,region,team"],
+      ["token_replay_root_cause_numeric_attributes", ""],
+    ]);
+    for (const key of ["tokenReplayRootCauseStringAttributes", "tokenReplayRootCauseNumericAttributes"]) {
+      for (const value of [null, "team", [1], [""], [" "], ["a,b"], ["a\nb"]])
+        expect(() => mineFormEntries({ [key]: value } as never)).toThrow(/attribute names/);
+    }
+  });
   it("trims duration timestamp selectors and rejects blank or nonstring values", () => {
     expect(mineFormEntries({ tokenReplayTimestampAttribute: " completed_at " }))
       .toEqual([["token_replay_timestamp_attribute", "completed_at"]]);
@@ -36,6 +47,8 @@ describe("Token replay policy request options", () => {
     ["tokenReplayWalkThroughHiddenTransitions", "token_replay_walk_through_hidden_transitions"],
     ["tokenReplayIncludeTraceDiagnostics", "token_replay_include_trace_diagnostics"],
     ["tokenReplayIncludeDurationDiagnostics", "token_replay_include_duration_diagnostics"],
+    ["tokenReplayIncludeRootCauseDiagnostics", "token_replay_include_root_cause_diagnostics"],
+    ["tokenReplayRootCauseEnableMultiplier", "token_replay_root_cause_enable_multiplier"],
   ] as const;
 
   it("omits unspecified policies and preserves each explicit true or false", () => {
