@@ -54,6 +54,7 @@ add_library(minera_core
   src/backend/declare_streaming.cpp
   src/backend/decision_mining.cpp
   src/backend/root_cause.cpp
+  src/backend/root_cause_trace_key.cpp
   src/backend/token_replay_root_cause.cpp
   src/backend/decision_replay.cpp
   src/backend/decision_table.cpp

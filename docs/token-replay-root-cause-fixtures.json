@@ -9,7 +9,9 @@
     "unknown_problem": "uses supplied context",
     "empty_class": "omit model before encoding",
     "empty_unknown_baseline": "skip empty cases; omit model if no nonempty baseline remains; explicitly supplied problem contexts may belong to empty cases",
-    "value_equal_trace_membership": {"source_traces": [{"case": "same", "events": [["A", 1]]}, {"case": "same", "events": [["A", 1]]}, {"case": "bad", "events": [["B", 8]]}], "fit_entry_source_indices": [0], "problem_entry_source_indices": [2], "reference_data": [[1], [1], [8]], "reference_target": [0, 0, 1], "native_index_cohort_gap": "only source index zero currently enters fit cohort"},
+    "value_equal_trace_membership": {"source_traces": [{"case": "same", "events": [["A", 1]]}, {"case": "same", "events": [["A", 1]]}, {"case": "bad", "events": [["B", 8]]}], "fit_entry_source_indices": [0], "problem_entry_source_indices": [2], "reference_data": [[1], [1], [8]], "reference_target": [0, 0, 1], "native_behavior": "both equivalent source traces enter the fit cohort with distinct source indices"},
+    "event_value_equality": {"integer_1_vs_string_1": true, "integer_1_vs_float_1": false, "integer_1_vs_boolean_true": false, "null_vs_string_None": true, "separate_nan_values": true, "positive_vs_negative_float_zero": false, "dictionary_key_order_ignored": true, "event_sequence_order_ignored": false, "nested_dictionary_value_order_ignored": false},
+    "trace_attribute_equality": {"integer_1_vs_float_1": true, "integer_1_vs_boolean_true": true, "integer_1_vs_string_1": false, "nested_dictionary_order_ignored": true, "properties_ignored": true, "different_trace_attributes_ignored": false, "equal_datetime_instants_match": true},
     "enable_multiplier_default": false,
     "multiplier_example": {"fit": [1, 2], "problem": [7, 8, 9, 10, 11], "balanced_fit": [1, 2, 1, 2]}
   },
@@ -62,7 +64,7 @@
     "importer_boundary": "The default pinned XES importer omits container elements and replaces parsed date offsets with UTC without adjusting wall time. Direct helper datetime inputs preserve supplied offsets; native import normalization remains a separate contract."
   },
   "remaining_contracts": [
-    "Reference trace-map membership also matches distinct value-equal trace objects; native explicit source-index cohorts require further compatibility reconciliation.",
+    "Trace-level NaN object-alias identity is not represented by native value cells; independent NaN trace attributes compare unequal.",
     "Legacy backwards replay diagnostic context production is a native extension."
   ]
 }
