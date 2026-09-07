@@ -3181,8 +3181,15 @@ Calendar temporal projections materialize every bucket between the first and
 last observed bucket, with zero metrics for empty buckets. Multi-period ticks
 anchor to the earliest event-start day; weekly and month/quarter/year periods
 anchor to the first natural boundary and advance by their configured multiple.
-Calendar steps preserve leap days and month ends. Fixed-width windows remain a
-separate native projection. Calendar metrics use completion-time case spans:
+Calendar steps preserve leap days and month ends. Fiscal quarter/year frequencies
+support `QE`, `QS`, `YE`, and `YS` with all twelve month suffixes and positive
+multipliers. Period
+starts and ends follow the selected fiscal month; multiple periods advance from
+the first natural label for the input, including fixed-offset and pre-epoch
+dates. Permanent public oracles cover all month anchors and one-, two-, and
+three-period groupings. Business-day/month calendars, semi-month and week-of-month
+offsets, subsecond bins, and complete frequency-alias acceptance remain open.
+Fixed-width windows remain a separate native projection. Calendar metrics use completion-time case spans:
 configured start timestamps control grouping only, default service time is zero,
 and waiting time equals sojourn time. Means use distinct cases rather than event
 weights. Calendar output always uses the canonical thirteen columns, ignoring

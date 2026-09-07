@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <stdexcept>
 
@@ -874,6 +875,77 @@ static void temporal_calendar_uses_selected_column_timezone() {
   options.grouper_freq.clear();
   options.start_timestamp_key.clear();
   assert(!log_to_features(log, options).temporal_rows.empty());
+}
+
+struct FiscalExpected { double timestamp; std::vector<double> values; };
+struct FiscalScenario { std::string frequency; std::size_t input; std::vector<FiscalExpected> rows; };
+#include "fixtures/temporal_fiscal_calendar.inc"
+
+static void temporal_calendar_fiscal_month_anchors() {
+  assert(fiscal_scenarios.size() == 168);
+  for (const auto& scenario : fiscal_scenarios) {
+    EventLog log;
+    const auto& dates = fiscal_inputs.at(scenario.input);
+    for (std::size_t i = 0; i < dates.size(); ++i) {
+      const auto id = std::to_string(i);
+      log.traces.push_back(Trace{id, {Event{id, "A", dates[i], "r"}}});
+    }
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = scenario.frequency;
+    const auto result = log_to_features(log, options);
+    const auto require = [&](bool value, const std::string& detail) {
+      if (!value) {
+        const auto message = "Fiscal calendar " + scenario.frequency +
+            ", input " + std::to_string(scenario.input) + ": " + detail;
+        std::fprintf(stderr, "%s\n", message.c_str());
+        std::fflush(stderr);
+        throw std::runtime_error(message);
+      }
+    };
+    require(result.feature_names.size() == 13, "canonical column count");
+    require(result.temporal_rows.size() == scenario.rows.size(), "row count");
+    for (std::size_t i = 0; i < scenario.rows.size(); ++i) {
+      const auto& actual = result.temporal_rows[i];
+      const auto& expected = scenario.rows[i];
+      require(actual.timestamp == expected.timestamp, "timestamp " + std::to_string(i) +
+          ", actual " + std::to_string(actual.timestamp) + ", expected " + std::to_string(expected.timestamp));
+      require(actual.values.size() == 13 && expected.values.size() == 13, "cell count");
+      for (std::size_t j = 0; j < 13; ++j)
+        require(std::holds_alternative<double>(actual.values[j]) &&
+                    std::abs(std::get<double>(actual.values[j]) - expected.values[j]) <= 1e-9,
+                "row " + std::to_string(i) + ", column " + std::to_string(j) + ", actual " +
+                    (std::holds_alternative<double>(actual.values[j]) ? std::to_string(std::get<double>(actual.values[j])) : "string") +
+                    ", expected " + std::to_string(expected.values[j]));
+    }
+  }
+  EventLog log;
+  for (const auto& date : {"2024-01-01T12:00:00Z", "2024-02-15T12:00:00Z", "2024-06-30T12:00:00Z"}) {
+    const auto id = std::to_string(log.traces.size());
+    log.traces.push_back(Trace{id, {Event{id, "A", date, "r"}}});
+  }
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  for (const auto& frequency : {"1QE-JAN", "+2QE-JAN", "2 QE-JAN"}) {
+    options.grouper_freq = frequency;
+    const auto result = log_to_features(log, options);
+    const bool single = options.grouper_freq == "1QE-JAN";
+    assert(result.temporal_rows.size() == (single ? 3 : 2));
+    assert(result.temporal_rows.front().timestamp == *parse_timestamp("2024-01-31T00:00:00Z"));
+    assert(result.temporal_rows.back().timestamp == *parse_timestamp("2024-07-31T00:00:00Z"));
+    assert(result.temporal_rows.front().values[2] == 1);
+    assert(result.temporal_rows.back().values[2] == (single ? 1 : 2));
+    if (single) assert(result.temporal_rows[1].timestamp == *parse_timestamp("2024-04-30T00:00:00Z"));
+  }
+  for (const auto& frequency : {"qe-jan", "qE-JAN", "QE-jan", "QS-feb", "ys-jul", "YE-Jun",
+                                "0QE-JAN", "-1QE-JAN", "QE-FOO", "QE-JAN-extra", "MS-JAN", "MONTH-JAN",
+                                "Q-JAN", "Y-JUN", "A-JUN", "AS-JUL"}) {
+    options.grouper_freq = frequency;
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
 }
 
 static void temporal_calendar_grid_uses_origin_and_fills_empty_periods() {
@@ -2820,6 +2892,7 @@ int main() {
   temporal_calendar_metrics_use_completions_and_canonical_schema();
   temporal_calendar_uses_selected_column_timezone();
   temporal_calendar_grid_uses_origin_and_fills_empty_periods();
+  temporal_calendar_fiscal_month_anchors();
   default_trace_selection_validates_all_candidate_hashability();
   default_trace_strings_have_fixed_cardinality_limit();
   default_trace_selection_ignores_custom_core_schema();
