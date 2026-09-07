@@ -923,6 +923,110 @@ static void temporal_calendar_rates_ignore_empty_traces() {
   }
 }
 
+static void temporal_calendar_categories_preserve_typed_equality_and_presence() {
+  EventLog log;
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq = "D";
+  options.activity_key = "step";
+  options.resource_key = "owner";
+  const auto event_with = [](EventAttribute value) {
+    Event event{"c", "", "1970-01-01T00:00:00Z", ""};
+    value.key = "step";
+    event.attributes.push_back(value);
+    value.key = "owner";
+    event.attributes.push_back(value);
+    return event;
+  };
+  Trace first;
+  first.events = {event_with({"", "true", AttributeKind::kBoolean}),
+      event_with({"", "1", AttributeKind::kInt}), event_with({"", "1.0", AttributeKind::kFloat}),
+      event_with({"", "1", AttributeKind::kString})};
+  log.traces = {first, Trace{"missing", {Event{"missing", "", "1970-01-01T00:00:00Z", ""}}},
+      Trace{"empty", {event_with({"", ""})}}};
+  auto result = log_to_features(log, options);
+  assert((result.temporal_rows[0].values == std::vector<double>{3,3,6,0,0,0,0,0,3,1,2,3,1}));
+  EventAttribute native{"", "stale", AttributeKind::kString};
+  native.typed_value = std::int64_t{1};
+  auto native_event = event_with(native);
+  native_event.activity = "projected activity";
+  native_event.resource = "projected resource";
+  native_event.activity_source_key = "step";
+  native_event.resource_source_key = "owner";
+  native_event.activity_attribute = native_event.attributes[0];
+  native_event.resource_attribute = native_event.attributes[1];
+  native_event.activity_state = FirstClassAttributeState::kPresent;
+  native_event.resource_state = FirstClassAttributeState::kPresent;
+  native_event.attributes.clear();
+  log.traces = {Trace{"c", {native_event, event_with({"", "1", AttributeKind::kInt})}}};
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[0] == 1 && result.temporal_rows[0].values[1] == 1);
+  assert(result.temporal_rows[0].values[8] == 1);
+  EventAttribute null{"", "stale", AttributeKind::kString, true};
+  log.traces = {Trace{"c", {event_with(null), event_with(null)}}};
+  result = log_to_features(log, options);
+  assert((result.temporal_rows[0].values == std::vector<double>{0,0,2,0,0,0,0,0,2,0,2,1,0}));
+  EventAttribute nonfinite{"", "stale", AttributeKind::kFloat};
+  nonfinite.typed_value = std::nan("");
+  log.traces = {Trace{"c", {event_with(nonfinite), event_with({"", "NaN", AttributeKind::kFloat}),
+      event_with({"", "Infinity", AttributeKind::kFloat}), event_with({"", "-Infinity", AttributeKind::kFloat})}}};
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[0] == 2 && result.temporal_rows[0].values[1] == 2);
+  assert(result.temporal_rows[0].values[8] == 2);
+  log.traces = {Trace{"c", {event_with(make_bytes_attribute("", "same")),
+      event_with({"", "same", AttributeKind::kString})}}};
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[0] == 2 && result.temporal_rows[0].values[1] == 2);
+  EventAttribute tuple{"", "", AttributeKind::kString};
+  tuple.container = AttributeContainerKind::kTuple;
+  tuple.children = {{"0", "true", AttributeKind::kBoolean}};
+  auto equivalent = tuple;
+  equivalent.children = {{"different-key", "1", AttributeKind::kInt}};
+  log.traces = {Trace{"c", {event_with(tuple), event_with(equivalent)}}};
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[0] == 1 && result.temporal_rows[0].values[1] == 1);
+  tuple.container = AttributeContainerKind::kFrozenSet;
+  equivalent.container = AttributeContainerKind::kFrozenSet;
+  log.traces = {Trace{"c", {event_with(tuple), event_with(equivalent)}}};
+  assert(log_to_features(log, options).temporal_rows[0].values[0] == 1);
+  tuple.container = AttributeContainerKind::kTuple;
+  tuple.children = {{"0", "stale", AttributeKind::kString, true}};
+  tuple.children[0].container = AttributeContainerKind::kList;
+  tuple.children[0].children = {{"invalid", "stale"}};
+  equivalent = tuple;
+  equivalent.children[0].is_null = false;
+  equivalent.children[0].first_class_state = FirstClassAttributeState::kNull;
+  equivalent.children[0].value = "different stale text";
+  log.traces = {Trace{"c", {event_with(tuple), event_with(equivalent)}}};
+  const auto null_members = log_to_features(log, options);
+  assert(null_members.temporal_rows[0].values[0] == 1 && null_members.temporal_rows[0].values[1] == 1);
+  assert(log.traces[0].events[0].attributes[0].children[0].container == AttributeContainerKind::kList);
+  const auto rejects = [&] {
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  for (const auto container : {AttributeContainerKind::kList, AttributeContainerKind::kContainer,
+                               AttributeContainerKind::kSet}) {
+    tuple.container = container;
+    log.traces = {Trace{"c", {event_with(tuple)}}};
+    rejects();
+  }
+  log.traces = {Trace{"c", {event_with({"", "a"})}}};
+  log.traces[0].events[0].attributes.pop_back();
+  rejects();
+  log.traces[0].events[0].attributes = {{"owner", "r"}};
+  rejects();
+  log.traces = {Trace{}};
+  rejects();
+  options.grouper_freq.clear();
+  assert(log_to_features(log, options).temporal_rows.empty());
+  log.traces = {Trace{"c", {Event{"c", "", "1970-01-01T00:00:00Z", ""}}}};
+  const auto fixed = log_to_features(log, options);
+  assert(fixed.temporal_rows[0].values[0] == 0 && fixed.temporal_rows[0].values[1] == 1);
+}
+
 static void temporal_calendar_frequency_uses_period_boundaries() {
   EventLog log;
   Trace first;
@@ -1490,6 +1594,7 @@ static void trace_default_schema_infers_complete_trace_presence() {
 }
 
 int main() {
+  temporal_calendar_categories_preserve_typed_equality_and_presence();
   temporal_calendar_rates_ignore_empty_traces();
   temporal_calendar_means_weight_distinct_cases_equally();
   temporal_calendar_metrics_use_completions_and_canonical_schema();
