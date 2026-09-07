@@ -3223,6 +3223,15 @@ or unsigned-range integers mixed with negative integers, also preserve object va
 Promotion can merge large adjacent IDs and changes case
 metrics, distinct category counts, and rework consistently without changing the
 native input attributes.
+Calendar case, activity, resource, completion, and start selectors share the
+projected trace-column view. A trace attribute `team` appears as `case:team`,
+including null values that mask conflicting event cells; absent trace attributes
+preserve event fallback. Already-prefixed trace attributes receive another prefix.
+Native date values override stale lexical metadata for timing, while actual string
+completion cells reject. Missing completion values are ignored when finding case
+time bounds; each valid case must retain at least one completion. Null or missing
+starts exclude events from calendar buckets but preserve their contribution to
+whole-case timing. An entirely missing start column rejects.
 The feature variations remain partial, including inference and extra-feature
 contracts that have not received complete behavioral coverage.
 
