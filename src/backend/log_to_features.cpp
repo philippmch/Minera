@@ -337,6 +337,7 @@ struct TemporalFrequency {
   std::int64_t multiple = 1;
   bool label_start = false;
   int week_end_day = 0;  // std::tm convention: Sunday = 0.
+  int period_start_month = 0;
 };
 
 std::string uppercase_ascii(std::string value) {
@@ -358,7 +359,26 @@ std::int64_t floor_division(std::int64_t numerator,
 TemporalFrequency parse_temporal_frequency(const std::string& raw) {
   if (raw.empty())
     throw std::invalid_argument("log_to_features: temporal frequency must not be empty");
-  const auto value = uppercase_ascii(raw);
+  auto normalized = raw;
+  const auto alias_begin = raw.find_first_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
+  if (alias_begin != std::string::npos) {
+    const auto alias = raw.substr(alias_begin);
+    const auto upper = uppercase_ascii(alias);
+    if (upper.starts_with("QE-") || upper.starts_with("QS-") ||
+        upper.starts_with("YE-") || upper.starts_with("YS-")) {
+      if (alias != upper)
+        throw std::invalid_argument("log_to_features: fiscal temporal frequency must use uppercase aliases");
+      std::size_t position = !raw.empty() && raw.front() == '+' ? 1 : 0;
+      const auto digits_begin = position;
+      while (position < alias_begin && std::isdigit(static_cast<unsigned char>(raw[position]))) ++position;
+      const auto digits_end = position;
+      while (position < alias_begin && std::isspace(static_cast<unsigned char>(raw[position]))) ++position;
+      if (position != alias_begin || (alias_begin != 0 && digits_begin == digits_end))
+        throw std::invalid_argument("log_to_features: invalid fiscal temporal frequency multiplier");
+      normalized = raw.substr(digits_begin, digits_end - digits_begin) + alias;
+    }
+  }
+  const auto value = uppercase_ascii(normalized);
   std::size_t suffix_begin = 0;
   while (suffix_begin < value.size() &&
          std::isdigit(static_cast<unsigned char>(value[suffix_begin])))
@@ -373,7 +393,19 @@ TemporalFrequency parse_temporal_frequency(const std::string& raw) {
   }
   if (multiple <= 0 || suffix_begin == value.size())
     throw std::invalid_argument("log_to_features: temporal frequency multiplier must be positive");
-  const auto suffix = value.substr(suffix_begin);
+  auto suffix = value.substr(suffix_begin);
+  std::optional<int> fiscal_month;
+  if (const auto separator = suffix.find('-'); separator != std::string::npos &&
+      suffix.front() != 'W') {
+    static const std::vector<std::string> months{
+        "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+    const auto base = suffix.substr(0, separator);
+    const auto month = std::find(months.begin(), months.end(), suffix.substr(separator + 1));
+    if ((base != "QE" && base != "QS" && base != "YE" && base != "YS") || month == months.end())
+      throw std::invalid_argument("log_to_features: invalid fiscal temporal frequency");
+    fiscal_month = static_cast<int>(month - months.begin());
+    suffix = base;
+  }
   TemporalFrequency result;
   result.multiple = multiple;
   if (suffix == "S" || suffix == "SEC" || suffix == "SECOND" ||
@@ -423,6 +455,10 @@ TemporalFrequency parse_temporal_frequency(const std::string& raw) {
   } else {
     throw std::invalid_argument("log_to_features: unsupported temporal frequency '" + raw + "'");
   }
+  if (fiscal_month) {
+    const int months = result.unit == TemporalFrequencyUnit::kQuarter ? 3 : 12;
+    result.period_start_month = *fiscal_month - (result.label_start ? 0 : months - 1);
+  }
   return result;
 }
 
@@ -455,6 +491,8 @@ std::int64_t epoch_seconds(std::chrono::sys_days day) {
   using namespace std::chrono;
   return duration_cast<seconds>(day.time_since_epoch()).count();
 }
+
+std::int64_t temporal_month_label(std::int64_t month_index, bool label_start);
 
 std::int64_t natural_temporal_bucket_label(double seconds,
                                    const TemporalFrequency& frequency) {
@@ -498,28 +536,14 @@ std::int64_t natural_temporal_bucket_label(double seconds,
           static_cast<std::int64_t>(calendar.tm_year + 1900) * 12 +
           calendar.tm_mon;
       const auto period = floor_division(
-          month_index, months_per_period * frequency.multiple);
+          month_index - frequency.period_start_month, months_per_period * frequency.multiple);
       const auto first_month =
-          period * months_per_period * frequency.multiple;
+          period * months_per_period * frequency.multiple + frequency.period_start_month;
       const auto label_month = frequency.label_start
                                    ? first_month
                                    : first_month +
                                          months_per_period * frequency.multiple - 1;
-      const auto year = floor_division(label_month, 12);
-      const auto month = label_month - year * 12;
-      const auto first_day = sys_days{
-          std::chrono::year{static_cast<int>(year)} /
-          std::chrono::month{static_cast<unsigned>(month + 1)} /
-          std::chrono::day{1}};
-      if (frequency.label_start) return epoch_seconds(first_day);
-      const auto next_month = first_day + days{32};
-      const auto next_calendar = utc_calendar(
-          static_cast<double>(epoch_seconds(next_month)));
-      const auto next_first = sys_days{
-          std::chrono::year{next_calendar.tm_year + 1900} /
-          std::chrono::month{static_cast<unsigned>(next_calendar.tm_mon + 1)} /
-          std::chrono::day{1}};
-      return epoch_seconds(next_first - days{1});
+      return temporal_month_label(label_month, frequency.label_start);
     }
   }
   throw std::invalid_argument("log_to_features: invalid temporal frequency");
