@@ -1100,9 +1100,9 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   bool have_resource_column = false;
   bool have_case_column = false;
   const auto temporal_case_key = options.case_id_key.value_or("case:concept:name");
-  const auto case_value = [&](const Trace& trace, const Event& event) {
-    if (temporal_case_key.starts_with("case:")) {
-      const auto trace_key = temporal_case_key.substr(5);
+  const auto projected_column_value = [&](const Trace& trace, const Event& event, const std::string& key) {
+    if (key.starts_with("case:")) {
+      const auto trace_key = key.substr(5);
       const bool projected_identifier = trace_key == "concept:name" ||
           (!trace.case_id_source_key.empty() && trace_key == trace.case_id_source_key) ||
           (trace.case_id_attribute &&
@@ -1117,7 +1117,29 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         if (auto value = native_event_attribute(context, trace_key)) return value;
       }
     }
-    return native_event_attribute(event, temporal_case_key);
+    return event_feature_cell(event, key);
+  };
+  const auto case_value = [&](const Trace& trace, const Event& event) {
+    return projected_column_value(trace, event, temporal_case_key);
+  };
+  const auto calendar_instant = [&](const Trace& trace, const Event& event,
+                                      const std::string& key, bool required) {
+    const auto value = projected_column_value(trace, event, key);
+    if (!value || absent_attribute(*value)) {
+      if (required) throw std::invalid_argument("log_to_features: missing temporal timestamp");
+      return std::numeric_limits<double>::quiet_NaN();
+    }
+    if (value->container != AttributeContainerKind::kScalar || !value->children.empty() ||
+        value->kind == AttributeKind::kBytes)
+      throw std::invalid_argument("log_to_features: invalid temporal timestamp attribute");
+    const auto* native_date = std::get_if<NativeDate>(&value->typed_value);
+    if (!native_date && (value->kind != AttributeKind::kDate ||
+        !std::holds_alternative<std::monostate>(value->typed_value)))
+      throw std::invalid_argument("log_to_features: temporal timestamp must be a date");
+    const auto parsed = parse_timestamp(native_date ? native_date->value : value->value);
+    if (!parsed || !std::isfinite(*parsed))
+      throw std::invalid_argument("log_to_features: invalid temporal timestamp");
+    return *parsed;
   };
   const auto missing_category = [](const EventAttribute& value) {
     if (absent_attribute(value)) return true;
@@ -1159,11 +1181,11 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     }
     return numeric && floating && !(unsigned_integer && negative_integer);
   };
-  const bool promote_activities = temporal_frequency && promote_numeric_column([&](const Trace&, const Event& event) {
-    return native_event_attribute(event, options.activity_key);
+  const bool promote_activities = temporal_frequency && promote_numeric_column([&](const Trace& trace, const Event& event) {
+    return projected_column_value(trace, event, options.activity_key);
   });
-  const bool promote_resources = temporal_frequency && promote_numeric_column([&](const Trace&, const Event& event) {
-    return native_event_attribute(event, options.resource_key);
+  const bool promote_resources = temporal_frequency && promote_numeric_column([&](const Trace& trace, const Event& event) {
+    return projected_column_value(trace, event, options.resource_key);
   });
   const bool promote_cases = temporal_frequency && promote_numeric_column(case_value);
   const auto promoted_value = [](EventAttribute value, bool promote) {
@@ -1193,11 +1215,11 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       std::size_t case_index = ti;
       if (temporal_frequency) {
         auto& categories = temporal_categories[&event];
-        if (const auto activity = native_event_attribute(event, options.activity_key)) {
+        if (const auto activity = projected_column_value(log.traces[ti], event, options.activity_key)) {
           have_activity_column = true;
           if (!missing_category(*activity)) categories.activity = std::to_string(activity_categories.insert(promoted_value(*activity, promote_activities)));
         }
-        if (const auto resource = native_event_attribute(event, options.resource_key)) {
+        if (const auto resource = projected_column_value(log.traces[ti], event, options.resource_key)) {
           have_resource_column = true;
           if (!missing_category(*resource)) categories.resource = std::to_string(resource_categories.insert(promoted_value(*resource, promote_resources)));
         }
@@ -1211,18 +1233,24 @@ LogToFeaturesResult log_to_features(const EventLog& log,
           }
         }
       }
-      const double finish = instant(event, options.timestamp_key, true);
+      const double finish = temporal_frequency
+          ? calendar_instant(log.traces[ti], event, options.timestamp_key, false)
+          : instant(event, options.timestamp_key, true);
       const double start = options.start_timestamp_key.empty()
                                ? finish
-                               : instant(event, options.start_timestamp_key, true);
+                               : temporal_frequency
+                                   ? calendar_instant(log.traces[ti], event, options.start_timestamp_key, false)
+                                   : instant(event, options.start_timestamp_key, true);
       if (!temporal_frequency && start > finish)
         throw std::invalid_argument("log_to_features: start timestamp after finish");
-      origin = std::min(origin, start);
+      if (std::isfinite(start)) origin = std::min(origin, start);
       events.push_back({&event, finish, start, case_index, i});
       if (case_index == no_case) continue;
       auto& metrics = cases[case_index];
-      metrics.start = std::min(metrics.start, temporal_frequency ? finish : start);
-      metrics.finish = std::max(metrics.finish, finish);
+      if (!temporal_frequency || std::isfinite(finish)) {
+        metrics.start = std::min(metrics.start, temporal_frequency ? finish : start);
+        metrics.finish = std::max(metrics.finish, finish);
+      }
       if (!temporal_frequency) metrics.service += finish - start;
       ++metrics.event_count;
       metrics.activities.insert(value_for(event, options.activity_key));
@@ -1234,6 +1262,10 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     throw std::invalid_argument("log_to_features: temporal activity and resource columns are required");
   if (temporal_frequency && (!have_case_column || cases.empty()))
     throw std::invalid_argument("log_to_features: temporal case identifiers are required");
+  if (temporal_frequency)
+    for (const auto& metrics : cases)
+      if (!std::isfinite(metrics.start) || !std::isfinite(metrics.finish))
+        throw std::invalid_argument("log_to_features: temporal case has no completion date");
   out.feature_names = options.feature_names;
   if (temporal_frequency || out.feature_names.empty()) {
     out.feature_names = {
@@ -1284,6 +1316,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   std::map<long long, double> bucket_timestamps;
   for (const auto& event : events) {
     if (temporal_frequency) {
+      if (!std::isfinite(event.start)) continue;
       const auto label = temporal_bucket_label(event.start, *temporal_frequency, origin);
       buckets[label].push_back(&event);
       bucket_timestamps[label] = static_cast<double>(label);
@@ -1296,6 +1329,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     }
   }
   if (temporal_frequency) {
+    if (buckets.empty()) throw std::invalid_argument("log_to_features: temporal start column has no dates");
     const auto last_label = buckets.rbegin()->first;
     for (auto label = buckets.begin()->first; label < last_label;) {
       const auto next = next_temporal_bucket_label(label, *temporal_frequency);

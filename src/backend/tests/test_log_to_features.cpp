@@ -1366,6 +1366,152 @@ static void temporal_calendar_numeric_columns_promote_before_grouping() {
   assert(log.traces[0].events[1].attributes[0] == native_float);
 }
 
+static void temporal_calendar_categories_use_projected_trace_columns() {
+  EventLog log;
+  log.traces = {Trace{"a", {Event{"a", "A", "1970-01-01T00:00:00Z", "r"},
+                              Event{"a", "B", "1970-01-01T00:00:00Z", "s"}}},
+                Trace{"b", {Event{"b", "C", "1970-01-01T00:00:00Z", "t"}}}};
+  for (auto& trace : log.traces) {
+    trace.attributes = {{"group", "shared"}, {"case:group", "double"}};
+    for (auto& event : trace.events) event.attributes = {{"case:group", event.activity}};
+  }
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq = "D";
+  options.activity_key = options.resource_key = "case:group";
+  auto result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[0] == 1 && result.temporal_rows[0].values[1] == 1);
+  assert(result.temporal_rows[0].values[8] == 1);
+  log.traces[0].attributes[0].is_null = true;
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[0] == 1 && result.temporal_rows[0].values[1] == 1);
+  assert(result.temporal_rows[0].values[8] == 2);
+  log.traces[0].attributes.erase(log.traces[0].attributes.begin());
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[0] == 3 && result.temporal_rows[0].values[1] == 3);
+  options.activity_key = options.resource_key = "case:case:group";
+  assert(log_to_features(log, options).temporal_rows[0].values[0] == 1);
+  options.activity_key = options.resource_key = "case:group";
+  EventAttribute high{"group", "stale", AttributeKind::kString};
+  high.typed_value = std::int64_t{9007199254740993};
+  EventAttribute floating{"group", "stale", AttributeKind::kString};
+  floating.typed_value = 9007199254740992.0;
+  log.traces[0].attributes = {high};
+  log.traces[1].attributes = {floating};
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[0] == 1 && result.temporal_rows[0].values[1] == 1);
+  assert(log.traces[0].attributes[0] == high && log.traces[1].attributes[0] == floating);
+  options.activity_key = options.resource_key = "case:identifier";
+  for (auto& trace : log.traces) {
+    trace.case_id_source_key = "identifier";
+    trace.case_id_state = FirstClassAttributeState::kPresent;
+    trace.case_id_attribute = EventAttribute{"identifier", "stale", AttributeKind::kInt};
+    trace.case_id_attribute->typed_value = std::int64_t{7};
+  }
+  assert(log_to_features(log, options).temporal_rows[0].values[0] == 1);
+  options.activity_key = options.resource_key = "time:timestamp";
+  for (auto& trace : log.traces) for (auto& event : trace.events) event.attributes.clear();
+  assert(log_to_features(log, options).temporal_rows[0].values[0] == 1);
+  options.activity_key = options.resource_key = "case:group";
+  options.grouper_freq.clear();
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[0] == 0 && result.temporal_rows[0].values[1] == 1);
+}
+
+static void temporal_calendar_timestamps_use_projected_native_dates() {
+  EventLog log;
+  log.traces = {Trace{"c", {Event{"c", "A", "1970-01-01T00:00:10Z", "r"}}},
+                Trace{"c", {Event{"c", "B", "1970-01-01T00:00:40Z", "r"}}}};
+  EventAttribute when{"when", "stale", AttributeKind::kString};
+  when.typed_value = NativeDate{"1970-01-02T00:00:10Z"};
+  log.traces[0].attributes = {when};
+  log.traces[0].events[0].attributes = {{"case:when", "1970-01-03T00:00:10Z", AttributeKind::kDate}};
+  log.traces[1].events[0].attributes = {{"case:when", "1970-01-02T00:00:30Z", AttributeKind::kDate}};
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq = "D";
+  options.timestamp_key = "case:when";
+  auto result = log_to_features(log, options);
+  assert(result.temporal_rows.size() == 1 && result.temporal_rows[0].timestamp == 86400);
+  assert(result.temporal_rows[0].values[5] == 20 && result.temporal_rows[0].values[2] == 2);
+  assert(log.traces[0].attributes[0] == when);
+  const auto rejects = [&] {
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  log.traces[0].attributes[0].is_null = true;
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[2] == 1 && result.temporal_rows[0].values[5] == 0);
+  log.traces[0].case_id = "different";
+  rejects();
+  log.traces[0].case_id = "c";
+  log.traces[0].attributes[0] = {"when", "1970-01-02T00:00:10Z", AttributeKind::kString};
+  rejects();
+  log.traces[0].attributes[0] = when;
+  options.timestamp_key = "time:timestamp";
+  options.start_timestamp_key = "case:when";
+  log.traces[0].attributes[0].is_null = true;
+  result = log_to_features(log, options);
+  assert(result.temporal_rows.size() == 1 && result.temporal_rows[0].timestamp == 86400);
+  assert(result.temporal_rows[0].values[2] == 1 && result.temporal_rows[0].values[5] == 30);
+  assert(result.temporal_rows[0].values[6] == 30);
+  log.traces[0].attributes.clear();
+  log.traces[0].events[0].attributes.clear();
+  assert(log_to_features(log, options).temporal_rows[0].values[2] == 1);
+  log.traces[1].events[0].attributes.clear();
+  rejects();
+  options.start_timestamp_key.clear();
+  options.timestamp_key = "finished";
+  for (auto& trace : log.traces) for (auto& event : trace.events) {
+    event.timestamp_source_key = "finished";
+    event.timestamp_attribute = EventAttribute{"finished", "stale", AttributeKind::kDate};
+    event.timestamp_attribute->typed_value = NativeDate{event.timestamp};
+    event.timestamp_state = FirstClassAttributeState::kPresent;
+    event.timestamp = "stale";
+  }
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[5] == 30);
+  assert(log.traces[0].events[0].timestamp == "stale");
+  log.traces[0].events[0].timestamp_attribute->kind = AttributeKind::kBytes;
+  rejects();
+  log.traces[0].events[0].timestamp_attribute->kind = AttributeKind::kDate;
+  log.traces[0].events[0].timestamp_state = FirstClassAttributeState::kNull;
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[2] == 1 && result.temporal_rows[0].values[5] == 0);
+  log.traces[0].case_id = "different";
+  rejects();
+}
+
+static void temporal_calendar_missing_completions_are_validated_per_case() {
+  EventLog log;
+  auto valid = timed_event("c", "A", "1970-01-01T00:00:00Z", "1970-01-01T00:00:00Z", 0);
+  auto missing = timed_event("c", "A", "1970-01-01T00:00:00Z", "", 1);
+  log.traces = {Trace{"c", {valid, missing}}};
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq = "D";
+  options.start_timestamp_key = "start_time";
+  auto result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[2] == 2 && result.temporal_rows[0].values[5] == 0);
+  assert(result.temporal_rows[0].values[8] == 1);
+  log.traces[0].events[1].timestamp_state = FirstClassAttributeState::kNull;
+  assert(log_to_features(log, options).temporal_rows[0].values == result.temporal_rows[0].values);
+  log.traces = {Trace{"c", {valid}}, Trace{"other", {missing}}};
+  bool rejected = false;
+  try { (void)log_to_features(log, options); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+  log.traces[1].case_id_state = FirstClassAttributeState::kNull;
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[2] == 2 && result.temporal_rows[0].values[11] == 1);
+  assert(result.temporal_rows[0].values[8] == 0);
+  options.start_timestamp_key.clear();
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[2] == 1);
+}
+
 static void temporal_calendar_frequency_uses_period_boundaries() {
   EventLog log;
   Trace first;
@@ -1933,6 +2079,9 @@ static void trace_default_schema_infers_complete_trace_presence() {
 }
 
 int main() {
+  temporal_calendar_missing_completions_are_validated_per_case();
+  temporal_calendar_timestamps_use_projected_native_dates();
+  temporal_calendar_categories_use_projected_trace_columns();
   temporal_calendar_numeric_columns_promote_before_grouping();
   temporal_calendar_scalar_case_ordering_is_exact();
   temporal_calendar_string_case_ties_use_lexical_order();
