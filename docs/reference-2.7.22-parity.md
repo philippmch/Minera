@@ -3177,6 +3177,13 @@ representation to preserve their type and children.
 Only the leading identifier column permits these typed cells; other feature
 columns retain numeric validation. Duplicate custom identifier names remain
 separate zero-valued core columns. Supplemental `case_ids` remain available.
+Calendar temporal projections materialize every bucket between the first and
+last observed bucket, with zero metrics for empty buckets. Multi-period ticks
+anchor to the earliest event-start day; weekly and month/quarter/year periods
+anchor to the first natural boundary and advance by their configured multiple.
+Calendar steps preserve leap days and month ends. Fixed-width windows remain a
+separate native projection. Temporal metric formulas, ignored schema options,
+and timezone-sensitive calendar behavior still need further behavioral alignment.
 The feature variations remain partial, including inference and extra-feature
 contracts that have not received complete behavioral coverage.
 
