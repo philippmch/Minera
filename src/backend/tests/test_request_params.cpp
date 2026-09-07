@@ -4207,6 +4207,14 @@ void log_to_features_params_contract() {
     } catch (const std::invalid_argument&) { rejected = true; }
     assert(rejected);
   }
+  const auto trace_empty = minera::parse_log_to_features_params(
+      [](std::string_view) { return std::string{}; },
+      [](std::string_view key) { return key == "features_case_string_attributes" || key == "features_case_numeric_attributes" || key == "features_event_successor_attributes" || key == "features_feature_names"; });
+  assert(trace_empty.variant == minera::LogToFeaturesVariant::TRACE_BASED);
+  assert(trace_empty.case_string_attributes_supplied && trace_empty.case_string_attributes.empty());
+  assert(trace_empty.case_numeric_attributes_supplied && trace_empty.case_numeric_attributes.empty());
+  assert(trace_empty.event_successor_attributes_supplied && trace_empty.event_successor_attributes.empty());
+  assert(trace_empty.feature_names_supplied && trace_empty.feature_names.empty());
   const auto no_presence = minera::parse_log_to_features_params(lookup);
   assert(!no_presence.event_string_attributes_supplied && !no_presence.event_numeric_attributes_supplied && !no_presence.feature_names_supplied);
   const auto omitted = minera::parse_log_to_features_params(fields({{"features_variant", "event_based"}}));

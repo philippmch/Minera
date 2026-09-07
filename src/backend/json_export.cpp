@@ -4930,7 +4930,7 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
   };
   std::set<std::string> unique_features;
   for (const auto& name : result.feature_names)
-    if (result.variant != LogToFeaturesVariant::EVENT_BASED &&
+    if (result.variant == LogToFeaturesVariant::TEMPORAL &&
         (name.empty() || !unique_features.insert(name).second))
       throw std::invalid_argument("log_to_features: invalid result feature schema");
   const auto valid_row = [&](const std::vector<double>& row) {

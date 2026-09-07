@@ -1844,6 +1844,13 @@ describe("Monte Carlo API", () => {
 });
 
 describe("log-to-features API", () => {
+  it("preserves trace empty groups and exact schema elements", () => {
+    const query = new URLSearchParams(logToFeaturesQuery({ features_case_string_attributes: [], features_case_numeric_attributes: [], features_event_successor_attributes: [], features_feature_names: ["", " event:n "] }));
+    expect(query.get("features_case_string_attributes")).toBe("");
+    expect(query.get("features_case_numeric_attributes")).toBe("");
+    expect(query.get("features_event_successor_attributes")).toBe("");
+    expect(query.get("features_feature_names")).toBe("\\e, event:n ");
+  });
   it("preserves exact event schema elements", () => {
     const query = new URLSearchParams(logToFeaturesQuery({ features_variant: "event_based", features_feature_names: ["", " event:n ", "a,b", "\\e"] }));
     expect(query.get("features_feature_names")).toBe("\\e, event:n ,a\\,b,\\\\e");

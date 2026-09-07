@@ -19,12 +19,12 @@ enum class LogToFeaturesVariant {
 
 // A deterministic, native projection of a traditional event log.  Attribute
 // names are interpreted as event/case attributes; *_string_attributes are
-// one-hot encoded and *_numeric_attributes are parsed as finite numbers.
+// one-hot encoded and *_numeric_attributes retain native numeric conversion.
 struct LogToFeaturesOptions {
   // The trace projection is the useful general-purpose default; callers that
   // need one row per event can still select EVENT_BASED explicitly.
   LogToFeaturesVariant variant = LogToFeaturesVariant::TRACE_BASED;
-  std::string activity_key = "activity";
+  std::string activity_key = "concept:name";
   std::string timestamp_key = "time:timestamp";
   std::string start_timestamp_key;
   std::string resource_key = "org:resource";
@@ -67,15 +67,19 @@ struct LogToFeaturesOptions {
   std::size_t min_num_different_string_values = 2;
   std::size_t max_num_different_string_values = 500;
 
-  // An explicit feature schema.  When non-empty it is returned verbatim and
-  // rows are sized to it (unknown names are filled with default_not_present).
+  // An explicit feature schema is returned verbatim. Core event/trace columns
+  // start at zero; duplicate names populate their variant-specific index.
   std::vector<std::string> feature_names;
   double default_not_present = 0.0;
-  // EVENT_BASED distinguishes an omitted list (infer) from an explicit empty
-  // list (select no columns). Nonempty lists are always explicit.
+  // Presence distinguishes omitted lists from explicit empty lists. Event
+  // projection infers each omitted group; trace projection infers only when
+  // all four ordinary attribute groups are omitted. Nonempty lists are explicit.
   bool event_string_attributes_supplied = false;
   bool event_numeric_attributes_supplied = false;
   bool feature_names_supplied = false;
+  bool case_string_attributes_supplied = false;
+  bool case_numeric_attributes_supplied = false;
+  bool event_successor_attributes_supplied = false;
 };
 
 struct TemporalFeatureRow {

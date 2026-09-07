@@ -4904,14 +4904,17 @@ LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
   params.event_string_attributes_supplied = supplied("event_string_attributes");
   params.event_numeric_attributes_supplied = supplied("event_numeric_attributes");
   params.feature_names_supplied = supplied("feature_names");
-  const bool event_based = params.variant == LogToFeaturesVariant::EVENT_BASED;
-  parse_list("event_string_attributes", params.event_string_attributes, event_based);
-  parse_list("event_numeric_attributes", params.event_numeric_attributes, event_based);
-  parse_list("case_string_attributes", params.case_string_attributes);
-  parse_list("case_numeric_attributes", params.case_numeric_attributes);
+  params.case_string_attributes_supplied = supplied("case_string_attributes");
+  params.case_numeric_attributes_supplied = supplied("case_numeric_attributes");
+  params.event_successor_attributes_supplied = supplied("event_successor_attributes");
+  const bool attribute_based = params.variant != LogToFeaturesVariant::TEMPORAL;
+  parse_list("event_string_attributes", params.event_string_attributes, attribute_based);
+  parse_list("event_numeric_attributes", params.event_numeric_attributes, attribute_based);
+  parse_list("case_string_attributes", params.case_string_attributes, attribute_based);
+  parse_list("case_numeric_attributes", params.case_numeric_attributes, attribute_based);
   parse_list("event_attributes", params.event_attributes);
   parse_list("case_attributes", params.case_attributes);
-  if (event_based && params.feature_names_supplied) {
+  if (attribute_based && params.feature_names_supplied) {
     const auto text = field(key_for("feature_names"));
     if (!text.empty()) {
       std::string token;
@@ -4932,7 +4935,7 @@ LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
       flush();
     }
   } else parse_list("feature_names", params.feature_names);
-  parse_list("event_successor_attributes", params.event_successor_attributes);
+  parse_list("event_successor_attributes", params.event_successor_attributes, attribute_based);
   auto assign_bool = [&](std::string_view suffix, bool& out) {
     if (supplied(suffix)) out = parse_boolean(require(suffix), key_for(suffix));
   };
