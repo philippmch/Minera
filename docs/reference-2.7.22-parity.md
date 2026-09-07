@@ -3137,9 +3137,18 @@ trace (event attributes) or on every trace (trace attributes), excludes the
 canonical trace identifier, and omits boolean-only attributes.
 Default trace inference still needs broader proof: mixed-type selection and
 ordinary attribute ordering vary across hash seeds in the pinned runtime.
-Default unhashable-container handling also remains open. Case identifier columns
-still require native and JSON string-cell support; out-of-band case IDs alone
-do not establish parity for that option.
+Default unhashable-container handling also remains open.
+
+Case identifier extraction inserts `@@case_id_column` before the core and extra
+schemas. The configured trace key defaults to `concept:name`; missing values
+raise, while empty strings and nulls remain distinct values. Native trace rows
+retain the original typed attribute for this cell. JSON emits scalar strings,
+safe integers, floats, booleans, and nulls directly. Larger integers retain exact
+canonical text in attribute details; bytes and nested containers use that same
+representation to preserve their type and children.
+Only the leading identifier column permits these typed cells; other feature
+columns retain numeric validation. Duplicate custom identifier names remain
+separate zero-valued core columns. Supplemental `case_ids` remain available.
 The feature variations remain partial, including inference and extra-feature
 contracts that have not received complete behavioral coverage.
 

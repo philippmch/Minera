@@ -687,6 +687,7 @@ export function isLogToTargetResult(value: unknown): value is LogToTargetResult 
 
 export type LogToFeaturesVariant = "event_based" | "trace_based" | "temporal";
 export type LogToFeaturesNumber = number | "NaN" | "Infinity" | "-Infinity";
+export type LogToFeaturesTraceCell = LogToFeaturesNumber | string | boolean | null | LogConversionAttributeDetail;
 export interface LogToFeaturesTemporalRow { timestamp: number; values: LogToFeaturesNumber[]; }
 export interface LogToFeaturesResult {
   family: "LOG_TO_FEATURES";
@@ -694,7 +695,7 @@ export interface LogToFeaturesResult {
   feature_names: string[];
   case_ids?: string[];
   event_rows?: LogToFeaturesNumber[][][];
-  trace_rows?: LogToFeaturesNumber[][];
+  trace_rows?: LogToFeaturesTraceCell[][];
   temporal_rows?: LogToFeaturesTemporalRow[];
 }
 export function isLogToFeaturesResult(value: unknown): value is LogToFeaturesResult {
@@ -706,7 +707,14 @@ export function isLogToFeaturesResult(value: unknown): value is LogToFeaturesRes
   const rows = (r: unknown): r is LogToFeaturesNumber[] => Array.isArray(r) && r.every((x) =>
     (typeof x === "number" && Number.isFinite(x)) || x === "NaN" || x === "Infinity" || x === "-Infinity");
   if (c.variant === "event_based") return Array.isArray(c.event_rows) && c.event_rows.every((t) => Array.isArray(t) && t.every(rows));
-  if (c.variant === "trace_based") return Array.isArray(c.trace_rows) && c.trace_rows.every(rows);
+  if (c.variant === "trace_based") {
+    const identifier = (cell: unknown) => cell === null || typeof cell === "string" ||
+      typeof cell === "boolean" || (typeof cell === "number" && Number.isFinite(cell)) ||
+      isLogConversionAttributeDetail(cell);
+    return Array.isArray(c.trace_rows) && c.trace_rows.every((row) =>
+      Array.isArray(row) && row.length === c.feature_names!.length && row.every((cell, index) =>
+        index === 0 && c.feature_names![0] === "@@case_id_column" ? identifier(cell) : rows([cell])));
+  }
   return Array.isArray(c.temporal_rows) && c.temporal_rows.every((r) => !!r && typeof r === "object" && typeof (r as LogToFeaturesTemporalRow).timestamp === "number" && Number.isFinite((r as LogToFeaturesTemporalRow).timestamp) && rows((r as LogToFeaturesTemporalRow).values));
 }
 

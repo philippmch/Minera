@@ -687,7 +687,6 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     const bool max_concurrent = options.enable_max_concurrent_events || (all_extra && !options.enable_max_concurrent_events_supplied);
     const bool max_per_activity = options.enable_max_concurrent_events_per_activity || (all_extra && !options.enable_max_concurrent_events_per_activity_supplied);
     if (case_duration) add_name("@@caseDuration");
-    if (case_id) add_name("@@case_id_column");
     if (first_times) for (const auto& a : activities) {
       add_name("startToFirstOcc@@" + a); add_name("firstOccToEnd@@" + a);
     }
@@ -714,8 +713,9 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       add_name("@@max_concurrent_activities_like_" + a);
     if (options.feature_names.empty() && !options.feature_names_supplied)
       out.feature_names.assign(names.begin(), names.begin() + core_feature_count);
+    if (case_id) out.feature_names.insert(out.feature_names.begin(), "@@case_id_column");
     std::unordered_map<std::string, std::size_t> index;
-    for (std::size_t i = 0; i < out.feature_names.size(); ++i) index[out.feature_names[i]] = i;
+    for (std::size_t i = case_id ? 1 : 0; i < out.feature_names.size(); ++i) index[out.feature_names[i]] = i;
     std::unordered_map<std::string, std::size_t> extra_index;
     for (std::size_t i = core_feature_count; i < names.size(); ++i) {
       extra_index[names[i]] = out.feature_names.size();
@@ -757,7 +757,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     }
     std::size_t trace_index = 0;
     for (const auto& t : log.traces) {
-      std::vector<double> row(out.feature_names.size(), 0.0);
+      std::vector<LogToFeaturesCell> row(out.feature_names.size(), 0.0);
       auto set_core = [&](const std::string& n, double v) { if (auto i = index.find(n); i != index.end()) row[i->second] = v; };
       auto set = [&](const std::string& n, double v) { if (auto i = extra_index.find(n); i != extra_index.end()) row[i->second] = v; };
       for (std::size_t i = core_feature_count; i < names.size(); ++i)
@@ -899,7 +899,13 @@ LogToFeaturesResult log_to_features(const EventLog& log,
             set("@@max_concurrent_activities_like_" + activity,
                 static_cast<double>(overlap_count));
       }
-      if (case_id) out.case_ids.push_back(t.case_id);
+      if (case_id) {
+        const auto identifier = numeric_cell(t, options.case_id_key);
+        if (!identifier)
+          throw std::invalid_argument("log_to_features: missing case identifier attribute: " + options.case_id_key);
+        row.front() = *identifier;
+        out.case_ids.push_back(t.case_id);
+      }
       out.trace_rows.push_back(std::move(row));
       ++trace_index;
     }
