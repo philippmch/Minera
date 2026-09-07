@@ -1361,6 +1361,16 @@ export function TokenReplayRootCauseDiagnosticsView({ diagnostics }: {
   diagnostics?: TokenReplayRootCauseDiagnostics;
 }) {
   if (diagnostics === undefined) return null;
+  const activityLabel = (row: TokenReplayRootCauseDiagnostics["unknown_activities"][number]) => {
+    const cell = row.activity_attribute;
+    if (cell ? cell.null : row.activity_is_null) return "(null activity)";
+    if (cell && cell.kind !== "string" && cell.kind !== "id") {
+      if (cell.kind === "int") return `${row.activity} (${cell.kind})`;
+      return `${String(cell.typed_value ?? cell.value)} (${cell.kind})`;
+    }
+    const value = cell?.value ?? row.activity;
+    return value === "" ? "(empty string)" : JSON.stringify(value);
+  };
   const groups = [
     { caption: "Transition classifiers", total: diagnostics.transitions.length,
       rows: diagnostics.transitions.slice(0, 30).map((row) => ({
@@ -1368,8 +1378,7 @@ export function TokenReplayRootCauseDiagnosticsView({ diagnostics }: {
       })) },
     { caption: "Unknown activity classifiers", total: diagnostics.unknown_activities.length,
       rows: diagnostics.unknown_activities.slice(0, 30).map((row) => ({
-        ...row, label: row.activity_is_null ? "(null activity)" :
-          row.activity === "" ? "(empty string)" : JSON.stringify(row.activity),
+        ...row, label: activityLabel(row),
       })) },
   ];
   const numericLabel = (value: number) => Object.is(value, -0) ? "-0" : String(value);

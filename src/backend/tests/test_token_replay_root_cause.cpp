@@ -265,7 +265,134 @@ void xes_encoding_contracts() {
   verify("<float key=\"v\" value=\"2.000\"/>", "2.0");
 }
 }
+void typed_unknown_activity_keys() {
+  const auto typed_event = [](EventAttribute activity, const std::string& cost) {
+    auto value = event("ignored", cost);
+    activity.key = "kind";
+    value.attributes.push_back(std::move(activity));
+    return value;
+  };
+  EventAttribute integer{"kind", "1", AttributeKind::kInt};
+  EventAttribute boolean{"kind", "true", AttributeKind::kBoolean};
+  EventAttribute real{"kind", "1.0", AttributeKind::kFloat};
+  EventAttribute null{"kind", "ignored", AttributeKind::kString, true};
+  EventLog log;
+  log.traces = {trace({typed_event(integer, "1")}), trace({typed_event({"kind", "1"}, "2")}),
+                trace({typed_event(boolean, "3")}), trace({typed_event(real, "4")}),
+                trace({typed_event(null, "5")}), trace({typed_event({"kind", "None"}, "6")}),
+                trace({typed_event({"kind", "known"}, "7")})};
+  TokenReplayOptions options;
+  options.activity_attribute = "kind";
+  options.root_cause.numeric_attributes = {"cost"};
+  TokenReplayUnknownRootCauseCohort cohort{"legacy ignored", true, {{0, event("", "99")}}, integer};
+  auto rows = token_replay_unknown_root_cause_diagnostics(log, {cohort}, options);
+  require(rows.size() == 1, "typed numeric key produces a model");
+  require(rows[0].source_trace_indices == std::vector<std::size_t>({1,4,5,6,0}), "integer key excludes equal bool and float but not string");
+  require(rows[0].activity == "1" && !rows[0].activity_is_null && rows[0].activity_attribute && rows[0].activity_attribute->kind == AttributeKind::kInt, "typed output overrides legacy fields");
+  cohort.activity_attribute.reset(); cohort.activity = "1"; cohort.activity_is_null = false;
+  cohort.problem_contexts = {{1, event("", "99")}};
+  rows = token_replay_unknown_root_cause_diagnostics(log, {cohort}, options);
+  require(rows[0].source_trace_indices == std::vector<std::size_t>({0,2,3,4,5,6,1}), "string key remains distinct from numeric key");
+  cohort.activity_attribute = null; cohort.problem_contexts = {{4, event("", "99")}};
+  rows = token_replay_unknown_root_cause_diagnostics(log, {cohort}, options);
+  require(rows[0].source_trace_indices == std::vector<std::size_t>({0,1,2,3,5,6,4}), "null key does not exclude literal None");
+  require(rows[0].activity_is_null && rows[0].activity_attribute->is_null, "typed null output retained");
+  // Original-source provenance still selects the typed generic cell.
+  for (auto& item : log.traces) {
+    auto& cell = item.events[0].attributes.back();
+    cell.key = "transport";
+    cell.first_class_source_key = "kind";
+  }
+  cohort.activity_attribute = boolean; cohort.problem_contexts = {{2, event("", "99")}};
+  rows = token_replay_unknown_root_cause_diagnostics(log, {cohort}, options);
+  require(rows[0].source_trace_indices == std::vector<std::size_t>({1,4,5,6,2}), "typed selector provenance preserved");
+
+  EventAttribute nan{"kind", "NaN", AttributeKind::kFloat};
+  nan.typed_value = std::numeric_limits<double>::quiet_NaN();
+  auto independent = nan;
+  independent.typed_value = std::numeric_limits<double>::quiet_NaN();
+  log.traces = {trace({typed_event(nan, "1")}), trace({typed_event(nan, "2")}),
+                trace({typed_event(independent, "3")}), trace({typed_event({"kind", "known"}, "4")})};
+  cohort.activity_attribute = nan; cohort.problem_contexts = {{0, event("", "99")}};
+  rows = token_replay_unknown_root_cause_diagnostics(log, {cohort}, options);
+  require(rows[0].source_trace_indices == std::vector<std::size_t>({2,3,0}), "NaN unknown membership follows scalar aliases");
+  cohort.activity_attribute->children.push_back({"nested", "value"});
+  bool rejected = false;
+  try { (void)token_replay_unknown_root_cause_diagnostics(log, {cohort}, options); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  require(rejected, "nested explicit keys are unhashable");
+  cohort.activity_attribute = nan;
+  log.traces[3].events[0].attributes.back().container = AttributeContainerKind::kList;
+  rows = token_replay_unknown_root_cause_diagnostics(log, {cohort}, options);
+  require(rows[0].source_trace_indices == std::vector<std::size_t>({2,3,0}), "nested selected activities cannot match scalar keys and stay baseline");
+  EventAttribute date{"kind", "2026-01-02T03:04:05.123456+02:30", AttributeKind::kDate};
+  EventAttribute same_date{"kind", "2026-01-02T00:34:05.123456Z", AttributeKind::kDate};
+  log.traces = {trace({typed_event(date, "1")}), trace({typed_event(same_date, "2")}),
+                trace({typed_event({"kind", date.value}, "3")}), trace({typed_event({"kind", "known"}, "4")})};
+  cohort.activity_attribute = date;
+  rows = token_replay_unknown_root_cause_diagnostics(log, {cohort}, options);
+  require(rows[0].source_trace_indices == std::vector<std::size_t>({2,3,0}), "typed date membership compares instants but not date strings");
+}
+
+void unknown_baseline_cache_preserves_lazy_validation() {
+  EventLog log;
+  auto baseline = event("a", "1");
+  baseline.attributes.push_back({"kind", "known"});
+  auto problematic = event("b", "8");
+  problematic.attributes.push_back({"kind", "X"});
+  problematic.attributes.push_back({"kind", "Y"});
+  log.traces = {trace({baseline}), trace({problematic})};
+  TokenReplayOptions options;
+  options.activity_attribute = "kind";
+  options.root_cause.numeric_attributes = {"cost"};
+  std::vector<TokenReplayUnknownRootCauseCohort> cohorts{
+      {"X", false, {{1, event("", "8")}}},
+      {"Y", false, {{1, event("", "9")}}}};
+  const auto rows = token_replay_unknown_root_cause_diagnostics(log, cohorts, options);
+  require(rows.size() == 2 && rows[0].data[0][0] == 1 && rows[1].data[0][0] == 1,
+          "baseline caching never evaluates a trace while it belongs to the problem cohort");
+  cohorts.push_back({"Z", false, {{0, event("", "10")}}});
+  bool rejected = false;
+  try { (void)token_replay_unknown_root_cause_diagnostics(log, cohorts, options); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  require(rejected, "selector errors still arise when a formerly problematic trace first becomes a baseline candidate");
+}
+
+void integrated_typed_unknown_activity_keys() {
+  const auto unknown_event = [](EventAttribute cell, const std::string& cost) {
+    auto value = event("1", cost);
+    value.activity_state = FirstClassAttributeState::kPresent;
+    value.activity_source_key = "concept:name";
+    cell.key = "concept:name";
+    value.activity_attribute = std::move(cell);
+    return value;
+  };
+  EventLog log;
+  log.traces = {trace({event("a", "1"), event("b", "2")}),
+                trace({event("a", "3"), unknown_event({"", "1", AttributeKind::kInt}, "8"), event("b", "9")}),
+                trace({event("a", "4"), unknown_event({"", "1"}, "10"), event("b", "11")})};
+  std::vector<TokenReplayTraceDiagnostics> diagnostics(3);
+  for (std::size_t i = 0; i < diagnostics.size(); ++i) {
+    diagnostics[i].trace_index = i;
+    diagnostics[i].replayed_events = log.traces[i].events.size();
+    if (i) {
+      diagnostics[i].unknown_event_indices = {1};
+      diagnostics[i].unknown_activities = {"1"};
+      diagnostics[i].unknown_activity_is_null = {false};
+    }
+  }
+  TokenReplayOptions options;
+  options.root_cause.numeric_attributes = {"cost"};
+  const auto result = compute_token_replay_root_cause_diagnostics(log, sequence(), diagnostics, options);
+  require(result.unknown_activities.size() == 2, "same spelling retains distinct typed unknown groups");
+  require(result.unknown_activities[0].activity_attribute->kind == AttributeKind::kInt && result.unknown_activities[1].activity_attribute->kind == AttributeKind::kString, "integrated diagnostics preserve original typed cells");
+  require(result.unknown_activities[0].data == std::vector<std::vector<double>>({{2},{9}}) && result.unknown_activities[1].data == std::vector<std::vector<double>>({{2},{11}}), "typed groups preserve known-event replay contexts and shared baseline exclusion");
+}
+
 int main() {
+  typed_unknown_activity_keys();
+  unknown_baseline_cache_preserves_lazy_validation();
+  integrated_typed_unknown_activity_keys();
   cohort_contracts();
   integration_contracts();
   equal_trace_membership_contracts();

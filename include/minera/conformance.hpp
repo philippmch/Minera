@@ -113,6 +113,7 @@ struct TokenReplayTransitionRootCauseDiagnostics : RootCauseModel {
 struct TokenReplayUnknownRootCauseDiagnostics : RootCauseModel {
   std::string activity;
   bool activity_is_null = false;
+  std::optional<EventAttribute> activity_attribute;
 };
 
 struct TokenReplayRootCauseDiagnostics {
@@ -134,6 +135,8 @@ struct TokenReplayUnknownRootCauseCohort {
   std::string activity;
   bool activity_is_null = false;
   std::vector<RootCauseObservation> problem_contexts;
+  // Explicit scalar identity takes precedence over the legacy string/null.
+  std::optional<EventAttribute> activity_attribute;
 };
 
 // Conformance of an event log against a discovered model: the four standard

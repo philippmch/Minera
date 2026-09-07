@@ -262,6 +262,18 @@ bool root_cause_traces_equal(const Trace& left, const Trace& right) {
   return true;
 }
 
+bool root_cause_scalar_keys_equal(const EventAttribute& left, const EventAttribute& right) {
+  for (const auto* value : {&left, &right})
+    if (value->container != AttributeContainerKind::kScalar || !value->children.empty())
+      throw std::invalid_argument("root cause: unhashable activity key");
+  return scalar_equal(left, right);
+}
+
+std::string root_cause_scalar_key_fingerprint(const EventAttribute& value) {
+  (void)root_cause_scalar_keys_equal(value, value);
+  return scalar_fingerprint(value);
+}
+
 std::string root_cause_trace_fingerprint(const Trace& trace) {
   std::string result;
   append_part(result, dictionary_fingerprint(trace_attributes(trace)));
