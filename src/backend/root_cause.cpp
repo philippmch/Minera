@@ -398,7 +398,11 @@ double number_for(const Event& event, const std::string& key) {
   else if (const auto* boolean = std::get_if<bool>(&value->typed_value)) result = *boolean ? 1.0 : 0.0;
   else if (value->kind == AttributeKind::kBoolean && (value->value == "true" || value->value == "false"))
     result = value->value == "true" ? 1.0 : 0.0;
-  else result = decimal_number(value->value, key);
+  else {
+    result = decimal_number(value->value, key);
+    if (value->kind == AttributeKind::kInt && std::isinf(result))
+      throw std::overflow_error("root cause: integer attribute outside float64 range: " + key);
+  }
   return result;
 }
 
@@ -525,6 +529,137 @@ EventLog build_root_cause_log(
 }
 
 namespace {
+EventAttribute shared_scalar(const RootCauseSharedValue& value, const std::string& key = {}) {
+  EventAttribute result{key, value.value, value.kind, value.is_null};
+  result.typed_value = value.typed_value;
+  result.container = value.container;
+  return result;
+}
+
+std::string shared_category(const RootCauseSharedValue& value, bool nested,
+                            std::set<const RootCauseSharedValue*>& active,
+                            std::optional<bool> null_override = std::nullopt) {
+  auto scalar = shared_scalar(value);
+  if (null_override) scalar.is_null = *null_override;
+  if (value.container == AttributeContainerKind::kScalar && value.children.empty())
+    return scalar_category(scalar, nested);
+  const bool tuple = value.container == AttributeContainerKind::kTuple;
+  if (tuple && scalar.is_null) return "None";
+  if (!active.insert(&value).second) return tuple ? "(...)" : "{...}";
+  std::string result;
+  const auto child_category = [&](const RootCauseSharedBinding& child) {
+    if (!child.value) throw std::invalid_argument("root cause: null shared value handle");
+    return shared_category(*child.value, true, active);
+  };
+  if (tuple) {
+    result = "(";
+    for (std::size_t i = 0; i < value.children.size(); ++i) {
+      if (i) result += ", ";
+      result += child_category(value.children[i]);
+    }
+    if (value.children.size() == 1) result += ',';
+    result += ')';
+  } else {
+    const bool list = value.container == AttributeContainerKind::kList;
+    result = "{'value': " + (value.container == AttributeContainerKind::kScalar ? scalar_category(scalar, true) : "None") + ", 'children': ";
+    result += list ? '[' : '{';
+    std::vector<const RootCauseSharedBinding*> children;
+    std::map<std::string, std::size_t> positions;
+    for (const auto& child : value.children) {
+      if (list) children.push_back(&child);
+      else {
+        const auto [found, inserted] = positions.emplace(child.key, children.size());
+        if (inserted) children.push_back(&child);
+        else children[found->second] = &child;
+      }
+    }
+    for (std::size_t i = 0; i < children.size(); ++i) {
+      if (i) result += ", ";
+      if (list) result += '(';
+      result += quoted_category(children[i]->key) + (list ? ", " : ": ") + child_category(*children[i]);
+      if (list) result += ')';
+    }
+    result += list ? ']' : '}';
+    result += '}';
+  }
+  active.erase(&value);
+  return result;
+}
+
+struct SharedSelection {
+  const RootCauseSharedValue* value = nullptr;
+  EventAttribute scalar;
+};
+
+std::optional<SharedSelection> shared_value_for(const RootCauseSharedContext& context,
+                                               const std::string& key) {
+  const auto cell_value = [&](const RootCauseSharedBinding& binding) -> std::optional<SharedSelection> {
+    if (!binding.value) throw std::invalid_argument("root cause: null shared value handle");
+    const auto& value = *binding.value;
+    if (value.first_class_role != FirstClassAttributeRole::kNone &&
+        value.first_class_state == FirstClassAttributeState::kMissing) return std::nullopt;
+    auto scalar = shared_scalar(value, binding.key);
+    if (value.first_class_state == FirstClassAttributeState::kNull) scalar.is_null = true;
+    return SharedSelection{&value, std::move(scalar)};
+  };
+  const RootCauseSharedBinding* selected = nullptr;
+  int selected_priority = 0;
+  std::size_t selected_count = 0;
+  for (const auto& binding : context.attributes) {
+    const int priority = binding.key == key ? 2 : binding.value &&
+        !binding.value->first_class_source_key.empty() && binding.value->first_class_source_key == key ? 1 : 0;
+    if (priority == 0 || priority < selected_priority) continue;
+    if (priority > selected_priority) {
+      selected = &binding;
+      selected_priority = priority;
+      selected_count = 1;
+    } else ++selected_count;
+  }
+  if (selected_count > 1) throw std::invalid_argument("root cause: ambiguous selected attribute: " + key);
+  if (selected) return cell_value(*selected);
+  const auto projected = [&](const std::string& value, FirstClassAttributeState state,
+                             const std::optional<RootCauseSharedBinding>& stored) -> std::optional<SharedSelection> {
+    if (state == FirstClassAttributeState::kMissing && (stored || value.empty())) return std::nullopt;
+    if (stored && state != FirstClassAttributeState::kNull) return cell_value(*stored);
+    return SharedSelection{nullptr, EventAttribute{key, value, AttributeKind::kString, state == FirstClassAttributeState::kNull}};
+  };
+  const auto matches = [&](const std::string& source, const std::optional<RootCauseSharedBinding>& stored,
+                           std::string_view canonical, std::string_view alias) {
+    return key == canonical || key == alias || (!source.empty() && key == source) ||
+        (stored && (stored->key == key || (stored->value && !stored->value->first_class_source_key.empty() &&
+                                         stored->value->first_class_source_key == key)));
+  };
+  const auto& event = context.prototype;
+  if (matches(event.activity_source_key, context.activity_attribute, "concept:name", "activity"))
+    return projected(event.activity, event.activity_state, context.activity_attribute);
+  if (matches(event.resource_source_key, context.resource_attribute, "org:resource", "resource"))
+    return projected(event.resource, event.resource_state, context.resource_attribute);
+  if (matches(event.timestamp_source_key, context.timestamp_attribute, "time:timestamp", "timestamp"))
+    return projected(event.timestamp, event.timestamp_state, context.timestamp_attribute);
+  if (matches(event.lifecycle_source_key, context.lifecycle_attribute, "lifecycle:transition", "lifecycle"))
+    return projected(event.lifecycle, event.lifecycle_state, context.lifecycle_attribute);
+  return std::nullopt;
+}
+
+std::string shared_category_for(const RootCauseSharedContext& context, const std::string& key) {
+  const auto selected = shared_value_for(context, key);
+  if (!selected) return "UNDEFINED";
+  if (!selected->value) return attribute_category(selected->scalar, false);
+  std::set<const RootCauseSharedValue*> active;
+  return shared_category(*selected->value, false, active, selected->scalar.is_null);
+}
+
+double shared_number_for(const RootCauseSharedContext& context, const std::string& key) {
+  const auto selected = shared_value_for(context, key);
+  if (!selected) throw std::invalid_argument("root cause: missing numeric attribute: " + key);
+  auto scalar = selected->scalar;
+  scalar.key = key;
+  if (selected->value && !selected->value->children.empty()) scalar.children.push_back({});
+  Event event;
+  event.attributes.push_back(std::move(scalar));
+  return number_for(event, key);
+}
+
 RootCauseSharedBinding share_binding(const EventAttribute& attribute) {
   auto value = std::make_shared<RootCauseSharedValue>();
   value->value = attribute.value;
@@ -618,32 +753,30 @@ EventLog materialize_root_cause_log(const RootCauseSharedLog& log) {
   return result;
 }
 
+template <class Observation, class Category, class Number>
+RootCauseRepresentation build_representation(
+    const std::vector<Observation>& fit, const std::vector<Observation>& problem,
+    const RootCauseOptions& options, Category get_category, Number get_number);
+
 RootCauseRepresentation build_shared_root_cause_representation(
     const std::vector<RootCauseSharedObservation>& fit,
     const std::vector<RootCauseSharedObservation>& problem,
     const RootCauseOptions& options) {
-  // Preserve the balancing error before inspecting any supplied value graph.
-  (void)cohort_repeats(fit.size(), problem.size(), options.enable_multiplier);
-  const auto snapshot = [](const auto& cohort) {
-    std::vector<RootCauseObservation> result;
-    for (const auto& observation : cohort)
-      result.push_back({observation.trace_index, materialize_root_cause_context(observation.context)});
-    return result;
-  };
-  return build_root_cause_representation(snapshot(fit), snapshot(problem), options);
+  return build_representation(fit, problem, options, shared_category_for, shared_number_for);
 }
 
-RootCauseRepresentation build_root_cause_representation(
-    const std::vector<RootCauseObservation>& fit,
-    const std::vector<RootCauseObservation>& problem,
-    const RootCauseOptions& options) {
+template <class Observation, class Category, class Number>
+RootCauseRepresentation build_representation(
+    const std::vector<Observation>& fit,
+    const std::vector<Observation>& problem,
+    const RootCauseOptions& options, Category get_category, Number get_number) {
   const auto repeats = cohort_repeats(fit.size(), problem.size(), options.enable_multiplier);
   RootCauseRepresentation model;
   std::vector<std::vector<std::string>> categories;
   for (const auto& key : options.string_attributes) {
     std::set<std::string> values;
     for (const auto* cohort : {&fit, &problem})
-      for (const auto& observation : *cohort) values.insert(category_for(observation.context, key));
+      for (const auto& observation : *cohort) values.insert(get_category(observation.context, key));
     categories.emplace_back(values.begin(), values.end());
     for (const auto& value : values) model.feature_names.push_back("event:" + key + "@" + value);
   }
@@ -651,16 +784,16 @@ RootCauseRepresentation build_root_cause_representation(
   std::map<std::string, std::size_t> column_indices;
   for (std::size_t i = 0; i < model.feature_names.size(); ++i)
     column_indices[model.feature_names[i]] = i;
-  const auto append = [&](const std::vector<RootCauseObservation>& cohort, int target, std::size_t repeats) {
+  const auto append = [&](const std::vector<Observation>& cohort, int target, std::size_t repeats) {
     std::vector<std::vector<double>> encoded;
     for (const auto& observation : cohort) {
       std::vector<double> row(model.feature_names.size(), 0.0);
       for (std::size_t i = 0; i < categories.size(); ++i) {
-        const auto value = category_for(observation.context, options.string_attributes[i]);
+        const auto value = get_category(observation.context, options.string_attributes[i]);
         row[column_indices.at("event:" + options.string_attributes[i] + "@" + value)] = 1.0;
       }
       for (const auto& key : options.numeric_attributes)
-        row[column_indices.at("event:" + key)] = number_for(observation.context, key);
+        row[column_indices.at("event:" + key)] = get_number(observation.context, key);
       encoded.push_back(std::move(row));
     }
     for (std::size_t repeat = 0; repeat < repeats; ++repeat)
@@ -673,6 +806,13 @@ RootCauseRepresentation build_root_cause_representation(
   append(fit, 0, repeats[0]);
   append(problem, 1, repeats[1]);
   return model;
+}
+
+RootCauseRepresentation build_root_cause_representation(
+    const std::vector<RootCauseObservation>& fit,
+    const std::vector<RootCauseObservation>& problem,
+    const RootCauseOptions& options) {
+  return build_representation(fit, problem, options, category_for, number_for);
 }
 
 std::optional<RootCauseModel> fit_root_cause_model(

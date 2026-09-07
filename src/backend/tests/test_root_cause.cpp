@@ -857,7 +857,79 @@ void test_tuple_values() {
   rejects([&] { (void)build_root_cause_representation({observation}, {}, {{}, {"v"}}); });
 }
 
+void test_shared_cyclic_encoding() {
+  using namespace minera;
+  Event event;
+  EventAttribute parent{"v", "parent"};
+  parent.children = {{"n", "1", AttributeKind::kInt}};
+  event.attributes = {parent, {"cost", "1"}};
+  auto context = make_shared_root_cause_context(event);
+  auto node = context.attributes[0].value;
+  node->children = {{"self", node}};
+  std::vector<RootCauseSharedObservation> rows{{4, context}};
+  const auto encode = [&](const RootCauseOptions& options) {
+    return build_shared_root_cause_representation(rows, {}, options);
+  };
+  auto matrix = encode({{"v"}, {}});
+  assert((matrix.feature_names == std::vector<std::string>{"event:v@{'value': 'parent', 'children': {'self': {...}}}"}));
+  assert((matrix.data == std::vector<std::vector<double>>{{1}}));
+  assert((encode({{}, {"cost"}}).data == std::vector<std::vector<double>>{{1}}));
+  assert((encode({{}, {}}).data == std::vector<std::vector<double>>{{}}));
+  rejects([&] { (void)encode({{}, {"v"}}); });
+  node->first_class_role = FirstClassAttributeRole::kResource;
+  node->first_class_state = FirstClassAttributeState::kNull;
+  matrix = encode({{"v"}, {}});
+  assert((matrix.feature_names == std::vector<std::string>{"event:v@{'value': None, 'children': {'self': {...}}}"}));
+  node->first_class_role = FirstClassAttributeRole::kNone;
+  node->first_class_state = FirstClassAttributeState::kMissing;
+  node->container = AttributeContainerKind::kList;
+  matrix = encode({{"v"}, {}});
+  assert((matrix.feature_names == std::vector<std::string>{"event:v@{'value': None, 'children': [('self', {...})]}"}));
+  node->children.clear();
+  node->container = AttributeContainerKind::kScalar;
+  auto tuple = std::make_shared<RootCauseSharedValue>();
+  tuple->container = AttributeContainerKind::kTuple;
+  tuple->children = {{"", node}};
+  node->children = {{"tuple", tuple}};
+  rows[0].context.attributes[0].value = tuple;
+  matrix = encode({{"v"}, {}});
+  assert((matrix.feature_names == std::vector<std::string>{"event:v@({'value': 'parent', 'children': {'tuple': (...)}},)"}));
+  node->children.clear();
+  tuple->children.clear();
+  auto plain = make_shared_root_cause_context(event);
+  plain.attributes.push_back({"unused", nullptr});
+  const auto safe = build_shared_root_cause_representation({{4, plain}}, {}, {{"v"}, {"cost"}});
+  const auto expected = build_root_cause_representation({{4, event}}, {}, {{"v"}, {"cost"}});
+  assert(safe.feature_names == expected.feature_names && safe.data == expected.data);
+  assert(safe.source_trace_indices == expected.source_trace_indices);
+  rejects([&] { (void)build_shared_root_cause_representation({{4, plain}}, {}, {{"unused"}, {}}); });
+  auto aliased = plain.attributes[0];
+  aliased.key = "alias";
+  aliased.value = std::make_shared<RootCauseSharedValue>(*aliased.value);
+  aliased.value->first_class_source_key = "v";
+  aliased.value->value = "lower priority";
+  plain.attributes.push_back(aliased);
+  const auto priority = build_shared_root_cause_representation({{4, plain}}, {}, {{"v"}, {"cost"}});
+  assert(priority.feature_names == safe.feature_names && priority.data == safe.data);
+  plain.attributes.push_back(plain.attributes[0]);
+  rejects([&] { (void)build_shared_root_cause_representation({{4, plain}}, {}, {{"v"}, {}}); });
+}
+
+void test_integer_float_overflow() {
+  using namespace minera;
+  RootCauseObservation huge;
+  huge.context.attributes = {{"v", "1" + std::string(400, '0'), AttributeKind::kInt}};
+  bool overflow = false;
+  try { (void)build_root_cause_representation({huge}, {}, {{}, {"v"}}); }
+  catch (const std::overflow_error&) { overflow = true; }
+  assert(overflow);
+  huge.context.attributes[0].kind = AttributeKind::kString;
+  assert(std::isinf(build_root_cause_representation({huge}, {}, {{}, {"v"}}).data[0][0]));
+}
+
 int main() {
+  test_integer_float_overflow();
+  test_shared_cyclic_encoding();
   test_tuple_values();
   test_shared_context_log();
   test_native_scalar_identity();
