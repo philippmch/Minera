@@ -4892,6 +4892,7 @@ LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
   }
   if (supplied("default_not_present"))
     params.default_not_present = parse_finite_double(require("default_not_present"), key_for("default_not_present"));
+  const bool calendar_temporal = params.variant == LogToFeaturesVariant::TEMPORAL && !params.grouper_freq.empty();
   const auto parse_list = [&](std::string_view suffix, std::vector<std::string>& out, bool allow_empty = false) {
     if (!supplied(suffix)) return;
     const auto k = key_for(suffix);
@@ -4900,7 +4901,7 @@ LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
     catch (const std::invalid_argument& e) {
       throw std::invalid_argument(k + ": " + e.what());
     }
-    if (out.empty()) throw std::invalid_argument(k + ": expected a non-empty list");
+    if (out.empty() && !calendar_temporal) throw std::invalid_argument(k + ": expected a non-empty list");
   };
   params.event_string_attributes_supplied = supplied("event_string_attributes");
   params.event_numeric_attributes_supplied = supplied("event_numeric_attributes");
@@ -4908,13 +4909,13 @@ LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
   params.case_string_attributes_supplied = supplied("case_string_attributes");
   params.case_numeric_attributes_supplied = supplied("case_numeric_attributes");
   params.event_successor_attributes_supplied = supplied("event_successor_attributes");
-  const bool attribute_based = params.variant != LogToFeaturesVariant::TEMPORAL;
+  const bool attribute_based = params.variant != LogToFeaturesVariant::TEMPORAL || calendar_temporal;
   parse_list("event_string_attributes", params.event_string_attributes, attribute_based);
   parse_list("event_numeric_attributes", params.event_numeric_attributes, attribute_based);
   parse_list("case_string_attributes", params.case_string_attributes, attribute_based);
   parse_list("case_numeric_attributes", params.case_numeric_attributes, attribute_based);
-  parse_list("event_attributes", params.event_attributes);
-  parse_list("case_attributes", params.case_attributes);
+  parse_list("event_attributes", params.event_attributes, calendar_temporal);
+  parse_list("case_attributes", params.case_attributes, calendar_temporal);
   if (attribute_based && params.feature_names_supplied) {
     const auto text = field(key_for("feature_names"));
     if (!text.empty()) {
@@ -4972,7 +4973,7 @@ LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
     params.min_num_different_string_values = parse_nonnegative_size(require("min_num_different_string_values"), key_for("min_num_different_string_values"));
   if (supplied("max_num_different_string_values"))
     params.max_num_different_string_values = parse_nonnegative_size(require("max_num_different_string_values"), key_for("max_num_different_string_values"));
-  if (params.variant != LogToFeaturesVariant::TRACE_BASED &&
+  if (params.variant != LogToFeaturesVariant::TRACE_BASED && !calendar_temporal &&
       params.min_num_different_string_values > params.max_num_different_string_values)
     throw std::invalid_argument("features string cardinality bounds are inverted");
   return params;

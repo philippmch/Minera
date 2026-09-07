@@ -4220,6 +4220,18 @@ void log_to_features_params_contract() {
   assert(trace_empty.case_numeric_attributes_supplied && trace_empty.case_numeric_attributes.empty());
   assert(trace_empty.event_successor_attributes_supplied && trace_empty.event_successor_attributes.empty());
   assert(trace_empty.feature_names_supplied && trace_empty.feature_names.empty());
+  const auto temporal_ignored = minera::parse_log_to_features_params(
+      [](std::string_view key) { return key == "features_variant" ? std::string("temporal") : std::string{}; },
+      [](std::string_view key) { return key == "features_variant" || key == "features_feature_names" || key == "features_event_string_attributes"; });
+  assert(temporal_ignored.feature_names_supplied && temporal_ignored.feature_names.empty());
+  assert(temporal_ignored.event_string_attributes_supplied && temporal_ignored.event_string_attributes.empty());
+  const auto temporal_blank_lists = minera::parse_log_to_features_params(fields({
+      {"features_variant", "temporal"}, {"features_event_string_attributes", ","},
+      {"features_case_attributes", " "}}));
+  assert(temporal_blank_lists.event_string_attributes.empty());
+  assert(temporal_blank_lists.case_attributes.empty());
+  (void)minera::parse_log_to_features_params(fields({{"features_variant", "temporal"}, {"features_min_num_different_string_values", "3"}, {"features_max_num_different_string_values", "2"}}));
+
   const auto extra_overrides = minera::parse_log_to_features_params(fields({
       {"features_enable_all_extra_features", "true"},
       {"features_enable_case_duration", "false"},

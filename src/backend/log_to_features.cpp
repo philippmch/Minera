@@ -597,6 +597,8 @@ std::int64_t next_temporal_bucket_label(std::int64_t label, const TemporalFreque
 
 LogToFeaturesResult log_to_features(const EventLog& log,
                                     const LogToFeaturesOptions& options) {
+  const bool calendar_projection = options.variant == LogToFeaturesVariant::TEMPORAL &&
+      !options.grouper_freq.empty();
   if (options.activity_key.empty() || options.timestamp_key.empty() ||
       options.resource_key.empty())
     throw std::invalid_argument("log_to_features: keys must not be empty");
@@ -607,17 +609,19 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     throw std::invalid_argument("log_to_features: window_seconds must be finite and positive");
   if (!std::isfinite(options.epsilon) || options.epsilon < 0.0)
     throw std::invalid_argument("log_to_features: epsilon must be finite and non-negative");
-  if (options.variant != LogToFeaturesVariant::TRACE_BASED &&
+  if (options.variant != LogToFeaturesVariant::TRACE_BASED && !calendar_projection &&
       options.min_num_different_string_values > options.max_num_different_string_values)
     throw std::invalid_argument("log_to_features: string cardinality bounds are inverted");
-  if (options.variant == LogToFeaturesVariant::TEMPORAL) {
+  if (options.variant == LogToFeaturesVariant::TEMPORAL && !calendar_projection) {
     validate_names(options.event_string_attributes, "event_string_attributes");
     validate_names(options.event_numeric_attributes, "event_numeric_attributes");
     validate_names(options.case_string_attributes, "case_string_attributes");
     validate_names(options.case_numeric_attributes, "case_numeric_attributes");
   }
-  validate_names(options.event_attributes, "event_attributes");
-  validate_names(options.case_attributes, "case_attributes");
+  if (!calendar_projection) {
+    validate_names(options.event_attributes, "event_attributes");
+    validate_names(options.case_attributes, "case_attributes");
+  }
 
   LogToFeaturesResult out;
   out.variant = options.variant;
@@ -1065,13 +1069,13 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       const double start = options.start_timestamp_key.empty()
                                ? finish
                                : instant(event, options.start_timestamp_key, true);
-      if (start > finish)
+      if (!temporal_frequency && start > finish)
         throw std::invalid_argument("log_to_features: start timestamp after finish");
       origin = std::min(origin, start);
       events.push_back({&event, finish, start, ti, i});
-      metrics.start = std::min(metrics.start, start);
+      metrics.start = std::min(metrics.start, temporal_frequency ? finish : start);
       metrics.finish = std::max(metrics.finish, finish);
-      metrics.service += finish - start;
+      if (!temporal_frequency) metrics.service += finish - start;
       ++metrics.event_count;
       metrics.activities.insert(value_for(event, options.activity_key));
       const auto resource = value_for(event, options.resource_key);
@@ -1079,7 +1083,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     }
   }
   out.feature_names = options.feature_names;
-  if (out.feature_names.empty()) {
+  if (temporal_frequency || out.feature_names.empty()) {
     out.feature_names = {
         "unique_resources", "unique_activities", "num_events",
         "average_arrival_rate", "average_finish_rate", "average_waiting_time",
@@ -1090,11 +1094,12 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     validate_names(out.feature_names, "feature_names");
   }
   if (events.empty()) return out;
-  std::vector<std::size_t> arrival_order(log.traces.size());
-  std::vector<std::size_t> finish_order(log.traces.size());
+  std::vector<std::size_t> arrival_order;
+  std::vector<std::size_t> finish_order;
   for (std::size_t i = 0; i < log.traces.size(); ++i) {
-    arrival_order[i] = i;
-    finish_order[i] = i;
+    if (temporal_frequency && cases[i].event_count == 0) continue;
+    arrival_order.push_back(i);
+    finish_order.push_back(i);
   }
   auto case_less = [&](std::size_t lhs, std::size_t rhs, bool by_finish) {
     const double a = by_finish ? cases[lhs].finish : cases[lhs].start;

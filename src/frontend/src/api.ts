@@ -5427,6 +5427,8 @@ export interface LogToFeaturesOptions {
   features_max_num_different_string_values?: number;
 }
 export function logToFeaturesQuery(options: LogToFeaturesOptions = {}): string {
+  const calendarTemporal = options.features_variant === "temporal" &&
+    (options.features_grouper_freq !== undefined ? options.features_grouper_freq !== "" : options.features_window_seconds === undefined);
   if (options.features_epsilon !== undefined &&
       (!Number.isFinite(options.features_epsilon) || options.features_epsilon < 0))
     throw new Error("features_epsilon must be finite and non-negative");
@@ -5436,7 +5438,7 @@ export function logToFeaturesQuery(options: LogToFeaturesOptions = {}): string {
   if (options.features_max_num_different_string_values !== undefined &&
       (!Number.isSafeInteger(options.features_max_num_different_string_values) || options.features_max_num_different_string_values < 0))
     throw new Error("features_max_num_different_string_values must be a non-negative integer");
-  if (options.features_variant !== undefined && options.features_variant !== "trace_based" &&
+  if (options.features_variant !== undefined && options.features_variant !== "trace_based" && !calendarTemporal &&
       options.features_min_num_different_string_values !== undefined &&
       options.features_max_num_different_string_values !== undefined &&
       options.features_min_num_different_string_values > options.features_max_num_different_string_values)

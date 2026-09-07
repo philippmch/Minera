@@ -843,6 +843,86 @@ static void temporal_calendar_grid_uses_origin_and_fills_empty_periods() {
   }
 }
 
+static void temporal_calendar_metrics_use_completions_and_canonical_schema() {
+  EventLog log;
+  Trace trace;
+  trace.events = {
+      timed_event("c", "A", "1970-01-01T00:00:00Z", "1970-01-01T00:00:10Z", 0),
+      timed_event("c", "B", "1970-01-01T00:00:20Z", "1970-01-01T00:00:40Z", 1)};
+  log.traces = {trace};
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq = "D";
+  options.start_timestamp_key = "start_time";
+  const auto expected = log_to_features(log, options);
+  assert((expected.temporal_rows[0].values == std::vector<double>{1,2,2,0,0,30,30,0,0,1,2,1,1}));
+  options.feature_names_supplied = true;
+  options.event_string_attributes = {"", "duplicate", "duplicate"};
+  options.event_attributes = {"", "duplicate", "duplicate"};
+  options.case_attributes = options.event_attributes;
+  for (const auto& schema : {std::vector<std::string>{}, std::vector<std::string>{"unknown"},
+                            std::vector<std::string>{"num_events", "num_events", ""}}) {
+    options.feature_names = schema;
+    const auto actual = log_to_features(log, options);
+    assert(actual.feature_names == expected.feature_names);
+    assert(actual.temporal_rows[0].values == expected.temporal_rows[0].values);
+  }
+  log.traces[0].events[1] = timed_event("c", "B", "1970-01-01T00:00:05Z", "1970-01-01T00:00:20Z", 1);
+  assert((log_to_features(log, options).temporal_rows[0].values == std::vector<double>{1,2,2,0,0,10,10,0,0,1,2,1,1}));
+  log.traces[0].events = {
+      timed_event("c", "A", "1970-01-01T00:00:20Z", "1970-01-01T00:00:10Z", 0),
+      timed_event("c", "B", "1970-01-01T00:00:50Z", "1970-01-01T00:00:40Z", 1)};
+  assert(log_to_features(log, options).temporal_rows[0].values == expected.temporal_rows[0].values);
+  options.event_string_attributes.clear();
+  options.event_attributes.clear();
+  options.case_attributes.clear();
+  options.grouper_freq.clear();
+  options.feature_names = {"average_service_time", "average_sojourn_time"};
+  bool rejected = false;
+  try { (void)log_to_features(log, options); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+  log.traces[0] = trace;
+  const auto fixed = log_to_features(log, options);
+  assert(fixed.feature_names == options.feature_names);
+  assert((fixed.temporal_rows[0].values == std::vector<double>{30,40}));
+}
+
+static void temporal_calendar_means_weight_distinct_cases_equally() {
+  EventLog log;
+  log.traces = {
+      Trace{"one", {Event{"one", "A", "1970-01-01T00:00:10Z", "r1"}}},
+      Trace{"three", {Event{"three", "B", "1970-01-01T00:00:00Z", "r1"},
+                       Event{"three", "C", "1970-01-01T00:00:20Z", "r2"},
+                       Event{"three", "D", "1970-01-01T00:00:40Z", "r2"}}}};
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq = "D";
+  const auto result = log_to_features(log, options);
+  assert(result.temporal_rows.size() == 1);
+  assert((result.temporal_rows[0].values == std::vector<double>{
+      2,4,4,5,15,20,20,0,0,1.5,2,2,1.5}));
+}
+
+static void temporal_calendar_rates_ignore_empty_traces() {
+  EventLog log;
+  const Trace nonempty{"c", {Event{"c", "A", "1970-01-01T00:00:10Z", "r"}}};
+  log.traces = {nonempty};
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq = "D";
+  const auto expected = log_to_features_json(log_to_features(log, options));
+  for (const auto& traces : {std::vector<Trace>{Trace{}, nonempty},
+                            std::vector<Trace>{nonempty, Trace{}},
+                            std::vector<Trace>{Trace{}, nonempty, Trace{}}}) {
+    log.traces = traces;
+    const auto result = log_to_features(log, options);
+    assert(result.temporal_rows[0].values[3] == 0);
+    assert(result.temporal_rows[0].values[4] == 0);
+    assert(log_to_features_json(result) == expected);
+  }
+}
+
 static void temporal_calendar_frequency_uses_period_boundaries() {
   EventLog log;
   Trace first;
@@ -868,8 +948,8 @@ static void temporal_calendar_frequency_uses_period_boundaries() {
   assert(jan7 && jan14);
   assert(weekly.temporal_rows[0].timestamp == *jan7);
   assert(weekly.temporal_rows[1].timestamp == *jan14);
-  assert(weekly.temporal_rows[0].values[0] == 1.0 &&
-         weekly.temporal_rows[1].values[1] == 1.0);
+  assert(weekly.temporal_rows[0].values[2] == 1.0 &&
+         weekly.temporal_rows[1].values[11] == 1.0);
 
   options.grouper_freq = "MS";
   const auto month_start = log_to_features(log, options);
@@ -1410,6 +1490,9 @@ static void trace_default_schema_infers_complete_trace_presence() {
 }
 
 int main() {
+  temporal_calendar_rates_ignore_empty_traces();
+  temporal_calendar_means_weight_distinct_cases_equally();
+  temporal_calendar_metrics_use_completions_and_canonical_schema();
   temporal_calendar_grid_uses_origin_and_fills_empty_periods();
   default_trace_selection_validates_all_candidate_hashability();
   default_trace_strings_have_fixed_cardinality_limit();
