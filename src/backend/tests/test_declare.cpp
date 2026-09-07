@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 #include <string_view>
 
 using namespace minera;
@@ -26,6 +27,48 @@ EventLog log(std::initializer_list<std::initializer_list<const char*>> traces) {
     result.traces.push_back(std::move(trace));
   }
   return result;
+}
+
+void case_provenance_does_not_shadow_event_activity() {
+  auto selected = log({{"A", "B"}});
+  const auto expected = discover_declare(selected);
+  auto& trace = selected.traces.front();
+  trace.case_id = "case-one";
+  trace.case_id_state = FirstClassAttributeState::kPresent;
+  trace.case_id_source_key = "concept:name";
+  for (auto& event : trace.events) {
+    event.case_id = trace.case_id;
+    event.case_id_state = FirstClassAttributeState::kPresent;
+    event.case_id_source_key = "concept:name";
+    event.activity_source_key = "concept:name";
+    event.activity_attribute = EventAttribute{"concept:name", event.activity};
+  }
+  assert(discover_declare(selected).rules == expected.rules);
+  const auto& responses = expected.rules.at(kDeclareChainResponse);
+  assert(std::any_of(responses.begin(), responses.end(), [](const auto& rule) {
+    return rule.first == "A" && rule.second == "B";
+  }));
+
+  DeclareDiscoveryOptions options;
+  options.allowed_templates = {kDeclareExistence};
+  options.activity_key = "case_id";
+  const auto case_model = discover_declare(selected, options);
+  assert(case_model.rules.at(kDeclareExistence).size() == 1);
+  assert(case_model.rules.at(kDeclareExistence).front().first == "case-one");
+  for (auto& event : trace.events) event.case_id_source_key = "batch";
+  options.activity_key = "batch";
+  assert(discover_declare(selected, options).rules == case_model.rules);
+
+  options.activity_key = "concept:name";
+  for (auto& event : trace.events) {
+    event.resource = "worker";
+    event.resource_state = FirstClassAttributeState::kPresent;
+    event.resource_source_key = "concept:name";
+  }
+  bool rejected = false;
+  try { (void)discover_declare(selected, options); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
 }
 
 void all_templates_are_named_and_filterable() {
@@ -823,6 +866,7 @@ void custom_flat_selectors_have_precedence_and_group_cases() {
 }  // namespace
 
 int main() {
+  case_provenance_does_not_shadow_event_activity();
   all_templates_are_named_and_filterable();
   duplicate_traces_and_thresholds_are_weighted();
   conformance_checks_direction_and_order();

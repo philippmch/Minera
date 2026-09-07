@@ -118,8 +118,11 @@ const std::string* resolve_event_field(const Event& event,
   const bool case_alias = selector == "case:concept:name" ||
                           selector == "case:id" || selector == "case_id" ||
                           selector == "case";
-  if (case_source || case_alias)
-    consider(case_source ? 2 : 1,
+  // Case provenance belongs to the trace scope. XES commonly uses the same
+  // source key for a trace id and an event activity; only use the case value
+  // when no event field claimed this selector (including null event cells).
+  if ((case_source || case_alias) && candidates.empty())
+    consider(0,
              first_class_value(event.case_id, event.case_id_state));
 
   if (candidates.size() > 1)

@@ -1,6 +1,9 @@
 #include "minera/conformance.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
+#include <algorithm>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 
 using namespace minera;
@@ -120,9 +123,37 @@ void integration_contracts() {
   require(result.root_cause_diagnostics->transitions[0].feature_names[0] == "event:org:resource@earlier",
           "missing retained cell does not erase earlier context with a present outer projection");
 }
+void xes_encoding_contracts() {
+  const auto verify = [](const std::string& cell, const std::string& category) {
+    std::istringstream xml("<log><trace><event><string key=\"concept:name\" value=\"b\"/>" + cell +
+      "</event></trace><trace><event><string key=\"concept:name\" value=\"b\"/>"
+      "<string key=\"v\" value=\"other\"/></event></trace></log>");
+    const auto log = import_xes_event_log(xml);
+    RootCauseOptions options;
+    options.string_attributes = {"v"};
+    const auto rows = token_replay_transition_root_cause_diagnostics(log,
+        {{1, {{0, log.traces[0].events[0]}}, {{1, log.traces[1].events[0]}}}}, options);
+    require(rows.size() == 1, "imported nested model");
+    const auto feature = "event:v@" + category;
+    const auto found = std::find(rows[0].feature_names.begin(), rows[0].feature_names.end(), feature);
+    require(found != rows[0].feature_names.end(), "imported categorical representation");
+    const auto column = static_cast<std::size_t>(found - rows[0].feature_names.begin());
+    require(rows[0].data[0][column] == 1 && rows[0].data[1][column] == 0, "imported one-hot identity");
+  };
+  verify("<string key=\"v\" value=\"parent\"><int key=\"n\" value=\"2\"/>"
+         "<boolean key=\"b\" value=\"true\"/></string>",
+         "{'value': 'parent', 'children': {'n': 2, 'b': True}}");
+  verify("<list key=\"v\"><values><string key=\"x\" value=\"hello\"/>"
+         "<int key=\"n\" value=\"2\"/></values></list>",
+         "{'value': None, 'children': [('x', 'hello'), ('n', 2)]}");
+  verify("<list key=\"v\"><values/></list>", "{'value': None, 'children': []}");
+  verify("<date key=\"v\" value=\"2026-01-02T03:04:05.125Z\"/>", "2026-01-02 03:04:05.125000+00:00");
+  verify("<float key=\"v\" value=\"2.000\"/>", "2.0");
+}
 }
 int main() {
   cohort_contracts();
   integration_contracts();
+  xes_encoding_contracts();
   std::cout << "root-cause replay contracts passed\n";
 }

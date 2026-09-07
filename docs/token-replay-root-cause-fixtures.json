@@ -37,13 +37,27 @@
   "tree": {
     "criterion": "gini", "max_depth": 7, "min_samples_split": 2, "min_samples_leaf": 1,
     "training_precision": "float32; matrix retains doubles",
+    "unseeded_tie_observation": {"trials": 128, "equivalent_one_hot_root_feature_counts": {"0": 73, "1": 55}, "native_current_behavior": "always first requested feature; stochastic parity remains open"},
     "no_split_differences": [1e-8, 1e-7],
     "split_example": {"fit": [0], "problem": [2e-7], "threshold": 1.0000000116860974e-7},
     "missing_only_example": {"fit": [1, 1], "problem": ["NaN", "NaN"], "finite_side": "left", "missing_side": "right", "native_encoding": "missing_only=true, threshold=0"}
   },
+  "nested_encoding": {
+    "scalar_children": "{'value': 'parent', 'children': {'n': 2, 'b': True}}",
+    "list": "{'value': None, 'children': [('x', 'hello'), ('n', 2)]}",
+    "empty_list": "{'value': None, 'children': []}",
+    "container_direct_helper": "{'value': None, 'children': {'x': 'hello'}}",
+    "date_category": "2026-01-02 03:04:05.123456+02:30",
+    "nested_date": "datetime.datetime(2026, 1, 2, 3, 4, 5, 123456, tzinfo=datetime.timezone.utc)",
+    "negative_offset_date": "datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=77400)))",
+    "fractional_offset_date": "datetime.datetime(2026, 1, 2, 3, 4, 5, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=82676, microseconds=999995)))",
+    "wide_offset_category": "2026-01-02 03:04:05+15:00",
+    "unicode_numeric_strings": {"１２.５": 12.5, " ٢.٥ ": 2.5, "١_٢.٣e٢": 1230},
+    "lexical_scalars": {"float_2.000": "2.0", "int_0002": "2"},
+    "string_escaping": "Nested strings quote and escape according to Unicode 14 printability; direct string categories retain the original text.",
+    "importer_boundary": "The default pinned XES importer omits container elements and replaces parsed date offsets with UTC without adjusting wall time. Direct helper datetime inputs preserve supplied offsets; native import normalization remains a separate contract."
+  },
   "remaining_contracts": [
-    "Nested categorical values are stringified by the pinned runtime; native scalar-only encoder currently rejects containers.",
-    "Categorical date and other non-string scalar representation needs additional independent fixtures.",
     "Unseeded equally optimal tree choices use native deterministic canonicalization.",
     "Legacy backwards replay diagnostic context production is a native extension."
   ]
