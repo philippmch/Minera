@@ -1513,19 +1513,30 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         return native_scalar_order_kind(resource_categories.values.at(static_cast<std::size_t>(std::stoull(id))));
       });
     double average_waiting = 0.0, average_sojourn = 0.0, average_service = 0.0;
+    std::size_t arrival_count = 0, finish_count = 0, waiting_count = 0, sojourn_count = 0, service_count = 0;
     for (const auto trace_id : trace_ids) {
       if (temporal_frequency) {
         const auto& case_events = by_trace.at(trace_id);
-        const auto representative = *std::min_element(case_events.begin(), case_events.end(),
-            [](const TimedEvent* left, const TimedEvent* right) {
-              return left->start < right->start;
-            });
-        const auto& event = *representative->event;
-        average_arrival += scratch_number(event, options.arrival_rate);
-        average_finish += scratch_number(event, options.finish_rate);
-        average_waiting += scratch_number(event, options.waiting_time);
-        average_sojourn += scratch_number(event, options.sojourn_time);
-        average_service += scratch_number(event, options.service_time);
+        const auto add_first_valid = [&](const std::string& key, double& total, std::size_t& count) {
+          const TimedEvent* representative = nullptr;
+          double first_value = 0.0;
+          for (const auto* event : case_events) {
+            const auto value = scratch_number(*event->event, key);
+            if (!std::isnan(value) && (!representative || event->start < representative->start)) {
+              representative = event;
+              first_value = value;
+            }
+          }
+          if (representative) {
+            total += first_value;
+            ++count;
+          }
+        };
+        add_first_valid(options.arrival_rate, average_arrival, arrival_count);
+        add_first_valid(options.finish_rate, average_finish, finish_count);
+        add_first_valid(options.waiting_time, average_waiting, waiting_count);
+        add_first_valid(options.sojourn_time, average_sojourn, sojourn_count);
+        add_first_valid(options.service_time, average_service, service_count);
         continue;
       }
       average_arrival += arrival_rate[trace_id];
@@ -1537,7 +1548,13 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       average_service += metrics.service;
     }
     const double case_count = static_cast<double>(trace_ids.size());
-    if (case_count > 0.0) {
+    if (temporal_frequency) {
+      if (arrival_count) average_arrival /= static_cast<double>(arrival_count);
+      if (finish_count) average_finish /= static_cast<double>(finish_count);
+      if (waiting_count) average_waiting /= static_cast<double>(waiting_count);
+      if (sojourn_count) average_sojourn /= static_cast<double>(sojourn_count);
+      if (service_count) average_service /= static_cast<double>(service_count);
+    } else if (case_count > 0.0) {
       average_arrival /= case_count;
       average_finish /= case_count;
       average_waiting /= case_count;

@@ -1723,6 +1723,127 @@ static void temporal_calendar_metric_destinations_observe_write_order() {
   }
 }
 
+static void temporal_calendar_metrics_select_first_valid_per_column() {
+  EventLog log;
+  log.traces = {Trace{"c", {
+      Event{"c", "A", "", "r"}, Event{"c", "A", "", "r"}}}};
+  log.traces[0].events[0].attributes = {{"start", "1970-01-01T00:00:00Z", AttributeKind::kDate}};
+  log.traces[0].events[1].attributes = {{"start", "1970-01-01T00:00:20Z", AttributeKind::kDate},
+                                       {"stamp", "1970-01-01T00:00:20Z", AttributeKind::kDate}};
+  const auto original = log.traces[0].events[0].attributes;
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.timestamp_key = "stamp";
+  options.start_timestamp_key = "start";
+  for (const auto& frequency : {"D", "10s"}) {
+    options.grouper_freq = frequency;
+    for (const auto& destination : {"@@arrival_rate", "@@finish_rate"}) {
+      options.diff_start_end = destination;
+      const auto result = log_to_features(log, options);
+      assert(result.temporal_rows.size() == (options.grouper_freq == "D" ? 1 : 3));
+      for (const auto& row : result.temporal_rows) {
+        assert(row.values[3] == 0 && row.values[4] == 0);
+        assert(row.values[5] == 0 && row.values[6] == 0 && row.values[7] == 0);
+      }
+    }
+  }
+  assert(log.traces[0].events[0].attributes == original);
+
+  log.traces[0].events = {
+      Event{"c", "A", "", "r"}, Event{"c", "A", "", "r"}, Event{"c", "A", "", "r"}};
+  for (std::size_t i = 0; i < 3; ++i) {
+    auto& event = log.traces[0].events[i];
+    event.attributes = {{"start", format_timestamp(static_cast<double>(i * 10)), AttributeKind::kDate},
+                        {"stamp", format_timestamp(i == 0 ? 0 : i == 1 ? 60 : 10), AttributeKind::kDate}};
+    if (i != 0) event.attributes.push_back({"id", i == 1 ? "c2" : "c1"});
+  }
+  options.case_id_key = "id";
+  options.diff_start_end = "id";
+  options.grouper_freq = "D";
+  auto result = log_to_features(log, options);
+  assert((result.temporal_rows[0].values == std::vector<double>{1,1,3,50,50,60,60,0,2,1,3,1,1}));
+  options.grouper_freq = "10s";
+  result = log_to_features(log, options);
+  assert(result.temporal_rows.size() == 3);
+  for (std::size_t i = 0; i < 3; ++i) {
+    assert(result.temporal_rows[i].values[3] == (i == 1 ? 50 : 0));
+    assert(result.temporal_rows[i].values[4] == (i == 1 ? 50 : 0));
+    assert(result.temporal_rows[i].values[5] == 60 && result.temporal_rows[i].values[6] == 60);
+  }
+  assert(log.traces[0].events[0].attributes.size() == 2);
+  assert(log.traces[0].events[1].attributes.back().value == "c2");
+
+  options.grouper_freq.clear();
+  options.case_id_key.reset();
+  options.window_seconds = 100;
+  options.diff_start_end = "@@arrival_rate";
+  log.traces = {Trace{"c", {timed_event("c", "A", "1970-01-01T00:00:00Z", "1970-01-01T00:00:10Z", 0),
+                            timed_event("c", "B", "1970-01-01T00:00:20Z", "1970-01-01T00:00:40Z", 1)}}};
+  options.timestamp_key = "time:timestamp";
+  options.start_timestamp_key = "start_time";
+  result = log_to_features(log, options);
+  const auto feature = [&](const std::string& name) {
+    const auto position = std::find(result.feature_names.begin(), result.feature_names.end(), name);
+    assert(position != result.feature_names.end());
+    return result.temporal_rows[0].values[static_cast<std::size_t>(position - result.feature_names.begin())];
+  };
+  assert(feature("average_service_time") == 30 && feature("average_sojourn_time") == 40);
+}
+
+static void temporal_calendar_metric_destination_matrix() {
+  struct ExpectedRow { double timestamp; std::vector<double> values; };
+  struct DestinationCase {
+    std::string name;
+    std::vector<std::pair<std::string LogToFeaturesOptions::*, std::string>> destinations;
+    std::vector<ExpectedRow> rows;
+  };
+  const std::vector<DestinationCase> scenarios{
+#include "fixtures/temporal_metric_destination_cases.inc"
+  };
+  assert(scenarios.size() == 128);
+  const auto event = [](const std::string& id, const std::string& activity,
+                        const std::string& resource, double start, double finish) {
+    constexpr double origin = 1704067200;
+    Event result{id, activity, format_timestamp(origin + finish), resource};
+    result.attributes = {{"start", format_timestamp(origin + start), AttributeKind::kDate}};
+    return result;
+  };
+  EventLog log;
+  log.traces = {
+      Trace{"c1", {event("c1", "A", "r1", 0, 10), event("c1", "B", "r1", 20, 40)}},
+      Trace{"c2", {event("c2", "A", "r2", 30, 50), event("c2", "C", "r3", 60, 70),
+                   event("c2", "B", "r2", 80, 110)}},
+      Trace{"c3", {event("c3", "D", "r4", 15, 25)}}};
+  const std::vector<std::string> names{
+      "unique_resources", "unique_activities", "num_events", "average_arrival_rate",
+      "average_finish_rate", "average_waiting_time", "average_sojourn_time", "average_service_time",
+      "total_number_of_reworked_activities", "avg_cases_per_resource", "avg_events_per_case",
+      "number_of_cases", "avg_resources_per_case"};
+  for (const auto& scenario : scenarios) {
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = scenario.name.substr(0, scenario.name.find('|'));
+    options.start_timestamp_key = "start";
+    for (const auto& [field, destination] : scenario.destinations) options.*field = destination;
+    const auto result = log_to_features(log, options);
+    const auto require = [&](bool condition, const std::string& detail) {
+      if (!condition) throw std::runtime_error("Temporal destination matrix " + scenario.name + ": " + detail);
+    };
+    require(result.feature_names == names, "canonical schema");
+    require(result.temporal_rows.size() == scenario.rows.size(), "row count");
+    for (std::size_t i = 0; i < scenario.rows.size(); ++i) {
+      const auto& actual = result.temporal_rows[i];
+      const auto& expected = scenario.rows[i];
+      require(std::abs(actual.timestamp - expected.timestamp) <= 1e-9, "timestamp " + std::to_string(i));
+      require(actual.values.size() == 13 && expected.values.size() == 13, "cell count");
+      for (std::size_t j = 0; j < 13; ++j)
+        require(std::holds_alternative<double>(actual.values[j]) &&
+                    std::abs(std::get<double>(actual.values[j]) - expected.values[j]) <= 1e-9,
+                "row " + std::to_string(i) + ", " + names[j]);
+    }
+  }
+}
+
 static void temporal_calendar_frequency_uses_period_boundaries() {
   EventLog log;
   Trace first;
@@ -2379,5 +2500,7 @@ int main() {
   observed_path_timing_uses_configured_starts();
   explicit_trace_attributes_scope_missing_values();
   overlap_extras_use_case_intervals_and_other_events();
+  temporal_calendar_metrics_select_first_valid_per_column();
+  temporal_calendar_metric_destination_matrix();
   temporal_calendar_frequency_uses_period_boundaries();
 }
