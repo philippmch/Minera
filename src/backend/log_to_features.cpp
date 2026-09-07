@@ -238,9 +238,25 @@ bool trace_inference_numeric(const EventAttribute& attribute) {
        attribute.kind != AttributeKind::kBoolean);
 }
 
+bool trace_inference_hashable(EventAttribute attribute) {
+  const auto normalize_null = [](auto&& self, EventAttribute& value) -> void {
+    if (absent_attribute(value)) {
+      value.is_null = true;
+      value.container = AttributeContainerKind::kScalar;
+      value.children.clear();
+      value.typed_value = std::monostate{};
+    } else {
+      for (auto& child : value.children) self(self, child);
+    }
+  };
+  normalize_null(normalize_null, attribute);
+  return root_cause_key_is_hashable(attribute);
+}
+
 std::vector<std::string> inferred_event_attributes(const EventLog& log,
                                                    bool numeric) {
   std::map<std::string, std::size_t> occurrences;
+  std::map<std::string, std::set<std::string>> string_values;
   const auto trace_count = log.trace_count();
   const auto keys = event_feature_keys(log);
   for (const auto& trace : log.traces) {
@@ -248,21 +264,26 @@ std::vector<std::string> inferred_event_attributes(const EventLog& log,
     for (const auto& event : trace.events) {
       for (const auto& key : keys) {
         const auto attribute = event_feature_cell(event, key);
-        if (attribute && (numeric ? trace_inference_numeric(*attribute) : native_string_cell(*attribute)))
+        if (!numeric && attribute && !trace_inference_hashable(*attribute))
+          throw std::invalid_argument("log_to_features: unhashable inferred event attribute: " + key);
+        if (attribute && (numeric ? trace_inference_numeric(*attribute) : native_string_cell(*attribute))) {
           seen.insert(key);
+          if (!numeric) string_values[key].insert(attribute->value);
+        }
       }
     }
     for (const auto& key : seen) ++occurrences[key];
   }
   std::vector<std::string> result;
   for (const auto& [key, count] : occurrences)
-    if (count == trace_count) result.push_back(key);
+    if (count == trace_count && (numeric || string_values[key].size() <= 12)) result.push_back(key);
   return result;
 }
 
 std::vector<std::string> inferred_trace_attributes(const EventLog& log,
                                                    bool numeric) {
   std::map<std::string, std::size_t> occurrences;
+  std::map<std::string, std::set<std::string>> string_values;
   const auto trace_count = log.trace_count();
   for (const auto& trace : log.traces) {
     std::set<std::string> keys;
@@ -273,13 +294,17 @@ std::vector<std::string> inferred_trace_attributes(const EventLog& log,
     keys.erase("concept:name");
     for (const auto& key : keys) {
       const auto attribute = numeric_cell(trace, key);
-      if (attribute && (numeric ? trace_inference_numeric(*attribute) : native_string_cell(*attribute)))
+      if (!numeric && attribute && !trace_inference_hashable(*attribute))
+        throw std::invalid_argument("log_to_features: unhashable inferred trace attribute: " + key);
+      if (attribute && (numeric ? trace_inference_numeric(*attribute) : native_string_cell(*attribute))) {
         ++occurrences[key];
+        if (!numeric) string_values[key].insert(attribute->value);
+      }
     }
   }
   std::vector<std::string> result;
   for (const auto& [key, count] : occurrences)
-    if (count == trace_count) result.push_back(key);
+    if (count == trace_count && (numeric || string_values[key].size() <= 12)) result.push_back(key);
   return result;
 }
 
@@ -739,7 +764,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     if (max_concurrent) add_name("@@max_concurrent_activities_general");
     if (max_per_activity) for (const auto& a : activities)
       add_name("@@max_concurrent_activities_like_" + a);
-    if (options.feature_names.empty() && !options.feature_names_supplied)
+    if (!explicit_trace_selection || (options.feature_names.empty() && !options.feature_names_supplied))
       out.feature_names.assign(names.begin(), names.begin() + core_feature_count);
     if (case_id) out.feature_names.insert(out.feature_names.begin(), "@@case_id_column");
     std::unordered_map<std::string, std::size_t> index;

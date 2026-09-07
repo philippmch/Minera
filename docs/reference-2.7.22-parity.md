@@ -3099,10 +3099,13 @@ bytes, and containers; absent trace values and traces with no selected event
 value use `UNDEFINED`. Successions require adjacent events with both values
 present; missing events interrupt a pair, and traces without a pair use
 `UNDEFINED`.
-Explicit trace schemas retain duplicate, empty, whitespace, and unknown names;
+In explicit selection mode, trace schemas retain duplicate, empty, whitespace,
+and unknown names;
 only the last duplicate column is populated. They encode only selected groups,
 with zero for unassigned core cells regardless of default-not-present. An empty
-schema retains one empty row per trace. Legacy activity-count, duration, and WIP
+schema retains one empty row per trace. With all ordinary selectors omitted,
+the supplied feature schema is ignored and the inferred core schema is generated.
+Legacy activity-count, duration, and WIP
 columns are no longer injected; timing and workload extras remain opt-in.
 Core extraction does not parse unused timestamps.
 Enabled trace extras append their columns after the core schema, including an
@@ -3152,10 +3155,17 @@ round-trip precision. Native NaN and infinities survive extraction; JSON encodes
 `NaN`, `Infinity`, and `-Infinity`, accepted by the typed frontend result guard.
 Homogeneous default trace inference requires an attribute somewhere in every
 trace (event attributes) or on every trace (trace attributes), excludes the
-canonical trace identifier, and omits boolean-only attributes.
+canonical trace identifier, and omits boolean-only attributes. Ordinary inferred
+string attributes have a fixed limit of 12 distinct values; explicit selection
+and the forced activity representation bypass that limit.
 Default trace inference still needs broader proof: mixed-type selection and
 ordinary attribute ordering vary across hash seeds in the pinned runtime.
-Default unhashable-container handling also remains open.
+Default inference validates hashability before completeness and type filtering:
+mutable lists, mappings, sets, and immutable containers containing mutable
+children raise. Canonical trace identifiers are excluded from this validation;
+event activity values are included. Null values remain hashable. Explicit
+ordinary selectors bypass this default validation and retain string conversion
+for selected categorical containers.
 
 Case identifier extraction inserts `@@case_id_column` before the core and extra
 schemas. The configured trace key defaults to `concept:name`; missing values
