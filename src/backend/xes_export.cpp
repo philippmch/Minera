@@ -172,7 +172,9 @@ std::string scalar_lexical_value(const EventAttribute& attribute) {
 
 void write_typed_attribute(std::ostream& out, std::string_view indent,
                            const EventAttribute& attribute) {
-  if (attribute.container == AttributeContainerKind::kTuple) {
+  if (attribute.container == AttributeContainerKind::kTuple ||
+      attribute.container == AttributeContainerKind::kSet ||
+      attribute.container == AttributeContainerKind::kFrozenSet) {
     write_typed_attribute(out, indent, EventAttribute{attribute.key, root_cause_attribute_category(attribute),
         AttributeKind::kString, attribute.is_null});
     return;

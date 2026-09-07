@@ -843,9 +843,47 @@ void typed_first_class_selectors_survive_flat_adapters() {
   assert(restored.traces[0].events[0].activity_attribute->children.size() == 1);
 }
 
+void set_values_export_as_strings() {
+  using namespace minera;
+  EventLog log;
+  log.traces.resize(1);
+  log.traces[0].case_id = "case";
+  log.traces[0].events.resize(1);
+  auto& event = log.traces[0].events[0];
+  event.activity = "A";
+  EventAttribute set{"set", "ignored"};
+  set.container = AttributeContainerKind::kSet;
+  set.children = {{"", "2", AttributeKind::kInt}, {"", "1", AttributeKind::kInt}};
+  auto frozen = set;
+  frozen.key = "frozen";
+  frozen.container = AttributeContainerKind::kFrozenSet;
+  auto empty = frozen;
+  empty.key = "empty";
+  empty.children.clear();
+  event.attributes = {set, frozen, empty};
+  for (const auto variant : {XesExportVariant::kLineByLine, XesExportVariant::kElementTree}) {
+    XesExportOptions options;
+    options.variant = variant;
+    std::istringstream input(serialize_xes(log, options));
+    const auto restored = import_xes_event_log(input);
+    const auto& attributes = restored.traces[0].events[0].attributes;
+    const std::vector<std::string> expected = {"{2, 1}", "frozenset({2, 1})", "frozenset()"};
+    assert(attributes.size() == expected.size());
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+      assert(attributes[i].kind == AttributeKind::kString);
+      assert(attributes[i].container == AttributeContainerKind::kScalar);
+      assert(attributes[i].children.empty());
+      assert(attributes[i].value == expected[i]);
+    }
+  }
+  const auto table_copy = event_table_to_event_log(event_log_to_table(log));
+  assert(table_copy.traces[0].events[0].attributes == event.attributes);
+}
+
 }  // namespace
 
 int main() {
+  set_values_export_as_strings();
   variants_and_gzip_round_trip();
   imports_external_dynamic_huffman_gzip();
   imports_fixed_huffman_and_concatenated_gzip();

@@ -609,6 +609,8 @@ std::string_view container_name(AttributeContainerKind kind) {
     case AttributeContainerKind::kList: return "list";
     case AttributeContainerKind::kContainer: return "container";
     case AttributeContainerKind::kTuple: return "tuple";
+    case AttributeContainerKind::kSet: return "set";
+    case AttributeContainerKind::kFrozenSet: return "frozenset";
   }
   throw std::invalid_argument("log conversion: invalid attribute container kind");
 }

@@ -130,8 +130,17 @@
     "unknown_key": "b'1' excludes a byte-valued activity while string 1, string b'1', and numeric 1 remain baseline values.",
     "xes": "Both exporter variations serialize bytes as their b-prefixed string representation."
   },
+  "set_values": {
+    "categories": "set(), frozenset(), {2, 1}, frozenset({2, 1}); supplied member iteration order is retained and typed-equal duplicates keep the first representative.",
+    "numeric": "Set and frozenset values are rejected by numeric feature selection.",
+    "unknown_key": "A frozen key matches equivalent ordinary or frozen set activities regardless of member order; numeric member equivalence applies recursively. Ordinary sets cannot be cohort dictionary keys.",
+    "trace_attributes": "With identical events, set/frozenset trace attributes compare equal for equal members regardless of representation order.",
+    "event_attributes": "Event attributes retain representation-sensitive equality; differing set member iteration order changes trace cohort membership.",
+    "xes": "Both exporter variations stringify sets/frozensets as XES string values. Native table/JSON transport retains distinct container kinds.",
+    "ordering_limit": "Python process hash seeds change set iteration order. The native ordered member representation preserves supplied order, but does not reconstruct runtime hash-table ordering from insertion history."
+  },
   "remaining_contracts": [
-    "Set and frozenset categorical values still lack native type representations.",
+    "Set/frozenset categorical order requires supplied runtime iteration order; process hash-seed-dependent ordering is not reconstructed from insertion history.",
     "Cyclic shared value graphs cannot be materialized into the native tree-shaped EventLog representation.",
     "Native scalar replacement must use assignment or emplace to renew NaN alias identity; mutation through a raw mutable variant reference does not renew it.",
     "Legacy backwards replay diagnostic context production is a native extension."

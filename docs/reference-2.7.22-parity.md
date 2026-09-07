@@ -355,8 +355,19 @@ The hexadecimal payload is authoritative even when a stale native scalar remains
 derived case IDs normalize byte cells to strings. This coverage is scoped to
 root-cause encoding and transport. Byte conversion in other numeric feature
 extractors and changed first-class table projections still requires auditing.
-The support module remains **partial** while set, frozenset, and remaining
-runtime value boundaries are audited.
+Set and frozenset values have distinct native container kinds. Their children
+carry the supplied member iteration order for categorical spelling; typed equal
+members collapse to the first supplied representative. Empty spellings are
+`set()` and `frozenset()`. Numeric feature selection rejects both types. Frozen
+activity keys compare members without regard to order and match equivalent
+ordinary set activities; mutable sets cannot themselves be cohort keys.
+Trace attributes use typed unordered membership equality across both kinds,
+while event attributes retain representation-sensitive equality. Both XES
+exporter variations write categorical strings; native table/JSON copies retain
+the distinct kinds and the UI displays their categorical spelling.
+The support module remains **partial**: runtime hash-seed-dependent set ordering
+is not reconstructed from insertion order, and remaining runtime value boundaries
+still require auditing.
 These contracts do not certify either replay variation.
 
 Token replay flat-input evidence: `normalize_token_replay_event_log` and the

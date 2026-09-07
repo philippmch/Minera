@@ -488,7 +488,67 @@ void byte_key_contracts() {
   }
 }
 
+void set_key_contracts() {
+  EventAttribute key{"task", ""}; key.container = AttributeContainerKind::kFrozenSet;
+  key.children = {{"", "1", AttributeKind::kInt}, {"", "x"}};
+  auto candidate = key; candidate.container = AttributeContainerKind::kSet;
+  candidate.children = {{"", "x"}, {"", "true", AttributeKind::kBoolean}};
+  auto other = candidate; other.children[1] = {"", "1"};
+  EventLog log;
+  const std::vector<EventAttribute> activities{key, candidate, other, {"task", "bad"}};
+  for (std::size_t i = 0; i < activities.size(); ++i) {
+    auto source = trace({event("", std::to_string(i + 1))});
+    source.case_id = std::to_string(i);
+    source.events[0].attributes.push_back(activities[i]);
+    log.traces.push_back(std::move(source));
+  }
+  TokenReplayOptions options; options.activity_attribute = "task";
+  options.root_cause.numeric_attributes = {"cost"};
+  TokenReplayUnknownRootCauseCohort cohort{"", false, {{3, event("", "99")}}, key};
+  const auto models = token_replay_unknown_root_cause_diagnostics(log, {cohort}, options);
+  require(models.size() == 1 && models[0].data == std::vector<std::vector<double>>({{3}, {99}}),
+          "frozen key excludes equal mutable sets while retaining typed unequal sets");
+  require(models[0].activity == "frozenset({1, 'x'})", "frozen activity retains supplied member display order");
+  const auto tuple = [](EventAttribute member) {
+    EventAttribute value{"task", ""}; value.container = AttributeContainerKind::kTuple;
+    value.children = {std::move(member)}; return value;
+  };
+  auto list = candidate; list.container = AttributeContainerKind::kList;
+  const auto verify_nested = [&](const EventAttribute& nested_key, const EventAttribute& nested_candidate,
+                                 const EventAttribute& nested_list) {
+    EventLog nested_log;
+    const std::vector<EventAttribute> nested_activities{nested_candidate, nested_list, {"task", "bad"}};
+    for (std::size_t i = 0; i < nested_activities.size(); ++i) {
+      auto source = trace({event("", std::to_string(i + 1))}); source.case_id = std::to_string(i);
+      source.events[0].attributes.push_back(nested_activities[i]); nested_log.traces.push_back(std::move(source));
+    }
+    TokenReplayUnknownRootCauseCohort nested_cohort{"", false, {{2, event("", "99")}}, nested_key};
+    const auto result = token_replay_unknown_root_cause_diagnostics(nested_log, {nested_cohort}, options);
+    require(result.size() == 1 && result[0].data == std::vector<std::vector<double>>({{2}, {99}}),
+            "tuple candidates recursively match mutable sets to frozen keys while lists remain distinct");
+  };
+  verify_nested(tuple(key), tuple(candidate), tuple(list));
+  verify_nested(tuple(tuple(key)), tuple(tuple(candidate)), tuple(tuple(list)));
+  auto frozen_outer = key; frozen_outer.children = {key};
+  auto mutable_outer = frozen_outer; mutable_outer.container = AttributeContainerKind::kSet;
+  verify_nested(frozen_outer, mutable_outer, list);
+  cohort.activity_attribute = candidate;
+  bool rejected = false;
+  try { (void)token_replay_unknown_root_cause_diagnostics(log, {cohort}, options); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  require(rejected, "mutable set cannot be an unknown cohort key");
+  log.traces = {trace({event("a", "1")}), trace({event("a", "1")}), trace({event("b", "8")})};
+  log.traces[0].attributes = {key}; log.traces[1].attributes = {candidate};
+  RootCauseOptions encoding; encoding.numeric_attributes = {"cost"};
+  TokenReplayTransitionRootCauseCohort transition{7, {{0, event("", "3")}}, {{2, event("", "8")}}};
+  const auto rows = token_replay_transition_root_cause_diagnostics(log, {transition}, encoding);
+  require(rows.size() == 1 && rows[0].source_trace_indices == std::vector<std::size_t>({0, 1, 2}) &&
+          rows[0].data == std::vector<std::vector<double>>({{3}, {3}, {8}}),
+          "trace attributes match unordered set and frozen values across cohort expansion");
+}
+
 int main() try {
+  set_key_contracts();
   byte_key_contracts();
   tuple_key_contracts();
   typed_unknown_activity_keys();
