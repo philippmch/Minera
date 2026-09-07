@@ -3249,6 +3249,15 @@ observe overwritten values while preserving native input attributes. Canonical
 output names remain unchanged. Destination collisions with case and date columns
 follow the validated grouping and timing stages; exhaustive collision coverage
 remains open.
+Per-case metric representatives select each destination's first nonmissing value
+in configured-start order within its bucket. Missing values do not poison case
+means, and all-missing metric buckets yield zero, including after difference
+writes merge events that originally lacked case identifiers.
+A permanent 128-case oracle matrix covers every single default scratch-column
+alias, every pair of shared metric destinations, all six sharing a destination,
+and activity/resource overwrites across daily and thirty-second buckets. The
+fixture varies case lengths, durations, activities, resources, and event order;
+it does not establish exhaustive coverage for arbitrary multi-column collisions.
 The feature variations remain partial, including inference and extra-feature
 contracts that have not received complete behavioral coverage.
 
