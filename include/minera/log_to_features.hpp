@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -92,12 +93,16 @@ struct LogToFeaturesOptions {
   bool enable_first_last_activity_index_supplied = false;
   bool enable_max_concurrent_events_supplied = false;
   bool enable_max_concurrent_events_per_activity_supplied = false;
-  std::string case_id_key = "concept:name";
+  // Omitted: concept:name for TRACE; case:concept:name for calendar TEMPORAL.
+  std::optional<std::string> case_id_key;
 };
+
+// Calendar buckets with events but no valid cases use an empty rework string.
+using TemporalFeatureCell = std::variant<double, std::string>;
 
 struct TemporalFeatureRow {
   double timestamp = 0.0;
-  std::vector<double> values;
+  std::vector<TemporalFeatureCell> values;
 };
 
 using LogToFeaturesCell = std::variant<double, EventAttribute>;

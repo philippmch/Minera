@@ -1032,9 +1032,10 @@ LogToFeaturesResult log_to_features(const EventLog& log,
                 static_cast<double>(overlap_count));
       }
       if (case_id) {
-        const auto identifier = numeric_cell(t, options.case_id_key);
+        const auto key = options.case_id_key.value_or("concept:name");
+        const auto identifier = numeric_cell(t, key);
         if (!identifier)
-          throw std::invalid_argument("log_to_features: missing case identifier attribute: " + options.case_id_key);
+          throw std::invalid_argument("log_to_features: missing case identifier attribute: " + key);
         row.front() = *identifier;
         out.case_ids.push_back(t.case_id);
       }
@@ -1055,7 +1056,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   struct TypedCategories {
     std::vector<EventAttribute> values;
     std::unordered_map<std::string, std::vector<std::size_t>> buckets;
-    std::string insert(const EventAttribute& value) {
+    std::size_t insert(const EventAttribute& value) {
       auto normalized = value;
       const auto normalize_null = [](auto&& self, EventAttribute& cell) -> void {
         if (absent_attribute(cell)) {
@@ -1073,13 +1074,13 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       auto& candidates = buckets[root_cause_scalar_key_fingerprint(normalized)];
       for (const auto candidate : candidates)
         if (root_cause_scalar_keys_equal(values[candidate], normalized))
-          return std::to_string(candidate);
+          return candidate;
       const auto index = values.size();
       values.push_back(std::move(normalized));
       candidates.push_back(index);
-      return std::to_string(index);
+      return index;
     }
-  } activity_categories, resource_categories;
+  } activity_categories, resource_categories, case_categories;
   struct EventCategories {
     std::optional<std::string> activity;
     std::optional<std::string> resource;
@@ -1087,6 +1088,27 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   std::unordered_map<const Event*, EventCategories> temporal_categories;
   bool have_activity_column = false;
   bool have_resource_column = false;
+  bool have_case_column = false;
+  const auto temporal_case_key = options.case_id_key.value_or("case:concept:name");
+  const auto case_value = [&](const Trace& trace, const Event& event) {
+    if (temporal_case_key.starts_with("case:")) {
+      const auto trace_key = temporal_case_key.substr(5);
+      const bool projected_identifier = trace_key == "concept:name" ||
+          (!trace.case_id_source_key.empty() && trace_key == trace.case_id_source_key) ||
+          (trace.case_id_attribute &&
+           (trace_key == trace.case_id_attribute->key ||
+            (!trace.case_id_attribute->first_class_source_key.empty() &&
+             trace_key == trace.case_id_attribute->first_class_source_key)));
+      if (projected_identifier) {
+        if (auto value = numeric_cell(trace, trace_key)) return value;
+      } else {
+        Event context;
+        context.attributes = trace.attributes;
+        if (auto value = native_event_attribute(context, trace_key)) return value;
+      }
+    }
+    return native_event_attribute(event, temporal_case_key);
+  };
   const auto missing_category = [](const EventAttribute& value) {
     if (absent_attribute(value)) return true;
     if (value.container != AttributeContainerKind::kScalar || !value.children.empty() ||
@@ -1104,20 +1126,30 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     std::set<std::string> activities;
     std::set<std::string> resources;
   };
-  std::vector<CaseTemporal> cases(log.traces.size());
+  const auto no_case = std::numeric_limits<std::size_t>::max();
+  std::vector<CaseTemporal> cases(temporal_frequency ? 0 : log.traces.size());
   for (std::size_t ti = 0; ti < log.traces.size(); ++ti) {
-    auto& metrics = cases[ti];
     for (std::size_t i = 0; i < log.traces[ti].events.size(); ++i) {
       const auto& event = log.traces[ti].events[i];
+      std::size_t case_index = ti;
       if (temporal_frequency) {
         auto& categories = temporal_categories[&event];
         if (const auto activity = native_event_attribute(event, options.activity_key)) {
           have_activity_column = true;
-          if (!missing_category(*activity)) categories.activity = activity_categories.insert(*activity);
+          if (!missing_category(*activity)) categories.activity = std::to_string(activity_categories.insert(*activity));
         }
         if (const auto resource = native_event_attribute(event, options.resource_key)) {
           have_resource_column = true;
-          if (!missing_category(*resource)) categories.resource = resource_categories.insert(*resource);
+          if (!missing_category(*resource)) categories.resource = std::to_string(resource_categories.insert(*resource));
+        }
+        const auto identifier = case_value(log.traces[ti], event);
+        case_index = no_case;
+        if (identifier) {
+          have_case_column = true;
+          if (!missing_category(*identifier)) {
+            case_index = case_categories.insert(*identifier);
+            if (cases.size() <= case_index) cases.resize(case_index + 1);
+          }
         }
       }
       const double finish = instant(event, options.timestamp_key, true);
@@ -1127,7 +1159,9 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       if (!temporal_frequency && start > finish)
         throw std::invalid_argument("log_to_features: start timestamp after finish");
       origin = std::min(origin, start);
-      events.push_back({&event, finish, start, ti, i});
+      events.push_back({&event, finish, start, case_index, i});
+      if (case_index == no_case) continue;
+      auto& metrics = cases[case_index];
       metrics.start = std::min(metrics.start, temporal_frequency ? finish : start);
       metrics.finish = std::max(metrics.finish, finish);
       if (!temporal_frequency) metrics.service += finish - start;
@@ -1139,6 +1173,8 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   }
   if (temporal_frequency && (!have_activity_column || !have_resource_column))
     throw std::invalid_argument("log_to_features: temporal activity and resource columns are required");
+  if (temporal_frequency && (!have_case_column || cases.empty()))
+    throw std::invalid_argument("log_to_features: temporal case identifiers are required");
   out.feature_names = options.feature_names;
   if (temporal_frequency || out.feature_names.empty()) {
     out.feature_names = {
@@ -1153,16 +1189,21 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   if (events.empty()) return out;
   std::vector<std::size_t> arrival_order;
   std::vector<std::size_t> finish_order;
-  for (std::size_t i = 0; i < log.traces.size(); ++i) {
+  for (std::size_t i = 0; i < cases.size(); ++i) {
     if (temporal_frequency && cases[i].event_count == 0) continue;
     arrival_order.push_back(i);
     finish_order.push_back(i);
   }
+  const bool string_case_order = temporal_frequency &&
+      std::all_of(case_categories.values.begin(), case_categories.values.end(), native_string_cell);
   auto case_less = [&](std::size_t lhs, std::size_t rhs, bool by_finish) {
     const double a = by_finish ? cases[lhs].finish : cases[lhs].start;
     const double b = by_finish ? cases[rhs].finish : cases[rhs].start;
     if (a != b) return a < b;
-    if (log.traces[lhs].case_id != log.traces[rhs].case_id)
+    if (string_case_order &&
+        case_categories.values[lhs].value != case_categories.values[rhs].value)
+      return case_categories.values[lhs].value < case_categories.values[rhs].value;
+    if (!temporal_frequency && log.traces[lhs].case_id != log.traces[rhs].case_id)
       return log.traces[lhs].case_id < log.traces[rhs].case_id;
     return lhs < rhs;
   };
@@ -1170,8 +1211,8 @@ LogToFeaturesResult log_to_features(const EventLog& log,
             [&](std::size_t lhs, std::size_t rhs) { return case_less(lhs, rhs, false); });
   std::sort(finish_order.begin(), finish_order.end(),
             [&](std::size_t lhs, std::size_t rhs) { return case_less(lhs, rhs, true); });
-  std::vector<double> arrival_rate(log.traces.size(), 0.0);
-  std::vector<double> finish_rate(log.traces.size(), 0.0);
+  std::vector<double> arrival_rate(cases.size(), 0.0);
+  std::vector<double> finish_rate(cases.size(), 0.0);
   for (std::size_t i = 1; i < arrival_order.size(); ++i)
     arrival_rate[arrival_order[i]] = cases[arrival_order[i]].start - cases[arrival_order[i - 1]].start;
   for (std::size_t i = 1; i < finish_order.size(); ++i)
@@ -1217,8 +1258,10 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     std::map<std::string, std::set<std::size_t>> cases_by_resource;
     std::map<std::size_t, std::set<std::string>> resources_by_trace;
     for (const auto* event : bucket_events) {
-      trace_ids.insert(event->trace);
-      by_trace[event->trace].push_back(event);
+      if (event->trace != no_case) {
+        trace_ids.insert(event->trace);
+        by_trace[event->trace].push_back(event);
+      }
       std::optional<std::string> resource;
       if (temporal_frequency) {
         const auto& categories = temporal_categories.at(event->event);
@@ -1231,8 +1274,11 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       }
       if (resource) {
         resources.insert(*resource);
-        cases_by_resource[*resource].insert(event->trace);
-        resources_by_trace[event->trace].insert(*resource);
+        auto& resource_cases = cases_by_resource[*resource];
+        if (event->trace != no_case) {
+          resource_cases.insert(event->trace);
+          resources_by_trace[event->trace].insert(*resource);
+        }
       }
     }
     double average_arrival = 0.0, average_finish = 0.0;
@@ -1286,6 +1332,8 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     add("average_sojourn_time", average_sojourn);
     add("average_service_time", average_service);
     add("total_number_of_reworked_activities", reworked);
+    if (temporal_frequency && !bucket_events.empty() && trace_ids.empty())
+      row.values[index.at("total_number_of_reworked_activities")] = std::string{};
     add("avg_cases_per_resource", cases_per_resource);
     add("avg_events_per_case", events_per_case);
     add("number_of_cases", case_count);

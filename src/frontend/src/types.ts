@@ -688,7 +688,8 @@ export function isLogToTargetResult(value: unknown): value is LogToTargetResult 
 export type LogToFeaturesVariant = "event_based" | "trace_based" | "temporal";
 export type LogToFeaturesNumber = number | "NaN" | "Infinity" | "-Infinity";
 export type LogToFeaturesTraceCell = LogToFeaturesNumber | string | boolean | null | LogConversionAttributeDetail;
-export interface LogToFeaturesTemporalRow { timestamp: number; values: LogToFeaturesNumber[]; }
+export type LogToFeaturesTemporalCell = LogToFeaturesNumber | "";
+export interface LogToFeaturesTemporalRow { timestamp: number; values: LogToFeaturesTemporalCell[]; }
 export interface LogToFeaturesResult {
   family: "LOG_TO_FEATURES";
   variant: LogToFeaturesVariant;
@@ -715,7 +716,11 @@ export function isLogToFeaturesResult(value: unknown): value is LogToFeaturesRes
       Array.isArray(row) && row.length === c.feature_names!.length && row.every((cell, index) =>
         index === 0 && c.feature_names![0] === "@@case_id_column" ? identifier(cell) : rows([cell])));
   }
-  return Array.isArray(c.temporal_rows) && c.temporal_rows.every((r) => !!r && typeof r === "object" && typeof (r as LogToFeaturesTemporalRow).timestamp === "number" && Number.isFinite((r as LogToFeaturesTemporalRow).timestamp) && rows((r as LogToFeaturesTemporalRow).values));
+  return Array.isArray(c.temporal_rows) && c.temporal_rows.every((r) =>
+    !!r && typeof r === "object" && typeof r.timestamp === "number" && Number.isFinite(r.timestamp) &&
+    Array.isArray(r.values) && r.values.length === c.feature_names!.length &&
+    r.values.every((cell, index) => rows([cell]) ||
+      (cell === "" && c.feature_names![index] === "total_number_of_reworked_activities")));
 }
 
 export type LogConversionVariant =

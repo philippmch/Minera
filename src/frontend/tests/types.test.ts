@@ -1031,6 +1031,12 @@ describe("isProfileClusteringResult", () => {
 });
 
 describe("isLogToFeaturesResult", () => {
+  it("preserves empty temporal rework cells only in the rework column", () => {
+    const result = { family: "LOG_TO_FEATURES", variant: "temporal", feature_names: ["num_events", "total_number_of_reworked_activities"] };
+    expect(isLogToFeaturesResult({ ...result, temporal_rows: [{ timestamp: 1, values: [1, ""] }] })).toBe(true);
+    for (const values of [["", 1], [1, "missing"], [1]])
+      expect(isLogToFeaturesResult({ ...result, temporal_rows: [{ timestamp: 1, values }] })).toBe(false);
+  });
   it("accepts typed identifiers only in the leading case identifier column", () => {
     const result = { family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: ["@@case_id_column", "event:n"] };
     const nested = { key: "id", value: "", kind: "string", container: "tuple", null: false,

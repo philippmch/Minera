@@ -4960,9 +4960,14 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
     if (!result.event_rows.empty() || !result.trace_rows.empty() ||
         !result.case_ids.empty())
       throw std::invalid_argument("log_to_features: mixed temporal result");
-    for (const auto& row : result.temporal_rows)
+    for (const auto& row : result.temporal_rows) {
       if (!std::isfinite(row.timestamp) || !valid_row(row.values))
         throw std::invalid_argument("log_to_features: invalid temporal result row");
+      for (std::size_t i = 0; i < row.values.size(); ++i)
+        if (const auto* value = std::get_if<std::string>(&row.values[i]); value &&
+            (!value->empty() || result.feature_names[i] != "total_number_of_reworked_activities"))
+          throw std::invalid_argument("log_to_features: invalid temporal string cell");
+    }
   }
   std::ostringstream out;
   out << std::setprecision(std::numeric_limits<double>::max_digits10);
@@ -5108,7 +5113,8 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
       out << "{\"timestamp\":" << row.timestamp << ",\"values\":[";
       for (std::size_t j = 0; j < row.values.size(); ++j) {
         if (j) out << ',';
-        write_number(row.values[j]);
+        if (const auto* value = std::get_if<double>(&row.values[j])) write_number(*value);
+        else write_json_string(out, std::get<std::string>(row.values[j]));
       }
       out << "]}";
     }
