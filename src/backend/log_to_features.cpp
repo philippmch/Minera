@@ -599,6 +599,67 @@ std::int64_t next_temporal_bucket_label(std::int64_t label, const TemporalFreque
   return temporal_month_label(month_index + span, frequency.label_start);
 }
 
+template <typename Less>
+void temporal_object_sort(std::vector<std::size_t>& order, const Less& less) {
+  // The object relation is partial. Explicit partition/insertion operations
+  // produce ranks without giving a partial comparator to a library sort.
+  struct Partition { std::size_t first, end, depth; };
+  std::size_t depth = 0;
+  for (auto size = order.size(); size > 1; size >>= 1) depth += 2;
+  std::vector<Partition> pending{{0, order.size(), depth}};
+  while (!pending.empty()) {
+    const auto [first, end, remaining] = pending.back();
+    pending.pop_back();
+    const auto size = end - first;
+    if (size < 2) continue;
+    if (size <= 16) {
+      for (auto i = first + 1; i < end; ++i) {
+        const auto value = order[i];
+        auto at = i;
+        while (at > first && less(value, order[at - 1])) {
+          order[at] = order[at - 1];
+          --at;
+        }
+        order[at] = value;
+      }
+      continue;
+    }
+    if (remaining == 0) {
+      const auto sift = [&](std::size_t root, std::size_t count) {
+        while (root < count / 2) {
+          auto child = root * 2 + 1;
+          if (child + 1 < count && less(order[first + child], order[first + child + 1])) ++child;
+          if (!less(order[first + root], order[first + child])) break;
+          std::swap(order[first + root], order[first + child]);
+          root = child;
+        }
+      };
+      for (auto root = size / 2; root > 0;) sift(--root, size);
+      for (auto count = size; count > 1;) {
+        std::swap(order[first], order[first + --count]);
+        sift(0, count);
+      }
+      continue;
+    }
+    const auto last = end - 1, middle = first + (size - 1) / 2;
+    if (less(order[middle], order[first])) std::swap(order[middle], order[first]);
+    if (less(order[last], order[middle])) std::swap(order[last], order[middle]);
+    if (less(order[middle], order[first])) std::swap(order[middle], order[first]);
+    std::swap(order[middle], order[last - 1]);
+    const auto pivot = order[last - 1];
+    auto left = first, right = last - 1;
+    while (true) {
+      do { ++left; } while (left < last - 1 && less(order[left], pivot));
+      do { --right; } while (right > first && less(pivot, order[right]));
+      if (left >= right) break;
+      std::swap(order[left], order[right]);
+    }
+    std::swap(order[left], order[last - 1]);
+    pending.push_back({left + 1, end, remaining - 1});
+    pending.push_back({first, left, remaining - 1});
+  }
+}
+
 }  // namespace
 
 LogToFeaturesResult log_to_features(const EventLog& log,
@@ -1354,25 +1415,20 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   const bool ordered_case_keys = temporal_frequency &&
       std::all_of(case_categories.values.begin(), case_categories.values.end(),
           [&](const auto& value) { return supports_case_order(supports_case_order, value); });
-  const auto validate_tuple_group = [&](const auto& values, const auto& value_of) {
-    std::vector<const EventAttribute*> ordered;
-    bool have_tuple = false;
-    for (const auto& value : values) {
-      const auto& cell = value_of(value);
-      if (!supports_case_order(supports_case_order, cell)) return;
-      have_tuple = have_tuple || cell.container == AttributeContainerKind::kTuple;
-      ordered.push_back(&cell);
-    }
-    if (!have_tuple) return;
-    const auto compare_group = [](auto&& self, const EventAttribute& left,
-                                  const EventAttribute& right) -> int {
-      if (root_cause_scalar_keys_equal(left, right)) return 0;
-      const auto rank = [](const EventAttribute& cell) {
-        if (absent_attribute(cell)) return 2;
+  const auto object_less = [&](auto&& self, const EventAttribute& left,
+                               const EventAttribute& right, bool grouping) -> bool {
+    if (root_cause_scalar_keys_equal(left, right)) return false;
+    if (grouping) {
+      const auto rank = [&](const EventAttribute& cell) {
+        if (absent_attribute(cell) || missing_category(cell)) return 2;
         return native_scalar_order_kind(cell) == NativeScalarOrderKind::kString ? 1 : 0;
       };
-      const auto left_rank = rank(left), right_rank = rank(right);
-      if (left_rank != right_rank) return left_rank < right_rank ? -1 : 1;
+      if (rank(left) != rank(right)) return rank(left) < rank(right);
+      if (rank(left) == 2) return false;
+    }
+    const bool left_tuple = left.container == AttributeContainerKind::kTuple;
+    const bool right_tuple = right.container == AttributeContainerKind::kTuple;
+    if (left_tuple || right_tuple) {
       const auto sequence = [](const EventAttribute& cell) {
         if (cell.container == AttributeContainerKind::kTuple) return cell.children;
         std::vector<EventAttribute> children;
@@ -1383,111 +1439,65 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         }
         return children;
       };
-      const bool left_tuple = left.container == AttributeContainerKind::kTuple;
-      const bool right_tuple = right.container == AttributeContainerKind::kTuple;
-      if (left_tuple || right_tuple) {
-        if ((!left_tuple && native_scalar_order_kind(left) != NativeScalarOrderKind::kBytes) ||
-            (!right_tuple && native_scalar_order_kind(right) != NativeScalarOrderKind::kBytes))
-          throw std::invalid_argument("log_to_features: incompatible temporal tuple grouping types");
-        const auto left_children = sequence(left), right_children = sequence(right);
-        for (std::size_t i = 0; i < std::min(left_children.size(), right_children.size()); ++i) {
-          const auto comparison = self(self, left_children[i], right_children[i]);
-          if (comparison != 0) return comparison;
-        }
-        return left_children.size() < right_children.size() ? -1 : left_children.size() > right_children.size() ? 1 : 0;
-      }
-      return native_scalar_key_compare(left, right);
-    };
-    std::sort(ordered.begin(), ordered.end(), [&](const auto* left, const auto* right) {
-      return compare_group(compare_group, *left, *right) < 0;
+      if ((!left_tuple && (!grouping || native_scalar_order_kind(left) != NativeScalarOrderKind::kBytes)) ||
+          (!right_tuple && (!grouping || native_scalar_order_kind(right) != NativeScalarOrderKind::kBytes)))
+        throw std::invalid_argument("log_to_features: incompatible temporal tuple ordering types");
+      const auto a = sequence(left), b = sequence(right);
+      for (std::size_t i = 0; i < std::min(a.size(), b.size()); ++i)
+        if (!root_cause_scalar_keys_equal(a[i], b[i])) return self(self, a[i], b[i], grouping);
+      return a.size() < b.size();
+    }
+    if (left.container == AttributeContainerKind::kFrozenSet || right.container == AttributeContainerKind::kFrozenSet) {
+      if (left.container != AttributeContainerKind::kFrozenSet || right.container != AttributeContainerKind::kFrozenSet)
+        throw std::invalid_argument("log_to_features: incompatible temporal frozen ordering types");
+      const auto a = root_cause_set_members(left), b = root_cause_set_members(right);
+      return a.size() < b.size() && std::all_of(a.begin(), a.end(), [&](const auto* member) {
+        return std::any_of(b.begin(), b.end(), [&](const auto* other) {
+          return root_cause_scalar_keys_equal(*member, *other);
+        });
+      });
+    }
+    if (absent_attribute(left) || absent_attribute(right))
+      throw std::invalid_argument("log_to_features: incompatible temporal null ordering types");
+    if (native_scalar_order_kind(left) == NativeScalarOrderKind::kNumeric &&
+        native_scalar_order_kind(right) == NativeScalarOrderKind::kNumeric &&
+        (missing_category(left) || missing_category(right))) return false;
+    return native_scalar_key_compare(left, right) < 0;
+  };
+  const auto validate_tuple_group = [&](const auto& values, const auto& value_of) {
+    std::vector<const EventAttribute*> keys;
+    bool have_container = false;
+    for (const auto& value : values) {
+      const auto& key = value_of(value);
+      have_container = have_container || key.container != AttributeContainerKind::kScalar;
+      keys.push_back(&key);
+    }
+    if (!have_container) return;
+    std::vector<std::size_t> order;
+    for (std::size_t i = 0; i < keys.size(); ++i) order.push_back(i);
+    temporal_object_sort(order, [&](std::size_t left, std::size_t right) {
+      return object_less(object_less, *keys[left], *keys[right], true);
     });
   };
   if (temporal_frequency) {
     validate_scalar_group(case_categories.values, native_scalar_order_kind);
     validate_tuple_group(case_categories.values, [](const EventAttribute& value) -> const EventAttribute& { return value; });
   }
-  std::vector<std::size_t> frozen_ranks;
-  if (temporal_frequency && !case_categories.values.empty() &&
-      std::all_of(case_categories.values.begin(), case_categories.values.end(), [](const auto& key) {
-        return key.container == AttributeContainerKind::kFrozenSet;
-      })) {
+  std::vector<std::size_t> object_ranks;
+  if (temporal_frequency && !ordered_case_keys) {
     auto order = arrival_order;
-    std::vector<std::vector<const EventAttribute*>> members;
-    for (const auto& key : case_categories.values) members.push_back(root_cause_set_members(key));
-    const auto subset = [&](std::size_t left, std::size_t right) {
-      const auto& a = members[left];
-      const auto& b = members[right];
-      return a.size() < b.size() && std::all_of(a.begin(), a.end(), [&](const auto* child) {
-        return std::any_of(b.begin(), b.end(), [&](const auto* other) {
-          return root_cause_scalar_keys_equal(*child, *other);
-        });
-      });
+    const auto group_key_less = [&](std::size_t left, std::size_t right) {
+      return object_less(object_less, case_categories.values[left], case_categories.values[right], true);
     };
-    // The object relation is partial. Explicit partition/insertion operations
-    // produce ranks without giving a partial comparator to a library sort.
-    struct Partition { std::size_t first, end, depth; };
-    std::size_t depth = 0;
-    for (auto size = order.size(); size > 1; size >>= 1) depth += 2;
-    std::vector<Partition> pending{{0, order.size(), depth}};
-    while (!pending.empty()) {
-      const auto [first, end, remaining] = pending.back();
-      pending.pop_back();
-      const auto size = end - first;
-      if (size < 2) continue;
-      if (size <= 16) {
-        for (auto i = first + 1; i < end; ++i) {
-          const auto value = order[i];
-          auto at = i;
-          while (at > first && subset(value, order[at - 1])) {
-            order[at] = order[at - 1];
-            --at;
-          }
-          order[at] = value;
-        }
-        continue;
-      }
-      if (remaining == 0) {
-        const auto sift = [&](std::size_t root, std::size_t count) {
-          while (root < count / 2) {
-            auto child = root * 2 + 1;
-            if (child + 1 < count && subset(order[first + child], order[first + child + 1])) ++child;
-            if (!subset(order[first + root], order[first + child])) break;
-            std::swap(order[first + root], order[first + child]);
-            root = child;
-          }
-        };
-        for (auto root = size / 2; root > 0;) sift(--root, size);
-        for (auto count = size; count > 1;) {
-          std::swap(order[first], order[first + --count]);
-          sift(0, count);
-        }
-        continue;
-      }
-      const auto last = end - 1, middle = first + (size - 1) / 2;
-      if (subset(order[middle], order[first])) std::swap(order[middle], order[first]);
-      if (subset(order[last], order[middle])) std::swap(order[last], order[middle]);
-      if (subset(order[middle], order[first])) std::swap(order[middle], order[first]);
-      std::swap(order[middle], order[last - 1]);
-      const auto pivot = order[last - 1];
-      auto left = first, right = last - 1;
-      while (true) {
-        do { ++left; } while (left < last - 1 && subset(order[left], pivot));
-        do { --right; } while (right > first && subset(pivot, order[right]));
-        if (left >= right) break;
-        std::swap(order[left], order[right]);
-      }
-      std::swap(order[left], order[last - 1]);
-      pending.push_back({left + 1, end, remaining - 1});
-      pending.push_back({first, left, remaining - 1});
-    }
-    frozen_ranks.resize(order.size());
-    for (std::size_t rank = 0; rank < order.size(); ++rank) frozen_ranks[order[rank]] = rank;
+    temporal_object_sort(order, group_key_less);
+    object_ranks.resize(order.size());
+    for (std::size_t rank = 0; rank < order.size(); ++rank) object_ranks[order[rank]] = rank;
   }
   auto case_less = [&](std::size_t lhs, std::size_t rhs, bool by_finish) {
     const double a = by_finish ? cases[lhs].finish : cases[lhs].start;
     const double b = by_finish ? cases[rhs].finish : cases[rhs].start;
     if (a != b) return a < b;
-    if (!frozen_ranks.empty()) return frozen_ranks[lhs] < frozen_ranks[rhs];
+    if (!object_ranks.empty()) return object_ranks[lhs] < object_ranks[rhs];
     if (ordered_case_keys)
       return compare_case_keys(compare_case_keys, case_categories.values[lhs], case_categories.values[rhs]) < 0;
     if (!temporal_frequency && log.traces[lhs].case_id != log.traces[rhs].case_id)
@@ -1495,27 +1505,20 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     return lhs < rhs;
   };
   const auto sort_endpoints = [&](std::vector<std::size_t>& order, bool by_finish) {
-    if (frozen_ranks.empty()) {
+    if (object_ranks.empty()) {
       std::sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
         return case_less(left, right, by_finish);
       });
       return;
     }
     std::sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
-      return frozen_ranks[left] < frozen_ranks[right];
+      return object_ranks[left] < object_ranks[right];
     });
-    std::vector<std::vector<const EventAttribute*>> members;
-    for (const auto& key : case_categories.values) members.push_back(root_cause_set_members(key));
     const auto less = [&](std::size_t left, std::size_t right) {
       const auto a = by_finish ? cases[left].finish : cases[left].start;
       const auto b = by_finish ? cases[right].finish : cases[right].start;
       if (a != b) return a < b;
-      return members[left].size() < members[right].size() &&
-          std::all_of(members[left].begin(), members[left].end(), [&](const auto* child) {
-            return std::any_of(members[right].begin(), members[right].end(), [&](const auto* other) {
-              return root_cause_scalar_keys_equal(*child, *other);
-            });
-          });
+      return object_less(object_less, case_categories.values[left], case_categories.values[right], false);
     };
     auto minimum = order.size();
     std::size_t carry = 0;
