@@ -1364,6 +1364,7 @@ export function TokenReplayRootCauseDiagnosticsView({ diagnostics }: {
   const activityLabel = (row: TokenReplayRootCauseDiagnostics["unknown_activities"][number]) => {
     const cell = row.activity_attribute;
     if (cell ? cell.null : row.activity_is_null) return "(null activity)";
+    if (cell?.container === "tuple") return `${row.activity} (tuple)`;
     if (cell && cell.kind !== "string" && cell.kind !== "id") {
       if (cell.kind === "int") return `${row.activity} (${cell.kind})`;
       return `${String(cell.typed_value ?? cell.value)} (${cell.kind})`;

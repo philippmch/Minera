@@ -21,7 +21,7 @@ namespace minera {
 // is available.
 enum class AttributeKind { kString, kDate, kInt, kFloat, kBoolean, kId };
 
-enum class AttributeContainerKind { kScalar, kList, kContainer };
+enum class AttributeContainerKind { kScalar, kList, kContainer, kTuple };
 
 enum class FirstClassAttributeState { kMissing, kPresent, kNull };
 

@@ -1,6 +1,7 @@
 #include "minera/conformance.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/xes_event_log_importer.hpp"
+#include "minera/xes_export.hpp"
 
 #include <algorithm>
 #include <iostream>
@@ -389,7 +390,71 @@ void integrated_typed_unknown_activity_keys() {
   require(result.unknown_activities[0].data == std::vector<std::vector<double>>({{2},{9}}) && result.unknown_activities[1].data == std::vector<std::vector<double>>({{2},{11}}), "typed groups preserve known-event replay contexts and shared baseline exclusion");
 }
 
+void tuple_key_contracts() {
+  const auto tuple = [](const EventAttribute& first) {
+    EventAttribute value{"task", ""};
+    value.container = AttributeContainerKind::kTuple;
+    value.children = {first, {"", "x"}};
+    return value;
+  };
+  const auto key = tuple({"", "1", AttributeKind::kInt});
+  auto list = key;
+  list.container = AttributeContainerKind::kList;
+  const std::vector<EventAttribute> activities = {
+    tuple({"", "true", AttributeKind::kBoolean}),
+    tuple({"", "1.0", AttributeKind::kFloat}),
+    tuple({"", "1"}), list, {"task", "(1, 'x')"}, {"task", "bad"}};
+  EventLog log;
+  for (std::size_t i = 0; i < activities.size(); ++i) {
+    auto source = trace({event("", std::to_string(i + 1))});
+    source.case_id = std::to_string(i);
+    source.events[0].attributes.push_back(activities[i]);
+    log.traces.push_back(std::move(source));
+  }
+  TokenReplayOptions options;
+  options.activity_attribute = "task";
+  options.root_cause.numeric_attributes = {"cost"};
+  TokenReplayUnknownRootCauseCohort cohort{"", false, {{5, event("", "99")}}, key};
+  const auto verify = [&](const EventLog& input) {
+    const auto models = token_replay_unknown_root_cause_diagnostics(input, {cohort}, options);
+    require(models.size() == 1, "tuple unknown classifier");
+    require(models[0].data == std::vector<std::vector<double>>({{3}, {4}, {5}, {99}}),
+            "tuple typed numeric matches exclude equivalents, retain list and string values");
+    require(models[0].activity == "(1, 'x')" &&
+            models[0].activity_attribute->container == AttributeContainerKind::kTuple,
+            "tuple output retains canonical name and ordered value type");
+  };
+  verify(log);
+  verify(event_table_to_event_log(event_log_to_table(log)));
+  const auto xml = to_xes(log);
+  std::istringstream serialized(xml);
+  const auto imported = import_xes_event_log(serialized);
+  const auto& attributes = imported.traces[0].events[0].attributes;
+  const auto restored = std::find_if(attributes.begin(), attributes.end(),
+      [](const auto& value) { return value.key == "task"; });
+  require(restored != attributes.end() && restored->kind == AttributeKind::kString &&
+          restored->value == "(True, 'x')",
+          "XES represents tuple attributes by their string spelling");
+  auto& retained = log.traces[0].events[0].attributes.back();
+  retained.first_class_state = FirstClassAttributeState::kNull;
+  retained.first_class_role = FirstClassAttributeRole::kActivity;
+  cohort.activity_attribute.reset();
+  cohort.activity_is_null = true;
+  const auto null_models = token_replay_unknown_root_cause_diagnostics(log, {cohort}, options);
+  require(null_models[0].source_trace_indices.front() == 1,
+          "retained null tuple metadata does not match the stale tuple contents");
+  retained.is_null = true;
+  std::istringstream null_xml(to_xes(log));
+  const auto null_import = import_xes_event_log(null_xml);
+  const auto& null_attributes = null_import.traces[0].events[0].attributes;
+  const auto null_cell = std::find_if(null_attributes.begin(), null_attributes.end(),
+      [](const auto& value) { return value.key == "task"; });
+  require(null_cell != null_attributes.end() && null_cell->is_null,
+          "tuple string export retains an explicit null state");
+}
+
 int main() {
+  tuple_key_contracts();
   typed_unknown_activity_keys();
   unknown_baseline_cache_preserves_lazy_validation();
   integrated_typed_unknown_activity_keys();

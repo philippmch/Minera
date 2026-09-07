@@ -4118,6 +4118,7 @@ const char* attribute_container_name(AttributeContainerKind container) {
     case AttributeContainerKind::kScalar: return "scalar";
     case AttributeContainerKind::kList: return "list";
     case AttributeContainerKind::kContainer: return "container";
+    case AttributeContainerKind::kTuple: return "tuple";
   }
   throw std::invalid_argument(
       "projected log contains an invalid attribute container");
