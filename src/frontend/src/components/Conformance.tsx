@@ -1365,6 +1365,7 @@ export function TokenReplayRootCauseDiagnosticsView({ diagnostics }: {
     const cell = row.activity_attribute;
     if (cell ? cell.null : row.activity_is_null) return "(null activity)";
     if (cell?.container === "tuple") return `${row.activity} (tuple)`;
+    if (cell?.container === "set" || cell?.container === "frozenset") return row.activity;
     if (cell?.kind === "bytes") return row.activity;
     if (cell && cell.kind !== "string" && cell.kind !== "id") {
       if (cell.kind === "int") return `${row.activity} (${cell.kind})`;

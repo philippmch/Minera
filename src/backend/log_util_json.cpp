@@ -50,6 +50,8 @@ const char* attribute_container_name(AttributeContainerKind kind) {
     case AttributeContainerKind::kList: return "list";
     case AttributeContainerKind::kContainer: return "container";
     case AttributeContainerKind::kTuple: return "tuple";
+    case AttributeContainerKind::kSet: return "set";
+    case AttributeContainerKind::kFrozenSet: return "frozenset";
   }
   return "scalar";
 }

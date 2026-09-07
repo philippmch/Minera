@@ -316,6 +316,18 @@ std::string scalar_category(const EventAttribute& value, bool nested) {
 }
 
 std::string attribute_category(const EventAttribute& value, bool nested) {
+  if (value.container == AttributeContainerKind::kSet || value.container == AttributeContainerKind::kFrozenSet) {
+    if (value.is_null) return "None";
+    const bool frozen = value.container == AttributeContainerKind::kFrozenSet;
+    const auto members = root_cause_set_members(value);
+    if (members.empty()) return frozen ? "frozenset()" : "set()";
+    std::string result = frozen ? "frozenset({" : "{";
+    for (std::size_t i = 0; i < members.size(); ++i) {
+      if (i) result += ", ";
+      result += attribute_category(*members[i], true);
+    }
+    return result + (frozen ? "})" : "}");
+  }
   if (value.container == AttributeContainerKind::kTuple) {
     if (value.is_null) return "None";
     std::string result = "(";
@@ -562,11 +574,35 @@ EventAttribute shared_scalar(const RootCauseSharedValue& value, const std::strin
   return result;
 }
 
+// Snapshot selected set graphs to retain scalar identity during deduplication.
+EventAttribute shared_set_member(const RootCauseSharedValue& value,
+                                 std::set<const RootCauseSharedValue*>& active,
+                                 std::optional<bool> null_override = std::nullopt) {
+  auto result = shared_scalar(value);
+  if (null_override) result.is_null = *null_override;
+  if (result.is_null && (result.container == AttributeContainerKind::kTuple ||
+      result.container == AttributeContainerKind::kSet || result.container == AttributeContainerKind::kFrozenSet)) return result;
+  if (!active.insert(&value).second) throw std::invalid_argument("root cause: cyclic set member");
+  for (const auto& child : value.children) {
+    if (!child.value) throw std::invalid_argument("root cause: null shared value handle");
+    auto member = shared_set_member(*child.value, active);
+    member.key = child.key;
+    result.children.push_back(std::move(member));
+  }
+  active.erase(&value);
+  return result;
+}
+
 std::string shared_category(const RootCauseSharedValue& value, bool nested,
                             std::set<const RootCauseSharedValue*>& active,
                             std::optional<bool> null_override = std::nullopt) {
   auto scalar = shared_scalar(value);
   if (null_override) scalar.is_null = *null_override;
+  if (value.container == AttributeContainerKind::kSet || value.container == AttributeContainerKind::kFrozenSet) {
+    if (scalar.is_null) return "None";
+    std::set<const RootCauseSharedValue*> members_active;
+    return attribute_category(shared_set_member(value, members_active, null_override), nested);
+  }
   if (value.container == AttributeContainerKind::kScalar && value.children.empty())
     return scalar_category(scalar, nested);
   const bool tuple = value.container == AttributeContainerKind::kTuple;

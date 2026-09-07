@@ -79,6 +79,8 @@ const char* container_name(AttributeContainerKind container) {
     case AttributeContainerKind::kList: return "list";
     case AttributeContainerKind::kContainer: return "container";
     case AttributeContainerKind::kTuple: return "tuple";
+    case AttributeContainerKind::kSet: return "set";
+    case AttributeContainerKind::kFrozenSet: return "frozenset";
   }
   throw std::invalid_argument(
       "DFG dataframe JSON: invalid attribute container");

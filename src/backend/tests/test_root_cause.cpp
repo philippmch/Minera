@@ -974,7 +974,85 @@ void test_byte_values() {
   assert(root_cause_attribute_category(tuple) == "(b'1',)");
 }
 
+void test_set_values() {
+  using namespace minera;
+  const auto collection = [](AttributeContainerKind kind, std::vector<EventAttribute> children) {
+    EventAttribute value{"v", ""}; value.container = kind; value.children = std::move(children); return value;
+  };
+  const auto set = AttributeContainerKind::kSet, frozen = AttributeContainerKind::kFrozenSet;
+  const EventAttribute one{"", "1", AttributeKind::kInt}, truth{"", "true", AttributeKind::kBoolean};
+  auto a = collection(frozen, {one, truth, {"", "x"}});
+  auto b = collection(frozen, {{"", "x"}, {"", "1.0", AttributeKind::kFloat}});
+  assert(root_cause_attribute_category(collection(set, {})) == "set()");
+  assert(root_cause_attribute_category(collection(frozen, {})) == "frozenset()");
+  assert(root_cause_attribute_category(a) == "frozenset({1, 'x'})");
+  assert(root_cause_scalar_keys_equal(a, b));
+  assert(root_cause_scalar_key_fingerprint(a) == root_cause_scalar_key_fingerprint(b));
+  Trace left, right;
+  left.attributes = {a}; right.attributes = {b};
+  right.attributes[0].container = set;
+  assert(root_cause_traces_equal(left, right));
+  assert(root_cause_trace_fingerprint(left) == root_cause_trace_fingerprint(right));
+  Event left_event, right_event;
+  left_event.attributes = {a}; right_event.attributes = {b};
+  left.events = {left_event}; right.events = {right_event};
+  assert(!root_cause_traces_equal(left, right));
+  right.events[0].attributes = {a};
+  assert(root_cause_traces_equal(left, right));
+  right.events[0].attributes[0].container = set;
+  assert(!root_cause_traces_equal(left, right));
+  std::vector<EventAttribute> many, reversed;
+  for (int i = 0; i < 2048; ++i) many.push_back({"", std::to_string(i), AttributeKind::kInt});
+  for (int i = 2047; i >= 0; --i) reversed.push_back({"", std::to_string(i) + ".0", AttributeKind::kFloat});
+  auto large = collection(frozen, many), large_reversed = collection(frozen, reversed);
+  large.children.insert(large.children.end(), reversed.begin(), reversed.end());
+  assert(root_cause_set_members(large).size() == 2048);
+  assert(root_cause_set_members(large)[1]->kind == AttributeKind::kInt);
+  assert(root_cause_scalar_keys_equal(large, large_reversed));
+  assert(root_cause_scalar_key_fingerprint(large) == root_cause_scalar_key_fingerprint(large_reversed));
+  large_reversed.children.back().value = "2048.0";
+  assert(!root_cause_scalar_keys_equal(large, large_reversed));
+  auto nested = collection(set, {a, b});
+  assert(root_cause_attribute_category(nested) == "{frozenset({1, 'x'})}");
+  assert(!root_cause_key_is_hashable(nested));
+  rejects([&] { (void)root_cause_scalar_key_fingerprint(nested); });
+  auto invalid = collection(frozen, {nested});
+  rejects([&] { (void)root_cause_attribute_category(invalid); });
+  assert(!root_cause_key_is_hashable(invalid));
+  auto nan = EventAttribute{"", "nan", AttributeKind::kFloat};
+  nan.typed_value = std::numeric_limits<double>::quiet_NaN();
+  auto other_nan = nan; other_nan.typed_value = std::numeric_limits<double>::quiet_NaN();
+  assert(root_cause_set_members(collection(set, {nan, nan, other_nan})).size() == 2);
+  RootCauseObservation observation;
+  observation.context.attributes = {nested};
+  const auto encoded = build_root_cause_representation({observation}, {}, {{"v"}, {}});
+  assert((encoded.feature_names == std::vector<std::string>{"event:v@{frozenset({1, 'x'})}"}));
+  rejects([&] { (void)build_root_cause_representation({observation}, {}, {{}, {"v"}}); });
+  RootCauseSharedObservation shared;
+  shared.context = make_shared_root_cause_context(observation.context);
+  const auto shared_encoded = build_shared_root_cause_representation({shared}, {}, {{"v"}, {}});
+  assert(shared_encoded.feature_names == encoded.feature_names);
+  rejects([&] { (void)build_shared_root_cause_representation({shared}, {}, {{}, {"v"}}); });
+  observation.context.attributes = {a};
+  rejects([&] { (void)build_root_cause_representation({observation}, {}, {{}, {"v"}}); });
+  auto frozen_shared = shared;
+  frozen_shared.context = make_shared_root_cause_context(observation.context);
+  rejects([&] { (void)build_shared_root_cause_representation({frozen_shared}, {}, {{}, {"v"}}); });
+  auto shared_value = shared.context.attributes[0].value;
+  shared_value->children = {{"", shared_value}};
+  rejects([&] { (void)build_shared_root_cause_representation({shared}, {}, {{"v"}, {}}); });
+  shared_value->is_null = true;
+  assert((build_shared_root_cause_representation({shared}, {}, {{"v"}, {}}).feature_names == std::vector<std::string>{"event:v@None"}));
+  shared_value->children.clear();
+  invalid.is_null = true;
+  assert(root_cause_attribute_category(invalid) == "None");
+  EventAttribute null{"", "", AttributeKind::kString, true};
+  assert(root_cause_scalar_keys_equal(invalid, null));
+  assert(root_cause_scalar_key_fingerprint(invalid) == root_cause_scalar_key_fingerprint(null));
+}
+
 int main() {
+  test_set_values();
   test_byte_values();
   test_integer_float_overflow();
   test_shared_cyclic_encoding();

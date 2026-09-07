@@ -134,10 +134,19 @@ class ActivityKeyIndex {
   std::unordered_map<std::string, std::vector<std::size_t>> buckets_;
 };
 
+void normalize_set_candidate(EventAttribute& value) {
+  if (value.container == AttributeContainerKind::kSet)
+    value.container = AttributeContainerKind::kFrozenSet;
+  if (value.container == AttributeContainerKind::kTuple)
+    for (auto& child : value.children) normalize_set_candidate(child);
+}
+
 bool contains_key(const Trace& trace, const ActivityKeyIndex& keys,
                   const std::string& selector) {
   for (const auto& event : trace.events) {
-    const auto activity = activity_value(event, selector);
+    auto activity = activity_value(event, selector);
+    // Set candidates participate in membership comparisons against frozen keys.
+    normalize_set_candidate(activity.value);
     if (activity.present && root_cause_key_is_hashable(activity.value))
       if (keys.find(activity.value)) return true;
   }

@@ -1,11 +1,13 @@
 #include "root_cause_trace_key.hpp"
 
+#include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <cstdlib>
 #include <map>
 #include <stdexcept>
 #include <string_view>
+#include <unordered_map>
 
 namespace minera {
 namespace {
@@ -154,6 +156,27 @@ bool scalar_equal(const EventAttribute& left, const EventAttribute& right) {
 }
 
 bool attribute_equal(const EventAttribute& left, const EventAttribute& right);
+std::string attribute_fingerprint(const EventAttribute& value);
+
+struct SetMembers {
+  std::vector<const EventAttribute*> ordered;
+  std::unordered_map<std::string, std::vector<const EventAttribute*>> buckets;
+};
+
+SetMembers index_set_members(const EventAttribute& value) {
+  SetMembers result;
+  if (value.is_null) return result;
+  for (const auto& child : value.children) {
+    if (!root_cause_key_is_hashable(child)) throw std::invalid_argument("root cause: unhashable set member");
+    auto& bucket = result.buckets[attribute_fingerprint(child)];
+    if (std::none_of(bucket.begin(), bucket.end(), [&](const auto* other) { return attribute_equal(child, *other); })) {
+      bucket.push_back(&child);
+      result.ordered.push_back(&child);
+    }
+  }
+  return result;
+}
+
 
 bool dictionary_equal(const Attributes& left, const Attributes& right) {
   if (left.size() != right.size()) return false;
@@ -163,7 +186,32 @@ bool dictionary_equal(const Attributes& left, const Attributes& right) {
   return true;
 }
 
+bool set_kind(const EventAttribute& value) {
+  return value.container == AttributeContainerKind::kSet || value.container == AttributeContainerKind::kFrozenSet;
+}
+
 bool attribute_equal(const EventAttribute& left, const EventAttribute& right) {
+  if (set_kind(left) && left.is_null) {
+    auto null = left; null.container = AttributeContainerKind::kScalar; null.children.clear();
+    return attribute_equal(null, right);
+  }
+  if (set_kind(right) && right.is_null) {
+    auto null = right; null.container = AttributeContainerKind::kScalar; null.children.clear();
+    return attribute_equal(left, null);
+  }
+  if (set_kind(left) || set_kind(right)) {
+    if (!set_kind(left) || !set_kind(right)) return false;
+    const auto a = index_set_members(left), b = index_set_members(right);
+    if (a.ordered.size() != b.ordered.size()) return false;
+    for (const auto& [fingerprint, members] : a.buckets) {
+      const auto found = b.buckets.find(fingerprint);
+      if (found == b.buckets.end() || found->second.size() != members.size()) return false;
+      for (const auto* member : members)
+        if (std::none_of(found->second.begin(), found->second.end(),
+                         [&](const auto* other) { return attribute_equal(*member, *other); })) return false;
+    }
+    return true;
+  }
   if (left.container == AttributeContainerKind::kTuple && left.is_null) {
     auto null = left;
     null.container = AttributeContainerKind::kScalar;
@@ -248,6 +296,17 @@ std::string dictionary_fingerprint(const Attributes& values) {
 }
 
 std::string attribute_fingerprint(const EventAttribute& value) {
+  if (set_kind(value)) {
+    if (value.is_null) return scalar_fingerprint(value);
+    std::vector<std::string> members;
+    const auto indexed = index_set_members(value);
+    for (const auto& [fingerprint, bucket] : indexed.buckets)
+      for (std::size_t i = 0; i < bucket.size(); ++i) members.push_back(fingerprint);
+    std::sort(members.begin(), members.end());
+    std::string result = "E";
+    for (const auto& member : members) append_part(result, member);
+    return result;
+  }
   if (value.container == AttributeContainerKind::kTuple) {
     if (value.is_null) return scalar_fingerprint(value);
     std::string result = "T";
@@ -290,8 +349,13 @@ bool root_cause_traces_equal(const Trace& left, const Trace& right) {
   return true;
 }
 
+std::vector<const EventAttribute*> root_cause_set_members(const EventAttribute& value) {
+  return index_set_members(value).ordered;
+}
+
 bool root_cause_key_is_hashable(const EventAttribute& value) {
-  if (value.container == AttributeContainerKind::kTuple) {
+  if (set_kind(value) && value.is_null) return true;
+  if (value.container == AttributeContainerKind::kTuple || value.container == AttributeContainerKind::kFrozenSet) {
     if (value.is_null) return true;
     for (const auto& child : value.children)
       if (!root_cause_key_is_hashable(child)) return false;
@@ -307,7 +371,7 @@ bool root_cause_scalar_keys_equal(const EventAttribute& left, const EventAttribu
 }
 
 std::string root_cause_scalar_key_fingerprint(const EventAttribute& value) {
-  (void)root_cause_scalar_keys_equal(value, value);
+  if (!root_cause_key_is_hashable(value)) throw std::invalid_argument("root cause: unhashable activity key");
   return attribute_fingerprint(value);
 }
 
