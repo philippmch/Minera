@@ -3196,7 +3196,7 @@ Missing
 entire selected columns and eventless calendar inputs reject. Mutable categories
 reject instead of being converted to strings. Container-valued resource ordering,
 nested container factorization and ordering, explicit dataframe dtype handling,
-metric-column collisions, and timezone-sensitive calendar behavior still need
+metric-column collisions, and named-zone calendar behavior still need
 further behavioral alignment.
 Calendar cases group by typed selected identifiers across native trace boundaries.
 The omitted key selects projected trace identifiers (`case:concept:name`), while
@@ -3232,6 +3232,16 @@ completion cells reject. Missing completion values are ignored when finding case
 time bounds; each valid case must retain at least one completion. Null or missing
 starts exclude events from calendar buckets but preserve their contribution to
 whole-case timing. An entirely missing start column rejects.
+Calendar grouping preserves consistent fixed offsets in the selected start
+column: local day and period boundaries become absolute output instants, including
+empty grid rows. Completion timestamps may use a different consistent offset;
+case durations still use absolute elapsed time. Mixed offsets or mixed naive and
+aware dates within either selected column reject. Native date payloads remain
+authoritative over stale lexical metadata. Named timezone transitions are not
+represented by this fixed-offset contract.
+An independent public XES importer probe found that several pinned import
+variations strip nonzero offsets to UTC wall time. Native XES import currently
+normalizes the absolute instant instead; that adapter discrepancy remains open.
 Calendar metric destination options expose arrival, finish, service, waiting,
 sojourn, and per-event difference scratch columns, including empty names. Ordered
 virtual writes let selected category columns and shared metric destinations

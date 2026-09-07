@@ -790,6 +790,91 @@ static void default_trace_selection_validates_all_candidate_hashability() {
   assert((explicit_list.trace_rows == std::vector<std::vector<double>>{{0,1}, {1,0}}));
 }
 
+static void temporal_calendar_uses_selected_column_timezone() {
+  const auto check = [](const std::string& first, const std::string& last,
+                        const std::string& frequency, const std::vector<std::string>& labels,
+                        const std::vector<double>& counts) {
+    EventLog log;
+    log.traces = {Trace{"c", {Event{"c", "A", first, "r"}, Event{"c", "B", last, "r"}}}};
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = frequency;
+    const auto result = log_to_features(log, options);
+    assert(result.temporal_rows.size() == labels.size());
+    for (std::size_t i = 0; i < labels.size(); ++i) {
+      const auto& row = result.temporal_rows[i];
+      assert(row.timestamp == *parse_timestamp(labels[i]));
+      assert(row.values[2] == counts[i]);
+      if (counts[i] == 0)
+        assert(std::all_of(row.values.begin(), row.values.end(), [](const auto& value) { return value == 0; }));
+      else {
+        assert(row.values[5] == *parse_timestamp(last) - *parse_timestamp(first));
+        assert(row.values[6] == row.values[5] && row.values[7] == 0);
+      }
+    }
+  };
+  check("2024-01-02T00:30:00+02:00", "2024-01-02T02:30:00+0200", "D",
+      {"2024-01-02T00:00:00+02:00"}, {2});
+  check("2024-01-01T23:30:00-05:00", "2024-01-02T00:30:00-05:00", "D",
+      {"2024-01-01T00:00:00-05:00", "2024-01-02T00:00:00-05:00"}, {1,1});
+  check("2024-01-07T23:30:00-05:00", "2024-01-08T00:30:00-05:00", "W",
+      {"2024-01-07T00:00:00-05:00", "2024-01-14T00:00:00-05:00"}, {1,1});
+  check("2024-01-31T23:30:00-05:00", "2024-02-01T00:30:00-05:00", "ME",
+      {"2024-01-31T00:00:00-05:00", "2024-02-29T00:00:00-05:00"}, {1,1});
+  check("2024-02-15T00:30:00+05:30", "2024-08-20T00:30:00+05:30", "2ME",
+      {"2024-02-29T00:00:00+05:30", "2024-04-30T00:00:00+05:30",
+       "2024-06-30T00:00:00+05:30", "2024-08-31T00:00:00+05:30"}, {1,0,0,1});
+  check("2024-01-02T00:30:00Z", "2024-01-02T02:30:00+00:00", "D",
+      {"2024-01-02T00:00:00Z"}, {2});
+  check("1969-12-31T23:30:00-01:00", "1970-01-01T00:30:00-01:00", "D",
+      {"1969-12-31T00:00:00-01:00", "1970-01-01T00:00:00-01:00"}, {1,1});
+  check("1969-12-28T23:30:00-01:00", "1969-12-29T00:30:00-01:00", "W",
+      {"1969-12-28T00:00:00-01:00", "1970-01-04T00:00:00-01:00"}, {1,1});
+  check("1969-12-31T23:30:00-01:00", "1970-01-01T00:30:00-01:00", "ME",
+      {"1969-12-31T00:00:00-01:00", "1970-01-31T00:00:00-01:00"}, {1,1});
+
+  EventLog log;
+  log.traces = {Trace{"c", {Event{"c", "A", "2024-01-01T22:30:00Z", "r"},
+                            Event{"c", "B", "2024-01-01T23:30:00Z", "r"}}}};
+  for (std::size_t i = 0; i < 2; ++i) {
+    EventAttribute start{"local", "stale", AttributeKind::kString};
+    start.typed_value = NativeDate{i == 0 ? "2024-01-02T00:30:00+02:00" : "2024-01-02T01:30:00+02:00"};
+    log.traces[0].events[i].attributes.push_back(start);
+  }
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq = "D";
+  options.start_timestamp_key = "local";
+  auto result = log_to_features(log, options);
+  assert(result.temporal_rows.size() == 1);
+  assert(result.temporal_rows[0].timestamp == *parse_timestamp("2024-01-02T00:00:00+02:00"));
+  assert(result.temporal_rows[0].values[5] == 3600 && result.temporal_rows[0].values[6] == 3600);
+  assert(log.traces[0].events[0].attributes[0].value == "stale");
+  const auto rejects = [&] {
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  auto& selected = log.traces[0].events[1].attributes[0];
+  selected.typed_value = NativeDate{"2024-01-02T01:30:00+03:00"};
+  rejects();
+  selected.typed_value = NativeDate{"2024-01-02T01:30:00"};
+  rejects();
+  selected.first_class_state = FirstClassAttributeState::kNull;
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[2] == 1 && result.temporal_rows[0].values[5] == 3600);
+  selected.first_class_state = FirstClassAttributeState::kPresent;
+  selected.typed_value = NativeDate{"2024-01-02T01:30:00+02:00"};
+  log.traces[0].events[1].timestamp = "2024-01-02T01:30:00+02:00";
+  rejects();
+  log.traces[0].events[1].timestamp = "2024-01-01T23:30:00";
+  rejects();
+  options.grouper_freq.clear();
+  options.start_timestamp_key.clear();
+  assert(!log_to_features(log, options).temporal_rows.empty());
+}
+
 static void temporal_calendar_grid_uses_origin_and_fills_empty_periods() {
   const auto check = [](const std::string& first, const std::string& last,
                         const std::string& frequency, const std::vector<std::string>& labels,
@@ -2217,6 +2302,7 @@ int main() {
   temporal_calendar_rates_ignore_empty_traces();
   temporal_calendar_means_weight_distinct_cases_equally();
   temporal_calendar_metrics_use_completions_and_canonical_schema();
+  temporal_calendar_uses_selected_column_timezone();
   temporal_calendar_grid_uses_origin_and_fills_empty_periods();
   default_trace_selection_validates_all_candidate_hashability();
   default_trace_strings_have_fixed_cardinality_limit();
