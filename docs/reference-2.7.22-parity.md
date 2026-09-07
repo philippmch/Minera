@@ -336,10 +336,16 @@ scalar fields and child bindings. Top-level rebinding remains local to each
 context. `build_shared_root_cause_representation` reads current values;
 `materialize_root_cause_log` makes a detached snapshot for existing algorithms
 and serializers. Importing a value-owned `Event` into the shared graph is also
-a snapshot; callers retain shared contexts to observe mutations. Cyclic graphs
-cannot be materialized into tree-shaped native logs.
-The support module remains **partial** while cyclic-value behavior and the
-remaining runtime value boundaries are audited.
+a snapshot; callers retain shared contexts to observe mutations. Shared-context
+encoding traverses selected values directly: cyclic dictionaries and tuples use
+`{...}` and `(...)` markers, unselected cycles are ignored, and numeric nested
+values are rejected without recursive materialization. Cyclic graphs still
+cannot be flattened into tree-shaped native logs. The shared and ordinary
+encoders use the same matrix construction and balancing logic. Integer values
+outside float64 range raise overflow; equivalent numeric strings may yield
+infinity in the standalone matrix helper.
+The support module remains **partial** while bytes, set, frozenset, and remaining
+runtime value boundaries are audited.
 These contracts do not certify either replay variation.
 
 Token replay flat-input evidence: `normalize_token_replay_event_log` and the
