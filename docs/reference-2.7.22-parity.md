@@ -268,8 +268,16 @@ Independent examples are recorded in `docs/token-replay-root-cause-fixtures.json
 and exercised by the registered classifier, replay-cohort, and transport tests.
 Training uses float32 comparisons while exported matrices retain doubles;
 NaN values use learned missing routes and serialize as null. Missing-only cuts
-have an explicit flag so tree JSON stays finite. Equal-score cuts use a stable
-native feature/threshold ordering rather than the runtime's unseeded choice.
+have an explicit flag so tree JSON stays finite. Feature visitation is randomized
+per node using an independently seeded local generator, permitting different
+equally optimal feature choices. Threshold selection uses strict score
+improvement, visiting all missing-right cuts before missing-left cuts. Independent
+enumeration of all 62 nonconstant labelings of four finite values and two missing
+values verifies the root-cut contract. Empty unknown-activity baseline cases are
+skipped; explicitly supplied problem contexts can belong to empty cases.
+Feature and unknown-activity selectors resolve exact keys before provenance
+aliases, reject ambiguity only at the winning priority, and honor retained
+first-class missing/null states and custom keys before stale text projections.
 Recursive categorical values now preserve ordered scalar children, dictionary
 replacement order, list duplicates, typed scalar representations, and nested
 string escaping using Unicode 14 data. Date categories preserve microseconds
@@ -282,7 +290,7 @@ unsupported elements remain separate from direct helper behavior.
 Standard XES trace and event `concept:name` provenance no longer collide in
 log-skeleton and DECLARE event selection, allowing nested-XES diagnostics to traverse the
 normal analysis pipeline while genuine event-field ambiguity still fails.
-The support module remains **partial** while unseeded tree-choice equivalence
+The support module remains **partial** while trace-map value-equality membership
 and remaining context/input boundaries are audited. Adding these encoding
 contracts does not certify either replay variation.
 

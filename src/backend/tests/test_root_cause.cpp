@@ -87,12 +87,13 @@ void test_encoding() {
   assert((model->feature_names == std::vector<std::string>{"event:group@a", "event:group@b"}));
   assert((model->data[0] == std::vector<double>{1, 0}));
   assert((model->data[2] == std::vector<double>{0, 1}));
-  // Either one-hot column yields the same optimal Gini split. Determinism
-  // chooses the first column and both children are pure.
-  assert(model->tree[0].feature_index == 0);
+  // Either one-hot column yields the same optimal Gini split.
+  assert(model->tree[0].feature_index == 0 || model->tree[0].feature_index == 1);
   assert(model->tree[0].threshold == 0.5);
-  assert(model->tree[model->tree[0].left].class_counts[0] == 0);
-  assert(model->tree[model->tree[0].right].class_counts[1] == 0);
+  for (const int child : {model->tree[0].left, model->tree[0].right})
+    assert(model->tree[child].class_counts[0] == 0 || model->tree[child].class_counts[1] == 0);
+  for (std::size_t row = 0; row < model->data.size(); ++row)
+    assert(predict(*model, model->data[row]) == model->target[row]);
 
   auto absent = RootCauseObservation{};
   auto null = categorical("");
@@ -125,6 +126,72 @@ void test_encoding() {
   projected.context.resource_source_key = "performer";
   const auto custom = fit_root_cause_model({projected}, {absent}, {{"performer"}, {}});
   assert((custom->feature_names == std::vector<std::string>{"event:performer@UNDEFINED", "event:performer@alice"}));
+}
+
+void test_equivalent_feature_choices() {
+  std::array<bool, 2> seen{};
+  for (int trial = 0; trial < 256; ++trial) {
+    const auto model = fit_root_cause_model({categorical("a"), categorical("a")},
+                                          {categorical("b"), categorical("b")}, {{"group"}, {}});
+    assert((model->data == std::vector<std::vector<double>>{{1, 0}, {1, 0}, {0, 1}, {0, 1}}));
+    assert((model->target == std::vector<int>{0, 0, 1, 1}));
+    const auto& root = model->tree.front();
+    assert(root.feature_index == 0 || root.feature_index == 1);
+    seen[static_cast<std::size_t>(root.feature_index)] = true;
+    assert(root.threshold == 0.5 && model->tree.size() == 3);
+    for (const int child : {root.left, root.right})
+      assert(model->tree[child].class_counts[0] == 0 || model->tree[child].class_counts[1] == 0);
+    for (std::size_t row = 0; row < model->data.size(); ++row)
+      assert(predict(*model, model->data[row]) == model->target[row]);
+  }
+  // Independent entropy-seeded fits exercise both equally optimal columns;
+  // the chance of 256 fair choices all taking one column is 2^-255.
+  assert(seen[0] && seen[1]);
+}
+
+void test_missing_route_order() {
+  const RootCauseOptions options{{}, {"cost"}};
+  const auto nan = numeric(std::numeric_limits<double>::quiet_NaN());
+  const auto ordinary = fit_root_cause_model({numeric(0), numeric(3), nan},
+                                            {numeric(1), numeric(2)}, options);
+  assert(ordinary->tree[0].threshold == 2.5 && !ordinary->tree[0].missing_go_to_left);
+  const auto missing = fit_root_cause_model({numeric(0), numeric(2), numeric(3)},
+                                           {numeric(1), nan, nan}, options);
+  assert(missing->tree[0].missing_only && !missing->tree[0].missing_go_to_left);
+
+  // Exhaust every nonconstant labeling. Compute candidate partitions afresh,
+  // independently of the trainer's incremental sorted-count scan.
+  for (unsigned mask = 1; mask < 63; ++mask) {
+    std::vector<RootCauseObservation> fit, problem;
+    for (unsigned row = 0; row < 6; ++row)
+      (mask & (1U << row) ? problem : fit).push_back(row < 4 ? numeric(row) : nan);
+    double best_score = -1, expected_threshold = 0;
+    bool expected_missing_left = false;
+    for (const bool missing_left : {false, true}) {
+      for (const double threshold : {0.5, 1.5, 2.5, std::numeric_limits<double>::infinity()}) {
+        if (missing_left && std::isinf(threshold)) continue;
+        std::array<std::array<double, 2>, 2> counts{};
+        for (unsigned row = 0; row < 6; ++row) {
+          const bool left = row < 4 ? row <= threshold : missing_left;
+          ++counts[left ? 0 : 1][mask & (1U << row) ? 1 : 0];
+        }
+        if (counts[0][0] + counts[0][1] == 0 || counts[1][0] + counts[1][1] == 0) continue;
+        double score = 0;
+        for (const auto& side : counts) score += (side[0] * side[0] + side[1] * side[1]) / (side[0] + side[1]);
+        if (score > best_score) {
+          best_score = score;
+          expected_threshold = threshold;
+          expected_missing_left = missing_left;
+        }
+      }
+    }
+    const auto model = fit_root_cause_model(fit, problem, options);
+    const auto& root = model->tree.front();
+    assert(root.feature_index == 0);
+    assert(root.missing_go_to_left == expected_missing_left);
+    assert(root.missing_only == std::isinf(expected_threshold));
+    assert(root.threshold == (root.missing_only ? 0 : expected_threshold));
+  }
 }
 
 void test_balancing() {
@@ -236,6 +303,42 @@ void test_first_class_encoding() {
   rejects([&] { (void)fit_root_cause_model({missing_numeric}, {numeric(8)}, {{}, {"cost"}}); });
   missing_numeric.context.attributes[0].first_class_state = minera::FirstClassAttributeState::kNull;
   rejects([&] { (void)fit_root_cause_model({missing_numeric}, {numeric(8)}, {{}, {"cost"}}); });
+
+  RootCauseObservation metadata;
+  metadata.context.resource_state = minera::FirstClassAttributeState::kPresent;
+  metadata.context.resource_attribute = minera::EventAttribute{"stored_worker", "alice"};
+  metadata.context.resource_attribute->first_class_source_key = "source_worker";
+  category(metadata, "stored_worker", "alice");
+  category(metadata, "source_worker", "alice");
+  metadata.context.resource_attribute->value = "2.5";
+  for (const auto* key : {"stored_worker", "source_worker"}) {
+    const auto model = fit_root_cause_model({metadata}, {metadata}, {{}, {key}});
+    assert(model->data[0][0] == 2.5);
+  }
+  metadata.context.resource_state = minera::FirstClassAttributeState::kMissing;
+  category(metadata, "stored_worker", "UNDEFINED");
+  metadata.context.resource_state = minera::FirstClassAttributeState::kNull;
+  category(metadata, "source_worker", "None");
+
+  RootCauseObservation ambiguous;
+  minera::EventAttribute first{"first", "1"}, second{"second", "2"};
+  first.first_class_source_key = second.first_class_source_key = "shared";
+  ambiguous.context.attributes = {first, second};
+  for (const bool numeric_selector : {false, true}) {
+    const RootCauseOptions selected = numeric_selector ? RootCauseOptions{{}, {"shared"}}
+                                                       : RootCauseOptions{{"shared"}, {}};
+    rejects([&] { (void)fit_root_cause_model({ambiguous}, {ambiguous}, selected); });
+  }
+  // A unique exact key supersedes every provenance match, in either order.
+  ambiguous.context.attributes.push_back({"shared", "3"});
+  for (int ordering = 0; ordering < 2; ++ordering) {
+    category(ambiguous, "shared", "3");
+    assert(fit_root_cause_model({ambiguous}, {ambiguous}, {{}, {"shared"}})->data[0][0] == 3);
+    std::reverse(ambiguous.context.attributes.begin(), ambiguous.context.attributes.end());
+  }
+  ambiguous.context.attributes.push_back({"shared", "4"});
+  rejects([&] { (void)fit_root_cause_model({ambiguous}, {ambiguous}, {{"shared"}, {}}); });
+  rejects([&] { (void)fit_root_cause_model({ambiguous}, {ambiguous}, {{}, {"shared"}}); });
 }
 
 void test_extended_categories() {
@@ -370,6 +473,8 @@ void test_depth_and_interactions() {
 int main() {
   test_numeric_tree();
   test_encoding();
+  test_equivalent_feature_choices();
+  test_missing_route_order();
   test_balancing();
   test_missing_and_errors();
   test_numeric_string_syntax();

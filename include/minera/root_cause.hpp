@@ -47,8 +47,10 @@ struct RootCauseModel {
 // Explicitly selected event attributes form a numeric/one-hot matrix. The
 // exposed matrix preserves double precision; CART uses float32 values, Gini
 // impurity, a float32 separation tolerance of 1e-7, and a maximum depth of
-// seven. Equally optimal cuts prefer the
-// first requested feature, then the lowest threshold, deterministically.
+// seven. A locally entropy-seeded engine shuffles feature visits at each
+// node, so equally optimal feature choices can vary between fits. Within a
+// feature, missing-right routes precede missing-left routes, and ascending
+// thresholds break equal-score ties within each route.
 // One-sided cohorts return no model. Invalid selected values throw
 // std::invalid_argument. Row order is fit, then problem; balancing repeats
 // the entire smaller cohort floor(larger/smaller) times.

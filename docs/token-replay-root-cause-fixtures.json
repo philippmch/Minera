@@ -1,6 +1,6 @@
 {
   "target": {"tag": "2.7.22", "commit": "0715c31f3f1d85924107d6aa5329806db69df899"},
-  "method": "Independent headless calls to the pinned runtime, without reading implementation source. Classifier dependency for these calls: 1.9.0. Equal-score tree cuts are unseeded; native trees canonicalize such ties.",
+  "method": "Independent headless calls to the pinned runtime, without reading implementation source. Classifier dependency for these calls: 1.9.0. Equal-score feature choices are unseeded; native training uses an independently seeded local feature permutation.",
   "cohort_contracts": {
     "transition_order": "source log order, fitting class then underfed class",
     "overlap": "problem membership overrides fitting membership",
@@ -8,6 +8,8 @@
     "unknown_baseline": "excludes every supplied unknown label, including labels with empty cohorts; uses raw final event",
     "unknown_problem": "uses supplied context",
     "empty_class": "omit model before encoding",
+    "empty_unknown_baseline": "skip empty cases; omit model if no nonempty baseline remains; explicitly supplied problem contexts may belong to empty cases",
+    "value_equal_trace_membership": {"source_traces": [{"case": "same", "events": [["A", 1]]}, {"case": "same", "events": [["A", 1]]}, {"case": "bad", "events": [["B", 8]]}], "fit_entry_source_indices": [0], "problem_entry_source_indices": [2], "reference_data": [[1], [1], [8]], "reference_target": [0, 0, 1], "native_index_cohort_gap": "only source index zero currently enters fit cohort"},
     "enable_multiplier_default": false,
     "multiplier_example": {"fit": [1, 2], "problem": [7, 8, 9, 10, 11], "balanced_fit": [1, 2, 1, 2]}
   },
@@ -37,7 +39,9 @@
   "tree": {
     "criterion": "gini", "max_depth": 7, "min_samples_split": 2, "min_samples_leaf": 1,
     "training_precision": "float32; matrix retains doubles",
-    "unseeded_tie_observation": {"trials": 128, "equivalent_one_hot_root_feature_counts": {"0": 73, "1": 55}, "native_current_behavior": "always first requested feature; stochastic parity remains open"},
+    "unseeded_tie_observation": {"trials": 128, "equivalent_one_hot_root_feature_counts": {"0": 73, "1": 55}, "native_current_behavior": "feature order is randomized per node; matrices and cohort order remain stable"},
+    "missing_route_search": {"finite_values": [0, 1, 2, 3], "missing_values": 2, "nonconstant_binary_labelings_checked": 62, "mismatches": 0, "selection": "strict score improvement; all ascending missing-right cuts including missing-only before ascending missing-left cuts"},
+    "missing_route_tie_example": {"values": [0, 1, 2, 3, "NaN"], "target": [0, 1, 1, 0, 0], "threshold": 2.5, "missing_go_to_left": false},
     "no_split_differences": [1e-8, 1e-7],
     "split_example": {"fit": [0], "problem": [2e-7], "threshold": 1.0000000116860974e-7},
     "missing_only_example": {"fit": [1, 1], "problem": ["NaN", "NaN"], "finite_side": "left", "missing_side": "right", "native_encoding": "missing_only=true, threshold=0"}
@@ -58,7 +62,7 @@
     "importer_boundary": "The default pinned XES importer omits container elements and replaces parsed date offsets with UTC without adjusting wall time. Direct helper datetime inputs preserve supplied offsets; native import normalization remains a separate contract."
   },
   "remaining_contracts": [
-    "Unseeded equally optimal tree choices use native deterministic canonicalization.",
+    "Reference trace-map membership also matches distinct value-equal trace objects; native explicit source-index cohorts require further compatibility reconciliation.",
     "Legacy backwards replay diagnostic context production is a native extension."
   ]
 }
