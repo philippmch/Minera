@@ -50,7 +50,7 @@ struct LogToFeaturesOptions {
   bool enable_succ_def_representation = true;
 
   // Trace-level extra feature families.  enable_all_extra_features enables
-  // all of these switches while preserving explicit feature_names ordering.
+  // each omitted numeric family; explicit false overrides suppress a family.
   bool enable_all_extra_features = false;
   bool enable_case_duration = false;
   bool add_case_identifier_column = false;
@@ -80,6 +80,17 @@ struct LogToFeaturesOptions {
   bool case_string_attributes_supplied = false;
   bool case_numeric_attributes_supplied = false;
   bool event_successor_attributes_supplied = false;
+  // Individual extra-feature overrides distinguish omitted from explicit false.
+  bool enable_case_duration_supplied = false;
+  bool enable_times_from_first_occurrence_supplied = false;
+  bool enable_times_from_last_occurrence_supplied = false;
+  bool enable_direct_paths_times_last_occ_supplied = false;
+  bool enable_indirect_paths_times_last_occ_supplied = false;
+  bool enable_work_in_progress_supplied = false;
+  bool enable_resource_workload_supplied = false;
+  bool enable_first_last_activity_index_supplied = false;
+  bool enable_max_concurrent_events_supplied = false;
+  bool enable_max_concurrent_events_per_activity_supplied = false;
 };
 
 struct TemporalFeatureRow {

@@ -1865,6 +1865,13 @@ describe("log-to-features API", () => {
       .toBe("features_event_attributes=a%5C%2Cb%2Cx&features_variant=event_based");
   });
 
+  it("preserves explicit false extra overrides and ignored trace cardinality bounds", () => {
+    expect(logToFeaturesQuery({ features_enable_all_extra_features: true,
+      features_enable_case_duration: false, features_enable_resource_workload: false,
+      features_min_num_different_string_values: 3, features_max_num_different_string_values: 2 }))
+      .toBe("features_enable_all_extra_features=true&features_enable_case_duration=false&features_enable_resource_workload=false&features_max_num_different_string_values=2&features_min_num_different_string_values=3");
+  });
+
   it("serializes trace representation and extra feature controls", () => {
     expect(logToFeaturesQuery({
       features_enable_all_extra_features: true,
@@ -1875,7 +1882,7 @@ describe("log-to-features API", () => {
       features_max_num_different_string_values: 8,
     })).toBe("features_enable_all_extra_features=true&features_epsilon=0.25&features_event_successor_attributes=concept%3Aname&features_grouper_freq=W-MON&features_max_num_different_string_values=8&features_min_num_different_string_values=1");
     expect(() => logToFeaturesQuery({ features_epsilon: -1 })).toThrow(/epsilon/);
-    expect(() => logToFeaturesQuery({ features_min_num_different_string_values: 3, features_max_num_different_string_values: 2 })).toThrow(/bounds/);
+    expect(() => logToFeaturesQuery({ features_variant: "event_based", features_min_num_different_string_values: 3, features_max_num_different_string_values: 2 })).toThrow(/bounds/);
   });
 
   it("rejects malformed backend payloads", async () => {

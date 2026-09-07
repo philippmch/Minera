@@ -4215,6 +4215,17 @@ void log_to_features_params_contract() {
   assert(trace_empty.case_numeric_attributes_supplied && trace_empty.case_numeric_attributes.empty());
   assert(trace_empty.event_successor_attributes_supplied && trace_empty.event_successor_attributes.empty());
   assert(trace_empty.feature_names_supplied && trace_empty.feature_names.empty());
+  const auto extra_overrides = minera::parse_log_to_features_params(fields({
+      {"features_enable_all_extra_features", "true"},
+      {"features_enable_case_duration", "false"},
+      {"feature_enable_resource_workload", "false"},
+      {"features_min_num_different_string_values", "3"},
+      {"features_max_num_different_string_values", "2"}}));
+  assert(extra_overrides.enable_all_extra_features);
+  assert(extra_overrides.enable_case_duration_supplied && !extra_overrides.enable_case_duration);
+  assert(extra_overrides.enable_resource_workload_supplied && !extra_overrides.enable_resource_workload);
+  assert(!extra_overrides.enable_work_in_progress_supplied);
+
   const auto no_presence = minera::parse_log_to_features_params(lookup);
   assert(!no_presence.event_string_attributes_supplied && !no_presence.event_numeric_attributes_supplied && !no_presence.feature_names_supplied);
   const auto omitted = minera::parse_log_to_features_params(fields({{"features_variant", "event_based"}}));
@@ -4258,7 +4269,7 @@ void log_to_features_params_contract() {
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
   threw = false;
-  try { (void)minera::parse_log_to_features_params(fields({{"features_min_num_different_string_values", "3"}, {"features_max_num_different_string_values", "2"}})); }
+  try { (void)minera::parse_log_to_features_params(fields({{"features_variant", "event_based"}, {"features_min_num_different_string_values", "3"}, {"features_max_num_different_string_values", "2"}})); }
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
 }
