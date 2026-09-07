@@ -1052,6 +1052,50 @@ LogToFeaturesResult log_to_features(const EventLog& log,
                 parse_temporal_frequency(options.grouper_freq));
   std::vector<TimedEvent> events;
   double origin = std::numeric_limits<double>::infinity();
+  struct TypedCategories {
+    std::vector<EventAttribute> values;
+    std::unordered_map<std::string, std::vector<std::size_t>> buckets;
+    std::string insert(const EventAttribute& value) {
+      auto normalized = value;
+      const auto normalize_null = [](auto&& self, EventAttribute& cell) -> void {
+        if (absent_attribute(cell)) {
+          cell.is_null = true;
+          cell.container = AttributeContainerKind::kScalar;
+          cell.children.clear();
+          cell.typed_value = std::monostate{};
+        } else {
+          for (auto& child : cell.children) self(self, child);
+        }
+      };
+      normalize_null(normalize_null, normalized);
+      if (!root_cause_key_is_hashable(normalized))
+        throw std::invalid_argument("log_to_features: unhashable temporal category");
+      auto& candidates = buckets[root_cause_scalar_key_fingerprint(normalized)];
+      for (const auto candidate : candidates)
+        if (root_cause_scalar_keys_equal(values[candidate], normalized))
+          return std::to_string(candidate);
+      const auto index = values.size();
+      values.push_back(std::move(normalized));
+      candidates.push_back(index);
+      return std::to_string(index);
+    }
+  } activity_categories, resource_categories;
+  struct EventCategories {
+    std::optional<std::string> activity;
+    std::optional<std::string> resource;
+  };
+  std::unordered_map<const Event*, EventCategories> temporal_categories;
+  bool have_activity_column = false;
+  bool have_resource_column = false;
+  const auto missing_category = [](const EventAttribute& value) {
+    if (absent_attribute(value)) return true;
+    if (value.container != AttributeContainerKind::kScalar || !value.children.empty() ||
+        value.kind == AttributeKind::kBytes) return false;
+    if (const auto* number = std::get_if<double>(&value.typed_value)) return std::isnan(*number);
+    return value.kind == AttributeKind::kFloat &&
+        std::holds_alternative<std::monostate>(value.typed_value) &&
+        std::isnan(native_attribute_number(value));
+  };
   struct CaseTemporal {
     double start = std::numeric_limits<double>::infinity();
     double finish = -std::numeric_limits<double>::infinity();
@@ -1065,6 +1109,17 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     auto& metrics = cases[ti];
     for (std::size_t i = 0; i < log.traces[ti].events.size(); ++i) {
       const auto& event = log.traces[ti].events[i];
+      if (temporal_frequency) {
+        auto& categories = temporal_categories[&event];
+        if (const auto activity = native_event_attribute(event, options.activity_key)) {
+          have_activity_column = true;
+          if (!missing_category(*activity)) categories.activity = activity_categories.insert(*activity);
+        }
+        if (const auto resource = native_event_attribute(event, options.resource_key)) {
+          have_resource_column = true;
+          if (!missing_category(*resource)) categories.resource = resource_categories.insert(*resource);
+        }
+      }
       const double finish = instant(event, options.timestamp_key, true);
       const double start = options.start_timestamp_key.empty()
                                ? finish
@@ -1082,6 +1137,8 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       if (!resource.empty()) metrics.resources.insert(resource);
     }
   }
+  if (temporal_frequency && (!have_activity_column || !have_resource_column))
+    throw std::invalid_argument("log_to_features: temporal activity and resource columns are required");
   out.feature_names = options.feature_names;
   if (temporal_frequency || out.feature_names.empty()) {
     out.feature_names = {
@@ -1162,12 +1219,20 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     for (const auto* event : bucket_events) {
       trace_ids.insert(event->trace);
       by_trace[event->trace].push_back(event);
-      activities.insert(value_for(*event->event, options.activity_key));
-      const auto resource = value_for(*event->event, options.resource_key);
-      if (!resource.empty()) {
-        resources.insert(resource);
-        cases_by_resource[resource].insert(event->trace);
-        resources_by_trace[event->trace].insert(resource);
+      std::optional<std::string> resource;
+      if (temporal_frequency) {
+        const auto& categories = temporal_categories.at(event->event);
+        if (categories.activity) activities.insert(*categories.activity);
+        resource = categories.resource;
+      } else {
+        activities.insert(value_for(*event->event, options.activity_key));
+        const auto value = value_for(*event->event, options.resource_key);
+        if (!value.empty()) resource = value;
+      }
+      if (resource) {
+        resources.insert(*resource);
+        cases_by_resource[*resource].insert(event->trace);
+        resources_by_trace[event->trace].insert(*resource);
       }
     }
     double average_arrival = 0.0, average_finish = 0.0;
@@ -1194,8 +1259,12 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     double resources_per_case = 0.0;
     for (const auto& [trace_id, trace_events] : by_trace) {
       std::set<std::string> trace_activities;
-      for (const auto* event : trace_events)
-        trace_activities.insert(value_for(*event->event, options.activity_key));
+      for (const auto* event : trace_events) {
+        if (temporal_frequency) {
+          const auto& activity = temporal_categories.at(event->event).activity;
+          if (activity) trace_activities.insert(*activity);
+        } else trace_activities.insert(value_for(*event->event, options.activity_key));
+      }
       reworked += static_cast<double>(trace_events.size() - trace_activities.size());
       events_per_case += static_cast<double>(trace_events.size());
       resources_per_case += static_cast<double>(resources_by_trace[trace_id].size());

@@ -3187,9 +3187,16 @@ configured start timestamps control grouping only, default service time is zero,
 and waiting time equals sojourn time. Means use distinct cases rather than event
 weights. Calendar output always uses the canonical thirteen columns, ignoring
 custom feature schemas and ordinary attribute selectors. Fixed-width projections
-retain their explicit schema and interval metrics. Typed/missing resource values,
-empty-only logs, duplicate case identifiers, metric-column collisions, and timezone-sensitive
-calendar behavior still need further behavioral alignment.
+retain their explicit schema and interval metrics. Calendar activity and resource
+categories preserve typed equality, including numeric/bool collisions, distinct
+strings, bytes, and ordinary immutable containers. Empty strings count; null, NaN,
+and missing values are excluded from category sets. Rework still counts every event, including events
+with absent activities, and resource means include cases without resources. Missing
+entire selected columns and eventless calendar inputs reject. Mutable categories
+reject instead of being converted to strings. Heterogeneous resource ordering,
+nested container factorization, duplicate case identifiers,
+metric-column collisions, and timezone-sensitive calendar behavior still need
+further behavioral alignment.
 The feature variations remain partial, including inference and extra-feature
 contracts that have not received complete behavioral coverage.
 
