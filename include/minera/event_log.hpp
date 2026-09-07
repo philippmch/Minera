@@ -1,11 +1,14 @@
 #pragma once
 
 #include <cstddef>
+#include <atomic>
 #include <cstdint>
 #include <cmath>
 #include <optional>
+#include <initializer_list>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -45,8 +48,73 @@ struct NativeDate {
   bool operator==(const NativeDate&) const = default;
 };
 
-using NativeAttributeValue =
-    std::variant<std::monostate, std::int64_t, double, bool, NativeDate>;
+// Scalar identity follows copies independently of value equality. This is
+// needed for alias-sensitive NaN comparisons without sharing heap storage.
+// Replace scalars through assignment or emplace to renew that identity.
+// Mutating a held value through get/get_if/visit or a Base reference cannot
+// renew identity and therefore does not preserve replacement alias semantics.
+class NativeAttributeValue
+    : public std::variant<std::monostate, std::int64_t, double, bool, NativeDate> {
+ public:
+  using Base = std::variant<std::monostate, std::int64_t, double, bool, NativeDate>;
+  using Base::Base;
+
+  NativeAttributeValue() = default;
+  NativeAttributeValue(const NativeAttributeValue&) = default;
+  NativeAttributeValue(NativeAttributeValue&&) noexcept = default;
+  NativeAttributeValue& operator=(const NativeAttributeValue&) = default;
+  NativeAttributeValue& operator=(NativeAttributeValue&&) noexcept = default;
+
+  template <class T>
+    requires (!std::is_same_v<std::remove_cvref_t<T>, NativeAttributeValue> &&
+              std::is_assignable_v<Base&, T&&>)
+  NativeAttributeValue& operator=(T&& value) {
+    scalar_identity_ = next_identity();
+    Base::operator=(std::forward<T>(value));
+    return *this;
+  }
+
+  template <class T, class... Args>
+  decltype(auto) emplace(Args&&... args) {
+    scalar_identity_ = next_identity();
+    return Base::template emplace<T>(std::forward<Args>(args)...);
+  }
+  template <std::size_t Index, class... Args>
+  decltype(auto) emplace(Args&&... args) {
+    scalar_identity_ = next_identity();
+    return Base::template emplace<Index>(std::forward<Args>(args)...);
+  }
+  template <class T, class U, class... Args>
+  decltype(auto) emplace(std::initializer_list<U> values, Args&&... args) {
+    scalar_identity_ = next_identity();
+    return Base::template emplace<T>(values, std::forward<Args>(args)...);
+  }
+  template <std::size_t Index, class U, class... Args>
+  decltype(auto) emplace(std::initializer_list<U> values, Args&&... args) {
+    scalar_identity_ = next_identity();
+    return Base::template emplace<Index>(values, std::forward<Args>(args)...);
+  }
+
+  void swap(NativeAttributeValue& other) noexcept(noexcept(std::declval<Base&>().swap(std::declval<Base&>()))) {
+    Base::swap(other);
+    std::swap(scalar_identity_, other.scalar_identity_);
+  }
+  friend void swap(NativeAttributeValue& left, NativeAttributeValue& right) noexcept(noexcept(left.swap(right))) {
+    left.swap(right);
+  }
+  [[nodiscard]] std::uint64_t scalar_identity() const noexcept { return scalar_identity_; }
+
+  friend bool operator==(const NativeAttributeValue& left, const NativeAttributeValue& right) {
+    return static_cast<const Base&>(left) == static_cast<const Base&>(right);
+  }
+
+ private:
+  static std::uint64_t next_identity() noexcept {
+    static std::atomic<std::uint64_t> sequence{1};
+    return sequence.fetch_add(1, std::memory_order_relaxed);
+  }
+  std::uint64_t scalar_identity_ = next_identity();
+};
 
 // One generic event attribute beyond the four first-class fields: any extra
 // CSV column, or any XES event attribute other than the activity, timestamp,
@@ -378,3 +446,13 @@ inline void copy_event_log_context(const EventLog& source, EventLog& target) {
 }
 
 }  // namespace minera
+
+namespace std {
+template <>
+struct variant_size<minera::NativeAttributeValue>
+    : variant_size<minera::NativeAttributeValue::Base> {};
+
+template <size_t Index>
+struct variant_alternative<Index, minera::NativeAttributeValue>
+    : variant_alternative<Index, minera::NativeAttributeValue::Base> {};
+}  // namespace std

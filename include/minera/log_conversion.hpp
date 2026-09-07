@@ -38,8 +38,8 @@ struct LogConversionOptions {
   // the limit raises std::length_error instead of silently truncating input.
   std::optional<std::size_t> max_rows_to_materialize;
   // These options are accepted for adapters whose implementation can expose
-  // identity or compression details.  Native value objects have no observable
-  // aliasing/compression state, so they do not change conversion results.
+  // identity or compression details. Native copies retain immutable scalar
+  // identity in either mode; these flags do not change conversion results.
   bool deep_copy = true;
   bool compress = false;
   bool lazy_output = false;
