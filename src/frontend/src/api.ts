@@ -5397,6 +5397,12 @@ export interface LogToFeaturesOptions {
   features_timestamp_key?: string;
   features_start_timestamp_key?: string;
   features_resource_key?: string;
+  features_arrival_rate?: string;
+  features_finish_rate?: string;
+  features_service_time?: string;
+  features_waiting_time?: string;
+  features_sojourn_time?: string;
+  features_diff_start_end?: string;
   features_grouper_freq?: string;
   features_window_seconds?: number;
   features_default_not_present?: number;

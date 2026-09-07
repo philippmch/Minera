@@ -1100,7 +1100,11 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   bool have_resource_column = false;
   bool have_case_column = false;
   const auto temporal_case_key = options.case_id_key.value_or("case:concept:name");
+  std::unordered_map<const Event*, std::unordered_map<std::string, EventAttribute>> virtual_columns;
   const auto projected_column_value = [&](const Trace& trace, const Event& event, const std::string& key) {
+    if (const auto row = virtual_columns.find(&event); row != virtual_columns.end())
+      if (const auto value = row->second.find(key); value != row->second.end())
+        return std::optional<EventAttribute>{value->second};
     if (key.starts_with("case:")) {
       const auto trace_key = key.substr(5);
       const bool projected_identifier = trace_key == "concept:name" ||
@@ -1181,12 +1185,12 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     }
     return numeric && floating && !(unsigned_integer && negative_integer);
   };
-  const bool promote_activities = temporal_frequency && promote_numeric_column([&](const Trace& trace, const Event& event) {
+  const auto activity_value = [&](const Trace& trace, const Event& event) {
     return projected_column_value(trace, event, options.activity_key);
-  });
-  const bool promote_resources = temporal_frequency && promote_numeric_column([&](const Trace& trace, const Event& event) {
+  };
+  const auto resource_value = [&](const Trace& trace, const Event& event) {
     return projected_column_value(trace, event, options.resource_key);
-  });
+  };
   const bool promote_cases = temporal_frequency && promote_numeric_column(case_value);
   const auto promoted_value = [](EventAttribute value, bool promote) {
     if (promote) {
@@ -1208,21 +1212,14 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     std::set<std::string> resources;
   };
   const auto no_case = std::numeric_limits<std::size_t>::max();
+  std::unordered_map<const Event*, const Trace*> event_traces;
   std::vector<CaseTemporal> cases(temporal_frequency ? 0 : log.traces.size());
   for (std::size_t ti = 0; ti < log.traces.size(); ++ti) {
     for (std::size_t i = 0; i < log.traces[ti].events.size(); ++i) {
       const auto& event = log.traces[ti].events[i];
+      event_traces[&event] = &log.traces[ti];
       std::size_t case_index = ti;
       if (temporal_frequency) {
-        auto& categories = temporal_categories[&event];
-        if (const auto activity = projected_column_value(log.traces[ti], event, options.activity_key)) {
-          have_activity_column = true;
-          if (!missing_category(*activity)) categories.activity = std::to_string(activity_categories.insert(promoted_value(*activity, promote_activities)));
-        }
-        if (const auto resource = projected_column_value(log.traces[ti], event, options.resource_key)) {
-          have_resource_column = true;
-          if (!missing_category(*resource)) categories.resource = std::to_string(resource_categories.insert(promoted_value(*resource, promote_resources)));
-        }
         const auto identifier = case_value(log.traces[ti], event);
         case_index = no_case;
         if (identifier) {
@@ -1258,8 +1255,6 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       if (!resource.empty()) metrics.resources.insert(resource);
     }
   }
-  if (temporal_frequency && (!have_activity_column || !have_resource_column))
-    throw std::invalid_argument("log_to_features: temporal activity and resource columns are required");
   if (temporal_frequency && (!have_case_column || cases.empty()))
     throw std::invalid_argument("log_to_features: temporal case identifiers are required");
   if (temporal_frequency)
@@ -1312,6 +1307,115 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     arrival_rate[arrival_order[i]] = cases[arrival_order[i]].start - cases[arrival_order[i - 1]].start;
   for (std::size_t i = 1; i < finish_order.size(); ++i)
     finish_rate[finish_order[i]] = cases[finish_order[i]].finish - cases[finish_order[i - 1]].finish;
+  const auto scratch_number = [&](const Event& event, const std::string& key) {
+    const auto value = projected_column_value(*event_traces.at(&event), event, key);
+    if (!value || missing_category(*value)) return std::numeric_limits<double>::quiet_NaN();
+    return native_attribute_number(*value);
+  };
+  if (temporal_frequency) {
+    for (const auto* destination : {&options.arrival_rate, &options.finish_rate,
+                                    &options.service_time, &options.sojourn_time,
+                                    &options.waiting_time})
+      if (*destination == temporal_case_key)
+        throw std::invalid_argument("log_to_features: temporal metric destination replaces the case column");
+    const auto write_column = [&](const std::string& key, const std::vector<double>& values) {
+      for (std::size_t i = 0; i < events.size(); ++i) {
+        EventAttribute value{key, "", AttributeKind::kFloat};
+        value.typed_value = values[i];
+        virtual_columns[events[i].event][key] = std::move(value);
+      }
+    };
+    const auto locate_case = [&](const Event& event) {
+      const auto identifier = case_value(*event_traces.at(&event), event);
+      if (!identifier || missing_category(*identifier)) return no_case;
+      const auto previous_size = case_categories.values.size();
+      const auto group = case_categories.insert(promoted_value(*identifier, promote_cases));
+      if (group >= previous_size)
+        throw std::invalid_argument("log_to_features: derived column changed a temporal case identifier");
+      return group;
+    };
+    const auto write_case_column = [&](const std::string& key, const std::vector<double>& values) {
+      std::vector<double> event_values;
+      event_values.reserve(events.size());
+      for (const auto& event : events) {
+        const auto group = locate_case(*event.event);
+        event_values.push_back(group == no_case ? std::numeric_limits<double>::quiet_NaN() : values.at(group));
+      }
+      write_column(key, event_values);
+    };
+    write_case_column(options.arrival_rate, arrival_rate);
+    write_case_column(options.finish_rate, finish_rate);
+    std::vector<double> differences;
+    differences.reserve(events.size());
+    for (const auto& event : events) {
+      const auto finish = calendar_instant(*event_traces.at(event.event), *event.event, options.timestamp_key, false);
+      differences.push_back(finish - finish);
+    }
+    write_column(options.diff_start_end, differences);
+
+    // Grouping observes the diff destination before the case-level writes.
+    case_categories = {};
+    cases.clear();
+    for (auto& event : events) {
+      const auto& trace = *event_traces.at(event.event);
+      const auto identifier = case_value(trace, *event.event);
+      event.trace = no_case;
+      if (!identifier || missing_category(*identifier)) continue;
+      event.trace = case_categories.insert(promoted_value(*identifier, promote_cases));
+      if (cases.size() <= event.trace) cases.resize(event.trace + 1);
+      auto& metrics = cases[event.trace];
+      const auto finish = calendar_instant(trace, *event.event, options.timestamp_key, false);
+      if (std::isfinite(finish)) {
+        metrics.start = std::min(metrics.start, finish);
+        metrics.finish = std::max(metrics.finish, finish);
+      }
+      const auto difference = scratch_number(*event.event, options.diff_start_end);
+      if (!std::isnan(difference)) metrics.service += difference;
+      ++metrics.event_count;
+    }
+    std::vector<double> service, sojourn;
+    for (const auto& metrics : cases) {
+      if (!std::isfinite(metrics.start) || !std::isfinite(metrics.finish))
+        throw std::invalid_argument("log_to_features: temporal case has no completion date");
+      service.push_back(metrics.service);
+      sojourn.push_back(metrics.finish - metrics.start);
+    }
+    write_case_column(options.service_time, service);
+    // Sojourn's date access occurs after the service destination is written.
+    for (const auto& event : events)
+      (void)calendar_instant(*event_traces.at(event.event), *event.event, options.timestamp_key, false);
+    write_case_column(options.sojourn_time, sojourn);
+    std::vector<double> waiting;
+    waiting.reserve(events.size());
+    for (const auto& event : events) {
+      (void)locate_case(*event.event);
+      waiting.push_back(scratch_number(*event.event, options.sojourn_time) -
+                        scratch_number(*event.event, options.service_time));
+    }
+    write_column(options.waiting_time, waiting);
+
+    const bool promote_activities = promote_numeric_column(activity_value);
+    const bool promote_resources = promote_numeric_column(resource_value);
+    origin = std::numeric_limits<double>::infinity();
+    for (auto& event : events) {
+      const auto& trace = *event_traces.at(event.event);
+      event.trace = locate_case(*event.event);
+      auto& categories = temporal_categories[event.event];
+      if (const auto activity = activity_value(trace, *event.event)) {
+        have_activity_column = true;
+        if (!missing_category(*activity)) categories.activity = std::to_string(activity_categories.insert(promoted_value(*activity, promote_activities)));
+      }
+      if (const auto resource = resource_value(trace, *event.event)) {
+        have_resource_column = true;
+        if (!missing_category(*resource)) categories.resource = std::to_string(resource_categories.insert(promoted_value(*resource, promote_resources)));
+      }
+      event.start = calendar_instant(trace, *event.event,
+          options.start_timestamp_key.empty() ? options.timestamp_key : options.start_timestamp_key, false);
+      if (std::isfinite(event.start)) origin = std::min(origin, event.start);
+    }
+    if (!have_activity_column || !have_resource_column)
+      throw std::invalid_argument("log_to_features: temporal activity and resource columns are required");
+  }
   std::map<long long, std::vector<const TimedEvent*>> buckets;
   std::map<long long, double> bucket_timestamps;
   for (const auto& event : events) {
@@ -1385,6 +1489,20 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       });
     double average_waiting = 0.0, average_sojourn = 0.0, average_service = 0.0;
     for (const auto trace_id : trace_ids) {
+      if (temporal_frequency) {
+        const auto& case_events = by_trace.at(trace_id);
+        const auto representative = *std::min_element(case_events.begin(), case_events.end(),
+            [](const TimedEvent* left, const TimedEvent* right) {
+              return left->start < right->start;
+            });
+        const auto& event = *representative->event;
+        average_arrival += scratch_number(event, options.arrival_rate);
+        average_finish += scratch_number(event, options.finish_rate);
+        average_waiting += scratch_number(event, options.waiting_time);
+        average_sojourn += scratch_number(event, options.sojourn_time);
+        average_service += scratch_number(event, options.service_time);
+        continue;
+      }
       average_arrival += arrival_rate[trace_id];
       average_finish += finish_rate[trace_id];
       const auto& metrics = cases[trace_id];

@@ -4217,6 +4217,17 @@ void log_to_features_params_contract() {
   assert(!minera::parse_log_to_features_params(fields({{"features_variant", "temporal"}})).case_id_key.has_value());
   assert(minera::parse_log_to_features_params(fields({{"features_variant", "temporal"}, {"features_case_id_key", "concept:name"}})).case_id_key == "concept:name");
   assert(identifier_key.case_id_key == "custom:id");
+  const auto metric_destinations = minera::parse_log_to_features_params(fields({
+      {"features_arrival_rate", "arrival"}, {"features_finish_rate", "finish"},
+      {"features_service_time", "service"}, {"features_waiting_time", "wait"},
+      {"features_sojourn_time", "sojourn"}, {"feature_diff_start_end", "diff"}}));
+  assert(metric_destinations.arrival_rate == "arrival" && metric_destinations.finish_rate == "finish");
+  assert(metric_destinations.service_time == "service" && metric_destinations.waiting_time == "wait");
+  assert(metric_destinations.sojourn_time == "sojourn" && metric_destinations.diff_start_end == "diff");
+  const auto empty_metric_destination = minera::parse_log_to_features_params(
+      [](std::string_view) { return std::string{}; },
+      [](std::string_view key) { return key == "features_service_time"; });
+  assert(empty_metric_destination.service_time.empty());
   assert(minera::parse_log_to_features_params(fields({{"feature_case_id_key", "alias:id"}})).case_id_key == "alias:id");
 
   assert(trace_empty.case_string_attributes_supplied && trace_empty.case_string_attributes.empty());
