@@ -426,15 +426,20 @@ TemporalFrequency parse_temporal_frequency(const std::string& raw) {
 }
 
 std::tm utc_calendar(double seconds) {
-  const auto integral = static_cast<std::time_t>(std::floor(seconds));
+  using namespace std::chrono;
+  const auto day_count = std::floor(seconds / 86400.0);
+  const auto minimum = sys_days{year::min() / January / day{1}}.time_since_epoch().count();
+  const auto maximum = sys_days{year::max() / December / day{31}}.time_since_epoch().count();
+  if (!std::isfinite(day_count) || day_count < static_cast<double>(minimum) ||
+      day_count > static_cast<double>(maximum))
+    throw std::invalid_argument("log_to_features: timestamp is outside the calendar range");
+  const sys_days date{days{static_cast<days::rep>(day_count)}};
+  const year_month_day civil{date};
   std::tm calendar{};
-#if defined(_WIN32)
-  if (gmtime_s(&calendar, &integral) != 0)
-    throw std::invalid_argument("log_to_features: timestamp is outside the calendar range");
-#else
-  if (gmtime_r(&integral, &calendar) == nullptr)
-    throw std::invalid_argument("log_to_features: timestamp is outside the calendar range");
-#endif
+  calendar.tm_year = static_cast<int>(civil.year()) - 1900;
+  calendar.tm_mon = static_cast<int>(static_cast<unsigned>(civil.month())) - 1;
+  calendar.tm_mday = static_cast<int>(static_cast<unsigned>(civil.day()));
+  calendar.tm_wday = static_cast<int>(weekday{date}.c_encoding());
   return calendar;
 }
 
@@ -1126,6 +1131,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   const auto case_value = [&](const Trace& trace, const Event& event) {
     return projected_column_value(trace, event, temporal_case_key);
   };
+  std::unordered_map<std::string, std::optional<int>> calendar_timezones;
   const auto calendar_instant = [&](const Trace& trace, const Event& event,
                                       const std::string& key, bool required) {
     const auto value = projected_column_value(trace, event, key);
@@ -1140,9 +1146,25 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     if (!native_date && (value->kind != AttributeKind::kDate ||
         !std::holds_alternative<std::monostate>(value->typed_value)))
       throw std::invalid_argument("log_to_features: temporal timestamp must be a date");
-    const auto parsed = parse_timestamp(native_date ? native_date->value : value->value);
+    std::string_view text = native_date ? native_date->value : value->value;
+    const auto parsed = parse_timestamp(text);
     if (!parsed || !std::isfinite(*parsed))
       throw std::invalid_argument("log_to_features: invalid temporal timestamp");
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back()))) text.remove_suffix(1);
+    std::optional<int> offset;
+    if (!text.empty() && (text.back() == 'Z' || text.back() == 'z')) {
+      offset = 0;
+    } else if (const auto sign = text.find_last_of("+-"); sign != std::string_view::npos && sign > 10) {
+      const auto zone = text.substr(sign + 1);
+      const auto hours = (zone[0] - '0') * 10 + zone[1] - '0';
+      const auto minute_index = zone.size() > 2 && zone[2] == ':' ? 3u : 2u;
+      const auto minutes = zone.size() >= minute_index + 2
+          ? (zone[minute_index] - '0') * 10 + zone[minute_index + 1] - '0' : 0;
+      offset = (text[sign] == '-' ? -1 : 1) * (hours * 3600 + minutes * 60);
+    }
+    const auto [timezone, inserted] = calendar_timezones.try_emplace(key, offset);
+    if (!inserted && timezone->second != offset)
+      throw std::invalid_argument("log_to_features: temporal timestamp column has mixed timezones");
     return *parsed;
   };
   const auto missing_category = [](const EventAttribute& value) {
@@ -1418,12 +1440,15 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   }
   std::map<long long, std::vector<const TimedEvent*>> buckets;
   std::map<long long, double> bucket_timestamps;
+  const auto bucket_time_key = options.start_timestamp_key.empty() ? options.timestamp_key : options.start_timestamp_key;
+  const auto bucket_zone = calendar_timezones.find(bucket_time_key);
+  const auto bucket_offset = bucket_zone == calendar_timezones.end() ? 0 : bucket_zone->second.value_or(0);
   for (const auto& event : events) {
     if (temporal_frequency) {
       if (!std::isfinite(event.start)) continue;
-      const auto label = temporal_bucket_label(event.start, *temporal_frequency, origin);
+      const auto label = temporal_bucket_label(event.start + bucket_offset, *temporal_frequency, origin + bucket_offset);
       buckets[label].push_back(&event);
-      bucket_timestamps[label] = static_cast<double>(label);
+      bucket_timestamps[label] = static_cast<double>(label) - bucket_offset;
     } else {
       const auto bucket = static_cast<long long>(
           std::floor((event.start - origin) / options.window_seconds));
@@ -1440,7 +1465,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       if (next <= label || next > last_label)
         throw std::invalid_argument("log_to_features: inconsistent temporal grid");
       buckets.try_emplace(next);
-      bucket_timestamps[next] = static_cast<double>(next);
+      bucket_timestamps[next] = static_cast<double>(next) - bucket_offset;
       label = next;
     }
   }
