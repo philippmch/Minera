@@ -375,6 +375,66 @@ std::string root_cause_scalar_key_fingerprint(const EventAttribute& value) {
   return attribute_fingerprint(value);
 }
 
+NativeScalarOrderKind native_scalar_order_kind(const EventAttribute& value) {
+  if (value.container != AttributeContainerKind::kScalar || !value.children.empty())
+    return NativeScalarOrderKind::kUnsupported;
+  switch (scalar_kind(value)) {
+    case Scalar::kString: return NativeScalarOrderKind::kString;
+    case Scalar::kInteger:
+    case Scalar::kReal: return NativeScalarOrderKind::kNumeric;
+    case Scalar::kBytes: return NativeScalarOrderKind::kBytes;
+    case Scalar::kDate: return NativeScalarOrderKind::kDate;
+    case Scalar::kNull: return NativeScalarOrderKind::kUnsupported;
+  }
+  return NativeScalarOrderKind::kUnsupported;
+}
+
+int native_scalar_key_compare(const EventAttribute& left, const EventAttribute& right) {
+  const auto kind = native_scalar_order_kind(left);
+  if (kind == NativeScalarOrderKind::kUnsupported || kind != native_scalar_order_kind(right))
+    throw std::invalid_argument("native scalar keys have incompatible ordering types");
+  const auto compare = [](const auto& a, const auto& b) { return a < b ? -1 : b < a ? 1 : 0; };
+  if (kind == NativeScalarOrderKind::kString) return compare(left.value, right.value);
+  if (kind == NativeScalarOrderKind::kBytes)
+    return compare(decode_bytes_attribute(left), decode_bytes_attribute(right));
+  if (kind == NativeScalarOrderKind::kDate) {
+    const auto a = date_value(left), b = date_value(right);
+    if (a.aware != b.aware) throw std::invalid_argument("native date keys have incompatible time zones");
+    return compare(a.microseconds, b.microseconds);
+  }
+  const auto compare_integer = [&](std::string_view a, std::string_view b) {
+    const bool negative_a = a.front() == '-', negative_b = b.front() == '-';
+    if (negative_a != negative_b) return negative_a ? -1 : 1;
+    if (negative_a) a.remove_prefix(1);
+    if (negative_b) b.remove_prefix(1);
+    const int magnitude = a.size() == b.size() ? compare(a, b) : compare(a.size(), b.size());
+    return negative_a ? -magnitude : magnitude;
+  };
+  const bool integer_left = scalar_kind(left) == Scalar::kInteger;
+  const bool integer_right = scalar_kind(right) == Scalar::kInteger;
+  if (integer_left && integer_right) return compare_integer(integer_text(left), integer_text(right));
+  if (!integer_left && !integer_right) {
+    const auto a = real_value(left), b = real_value(right);
+    if (std::isnan(a) || std::isnan(b)) throw std::invalid_argument("native NaN keys are unordered");
+    return compare(a, b);
+  }
+  const auto integer = integer_text(integer_left ? left : right);
+  const double real = real_value(integer_left ? right : left);
+  if (std::isnan(real)) throw std::invalid_argument("native NaN keys are unordered");
+  int result = 0;
+  if (std::isinf(real)) result = real > 0 ? -1 : 1;
+  else {
+    const auto truncated = std::trunc(real);
+    char buffer[512];
+    const auto converted = std::to_chars(buffer, buffer + sizeof(buffer), truncated, std::chars_format::fixed, 0);
+    if (converted.ec != std::errc{}) throw std::invalid_argument("native real key cannot be ordered");
+    const auto integer_part = truncated == 0 ? std::string("0") : std::string(buffer, converted.ptr);
+    result = compare_integer(integer, integer_part);
+    if (result == 0) result = compare(truncated, real);
+  }
+  return integer_left ? result : -result;
+}
+
 std::string root_cause_trace_fingerprint(const Trace& trace) {
   std::string result;
   append_part(result, dictionary_fingerprint(trace_attributes(trace)));

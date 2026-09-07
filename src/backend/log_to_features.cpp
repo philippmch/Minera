@@ -1081,6 +1081,16 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       return index;
     }
   } activity_categories, resource_categories, case_categories;
+  const auto validate_scalar_group = [](const auto& values, const auto& kind_of) {
+    std::optional<NativeScalarOrderKind> nonstring_kind;
+    for (const auto& value : values) {
+      const auto kind = kind_of(value);
+      if (kind == NativeScalarOrderKind::kUnsupported || kind == NativeScalarOrderKind::kString) continue;
+      if (nonstring_kind && *nonstring_kind != kind)
+        throw std::invalid_argument("log_to_features: incompatible temporal scalar ordering types");
+      nonstring_kind = kind;
+    }
+  };
   struct EventCategories {
     std::optional<std::string> activity;
     std::optional<std::string> resource;
@@ -1194,15 +1204,19 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     arrival_order.push_back(i);
     finish_order.push_back(i);
   }
-  const bool string_case_order = temporal_frequency &&
-      std::all_of(case_categories.values.begin(), case_categories.values.end(), native_string_cell);
+  const bool scalar_case_order = temporal_frequency &&
+      std::all_of(case_categories.values.begin(), case_categories.values.end(), [](const auto& value) {
+        return native_scalar_order_kind(value) != NativeScalarOrderKind::kUnsupported;
+      });
+  if (temporal_frequency) {
+    validate_scalar_group(case_categories.values, native_scalar_order_kind);
+  }
   auto case_less = [&](std::size_t lhs, std::size_t rhs, bool by_finish) {
     const double a = by_finish ? cases[lhs].finish : cases[lhs].start;
     const double b = by_finish ? cases[rhs].finish : cases[rhs].start;
     if (a != b) return a < b;
-    if (string_case_order &&
-        case_categories.values[lhs].value != case_categories.values[rhs].value)
-      return case_categories.values[lhs].value < case_categories.values[rhs].value;
+    if (scalar_case_order)
+      return native_scalar_key_compare(case_categories.values[lhs], case_categories.values[rhs]) < 0;
     if (!temporal_frequency && log.traces[lhs].case_id != log.traces[rhs].case_id)
       return log.traces[lhs].case_id < log.traces[rhs].case_id;
     return lhs < rhs;
@@ -1282,6 +1296,10 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       }
     }
     double average_arrival = 0.0, average_finish = 0.0;
+    if (temporal_frequency)
+      validate_scalar_group(resources, [&](const std::string& id) {
+        return native_scalar_order_kind(resource_categories.values.at(static_cast<std::size_t>(std::stoull(id))));
+      });
     double average_waiting = 0.0, average_sojourn = 0.0, average_service = 0.0;
     for (const auto trace_id : trace_ids) {
       average_arrival += arrival_rate[trace_id];

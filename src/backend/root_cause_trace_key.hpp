@@ -24,5 +24,10 @@ bool root_cause_scalar_keys_equal(const EventAttribute& left, const EventAttribu
 std::vector<const EventAttribute*> root_cause_set_members(const EventAttribute& value);
 bool root_cause_key_is_hashable(const EventAttribute& value);
 std::string root_cause_scalar_key_fingerprint(const EventAttribute& value);
+enum class NativeScalarOrderKind { kUnsupported, kString, kNumeric, kBytes, kDate };
+NativeScalarOrderKind native_scalar_order_kind(const EventAttribute& value);
+// Compare supported scalar values without rounding integer values to doubles.
+// Incompatible scalar types reject; containers have no ordering here.
+int native_scalar_key_compare(const EventAttribute& left, const EventAttribute& right);
 
 }  // namespace minera
