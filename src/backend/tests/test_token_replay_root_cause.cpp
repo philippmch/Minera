@@ -1,8 +1,10 @@
 #include "minera/conformance.hpp"
+#include "minera/log_conversion.hpp"
 #include "minera/xes_event_log_importer.hpp"
 
 #include <algorithm>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 
@@ -211,6 +213,30 @@ void equal_trace_membership_contracts() {
           rows[0].data[1999][0] == 1 && rows[0].source_trace_indices[1999] == 1999,
           "large repeated memberships expand once and retain all original source rows");
 }
+void nan_trace_membership_contracts() {
+  EventLog original;
+  original.traces = {trace({event("a", "1")})};
+  EventAttribute cell{"x", "nan", AttributeKind::kFloat};
+  cell.typed_value = std::numeric_limits<double>::quiet_NaN();
+  original.traces[0].attributes.push_back(cell);
+  const auto streamed = event_stream_to_event_log(event_log_to_event_stream(original));
+  const auto tabled = event_table_to_event_log(event_log_to_table(original));
+  EventLog log = original;
+  log.traces.push_back(original.traces[0]);
+  log.traces.push_back(streamed.traces.at(0));
+  log.traces.push_back(tabled.traces.at(0));
+  log.traces.push_back(original.traces[0]);
+  log.traces.back().attributes[0].typed_value = std::numeric_limits<double>::quiet_NaN();
+  log.traces.push_back(trace({event("b", "8")}));
+  RootCauseOptions options;
+  options.numeric_attributes = {"cost"};
+  const auto rows = token_replay_transition_root_cause_diagnostics(log,
+      {{7, {{0,event("", "1")}}, {{5,event("", "8")}}}}, options);
+  require(rows.size() == 1 && rows[0].source_trace_indices == std::vector<std::size_t>({0,1,2,3,5}),
+          "copied and converted NaN trace aliases match, independently assigned NaN does not");
+  require(rows[0].data == std::vector<std::vector<double>>({{1},{1},{1},{1},{8}}),
+          "NaN trace alias membership retains each original source row");
+}
 void xes_encoding_contracts() {
   const auto verify = [](const std::string& cell, const std::string& category) {
     std::istringstream xml("<log><trace><event><string key=\"concept:name\" value=\"b\"/>" + cell +
@@ -243,6 +269,7 @@ int main() {
   cohort_contracts();
   integration_contracts();
   equal_trace_membership_contracts();
+  nan_trace_membership_contracts();
   xes_encoding_contracts();
   std::cout << "root-cause replay contracts passed\n";
 }

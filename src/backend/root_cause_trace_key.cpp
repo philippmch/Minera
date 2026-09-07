@@ -134,8 +134,12 @@ bool scalar_equal(const EventAttribute& left, const EventAttribute& right) {
     return a == b && left.value == right.value;
   if (a == Scalar::kInteger && b == Scalar::kInteger)
     return integer_text(left) == integer_text(right);
-  if (a == Scalar::kReal && b == Scalar::kReal)
-    return real_value(left) == real_value(right);
+  if (a == Scalar::kReal && b == Scalar::kReal) {
+    const double x = real_value(left), y = real_value(right);
+    if (std::isnan(x) && std::isnan(y))
+      return left.typed_value.scalar_identity() == right.typed_value.scalar_identity();
+    return x == y;
+  }
   const auto& integer = a == Scalar::kInteger ? left : right;
   const double real = real_value(a == Scalar::kReal ? left : right);
   if (!std::isfinite(real) || std::trunc(real) != real) return false;
@@ -193,6 +197,7 @@ std::string scalar_fingerprint(const EventAttribute& value) {
     case Scalar::kInteger: return "I" + integer_text(value);
     case Scalar::kReal: {
       const double real = real_value(value);
+      if (std::isnan(real)) return "RN" + std::to_string(value.typed_value.scalar_identity());
       if (real == 0) return "I0";
       if (std::isfinite(real) && std::trunc(real) == real) {
         char buffer[512];

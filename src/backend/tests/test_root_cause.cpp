@@ -8,6 +8,13 @@
 #include <limits>
 #include <stdexcept>
 
+static_assert(std::variant_size_v<minera::NativeAttributeValue> == 5);
+static_assert(std::variant_size_v<const minera::NativeAttributeValue> == 5);
+static_assert(std::is_same_v<std::variant_alternative_t<0, minera::NativeAttributeValue>, std::monostate>);
+static_assert(std::is_same_v<std::variant_alternative_t<2, minera::NativeAttributeValue>, double>);
+static_assert(std::is_same_v<std::variant_alternative_t<4, minera::NativeAttributeValue>, minera::NativeDate>);
+static_assert(std::is_same_v<std::variant_alternative_t<2, const minera::NativeAttributeValue>, const double>);
+
 namespace {
 using minera::RootCauseObservation;
 using minera::RootCauseOptions;
@@ -471,6 +478,54 @@ void test_depth_and_interactions() {
 }
 }  // namespace
 
+void test_native_scalar_identity() {
+  using minera::NativeAttributeValue;
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  NativeAttributeValue first = nan;
+  const auto first_id = first.scalar_identity();
+  NativeAttributeValue copied = first;
+  assert(copied.scalar_identity() == first_id);
+  NativeAttributeValue moved = std::move(copied);
+  assert(moved.scalar_identity() == first_id);
+  NativeAttributeValue assigned;
+  assigned = moved;
+  assert(assigned.scalar_identity() == first_id);
+  NativeAttributeValue move_assigned;
+  move_assigned = std::move(assigned);
+  assert(move_assigned.scalar_identity() == first_id);
+  NativeAttributeValue independent = nan;
+  assert(independent.scalar_identity() != first_id);
+  first = nan;
+  assert(first.scalar_identity() != first_id);
+  const auto reassigned_id = first.scalar_identity();
+  first.emplace<double>(nan);
+  assert(first.scalar_identity() != reassigned_id);
+  const auto emplaced_id = first.scalar_identity();
+  first.emplace<2>(nan);
+  assert(first.scalar_identity() != emplaced_id);
+  const auto swapped_id = first.scalar_identity();
+  first.swap(moved);
+  assert(first.scalar_identity() == first_id && moved.scalar_identity() == swapped_id);
+  using std::swap;
+  swap(first, moved);
+  assert(first.scalar_identity() == swapped_id && moved.scalar_identity() == first_id);
+  std::swap(first, moved);
+  assert(first.scalar_identity() == first_id && moved.scalar_identity() == swapped_id);
+  assert(std::holds_alternative<double>(first));
+  assert(std::isnan(std::get<double>(first)) && std::isnan(std::get<2>(first)));
+  assert(std::get_if<double>(&first) != nullptr);
+  assert(std::visit([](const auto&) { return true; }, first));
+  NativeAttributeValue integer = std::int64_t{7};
+  NativeAttributeValue other_integer = std::int64_t{7};
+  assert(integer.scalar_identity() != other_integer.scalar_identity() && integer == other_integer);
+  NativeAttributeValue boolean(std::in_place_type<bool>, true);
+  assert(std::get<bool>(boolean));
+  boolean = minera::NativeDate{"2026-01-01T00:00:00Z"};
+  assert(std::get<minera::NativeDate>(boolean).value == "2026-01-01T00:00:00Z");
+  boolean = std::monostate{};
+  assert(std::holds_alternative<std::monostate>(boolean));
+}
+
 void test_trace_equivalence() {
   const auto compare = [](const minera::Trace& left, const minera::Trace& right, bool expected) {
     assert(minera::root_cause_traces_equal(left, right) == expected);
@@ -509,6 +564,24 @@ void test_trace_equivalence() {
   compare(attr_trace(null), attr_trace({"value", "None"}), false);
   compare(event_trace({"value", "NaN", minera::AttributeKind::kFloat}), event_trace({"value", "nan", minera::AttributeKind::kFloat}), true);
   compare(attr_trace({"value", "NaN", minera::AttributeKind::kFloat}), attr_trace({"value", "nan", minera::AttributeKind::kFloat}), false);
+  auto nan_trace = attr_trace({"value", "NaN", minera::AttributeKind::kFloat});
+  nan_trace.attributes[0].typed_value = std::numeric_limits<double>::quiet_NaN();
+  auto aliased_nan_trace = nan_trace;
+  compare(nan_trace, aliased_nan_trace, true);
+  aliased_nan_trace.attributes[0].typed_value = std::numeric_limits<double>::quiet_NaN();
+  compare(nan_trace, aliased_nan_trace, false);
+  assert(minera::root_cause_trace_fingerprint(nan_trace) != minera::root_cause_trace_fingerprint(aliased_nan_trace));
+  minera::EventAttribute nested_nan{"value", "parent"};
+  nested_nan.children = nan_trace.attributes;
+  auto nested_nan_trace = attr_trace(nested_nan);
+  auto nested_alias = nested_nan_trace;
+  compare(nested_nan_trace, nested_alias, true);
+  nested_alias.attributes[0].children[0].typed_value.emplace<double>(std::numeric_limits<double>::quiet_NaN());
+  compare(nested_nan_trace, nested_alias, false);
+  auto event_nan = event_trace(nan_trace.attributes[0]);
+  auto independent_event_nan = event_nan;
+  independent_event_nan.events[0].attributes[0].typed_value = std::numeric_limits<double>::quiet_NaN();
+  compare(event_nan, independent_event_nan, true);
   compare(event_trace({"value", "0.0", minera::AttributeKind::kFloat}), event_trace({"value", "-0.0", minera::AttributeKind::kFloat}), false);
   compare(attr_trace({"value", "0.0", minera::AttributeKind::kFloat}), attr_trace({"value", "-0.0", minera::AttributeKind::kFloat}), true);
   compare(attr_trace({"value", "1267650600228229401496703205376", minera::AttributeKind::kInt}), attr_trace({"value", "1.2676506002282294e30", minera::AttributeKind::kFloat}), true);
@@ -574,6 +647,7 @@ void test_trace_equivalence() {
 }
 
 int main() {
+  test_native_scalar_identity();
   test_trace_equivalence();
   test_numeric_tree();
   test_encoding();

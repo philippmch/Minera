@@ -63,8 +63,19 @@
     "string_escaping": "Nested strings quote and escape according to Unicode 14 printability; direct string categories retain the original text.",
     "importer_boundary": "The default pinned XES importer omits container elements and replaces parsed date offsets with UTC without adjusting wall time. Direct helper datetime inputs preserve supplied offsets; native import normalization remains a separate contract."
   },
+  "trace_nan_alias_identity": {
+    "shared_scalar": true,
+    "shallow_copy": true,
+    "deep_copy": true,
+    "independent_scalar": false,
+    "reassigned_scalar": false,
+    "nested_dictionary_and_list": "Shared NaN scalars match through copied nested values; independent NaN scalars do not.",
+    "reference_cohort_data": [[1], [1], [8]],
+    "reference_cohort_target": [0, 0, 1],
+    "native_transport": "Copies and in-memory stream/table conversions preserve scalar identity. Serialized formats do not encode shared scalar identity."
+  },
   "remaining_contracts": [
-    "Trace-level NaN object-alias identity is not represented by native value cells; independent NaN trace attributes compare unequal.",
+    "Native scalar replacement must use assignment or emplace to renew NaN alias identity; mutation through a raw mutable variant reference does not renew it.",
     "Legacy backwards replay diagnostic context production is a native extension."
   ]
 }

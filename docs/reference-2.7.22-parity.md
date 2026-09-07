@@ -298,8 +298,14 @@ equality and matching groups are cached; repeated contexts expand once per group
 Problem membership overrides the entire equivalent-trace class. Independent
 fixtures cover numeric/string differences between event and trace scope, nested
 ordering, datetime instants, and source-row expansion.
-The support module remains **partial** while trace-level NaN object-alias identity
-and remaining context/input boundaries are audited. Adding these encoding
+NaN trace attributes retain scalar identity through native copies and in-memory
+stream/table conversions: copied aliases match, independently assigned NaNs do
+not. Nested values use the same rule; event values retain stringified equality.
+Serialized formats do not encode shared scalar identity.
+Scalar replacement uses assignment or `emplace`; mutation through a raw mutable
+variant reference cannot renew alias identity and remains outside this contract.
+The support module remains **partial** while remaining context/input boundaries
+are audited. Adding these encoding
 contracts does not certify either replay variation.
 
 Token replay flat-input evidence: `normalize_token_replay_event_log` and the
