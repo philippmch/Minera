@@ -3234,6 +3234,15 @@ comparisons do not define a total order, so encounter order, endpoint-only ranks
 and independently sorted tie groups are insufficient. Public fixtures cover
 subset chains, incomparable sets, mixed endpoints, and larger collections up to
 1,000 cases; frozen-set and NaN-containing mixed domains remain partial.
+Nested tuple comparisons stop at the first unequal member, including frozen-set
+members. A differing earlier member prevents inspection of incompatible later
+members. Frozen-set/scalar grouping rejects numeric, byte, and date comparisons;
+strings and missing tuple members can group but reject when an endpoint tie
+requires their direct comparison with a frozen set. Resource checks retain their
+bucket-local scope. Tuple NaN ordering uses the original member identities:
+shared NaNs permit comparison of later members, while distinct NaNs stop numeric
+tuple comparison without ordering either value before the other. These ordering
+rules do not change the separate tuple-NaN category lookup normalization.
 Calendar EventLog projections infer numeric promotion independently for selected
 activity, resource, and case-ID columns across the entire log. Float or missing
 cells promote eligible integer columns to float64 before category grouping;
