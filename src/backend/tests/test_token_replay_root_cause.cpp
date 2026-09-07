@@ -167,6 +167,50 @@ void integration_contracts() {
   require(result.root_cause_diagnostics->transitions[0].feature_names[0] == "event:org:resource@earlier",
           "missing retained cell does not erase earlier context with a present outer projection");
 }
+void equal_trace_membership_contracts() {
+  EventLog log;
+  log.traces = {trace({event("a", "1")}), trace({event("a", "1")}), trace({event("b", "8")})};
+  log.traces[0].events[0].attributes[0].kind = AttributeKind::kInt;
+  log.traces[0].events[0].attributes[0].typed_value = std::int64_t{1};
+  log.traces[1].properties.push_back({"ignored", "metadata"});
+  RootCauseOptions options;
+  options.numeric_attributes = {"cost"};
+  TokenReplayTransitionRootCauseCohort cohort{7, {{0,event("", "3")}}, {{2,event("", "8")}}};
+  auto rows = token_replay_transition_root_cause_diagnostics(log, {cohort}, options);
+  require(rows.size() == 1 && rows[0].source_trace_indices == std::vector<std::size_t>({0,1,2}),
+          "one trace-map entry matches equal source values without losing row identities");
+  require(rows[0].data == std::vector<std::vector<double>>({{3},{3},{8}}) && rows[0].fit_count == 2,
+          "matched traces share the supplied first context");
+  cohort.fit_contexts = {{0,event("", "3")}, {1,event("", "99")}, {2,event("", "2")}};
+  cohort.problem_contexts = {{1,event("", "9")}};
+  rows = token_replay_transition_root_cause_diagnostics(log, {cohort}, options);
+  require(rows[0].source_trace_indices == std::vector<std::size_t>({2,0,1}) &&
+          rows[0].data == std::vector<std::vector<double>>({{2},{9},{9}}),
+          "problem membership overrides the whole equal-trace class");
+  TokenReplayOptions replay;
+  replay.root_cause = options;
+  const auto unknown = token_replay_unknown_root_cause_diagnostics(log,
+      {{"X",false,{{0,event("", "9")}}}}, replay);
+  require(unknown.size() == 1 && unknown[0].source_trace_indices == std::vector<std::size_t>({2,0,1}) &&
+          unknown[0].data == std::vector<std::vector<double>>({{8},{9},{9}}),
+          "unknown problem membership also expands trace-map equality");
+  log.traces[1].case_id = "different-case";
+  cohort.fit_contexts = {{0,event("", "3")}};
+  cohort.problem_contexts = {{2,event("", "8")}};
+  rows = token_replay_transition_root_cause_diagnostics(log, {cohort}, options);
+  require(rows[0].source_trace_indices == std::vector<std::size_t>({0,2}),
+          "different trace attributes prevent event-equal traces from matching");
+  log.traces.assign(2000, trace({event("a", "1")}));
+  log.traces.push_back(trace({event("b", "8")}));
+  cohort.fit_contexts.clear();
+  for (std::size_t i = 0; i < 2000; ++i)
+    cohort.fit_contexts.push_back({i,event("", i == 0 ? "1" : "99")});
+  cohort.problem_contexts = {{2000,event("", "8")}};
+  rows = token_replay_transition_root_cause_diagnostics(log, {cohort}, options);
+  require(rows[0].data.size() == 2001 && rows[0].fit_count == 2000 &&
+          rows[0].data[1999][0] == 1 && rows[0].source_trace_indices[1999] == 1999,
+          "large repeated memberships expand once and retain all original source rows");
+}
 void xes_encoding_contracts() {
   const auto verify = [](const std::string& cell, const std::string& category) {
     std::istringstream xml("<log><trace><event><string key=\"concept:name\" value=\"b\"/>" + cell +
@@ -198,6 +242,7 @@ void xes_encoding_contracts() {
 int main() {
   cohort_contracts();
   integration_contracts();
+  equal_trace_membership_contracts();
   xes_encoding_contracts();
   std::cout << "root-cause replay contracts passed\n";
 }

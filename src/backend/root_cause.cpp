@@ -1,6 +1,7 @@
 #include "minera/root_cause.hpp"
 #include "minera/timestamp.hpp"
 #include "root_cause_unicode.hpp"
+#include "root_cause_trace_key.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -484,6 +485,10 @@ class Trainer {
 };
 
 }  // namespace
+
+std::string root_cause_attribute_category(const EventAttribute& attribute) {
+  return attribute_category(attribute, false);
+}
 
 std::optional<RootCauseModel> fit_root_cause_model(
     const std::vector<RootCauseObservation>& fit,

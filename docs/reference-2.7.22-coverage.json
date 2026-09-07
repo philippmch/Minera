@@ -6979,6 +6979,7 @@
       "artifacts": [
         "include/minera/root_cause.hpp",
         "src/backend/root_cause.cpp",
+        "src/backend/root_cause_trace_key.cpp",
         "src/backend/token_replay_root_cause.cpp",
         "src/backend/tests/test_root_cause.cpp",
         "src/backend/tests/test_token_replay_root_cause.cpp",

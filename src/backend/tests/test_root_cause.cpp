@@ -1,4 +1,5 @@
 #include "minera/root_cause.hpp"
+#include "../root_cause_trace_key.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -470,7 +471,110 @@ void test_depth_and_interactions() {
 }
 }  // namespace
 
+void test_trace_equivalence() {
+  const auto compare = [](const minera::Trace& left, const minera::Trace& right, bool expected) {
+    assert(minera::root_cause_traces_equal(left, right) == expected);
+    assert(minera::root_cause_traces_equal(right, left) == expected);
+    if (expected) assert(minera::root_cause_trace_fingerprint(left) == minera::root_cause_trace_fingerprint(right));
+  };
+  const auto event_trace = [](minera::EventAttribute value) {
+    minera::Trace trace;
+    trace.case_id = "case-one";
+    minera::Event event;
+    event.activity = "A";
+    value.key = "value";
+    event.attributes.push_back(std::move(value));
+    trace.events.push_back(std::move(event));
+    return trace;
+  };
+  const auto attr_trace = [](minera::EventAttribute value) {
+    minera::Trace trace;
+    value.key = "value";
+    trace.attributes.push_back(std::move(value));
+    return trace;
+  };
+  minera::EventAttribute integer{"value", "1", minera::AttributeKind::kInt};
+  minera::EventAttribute real{"value", "1.0", minera::AttributeKind::kFloat};
+  minera::EventAttribute boolean{"value", "true", minera::AttributeKind::kBoolean};
+  minera::EventAttribute text{"value", "1"};
+  compare(event_trace(integer), event_trace(text), true);
+  compare(event_trace(integer), event_trace(real), false);
+  compare(event_trace(integer), event_trace(boolean), false);
+  compare(attr_trace(integer), attr_trace(real), true);
+  compare(attr_trace(integer), attr_trace(boolean), true);
+  compare(attr_trace(integer), attr_trace(text), false);
+  minera::EventAttribute null{"value", "ignored"};
+  null.is_null = true;
+  compare(event_trace(null), event_trace({"value", "None"}), true);
+  compare(attr_trace(null), attr_trace({"value", "None"}), false);
+  compare(event_trace({"value", "NaN", minera::AttributeKind::kFloat}), event_trace({"value", "nan", minera::AttributeKind::kFloat}), true);
+  compare(attr_trace({"value", "NaN", minera::AttributeKind::kFloat}), attr_trace({"value", "nan", minera::AttributeKind::kFloat}), false);
+  compare(event_trace({"value", "0.0", minera::AttributeKind::kFloat}), event_trace({"value", "-0.0", minera::AttributeKind::kFloat}), false);
+  compare(attr_trace({"value", "0.0", minera::AttributeKind::kFloat}), attr_trace({"value", "-0.0", minera::AttributeKind::kFloat}), true);
+  compare(attr_trace({"value", "1267650600228229401496703205376", minera::AttributeKind::kInt}), attr_trace({"value", "1.2676506002282294e30", minera::AttributeKind::kFloat}), true);
+  compare(attr_trace({"value", "1267650600228229401496703205377", minera::AttributeKind::kInt}), attr_trace({"value", "1.2676506002282294e30", minera::AttributeKind::kFloat}), false);
+
+  auto a = event_trace(text), b = a;
+  a.events[0].attributes.push_back({"other", "x"});
+  b = a;
+  std::reverse(b.events[0].attributes.begin(), b.events[0].attributes.end());
+  b.events[0].case_id = "ignored event projection";
+  b.events[0].input_order = 99;
+  b.properties.push_back({"ignored", "property"});
+  compare(a, b, true);
+  b.case_id = "case-two";
+  compare(a, b, false);
+  b = a;
+  b.attributes.push_back({"extra", "different"});
+  compare(a, b, false);
+  b = a;
+  b.events.push_back(b.events[0]);
+  compare(a, b, false);
+  a.events.push_back(a.events[0]);
+  a.events[1].activity = "B";
+  b = a;
+  std::reverse(b.events.begin(), b.events.end());
+  compare(a, b, false);
+
+  minera::EventAttribute nested{"value", "parent"};
+  nested.children = {{"one", "1", minera::AttributeKind::kInt}, {"two", "2", minera::AttributeKind::kInt}};
+  auto reordered = nested;
+  std::reverse(reordered.children.begin(), reordered.children.end());
+  compare(event_trace(nested), event_trace(reordered), false);
+  compare(attr_trace(nested), attr_trace(reordered), true);
+  nested.container = reordered.container = minera::AttributeContainerKind::kList;
+  compare(attr_trace(nested), attr_trace(reordered), false);
+  nested.children.push_back({"one", "3", minera::AttributeKind::kInt});
+  reordered = nested;
+  reordered.children[0].value = "3";
+  reordered.children.pop_back();
+  nested.container = reordered.container = minera::AttributeContainerKind::kContainer;
+  compare(attr_trace(nested), attr_trace(reordered), true);
+
+  const auto date = [](const char* value) { return minera::EventAttribute{"value", value, minera::AttributeKind::kDate}; };
+  compare(attr_trace(date("2026-01-02T03:04:05.123456+02:30")), attr_trace(date("2026-01-02T00:34:05.123456Z")), true);
+  compare(attr_trace(date("2026-01-02T00:34:05.123456")), attr_trace(date("2026-01-02T00:34:05.123456Z")), false);
+  compare(attr_trace(date("9999-01-02T00:34:05.123456Z")), attr_trace(date("9999-01-02T00:34:05.123457Z")), false);
+
+  a = event_trace(text);
+  b = a;
+  b.events[0].activity_state = minera::FirstClassAttributeState::kPresent;
+  b.events[0].activity_source_key = "concept:name";
+  b.events[0].activity_attribute = minera::EventAttribute{"concept:name", "A"};
+  compare(a, b, true);
+  b.events[0].attributes.push_back({"concept:name", "B"});
+  a.events[0].activity = "B";
+  compare(a, b, true);
+  b.events[0].attributes.back().first_class_role = minera::FirstClassAttributeRole::kActivity;
+  a.events[0].activity.clear();
+  compare(a, b, true);
+  b.events[0].attributes.back().first_class_state = minera::FirstClassAttributeState::kNull;
+  a.events[0].activity = "None";
+  compare(a, b, true);
+}
+
 int main() {
+  test_trace_equivalence();
   test_numeric_tree();
   test_encoding();
   test_equivalent_feature_choices();

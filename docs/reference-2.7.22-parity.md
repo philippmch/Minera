@@ -290,7 +290,15 @@ unsupported elements remain separate from direct helper behavior.
 Standard XES trace and event `concept:name` provenance no longer collide in
 log-skeleton and DECLARE event selection, allowing nested-XES diagnostics to traverse the
 normal analysis pipeline while genuine event-field ambiguity still fails.
-The support module remains **partial** while trace-map value-equality membership
+Trace-map memberships now expand value-equal source traces while retaining every
+source index. Event dictionaries compare ordered event sequences with stringified
+values; trace attributes retain typed numeric/date and recursive equality, and
+trace properties do not participate. Fingerprint buckets are verified with full
+equality and matching groups are cached; repeated contexts expand once per group.
+Problem membership overrides the entire equivalent-trace class. Independent
+fixtures cover numeric/string differences between event and trace scope, nested
+ordering, datetime instants, and source-row expansion.
+The support module remains **partial** while trace-level NaN object-alias identity
 and remaining context/input boundaries are audited. Adding these encoding
 contracts does not certify either replay variation.
 

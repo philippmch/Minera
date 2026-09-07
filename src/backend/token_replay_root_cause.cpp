@@ -1,21 +1,57 @@
 #include "minera/conformance.hpp"
+#include "root_cause_trace_key.hpp"
 
 #include <algorithm>
 #include <map>
+#include <memory>
 #include <set>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace minera {
 namespace {
 using Contexts = std::map<std::size_t, RootCauseObservation>;
 
-Contexts indexed_contexts(const EventLog& log,
+class TraceCohortIndex {
+ public:
+  explicit TraceCohortIndex(const EventLog& log) : log_(log) {}
+  const std::vector<std::size_t>& matches(std::size_t source) {
+    if (source >= log_.traces.size())
+      throw std::out_of_range("root cause: source trace index out of range");
+    if (const auto found = matches_.find(source); found != matches_.end()) return *found->second;
+    if (!indexed_) {
+      hashes_.reserve(log_.traces.size());
+      for (std::size_t i = 0; i < log_.traces.size(); ++i) {
+        const auto hash = std::hash<std::string>{}(root_cause_trace_fingerprint(log_.traces[i]));
+        hashes_.push_back(hash);
+        buckets_[hash].push_back(i);
+      }
+      indexed_ = true;
+    }
+    auto group = std::make_shared<std::vector<std::size_t>>();
+    for (const auto candidate : buckets_.at(hashes_[source]))
+      if (candidate == source || root_cause_traces_equal(log_.traces[source], log_.traces[candidate]))
+        group->push_back(candidate);
+    for (const auto member : *group) matches_[member] = group;
+    return *group;
+  }
+ private:
+  const EventLog& log_;
+  bool indexed_ = false;
+  std::vector<std::size_t> hashes_;
+  std::unordered_map<std::size_t, std::vector<std::size_t>> buckets_;
+  std::unordered_map<std::size_t, std::shared_ptr<std::vector<std::size_t>>> matches_;
+};
+
+Contexts indexed_contexts(TraceCohortIndex& index,
                           const std::vector<RootCauseObservation>& observations) {
   Contexts result;
+  std::set<std::size_t> covered_groups;
   for (const auto& observation : observations) {
-    if (observation.trace_index >= log.traces.size())
-      throw std::out_of_range("root cause: source trace index out of range");
-    result.try_emplace(observation.trace_index, observation);
+    const auto& group = index.matches(observation.trace_index);
+    if (!covered_groups.insert(group.front()).second) continue;
+    for (const auto source : group)
+      result.try_emplace(source, RootCauseObservation{source, observation.context});
   }
   return result;
 }
@@ -122,9 +158,10 @@ std::vector<TokenReplayTransitionRootCauseDiagnostics> token_replay_transition_r
     const EventLog& log, const std::vector<TokenReplayTransitionRootCauseCohort>& cohorts,
     const RootCauseOptions& options) {
   std::vector<TokenReplayTransitionRootCauseDiagnostics> result;
+  TraceCohortIndex index(log);
   for (const auto& cohort : cohorts) {
-    const auto fitting = indexed_contexts(log, cohort.fit_contexts);
-    const auto problematic = indexed_contexts(log, cohort.problem_contexts);
+    const auto fitting = indexed_contexts(index, cohort.fit_contexts);
+    const auto problematic = indexed_contexts(index, cohort.problem_contexts);
     std::vector<RootCauseObservation> fit, problem;
     for (const auto& [index, observation] : fitting)
       if (!problematic.contains(index)) fit.push_back(observation);
@@ -147,8 +184,9 @@ std::vector<TokenReplayUnknownRootCauseDiagnostics> token_replay_unknown_root_ca
   for (const auto& cohort : cohorts)
     keys.insert(cohort.activity_is_null ? std::nullopt : std::optional<std::string>(cohort.activity));
   std::vector<TokenReplayUnknownRootCauseDiagnostics> result;
+  TraceCohortIndex index(log);
   for (const auto& cohort : cohorts) {
-    const auto problematic = indexed_contexts(log, cohort.problem_contexts);
+    const auto problematic = indexed_contexts(index, cohort.problem_contexts);
     if (problematic.empty()) continue;
     std::vector<RootCauseObservation> fit, problem;
     for (std::size_t i = 0; i < log.traces.size(); ++i) {

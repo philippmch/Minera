@@ -121,6 +121,9 @@ struct TokenReplayRootCauseDiagnostics {
   std::vector<TokenReplayUnknownRootCauseDiagnostics> unknown_activities;
 };
 
+// Context entries identify representative source traces. Diagnostic helpers
+// expand value-equal traces in source order and keep the first supplied context
+// for each equivalence class; problem membership takes precedence over fit.
 struct TokenReplayTransitionRootCauseCohort {
   std::size_t transition_index = 0;
   std::vector<RootCauseObservation> fit_contexts;
