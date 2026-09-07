@@ -792,6 +792,7 @@ int usage(const char* program) {
                "  --log-to-features         Emit standalone feature-table JSON\n"
                "  --features-variant <id>  event_based (default), trace_based, temporal\n"
                "  --features-activity-key <name> Activity attribute\n"
+               "  --features-case-id-key <name> Trace identifier attribute\n"
                "  --features-timestamp-key <name> Timestamp attribute\n"
                "  --features-grouper-freq <id> Calendar temporal frequency\n"
                "                            (default: W)\n"
@@ -3251,7 +3252,7 @@ int main(int argc, char** argv) {
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> feature_option_names = {
-          "features_variant", "features_activity_key", "features_timestamp_key",
+          "features_variant", "features_activity_key", "features_case_id_key", "features_timestamp_key",
           "features_start_timestamp_key", "features_resource_key",
           "features_grouper_freq", "features_window_seconds",
           "features_default_not_present",
@@ -3267,7 +3268,7 @@ int main(int argc, char** argv) {
           "features_enable_first_last_activity_index", "features_enable_max_concurrent_events",
           "features_enable_max_concurrent_events_per_activity", "features_epsilon",
           "features_min_num_different_string_values", "features_max_num_different_string_values",
-          "feature_variant", "feature_activity_key", "feature_timestamp_key",
+          "feature_variant", "feature_activity_key", "feature_case_id_key", "feature_timestamp_key",
           "feature_start_timestamp_key", "feature_resource_key", "feature_window_seconds",
           "feature_grouper_freq",
           "feature_default_not_present", "feature_event_string_attributes",

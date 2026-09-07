@@ -1031,6 +1031,19 @@ describe("isProfileClusteringResult", () => {
 });
 
 describe("isLogToFeaturesResult", () => {
+  it("accepts typed identifiers only in the leading case identifier column", () => {
+    const result = { family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: ["@@case_id_column", "event:n"] };
+    const nested = { key: "id", value: "", kind: "string", container: "tuple", null: false,
+      children: [{ key: "0", value: "x", kind: "string", container: "scalar", null: false }] };
+    for (const identifier of ["c1", "", 7, true, null, nested,
+      { key: "id", value: "9007199254740993", kind: "int", container: "scalar", null: false }])
+      expect(isLogToFeaturesResult({ ...result, trace_rows: [[identifier, 2]] })).toBe(true);
+    for (const row of [["c1", "bad"], ["c1", null], ["c1", nested], ["c1"], ["c1", 2, 3], [NaN, 2], [{ kind: "tuple" }, 2]])
+      expect(isLogToFeaturesResult({ ...result, trace_rows: [row] })).toBe(false);
+    expect(isLogToFeaturesResult({ ...result, feature_names: ["event:n", "@@case_id_column"], trace_rows: [[2, "c1"]] })).toBe(false);
+    expect(isLogToFeaturesResult({ ...result, feature_names: ["@@case_id_column", "@@case_id_column"], trace_rows: [["c1", 0]] })).toBe(true);
+  });
+
   it("retains explicit event schema names and zero-width rows", () => {
     expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "event_based", feature_names: ["event:v", "event:v", ""], event_rows: [[[12, 0, 0]]] })).toBe(true);
     expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "event_based", feature_names: [], event_rows: [[[], []]] })).toBe(true);

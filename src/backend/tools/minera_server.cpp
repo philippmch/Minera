@@ -4386,7 +4386,7 @@ void handle_log_to_features(const httplib::Request& request,
     { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
     if (!session) { response.status = 409; response.set_content(error_json("no cached log; run /api/mine first"), "application/json"); return; }
     static const std::set<std::string> allowed = {
-        "features_variant", "features_activity_key", "features_timestamp_key",
+        "features_variant", "features_activity_key", "features_case_id_key", "features_timestamp_key",
         "features_start_timestamp_key", "features_resource_key", "features_grouper_freq",
         "features_window_seconds",
         "features_default_not_present", "features_event_string_attributes",
@@ -4402,7 +4402,7 @@ void handle_log_to_features(const httplib::Request& request,
         "features_enable_first_last_activity_index", "features_enable_max_concurrent_events",
         "features_enable_max_concurrent_events_per_activity", "features_epsilon",
         "features_min_num_different_string_values", "features_max_num_different_string_values",
-        "feature_variant", "feature_activity_key", "feature_timestamp_key",
+        "feature_variant", "feature_activity_key", "feature_case_id_key", "feature_timestamp_key",
         "feature_start_timestamp_key", "feature_resource_key", "feature_grouper_freq",
         "feature_window_seconds",
         "feature_default_not_present", "feature_event_string_attributes",

@@ -1872,6 +1872,15 @@ describe("log-to-features API", () => {
       .toBe("features_enable_all_extra_features=true&features_enable_case_duration=false&features_enable_resource_workload=false&features_max_num_different_string_values=2&features_min_num_different_string_values=3");
   });
 
+  it("requests a custom typed case identifier column", async () => {
+    expect(logToFeaturesQuery({ features_case_id_key: "custom:id", features_add_case_identifier_column: true }))
+      .toBe("features_add_case_identifier_column=true&features_case_id_key=custom%3Aid");
+    const result = { family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: ["@@case_id_column", "event:n"], trace_rows: [["c1", 2], [null, 3]] };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => result })));
+    await expect(requestLogToFeatures()).resolves.toEqual(result);
+    vi.unstubAllGlobals();
+  });
+
   it("serializes trace representation and extra feature controls", () => {
     expect(logToFeaturesQuery({
       features_enable_all_extra_features: true,

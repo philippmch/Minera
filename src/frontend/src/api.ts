@@ -5393,6 +5393,7 @@ export async function requestLogUtility(options: LogUtilityOptions = {}): Promis
 export interface LogToFeaturesOptions {
   features_variant?: "event_based" | "trace_based" | "temporal";
   features_activity_key?: string;
+  features_case_id_key?: string;
   features_timestamp_key?: string;
   features_start_timestamp_key?: string;
   features_resource_key?: string;

@@ -1,5 +1,6 @@
 #include "minera/json_export.hpp"
 #include "minera/pnml.hpp"
+#include "root_cause_trace_key.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -4933,7 +4934,7 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
     if (result.variant == LogToFeaturesVariant::TEMPORAL &&
         (name.empty() || !unique_features.insert(name).second))
       throw std::invalid_argument("log_to_features: invalid result feature schema");
-  const auto valid_row = [&](const std::vector<double>& row) {
+  const auto valid_row = [&](const auto& row) {
     return row.size() == result.feature_names.size();
   };
   if (result.variant == LogToFeaturesVariant::EVENT_BASED) {
@@ -4947,9 +4948,14 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
     if (!result.event_rows.empty() || !result.temporal_rows.empty() ||
         (!result.case_ids.empty() && result.case_ids.size() != result.trace_rows.size()))
       throw std::invalid_argument("log_to_features: inconsistent trace result");
-    for (const auto& row : result.trace_rows)
+    for (const auto& row : result.trace_rows) {
       if (!valid_row(row))
         throw std::invalid_argument("log_to_features: invalid trace result row");
+      for (std::size_t i = 0; i < row.size(); ++i)
+        if (std::holds_alternative<EventAttribute>(row[i]) &&
+            (i != 0 || result.feature_names[i] != "@@case_id_column"))
+          throw std::invalid_argument("log_to_features: typed cell outside identifier column");
+    }
   } else if (result.variant == LogToFeaturesVariant::TEMPORAL) {
     if (!result.event_rows.empty() || !result.trace_rows.empty() ||
         !result.case_ids.empty())
@@ -4964,6 +4970,87 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
     if (std::isnan(value)) write_json_string(out, "NaN");
     else if (std::isinf(value)) write_json_string(out, value < 0 ? "-Infinity" : "Infinity");
     else out << value;
+  };
+  const auto safe_integer_text = [](std::string_view canonical) {
+    const auto magnitude = canonical.front() == '-' ? canonical.substr(1) : canonical;
+    constexpr std::string_view limit = "9007199254740991";
+    return magnitude.size() < limit.size() ||
+        (magnitude.size() == limit.size() && magnitude <= limit);
+  };
+  const auto normalize_identifier_detail = [&](auto&& self, EventAttribute& attribute) -> void {
+    if (!attribute.is_null && attribute.container == AttributeContainerKind::kScalar &&
+        attribute.kind != AttributeKind::kBytes &&
+        (std::holds_alternative<std::int64_t>(attribute.typed_value) ||
+         (attribute.kind == AttributeKind::kInt &&
+          std::holds_alternative<std::monostate>(attribute.typed_value)))) {
+      const auto canonical = root_cause_attribute_category(attribute);
+      if (!safe_integer_text(canonical)) {
+        attribute.kind = AttributeKind::kInt;
+        attribute.value = canonical;
+        attribute.typed_value = std::monostate{};
+      }
+    }
+    for (auto& child : attribute.children) self(self, child);
+  };
+  const auto write_identifier = [&](const EventAttribute& attribute) {
+    if (attribute.is_null) { out << "null"; return; }
+    if (attribute.container != AttributeContainerKind::kScalar ||
+        attribute.kind == AttributeKind::kBytes || !attribute.children.empty()) {
+      auto exact = attribute;
+      normalize_identifier_detail(normalize_identifier_detail, exact);
+      write_attribute_detail(out, exact);
+      return;
+    }
+    const auto write_integer = [&] {
+      const auto canonical = root_cause_attribute_category(attribute);
+      if (safe_integer_text(canonical)) {
+        out << canonical;
+      } else {
+        auto exact = attribute;
+        exact.kind = AttributeKind::kInt;
+        exact.value = canonical;
+        exact.typed_value = std::monostate{};
+        write_attribute_detail(out, exact);
+      }
+    };
+    if (std::holds_alternative<std::int64_t>(attribute.typed_value)) {
+      write_integer();
+      return;
+    }
+    if (const auto* value = std::get_if<double>(&attribute.typed_value)) {
+      write_number(*value);
+      return;
+    }
+    if (const auto* value = std::get_if<bool>(&attribute.typed_value)) {
+      out << (*value ? "true" : "false");
+      return;
+    }
+    if (const auto* value = std::get_if<NativeDate>(&attribute.typed_value)) {
+      write_json_string(out, value->value);
+      return;
+    }
+    switch (attribute.kind) {
+      case AttributeKind::kInt: {
+        write_integer();
+        return;
+      }
+      case AttributeKind::kFloat: {
+        write_number(native_attribute_number(attribute));
+        return;
+      }
+      case AttributeKind::kBoolean:
+        if (attribute.value == "true" || attribute.value == "1") out << "true";
+        else if (attribute.value == "false" || attribute.value == "0") out << "false";
+        else throw std::invalid_argument("log_to_features: invalid boolean identifier");
+        return;
+      case AttributeKind::kString:
+      case AttributeKind::kDate:
+      case AttributeKind::kId:
+        write_json_string(out, attribute.value);
+        return;
+      case AttributeKind::kBytes: break;
+    }
+    throw std::invalid_argument("log_to_features: invalid identifier attribute kind");
   };
   out << "{\"family\":\"LOG_TO_FEATURES\",\"variant\":";
   write_json_string(out, variant_name());
@@ -5005,7 +5092,10 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
       out << '[';
       for (std::size_t j = 0; j < result.trace_rows[i].size(); ++j) {
         if (j) out << ',';
-        write_number(result.trace_rows[i][j]);
+        if (const auto* value = std::get_if<double>(&result.trace_rows[i][j]))
+          write_number(*value);
+        else
+          write_identifier(std::get<EventAttribute>(result.trace_rows[i][j]));
       }
       out << ']';
     }

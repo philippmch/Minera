@@ -10,6 +10,24 @@
 
 using namespace minera;
 
+static bool operator==(const LogToFeaturesCell& cell, double expected) {
+  return std::holds_alternative<double>(cell) && std::get<double>(cell) == expected;
+}
+
+static bool operator==(const std::vector<LogToFeaturesCell>& row,
+                       const std::vector<double>& expected) {
+  return row.size() == expected.size() &&
+      std::equal(row.begin(), row.end(), expected.begin(),
+                 [](const auto& cell, double value) { return cell == value; });
+}
+
+static bool operator==(const std::vector<std::vector<LogToFeaturesCell>>& rows,
+                       const std::vector<std::vector<double>>& expected) {
+  return rows.size() == expected.size() &&
+      std::equal(rows.begin(), rows.end(), expected.begin(),
+                 [](const auto& row, const auto& values) { return row == values; });
+}
+
 static EventLog fixture() {
   EventLog log;
   Trace t; t.case_id = "c1";
@@ -20,6 +38,127 @@ static EventLog fixture() {
   Event b{"c1", "B", "2024-01-01T01:00:00Z", "r1", 1};
   b.attributes.push_back({"amount", "3", AttributeKind::kFloat});
   t.events = {a, b}; log.traces.push_back(t); return log;
+}
+
+static void trace_identifier_feature_preserves_native_cells() {
+  auto log = fixture();
+  LogToFeaturesOptions options;
+  options.event_string_attributes_supplied = true;
+  options.add_case_identifier_column = true;
+  options.feature_names = {"unknown", "@@case_id_column"};
+  options.enable_case_duration = true;
+  auto result = log_to_features(log, options);
+  assert((result.feature_names == std::vector<std::string>{
+      "@@case_id_column", "unknown", "@@case_id_column", "@@caseDuration"}));
+  assert(std::get<EventAttribute>(result.trace_rows[0][0]).value == "c1");
+  assert(result.trace_rows[0][1] == 0 && result.trace_rows[0][2] == 0 && result.trace_rows[0][3] == 3600);
+  assert(log_to_features_json(result).find("\"trace_rows\":[[\"c1\",0,0,3600]]") != std::string::npos);
+
+  options.case_id_key = "identifier";
+  options.feature_names.clear();
+  options.feature_names_supplied = true;
+  options.enable_case_duration = false;
+  const auto check = [&](const EventAttribute& attribute, const std::string& json_value) {
+    log.traces[0].attributes = {attribute};
+    const auto actual = log_to_features(log, options);
+    assert(actual.feature_names == std::vector<std::string>{"@@case_id_column"});
+    assert(std::get<EventAttribute>(actual.trace_rows[0][0]) == attribute);
+    assert(log_to_features_json(actual).find("\"trace_rows\":[[" + json_value + "]]") != std::string::npos);
+  };
+  check({"identifier", ""}, "\"\"");
+  check({"identifier", "opaque", AttributeKind::kId}, "\"opaque\"");
+  check({"identifier", "ignored", AttributeKind::kString, true}, "null");
+  const auto integer_detail = [](const std::string& value) {
+    return "{\"key\":\"identifier\",\"value\":\"" + value +
+        "\",\"kind\":\"int\",\"container\":\"scalar\",\"null\":false}";
+  };
+  check({"identifier", "9007199254740991", AttributeKind::kInt}, "9007199254740991");
+  check({"identifier", "-9007199254740991", AttributeKind::kInt}, "-9007199254740991");
+  check({"identifier", "9007199254740993", AttributeKind::kInt}, integer_detail("9007199254740993"));
+  check({"identifier", "-9007199254740992", AttributeKind::kInt}, integer_detail("-9007199254740992"));
+  check({"identifier", "+000123456789012345678901234567890", AttributeKind::kInt}, integer_detail("123456789012345678901234567890"));
+  check({"identifier", "1.25", AttributeKind::kFloat}, "1.25");
+  check({"identifier", "1e-400", AttributeKind::kFloat}, "0");
+  check({"identifier", "1e400", AttributeKind::kFloat}, "\"Infinity\"");
+  log.traces[0].attributes = {{"identifier", "0x1p2", AttributeKind::kFloat}};
+  bool hex_rejected = false;
+  try { (void)log_to_features_json(log_to_features(log, options)); }
+  catch (const std::invalid_argument&) { hex_rejected = true; }
+  assert(hex_rejected);
+  check({"identifier", "true", AttributeKind::kBoolean}, "true");
+  EventAttribute native{"identifier", "stale", AttributeKind::kInt};
+  native.typed_value = std::int64_t{9007199254740993};
+  check(native, integer_detail("9007199254740993"));
+  native.kind = AttributeKind::kBoolean;
+  native.typed_value = false;
+  check(native, "false");
+  native.kind = AttributeKind::kFloat;
+  native.typed_value = std::numeric_limits<double>::infinity();
+  check(native, "\"Infinity\"");
+  native.typed_value = -std::numeric_limits<double>::infinity();
+  check(native, "\"-Infinity\"");
+  native.typed_value = std::nan("");
+  check(native, "\"NaN\"");
+  native.kind = AttributeKind::kDate;
+  native.typed_value = NativeDate{"2024-01-01T00:00:00Z"};
+  check(native, "\"2024-01-01T00:00:00Z\"");
+
+  auto bytes = make_bytes_attribute("identifier", std::string("a\0b", 3));
+  log.traces[0].attributes = {bytes};
+  result = log_to_features(log, options);
+  assert(std::get<EventAttribute>(result.trace_rows[0][0]) == bytes);
+  assert(log_to_features_json(result).find("\"kind\":\"bytes\"") != std::string::npos);
+  EventAttribute nested{"identifier", "", AttributeKind::kString};
+  nested.container = AttributeContainerKind::kTuple;
+  nested.children = {bytes, native};
+  nested.first_class_role = FirstClassAttributeRole::kCaseId;
+  nested.first_class_state = FirstClassAttributeState::kPresent;
+  nested.first_class_source_key = "identifier";
+  log.traces[0].attributes = {nested};
+  result = log_to_features(log, options);
+  assert(std::get<EventAttribute>(result.trace_rows[0][0]) == nested);
+  const auto nested_json = log_to_features_json(result);
+  assert(nested_json.find("\"container\":\"tuple\"") != std::string::npos);
+  assert(nested_json.find("\"children\":[{") != std::string::npos);
+  assert(nested_json.find("\"typed_value\":\"2024-01-01T00:00:00Z\"") != std::string::npos);
+  EventAttribute unsafe_child{"large", "stale", AttributeKind::kInt};
+  unsafe_child.typed_value = std::int64_t{9007199254740993};
+  EventAttribute inner{"inner", "", AttributeKind::kString};
+  inner.container = AttributeContainerKind::kList;
+  inner.children = {unsafe_child,
+      EventAttribute{"larger", "+000123456789012345678901234567890", AttributeKind::kInt}};
+  nested.children.push_back(inner);
+  log.traces[0].attributes = {nested};
+  result = log_to_features(log, options);
+  assert(std::get<EventAttribute>(result.trace_rows[0][0]) == nested);
+  const auto exact_nested_json = log_to_features_json(result);
+  assert(exact_nested_json.find("\"key\":\"large\",\"value\":\"9007199254740993\"") != std::string::npos);
+  assert(exact_nested_json.find("\"key\":\"larger\",\"value\":\"123456789012345678901234567890\"") != std::string::npos);
+  assert(exact_nested_json.find("\"typed_value\":9007199254740993") == std::string::npos);
+
+  const auto rejects_json = [](const LogToFeaturesResult& malformed) {
+    bool rejected = false;
+    try { (void)log_to_features_json(malformed); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  result.feature_names[0] = "unknown";
+  rejects_json(result);
+  result.feature_names = {"unknown", "@@case_id_column"};
+  result.trace_rows[0].insert(result.trace_rows[0].begin(), 0.0);
+  rejects_json(result);
+  log.traces[0].attributes.clear();
+  bool missing_rejected = false;
+  try { (void)log_to_features(log, options); }
+  catch (const std::invalid_argument&) { missing_rejected = true; }
+  assert(missing_rejected);
+  options.case_id_key = "concept:name";
+  log.traces[0].case_id_attribute = EventAttribute{"concept:name", "stale", AttributeKind::kInt};
+  log.traces[0].case_id_attribute->typed_value = std::int64_t{42};
+  log.traces[0].case_id_state = FirstClassAttributeState::kPresent;
+  result = log_to_features(log, options);
+  assert(std::get<EventAttribute>(result.trace_rows[0][0]) == *log.traces[0].case_id_attribute);
+  assert(log_to_features_json(result).find("\"trace_rows\":[[42]]") != std::string::npos);
 }
 
 static Event timed_event(const std::string& case_id, const std::string& activity,
@@ -361,7 +500,8 @@ static void explicit_trace_numeric_attributes_retain_native_values() {
     const auto json = log_to_features_json(result);
     if (std::isnan(expected)) assert(json.find("\"NaN\"") != std::string::npos);
     if (std::isinf(expected) && expected < 0) assert(json.find("\"-Infinity\"") != std::string::npos);
-    for (double actual : result.trace_rows[0]) {
+    for (const auto& cell : result.trace_rows[0]) {
+      const double actual = std::get<double>(cell);
       if (std::isnan(expected)) assert(std::isnan(actual));
       else assert(actual == expected);
     }
@@ -844,6 +984,7 @@ static void trace_default_schema_infers_complete_trace_presence() {
 }
 
 int main() {
+  trace_identifier_feature_preserves_native_cells();
   occurrence_timing_uses_input_order_and_interval_endpoints();
   extra_features_append_to_custom_core_schema_and_respect_overrides();
   trace_default_schema_infers_complete_trace_presence();

@@ -4211,6 +4211,11 @@ void log_to_features_params_contract() {
       [](std::string_view) { return std::string{}; },
       [](std::string_view key) { return key == "features_case_string_attributes" || key == "features_case_numeric_attributes" || key == "features_event_successor_attributes" || key == "features_feature_names"; });
   assert(trace_empty.variant == minera::LogToFeaturesVariant::TRACE_BASED);
+  assert(trace_empty.case_id_key == "concept:name");
+  const auto identifier_key = minera::parse_log_to_features_params(fields({{"features_case_id_key", "custom:id"}}));
+  assert(identifier_key.case_id_key == "custom:id");
+  assert(minera::parse_log_to_features_params(fields({{"feature_case_id_key", "alias:id"}})).case_id_key == "alias:id");
+
   assert(trace_empty.case_string_attributes_supplied && trace_empty.case_string_attributes.empty());
   assert(trace_empty.case_numeric_attributes_supplied && trace_empty.case_numeric_attributes.empty());
   assert(trace_empty.event_successor_attributes_supplied && trace_empty.event_successor_attributes.empty());

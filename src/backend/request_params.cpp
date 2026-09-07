@@ -4880,6 +4880,7 @@ LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
     if (supplied(suffix)) out = require(suffix);
   };
   assign_string("activity_key", params.activity_key);
+  assign_string("case_id_key", params.case_id_key);
   assign_string("timestamp_key", params.timestamp_key);
   assign_string("start_timestamp_key", params.start_timestamp_key);
   assign_string("resource_key", params.resource_key);

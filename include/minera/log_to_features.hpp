@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "minera/event_log.hpp"
@@ -91,6 +92,7 @@ struct LogToFeaturesOptions {
   bool enable_first_last_activity_index_supplied = false;
   bool enable_max_concurrent_events_supplied = false;
   bool enable_max_concurrent_events_per_activity_supplied = false;
+  std::string case_id_key = "concept:name";
 };
 
 struct TemporalFeatureRow {
@@ -98,13 +100,16 @@ struct TemporalFeatureRow {
   std::vector<double> values;
 };
 
+using LogToFeaturesCell = std::variant<double, EventAttribute>;
+
 struct LogToFeaturesResult {
   LogToFeaturesVariant variant = LogToFeaturesVariant::TRACE_BASED;
   std::vector<std::string> feature_names;
-  // Case identifiers are carried out-of-band because feature rows are numeric.
+  // Supplemental projected identifiers; the optional first feature cell retains
+  // the selected identifier's native value and attribute metadata.
   std::vector<std::string> case_ids;
   std::vector<std::vector<std::vector<double>>> event_rows;
-  std::vector<std::vector<double>> trace_rows;
+  std::vector<std::vector<LogToFeaturesCell>> trace_rows;
   std::vector<TemporalFeatureRow> temporal_rows;
 };
 
