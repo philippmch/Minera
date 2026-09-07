@@ -630,6 +630,154 @@ static void trace_extra_timestamps_respect_native_values_and_presence() {
   rejects();
 }
 
+static void default_trace_selection_ignores_custom_core_schema() {
+  EventLog log;
+  Trace trace;
+  trace.case_id = "c";
+  trace.events = {timed_event("c", "A", "1970-01-01T00:00:00Z", "1970-01-01T00:00:10Z", 0)};
+  trace.events[0].resource.clear();
+  trace.events[0].attributes = {{"v", "2", AttributeKind::kInt}};
+  log.traces = {trace};
+  LogToFeaturesOptions options;
+  const auto expected = log_to_features(log, options);
+  assert((expected.feature_names == std::vector<std::string>{"event:concept:name@A", "event:v",
+      "succession:concept:name@UNDEFINED"}));
+  assert((expected.trace_rows[0] == std::vector<double>{1,2,1}));
+  options.feature_names_supplied = true;
+  for (const auto& schema : {std::vector<std::string>{}, std::vector<std::string>{"unknown"},
+                            std::vector<std::string>{"event:v"}}) {
+    options.feature_names = schema;
+    const auto result = log_to_features(log, options);
+    assert(result.feature_names == expected.feature_names);
+    assert(result.trace_rows == expected.trace_rows);
+  }
+  options.event_successor_attributes = {"v"};
+  options.event_successor_attributes_supplied = true;
+  options.feature_names = {"unknown", "@@caseDuration"};
+  options.enable_case_duration = true;
+  options.add_case_identifier_column = true;
+  const auto extras = log_to_features(log, options);
+  assert((extras.feature_names == std::vector<std::string>{"@@case_id_column", "event:concept:name@A",
+      "event:v", "succession:concept:name@UNDEFINED", "@@caseDuration"}));
+  assert(std::get<EventAttribute>(extras.trace_rows[0][0]).value == "c");
+  assert(extras.trace_rows[0][1] == 1 && extras.trace_rows[0][2] == 2 &&
+         extras.trace_rows[0][3] == 1 && extras.trace_rows[0][4] == 0);
+  options.event_string_attributes_supplied = true;
+  options.event_successor_attributes.clear();
+  options.feature_names = {"unknown"};
+  options.enable_case_duration = false;
+  options.add_case_identifier_column = false;
+  const auto explicit_empty = log_to_features(log, options);
+  assert(explicit_empty.feature_names == std::vector<std::string>{"unknown"});
+  assert((explicit_empty.trace_rows[0] == std::vector<double>{0}));
+  options.feature_names.clear();
+  assert(log_to_features(log, options).trace_rows[0].empty());
+}
+
+static void default_trace_strings_have_fixed_cardinality_limit() {
+  EventLog log;
+  const auto add_trace = [&](int value) {
+    Trace trace;
+    trace.case_id = "c" + std::to_string(value);
+    trace.attributes = {{"group", std::to_string(value)}};
+    Event event{trace.case_id, "A" + std::to_string(value)};
+    event.attributes = {{"label", std::to_string(value)}, {"number", std::to_string(value), AttributeKind::kInt}};
+    trace.events = {event};
+    log.traces.push_back(trace);
+  };
+  for (int i = 0; i < 12; ++i) add_trace(i);
+  LogToFeaturesOptions options;
+  options.enable_succ_def_representation = false;
+  options.min_num_different_string_values = 500;
+  options.max_num_different_string_values = 500;
+  const auto count_prefix = [](const auto& result, const std::string& prefix) {
+    return std::count_if(result.feature_names.begin(), result.feature_names.end(),
+                         [&](const auto& name) { return name.starts_with(prefix); });
+  };
+  auto result = log_to_features(log, options);
+  assert(count_prefix(result, "trace:group@") == 12);
+  assert(count_prefix(result, "event:label@") == 12);
+  assert(count_prefix(result, "event:concept:name@") == 12);
+  add_trace(12);
+  result = log_to_features(log, options);
+  assert(count_prefix(result, "trace:group@") == 0);
+  assert(count_prefix(result, "event:label@") == 0);
+  assert(count_prefix(result, "event:concept:name@") == 13);
+  assert(count_prefix(result, "event:number") == 1);
+  options.enable_activity_def_representation = false;
+  result = log_to_features(log, options);
+  assert(result.feature_names == std::vector<std::string>{"event:number"});
+  options.event_string_attributes = {"label"};
+  options.case_string_attributes = {"group"};
+  result = log_to_features(log, options);
+  assert(count_prefix(result, "trace:group@") == 13);
+  assert(count_prefix(result, "event:label@") == 13);
+}
+
+static void default_trace_selection_validates_all_candidate_hashability() {
+  EventLog log;
+  log.traces = {Trace{"c1", {Event{"c1", "A"}}}, Trace{"c2", {Event{"c2", "A"}}}};
+  EventAttribute mutable_value{"value", "", AttributeKind::kString};
+  mutable_value.children = {{"0", "1", AttributeKind::kInt}};
+  LogToFeaturesOptions options;
+  options.feature_names_supplied = true;
+  options.event_successor_attributes = {"unknown"};
+  const auto rejects = [&] {
+    bool rejected = false;
+    try { (void)log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  for (const auto kind : {AttributeContainerKind::kList, AttributeContainerKind::kContainer,
+                          AttributeContainerKind::kSet}) {
+    mutable_value.container = kind;
+    log.traces[0].events[0].attributes = {mutable_value};
+    rejects();
+    log.traces[0].events[0].attributes.clear();
+    log.traces[0].attributes = {mutable_value};
+    rejects();
+    log.traces[0].attributes.clear();
+  }
+  mutable_value.container = AttributeContainerKind::kList;
+  EventAttribute tuple{"value", "", AttributeKind::kString};
+  tuple.container = AttributeContainerKind::kTuple;
+  tuple.children = {mutable_value};
+  log.traces[0].events[0].attributes = {tuple};
+  rejects();
+  tuple.children[0].is_null = true;
+  log.traces[0].events[0].attributes = {tuple};
+  (void)log_to_features(log, options);
+  tuple.children.clear();
+  for (const auto kind : {AttributeContainerKind::kTuple, AttributeContainerKind::kFrozenSet}) {
+    tuple.container = kind;
+    log.traces[0].events[0].attributes = {tuple};
+    const auto result = log_to_features(log, options);
+    assert(std::none_of(result.feature_names.begin(), result.feature_names.end(),
+                        [](const auto& name) { return name.starts_with("event:value"); }));
+  }
+  log.traces[0].events[0].attributes.clear();
+  auto case_id = mutable_value;
+  case_id.key = "concept:name";
+  log.traces[0].case_id_attribute = case_id;
+  log.traces[0].case_id_state = FirstClassAttributeState::kPresent;
+  (void)log_to_features(log, options);
+  log.traces[0].events[0].activity_attribute = case_id;
+  log.traces[0].events[0].activity_state = FirstClassAttributeState::kPresent;
+  rejects();
+  log.traces[0].events[0].activity_attribute.reset();
+  log.traces[0].events[0].attributes = {mutable_value};
+  options.event_string_attributes_supplied = true;
+  assert(log_to_features(log, options).trace_rows[0].empty());
+  options.event_string_attributes = {"value"};
+  options.feature_names_supplied = false;
+  options.event_successor_attributes.clear();
+  const auto explicit_list = log_to_features(log, options);
+  // List attributes retain the ordered key/value child wrapper from import.
+  assert((explicit_list.feature_names == std::vector<std::string>{"event:value@UNDEFINED",
+      "event:value@{'value': None, 'children': [('0', 1)]}"}));
+  assert((explicit_list.trace_rows == std::vector<std::vector<double>>{{0,1}, {1,0}}));
+}
+
 static void temporal_calendar_frequency_uses_period_boundaries() {
   EventLog log;
   Trace first;
@@ -947,6 +1095,13 @@ static void numeric_features_resolve_first_class_cells_and_inference() {
     typed.container = kind;
     for (auto& entry : inferred_log.traces[0].events) entry.attributes = {typed};
     inferred_log.traces[0].attributes = {typed};
+    if (kind == AttributeContainerKind::kList || kind == AttributeContainerKind::kSet) {
+      bool rejected = false;
+      try { (void)log_to_features(inferred_log); }
+      catch (const std::invalid_argument&) { rejected = true; }
+      assert(rejected);
+      continue;
+    }
     const auto nested = log_to_features(inferred_log);
     assert(std::find(nested.feature_names.begin(), nested.feature_names.end(), "event:number") == nested.feature_names.end());
     assert(std::find(nested.feature_names.begin(), nested.feature_names.end(), "trace:number") == nested.feature_names.end());
@@ -1190,6 +1345,9 @@ static void trace_default_schema_infers_complete_trace_presence() {
 }
 
 int main() {
+  default_trace_selection_validates_all_candidate_hashability();
+  default_trace_strings_have_fixed_cardinality_limit();
+  default_trace_selection_ignores_custom_core_schema();
   trace_extra_timestamps_respect_native_values_and_presence();
   concurrency_uses_exact_comparison_and_required_accesses();
   indirect_paths_include_every_nonadjacent_later_event();
