@@ -1235,6 +1235,117 @@ static void temporal_calendar_string_case_ties_use_lexical_order() {
   } while (std::next_permutation(order.begin(), order.end()));
 }
 
+static void temporal_calendar_tuple_case_ordering() {
+  const auto integer = [](int value) { return EventAttribute{"", std::to_string(value), AttributeKind::kInt}; };
+  const auto tuple = [](std::vector<EventAttribute> children) {
+    EventAttribute value{"id", "", AttributeKind::kString};
+    value.container = AttributeContainerKind::kTuple;
+    value.children = std::move(children);
+    return value;
+  };
+  EventAttribute null{"", "stale"};
+  null.is_null = true;
+  const auto check = [&](EventAttribute anchor, EventAttribute a, EventAttribute b,
+                         const std::vector<double>& arrivals, bool rejects_tie = false,
+                         bool distinct = false) {
+    std::vector<Trace> traces{
+        Trace{"anchor", {Event{"anchor", "X", format_timestamp(0), "r"}}},
+        Trace{"a", {Event{"a", "A", format_timestamp(10), "r"}, Event{"a", "A", format_timestamp(20), "r"}}},
+        Trace{"b", {Event{"b", "B", format_timestamp(distinct ? 11 : 10), "r"}, Event{"b", "B", format_timestamp(30), "r"}}}};
+    const std::vector<EventAttribute> identifiers{anchor, a, b};
+    for (std::size_t i = 0; i < traces.size(); ++i)
+      for (auto& event : traces[i].events) {
+        auto id = identifiers[i];
+        id.key = "id";
+        event.attributes = {id};
+      }
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = "10s";
+    options.case_id_key = "id";
+    std::vector<std::size_t> order{0,1,2};
+    do {
+      EventLog log;
+      for (const auto i : order) log.traces.push_back(traces[i]);
+      if (rejects_tie) {
+        bool rejected = false;
+        try { (void)log_to_features(log, options); }
+        catch (const std::invalid_argument&) { rejected = true; }
+        assert(rejected);
+      } else {
+        const auto result = log_to_features(log, options);
+        assert(result.temporal_rows.size() == 4);
+        const std::vector<double> finishes{0,15,20,10};
+        for (std::size_t i = 0; i < 4; ++i) {
+          assert(result.temporal_rows[i].values[3] == arrivals[i]);
+          assert(result.temporal_rows[i].values[4] == finishes[i]);
+        }
+      }
+    } while (std::next_permutation(order.begin(), order.end()));
+  };
+  check(tuple({integer(0)}), tuple({integer(2)}), tuple({integer(1)}), {0,5,0,10});
+  check(tuple({tuple({integer(0)})}), tuple({tuple({integer(2)})}), tuple({tuple({integer(1)})}), {0,5,0,10});
+  check(tuple({null, integer(0)}), tuple({null, integer(1)}), tuple({null, integer(2)}), {0,5,10,0});
+  check(tuple({}), tuple({integer(1), integer(2)}), tuple({integer(1)}), {0,5,0,10});
+  EventAttribute real{"", "stale", AttributeKind::kFloat};
+  real.typed_value = 1.0;
+  check(tuple({integer(0)}), tuple({integer(1), integer(2)}), tuple({real, integer(1)}), {0,5,0,10});
+  const EventAttribute text{"", "a"};
+  check(tuple({tuple({integer(0)})}), tuple({tuple({integer(1)})}), tuple({text}), {}, true);
+  check(tuple({tuple({integer(0)})}), tuple({tuple({integer(1)})}), tuple({text}), {0,5.5,10,1}, false, true);
+  check(tuple({integer(0)}), tuple({integer(1)}), text, {}, true);
+  check(tuple({integer(0)}), tuple({integer(1)}), text, {0,5.5,10,1}, false, true);
+  check(tuple({integer(0)}), tuple({tuple({integer(1)})}), tuple({integer(1)}), {}, true);
+  check(tuple({integer(0)}), tuple({tuple({integer(1)})}), tuple({integer(1)}), {}, true, true);
+  check(tuple({integer(0)}), tuple({integer(2)}), integer(1), {}, true, true);
+  check(tuple({integer(0)}), tuple({null}), tuple({integer(1)}), {}, true);
+  check(tuple({integer(0)}), tuple({null}), tuple({integer(1)}), {0,5.5,10,1}, false, true);
+
+  const auto bytes = make_bytes_attribute("", "x");
+  EventAttribute date{"", "2024-01-01T00:00:00Z", AttributeKind::kDate};
+  EventAttribute boolean{"", "true", AttributeKind::kBoolean};
+  struct ResourcePair { EventAttribute first, second; bool rejects; };
+  const std::vector<ResourcePair> resource_pairs{
+      {tuple({integer(1)}), integer(1), true},
+      {tuple({integer(1)}), boolean, true},
+      {tuple({integer(1)}), date, true},
+      {tuple({integer(1)}), bytes, false},
+      {tuple({integer(1)}), text, false},
+      {tuple({integer(1)}), tuple({bytes}), true},
+      {tuple({integer(1)}), tuple({date}), true},
+      {tuple({null}), tuple({integer(1)}), false},
+      {tuple({integer(1)}), tuple({text}), false},
+      {tuple({tuple({integer(1)})}), tuple({bytes}), false},
+      {tuple({tuple({integer(1)})}), tuple({null}), false},
+      {tuple({tuple({integer(1)})}), tuple({integer(1)}), true},
+      {tuple({}), tuple({integer(1)}), false},
+      {tuple({integer(1), integer(2)}), tuple({integer(1)}), false},
+      {tuple({integer(1), null}), tuple({integer(1), integer(2)}), false}};
+  for (const auto& pair : resource_pairs)
+    for (const bool separate : {false, true})
+      for (const bool reverse : {false, true}) {
+        auto first = pair.first, second = pair.second;
+        first.key = second.key = "owner";
+        Event a{"c", "A", "2024-01-01T00:00:00Z", ""};
+        Event b{"c", "A", separate ? "2024-01-02T00:00:00Z" : "2024-01-01T00:00:01Z", ""};
+        a.attributes = {reverse ? second : first};
+        b.attributes = {reverse ? first : second};
+        EventLog log;
+        log.traces = {Trace{"c", {a,b}}};
+        LogToFeaturesOptions options;
+        options.variant = LogToFeaturesVariant::TEMPORAL;
+        options.grouper_freq = "D";
+        options.resource_key = "owner";
+        bool rejected = false;
+        try {
+          const auto result = log_to_features(log, options);
+          assert(result.temporal_rows.size() == (separate ? 2 : 1));
+          for (const auto& row : result.temporal_rows) assert(row.values[0] == (separate ? 1 : 2));
+        } catch (const std::invalid_argument&) { rejected = true; }
+        assert(rejected == (pair.rejects && !separate));
+      }
+}
+
 static void temporal_calendar_scalar_case_ordering_is_exact() {
   const auto integer = [](const std::string& value) { return EventAttribute{"id", value, AttributeKind::kInt}; };
   const auto real = [](double value) {
@@ -2416,6 +2527,7 @@ int main() {
   temporal_calendar_timestamps_use_projected_native_dates();
   temporal_calendar_categories_use_projected_trace_columns();
   temporal_calendar_numeric_columns_promote_before_grouping();
+  temporal_calendar_tuple_case_ordering();
   temporal_calendar_scalar_case_ordering_is_exact();
   temporal_calendar_string_case_ties_use_lexical_order();
   temporal_calendar_groups_selected_typed_case_identifiers();
