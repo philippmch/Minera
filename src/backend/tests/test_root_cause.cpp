@@ -927,7 +927,55 @@ void test_integer_float_overflow() {
   assert(std::isinf(build_root_cause_representation({huge}, {}, {{}, {"v"}}).data[0][0]));
 }
 
+void test_byte_values() {
+  using namespace minera;
+  std::string all;
+  for (int i = 0; i < 256; ++i) all += static_cast<char>(i);
+  assert(decode_bytes_attribute(make_bytes_attribute("v", all)) == all);
+  assert(root_cause_attribute_category(make_bytes_attribute("v", "")) == "b''");
+  assert(root_cause_attribute_category(make_bytes_attribute("v", "a'b")) == "b\"a'b\"");
+  const std::string controls{"\0\t\n\r\x1f\x7f\x80\xff", 8};
+  assert(root_cause_attribute_category(make_bytes_attribute("v", controls)) == "b'\\x00\\t\\n\\r\\x1f\\x7f\\x80\\xff'");
+  auto a = make_bytes_attribute("v", std::string(1, static_cast<char>(0xaf)));
+  auto b = a;
+  b.value = "AF";
+  assert(root_cause_scalar_keys_equal(a, b));
+  assert(root_cause_scalar_key_fingerprint(a) == root_cause_scalar_key_fingerprint(b));
+  a = make_bytes_attribute("v", "1");
+  assert(!root_cause_scalar_keys_equal(a, EventAttribute{"v", "1"}));
+  assert(!root_cause_scalar_keys_equal(a, EventAttribute{"v", "b'1'"}));
+  const auto representation = [](const EventAttribute& value) {
+    RootCauseObservation observation;
+    observation.context.attributes = {value};
+    return build_root_cause_representation({observation}, {}, {{}, {"v"}});
+  };
+  assert(representation(make_bytes_attribute("v", "1_2.5")).data[0][0] == 12.5);
+  Trace derived;
+  derived.case_id_attribute = make_bytes_attribute("case", "original");
+  set_trace_case_id(derived, "derived-case");
+  assert(derived.case_id_attribute->kind == AttributeKind::kString);
+  assert(derived.case_id_attribute->value == "derived-case");
+  auto authoritative = make_bytes_attribute("v", "1_2.5");
+  for (const NativeAttributeValue stale : {NativeAttributeValue{std::int64_t{99}}, NativeAttributeValue{NativeDate{"invalid"}}}) {
+    authoritative.typed_value = stale;
+    assert(representation(authoritative).data[0][0] == 12.5);
+    assert(root_cause_attribute_category(authoritative) == "b'1_2.5'");
+    assert(root_cause_scalar_keys_equal(authoritative, make_bytes_attribute("v", "1_2.5")));
+  }
+  assert(std::isinf(representation(make_bytes_attribute("v", "inf")).data[0][0]));
+  assert(std::isnan(representation(make_bytes_attribute("v", "nan")).data[0][0]));
+  for (const auto& raw : {std::string(""), std::string("\xc2\xa0" "1"), std::string("\xef\xbc\x91"), std::string("1\0", 2)})
+    rejects([&] { (void)representation(make_bytes_attribute("v", raw)); });
+  rejects([&] { (void)decode_bytes_attribute(EventAttribute{"v", "f", AttributeKind::kBytes}); });
+  rejects([&] { (void)decode_bytes_attribute(EventAttribute{"v", "zz", AttributeKind::kBytes}); });
+  EventAttribute tuple{"v", ""};
+  tuple.container = AttributeContainerKind::kTuple;
+  tuple.children = {a};
+  assert(root_cause_attribute_category(tuple) == "(b'1',)");
+}
+
 int main() {
+  test_byte_values();
   test_integer_float_overflow();
   test_shared_cyclic_encoding();
   test_tuple_values();

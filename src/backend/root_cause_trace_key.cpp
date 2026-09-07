@@ -62,9 +62,10 @@ Attributes trace_attributes(const Trace& trace) {
   return result;
 }
 
-enum class Scalar { kNull, kString, kInteger, kReal, kDate };
+enum class Scalar { kNull, kString, kInteger, kReal, kDate, kBytes };
 Scalar scalar_kind(const EventAttribute& value) {
   if (value.is_null) return Scalar::kNull;
+  if (value.kind == AttributeKind::kBytes) return Scalar::kBytes;
   if (std::holds_alternative<NativeDate>(value.typed_value)) return Scalar::kDate;
   if (std::holds_alternative<double>(value.typed_value)) return Scalar::kReal;
   if (std::holds_alternative<std::int64_t>(value.typed_value) || std::holds_alternative<bool>(value.typed_value)) return Scalar::kInteger;
@@ -128,6 +129,8 @@ DateValue date_value(const EventAttribute& value) {
 bool scalar_equal(const EventAttribute& left, const EventAttribute& right) {
   const auto a = scalar_kind(left), b = scalar_kind(right);
   if (a == Scalar::kNull || b == Scalar::kNull) return a == b;
+  if (a == Scalar::kBytes || b == Scalar::kBytes)
+    return a == b && decode_bytes_attribute(left) == decode_bytes_attribute(right);
   if (a == Scalar::kDate || b == Scalar::kDate)
     return a == b && date_value(left) == date_value(right);
   if (a == Scalar::kString || b == Scalar::kString)
@@ -211,6 +214,7 @@ void append_part(std::string& result, const std::string& part) {
 std::string scalar_fingerprint(const EventAttribute& value) {
   switch (scalar_kind(value)) {
     case Scalar::kNull: return "N";
+    case Scalar::kBytes: return "B" + decode_bytes_attribute(value);
     case Scalar::kString: return "S" + value.value;
     case Scalar::kInteger: return "I" + integer_text(value);
     case Scalar::kReal: {

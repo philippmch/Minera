@@ -453,7 +453,43 @@ void tuple_key_contracts() {
           "tuple string export retains an explicit null state");
 }
 
-int main() {
+void byte_key_contracts() {
+  const auto key = make_bytes_attribute("task", "1");
+  const std::vector<EventAttribute> activities = {key, {"task", "1"}, {"task", "b'1'"},
+      {"task", "1", AttributeKind::kInt}, {"task", "bad"}};
+  EventLog log;
+  for (std::size_t i = 0; i < activities.size(); ++i) {
+    auto source = trace({event("", std::to_string(i + 1))});
+    source.case_id = std::to_string(i);
+    source.events[0].attributes.push_back(activities[i]);
+    log.traces.push_back(std::move(source));
+  }
+  TokenReplayOptions options;
+  options.activity_attribute = "task";
+  options.root_cause.numeric_attributes = {"cost"};
+  TokenReplayUnknownRootCauseCohort cohort{"", false, {{4, event("", "99")}}, key};
+  const auto verify = [&](const EventLog& input) {
+    const auto models = token_replay_unknown_root_cause_diagnostics(input, {cohort}, options);
+    require(models.size() == 1 && models[0].data == std::vector<std::vector<double>>({{2}, {3}, {4}, {99}}),
+            "byte key excludes byte activity but preserves string and numeric baselines");
+    require(models[0].activity == "b'1'" && models[0].activity_attribute->kind == AttributeKind::kBytes,
+            "byte diagnostic retains binary type and readable spelling");
+  };
+  verify(log);
+  verify(event_table_to_event_log(event_log_to_table(log)));
+  for (const NativeAttributeValue stale : {NativeAttributeValue{std::int64_t{99}}, NativeAttributeValue{NativeDate{"invalid"}}}) {
+    log.traces[0].events[0].attributes.back().typed_value = stale;
+    std::istringstream xml(to_xes(log));
+    const auto imported = import_xes_event_log(xml);
+    const auto& attributes = imported.traces[0].events[0].attributes;
+    const auto restored = std::find_if(attributes.begin(), attributes.end(), [](const auto& value) { return value.key == "task"; });
+    require(restored != attributes.end() && restored->kind == AttributeKind::kString && restored->value == "b'1'",
+            "XES byte spelling overrides stale native scalar values");
+  }
+}
+
+int main() try {
+  byte_key_contracts();
   tuple_key_contracts();
   typed_unknown_activity_keys();
   unknown_baseline_cache_preserves_lazy_validation();
@@ -464,4 +500,7 @@ int main() {
   nan_trace_membership_contracts();
   xes_encoding_contracts();
   std::cout << "root-cause replay contracts passed\n";
+} catch (const std::exception& error) {
+  std::cerr << error.what() << '\n';
+  return 1;
 }

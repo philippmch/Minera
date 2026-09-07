@@ -68,6 +68,7 @@ const char* kind_name(AttributeKind kind) {
     case AttributeKind::kFloat: return "float";
     case AttributeKind::kBoolean: return "boolean";
     case AttributeKind::kId: return "id";
+    case AttributeKind::kBytes: return "bytes";
   }
   throw std::invalid_argument("DFG dataframe JSON: invalid attribute kind");
 }

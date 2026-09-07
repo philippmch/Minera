@@ -28,6 +28,8 @@ describe("root-cause diagnostic classifiers", () => {
       { ...rootCauseModel, activity: "1", activity_is_null: false,
         activity_attribute: { key: "concept:name", value: "1", kind: "int", container: "scalar", null: false, typed_value: 1 } },
       { ...rootCauseModel, activity: "1", activity_is_null: false },
+      { ...rootCauseModel, activity: "b'1'", activity_is_null: false,
+        activity_attribute: { key: "task", value: "31", kind: "bytes", container: "scalar", null: false } },
       { ...rootCauseModel, activity: "(1,)", activity_is_null: false,
         activity_attribute: { key: "concept:name", value: "", kind: "string", container: "tuple", null: false } },
       { ...rootCauseModel, activity: "9007199254740993", activity_is_null: false,
@@ -35,6 +37,7 @@ describe("root-cause diagnostic classifiers", () => {
     ] });
     expect(html).toContain("<strong>1 (int)</strong>");
     expect(html).toContain("<strong>&quot;1&quot;</strong>");
+    expect(html).toContain("<strong>b&#x27;1&#x27;</strong>");
     expect(html).toContain("<strong>(1,) (tuple)</strong>");
     expect(html).toContain("<strong>9007199254740993 (int)</strong>");
   });

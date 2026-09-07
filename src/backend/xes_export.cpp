@@ -57,6 +57,7 @@ std::string_view element_name(AttributeKind kind) {
     case AttributeKind::kFloat: return "float";
     case AttributeKind::kBoolean: return "boolean";
     case AttributeKind::kId: return "id";
+    case AttributeKind::kBytes: return "string";
   }
   return "string";
 }
@@ -93,37 +94,39 @@ bool parse_float_value(std::string_view value, double& result) {
 
 std::string scalar_lexical_value(const EventAttribute& attribute) {
   if (attribute.is_null) return {};
-  if (const auto* value = std::get_if<std::int64_t>(&attribute.typed_value)) {
-    if (attribute.kind != AttributeKind::kInt)
-      throw std::invalid_argument("XES attribute has an incompatible integer native value");
-    return std::to_string(*value);
-  }
-  if (const auto* value = std::get_if<double>(&attribute.typed_value)) {
-    if (attribute.kind != AttributeKind::kFloat)
-      throw std::invalid_argument("XES attribute has an incompatible float native value");
-    if (std::isnan(*value)) return "NaN";
-    if (std::isinf(*value)) return *value < 0 ? "-INF" : "INF";
-    char buffer[128];
-    const auto converted = std::to_chars(
-        buffer, buffer + sizeof(buffer), *value,
-        std::chars_format::general, std::numeric_limits<double>::max_digits10);
-    if (converted.ec != std::errc{})
-      throw std::invalid_argument("XES float attribute cannot be serialized");
-    return std::string(buffer, converted.ptr);
-  }
-  if (const auto* value = std::get_if<bool>(&attribute.typed_value)) {
-    if (attribute.kind != AttributeKind::kBoolean)
-      throw std::invalid_argument("XES attribute has an incompatible boolean native value");
-    return *value ? "true" : "false";
-  }
-  if (const auto* value = std::get_if<NativeDate>(&attribute.typed_value)) {
-    if (attribute.kind != AttributeKind::kDate)
-      throw std::invalid_argument("XES attribute has an incompatible date native value");
-    const auto instant = parse_timestamp(value->value);
-    if (!instant)
-      throw std::invalid_argument("XES date attribute has an invalid native value: " +
-                                  value->value);
-    return format_timestamp(*instant);
+  if (attribute.kind != AttributeKind::kBytes) {
+    if (const auto* value = std::get_if<std::int64_t>(&attribute.typed_value)) {
+      if (attribute.kind != AttributeKind::kInt)
+        throw std::invalid_argument("XES attribute has an incompatible integer native value");
+      return std::to_string(*value);
+    }
+    if (const auto* value = std::get_if<double>(&attribute.typed_value)) {
+      if (attribute.kind != AttributeKind::kFloat)
+        throw std::invalid_argument("XES attribute has an incompatible float native value");
+      if (std::isnan(*value)) return "NaN";
+      if (std::isinf(*value)) return *value < 0 ? "-INF" : "INF";
+      char buffer[128];
+      const auto converted = std::to_chars(
+          buffer, buffer + sizeof(buffer), *value,
+          std::chars_format::general, std::numeric_limits<double>::max_digits10);
+      if (converted.ec != std::errc{})
+        throw std::invalid_argument("XES float attribute cannot be serialized");
+      return std::string(buffer, converted.ptr);
+    }
+    if (const auto* value = std::get_if<bool>(&attribute.typed_value)) {
+      if (attribute.kind != AttributeKind::kBoolean)
+        throw std::invalid_argument("XES attribute has an incompatible boolean native value");
+      return *value ? "true" : "false";
+    }
+    if (const auto* value = std::get_if<NativeDate>(&attribute.typed_value)) {
+      if (attribute.kind != AttributeKind::kDate)
+        throw std::invalid_argument("XES attribute has an incompatible date native value");
+      const auto instant = parse_timestamp(value->value);
+      if (!instant)
+        throw std::invalid_argument("XES date attribute has an invalid native value: " +
+                                    value->value);
+      return format_timestamp(*instant);
+    }
   }
 
   switch (attribute.kind) {
@@ -157,6 +160,12 @@ std::string scalar_lexical_value(const EventAttribute& attribute) {
     case AttributeKind::kString:
     case AttributeKind::kId:
       return attribute.value;
+    case AttributeKind::kBytes: {
+      auto scalar = attribute;
+      scalar.children.clear();
+      scalar.container = AttributeContainerKind::kScalar;
+      return root_cause_attribute_category(scalar);
+    }
   }
   throw std::invalid_argument("XES attribute has an unsupported kind");
 }

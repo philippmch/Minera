@@ -121,8 +121,17 @@
     "numeric_cycle": "Rejected as a nonnumeric dictionary value.",
     "integer_overflow": "Integer 10**400 cannot convert to float64, while the equivalent numeric string produces infinity in the standalone representation helper."
   },
+  "byte_values": {
+    "hex_storage": "Native byte cells use kind=bytes and a hexadecimal value; make_bytes_attribute and decode_bytes_attribute convert binary octets losslessly.",
+    "empty_category": "b''",
+    "quote_selection": "Bytes containing an apostrophe but no double quote use double-quoted representation; otherwise apostrophes delimit and escape as needed.",
+    "control_category": "b'\\x00\\t\\n\\r\\x1f\\x7f\\x80\\xff'",
+    "numeric": "ASCII numeric byte strings accept underscores, NaN, and infinity; UTF-8 Unicode digits/whitespace and embedded NUL are rejected.",
+    "unknown_key": "b'1' excludes a byte-valued activity while string 1, string b'1', and numeric 1 remain baseline values.",
+    "xes": "Both exporter variations serialize bytes as their b-prefixed string representation."
+  },
   "remaining_contracts": [
-    "Bytes, set, and frozenset categorical values still lack native type representations.",
+    "Set and frozenset categorical values still lack native type representations.",
     "Cyclic shared value graphs cannot be materialized into the native tree-shaped EventLog representation.",
     "Native scalar replacement must use assignment or emplace to renew NaN alias identity; mutation through a raw mutable variant reference does not renew it.",
     "Legacy backwards replay diagnostic context production is a native extension."
