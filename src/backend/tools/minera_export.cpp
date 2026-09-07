@@ -1124,6 +1124,11 @@ int usage(const char* program) {
                "  --token-replay-include-duration-diagnostics <bool>\n"
                "                            Compare case durations by replay deviation\n"
                "  --token-replay-timestamp-attribute <name> Case-duration timestamp field\n"
+               "  --token-replay-include-root-cause-diagnostics <bool>\n"
+               "                            Train attribute explanations for replay deviations\n"
+               "  --token-replay-root-cause-string-attributes <names> Comma-separated categories\n"
+               "  --token-replay-root-cause-numeric-attributes <names> Comma-separated numeric fields\n"
+               "  --token-replay-root-cause-enable-multiplier <bool> Repeat the smaller cohort\n"
                "  --token-replay-case-id-attribute <name> Flat-input case selector\n"
                "  --token-replay-max-rows-to-materialize <n> Replay event cap\n"
                "  --token-replay-stop-immediately-unfit\n"
@@ -2090,6 +2095,25 @@ int main(int argc, char** argv) {
       }
       continue;
     }
+    if (arg == "--token-replay-root-cause-string-attributes" ||
+        arg == "--token-replay-root-cause-numeric-attributes") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const bool strings = arg == "--token-replay-root-cause-string-attributes";
+      const std::string_view name = strings ? "token_replay_root_cause_string_attributes"
+                                            : "token_replay_root_cause_numeric_attributes";
+      try {
+        const auto parsed = minera::parse_token_replay_params(
+            [&](std::string_view field) { return field == name ? std::string(value) : std::string{}; },
+            [&](std::string_view field) { return field == name; });
+        if (strings) token_replay_options.root_cause.string_attributes = parsed.root_cause.string_attributes;
+        else token_replay_options.root_cause.numeric_attributes = parsed.root_cause.numeric_attributes;
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      continue;
+    }
     bool* replay_policy = nullptr;
     for (const auto& [name, destination] : {
              std::pair<std::string_view, bool*>{
@@ -2098,7 +2122,9 @@ int main(int argc, char** argv) {
              {"--token-replay-consider-activities-not-in-model-in-fitness", &token_replay_options.consider_activities_not_in_model_in_fitness},
              {"--token-replay-walk-through-hidden-transitions", &token_replay_options.walk_through_hidden_transitions},
              {"--token-replay-include-trace-diagnostics", &token_replay_options.include_trace_diagnostics},
-             {"--token-replay-include-duration-diagnostics", &token_replay_options.include_duration_diagnostics}}) {
+             {"--token-replay-include-duration-diagnostics", &token_replay_options.include_duration_diagnostics},
+             {"--token-replay-include-root-cause-diagnostics", &token_replay_options.include_root_cause_diagnostics},
+             {"--token-replay-root-cause-enable-multiplier", &token_replay_options.root_cause.enable_multiplier}}) {
       if (arg == name) replay_policy = destination;
     }
     if (replay_policy) {

@@ -12,6 +12,7 @@
 #include "minera/event_log.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/process_tree.hpp"
+#include "minera/root_cause.hpp"
 
 namespace minera {
 
@@ -105,6 +106,33 @@ struct TokenReplayUnknownActivityDurationCohort {
   std::vector<std::size_t> problem_trace_indices;
 };
 
+struct TokenReplayTransitionRootCauseDiagnostics : RootCauseModel {
+  std::size_t transition_index = 0;
+};
+
+struct TokenReplayUnknownRootCauseDiagnostics : RootCauseModel {
+  std::string activity;
+  bool activity_is_null = false;
+};
+
+struct TokenReplayRootCauseDiagnostics {
+  RootCauseOptions options;
+  std::vector<TokenReplayTransitionRootCauseDiagnostics> transitions;
+  std::vector<TokenReplayUnknownRootCauseDiagnostics> unknown_activities;
+};
+
+struct TokenReplayTransitionRootCauseCohort {
+  std::size_t transition_index = 0;
+  std::vector<RootCauseObservation> fit_contexts;
+  std::vector<RootCauseObservation> problem_contexts;
+};
+
+struct TokenReplayUnknownRootCauseCohort {
+  std::string activity;
+  bool activity_is_null = false;
+  std::vector<RootCauseObservation> problem_contexts;
+};
+
 // Conformance of an event log against a discovered model: the four standard
 // quality dimensions. Token-based replay fitness (does the model reproduce the
 // log?), escaping-edges precision (does the model allow much more than the
@@ -134,6 +162,7 @@ struct ConformanceResult {
   std::string activity_attribute = "concept:name";
   std::optional<std::vector<TokenReplayTraceDiagnostics>> trace_diagnostics;
   std::optional<TokenReplayDurationDiagnostics> duration_diagnostics;
+  std::optional<TokenReplayRootCauseDiagnostics> root_cause_diagnostics;
 };
 
 // Token-replay implementation variation. FORWARD is the modern replay used
@@ -176,7 +205,22 @@ struct TokenReplayOptions {
   std::optional<std::size_t> max_rows_to_materialize;
   bool include_duration_diagnostics = false;
   std::string timestamp_attribute = "time:timestamp";
+  bool include_root_cause_diagnostics = false;
+  RootCauseOptions root_cause;
 };
+
+[[nodiscard]] std::vector<TokenReplayTransitionRootCauseDiagnostics>
+token_replay_transition_root_cause_diagnostics(
+    const EventLog& log, const std::vector<TokenReplayTransitionRootCauseCohort>& cohorts,
+    const RootCauseOptions& options = {});
+[[nodiscard]] std::vector<TokenReplayUnknownRootCauseDiagnostics>
+token_replay_unknown_root_cause_diagnostics(
+    const EventLog& log, const std::vector<TokenReplayUnknownRootCauseCohort>& cohorts,
+    const TokenReplayOptions& options = {});
+[[nodiscard]] TokenReplayRootCauseDiagnostics compute_token_replay_root_cause_diagnostics(
+    const EventLog& log, const PetriNet& net,
+    const std::vector<TokenReplayTraceDiagnostics>& traces,
+    const TokenReplayOptions& options = {});
 
 // Seconds between the first and last source-order events. Empty traces and
 // missing/null/invalid endpoint timestamps fail; intermediate events are not read.

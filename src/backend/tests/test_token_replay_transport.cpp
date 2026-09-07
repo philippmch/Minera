@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include <map>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -33,6 +34,9 @@ void replay_policy_request_contract() {
   assert(defaults.walk_through_hidden_transitions);
   assert(!defaults.include_trace_diagnostics);
   assert(!defaults.include_duration_diagnostics);
+  assert(!defaults.include_root_cause_diagnostics);
+  assert(!defaults.root_cause.enable_multiplier);
+  assert(defaults.root_cause.string_attributes.empty() && defaults.root_cause.numeric_attributes.empty());
   assert(defaults.timestamp_attribute == "time:timestamp");
   const Fields configured{
       {"token_replay_variant", "backwards"},
@@ -44,6 +48,10 @@ void replay_policy_request_contract() {
       {"token_replay_walk_through_hidden_transitions", "false"},
       {"token_replay_include_trace_diagnostics", "true"},
       {"token_replay_include_duration_diagnostics", "true"},
+      {"token_replay_include_root_cause_diagnostics", "true"},
+      {"token_replay_root_cause_enable_multiplier", "1"},
+      {"token_replay_root_cause_string_attributes", " team ,region,team "},
+      {"token_replay_root_cause_numeric_attributes", "cost,cost"},
       {"token_replay_timestamp_attribute", " completed_at "},
       {"token_replay_case_id_attribute", " group "},
       {"token_replay_max_rows_to_materialize", "0"}};
@@ -55,12 +63,17 @@ void replay_policy_request_contract() {
   assert(!options.consider_activities_not_in_model_in_fitness);
   assert(!options.walk_through_hidden_transitions && options.include_trace_diagnostics);
   assert(options.include_duration_diagnostics && options.timestamp_attribute == "completed_at");
+  assert(options.include_root_cause_diagnostics && options.root_cause.enable_multiplier);
+  assert((options.root_cause.string_attributes == std::vector<std::string>{"team", "region", "team"}));
+  assert((options.root_cause.numeric_attributes == std::vector<std::string>{"cost", "cost"}));
   assert(options.case_id_attribute == "group");
   assert(options.max_rows_to_materialize && *options.max_rows_to_materialize == 0);
   const auto mine = minera::parse_mine_params(lookup(configured), presence(configured));
   assert(mine.token_replay_activity_attribute_supplied);
   assert(mine.token_replay.include_trace_diagnostics);
   assert(mine.token_replay.include_duration_diagnostics);
+  assert(mine.token_replay.include_root_cause_diagnostics && mine.token_replay.root_cause.enable_multiplier);
+  assert(mine.token_replay.root_cause.numeric_attributes == options.root_cause.numeric_attributes);
   assert(mine.token_replay.timestamp_attribute == "completed_at");
   assert(!mine.token_replay.walk_through_hidden_transitions);
   assert(!mine.token_replay.consider_remaining_in_fitness);
@@ -71,6 +84,7 @@ void replay_policy_request_contract() {
          "token_replay_consider_activities_not_in_model_in_fitness",
          "token_replay_walk_through_hidden_transitions", "token_replay_include_trace_diagnostics",
          "token_replay_include_duration_diagnostics", "token_replay_timestamp_attribute",
+         "token_replay_include_root_cause_diagnostics", "token_replay_root_cause_enable_multiplier",
          "token_replay_case_id_attribute", "token_replay_max_rows_to_materialize"}) {
     for (const auto* value : {"", "  ", "invalid"}) {
       if ((std::string_view(name) == "token_replay_activity_attribute" ||
@@ -94,6 +108,18 @@ void replay_policy_request_contract() {
     try { (void)minera::parse_token_replay_params(lookup(invalid), presence(invalid)); }
     catch (const std::invalid_argument&) { rejected = true; }
     assert(rejected);
+  }
+  for (const auto* name : {"token_replay_root_cause_string_attributes", "token_replay_root_cause_numeric_attributes"}) {
+    for (const auto* value : {",", "a,", ",b", "a, ,b", "a\nb"}) {
+      const Fields invalid{{name, value}};
+      bool rejected = false;
+      try { (void)minera::parse_token_replay_params(lookup(invalid), presence(invalid)); }
+      catch (const std::invalid_argument&) { rejected = true; }
+      assert(rejected);
+    }
+    const Fields empty_list{{name, ""}};
+    const auto parsed = minera::parse_token_replay_params(lookup(empty_list), presence(empty_list));
+    assert(parsed.root_cause.string_attributes.empty() && parsed.root_cause.numeric_attributes.empty());
   }
 }
 
@@ -196,6 +222,58 @@ void replay_duration_json_contract() {
   assert(minera::imported_model_json(model, graph).find("\"transitions\": [], \"unknown_activities\": []") != std::string::npos);
 }
 
+void replay_root_cause_json_contract() {
+  minera::DirectlyFollowsGraph graph;
+  minera::ModelConformance model;
+  assert(minera::imported_model_json(model, graph).find("root_cause_diagnostics") == std::string::npos);
+  model.token_replay.root_cause_diagnostics.emplace();
+  auto& diagnostics = *model.token_replay.root_cause_diagnostics;
+  diagnostics.options.numeric_attributes = {"cost", "cost"};
+  diagnostics.options.enable_multiplier = true;
+  const auto observation = [](double value, std::size_t trace) {
+    minera::RootCauseObservation result;
+    result.trace_index = trace;
+    minera::EventAttribute attribute;
+    attribute.key = "cost";
+    attribute.kind = minera::AttributeKind::kFloat;
+    attribute.typed_value = value;
+    result.context.attributes.push_back(attribute);
+    return result;
+  };
+  const double value = 0.12345678912345678;
+  const auto trained = minera::fit_root_cause_model(
+      {observation(value, 2)}, {observation(std::numeric_limits<double>::quiet_NaN(), 7)},
+      diagnostics.options);
+  assert(trained && trained->tree.front().missing_only);
+  minera::TokenReplayTransitionRootCauseDiagnostics transition;
+  static_cast<minera::RootCauseModel&>(transition) = *trained;
+  transition.transition_index = 3;
+  diagnostics.transitions.push_back(transition);
+  minera::TokenReplayUnknownRootCauseDiagnostics unknown;
+  static_cast<minera::RootCauseModel&>(unknown) = *trained;
+  unknown.classes[1] = "containing";
+  unknown.activity = "unknown\"activity";
+  unknown.activity_is_null = true;
+  diagnostics.unknown_activities.push_back(unknown);
+  const auto json = minera::imported_model_json(model, graph);
+  assert(json.find("\"root_cause_diagnostics\": {\"string_attributes\": [], \"numeric_attributes\": [\"cost\", \"cost\"], \"enable_multiplier\": true") != std::string::npos);
+  assert(json.find("\"transition_index\": 3, \"fit_count\": 1, \"problem_count\": 1") != std::string::npos);
+  assert(json.find("\"feature_names\": [\"event:cost\", \"event:cost\"]") != std::string::npos);
+  assert(json.find("\"classes\": [\"fit\", \"underfed\"]") != std::string::npos);
+  assert(json.find("\"classes\": [\"fit\", \"containing\"]") != std::string::npos);
+  assert(json.find("\"target\": [0, 1], \"source_trace_indices\": [2, 7]") != std::string::npos);
+  assert(json.find("\"feature_index\": 1, \"threshold\": 0, \"left\": 1, \"right\": 2, \"class_counts\": [1, 1], \"missing_go_to_left\": false, \"missing_only\": true") != std::string::npos);
+  assert(json.find("\"activity\": \"unknown\\\"activity\", \"activity_is_null\": true") != std::string::npos);
+  const std::string data_prefix = "\"data\": [[0, ";
+  const auto start = json.find(data_prefix);
+  assert(start != std::string::npos && std::stod(json.substr(start + data_prefix.size())) == value);
+  assert(json.find("[0, null]") != std::string::npos);
+  assert(json.find("nan") == std::string::npos && json.find("Infinity") == std::string::npos);
+  diagnostics.transitions.clear();
+  diagnostics.unknown_activities.clear();
+  assert(minera::imported_model_json(model, graph).find("\"transitions\": [], \"unknown_activities\": []") != std::string::npos);
+}
+
 void replay_null_labels_survive_json() {
   minera::PetriNet net;
   net.set_activities({""});
@@ -229,5 +307,6 @@ int main() {
   replay_policy_request_contract();
   replay_diagnostics_json_contract();
   replay_duration_json_contract();
+  replay_root_cause_json_contract();
   replay_null_labels_survive_json();
 }

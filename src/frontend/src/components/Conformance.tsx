@@ -13,6 +13,7 @@ import {
   type ModelConformance,
   type TokenReplayTraceDiagnostics,
   type TokenReplayDurationDiagnostics,
+  type TokenReplayRootCauseDiagnostics,
   type DfgAlignmentOptions,
   type DfgAlignmentResult,
   type EditDistanceOptions,
@@ -1356,6 +1357,67 @@ export function TokenReplayDurationDiagnosticsView({ diagnostics }: {
   </section>;
 }
 
+export function TokenReplayRootCauseDiagnosticsView({ diagnostics }: {
+  diagnostics?: TokenReplayRootCauseDiagnostics;
+}) {
+  if (diagnostics === undefined) return null;
+  const groups = [
+    { caption: "Transition classifiers", total: diagnostics.transitions.length,
+      rows: diagnostics.transitions.slice(0, 30).map((row) => ({
+        ...row, label: `Transition #${row.transition_index}`,
+      })) },
+    { caption: "Unknown activity classifiers", total: diagnostics.unknown_activities.length,
+      rows: diagnostics.unknown_activities.slice(0, 30).map((row) => ({
+        ...row, label: row.activity_is_null ? "(null activity)" :
+          row.activity === "" ? "(empty string)" : JSON.stringify(row.activity),
+      })) },
+  ];
+  const numericLabel = (value: number) => Object.is(value, -0) ? "-0" : String(value);
+  return <section className="panel conf-panel">
+    <div className="panel-head"><h2>Replay root-cause diagnostics</h2></div>
+    <p className="conf-inline-note">These classifiers describe associations, not causal proof.</p>
+    <p>String attributes: {replayDiagnosticList(diagnostics.string_attributes)} · Numeric attributes: {replayDiagnosticList(diagnostics.numeric_attributes)}.
+      {" "}Balance fitting and problem samples: {diagnostics.enable_multiplier ? "yes" : "no"}.
+      {" "}Balancing replicates the smaller class by an integer multiplier; cohort counts below are original case counts.</p>
+    {groups.every((group) => group.total === 0)
+      ? <p className="conf-allfit">Root-cause diagnostics were requested, but there are no comparisons.</p>
+      : groups.map((group) => <Fragment key={group.caption}>
+        <h3>{group.caption}</h3>
+        {group.total === 0 ? <p>No comparisons.</p> : <>
+          <p className="conf-inline-note">Showing {group.rows.length} of {group.total} classifiers (limit 30).</p>
+          <ol className="variant-list">{group.rows.map((row, index) => <li className="variant" key={index}>
+            <div className="variant-top"><strong>{row.label}</strong>
+              <span className="variant-count">{numberFormat.format(row.fit_count)} fit cases · {numberFormat.format(row.problem_count)} problem cases</span></div>
+            <p>Features ({row.feature_names.length}): {replayDiagnosticList(row.feature_names.map((name) => JSON.stringify(name)))}</p>
+            <details><summary>Classifier tree and rules</summary>
+              <p>Class 0: {row.classes[0]} · Class 1: {row.classes[1]}. Categorical features are one-hot indicators.
+                {" "}Start at node #0; follow each condition to its next node.</p>
+              <p>Showing {Math.min(row.tree.length, 100)} of {row.tree.length} tree nodes (limit 100).
+                {" "}{row.data.length} training samples; {row.source_trace_indices.length} source trace references.</p>
+              {row.tree.length === 0 ? <p>No classifier tree was returned.</p> : <ol>
+                {row.tree.slice(0, 100).map((node, nodeIndex) => <li key={nodeIndex}>
+                  Node #{nodeIndex}: {node.feature_index < 0 ? <>
+                    predict {row.classes[node.class_counts[1] > node.class_counts[0] ? 1 : 0]}
+                  </> : node.missing_only ? <>
+                    if <code>{row.feature_names[node.feature_index] ?? `feature #${node.feature_index}`}</code> is present,
+                    {" "}go to #{node.left}; if missing, go to #{node.right}
+                  </> : <>
+                    if <code>{row.feature_names[node.feature_index] ?? `feature #${node.feature_index}`}</code> ≤ {numericLabel(node.threshold)},
+                    {" "}go to #{node.left}; otherwise go to #{node.right}.
+                    {" "}Missing (NaN) values go to #{node.missing_go_to_left ? node.left : node.right}
+                  </>}
+                  {" "}({row.classes[0]}: {numericLabel(node.class_counts[0])}, {row.classes[1]}: {numericLabel(node.class_counts[1])})
+                </li>)}
+              </ol>}
+              {row.tree.length > 100 && <p>{row.tree.length - 100} tree nodes omitted; referenced nodes may be outside this preview.</p>}
+            </details>
+          </li>)}</ol>
+          {group.total > group.rows.length && <p>{group.total - group.rows.length} classifiers omitted.</p>}
+        </>}
+      </Fragment>)}
+  </section>;
+}
+
 function TokenReplay({
   data,
   conformance,
@@ -1460,6 +1522,7 @@ function TokenReplay({
 
       <TokenReplayDiagnostics traces={conformance.trace_diagnostics} />
       <TokenReplayDurationDiagnosticsView diagnostics={conformance.duration_diagnostics} />
+      <TokenReplayRootCauseDiagnosticsView diagnostics={conformance.root_cause_diagnostics} />
 
       <section className="panel conf-panel">
         <div className="panel-head">

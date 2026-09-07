@@ -249,9 +249,30 @@ shared by compact, detailed, per-place, and token-evaluation entry points.
 Forward duplicate-label tie selection and replay flood-cleaning/exhaustive-
 exploration controls still require reconciliation.
 The backwards hidden-walk toggle is a native extension; the pinned legacy
-variation ignores that parameter. Root-cause diagnostic projections and remaining
+variation ignores that parameter. Remaining root-cause encoding contracts and
 trace/event identity-map compatibility remain separate work. Duration support is
 covered independently from the still-partial replay algorithms.
+
+Root-cause diagnostics now expose transition-underfeeding and unknown-activity
+cohorts through native APIs, CLI/server JSON, and frontend controls/results.
+Explicit categorical/numeric event selectors produce feature matrices, source
+trace indices, class targets, and a depth-seven Gini tree. Cohorts retain source
+log order, first supplied contexts, and problem-over-fit precedence. Optional
+balancing repeats the entire smaller cohort and defaults off. Unknown-activity
+baselines exclude the union of supplied unknown labels and use the raw final
+event; forward replay observations share the final accumulated context of
+examined known activities. Blocked unfired transitions have no root-cause
+observations. These diagnostics leave replay metrics unchanged.
+
+Independent examples are recorded in `docs/token-replay-root-cause-fixtures.json`
+and exercised by the registered classifier, replay-cohort, and transport tests.
+Training uses float32 comparisons while exported matrices retain doubles;
+NaN values use learned missing routes and serialize as null. Missing-only cuts
+have an explicit flag so tree JSON stays finite. Equal-score cuts use a stable
+native feature/threshold ordering rather than the runtime's unseeded choice.
+The support module remains **partial**: nested categorical values and categorical
+date/other scalar formatting need further parity work. Adding a usable tree and
+its adapters does not close those contracts or either replay variation.
 
 Token replay flat-input evidence: `normalize_token_replay_event_log` and the
 three replay API families accept `EventDataView`, streams, eager tables, and lazy

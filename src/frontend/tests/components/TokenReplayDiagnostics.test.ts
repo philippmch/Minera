@@ -3,6 +3,63 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TokenReplayDiagnostics, TokenReplayDurationDiagnosticsView } from "../../src/components/Conformance";
 import type { TokenReplayTraceDiagnostics, TokenReplayDurationDiagnostics } from "../../src/types";
+import { TokenReplayRootCauseDiagnosticsView } from "../../src/components/Conformance";
+import type { TokenReplayRootCauseDiagnostics, TokenReplayRootCauseModel } from "../../src/types";
+
+const rootCauseModel: TokenReplayRootCauseModel = {
+  fit_count: 3, problem_count: 1, feature_names: ["amount", "team@<sales>"],
+  classes: ["fit", "underfed"], data: [[-1, 1], [null, 0]], target: [0, 1],
+  source_trace_indices: [2, 5], tree: [
+    { feature_index: 0, threshold: -0, left: 1, right: 2, class_counts: [3, 1], missing_go_to_left: false },
+    { feature_index: -1, threshold: 0, left: -1, right: -1, class_counts: [3, 0], missing_go_to_left: false },
+    { feature_index: -1, threshold: 0, left: -1, right: -1, class_counts: [0, 1], missing_go_to_left: false },
+  ],
+};
+const rootCauseDiagnostics: TokenReplayRootCauseDiagnostics = {
+  string_attributes: ["team"], numeric_attributes: ["amount"], enable_multiplier: false,
+  transitions: [{ ...rootCauseModel, transition_index: 7 }], unknown_activities: [],
+};
+const renderRootCauses = (diagnostics?: TokenReplayRootCauseDiagnostics) =>
+  renderToStaticMarkup(createElement(TokenReplayRootCauseDiagnosticsView, { diagnostics }));
+
+describe("root-cause diagnostic classifiers", () => {
+  it("distinguishes absent and requested empty results", () => {
+    expect(renderRootCauses()).toBe("");
+    expect(renderRootCauses({ ...rootCauseDiagnostics, transitions: [] }))
+      .toContain("Root-cause diagnostics were requested, but there are no comparisons.");
+  });
+  it("renders cohort counts, signed thresholds, leaves and missing routing safely", () => {
+    const html = renderRootCauses(rootCauseDiagnostics);
+    for (const text of ["Transition #7", "3 fit cases", "1 problem cases", "amount", "&lt;sales&gt;",
+      "≤ -0", "Missing (NaN) values go to #2", "predict fit", "predict underfed",
+      "associations, not causal proof", "Showing 3 of 3 tree nodes", "one-hot indicators"])
+      expect(html).toContain(text);
+    expect(html).not.toContain("<sales>");
+  });
+  it("distinguishes null and empty labels and renders missing-only splits", () => {
+    const html = renderRootCauses({ ...rootCauseDiagnostics, unknown_activities: [
+      { ...rootCauseModel, activity: "", activity_is_null: true },
+      { ...rootCauseModel, activity: "", activity_is_null: false },
+    ], transitions: [{ ...rootCauseModel, transition_index: 1,
+      tree: [{ ...rootCauseModel.tree[0], missing_only: true }] }] });
+    expect(html).toContain("(null activity)");
+    expect(html).toContain("(empty string)");
+    expect(html).toContain("is present, go to #1; if missing, go to #2");
+  });
+  it("caps classifiers, features and tree nodes with explicit omitted counts", () => {
+    const model = { ...rootCauseModel, feature_names: Array.from({ length: 105 }, (_, i) => `feature${i}`),
+      tree: Array.from({ length: 104 }, () => rootCauseModel.tree[1]) };
+    const html = renderRootCauses({ ...rootCauseDiagnostics,
+      transitions: Array.from({ length: 33 }, (_, i) => ({ ...model, transition_index: i })) });
+    expect(html).toContain("Showing 30 of 33 classifiers (limit 30)");
+    expect(html).toContain("3 classifiers omitted");
+    expect(html).toContain("Showing 100 of 104 tree nodes (limit 100)");
+    expect(html).toContain("4 tree nodes omitted");
+    expect(html).toContain("5 more omitted");
+    expect(html).not.toContain("feature104");
+    expect(html).not.toContain("Transition #32");
+  });
+});
 
 const trace = (trace_index = 0): TokenReplayTraceDiagnostics => ({
   trace_index, case_id: "shared-case", trace_is_fit: false, trace_fitness: 0.75,

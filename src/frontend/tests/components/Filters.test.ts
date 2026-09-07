@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { alphaValidationMessage, tokenReplayInputOptionsFromForm, tokenReplayInputValidationMessage } from "../../src/components/Filters";
 import { TOKEN_REPLAY_POLICY_DEFAULTS, TokenReplayPolicyControls, tokenReplayPolicyOptionsFromForm,
   tokenReplayPoliciesAreDirty } from "../../src/components/Filters";
+import { TokenReplayRootCauseControls, tokenReplayRootCauseOptionsFromForm } from "../../src/components/Filters";
 import { alphaOptionsFromForm, alphaSettingsAreDirty, attributeOccurrenceValidationMessage, caseGroupingValidationMessage, correlationValidationMessage, footprintsValidationMessage, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
 
 describe("token replay policy controls", () => {
@@ -46,6 +47,7 @@ describe("token replay policy controls", () => {
 
   it("applies disabled fitness/navigation policies together with requested diagnostics", () => {
     const changed = {
+      tokenReplayIncludeRootCauseDiagnostics: true,
       tokenReplayConsiderRemainingInFitness: false,
       tokenReplayTryToReachFinalMarkingThroughHidden: false,
       tokenReplayConsiderActivitiesNotInModelInFitness: true,
@@ -64,6 +66,24 @@ describe("token replay policy controls", () => {
 });
 
 describe("token replay input settings", () => {
+  it("validates selected root-cause attributes while retaining disabled form values", () => {
+    expect(tokenReplayRootCauseOptionsFromForm(false, "a,,b", "", true)).toEqual({});
+    expect(() => tokenReplayRootCauseOptionsFromForm(true, "", " ")).toThrow(/at least one/);
+    expect(() => tokenReplayRootCauseOptionsFromForm(true, "a,,b", "")).toThrow(/non-empty/);
+    expect(tokenReplayRootCauseOptionsFromForm(true, " region, team, region ", "")).toEqual({
+      tokenReplayRootCauseStringAttributes: ["region", "team", "region"],
+      tokenReplayRootCauseNumericAttributes: [], tokenReplayRootCauseEnableMultiplier: false,
+    });
+    const renderControls = (enabled: boolean) => renderToStaticMarkup(createElement(TokenReplayRootCauseControls, {
+      enabled, strings: "region", numerics: "amount", multiplier: false,
+      onStrings: () => {}, onNumerics: () => {}, onMultiplier: () => {},
+    }));
+    expect(renderControls(false).match(/disabled=""/g)).toHaveLength(3);
+    expect(renderControls(false)).toContain('value="region"');
+    expect(renderControls(false)).toContain('value="amount"');
+    expect(renderControls(false)).toContain('<option value="false" selected="">no (default)</option>');
+    expect(renderControls(true)).not.toContain("disabled");
+  });
   it("only applies custom duration timestamps when enabled and preserves implicit defaults", () => {
     expect(tokenReplayInputOptionsFromForm("", "time:timestamp", true)).toEqual({});
     expect(tokenReplayInputOptionsFromForm("", " completed_at ", true))

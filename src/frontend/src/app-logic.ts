@@ -137,6 +137,10 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       options.tokenReplayWalkThroughHiddenTransitions === false ||
       options.tokenReplayIncludeTraceDiagnostics === true ||
       options.tokenReplayIncludeDurationDiagnostics === true ||
+      options.tokenReplayIncludeRootCauseDiagnostics === true ||
+      Boolean(options.tokenReplayRootCauseStringAttributes?.length) ||
+      Boolean(options.tokenReplayRootCauseNumericAttributes?.length) ||
+      options.tokenReplayRootCauseEnableMultiplier === true ||
       Boolean(options.tokenReplayTimestampAttribute?.trim() &&
         options.tokenReplayTimestampAttribute.trim() !== "time:timestamp") ||
       Boolean(options.tokenReplayActivityAttribute?.trim() &&

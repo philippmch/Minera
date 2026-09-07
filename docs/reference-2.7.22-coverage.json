@@ -6975,7 +6975,15 @@
       "classification": "support",
       "selectors": [],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/root_cause.hpp",
+        "src/backend/root_cause.cpp",
+        "src/backend/token_replay_root_cause.cpp",
+        "src/backend/tests/test_root_cause.cpp",
+        "src/backend/tests/test_token_replay_root_cause.cpp",
+        "src/backend/tests/test_token_replay_transport.cpp"
+      ]
     },
     {
       "module": "algo.conformance.tokenreplay.variants.backwards",

@@ -1214,6 +1214,95 @@ void write_token_replay_duration(std::ostream& out,
   out << "]}";
 }
 
+void write_root_cause_model(std::ostream& out, const RootCauseModel& model) {
+  const auto previous_precision = out.precision(std::numeric_limits<double>::max_digits10);
+  const auto strings = [&](std::string_view name, const auto& values) {
+    out << ", ";
+    write_json_string(out, name);
+    out << ": [";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i) out << ", ";
+      write_json_string(out, values[i]);
+    }
+    out << ']';
+  };
+  const auto numbers = [&](std::string_view name, const auto& values) {
+    out << ", ";
+    write_json_string(out, name);
+    out << ": [";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i) out << ", ";
+      out << values[i];
+    }
+    out << ']';
+  };
+  out << ", \"fit_count\": " << model.fit_count
+      << ", \"problem_count\": " << model.problem_count;
+  strings("feature_names", model.feature_names);
+  strings("classes", model.classes);
+  out << ", \"data\": [";
+  for (std::size_t row = 0; row < model.data.size(); ++row) {
+    if (row) out << ", ";
+    out << '[';
+    for (std::size_t column = 0; column < model.data[row].size(); ++column) {
+      if (column) out << ", ";
+      if (std::isfinite(model.data[row][column])) out << model.data[row][column];
+      else out << "null";
+    }
+    out << ']';
+  }
+  out << ']';
+  numbers("target", model.target);
+  numbers("source_trace_indices", model.source_trace_indices);
+  out << ", \"tree\": [";
+  for (std::size_t i = 0; i < model.tree.size(); ++i) {
+    if (i) out << ", ";
+    const auto& node = model.tree[i];
+    out << "{\"feature_index\": " << node.feature_index
+        << ", \"threshold\": " << node.threshold
+        << ", \"left\": " << node.left << ", \"right\": " << node.right
+        << ", \"class_counts\": [" << node.class_counts[0] << ", " << node.class_counts[1]
+        << "], \"missing_go_to_left\": " << (node.missing_go_to_left ? "true" : "false")
+        << ", \"missing_only\": " << (node.missing_only ? "true" : "false") << '}';
+  }
+  out << ']';
+  out.precision(previous_precision);
+}
+
+void write_token_replay_root_cause(
+    std::ostream& out, const TokenReplayRootCauseDiagnostics& diagnostics) {
+  out << "{\"string_attributes\": [";
+  for (std::size_t i = 0; i < diagnostics.options.string_attributes.size(); ++i) {
+    if (i) out << ", ";
+    write_json_string(out, diagnostics.options.string_attributes[i]);
+  }
+  out << "], \"numeric_attributes\": [";
+  for (std::size_t i = 0; i < diagnostics.options.numeric_attributes.size(); ++i) {
+    if (i) out << ", ";
+    write_json_string(out, diagnostics.options.numeric_attributes[i]);
+  }
+  out << "], \"enable_multiplier\": " << (diagnostics.options.enable_multiplier ? "true" : "false")
+      << ", \"transitions\": [";
+  for (std::size_t i = 0; i < diagnostics.transitions.size(); ++i) {
+    if (i) out << ", ";
+    const auto& row = diagnostics.transitions[i];
+    out << "{\"transition_index\": " << row.transition_index;
+    write_root_cause_model(out, row);
+    out << '}';
+  }
+  out << "], \"unknown_activities\": [";
+  for (std::size_t i = 0; i < diagnostics.unknown_activities.size(); ++i) {
+    if (i) out << ", ";
+    const auto& row = diagnostics.unknown_activities[i];
+    out << "{\"activity\": ";
+    write_json_string(out, row.activity);
+    out << ", \"activity_is_null\": " << (row.activity_is_null ? "true" : "false");
+    write_root_cause_model(out, row);
+    out << '}';
+  }
+  out << "]}";
+}
+
 void write_conformance(std::ostream& out,
                        const ConformanceResult& conformance,
                        const DirectlyFollowsGraph& graph) {
@@ -1275,6 +1364,10 @@ void write_conformance(std::ostream& out,
   if (conformance.duration_diagnostics) {
     out << ", \"duration_diagnostics\": ";
     write_token_replay_duration(out, *conformance.duration_diagnostics);
+  }
+  if (conformance.root_cause_diagnostics) {
+    out << ", \"root_cause_diagnostics\": ";
+    write_token_replay_root_cause(out, *conformance.root_cause_diagnostics);
   }
   out << '}';
 }

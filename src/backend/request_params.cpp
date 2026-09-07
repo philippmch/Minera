@@ -639,6 +639,26 @@ TokenReplayOptions parse_token_replay_params(const FieldLookup& field,
         "token_replay_max_rows_to_materialize");
   }
   for (const auto& [name, destination] : {
+           std::pair<std::string_view, std::vector<std::string>*>{
+               "token_replay_root_cause_string_attributes", &options.root_cause.string_attributes},
+           {"token_replay_root_cause_numeric_attributes", &options.root_cause.numeric_attributes}}) {
+    if (!supplied(name)) continue;
+    const auto value = field(name);
+    if (value.find_first_of("\r\n") != std::string::npos)
+      throw std::invalid_argument(std::string(name) + ": attribute names cannot contain line breaks");
+    if (trim_text(value).empty()) continue;
+    std::size_t begin = 0;
+    while (begin <= value.size()) {
+      const auto comma = value.find(',', begin);
+      const auto part = trim_text(value.substr(begin, comma == std::string::npos ? comma : comma - begin));
+      if (part.empty())
+        throw std::invalid_argument(std::string(name) + ": expected non-empty comma-separated attribute names");
+      destination->push_back(part);
+      if (comma == std::string::npos) break;
+      begin = comma + 1;
+    }
+  }
+  for (const auto& [name, destination] : {
            std::pair<std::string_view, bool*>{
                "token_replay_stop_immediately_unfit", &options.stop_immediately_unfit},
            {"token_replay_consider_remaining_in_fitness", &options.consider_remaining_in_fitness},
@@ -646,7 +666,9 @@ TokenReplayOptions parse_token_replay_params(const FieldLookup& field,
            {"token_replay_consider_activities_not_in_model_in_fitness", &options.consider_activities_not_in_model_in_fitness},
            {"token_replay_walk_through_hidden_transitions", &options.walk_through_hidden_transitions},
            {"token_replay_include_trace_diagnostics", &options.include_trace_diagnostics},
-           {"token_replay_include_duration_diagnostics", &options.include_duration_diagnostics}}) {
+           {"token_replay_include_duration_diagnostics", &options.include_duration_diagnostics},
+           {"token_replay_include_root_cause_diagnostics", &options.include_root_cause_diagnostics},
+           {"token_replay_root_cause_enable_multiplier", &options.root_cause.enable_multiplier}}) {
     if (supplied(name)) *destination = parse_boolean(field(name), name);
   }
   return options;
