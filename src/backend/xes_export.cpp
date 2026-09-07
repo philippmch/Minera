@@ -1,4 +1,5 @@
 #include "minera/xes_export.hpp"
+#include "root_cause_trace_key.hpp"
 
 #include "gzip_codec.hpp"
 
@@ -162,6 +163,11 @@ std::string scalar_lexical_value(const EventAttribute& attribute) {
 
 void write_typed_attribute(std::ostream& out, std::string_view indent,
                            const EventAttribute& attribute) {
+  if (attribute.container == AttributeContainerKind::kTuple) {
+    write_typed_attribute(out, indent, EventAttribute{attribute.key, root_cause_attribute_category(attribute),
+        AttributeKind::kString, attribute.is_null});
+    return;
+  }
   if (attribute.container != AttributeContainerKind::kScalar) {
     const auto element = attribute.container == AttributeContainerKind::kList
                              ? "list"

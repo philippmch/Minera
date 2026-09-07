@@ -298,6 +298,16 @@ std::string scalar_category(const EventAttribute& value, bool nested) {
 }
 
 std::string attribute_category(const EventAttribute& value, bool nested) {
+  if (value.container == AttributeContainerKind::kTuple) {
+    if (value.is_null) return "None";
+    std::string result = "(";
+    for (std::size_t i = 0; i < value.children.size(); ++i) {
+      if (i) result += ", ";
+      result += attribute_category(value.children[i], true);
+    }
+    if (value.children.size() == 1) result += ',';
+    return result + ')';
+  }
   if (value.container == AttributeContainerKind::kScalar && value.children.empty())
     return scalar_category(value, nested);
   const bool list = value.container == AttributeContainerKind::kList;

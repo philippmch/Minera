@@ -161,6 +161,24 @@ bool dictionary_equal(const Attributes& left, const Attributes& right) {
 }
 
 bool attribute_equal(const EventAttribute& left, const EventAttribute& right) {
+  if (left.container == AttributeContainerKind::kTuple && left.is_null) {
+    auto null = left;
+    null.container = AttributeContainerKind::kScalar;
+    null.children.clear();
+    return attribute_equal(null, right);
+  }
+  if (right.container == AttributeContainerKind::kTuple && right.is_null) {
+    auto null = right;
+    null.container = AttributeContainerKind::kScalar;
+    null.children.clear();
+    return attribute_equal(left, null);
+  }
+  if (left.container == AttributeContainerKind::kTuple || right.container == AttributeContainerKind::kTuple) {
+    if (left.container != right.container || left.children.size() != right.children.size()) return false;
+    for (std::size_t i = 0; i < left.children.size(); ++i)
+      if (!attribute_equal(left.children[i], right.children[i])) return false;
+    return true;
+  }
   const bool left_nested = left.container != AttributeContainerKind::kScalar || !left.children.empty();
   const bool right_nested = right.container != AttributeContainerKind::kScalar || !right.children.empty();
   if (left_nested != right_nested) return false;
@@ -226,6 +244,12 @@ std::string dictionary_fingerprint(const Attributes& values) {
 }
 
 std::string attribute_fingerprint(const EventAttribute& value) {
+  if (value.container == AttributeContainerKind::kTuple) {
+    if (value.is_null) return scalar_fingerprint(value);
+    std::string result = "T";
+    for (const auto& child : value.children) append_part(result, attribute_fingerprint(child));
+    return result;
+  }
   if (value.container == AttributeContainerKind::kScalar && value.children.empty())
     return scalar_fingerprint(value);
   auto scalar = value;
@@ -262,16 +286,25 @@ bool root_cause_traces_equal(const Trace& left, const Trace& right) {
   return true;
 }
 
+bool root_cause_key_is_hashable(const EventAttribute& value) {
+  if (value.container == AttributeContainerKind::kTuple) {
+    if (value.is_null) return true;
+    for (const auto& child : value.children)
+      if (!root_cause_key_is_hashable(child)) return false;
+    return true;
+  }
+  return value.container == AttributeContainerKind::kScalar && value.children.empty();
+}
+
 bool root_cause_scalar_keys_equal(const EventAttribute& left, const EventAttribute& right) {
-  for (const auto* value : {&left, &right})
-    if (value->container != AttributeContainerKind::kScalar || !value->children.empty())
-      throw std::invalid_argument("root cause: unhashable activity key");
-  return scalar_equal(left, right);
+  if (!root_cause_key_is_hashable(left) || !root_cause_key_is_hashable(right))
+    throw std::invalid_argument("root cause: unhashable activity key");
+  return attribute_equal(left, right);
 }
 
 std::string root_cause_scalar_key_fingerprint(const EventAttribute& value) {
   (void)root_cause_scalar_keys_equal(value, value);
-  return scalar_fingerprint(value);
+  return attribute_fingerprint(value);
 }
 
 std::string root_cause_trace_fingerprint(const Trace& trace) {

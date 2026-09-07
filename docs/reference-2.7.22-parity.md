@@ -324,9 +324,13 @@ baseline values for scalar keys.
 Typed key buckets verify equality after fingerprint lookup, and baseline
 eligibility is cached across classifiers. The UI includes scalar type labels
 so same-spelling typed keys remain distinguishable.
-The support module remains **partial**: tuple-valued unknown keys are not yet
-represented. Adding these encoding
-contracts includes a reference-aware helper path: `RootCauseSharedContext` and
+Tuple values retain ordered children in native cells and JSON. Tuple categories
+use recursive tuple syntax, including the singleton comma; typed key equality
+ignores positional child names and distinguishes tuples from lists and strings.
+Tuples containing mutable list/dictionary values cannot be keys. XES exports
+their string spelling, matching the pinned exporter, and reimport yields strings.
+The UI identifies tuple keys separately from their string spelling.
+A reference-aware helper path uses `RootCauseSharedContext` and
 `build_shared_root_cause_log` share entire nested value objects, including parent
 scalar fields and child bindings. Top-level rebinding remains local to each
 context. `build_shared_root_cause_representation` reads current values;
@@ -334,6 +338,8 @@ context. `build_shared_root_cause_representation` reads current values;
 and serializers. Importing a value-owned `Event` into the shared graph is also
 a snapshot; callers retain shared contexts to observe mutations. Cyclic graphs
 cannot be materialized into tree-shaped native logs.
+The support module remains **partial** while cyclic-value behavior and the
+remaining runtime value boundaries are audited.
 These contracts do not certify either replay variation.
 
 Token replay flat-input evidence: `normalize_token_replay_event_log` and the

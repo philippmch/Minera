@@ -63,6 +63,12 @@ function conversionLog() {
 }
 
 describe("selected first-class attribute detail contracts", () => {
+  it("accepts ordered tuple cells in conversion and utility results", () => {
+    const log = conversionLog();
+    log.traces[0].events[0].activity_attribute = { ...integerDetail, container: "tuple" };
+    expect(isLogConversionResult({ family: "LOG_CONVERSION", variant: "TO_EVENT_LOG", log })).toBe(true);
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "FIXED_PREFIXES", log })).toBe(true);
+  });
   it("accepts recursive typed details in conversion and log-utility logs", () => {
     const log = conversionLog();
     expect(isLogConversionResult({

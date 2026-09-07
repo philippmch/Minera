@@ -138,7 +138,7 @@ bool contains_key(const Trace& trace, const ActivityKeyIndex& keys,
                   const std::string& selector) {
   for (const auto& event : trace.events) {
     const auto activity = activity_value(event, selector);
-    if (activity.present && activity.value.container == AttributeContainerKind::kScalar && activity.value.children.empty())
+    if (activity.present && root_cause_key_is_hashable(activity.value))
       if (keys.find(activity.value)) return true;
   }
   return false;

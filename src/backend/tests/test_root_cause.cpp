@@ -809,7 +809,56 @@ void test_shared_context_log() {
   rejects([&] { (void)materialize_root_cause_context(cyclic); });
 }
 
+void test_tuple_values() {
+  using namespace minera;
+  const auto tuple = [](std::vector<EventAttribute> children) {
+    EventAttribute result{"v", ""};
+    result.container = AttributeContainerKind::kTuple;
+    result.children = std::move(children);
+    return result;
+  };
+  const auto one = EventAttribute{"ignored", "1", AttributeKind::kInt};
+  assert(root_cause_attribute_category(tuple({})) == "()");
+  assert(root_cause_attribute_category(tuple({one})) == "(1,)");
+  EventAttribute null{"", "", AttributeKind::kString, true};
+  auto nested = tuple({null, tuple({one, {"", "2", AttributeKind::kInt}})});
+  assert(root_cause_attribute_category(nested) == "(None, (1, 2))");
+  auto a = tuple({one, {"", "x"}});
+  auto b = tuple({{"different-key", "true", AttributeKind::kBoolean}, {"other", "x"}});
+  assert(root_cause_scalar_keys_equal(a, b));
+  assert(root_cause_scalar_key_fingerprint(a) == root_cause_scalar_key_fingerprint(b));
+  b.children[0] = {"", "1"};
+  assert(!root_cause_scalar_keys_equal(a, b));
+  Trace left, right;
+  left.attributes = {a};
+  right.attributes = {a};
+  right.attributes[0].children[0].key = "position-only";
+  assert(root_cause_traces_equal(left, right));
+  assert(root_cause_trace_fingerprint(left) == root_cause_trace_fingerprint(right));
+  right.attributes[0].container = AttributeContainerKind::kList;
+  assert(!root_cause_traces_equal(left, right));
+  auto nan = EventAttribute{"", "nan", AttributeKind::kFloat};
+  nan.typed_value = std::numeric_limits<double>::quiet_NaN();
+  a = tuple({nan}); b = a;
+  assert(root_cause_scalar_keys_equal(a, b));
+  b.children[0].typed_value = std::numeric_limits<double>::quiet_NaN();
+  assert(!root_cause_scalar_keys_equal(a, b));
+  a.children[0].container = AttributeContainerKind::kList;
+  assert(!root_cause_key_is_hashable(a));
+  rejects([&] { (void)root_cause_scalar_key_fingerprint(a); });
+  a.is_null = true;
+  assert(root_cause_scalar_keys_equal(a, null));
+  assert(root_cause_scalar_key_fingerprint(a) == root_cause_scalar_key_fingerprint(null));
+  assert(root_cause_attribute_category(a) == "None");
+  RootCauseObservation observation;
+  observation.context.attributes = {nested};
+  const auto representation = build_root_cause_representation({observation}, {}, {{"v"}, {}});
+  assert((representation.feature_names == std::vector<std::string>{"event:v@(None, (1, 2))"}));
+  rejects([&] { (void)build_root_cause_representation({observation}, {}, {{}, {"v"}}); });
+}
+
 int main() {
+  test_tuple_values();
   test_shared_context_log();
   test_native_scalar_identity();
   test_trace_equivalence();

@@ -103,9 +103,18 @@
     "native_api": "RootCauseSharedContext and build_shared_root_cause_log preserve reference semantics. make_shared_root_cause_context snapshots a value-owned Event; materialize_root_cause_log creates a detached EventLog snapshot. Encoding reads the current shared values.",
     "lifetime": "Shared values remain valid after the input context owner is destroyed."
   },
+  "tuple_values": {
+    "categories": ["()", "(1,)", "('x', True, None)", "(None, (1, 2))"],
+    "key": "(1, 'x')",
+    "equivalent_keys": ["(True, 'x')", "(1.0, 'x')"],
+    "distinct_baseline_values": ["('1', 'x')", "[1, 'x']", "string spelling of (1, 'x')"],
+    "empty_tuple_differs_from_empty_list": true,
+    "child_names": "Ignored for positional tuple equality; element order and recursive types are retained.",
+    "xes": "Tuple values serialize as string attributes containing their tuple representation, then import as strings.",
+    "json": "The tuple container tag and ordered child cells are retained."
+  },
   "remaining_contracts": [
     "Cyclic shared value graphs cannot be materialized into the native tree-shaped EventLog representation.",
-    "Tuple-valued unknown-activity keys remain unsupported by native scalar activity cells.",
     "Native scalar replacement must use assignment or emplace to renew NaN alias identity; mutation through a raw mutable variant reference does not renew it.",
     "Legacy backwards replay diagnostic context production is a native extension."
   ]
