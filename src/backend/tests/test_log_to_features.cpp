@@ -1266,6 +1266,106 @@ static void temporal_calendar_scalar_case_ordering_is_exact() {
   assert(log_to_features(log, options).temporal_rows[0].values[0] == 2);
 }
 
+static void temporal_calendar_numeric_columns_promote_before_grouping() {
+  const EventAttribute high{"value", "9007199254740993", AttributeKind::kInt};
+  const EventAttribute adjacent{"value", "9007199254740992", AttributeKind::kInt};
+  const EventAttribute floating{"value", "9007199254740992.0", AttributeKind::kFloat};
+  const auto make_event = [](EventAttribute value, const std::string& day = "01") {
+    Event event{"c", "", "1970-01-" + day + "T00:00:00Z", ""};
+    event.attributes = {value, EventAttribute{"unrelated", "true", AttributeKind::kBoolean}};
+    return event;
+  };
+  EventLog log;
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq = "D";
+  options.activity_key = options.resource_key = "value";
+  log.traces = {Trace{"c", {make_event(high), make_event(floating)}}};
+  auto result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[0] == 1 && result.temporal_rows[0].values[1] == 1);
+  assert(result.temporal_rows[0].values[8] == 1);
+  log.traces[0].events.push_back(make_event({"value", "", AttributeKind::kString, true}));
+  assert(log_to_features(log, options).temporal_rows[0].values[8] == 2);
+  log.traces[0].events.back().attributes.clear();
+  assert(log_to_features(log, options).temporal_rows[0].values[8] == 2);
+  for (const auto& blocker : {EventAttribute{"value", "true", AttributeKind::kBoolean},
+                              EventAttribute{"value", "s", AttributeKind::kString},
+                              EventAttribute{"value", "", AttributeKind::kString}}) {
+    log.traces[0].events.back() = make_event(blocker);
+    result = log_to_features(log, options);
+    assert(result.temporal_rows[0].values[0] == 3 && result.temporal_rows[0].values[1] == 3);
+  }
+  log.traces[0].events = {make_event(high), make_event(adjacent)};
+  assert(log_to_features(log, options).temporal_rows[0].values[0] == 2);
+  log.traces[0].events.push_back(make_event(floating, "02"));
+  result = log_to_features(log, options);
+  assert(result.temporal_rows.size() == 2 && result.temporal_rows[0].values[0] == 1);
+  log.traces[0].events.back() = make_event({"value", "true", AttributeKind::kBoolean}, "02");
+  assert(log_to_features(log, options).temporal_rows[0].values[0] == 2);
+  auto native_high = high;
+  native_high.kind = AttributeKind::kString;
+  native_high.value = "stale";
+  native_high.typed_value = std::int64_t{9007199254740993};
+  auto native_float = floating;
+  native_float.kind = AttributeKind::kString;
+  native_float.value = "stale";
+  native_float.typed_value = 9007199254740992.0;
+  log.traces[0].events = {make_event(native_high), make_event(native_float)};
+  assert(log_to_features(log, options).temporal_rows[0].values[0] == 1);
+  assert(log.traces[0].events[0].attributes[0] == native_high);
+  assert(log.traces[0].events[1].attributes[0] == native_float);
+  options.case_id_key = "value";
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[11] == 1);
+  log.traces[0].events = {make_event(high), make_event(adjacent)};
+  assert(log_to_features(log, options).temporal_rows[0].values[11] == 2);
+  log.traces[0].events.push_back(make_event({"value", "", AttributeKind::kString, true}));
+  result = log_to_features(log, options);
+  assert(result.temporal_rows[0].values[11] == 1 && result.temporal_rows[0].values[10] == 2);
+  log.traces[0].events = {make_event(high), make_event(floating), make_event({"value", "true", AttributeKind::kBoolean})};
+  assert(log_to_features(log, options).temporal_rows[0].values[11] == 3);
+  options.case_id_key.reset();
+  log.traces = {Trace{"a", {make_event(native_high)}}, Trace{"b", {make_event(native_float)}}};
+  log.traces[0].case_id_attribute = native_high;
+  log.traces[1].case_id_attribute = native_float;
+  for (auto& trace : log.traces) trace.case_id_state = FirstClassAttributeState::kPresent;
+  assert(log_to_features(log, options).temporal_rows[0].values[11] == 1);
+  options.grouper_freq.clear();
+  log.traces = {Trace{"c", {make_event(high), make_event(floating)}}};
+  assert(log_to_features(log, options).temporal_rows[0].values[0] == 2);
+  options.grouper_freq = "D";
+  options.case_id_key = "value";
+  const auto check_bounds = [&](const std::vector<EventAttribute>& values, double groups) {
+    log.traces = {Trace{"c", {}}};
+    for (const auto& value : values) log.traces[0].events.push_back(make_event(value));
+    const auto actual = log_to_features(log, options);
+    assert(actual.temporal_rows[0].values[0] == groups);
+    assert(actual.temporal_rows[0].values[1] == groups);
+    assert(actual.temporal_rows[0].values[11] == groups);
+  };
+  const auto integer = [](const std::string& value) { return EventAttribute{"value", value, AttributeKind::kInt}; };
+  const auto real = [](const std::string& value) { return EventAttribute{"value", value, AttributeKind::kFloat}; };
+  const EventAttribute null{"value", "", AttributeKind::kString, true};
+  check_bounds({integer("18446744073709551617"), real("18446744073709551616")}, 2);
+  check_bounds({integer("18446744073709551617"), integer("18446744073709551616"), null}, 2);
+  check_bounds({integer("18446744073709551615"), real("18446744073709551616")}, 1);
+  check_bounds({integer("9223372036854775809"), integer("9223372036854775808"), null}, 1);
+  check_bounds({integer("9223372036854775809"), integer("9223372036854775808"), real("9223372036854775808")}, 1);
+  check_bounds({integer("9223372036854775809"), real("9223372036854775808"), real("-1.0")}, 2);
+  check_bounds({integer("9223372036854775809"), integer("9223372036854775808"), integer("-1"), null}, 3);
+  check_bounds({integer("9223372036854775809"), real("9223372036854775808"), integer("-1")}, 3);
+  check_bounds({integer("-9223372036854775809"), real("-9223372036854775808")}, 2);
+  check_bounds({integer("-9223372036854775808"), real("-9223372036854775808")}, 1);
+  check_bounds({high, adjacent, null}, 1);
+  native_high.kind = AttributeKind::kDate;
+  native_float.kind = AttributeKind::kDate;
+  check_bounds({native_high, native_float}, 1);
+  check_bounds({native_high, adjacent, null}, 1);
+  assert(log.traces[0].events[0].attributes[0] == native_high);
+  check_bounds({native_high, native_float, null}, 1);
+  assert(log.traces[0].events[1].attributes[0] == native_float);
+}
+
 static void temporal_calendar_frequency_uses_period_boundaries() {
   EventLog log;
   Trace first;
@@ -1833,6 +1933,7 @@ static void trace_default_schema_infers_complete_trace_presence() {
 }
 
 int main() {
+  temporal_calendar_numeric_columns_promote_before_grouping();
   temporal_calendar_scalar_case_ordering_is_exact();
   temporal_calendar_string_case_ties_use_lexical_order();
   temporal_calendar_groups_selected_typed_case_identifiers();

@@ -1128,6 +1128,55 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         std::holds_alternative<std::monostate>(value.typed_value) &&
         std::isnan(native_attribute_number(value));
   };
+  const auto promote_numeric_column = [&](const auto& selected_value) {
+    bool numeric = true, floating = false;
+    bool unsigned_integer = false, negative_integer = false;
+    const EventAttribute minimum{"", "-9223372036854775808", AttributeKind::kInt};
+    const EventAttribute maximum{"", "18446744073709551615", AttributeKind::kInt};
+    const EventAttribute signed_maximum{"", "9223372036854775807", AttributeKind::kInt};
+    const EventAttribute zero{"", "0", AttributeKind::kInt};
+    for (const auto& trace : log.traces) for (const auto& event : trace.events) {
+      const auto value = selected_value(trace, event);
+      if (!value || missing_category(*value)) {
+        floating = true;
+        continue;
+      }
+      if (native_scalar_order_kind(*value) != NativeScalarOrderKind::kNumeric ||
+          std::holds_alternative<bool>(value->typed_value) ||
+          (std::holds_alternative<std::monostate>(value->typed_value) && value->kind == AttributeKind::kBoolean)) {
+        numeric = false;
+        continue;
+      }
+      if (std::holds_alternative<double>(value->typed_value) ||
+          (std::holds_alternative<std::monostate>(value->typed_value) && value->kind == AttributeKind::kFloat))
+        floating = true;
+      else {
+        if (native_scalar_key_compare(*value, minimum) < 0 || native_scalar_key_compare(*value, maximum) > 0)
+          numeric = false;
+        unsigned_integer = unsigned_integer || native_scalar_key_compare(*value, signed_maximum) > 0;
+        negative_integer = negative_integer || native_scalar_key_compare(*value, zero) < 0;
+      }
+    }
+    return numeric && floating && !(unsigned_integer && negative_integer);
+  };
+  const bool promote_activities = temporal_frequency && promote_numeric_column([&](const Trace&, const Event& event) {
+    return native_event_attribute(event, options.activity_key);
+  });
+  const bool promote_resources = temporal_frequency && promote_numeric_column([&](const Trace&, const Event& event) {
+    return native_event_attribute(event, options.resource_key);
+  });
+  const bool promote_cases = temporal_frequency && promote_numeric_column(case_value);
+  const auto promoted_value = [](EventAttribute value, bool promote) {
+    if (promote) {
+      const auto number = std::holds_alternative<std::int64_t>(value.typed_value)
+          ? static_cast<double>(std::get<std::int64_t>(value.typed_value))
+          : std::holds_alternative<double>(value.typed_value)
+              ? std::get<double>(value.typed_value) : native_attribute_number(value);
+      value.kind = AttributeKind::kFloat;
+      value.typed_value = number;
+    }
+    return value;
+  };
   struct CaseTemporal {
     double start = std::numeric_limits<double>::infinity();
     double finish = -std::numeric_limits<double>::infinity();
@@ -1146,18 +1195,18 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         auto& categories = temporal_categories[&event];
         if (const auto activity = native_event_attribute(event, options.activity_key)) {
           have_activity_column = true;
-          if (!missing_category(*activity)) categories.activity = std::to_string(activity_categories.insert(*activity));
+          if (!missing_category(*activity)) categories.activity = std::to_string(activity_categories.insert(promoted_value(*activity, promote_activities)));
         }
         if (const auto resource = native_event_attribute(event, options.resource_key)) {
           have_resource_column = true;
-          if (!missing_category(*resource)) categories.resource = std::to_string(resource_categories.insert(*resource));
+          if (!missing_category(*resource)) categories.resource = std::to_string(resource_categories.insert(promoted_value(*resource, promote_resources)));
         }
         const auto identifier = case_value(log.traces[ti], event);
         case_index = no_case;
         if (identifier) {
           have_case_column = true;
           if (!missing_category(*identifier)) {
-            case_index = case_categories.insert(*identifier);
+            case_index = case_categories.insert(promoted_value(*identifier, promote_cases));
             if (cases.size() <= case_index) cases.resize(case_index + 1);
           }
         }
