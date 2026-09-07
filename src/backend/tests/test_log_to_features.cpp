@@ -1236,6 +1236,104 @@ static void temporal_calendar_string_case_ties_use_lexical_order() {
   } while (std::next_permutation(order.begin(), order.end()));
 }
 
+struct FrozenExpected { double timestamp, arrival, finish, cases; };
+struct FrozenCaseScenario { std::string name; std::vector<std::vector<int>> keys; std::vector<FrozenExpected> rows; };
+struct FrozenEndpointScenario { std::vector<std::vector<int>> keys; std::vector<double> ends, rates; };
+#include "fixtures/temporal_frozen_case_order.inc"
+
+static void temporal_calendar_frozen_case_tie_order() {
+  const auto& scenarios = frozen_case_scenarios;
+  assert(scenarios.size() == 67);
+  for (const auto& scenario : scenarios) {
+    const auto event = [](const std::string& name, const std::vector<int>& members, double time) {
+      Event result{name, "A", format_timestamp(1704067200 + time), "r"};
+      EventAttribute key{"id", ""};
+      key.container = AttributeContainerKind::kFrozenSet;
+      for (const auto member : members) key.children.push_back({"", std::to_string(member), AttributeKind::kInt});
+      result.attributes = {std::move(key)};
+      return result;
+    };
+    EventLog log;
+    log.traces = {Trace{"anchor", {event("anchor", {-1}, 0)}}};
+    for (std::size_t i = 0; i < scenario.keys.size(); ++i) {
+      const auto id = std::to_string(i);
+      log.traces.push_back(Trace{id, {event(id, scenario.keys[i], 10), event(id, scenario.keys[i], 20 + i * 10)}});
+    }
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = "10s";
+    options.case_id_key = "id";
+    const auto result = log_to_features(log, options);
+    assert(result.temporal_rows.size() == scenario.rows.size());
+    for (std::size_t i = 0; i < scenario.rows.size(); ++i) {
+      const auto& expected = scenario.rows[i];
+      const auto& actual = result.temporal_rows[i];
+      if (actual.timestamp != expected.timestamp || actual.values[3] != expected.arrival ||
+          actual.values[4] != expected.finish || actual.values[11] != expected.cases)
+        throw std::runtime_error("Frozen case tie ordering: " + scenario.name + ", row " + std::to_string(i));
+    }
+  }
+}
+
+static void temporal_calendar_frozen_mixed_endpoints() {
+  const auto& scenarios = frozen_endpoint_scenarios;
+  assert(scenarios.size() == 29);
+  for (const auto& scenario : scenarios) {
+    EventLog log;
+    log.traces = {Trace{"c", {}}};
+    for (std::size_t i = 0; i < scenario.keys.size(); ++i) {
+      Event event{"c", "A", format_timestamp(1704067200 + scenario.ends[i]), "r"};
+      EventAttribute key{"id", ""};
+      key.container = AttributeContainerKind::kFrozenSet;
+      for (const auto member : scenario.keys[i]) key.children.push_back({"", std::to_string(member), AttributeKind::kInt});
+      event.attributes = {key, {"start", format_timestamp(1704067200 + i * 10), AttributeKind::kDate}};
+      log.traces[0].events.push_back(event);
+    }
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = "10s";
+    options.case_id_key = "id";
+    options.start_timestamp_key = "start";
+    const auto result = log_to_features(log, options);
+    assert(result.temporal_rows.size() == scenario.keys.size());
+    for (std::size_t i = 0; i < scenario.keys.size(); ++i) {
+      const auto& row = result.temporal_rows[i];
+      assert(row.timestamp == 1704067200 + i * 10);
+      if (row.values[3] != scenario.rates[i] || row.values[4] != scenario.rates[i])
+        throw std::runtime_error("Frozen mixed endpoints: " + std::to_string(scenario.keys.size()) + ", row " + std::to_string(i));
+      assert(row.values[11] == 1 && row.values[5] == 0 && row.values[6] == 0);
+    }
+  }
+}
+
+static void temporal_calendar_frozen_ties_keep_typed_members() {
+  EventAttribute shared_nan{"", "", AttributeKind::kFloat};
+  shared_nan.typed_value = std::numeric_limits<double>::quiet_NaN();
+  EventAttribute smaller{"id", ""};
+  smaller.container = AttributeContainerKind::kFrozenSet;
+  smaller.children = {{"", "true", AttributeKind::kBoolean}, {"", "1", AttributeKind::kInt}, shared_nan};
+  auto larger = smaller;
+  larger.children.push_back({"", "2", AttributeKind::kInt});
+  auto anchor = smaller;
+  anchor.children = {{"", "-1", AttributeKind::kInt}};
+  EventLog log;
+  log.traces = {
+      Trace{"anchor", {Event{"anchor", "A", format_timestamp(0), "r"}}},
+      Trace{"large", {Event{"large", "A", format_timestamp(10), "r"}, Event{"large", "A", format_timestamp(20), "r"}}},
+      Trace{"small", {Event{"small", "A", format_timestamp(10), "r"}, Event{"small", "A", format_timestamp(30), "r"}}}};
+  const std::vector<EventAttribute> keys{anchor, larger, smaller};
+  for (std::size_t i = 0; i < keys.size(); ++i)
+    for (auto& event : log.traces[i].events) event.attributes = {keys[i]};
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.grouper_freq = "10s";
+  options.case_id_key = "id";
+  const auto result = log_to_features(log, options);
+  const std::vector<double> arrivals{0,5,0,10};
+  for (std::size_t i = 0; i < arrivals.size(); ++i) assert(result.temporal_rows[i].values[3] == arrivals[i]);
+  assert(log.traces[2].events[0].attributes[0].children[2].typed_value.scalar_identity() == shared_nan.typed_value.scalar_identity());
+}
+
 static void temporal_calendar_tuple_nan_factorization_is_local() {
   const auto nan = [] {
     EventAttribute value{"", "stale", AttributeKind::kDate};
@@ -2598,6 +2696,9 @@ int main() {
   temporal_calendar_timestamps_use_projected_native_dates();
   temporal_calendar_categories_use_projected_trace_columns();
   temporal_calendar_numeric_columns_promote_before_grouping();
+  temporal_calendar_frozen_case_tie_order();
+  temporal_calendar_frozen_mixed_endpoints();
+  temporal_calendar_frozen_ties_keep_typed_members();
   temporal_calendar_tuple_nan_factorization_is_local();
   temporal_calendar_tuple_case_ordering();
   temporal_calendar_scalar_case_ordering_is_exact();

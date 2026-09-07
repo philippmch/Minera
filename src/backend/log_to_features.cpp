@@ -7,6 +7,7 @@
 #include <cctype>
 #include <cstdint>
 #include <ctime>
+#include <deque>
 #include <limits>
 #include <map>
 #include <set>
@@ -1405,20 +1406,278 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     validate_scalar_group(case_categories.values, native_scalar_order_kind);
     validate_tuple_group(case_categories.values, [](const EventAttribute& value) -> const EventAttribute& { return value; });
   }
+  std::vector<std::size_t> frozen_ranks;
+  if (temporal_frequency && !case_categories.values.empty() &&
+      std::all_of(case_categories.values.begin(), case_categories.values.end(), [](const auto& key) {
+        return key.container == AttributeContainerKind::kFrozenSet;
+      })) {
+    auto order = arrival_order;
+    std::vector<std::vector<const EventAttribute*>> members;
+    for (const auto& key : case_categories.values) members.push_back(root_cause_set_members(key));
+    const auto subset = [&](std::size_t left, std::size_t right) {
+      const auto& a = members[left];
+      const auto& b = members[right];
+      return a.size() < b.size() && std::all_of(a.begin(), a.end(), [&](const auto* child) {
+        return std::any_of(b.begin(), b.end(), [&](const auto* other) {
+          return root_cause_scalar_keys_equal(*child, *other);
+        });
+      });
+    };
+    // The object relation is partial. Explicit partition/insertion operations
+    // produce ranks without giving a partial comparator to a library sort.
+    struct Partition { std::size_t first, end, depth; };
+    std::size_t depth = 0;
+    for (auto size = order.size(); size > 1; size >>= 1) depth += 2;
+    std::vector<Partition> pending{{0, order.size(), depth}};
+    while (!pending.empty()) {
+      const auto [first, end, remaining] = pending.back();
+      pending.pop_back();
+      const auto size = end - first;
+      if (size < 2) continue;
+      if (size <= 16) {
+        for (auto i = first + 1; i < end; ++i) {
+          const auto value = order[i];
+          auto at = i;
+          while (at > first && subset(value, order[at - 1])) {
+            order[at] = order[at - 1];
+            --at;
+          }
+          order[at] = value;
+        }
+        continue;
+      }
+      if (remaining == 0) {
+        const auto sift = [&](std::size_t root, std::size_t count) {
+          while (root < count / 2) {
+            auto child = root * 2 + 1;
+            if (child + 1 < count && subset(order[first + child], order[first + child + 1])) ++child;
+            if (!subset(order[first + root], order[first + child])) break;
+            std::swap(order[first + root], order[first + child]);
+            root = child;
+          }
+        };
+        for (auto root = size / 2; root > 0;) sift(--root, size);
+        for (auto count = size; count > 1;) {
+          std::swap(order[first], order[first + --count]);
+          sift(0, count);
+        }
+        continue;
+      }
+      const auto last = end - 1, middle = first + (size - 1) / 2;
+      if (subset(order[middle], order[first])) std::swap(order[middle], order[first]);
+      if (subset(order[last], order[middle])) std::swap(order[last], order[middle]);
+      if (subset(order[middle], order[first])) std::swap(order[middle], order[first]);
+      std::swap(order[middle], order[last - 1]);
+      const auto pivot = order[last - 1];
+      auto left = first, right = last - 1;
+      while (true) {
+        do { ++left; } while (left < last - 1 && subset(order[left], pivot));
+        do { --right; } while (right > first && subset(pivot, order[right]));
+        if (left >= right) break;
+        std::swap(order[left], order[right]);
+      }
+      std::swap(order[left], order[last - 1]);
+      pending.push_back({left + 1, end, remaining - 1});
+      pending.push_back({first, left, remaining - 1});
+    }
+    frozen_ranks.resize(order.size());
+    for (std::size_t rank = 0; rank < order.size(); ++rank) frozen_ranks[order[rank]] = rank;
+  }
   auto case_less = [&](std::size_t lhs, std::size_t rhs, bool by_finish) {
     const double a = by_finish ? cases[lhs].finish : cases[lhs].start;
     const double b = by_finish ? cases[rhs].finish : cases[rhs].start;
     if (a != b) return a < b;
+    if (!frozen_ranks.empty()) return frozen_ranks[lhs] < frozen_ranks[rhs];
     if (ordered_case_keys)
       return compare_case_keys(compare_case_keys, case_categories.values[lhs], case_categories.values[rhs]) < 0;
     if (!temporal_frequency && log.traces[lhs].case_id != log.traces[rhs].case_id)
       return log.traces[lhs].case_id < log.traces[rhs].case_id;
     return lhs < rhs;
   };
-  std::sort(arrival_order.begin(), arrival_order.end(),
-            [&](std::size_t lhs, std::size_t rhs) { return case_less(lhs, rhs, false); });
-  std::sort(finish_order.begin(), finish_order.end(),
-            [&](std::size_t lhs, std::size_t rhs) { return case_less(lhs, rhs, true); });
+  const auto sort_endpoints = [&](std::vector<std::size_t>& order, bool by_finish) {
+    if (frozen_ranks.empty()) {
+      std::sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
+        return case_less(left, right, by_finish);
+      });
+      return;
+    }
+    std::sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
+      return frozen_ranks[left] < frozen_ranks[right];
+    });
+    std::vector<std::vector<const EventAttribute*>> members;
+    for (const auto& key : case_categories.values) members.push_back(root_cause_set_members(key));
+    const auto less = [&](std::size_t left, std::size_t right) {
+      const auto a = by_finish ? cases[left].finish : cases[left].start;
+      const auto b = by_finish ? cases[right].finish : cases[right].start;
+      if (a != b) return a < b;
+      return members[left].size() < members[right].size() &&
+          std::all_of(members[left].begin(), members[left].end(), [&](const auto* child) {
+            return std::any_of(members[right].begin(), members[right].end(), [&](const auto* other) {
+              return root_cause_scalar_keys_equal(*child, *other);
+            });
+          });
+    };
+    auto minimum = order.size();
+    std::size_t carry = 0;
+    while (minimum >= 64) { carry |= minimum & 1; minimum >>= 1; }
+    minimum += carry;
+    struct Run { std::size_t first, length; };
+    std::vector<Run> runs;
+    int gallop_threshold = 7;
+    const auto gallop = [&](const std::deque<std::size_t>& values, std::size_t key,
+                            bool upper_bound, bool from_back) {
+      const auto before = [&](std::size_t at) {
+        return upper_bound ? !less(key, values[at]) : less(values[at], key);
+      };
+      const auto hint = from_back ? values.size() - 1 : 0;
+      std::size_t low = 0, high = values.size(), step = 1;
+      if (before(hint)) {
+        low = hint + 1;
+        while (step < values.size() - hint) {
+          if (!before(hint + step)) { high = hint + step; break; }
+          low = hint + step + 1;
+          step = step > values.size() / 2 ? values.size() : step * 2 + 1;
+        }
+      } else {
+        high = hint;
+        while (step <= hint) {
+          if (before(hint - step)) { low = hint - step + 1; break; }
+          high = hint - step;
+          step = step > values.size() / 2 ? values.size() : step * 2 + 1;
+        }
+      }
+      while (low < high) {
+        const auto middle = low + (high - low) / 2;
+        if (before(middle)) low = middle + 1;
+        else high = middle;
+      }
+      return low;
+    };
+    const auto merge = [&](std::size_t index) {
+      const auto left_run = runs[index], right_run = runs[index + 1];
+      std::deque<std::size_t> left(order.begin() + left_run.first, order.begin() + right_run.first);
+      std::deque<std::size_t> right(order.begin() + right_run.first,
+                                    order.begin() + right_run.first + right_run.length);
+      std::vector<std::size_t> combined, output, suffix;
+      combined.reserve(left.size() + right.size());
+      const auto prefix_count = gallop(left, right.front(), true, false);
+      for (std::size_t i = 0; i < prefix_count; ++i) {
+        combined.push_back(left.front()); left.pop_front();
+      }
+      if (!left.empty()) {
+        const auto retained = gallop(right, left.back(), false, true);
+        suffix.assign(right.begin() + retained, right.end());
+        right.erase(right.begin() + retained, right.end());
+      }
+      const bool backward = left.size() > right.size();
+      const auto take = [&](std::deque<std::size_t>& source) {
+        output.push_back(backward ? source.back() : source.front());
+        if (backward) source.pop_back(); else source.pop_front();
+      };
+      if (!left.empty() && !right.empty()) take(backward ? left : right);
+      int left_wins = 0, right_wins = 0;
+      while (!left.empty() && !right.empty()) {
+        if (backward && right.size() == 1) {
+          while (!left.empty()) take(left);
+          break;
+        }
+        if (!backward && left.size() == 1) {
+          while (!right.empty()) take(right);
+          break;
+        }
+        const bool take_left = backward ? less(right.back(), left.back()) : !less(right.front(), left.front());
+        if (take_left) { take(left); ++left_wins; right_wins = 0; }
+        else { take(right); ++right_wins; left_wins = 0; }
+        if (std::max(left_wins, right_wins) < gallop_threshold) continue;
+        while (!left.empty() && !right.empty()) {
+          auto cut = gallop(left, backward ? right.back() : right.front(), true, backward);
+          const auto left_count = backward ? left.size() - cut : cut;
+          for (std::size_t i = 0; i < left_count; ++i) take(left);
+          if (left.empty() || (!backward && left.size() == 1)) break;
+          take(right);
+          if (right.empty()) break;
+          cut = gallop(right, backward ? left.back() : left.front(), false, backward);
+          const auto right_count = backward ? right.size() - cut : cut;
+          for (std::size_t i = 0; i < right_count; ++i) take(right);
+          if (right.empty() || (backward && right.size() == 1)) break;
+          take(left);
+          if ((backward && right.size() <= 1) || (!backward && left.size() <= 1)) break;
+          --gallop_threshold;
+          if (left_count < 7 && right_count < 7) break;
+        }
+        if (!left.empty() && !right.empty() &&
+            !((backward && right.size() == 1) || (!backward && left.size() == 1)))
+          gallop_threshold = std::max(gallop_threshold, 0) + 2;
+        else gallop_threshold = std::max(gallop_threshold, 1);
+        left_wins = right_wins = 0;
+      }
+      if (backward) {
+        combined.insert(combined.end(), left.begin(), left.end());
+        combined.insert(combined.end(), right.begin(), right.end());
+        combined.insert(combined.end(), output.rbegin(), output.rend());
+      } else {
+        combined.insert(combined.end(), output.begin(), output.end());
+        combined.insert(combined.end(), left.begin(), left.end());
+        combined.insert(combined.end(), right.begin(), right.end());
+      }
+      combined.insert(combined.end(), suffix.begin(), suffix.end());
+      std::copy(combined.begin(), combined.end(), order.begin() + left_run.first);
+      runs[index].length += right_run.length;
+      runs.erase(runs.begin() + index + 1);
+    };
+    for (std::size_t first = 0; first < order.size();) {
+      auto end = first + 1;
+      if (end < order.size()) {
+        const bool descending = less(order[end], order[first]);
+        ++end;
+        while (end < order.size() && (descending ? less(order[end], order[end - 1])
+                                                : !less(order[end], order[end - 1]))) ++end;
+        if (descending) std::reverse(order.begin() + first, order.begin() + end);
+      }
+      const auto extended = std::min(order.size(), first + std::max(minimum, end - first));
+      for (auto i = end; i < extended; ++i) {
+        const auto value = order[i];
+        auto low = first, high = i;
+        while (low < high) {
+          const auto middle = low + (high - low) / 2;
+          if (less(value, order[middle])) high = middle;
+          else low = middle + 1;
+        }
+        std::move_backward(order.begin() + low, order.begin() + i, order.begin() + i + 1);
+        order[low] = value;
+      }
+      runs.push_back({first, extended - first});
+      first = extended;
+    }
+    const auto natural_runs = std::move(runs);
+    runs.clear();
+    std::vector<std::size_t> powers;
+    if (order.size() > std::numeric_limits<std::size_t>::max() / 4)
+      throw std::invalid_argument("log_to_features: temporal ordering range overflows");
+    const auto denominator = 2 * order.size();
+    for (std::size_t i = 0; i < natural_runs.size(); ++i) {
+      if (i > 0) {
+        const auto previous = natural_runs[i - 1], current = natural_runs[i];
+        auto left_midpoint = 2 * previous.first + previous.length;
+        auto right_midpoint = 2 * current.first + current.length;
+        std::size_t power = 0;
+        while ((left_midpoint >= denominator) == (right_midpoint >= denominator)) {
+          left_midpoint = (left_midpoint % denominator) * 2;
+          right_midpoint = (right_midpoint % denominator) * 2;
+          ++power;
+        }
+        while (!powers.empty() && powers.back() > power) {
+          merge(runs.size() - 2);
+          powers.pop_back();
+        }
+        powers.push_back(power);
+      }
+      runs.push_back(natural_runs[i]);
+    }
+    while (runs.size() > 1) merge(runs.size() - 2);
+  };
+  sort_endpoints(arrival_order, false);
+  sort_endpoints(finish_order, true);
   std::vector<double> arrival_rate(cases.size(), 0.0);
   std::vector<double> finish_rate(cases.size(), 0.0);
   for (std::size_t i = 1; i < arrival_order.size(); ++i)

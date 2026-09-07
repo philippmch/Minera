@@ -3228,6 +3228,12 @@ set contains a tuple or appears inside one. Separate lookup keys preserve the
 original category representatives and native input attributes; shared key
 equality outside temporal extraction is unchanged. Equal nested null tuples
 continue to merge.
+Homogeneous frozen-set case identifiers require two ordering stages: object-key
+group ordering followed by whole-list endpoint/key comparisons. Proper subset
+comparisons do not define a total order, so encounter order, endpoint-only ranks,
+and independently sorted tie groups are insufficient. Public fixtures cover
+subset chains, incomparable sets, mixed endpoints, and larger collections up to
+1,000 cases; frozen-set and NaN-containing mixed domains remain partial.
 Calendar EventLog projections infer numeric promotion independently for selected
 activity, resource, and case-ID columns across the entire log. Float or missing
 cells promote eligible integer columns to float64 before category grouping;
