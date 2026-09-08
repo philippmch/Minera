@@ -3325,10 +3325,21 @@ retaining input clock fields, including nonzero-offset inputs. Native import
 now follows this behavior for date attributes and selected timestamps.
 `RUSTXES` retains absolute-instant normalization instead, matching its observed
 file-import backend. Six-digit fractions survive and finer fractions truncate.
-The public line and regex variations do not preserve the tested nested-date
-shape, while native recursive metadata is retained; nested shape parity remains
-open. The public Rust wrapper lacks string deserialization and exposes a table
-on file import; full adapter/result-type equivalence remains unproven.
+Nested scalar and list imports now follow variation-specific shapes, with 128
+permanent public-category fixtures across event and trace attributes.
+`LINE_BY_LINE` flattens recursive children into the containing attribute map;
+later duplicate keys replace earlier values, including selected first-class
+keys. `CHUNK_REGEX` drops scalar children and retains list children as a mapping.
+`ITERPARSE` and `ITERPARSE_MEM_COMPRESSED` preserve scalar children as mappings,
+wrapped list entries as ordered pairs, and direct list children as mappings.
+`ITERPARSE_20` retains direct list entries as ordered pairs but ignores entries
+inside a `values` wrapper. Native Rust scalar imports discard child metadata
+and retain the first duplicate attribute. Rust list stringification, unknown
+container tags, log-level shape differences, and empty/malformed shape edges
+remain open. Public exporter probes also show variation-specific handling of
+dictionary-shaped list children; exact export behavior remains open.
+The public Rust wrapper lacks string deserialization; complete file/string
+adapter and result-type equivalence remains unproven.
 Calendar metric destination options expose arrival, finish, service, waiting,
 sojourn, and per-event difference scratch columns, including empty names. Ordered
 virtual writes let selected category columns and shared metric destinations

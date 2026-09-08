@@ -201,6 +201,14 @@ std::optional<EventAttribute> parse_attribute_node(
       result.value = date->value;
   }
   if (start.self_closing) return result;
+  if (kind && (variant == XesImportVariant::kChunkRegex ||
+               variant == XesImportVariant::kRustXes)) {
+    skip_element(parser, start);
+    return result;
+  }
+  if (list && variant != XesImportVariant::kIterparse20 &&
+      variant != XesImportVariant::kRustXes)
+    result.container = AttributeContainerKind::kContainer;
 
   while (true) {
     const auto token = parser.next();
@@ -213,10 +221,15 @@ std::optional<EventAttribute> parse_attribute_node(
     }
     if (token.kind != detail::XmlPullParser::Kind::StartElement) continue;
     if (!kind) {
-      // The XES list grammar wraps its entries in a <values> element.  Older
-      // producers also emit direct children, so accept both forms while
-      // preserving every recursive typed attribute.
+      // Wrapped and direct list entries have different result shapes across
+      // the parser variations, even when their scalar contents are identical.
       if (list && local_name(token.name) == "values") {
+        if (variant == XesImportVariant::kIterparse20) {
+          skip_element(parser, token);
+          continue;
+        }
+        if (variant != XesImportVariant::kChunkRegex)
+          result.container = AttributeContainerKind::kList;
         if (token.self_closing) continue;
         while (true) {
           const auto values_token = parser.next();
@@ -244,6 +257,29 @@ std::optional<EventAttribute> parse_attribute_node(
       result.children.push_back(*child);
     }
   }
+}
+
+void replace_attribute(std::vector<EventAttribute>& attributes,
+                       EventAttribute attribute, bool overwrite = true) {
+  const auto existing = std::find_if(attributes.begin(), attributes.end(),
+      [&](const auto& item) { return item.key == attribute.key; });
+  if (existing == attributes.end()) attributes.push_back(std::move(attribute));
+  else if (overwrite) *existing = std::move(attribute);
+}
+
+template <typename Emit>
+void emit_imported_attribute(EventAttribute attribute, XesImportVariant variant,
+                             const Emit& emit) {
+  if (variant != XesImportVariant::kLineByLine) {
+    emit(std::move(attribute));
+    return;
+  }
+  auto children = std::move(attribute.children);
+  attribute.children.clear();
+  if (attribute.container == AttributeContainerKind::kScalar)
+    emit(std::move(attribute));
+  for (auto& child : children)
+    emit_imported_attribute(std::move(child), variant, emit);
 }
 
 int selector_match_rank(std::string_view key, std::string_view selector) {
@@ -492,7 +528,8 @@ EventLog import_xes_event_log(
                                      FirstClassAttributeState& state,
                                      std::string& source_key,
                                      std::optional<EventAttribute>& metadata) {
-      if (rank == 0 || rank <= current_rank) return;
+      if (rank == 0 || rank < current_rank ||
+          (rank == current_rank && options.variant == XesImportVariant::kRustXes)) return;
       current_rank = rank;
       target = attribute.value;
       state = attribute.is_null ? FirstClassAttributeState::kNull
@@ -534,7 +571,8 @@ EventLog import_xes_event_log(
     if (attributes_to_read.empty() || attributes_to_read.contains(attribute.key) ||
         activity_rank != 0 || timestamp_rank != 0 || resource_rank != 0 ||
         lifecycle_rank != 0) {
-      current_event.attributes.push_back(std::move(attribute));
+      replace_attribute(current_event.attributes, std::move(attribute),
+                        options.variant != XesImportVariant::kRustXes);
     }
   };
 
@@ -626,33 +664,36 @@ EventLog import_xes_event_log(
       } else if (in_event && parent == "event") {
         consumed_by_parser = true;
         if (const auto attribute = parse_attribute_node(parser, token, options.variant))
-          apply_event_attribute(*attribute);
+          emit_imported_attribute(*attribute, options.variant, apply_event_attribute);
       } else if (in_trace && !in_event && parent == "trace") {
         consumed_by_parser = true;
         if (const auto attribute = parse_attribute_node(parser, token, options.variant)) {
-          const auto rank = attribute->container == AttributeContainerKind::kScalar
-                                ? case_selector_match_rank(
-                                      attribute->key, options.case_attribute)
-                                : 0;
-          if (rank > static_cast<int>(case_match_rank)) {
-            case_match_rank = static_cast<std::size_t>(rank);
-            current_trace.case_id = attribute->value;
-            current_trace.case_id_state =
-                attribute->is_null ? FirstClassAttributeState::kNull
-                                    : FirstClassAttributeState::kPresent;
-            current_trace.case_id_source_key = attribute->key;
-            current_trace.case_id_attribute = *attribute;
-          }
-          if (attributes_to_read.empty() ||
-              attributes_to_read.contains(attribute->key) || rank != 0)
-            current_trace.attributes.push_back(*attribute);
+          emit_imported_attribute(*attribute, options.variant, [&](EventAttribute emitted) {
+            const auto rank = emitted.container == AttributeContainerKind::kScalar
+                ? case_selector_match_rank(emitted.key, options.case_attribute) : 0;
+            if (rank != 0 && (rank > static_cast<int>(case_match_rank) ||
+                (rank == static_cast<int>(case_match_rank) &&
+                 options.variant != XesImportVariant::kRustXes))) {
+              case_match_rank = static_cast<std::size_t>(rank);
+              current_trace.case_id = emitted.value;
+              current_trace.case_id_state = emitted.is_null ? FirstClassAttributeState::kNull
+                                                            : FirstClassAttributeState::kPresent;
+              current_trace.case_id_source_key = emitted.key;
+              current_trace.case_id_attribute = emitted;
+            }
+            if (attributes_to_read.empty() || attributes_to_read.contains(emitted.key) || rank != 0)
+              replace_attribute(current_trace.attributes, std::move(emitted),
+                                options.variant != XesImportVariant::kRustXes);
+          });
         }
       } else if (!in_trace && parent == "log") {
         consumed_by_parser = true;
-        if (const auto attribute = parse_attribute_node(parser, token, options.variant);
-            attribute && (attributes_to_read.empty() ||
-                          attributes_to_read.contains(attribute->key)))
-          log.attributes.push_back(*attribute);
+        if (const auto attribute = parse_attribute_node(parser, token, options.variant))
+          emit_imported_attribute(*attribute, options.variant, [&](EventAttribute emitted) {
+            if (attributes_to_read.empty() || attributes_to_read.contains(emitted.key))
+              replace_attribute(log.attributes, std::move(emitted),
+                                options.variant != XesImportVariant::kRustXes);
+          });
       }
 
       if (token.self_closing) {
