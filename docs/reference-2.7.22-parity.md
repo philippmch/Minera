@@ -3336,8 +3336,18 @@ wrapped list entries as ordered pairs, and direct list children as mappings.
 inside a `values` wrapper. Native Rust scalar imports discard child metadata
 and retain the first duplicate attribute. Rust list stringification, unknown
 container tags, log-level shape differences, and empty/malformed shape edges
-remain open. Public exporter probes also show variation-specific handling of
-dictionary-shaped list children; exact export behavior remains open.
+remain open. Public exporter probes cover 288 combinations of nested shapes,
+event/trace/log/global scopes, both export variations, and plain/gzip transport.
+Native dictionary-shaped list exports now emit `list`/`values`: `ETREE` writes
+typed mapping entries, while `LINE_BY_LINE` uses the first two Unicode code
+points of each mapping key as a string key/value pair and rejects shorter keys.
+Ordered pair lists retain duplicates; mapping children use last-value replacement
+at the first insertion position. Recursive writers and first-class projections
+carry the selected variation. Permanent tests cover these rules at all four
+scopes and both first-class name projections, with plain and gzip output.
+This checkpoint retains the native explicit-null extension. Public None-child
+omission and exporter-specific boolean/date lexical formatting remain open;
+the exporter coverage units are still partial.
 The public Rust wrapper lacks string deserialization; complete file/string
 adapter and result-type equivalence remains unproven.
 Calendar metric destination options expose arrival, finish, service, waiting,
