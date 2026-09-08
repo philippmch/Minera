@@ -3213,7 +3213,13 @@ Public fixtures cover source-resolution promotion, fractional truncation, sparse
 grids, fixed offsets, case-rate ties, and case-sensitive frequency aliases.
 Numeric case metrics retain observed floating-point timestamp behavior.
 XES import preserves up to six fractional digits, truncating finer fractions;
-XES export precision and the offset adapter discrepancy remain open.
+both XES exporters preserve those microseconds in first-class timestamps and
+log, trace, event, and nested date attributes, including compressed output.
+Explicit nanosecond native dates retain up to nine digits on export; re-import
+still follows the microsecond source contract. Native export normalizes whole
+seconds to UTC independently of the fraction, avoiding rounding into the next
+second or losing precision at distant dates. The offset adapter discrepancy
+remains open.
 Fractional tick coefficients now follow the observed double conversion and
 truncation behavior. Each compound component normalizes independently through
 direct conversions to finer units (days begin at hours), accepting an integer

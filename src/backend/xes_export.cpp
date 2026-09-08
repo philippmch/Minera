@@ -92,6 +92,33 @@ bool parse_float_value(std::string_view value, double& result) {
   return parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size();
 }
 
+std::string xes_date_lexical_value(std::string_view text,
+                                 NativeDateResolution resolution) {
+  const auto instant = parse_timestamp(text);
+  if (!instant)
+    throw std::invalid_argument("XES date attribute has an invalid value: " +
+                                std::string(text));
+  const auto dot = text.find('.');
+  if (dot == std::string_view::npos) return format_timestamp(*instant);
+  auto end = dot + 1;
+  while (end < text.size() && std::isdigit(static_cast<unsigned char>(text[end]))) ++end;
+  if (end - dot - 1 <= 3) return format_timestamp(*instant);
+
+  // Normalize the whole second independently so a rounded double cannot carry
+  // a final fractional digit into the next second or lose distant-date bits.
+  auto integral = std::string(text);
+  integral.erase(dot, end - dot);
+  const auto whole = parse_timestamp(integral);
+  if (!whole) throw std::invalid_argument("XES date has an invalid integral instant");
+  auto normalized = format_timestamp(*whole);
+  normalized.resize(normalized.find('.'));
+  normalized += '.';
+  const auto precision = resolution == NativeDateResolution::kNanosecond ? 9u : 6u;
+  normalized += text.substr(dot + 1, std::min<std::size_t>(precision, end - dot - 1));
+  normalized += 'Z';
+  return normalized;
+}
+
 std::string scalar_lexical_value(const EventAttribute& attribute) {
   if (attribute.is_null) return {};
   if (attribute.kind != AttributeKind::kBytes) {
@@ -121,11 +148,7 @@ std::string scalar_lexical_value(const EventAttribute& attribute) {
     if (const auto* value = std::get_if<NativeDate>(&attribute.typed_value)) {
       if (attribute.kind != AttributeKind::kDate)
         throw std::invalid_argument("XES attribute has an incompatible date native value");
-      const auto instant = parse_timestamp(value->value);
-      if (!instant)
-        throw std::invalid_argument("XES date attribute has an invalid native value: " +
-                                    value->value);
-      return format_timestamp(*instant);
+      return xes_date_lexical_value(value->value, value->resolution);
     }
   }
 
@@ -151,11 +174,7 @@ std::string scalar_lexical_value(const EventAttribute& attribute) {
             "XES boolean attribute has an invalid value: " + attribute.value);
       return attribute.value;
     case AttributeKind::kDate: {
-      const auto instant = parse_timestamp(attribute.value);
-      if (!instant)
-        throw std::invalid_argument("XES date attribute has an invalid value: " +
-                                    attribute.value);
-      return format_timestamp(*instant);
+      return xes_date_lexical_value(attribute.value, NativeDateResolution::kMicrosecond);
     }
     case AttributeKind::kString:
     case AttributeKind::kId:
