@@ -56,7 +56,8 @@ bool true_attribute(const std::vector<std::pair<std::string, std::string>>& attr
 }
 
 NativeAttributeValue parse_native_value(AttributeKind kind,
-                                        std::string_view value) {
+                                       std::string_view value,
+                                       XesImportVariant variant) {
   switch (kind) {
     case AttributeKind::kInt: {
       if (value.empty())
@@ -97,10 +98,22 @@ NativeAttributeValue parse_native_value(AttributeKind kind,
       throw std::invalid_argument("XES boolean attribute has an invalid value: " +
                                   std::string(value));
     case AttributeKind::kDate: {
-      const auto parsed = parse_timestamp(value);
+      auto parsed = parse_timestamp(value);
       if (!parsed) {
         throw std::invalid_argument("XES date attribute has an invalid value: " +
                                     std::string(value));
+      }
+      std::string wall_time;
+      if (variant != XesImportVariant::kRustXes) {
+        const auto time = value.find_first_of("Tt ");
+        const auto offset = time == std::string_view::npos ? std::string_view::npos
+            : value.find_first_of("+-", time + 1);
+        if (offset != std::string_view::npos) {
+          // These parser variations retain the clock fields and attach UTC.
+          wall_time = std::string(value.substr(0, offset)) + 'Z';
+          value = wall_time;
+          parsed = parse_timestamp(value);
+        }
       }
       if (const auto dot = value.find('.'); dot != std::string_view::npos) {
         auto end = dot + 1;
@@ -149,6 +162,7 @@ void skip_element(detail::XmlPullParser& parser,
 std::optional<EventAttribute> parse_attribute_node(
     detail::XmlPullParser& parser,
     const detail::XmlPullParser::Token& start,
+    XesImportVariant variant,
     std::size_t depth = 0) {
   constexpr std::size_t kMaxAttributeDepth = 128;
   if (depth > kMaxAttributeDepth)
@@ -182,7 +196,7 @@ std::optional<EventAttribute> parse_attribute_node(
     throw std::invalid_argument("XES scalar attribute is missing its value");
   }
   if (!is_null && kind) {
-    result.typed_value = parse_native_value(*kind, result.value);
+    result.typed_value = parse_native_value(*kind, result.value, variant);
     if (const auto* date = std::get_if<NativeDate>(&result.typed_value))
       result.value = date->value;
   }
@@ -215,15 +229,15 @@ std::optional<EventAttribute> parse_attribute_node(
           if (values_token.kind != detail::XmlPullParser::Kind::StartElement)
             continue;
           if (const auto child =
-                  parse_attribute_node(parser, values_token, depth + 1))
+                  parse_attribute_node(parser, values_token, variant, depth + 1))
             result.children.push_back(*child);
         }
       } else if (const auto child =
-                     parse_attribute_node(parser, token, depth + 1)) {
+                     parse_attribute_node(parser, token, variant, depth + 1)) {
         result.children.push_back(*child);
       }
     } else if (const auto child =
-                   parse_attribute_node(parser, token, depth + 1)) {
+                   parse_attribute_node(parser, token, variant, depth + 1)) {
       // Scalar attributes are normally self-closing, but the attribute
       // representation also permits recursive metadata children. Preserve
       // those children instead of discarding the whole nested subtree.
@@ -319,7 +333,9 @@ void validate_variant(XesImportVariant variant) {
   throw std::invalid_argument("XES import: unsupported parser variant");
 }
 
-double required_timestamp(const Event& event) {
+using TimestampOrderKey = std::pair<std::int64_t, std::int64_t>;
+
+TimestampOrderKey required_timestamp(const Event& event) {
   if (event.timestamp.empty()) {
     throw std::runtime_error(
         "XES timestamp sorting requires a timestamp on every event");
@@ -329,15 +345,27 @@ double required_timestamp(const Event& event) {
     throw std::runtime_error(
         "XES timestamp sorting encountered an invalid timestamp");
   }
-  return *parsed;
+  auto integral = event.timestamp;
+  std::int64_t fraction = 0;
+  if (const auto dot = integral.find('.'); dot != std::string::npos) {
+    auto end = dot + 1;
+    unsigned digits = 0;
+    while (end < integral.size() && std::isdigit(static_cast<unsigned char>(integral[end]))) {
+      if (digits++ < 9) fraction = fraction * 10 + integral[end] - '0';
+      ++end;
+    }
+    while (digits++ < 9) fraction *= 10;
+    integral.erase(dot, end - dot);
+  }
+  return {static_cast<std::int64_t>(*parse_timestamp(integral)), fraction};
 }
 
 void sort_log_by_timestamp(EventLog& log, bool reverse) {
-  std::vector<std::pair<double, Trace>> timed_traces;
+  std::vector<std::pair<TimestampOrderKey, Trace>> timed_traces;
   timed_traces.reserve(log.traces.size());
   for (auto& trace : log.traces) {
     if (trace.events.empty()) continue;
-    std::vector<std::pair<double, Event>> timed_events;
+    std::vector<std::pair<TimestampOrderKey, Event>> timed_events;
     timed_events.reserve(trace.events.size());
     for (auto& event : trace.events) {
       const auto timestamp = required_timestamp(event);
@@ -585,7 +613,7 @@ EventLog import_xes_event_log(
         active_global = &log.metadata.globals.back();
       } else if (active_global && parent == "global") {
         consumed_by_parser = true;
-        if (const auto attribute = parse_attribute_node(parser, token)) {
+        if (const auto attribute = parse_attribute_node(parser, token, options.variant)) {
           if (attributes_to_read.empty() ||
               attributes_to_read.contains(attribute->key)) {
             active_global->attributes.push_back(*attribute);
@@ -597,11 +625,11 @@ EventLog import_xes_event_log(
         }
       } else if (in_event && parent == "event") {
         consumed_by_parser = true;
-        if (const auto attribute = parse_attribute_node(parser, token))
+        if (const auto attribute = parse_attribute_node(parser, token, options.variant))
           apply_event_attribute(*attribute);
       } else if (in_trace && !in_event && parent == "trace") {
         consumed_by_parser = true;
-        if (const auto attribute = parse_attribute_node(parser, token)) {
+        if (const auto attribute = parse_attribute_node(parser, token, options.variant)) {
           const auto rank = attribute->container == AttributeContainerKind::kScalar
                                 ? case_selector_match_rank(
                                       attribute->key, options.case_attribute)
@@ -621,7 +649,7 @@ EventLog import_xes_event_log(
         }
       } else if (!in_trace && parent == "log") {
         consumed_by_parser = true;
-        if (const auto attribute = parse_attribute_node(parser, token);
+        if (const auto attribute = parse_attribute_node(parser, token, options.variant);
             attribute && (attributes_to_read.empty() ||
                           attributes_to_read.contains(attribute->key)))
           log.attributes.push_back(*attribute);
@@ -678,7 +706,8 @@ EventLog import_xes_event_log(
   log.metadata.compatibility_event_globals_snapshot =
       log.metadata.event_globals;
 
-  if (options.timestamp_sort) sort_log_by_timestamp(log, options.reverse_sort);
+  if (options.timestamp_sort && options.variant != XesImportVariant::kChunkRegex)
+    sort_log_by_timestamp(log, options.reverse_sort);
 
   return log;
 }
