@@ -341,6 +341,7 @@ struct TemporalFrequency {
   bool business = false;
   int month_day = 15;
   int month_week = 1;
+  std::int64_t tick_ns = 0;
 };
 
 std::string uppercase_ascii(std::string value) {
@@ -359,10 +360,154 @@ std::int64_t floor_division(std::int64_t numerator,
   return quotient;
 }
 
+// Fixed ticks are parsed as decimal integers so neither width nor membership
+// depends on floating-point rounding.
+std::optional<std::int64_t> temporal_tick_width(std::string_view text) {
+  std::uint64_t total = 0;
+  std::size_t position = 0;
+  bool found = false;
+  while (position < text.size()) {
+    while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position]))) ++position;
+    if (position == text.size()) break;
+    if (text[position] == '+') ++position;
+    std::string digits;
+    unsigned decimals = 0;
+    bool dot = false;
+    while (position < text.size() && (std::isdigit(static_cast<unsigned char>(text[position])) || text[position] == '.')) {
+      const char c = text[position++];
+      if (c == '.') { if (dot) return std::nullopt; dot = true; }
+      else { digits += c; if (dot) ++decimals; }
+    }
+    while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position]))) ++position;
+    const auto begin = position;
+    while (position < text.size() && std::isalpha(static_cast<unsigned char>(text[position]))) ++position;
+    const auto unit = std::string(text.substr(begin, position - begin));
+    const auto upper = uppercase_ascii(unit);
+    std::uint64_t scale = unit == "s" ? 1000000000ULL : unit == "h" ? 3600000000000ULL :
+      upper == "D" ? 86400000000000ULL : upper == "MIN" ? 60000000000ULL :
+      unit == "ms" ? 1000000ULL : upper == "US" ? 1000ULL : upper == "NS" ? 1ULL : 0;
+    if (!scale) return std::nullopt;
+    if (digits.empty()) { if (dot) return std::nullopt; digits = "1"; }
+    std::uint64_t number = 0;
+    const auto converted = std::from_chars(digits.data(), digits.data() + digits.size(), number);
+    if (converted.ec != std::errc{}) throw std::invalid_argument("log_to_features: temporal tick width overflows");
+    while (decimals && number % 10 == 0 && number) { number /= 10; --decimals; }
+    while (decimals && scale % 10 == 0) { scale /= 10; --decimals; }
+    if (decimals || number > (static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) - total) / scale)
+      throw std::invalid_argument("log_to_features: temporal tick width is not representable in nanoseconds");
+    total += number * scale;
+    found = true;
+  }
+  if (!found) return std::nullopt;
+  if (!total) throw std::invalid_argument("log_to_features: temporal tick width must be positive");
+  return static_cast<std::int64_t>(total);
+}
+
+using ExactTemporalInstant = std::pair<std::int64_t, std::int64_t>;
+
+ExactTemporalInstant exact_temporal_instant(std::string text) {
+  std::int64_t fraction = 0;
+  const auto point = text.find('.', text.find_first_of("Tt "));
+  if (point != std::string::npos) {
+    auto end = point + 1;
+    unsigned count = 0;
+    while (end < text.size() && std::isdigit(static_cast<unsigned char>(text[end]))) {
+      if (count++ < 9) fraction = fraction * 10 + text[end] - '0';
+      ++end;
+    }
+    while (count++ < 9) fraction *= 10;
+    text.erase(point, end - point);
+  }
+  const auto seconds = parse_timestamp(text);
+  if (!seconds || !std::isfinite(*seconds)) throw std::invalid_argument("log_to_features: invalid exact temporal timestamp");
+  return {static_cast<std::int64_t>(*seconds), fraction};
+}
+
+ExactTemporalInstant add_temporal_nanos(ExactTemporalInstant instant, std::int64_t nanos) {
+  instant.first += nanos / 1000000000;
+  instant.second += nanos % 1000000000;
+  if (instant.second < 0) { --instant.first; instant.second += 1000000000; }
+  if (instant.second >= 1000000000) { ++instant.first; instant.second -= 1000000000; }
+  return instant;
+}
+
+std::string temporal_nanosecond_text(ExactTemporalInstant instant) {
+  const bool negative = instant.first < 0;
+  auto seconds = negative ? -instant.first : instant.first;
+  auto fraction = instant.second;
+  if (negative && fraction) { --seconds; fraction = 1000000000 - fraction; }
+  auto tail = std::to_string(fraction);
+  auto result = std::to_string(seconds) + std::string(9 - tail.size(), '0') + tail;
+  const auto nonzero = result.find_first_not_of('0');
+  result = nonzero == std::string::npos ? "0" : result.substr(nonzero);
+  return negative && result != "0" ? "-" + result : result;
+}
+
+double temporal_metric_instant(ExactTemporalInstant instant, bool nanosecond_source) {
+  auto integer = temporal_nanosecond_text(instant);
+  if (!nanosecond_source) {
+    if (integer == "0") return 0.0;
+    integer.resize(integer.size() - 3);
+    // Parse decimal seconds directly: converting the microsecond integer to
+    // double first loses low bits at distant dates. Padding also avoids
+    // subtractive cancellation for negative instants close to the epoch.
+    const auto sign = integer.front() == '-' ? 1u : 0u;
+    if (integer.size() - sign <= 6)
+      integer.insert(sign, 7 - (integer.size() - sign), '0');
+    integer.insert(integer.size() - 6, 1, '.');
+  }
+  double value = 0.0;
+  const auto parsed = std::from_chars(integer.data(), integer.data() + integer.size(), value);
+  if (parsed.ec != std::errc{}) throw std::invalid_argument("log_to_features: temporal metric timestamp out of range");
+  if (nanosecond_source) {
+    value /= 1e9;
+    // Timestamp sources expose a double rounded to six decimal places.
+    // Decimal formatting avoids changing halfway cases by multiplying first.
+    char rounded[64];
+    const auto formatted = std::to_chars(rounded, rounded + sizeof(rounded), value, std::chars_format::fixed, 6);
+    if (formatted.ec != std::errc{}) throw std::invalid_argument("log_to_features: temporal metric timestamp out of range");
+    const auto converted = std::from_chars(rounded, formatted.ptr, value);
+    if (converted.ec != std::errc{}) throw std::invalid_argument("log_to_features: temporal metric timestamp out of range");
+  }
+  return value;
+}
+
+ExactTemporalInstant fixed_temporal_label(ExactTemporalInstant value, std::int64_t origin, std::int64_t width) {
+  // Compute (seconds * 1e9 + fraction) modulo width without epoch-ns overflow.
+  std::uint64_t seconds = static_cast<std::uint64_t>(value.first - origin);
+  std::uint64_t factor = 1000000000ULL % width;
+  std::uint64_t remainder = value.second % width;
+  while (seconds) {
+    if (seconds & 1) remainder = (remainder + factor) % width;
+    seconds >>= 1;
+    factor = (factor + factor) % width;
+  }
+  return add_temporal_nanos(value, -static_cast<std::int64_t>(remainder));
+}
+
 TemporalFrequency parse_temporal_frequency(const std::string& raw) {
   if (raw.empty())
     throw std::invalid_argument("log_to_features: temporal frequency must not be empty");
+  if (const auto width = temporal_tick_width(raw)) {
+    TemporalFrequency tick;
+    tick.unit = TemporalFrequencyUnit::kSecond;
+    tick.tick_ns = *width;
+    return tick;
+  }
   auto normalized = raw;
+  while (!normalized.empty() && std::isspace(static_cast<unsigned char>(normalized.back()))) normalized.pop_back();
+  while (!normalized.empty() && std::isspace(static_cast<unsigned char>(normalized.front()))) normalized.erase(0, 1);
+  if (!normalized.empty() && normalized.front() == '+') normalized.erase(0, 1);
+  normalized.erase(std::remove_if(normalized.begin(), normalized.end(), [](unsigned char c) { return std::isspace(c); }), normalized.end());
+  const auto modern_begin = normalized.find_first_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
+  const auto modern = normalized.substr(modern_begin == std::string::npos ? normalized.size() : modern_begin);
+  const auto modern_upper = uppercase_ascii(modern);
+  if (!(modern_upper == "B" || modern_upper == "W" || modern_upper.starts_with("W-") ||
+        (modern == modern_upper && (modern == "ME" || modern == "MS" || modern == "QE" || modern == "QS" ||
+         modern == "YE" || modern == "YS" || modern.starts_with("QE-") || modern.starts_with("QS-") ||
+         modern.starts_with("YE-") || modern.starts_with("YS-") || modern.starts_with("B") ||
+         modern.starts_with("SM") || modern.starts_with("WOM-")))))
+    throw std::invalid_argument("log_to_features: unsupported temporal frequency '" + raw + "'");
   const auto alias_begin = raw.find_first_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
   if (alias_begin != std::string::npos) {
     const auto alias = raw.substr(alias_begin);
@@ -1362,6 +1507,8 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     return projected_column_value(trace, event, temporal_case_key);
   };
   std::unordered_map<std::string, std::optional<int>> calendar_timezones;
+  std::map<std::pair<const Event*, std::string>, ExactTemporalInstant> exact_calendar_instants;
+  std::unordered_map<std::string, bool> nanosecond_columns;
   const auto calendar_instant = [&](const Trace& trace, const Event& event,
                                       const std::string& key, bool required) {
     const auto value = projected_column_value(trace, event, key);
@@ -1376,7 +1523,17 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     if (!native_date && (value->kind != AttributeKind::kDate ||
         !std::holds_alternative<std::monostate>(value->typed_value)))
       throw std::invalid_argument("log_to_features: temporal timestamp must be a date");
-    std::string_view text = native_date ? native_date->value : value->value;
+    std::string lexical = native_date ? native_date->value : value->value;
+    const bool nanos = native_date && native_date->resolution == NativeDateResolution::kNanosecond;
+    nanosecond_columns[key] = nanosecond_columns[key] || nanos;
+    const auto point = lexical.find('.', lexical.find_first_of("Tt "));
+    if (point != std::string::npos) {
+      auto end = point + 1;
+      while (end < lexical.size() && std::isdigit(static_cast<unsigned char>(lexical[end]))) ++end;
+      const auto keep = point + 1 + (nanos ? 9 : 6);
+      if (end > keep) lexical.erase(keep, end - keep);
+    }
+    std::string_view text = lexical;
     const auto parsed = parse_timestamp(text);
     if (!parsed || !std::isfinite(*parsed))
       throw std::invalid_argument("log_to_features: invalid temporal timestamp");
@@ -1395,7 +1552,9 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     const auto [timezone, inserted] = calendar_timezones.try_emplace(key, offset);
     if (!inserted && timezone->second != offset)
       throw std::invalid_argument("log_to_features: temporal timestamp column has mixed timezones");
-    return *parsed;
+    const auto exact = exact_temporal_instant(lexical);
+    exact_calendar_instants[{&event, key}] = exact;
+    return temporal_metric_instant(exact, nanos);
   };
   const auto missing_category = [](const EventAttribute& value) {
     if (absent_attribute(value)) return true;
@@ -1939,34 +2098,55 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     if (!have_activity_column || !have_resource_column)
       throw std::invalid_argument("log_to_features: temporal activity and resource columns are required");
   }
-  std::map<long long, std::vector<const TimedEvent*>> buckets;
-  std::map<long long, double> bucket_timestamps;
+  std::map<ExactTemporalInstant, std::vector<const TimedEvent*>> buckets;
+  std::map<ExactTemporalInstant, double> bucket_timestamps;
   const auto bucket_time_key = options.start_timestamp_key.empty() ? options.timestamp_key : options.start_timestamp_key;
   const auto bucket_zone = calendar_timezones.find(bucket_time_key);
   const auto bucket_offset = bucket_zone == calendar_timezones.end() ? 0 : bucket_zone->second.value_or(0);
+  const auto tick_width = temporal_frequency ? temporal_frequency->tick_ns : 0;
+  if (tick_width && !nanosecond_columns[bucket_time_key] && tick_width % 1000)
+    throw std::invalid_argument("log_to_features: tick width requires nanosecond timestamp sources");
+  std::int64_t tick_origin = 0;
+  std::int64_t exact_origin = 0;
+  if (temporal_frequency) {
+    std::optional<ExactTemporalInstant> earliest;
+    for (const auto& event : events) if (std::isfinite(event.start)) {
+      auto exact = exact_calendar_instants.at({event.event, bucket_time_key});
+      exact.first += bucket_offset;
+      if (!earliest || exact < *earliest) earliest = exact;
+    }
+    if (earliest) {
+      exact_origin = earliest->first;
+      tick_origin = floor_division(exact_origin, 86400) * 86400;
+    }
+  }
   for (const auto& event : events) {
     if (temporal_frequency) {
       if (!std::isfinite(event.start)) continue;
-      const auto label = temporal_bucket_label(event.start + bucket_offset, *temporal_frequency, origin + bucket_offset);
+      auto exact = exact_calendar_instants.at({event.event, bucket_time_key});
+      exact.first += bucket_offset;
+      const ExactTemporalInstant label = tick_width
+          ? fixed_temporal_label(exact, tick_origin, tick_width)
+          : ExactTemporalInstant{temporal_bucket_label(static_cast<double>(exact.first), *temporal_frequency, static_cast<double>(exact_origin)), 0};
       buckets[label].push_back(&event);
-      bucket_timestamps[label] = static_cast<double>(label) - bucket_offset;
+      bucket_timestamps[label] = static_cast<double>(label.first - bucket_offset) + static_cast<double>(label.second) / 1e9;
     } else {
-      const auto bucket = static_cast<long long>(
-          std::floor((event.start - origin) / options.window_seconds));
+      const ExactTemporalInstant bucket{static_cast<long long>(
+          std::floor((event.start - origin) / options.window_seconds)), 0};
       buckets[bucket].push_back(&event);
       bucket_timestamps[bucket] =
-          origin + static_cast<double>(bucket) * options.window_seconds;
+          origin + static_cast<double>(bucket.first) * options.window_seconds;
     }
   }
   if (temporal_frequency) {
     if (buckets.empty()) throw std::invalid_argument("log_to_features: temporal start column has no dates");
     const auto last_label = buckets.rbegin()->first;
     for (auto label = buckets.begin()->first; label < last_label;) {
-      const auto next = next_temporal_bucket_label(label, *temporal_frequency);
+      const auto next = tick_width ? add_temporal_nanos(label, tick_width) : ExactTemporalInstant{next_temporal_bucket_label(label.first, *temporal_frequency), 0};
       if (next <= label || next > last_label)
         throw std::invalid_argument("log_to_features: inconsistent temporal grid");
       buckets.try_emplace(next);
-      bucket_timestamps[next] = static_cast<double>(next) - bucket_offset;
+      bucket_timestamps[next] = static_cast<double>(next.first - bucket_offset) + static_cast<double>(next.second) / 1e9;
       label = next;
     }
   }
@@ -1974,6 +2154,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   for (const auto& [bucket, bucket_events] : buckets) {
     TemporalFeatureRow row;
     row.timestamp = bucket_timestamps.at(bucket);
+    if (temporal_frequency) row.timestamp_ns = temporal_nanosecond_text({bucket.first - bucket_offset, bucket.second});
     row.values.assign(out.feature_names.size(), temporal_frequency && bucket_events.empty() ? 0.0 : options.default_not_present);
     auto add = [&](const std::string& name, double value) {
       if (const auto it = index.find(name); it != index.end()) row.values[it->second] = value;

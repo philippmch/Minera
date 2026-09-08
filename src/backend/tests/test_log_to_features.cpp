@@ -2400,7 +2400,7 @@ static void temporal_calendar_frequency_uses_period_boundaries() {
   const auto jan1 = parse_timestamp("2024-01-01T00:00:00Z");
   assert(jan1 && month_start.temporal_rows[0].timestamp == *jan1);
 
-  options.grouper_freq = "M";
+  options.grouper_freq = "ME";
   const auto month_end = log_to_features(log, options);
   const auto jan31 = parse_timestamp("2024-01-31T00:00:00Z");
   assert(jan31 && month_end.temporal_rows.size() == 1 &&
@@ -2932,7 +2932,184 @@ static void trace_default_schema_infers_complete_trace_presence() {
   }));
 }
 
+#include "temporal_subsecond_expected.inc"
+#include "temporal_alias_expected.inc"
+
+static void temporal_subsecond_public_rows() {
+  for (const auto& scenario : subsecond_scenarios) {
+    std::fprintf(stderr, "temporal subsecond: %s\n", scenario.name);
+    std::fflush(stderr);
+    EventLog log;
+    Trace trace{"case", {}};
+    for (const auto& [date, nanos] : scenario.dates) {
+      Event event{"case", "A", date, "r"};
+      event.timestamp_state = FirstClassAttributeState::kPresent;
+      event.timestamp_attribute = EventAttribute{"time:timestamp", "stale projection", AttributeKind::kDate};
+      event.timestamp_attribute->typed_value = NativeDate{date, nanos ? NativeDateResolution::kNanosecond : NativeDateResolution::kMicrosecond};
+      trace.events.push_back(std::move(event));
+    }
+    log.traces.push_back(std::move(trace));
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = scenario.frequency;
+    LogToFeaturesResult result;
+    bool rejected = false;
+    try { result = log_to_features(log, options); }
+    catch (const std::invalid_argument& error) {
+      rejected = true;
+      if (scenario.accepted) { std::fprintf(stderr, "unexpected rejection: %s\n", error.what()); std::fflush(stderr); }
+    }
+    assert(rejected != scenario.accepted);
+    if (rejected) continue;
+    assert(result.temporal_rows.size() == scenario.count);
+    std::size_t index = 0;
+    for (const auto& run : scenario.runs) for (std::size_t i = 0; i < run.count; ++i, ++index) {
+      const auto& row = result.temporal_rows[index];
+      const auto expected = scenario.first_ns + static_cast<std::int64_t>(index) * scenario.step_ns;
+      if (row.timestamp_ns != std::to_string(expected)) {
+        std::fprintf(stderr, "label row %zu: expected %lld, got %s\n", index, static_cast<long long>(expected), row.timestamp_ns.value_or("missing").c_str());
+        std::fflush(stderr);
+        assert(false);
+      }
+      assert(row.values.size() == run.values.size());
+      for (std::size_t column = 0; column < run.values.size(); ++column) {
+        const auto actual = std::get<double>(row.values[column]);
+        if (!(actual == run.values[column] || (std::isnan(actual) && std::isnan(run.values[column])))) {
+          std::fprintf(stderr, "metric row %zu column %zu: expected %.17g, got %.17g\n", index, column, run.values[column], actual);
+          std::fflush(stderr);
+          assert(false);
+        }
+      }
+    }
+  }
+}
+
+static void temporal_frequency_public_aliases() {
+  for (const auto& scenario : temporal_alias_scenarios) {
+    std::fprintf(stderr, "temporal alias: %s\n", scenario.frequency);
+    std::fflush(stderr);
+    EventLog log;
+    if (scenario.single_case) log.traces.push_back(Trace{"case", {}});
+    for (std::size_t i = 0; i < scenario.dates.size(); ++i) {
+      const auto id = scenario.single_case ? "case" : "c" + std::to_string(i);
+      Event event{id, "A", scenario.dates[i], "r"};
+      if (scenario.single_case) log.traces.front().events.push_back(std::move(event));
+      else log.traces.push_back(Trace{id, {event}});
+    }
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = scenario.frequency;
+    LogToFeaturesResult result;
+    bool rejected = false;
+    try { result = log_to_features(log, options); }
+    catch (const std::invalid_argument& error) {
+      rejected = true;
+      if (scenario.accepted) { std::fprintf(stderr, "unexpected rejection: %s\n", error.what()); std::fflush(stderr); }
+    }
+    assert(rejected != scenario.accepted);
+    if (rejected) continue;
+    assert(result.temporal_rows.size() == scenario.labels.size());
+    for (std::size_t i = 0; i < scenario.labels.size(); ++i) {
+      assert(result.temporal_rows[i].timestamp == scenario.labels[i]);
+      assert(result.temporal_rows[i].values == scenario.values[i]);
+    }
+  }
+}
+
+static void temporal_subsecond_case_rates() {
+  for (const auto& scenario : subsecond_case_rates) {
+    EventLog log;
+    for (std::size_t i = 0; i < scenario.ids.size(); ++i) {
+      Event event{scenario.ids[i], "A", scenario.completions[i], "r"};
+      event.timestamp_state = FirstClassAttributeState::kPresent;
+      event.timestamp_attribute = EventAttribute{"time:timestamp", scenario.completions[i], AttributeKind::kDate};
+      event.timestamp_attribute->typed_value = NativeDate{scenario.completions[i], NativeDateResolution::kNanosecond};
+      EventAttribute start{"start", scenario.starts[i], AttributeKind::kDate};
+      start.typed_value = NativeDate{scenario.starts[i], NativeDateResolution::kNanosecond};
+      event.attributes.push_back(start);
+      log.traces.push_back(Trace{scenario.ids[i], {event}});
+    }
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.start_timestamp_key = "start";
+    options.grouper_freq = "us";
+    const auto result = log_to_features(log, options);
+    assert(result.temporal_rows.size() == scenario.labels.size());
+    for (std::size_t i = 0; i < scenario.labels.size(); ++i) {
+      assert(result.temporal_rows[i].timestamp_ns == scenario.labels[i]);
+      assert(result.temporal_rows[i].values == scenario.values[i]);
+    }
+  }
+}
+
+static void temporal_source_precision_and_calendar_edges() {
+  struct Scenario { const char* text; bool nanos; const char* frequency; const char* expected; };
+  for (const auto& scenario : std::vector<Scenario>{
+      {"2024-01-01T00:00:00.1234567899Z", false, "us", "1704067200123456000"},
+      {"2024-01-01T00:00:00.1234567899Z", true, "ns", "1704067200123456789"},
+      {"1969-12-31T23:59:59.9999999999Z", false, "us", "-1000"},
+      {"1969-12-31T23:59:59.9999999999Z", true, "ns", "-1"},
+      {"2024-01-31T23:59:59.999999999Z", true, "MS", "1704067200000000000"},
+      {"2500-01-01T00:00:00.000000001Z", true, "ns", "16725225600000000001"},
+      {"1600-01-01T00:00:00.000000001Z", true, "ns", "-11676095999999999999"}}) {
+    Event event{"c", "A", scenario.text, "r"};
+    event.timestamp_state = FirstClassAttributeState::kPresent;
+    event.timestamp_attribute = EventAttribute{"time:timestamp", scenario.text, AttributeKind::kDate};
+    event.timestamp_attribute->typed_value = NativeDate{scenario.text, scenario.nanos ? NativeDateResolution::kNanosecond : NativeDateResolution::kMicrosecond};
+    EventLog log;
+    log.traces.push_back(Trace{"c", {event}});
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = scenario.frequency;
+    const auto result = log_to_features(log, options);
+    assert(result.temporal_rows.size() == 1);
+    assert(result.temporal_rows.front().timestamp_ns == scenario.expected);
+  }
+}
+
+static void temporal_microseconds_at_distant_dates() {
+  for (const auto& dates : std::vector<std::pair<std::string, std::string>>{
+      {"2500-01-01T00:00:00Z", "2500-01-01T00:00:00.000001Z"},
+      {"1969-12-31T23:59:59.999999Z", "1970-01-01T00:00:00Z"}}) {
+    EventLog log;
+    log.traces.push_back(Trace{"c", {Event{"c", "A", dates.first, "r"}, Event{"c", "A", dates.second, "r"}}});
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = "s";
+    const auto result = log_to_features(log, options);
+    const double expected = dates.first.starts_with("2500") ? 1.9073486328125e-6 : 1e-6;
+    assert(result.temporal_rows.size() == (dates.first.starts_with("2500") ? 1u : 2u));
+    for (const auto& row : result.temporal_rows) {
+      assert(row.values[5] == expected);
+      assert(row.values[6] == expected);
+    }
+  }
+}
+
+static void temporal_exact_json_contract() {
+  assert((NativeDate{"1970-01-01T00:00:00Z"} == NativeDate{"1970-01-01T00:00:00Z", NativeDateResolution::kNanosecond}));
+  LogToFeaturesResult result;
+  result.variant = LogToFeaturesVariant::TEMPORAL;
+  result.temporal_rows = {{1704067200.0, {}, "1704067200000000001"}, {1704067200.0, {}, "1704067200000000002"}};
+  const auto json = log_to_features_json(result);
+  assert(json.find("1704067200000000001") != std::string::npos && json.find("1704067200000000002") != std::string::npos);
+  for (const auto* invalid : {"", "+1", "-0", "01", "1.5"}) {
+    result.temporal_rows.front().timestamp_ns = invalid;
+    bool rejected = false;
+    try { (void)log_to_features_json(result); } catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
+  for (auto& row : result.temporal_rows) row.timestamp_ns.reset();
+  assert(log_to_features_json(result).find("timestamp_ns") == std::string::npos);
+}
+
 int main() {
+  temporal_subsecond_public_rows();
+  temporal_frequency_public_aliases();
+  temporal_exact_json_contract();
+  temporal_microseconds_at_distant_dates();
+  temporal_source_precision_and_calendar_edges();
+  temporal_subsecond_case_rates();
   temporal_calendar_metric_destinations_observe_write_order();
   temporal_calendar_missing_completions_are_validated_per_case();
   temporal_calendar_timestamps_use_projected_native_dates();

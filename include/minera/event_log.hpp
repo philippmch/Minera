@@ -43,10 +43,14 @@ enum class FirstClassAttributeRole {
 // distinct wrapper (rather than a bare string) means a date cannot be
 // confused with a regular string when an attribute is copied between
 // adapters.
+enum class NativeDateResolution { kMicrosecond, kNanosecond };
+
 struct NativeDate {
   std::string value;
+  // Source precision is transport metadata; value equality ignores it.
+  NativeDateResolution resolution = NativeDateResolution::kMicrosecond;
 
-  bool operator==(const NativeDate&) const = default;
+  bool operator==(const NativeDate& other) const { return value == other.value; }
 };
 
 // Scalar identity follows copies independently of value equality. This is

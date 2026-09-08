@@ -110,6 +110,8 @@ using TemporalFeatureCell = std::variant<double, std::string>;
 struct TemporalFeatureRow {
   double timestamp = 0.0;
   std::vector<TemporalFeatureCell> values;
+  // Exact decimal epoch nanoseconds for frequency-based temporal labels.
+  std::optional<std::string> timestamp_ns;
 };
 
 using LogToFeaturesCell = std::variant<double, EventAttribute>;

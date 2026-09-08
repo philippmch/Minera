@@ -102,6 +102,22 @@ NativeAttributeValue parse_native_value(AttributeKind kind,
         throw std::invalid_argument("XES date attribute has an invalid value: " +
                                     std::string(value));
       }
+      if (const auto dot = value.find('.'); dot != std::string_view::npos) {
+        auto end = dot + 1;
+        while (end < value.size() && value[end] >= '0' && value[end] <= '9') ++end;
+        if (end - dot - 1 > 3) {
+          auto integral = std::string(value);
+          integral.erase(dot, end - dot);
+          const auto whole = parse_timestamp(integral);
+          if (!whole) throw std::invalid_argument("XES date has an invalid integral instant");
+          auto normalized = format_timestamp(*whole);
+          normalized.resize(normalized.find('.'));
+          normalized += '.';
+          normalized += value.substr(dot + 1, std::min<std::size_t>(6, end - dot - 1));
+          normalized += 'Z';
+          return NativeDate{std::move(normalized)};
+        }
+      }
       return NativeDate{format_timestamp(*parsed)};
     }
     case AttributeKind::kString:

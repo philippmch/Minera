@@ -689,7 +689,11 @@ export type LogToFeaturesVariant = "event_based" | "trace_based" | "temporal";
 export type LogToFeaturesNumber = number | "NaN" | "Infinity" | "-Infinity";
 export type LogToFeaturesTraceCell = LogToFeaturesNumber | string | boolean | null | LogConversionAttributeDetail;
 export type LogToFeaturesTemporalCell = LogToFeaturesNumber | "";
-export interface LogToFeaturesTemporalRow { timestamp: number; values: LogToFeaturesTemporalCell[]; }
+export interface LogToFeaturesTemporalRow {
+  timestamp: number;
+  timestamp_ns?: string;
+  values: LogToFeaturesTemporalCell[];
+}
 export interface LogToFeaturesResult {
   family: "LOG_TO_FEATURES";
   variant: LogToFeaturesVariant;
@@ -718,6 +722,7 @@ export function isLogToFeaturesResult(value: unknown): value is LogToFeaturesRes
   }
   return Array.isArray(c.temporal_rows) && c.temporal_rows.every((r) =>
     !!r && typeof r === "object" && typeof r.timestamp === "number" && Number.isFinite(r.timestamp) &&
+    (r.timestamp_ns === undefined || (typeof r.timestamp_ns === "string" && /^(?:0|-?[1-9][0-9]*)(?![\s\S])/.test(r.timestamp_ns))) &&
     Array.isArray(r.values) && r.values.length === c.feature_names!.length &&
     r.values.every((cell, index) => rows([cell]) ||
       (cell === "" && c.feature_names![index] === "total_number_of_reworked_activities")));
