@@ -2934,6 +2934,42 @@ static void trace_default_schema_infers_complete_trace_presence() {
 
 #include "temporal_subsecond_expected.inc"
 #include "temporal_alias_expected.inc"
+#include "temporal_frequency_boundaries_expected.inc"
+
+static void temporal_frequency_public_boundaries() {
+  for (const auto& scenario : frequency_boundary_scenarios) {
+    EventLog log;
+    Trace trace{"case", {}};
+    for (const auto& date : scenario.dates) {
+      Event event{"case", "A", date, "r"};
+      event.timestamp_state = FirstClassAttributeState::kPresent;
+      event.timestamp_attribute = EventAttribute{"time:timestamp", date, AttributeKind::kDate};
+      event.timestamp_attribute->typed_value = NativeDate{date, NativeDateResolution::kNanosecond};
+      trace.events.push_back(std::move(event));
+    }
+    log.traces.push_back(std::move(trace));
+    LogToFeaturesOptions options;
+    options.variant = LogToFeaturesVariant::TEMPORAL;
+    options.grouper_freq = scenario.frequency;
+    LogToFeaturesResult result;
+    bool rejected = false;
+    try { result = log_to_features(log, options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    if (rejected == scenario.accepted) {
+      std::fprintf(stderr, "frequency acceptance mismatch: %s\n", scenario.frequency);
+      assert(false);
+    }
+    if (rejected) continue;
+    assert(result.temporal_rows.size() == scenario.labels.size());
+    for (std::size_t i = 0; i < scenario.labels.size(); ++i) {
+      const auto& row = result.temporal_rows[i];
+      if (row.timestamp_ns != scenario.labels[i] || row.values != scenario.values[i]) {
+        std::fprintf(stderr, "frequency boundary mismatch: %s row %zu\n", scenario.frequency, i);
+        assert(false);
+      }
+    }
+  }
+}
 
 static void temporal_subsecond_public_rows() {
   for (const auto& scenario : subsecond_scenarios) {
@@ -3104,6 +3140,7 @@ static void temporal_exact_json_contract() {
 }
 
 int main() {
+  temporal_frequency_public_boundaries();
   temporal_subsecond_public_rows();
   temporal_frequency_public_aliases();
   temporal_exact_json_contract();
