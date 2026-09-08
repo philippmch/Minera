@@ -3214,12 +3214,16 @@ grids, fixed offsets, case-rate ties, and case-sensitive frequency aliases.
 Numeric case metrics retain observed floating-point timestamp behavior.
 XES import preserves up to six fractional digits, truncating finer fractions;
 XES export precision and the offset adapter discrepancy remain open.
-Custom business calendars, complete frequency-alias acceptance, and exact
-floating-point normalization of arbitrary fractional frequency coefficients
-remain open. In particular, the pinned runtime can normalize tiny coefficients
-to zero or reject mathematically integral nanosecond widths; the current decimal
-parser does not reproduce every such boundary. These fixtures do not establish
-full temporal-feature parity.
+Fractional tick coefficients now follow the observed double conversion and
+truncation behavior. Each compound component normalizes independently through
+direct conversions to finer units (days begin at hours), accepting an integer
+when its residual is at most `1e-8`. Tiny components may become zero, while
+some mathematically integral nanosecond widths reject because of their floating
+residual. A zero total width rejects. Public observations across 7,707 positive
+frequency inputs support this rule; 180 permanent boundary scenarios verify
+acceptance, exact labels, compound syntax, and all thirteen output metrics.
+Custom business calendars and exhaustive frequency-alias and adapter coverage
+remain open. These fixtures do not establish full temporal-feature parity.
 Fixed-width windows remain a separate native projection. Calendar metrics use completion-time case spans:
 configured start timestamps control grouping only, default service time is zero,
 and waiting time equals sojourn time. Means use distinct cases rather than event

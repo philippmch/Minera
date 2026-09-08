@@ -360,8 +360,27 @@ std::int64_t floor_division(std::int64_t numerator,
   return quotient;
 }
 
-// Fixed ticks are parsed as decimal integers so neither width nor membership
-// depends on floating-point rounding.
+// Normalize each component before adding it. Test the fractional residual
+// against truncation, using direct conversions from the original unit so
+// intermediate floating-point multiplications cannot change acceptance.
+std::uint64_t normalized_temporal_tick(double coefficient, std::uint64_t scale) {
+  constexpr std::uint64_t units[] = {3600000000000ULL, 60000000000ULL,
+      1000000000ULL, 1000000ULL, 1000ULL, 1ULL};
+  for (const auto unit : units) {
+    if (unit > scale) continue;
+    const double count = coefficient * static_cast<double>(scale / unit);
+    const double integral = std::trunc(count);
+    if (!std::isfinite(count) || count >= 9223372036854775808.0)
+      throw std::invalid_argument("log_to_features: temporal tick width overflows");
+    if (count - integral > 1e-8) continue;
+    const auto number = static_cast<std::uint64_t>(integral);
+    if (number > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) / unit)
+      throw std::invalid_argument("log_to_features: temporal tick width overflows");
+    return number * unit;
+  }
+  throw std::invalid_argument("log_to_features: temporal tick width is not representable in nanoseconds");
+}
+
 std::optional<std::int64_t> temporal_tick_width(std::string_view text) {
   std::uint64_t total = 0;
   std::size_t position = 0;
@@ -369,14 +388,18 @@ std::optional<std::int64_t> temporal_tick_width(std::string_view text) {
   while (position < text.size()) {
     while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position]))) ++position;
     if (position == text.size()) break;
-    if (text[position] == '+') ++position;
-    std::string digits;
-    unsigned decimals = 0;
+    if (text[position] == '+') {
+      ++position;
+      if (position == text.size() ||
+          (!std::isdigit(static_cast<unsigned char>(text[position])) && text[position] != '.'))
+        return std::nullopt;
+    }
+    std::string coefficient;
     bool dot = false;
     while (position < text.size() && (std::isdigit(static_cast<unsigned char>(text[position])) || text[position] == '.')) {
       const char c = text[position++];
       if (c == '.') { if (dot) return std::nullopt; dot = true; }
-      else { digits += c; if (dot) ++decimals; }
+      coefficient += c;
     }
     while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position]))) ++position;
     const auto begin = position;
@@ -387,15 +410,15 @@ std::optional<std::int64_t> temporal_tick_width(std::string_view text) {
       upper == "D" ? 86400000000000ULL : upper == "MIN" ? 60000000000ULL :
       unit == "ms" ? 1000000ULL : upper == "US" ? 1000ULL : upper == "NS" ? 1ULL : 0;
     if (!scale) return std::nullopt;
-    if (digits.empty()) { if (dot) return std::nullopt; digits = "1"; }
-    std::uint64_t number = 0;
-    const auto converted = std::from_chars(digits.data(), digits.data() + digits.size(), number);
-    if (converted.ec != std::errc{}) throw std::invalid_argument("log_to_features: temporal tick width overflows");
-    while (decimals && number % 10 == 0 && number) { number /= 10; --decimals; }
-    while (decimals && scale % 10 == 0) { scale /= 10; --decimals; }
-    if (decimals || number > (static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) - total) / scale)
-      throw std::invalid_argument("log_to_features: temporal tick width is not representable in nanoseconds");
-    total += number * scale;
+    if (coefficient.empty()) coefficient = "1";
+    double number = 0;
+    const auto converted = std::from_chars(coefficient.data(), coefficient.data() + coefficient.size(), number);
+    if (converted.ec != std::errc{} || converted.ptr != coefficient.data() + coefficient.size())
+      throw std::invalid_argument("log_to_features: invalid temporal tick coefficient");
+    const auto width = normalized_temporal_tick(number, scale);
+    if (width > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) - total)
+      throw std::invalid_argument("log_to_features: temporal tick width overflows");
+    total += width;
     found = true;
   }
   if (!found) return std::nullopt;
