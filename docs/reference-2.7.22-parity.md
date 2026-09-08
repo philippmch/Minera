@@ -3194,8 +3194,16 @@ period ends use the last weekday and send subsequent weekend events to the next
 period; starts use the first weekday and retain earlier weekend events in the
 previous period. Empty grids advance through business labels from the first
 observed bucket, preserving local fixed offsets and pre-epoch dates.
-Custom business calendars, semi-month and week-of-month offsets, subsecond bins,
-and complete frequency-alias acceptance remain open.
+Semi-month frequencies use `SME` (configured day and month end) or `SMS` (month
+start and configured day), defaulting to day 15. Explicit days range from 1 to 27
+for `SME` and 2 to 27 for `SMS`. Week-of-month frequencies select the first through
+fourth occurrence of any weekday with `WOM-1MON` through `WOM-4SUN`. Both families
+assign an event on a label day to the bucket beginning at that label, start at
+the preceding natural label when necessary, and advance multiples from the
+input's first label. Sparse
+grids retain empty buckets, local fixed offsets, and pre-epoch boundaries.
+Custom business calendars, subsecond bins, and complete frequency-alias
+acceptance remain open.
 Fixed-width windows remain a separate native projection. Calendar metrics use completion-time case spans:
 configured start timestamps control grouping only, default service time is zero,
 and waiting time equals sojourn time. Means use distinct cases rather than event

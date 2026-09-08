@@ -955,13 +955,14 @@ struct BusinessScenario {
   std::vector<FiscalExpected> rows;
 };
 #include "fixtures/temporal_business_calendar.inc"
+#include "fixtures/temporal_semi_wom_calendar.inc"
 
-static void temporal_calendar_business_days_and_periods() {
-  assert(business_scenarios.size() == 269);
-  for (const auto& scenario : business_scenarios) {
+static void check_calendar_scenarios(const std::vector<BusinessScenario>& scenarios,
+                                      const std::vector<std::vector<std::string>>& inputs) {
+  for (const auto& scenario : scenarios) {
     EventLog log;
     if (scenario.single_case) log.traces = {Trace{"c", {}}};
-    const auto& dates = business_inputs.at(scenario.input);
+    const auto& dates = inputs.at(scenario.input);
     for (std::size_t i = 0; i < dates.size(); ++i) {
       const auto id = scenario.single_case ? "c" : std::to_string(i);
       Event event{id, "A", dates[i], "r"};
@@ -973,7 +974,7 @@ static void temporal_calendar_business_days_and_periods() {
     options.grouper_freq = scenario.frequency;
     const auto require = [&](bool value, const std::string& detail) {
       if (value) return;
-      const auto message = "Business calendar " + scenario.frequency + ", input " +
+      const auto message = "Calendar " + scenario.frequency + ", input " +
           std::to_string(scenario.input) + ": " + detail;
       std::fprintf(stderr, "%s\n", message.c_str()); std::fflush(stderr);
       throw std::runtime_error(message);
@@ -996,6 +997,16 @@ static void temporal_calendar_business_days_and_periods() {
     } catch (const std::invalid_argument&) { rejected = true; }
     require(rejected == scenario.rejects, "rejection status");
   }
+}
+
+static void temporal_calendar_business_days_and_periods() {
+  assert(business_scenarios.size() == 269);
+  check_calendar_scenarios(business_scenarios, business_inputs);
+}
+
+static void temporal_calendar_semi_month_and_week_of_month() {
+  assert(semi_wom_scenarios.size() == 357);
+  check_calendar_scenarios(semi_wom_scenarios, semi_wom_inputs);
 }
 
 static void temporal_calendar_grid_uses_origin_and_fills_empty_periods() {
@@ -2944,6 +2955,7 @@ int main() {
   temporal_calendar_grid_uses_origin_and_fills_empty_periods();
   temporal_calendar_fiscal_month_anchors();
   temporal_calendar_business_days_and_periods();
+  temporal_calendar_semi_month_and_week_of_month();
   default_trace_selection_validates_all_candidate_hashability();
   default_trace_strings_have_fixed_cardinality_limit();
   default_trace_selection_ignores_custom_core_schema();
