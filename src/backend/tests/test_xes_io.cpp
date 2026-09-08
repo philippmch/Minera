@@ -483,12 +483,17 @@ void typed_nested_attributes_and_first_class_states_round_trip() {
   assert(std::get<bool>(find_attribute(event.attributes, "valid")
                             ->typed_value) == false);
 
-  const auto exported = minera::to_xes(log);
+  minera::XesExportOptions options;
+  options.variant = minera::XesExportVariant::ETREE;
+  const auto exported = minera::serialize_xes(log, options);
   std::istringstream round_input(exported);
   const auto round = minera::import_xes_event_log(round_input);
   assert(round.attribute("concept:name") != nullptr);
   assert(*round.attribute("concept:name") == "stored-name");
-  assert(round.metadata.globals == log.metadata.globals);
+  auto expected_globals = log.metadata.globals;
+  expected_globals[0].attributes[0].container = minera::AttributeContainerKind::kList;
+  expected_globals[0].attributes[0].children[1].container = minera::AttributeContainerKind::kList;
+  assert(round.metadata.globals == expected_globals);
   assert(round.traces[0].case_id_state ==
          minera::FirstClassAttributeState::kMissing);
   assert(round.traces[0].events[0].activity_state ==
@@ -527,10 +532,10 @@ void standards_lists_round_trip_recursive_typed_children() {
       "<list key=\"tags\"><values><int key=\"0\" value=\"7\"/>"
       "<string key=\"nested-meta\" value=\"outer\"><boolean "
       "key=\"enabled\" value=\"true\"/></string>"
-      "<container key=\"details\"><date key=\"when\" "
+      "<list key=\"details\"><values><date key=\"when\" "
       "value=\"2026-01-01T00:00:00Z\"/>"
       "<list key=\"labels\"><values><boolean key=\"0\" "
-      "value=\"true\"/></values></list></container>"
+      "value=\"true\"/></values></list></values></list>"
       "</values></list>"
       "<string key=\"nested-null\" null=\"true\"><int key=\"count\" "
       "value=\"2\"/></string></event></trace></log>";
@@ -1004,6 +1009,87 @@ void date_import_sorting_uses_exact_fields_and_variant_rules() {
   assert(log.traces[0].events[1].timestamp == "2024-01-01T04:00:00.123456Z");
 }
 
+void nested_export_variants_match_public_mapping_shapes() {
+  using namespace minera;
+  const auto check = [](const EventAttribute& parent, const std::string& line,
+                        const std::string& tree, bool line_error = false) {
+    for (const auto variant : {XesExportVariant::LINE_BY_LINE, XesExportVariant::ETREE}) {
+      for (const bool compressed : {false, true}) {
+        for (int scope = 0; scope != 6; ++scope) {
+          EventLog log;
+          log.traces = {Trace{"c", {Event{"c", "A"}}}};
+          auto value = parent;
+          if (scope == 0) log.attributes = {value};
+          if (scope == 1) log.metadata.globals.push_back({"global", {value}});
+          if (scope == 2) log.traces[0].attributes = {value};
+          if (scope == 3) log.traces[0].events[0].attributes = {value};
+          if (scope == 4) {
+            value.key = "concept:name";
+            log.traces[0].case_id = value.value;
+            log.traces[0].case_id_state = FirstClassAttributeState::kPresent;
+            log.traces[0].case_id_attribute = value;
+          }
+          if (scope == 5) {
+            value.key = "concept:name";
+            log.traces[0].events[0].activity = value.value;
+            log.traces[0].events[0].activity_state = FirstClassAttributeState::kPresent;
+            log.traces[0].events[0].activity_attribute = value;
+          }
+          XesExportOptions options;
+          options.variant = variant;
+          options.compress = compressed;
+          if (line_error && variant == XesExportVariant::LINE_BY_LINE) {
+            assert(throws([&] { (void)serialize_xes(log, options); }));
+            continue;
+          }
+          const auto bytes = serialize_xes(log, options);
+          const auto xml = compressed ? detail::gzip_decompress(bytes, 1024 * 1024) : bytes;
+          const auto begin = xml.find("key=\"" + value.key + "\"", scope == 5 ? xml.find("<event>") : 0);
+          assert(begin != std::string::npos);
+          const auto end = xml.find(parent.container == AttributeContainerKind::kScalar ? "</string>" : "</list>", begin);
+          assert(end != std::string::npos);
+          auto actual = xml.substr(begin, end - begin);
+          std::string compact;
+          for (const char c : actual) if (c != ' ' && c != '\n' && c != '\r' && c != '\t') compact += c;
+          const auto& expected = variant == XesExportVariant::LINE_BY_LINE ? line : tree;
+          const auto scalar_value = parent.container == AttributeContainerKind::kScalar
+              ? "value=\"" + value.value + "\"" : "";
+          assert(compact == "key=\"" + value.key + "\"" + scalar_value + ">" + expected);
+        }
+      }
+    }
+  };
+  EventAttribute mapping{"parent", ""};
+  mapping.container = AttributeContainerKind::kContainer;
+  check(mapping, "<values></values>", "<values></values>");
+  mapping.children = {{"ab", "7", AttributeKind::kInt}, {"cd", "text"}};
+  check(mapping, "<values><stringkey=\"a\"value=\"b\"/><stringkey=\"c\"value=\"d\"/></values>",
+        "<values><intkey=\"ab\"value=\"7\"/><stringkey=\"cd\"value=\"text\"/></values>");
+  mapping.children = {{"\xF0\x9F\x98\x80x", "7", AttributeKind::kInt}, {"\xC3\xA9\xE6\xBC\xA2", "text"}};
+  check(mapping, "<values><stringkey=\"\xF0\x9F\x98\x80\"value=\"x\"/><stringkey=\"\xC3\xA9\"value=\"\xE6\xBC\xA2\"/></values>",
+        "<values><intkey=\"\xF0\x9F\x98\x80x\"value=\"7\"/><stringkey=\"\xC3\xA9\xE6\xBC\xA2\"value=\"text\"/></values>");
+  for (const std::string key : {"a", "\xF0\x9F\x98\x80", "\xC3\xA9", ""}) {
+    mapping.children = {{key, "7", AttributeKind::kInt}};
+    check(mapping, "", "<values><intkey=\"" + key + "\"value=\"7\"/></values>", true);
+  }
+  mapping.children = {{"ab", "1", AttributeKind::kInt}, {"cd", "text"}, {"ab", "9", AttributeKind::kInt}};
+  check(mapping, "<values><stringkey=\"a\"value=\"b\"/><stringkey=\"c\"value=\"d\"/></values>",
+        "<values><intkey=\"ab\"value=\"9\"/><stringkey=\"cd\"value=\"text\"/></values>");
+  mapping.container = AttributeContainerKind::kList;
+  const std::string sequence = "<values><intkey=\"ab\"value=\"1\"/><stringkey=\"cd\"value=\"text\"/><intkey=\"ab\"value=\"9\"/></values>";
+  check(mapping, sequence, sequence);
+  mapping.container = AttributeContainerKind::kScalar;
+  mapping.value = "outer";
+  const std::string scalar_children = "<intkey=\"ab\"value=\"9\"/><stringkey=\"cd\"value=\"text\"/>";
+  check(mapping, scalar_children, scalar_children);
+  EventAttribute nested{"nested", ""};
+  nested.container = AttributeContainerKind::kContainer;
+  nested.children = {{"ab", "7", AttributeKind::kInt}};
+  mapping.children = {nested};
+  check(mapping, "<listkey=\"nested\"><values><stringkey=\"a\"value=\"b\"/></values></list>",
+        "<listkey=\"nested\"><values><intkey=\"ab\"value=\"7\"/></values></list>");
+}
+
 void date_export_preserves_source_precision() {
   using namespace minera;
   const std::vector<std::pair<std::string, std::string>> dates{
@@ -1026,8 +1112,7 @@ void date_export_preserves_source_precision() {
     event.timestamp_attribute = date;
     event.timestamp_attribute->key = "time:timestamp";
     event.timestamp_state = FirstClassAttributeState::kPresent;
-    EventAttribute nested{"nested", ""};
-    nested.container = AttributeContainerKind::kContainer;
+    EventAttribute nested{"nested", "outer"};
     nested.children = {date};
     event.attributes = {date, nested, {"legacy", source, AttributeKind::kDate}};
     trace.events = {event};
@@ -1074,6 +1159,7 @@ int main() {
   date_import_sorting_uses_exact_fields_and_variant_rules();
   date_import_variations_retain_wall_clock_fields();
   date_export_preserves_source_precision();
+  nested_export_variants_match_public_mapping_shapes();
   {
     std::istringstream input(R"(<log><trace><string key="concept:name" value="c"/>
       <event><string key="concept:name" value="A"/><date key="time:timestamp" value="2024-01-01T00:00:00.000999Z"/></event>
