@@ -880,6 +880,78 @@ void set_values_export_as_strings() {
   assert(table_copy.traces[0].events[0].attributes == event.attributes);
 }
 
+void date_import_variations_retain_wall_clock_fields() {
+  using namespace minera;
+  for (const auto variant : {XesImportVariant::ITERPARSE, XesImportVariant::LINE_BY_LINE,
+      XesImportVariant::ITERPARSE_MEM_COMPRESSED, XesImportVariant::ITERPARSE_20,
+      XesImportVariant::CHUNK_REGEX}) {
+    for (const auto* base : {"2024-01-01T00:00:00", "1969-12-31T23:59:59"}) {
+      for (const auto* fraction : {".123456", ".123456789"}) {
+        for (const auto* zone : {"", "Z", "+00:00", "+05:30", "-04:00"}) {
+          const auto source = std::string(base) + fraction + zone;
+          const auto expected = std::string(base) + ".123456Z";
+          const auto date = "<date key=\"when\" value=\"" + source + "\"/>";
+          const auto xml = "<log>" + date + "<trace><string key=\"concept:name\" value=\"c\"/>" +
+              date + "<string key=\"nested\" value=\"outer\">" + date + "</string><event>" +
+              "<string key=\"concept:name\" value=\"A\"/>" + date +
+              "<string key=\"nested\" value=\"outer\">" + date + "</string>" +
+              "<date key=\"generic\" value=\"" + source + "\"/>" +
+              "<string key=\"lexical\" value=\"" + source + "\"/></event></trace></log>";
+          for (const bool compressed : {false, true}) {
+            XesImportOptions options;
+            options.variant = variant;
+            options.timestamp_attribute = "when";
+            std::istringstream input(compressed ? detail::gzip_compress(xml) : xml);
+            const auto log = import_xes_event_log(input, options);
+            const auto& trace = log.traces[0];
+            const auto& event = trace.events[0];
+            assert(log.attributes[0].value == expected);
+            assert(find_attribute(trace.attributes, "when")->value == expected);
+            assert(find_attribute(trace.attributes, "nested")->children[0].value == expected);
+            assert(event.timestamp == expected);
+            assert(std::get<NativeDate>(event.timestamp_attribute->typed_value).value == expected);
+            assert(find_attribute(event.attributes, "generic")->value == expected);
+            assert(find_attribute(event.attributes, "nested")->children[0].value == expected);
+            assert(find_attribute(event.attributes, "lexical")->value == source);
+          }
+        }
+      }
+    }
+  }
+}
+
+void date_import_sorting_uses_exact_fields_and_variant_rules() {
+  using namespace minera;
+  const std::string xml = R"(<log><trace><string key="concept:name" value="c"/>
+    <event><string key="concept:name" value="late"/><date key="time:timestamp" value="2500-01-01T00:00:00.000002Z"/></event>
+    <event><string key="concept:name" value="early"/><date key="time:timestamp" value="2500-01-01T00:00:00.000001Z"/></event>
+    </trace></log>)";
+  for (const auto variant : {XesImportVariant::ITERPARSE, XesImportVariant::LINE_BY_LINE,
+      XesImportVariant::ITERPARSE_MEM_COMPRESSED, XesImportVariant::ITERPARSE_20,
+      XesImportVariant::CHUNK_REGEX}) {
+    for (const bool reverse : {false, true}) {
+      XesImportOptions options;
+      options.variant = variant;
+      options.timestamp_sort = true;
+      options.reverse_sort = reverse;
+      std::istringstream input(xml);
+      const auto log = import_xes_event_log(input, options);
+      const bool late_first = reverse || variant == XesImportVariant::CHUNK_REGEX;
+      assert(log.traces[0].events[0].activity == (late_first ? "late" : "early"));
+      assert(log.traces[0].events[1].activity == (late_first ? "early" : "late"));
+    }
+  }
+  XesImportOptions rust;
+  rust.variant = XesImportVariant::RUSTXES;
+  std::istringstream input(R"(<log><trace><string key="concept:name" value="c"/>
+    <event><string key="concept:name" value="A"/><date key="time:timestamp" value="2024-01-01T00:00:00.123456789+05:30"/></event>
+    <event><string key="concept:name" value="B"/><date key="time:timestamp" value="2024-01-01T00:00:00.123456-04:00"/></event>
+    </trace></log>)");
+  const auto log = import_xes_event_log(input, rust);
+  assert(log.traces[0].events[0].timestamp == "2023-12-31T18:30:00.123456Z");
+  assert(log.traces[0].events[1].timestamp == "2024-01-01T04:00:00.123456Z");
+}
+
 void date_export_preserves_source_precision() {
   using namespace minera;
   const std::vector<std::pair<std::string, std::string>> dates{
@@ -946,6 +1018,8 @@ void date_export_preserves_source_precision() {
 }  // namespace
 
 int main() {
+  date_import_sorting_uses_exact_fields_and_variant_rules();
+  date_import_variations_retain_wall_clock_fields();
   date_export_preserves_source_precision();
   {
     std::istringstream input(R"(<log><trace><string key="concept:name" value="c"/>

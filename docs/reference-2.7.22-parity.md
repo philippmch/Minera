@@ -1215,12 +1215,15 @@ selector and module proofs tie those cases to distinct public declarations.
 
 The native importer explicitly accepts `ITERPARSE`, `LINE_BY_LINE`,
 `ITERPARSE_MEM_COMPRESSED`, `ITERPARSE_20`, `CHUNK_REGEX`, and `RUSTXES` (plus
-their documented string aliases). These implementation strategies converge on
-one pull-parser EventLog contract rather than changing data semantics. XML
+their documented string aliases). These selectors share the native pull parser
+with variation-specific date conversion. XML
 trace and event order is retained by default. Optional timestamp sorting first
 orders every trace and then orders traces by their first event, with a reverse
 mode and stable ties. Empty traces are omitted only by the requested timestamp
-sort, matching that transformation's result shape. Trace caps apply in XML
+sort, matching that transformation's result shape. `CHUNK_REGEX` ignores the
+timestamp-sort request and retains input order. Sorting compares whole seconds
+and fractional digits separately, preserving adjacent microseconds at distant
+dates even when their double timestamps coincide. Trace caps apply in XML
 order, while a scalar-attribute projection keeps selected generic keys without
 discarding the case, activity, timestamp, resource, or lifecycle selectors
 needed to form the native log. All selectors, the timestamp requirement,
@@ -3218,8 +3221,8 @@ log, trace, event, and nested date attributes, including compressed output.
 Explicit nanosecond native dates retain up to nine digits on export; re-import
 still follows the microsecond source contract. Native export normalizes whole
 seconds to UTC independently of the fraction, avoiding rounding into the next
-second or losing precision at distant dates. The offset adapter discrepancy
-remains open.
+second or losing precision at distant dates. Import offset handling follows the
+selected variation as described below.
 Fractional tick coefficients now follow the observed double conversion and
 truncation behavior. Each compound component normalizes independently through
 direct conversions to finer units (days begin at hours), accepting an integer
@@ -3316,9 +3319,16 @@ case durations still use absolute elapsed time. Mixed offsets or mixed naive and
 aware dates within either selected column reject. Native date payloads remain
 authoritative over stale lexical metadata. Named timezone transitions are not
 represented by this fixed-offset contract.
-An independent public XES importer probe found that several pinned import
-variations strip nonzero offsets to UTC wall time. Native XES import currently
-normalizes the absolute instant instead; that adapter discrepancy remains open.
+Public XES importer probes establish that `ITERPARSE`, `LINE_BY_LINE`,
+`ITERPARSE_MEM_COMPRESSED`, `ITERPARSE_20`, and `CHUNK_REGEX` attach UTC while
+retaining input clock fields, including nonzero-offset inputs. Native import
+now follows this behavior for date attributes and selected timestamps.
+`RUSTXES` retains absolute-instant normalization instead, matching its observed
+file-import backend. Six-digit fractions survive and finer fractions truncate.
+The public line and regex variations do not preserve the tested nested-date
+shape, while native recursive metadata is retained; nested shape parity remains
+open. The public Rust wrapper lacks string deserialization and exposes a table
+on file import; full adapter/result-type equivalence remains unproven.
 Calendar metric destination options expose arrival, finish, service, waiting,
 sojourn, and per-event difference scratch columns, including empty names. Ordered
 virtual writes let selected category columns and shared metric destinations
