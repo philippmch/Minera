@@ -1,5 +1,7 @@
 #include <cassert>
+#include <array>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <limits>
 #include <sstream>
@@ -12,6 +14,7 @@
 #include "minera/xes_export.hpp"
 #include "minera/log_conversion.hpp"
 #include "../gzip_codec.hpp"
+#include "../root_cause_trace_key.hpp"
 
 namespace {
 
@@ -475,7 +478,7 @@ void typed_nested_attributes_and_first_class_states_round_trip() {
   assert(count != nullptr && std::get<std::int64_t>(count->typed_value) == 42);
   const auto* labels = find_attribute(event.attributes, "labels");
   assert(labels != nullptr &&
-         labels->container == minera::AttributeContainerKind::kList &&
+         labels->container == minera::AttributeContainerKind::kContainer &&
          labels->children.size() == 2);
   assert(std::get<bool>(find_attribute(event.attributes, "valid")
                             ->typed_value) == false);
@@ -880,6 +883,52 @@ void set_values_export_as_strings() {
   assert(table_copy.traces[0].events[0].attributes == event.attributes);
 }
 
+#include "xes_nested_expected.inc"
+
+void nested_attribute_variations_match_public_categories() {
+  using namespace minera;
+  for (const auto& scenario : xes_nested_scenarios) {
+    XesImportOptions options;
+    options.variant = parse_xes_import_variant(scenario.variant);
+    std::istringstream input(scenario.xml);
+    const auto log = import_xes_event_log(input, options);
+    assert(log.traces.size() == 1 && log.traces[0].events.size() == 1);
+    const auto& trace = log.traces[0];
+    const auto& event = trace.events[0];
+    std::vector<EventAttribute> actual = std::string_view(scenario.scope) == "trace"
+        ? trace.attributes : event.attributes;
+    const auto add_selected = [&](const std::optional<EventAttribute>& attribute) {
+      if (attribute && !find_attribute(actual, attribute->key)) actual.push_back(*attribute);
+    };
+    if (std::string_view(scenario.scope) == "trace") add_selected(trace.case_id_attribute);
+    else {
+      add_selected(event.activity_attribute);
+      add_selected(event.timestamp_attribute);
+      add_selected(event.resource_attribute);
+      add_selected(event.lifecycle_attribute);
+    }
+    if (actual.size() != scenario.attributes.size()) {
+      std::fprintf(stderr, "nested shape size: %s expected %zu got %zu\n", scenario.name, scenario.attributes.size(), actual.size());
+      assert(false);
+    }
+    for (const auto& [key, expected, type] : scenario.attributes) {
+      const auto* attribute = find_attribute(actual, key);
+      const auto category = attribute ? root_cause_attribute_category(*attribute) : "<missing>";
+      if (category != expected) {
+        std::fprintf(stderr, "nested shape: %s key %s expected %s got %s\n", scenario.name, key.c_str(), expected.c_str(), category.c_str());
+        assert(false);
+      }
+      assert(attribute);
+      if (type == "str") assert(attribute->kind == AttributeKind::kString);
+      else if (type == "int") assert(std::holds_alternative<std::int64_t>(attribute->typed_value));
+      else if (type == "float") assert(std::holds_alternative<double>(attribute->typed_value));
+      else if (type == "bool") assert(std::holds_alternative<bool>(attribute->typed_value));
+      else if (type == "datetime") assert(std::holds_alternative<NativeDate>(attribute->typed_value));
+      else assert(type == "mapping" && (attribute->container != AttributeContainerKind::kScalar || !attribute->children.empty()));
+    }
+  }
+}
+
 void date_import_variations_retain_wall_clock_fields() {
   using namespace minera;
   for (const auto variant : {XesImportVariant::ITERPARSE, XesImportVariant::LINE_BY_LINE,
@@ -907,11 +956,14 @@ void date_import_variations_retain_wall_clock_fields() {
             const auto& event = trace.events[0];
             assert(log.attributes[0].value == expected);
             assert(find_attribute(trace.attributes, "when")->value == expected);
-            assert(find_attribute(trace.attributes, "nested")->children[0].value == expected);
+            const bool flat = variant == XesImportVariant::LINE_BY_LINE || variant == XesImportVariant::CHUNK_REGEX;
+            const auto& trace_children = find_attribute(trace.attributes, "nested")->children;
+            assert(flat ? trace_children.empty() : trace_children[0].value == expected);
             assert(event.timestamp == expected);
             assert(std::get<NativeDate>(event.timestamp_attribute->typed_value).value == expected);
             assert(find_attribute(event.attributes, "generic")->value == expected);
-            assert(find_attribute(event.attributes, "nested")->children[0].value == expected);
+            const auto& event_children = find_attribute(event.attributes, "nested")->children;
+            assert(flat ? event_children.empty() : event_children[0].value == expected);
             assert(find_attribute(event.attributes, "lexical")->value == source);
           }
         }
@@ -1018,6 +1070,7 @@ void date_export_preserves_source_precision() {
 }  // namespace
 
 int main() {
+  nested_attribute_variations_match_public_categories();
   date_import_sorting_uses_exact_fields_and_variant_rules();
   date_import_variations_retain_wall_clock_fields();
   date_export_preserves_source_precision();
