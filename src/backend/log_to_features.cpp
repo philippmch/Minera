@@ -330,7 +330,7 @@ double instant(const Event& e, const std::string& key, bool required) {
 }
 
 enum class TemporalFrequencyUnit { kSecond, kMinute, kHour, kDay, kWeek,
-                                  kMonth, kQuarter, kYear };
+                                  kMonth, kQuarter, kYear, kSemiMonth, kWeekOfMonth };
 
 struct TemporalFrequency {
   TemporalFrequencyUnit unit = TemporalFrequencyUnit::kWeek;
@@ -339,6 +339,8 @@ struct TemporalFrequency {
   int week_end_day = 0;  // std::tm convention: Sunday = 0.
   int period_start_month = 0;
   bool business = false;
+  int month_day = 15;
+  int month_week = 1;
 };
 
 std::string uppercase_ascii(std::string value) {
@@ -370,7 +372,9 @@ TemporalFrequency parse_temporal_frequency(const std::string& raw) {
         upper.starts_with("BQE-") || upper.starts_with("BQS-") ||
         upper.starts_with("BYE-") || upper.starts_with("BYS-") ||
         upper == "B" || upper == "BME" || upper == "BMS" || upper == "BQE" ||
-        upper == "BQS" || upper == "BYE" || upper == "BYS") {
+        upper == "BQS" || upper == "BYE" || upper == "BYS" ||
+        upper == "SME" || upper == "SMS" || upper.starts_with("SME-") ||
+        upper.starts_with("SMS-") || upper.starts_with("WOM-")) {
       if (alias != upper && upper != "B")
         throw std::invalid_argument("log_to_features: fiscal temporal frequency must use uppercase aliases");
       std::size_t position = !raw.empty() && raw.front() == '+' ? 1 : 0;
@@ -401,7 +405,7 @@ TemporalFrequency parse_temporal_frequency(const std::string& raw) {
   auto suffix = value.substr(suffix_begin);
   std::optional<int> fiscal_month;
   if (const auto separator = suffix.find('-'); separator != std::string::npos &&
-      suffix.front() != 'W') {
+      suffix.front() != 'W' && !suffix.starts_with("SME-") && !suffix.starts_with("SMS-")) {
     static const std::vector<std::string> months{
         "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
     const auto base = suffix.substr(0, separator);
@@ -419,7 +423,27 @@ TemporalFrequency parse_temporal_frequency(const std::string& raw) {
     result.business = true;
     suffix.erase(0, 1);
   }
-  if (suffix == "B") {
+  if (suffix == "SME" || suffix == "SMS" || suffix.starts_with("SME-") || suffix.starts_with("SMS-")) {
+    result.unit = TemporalFrequencyUnit::kSemiMonth;
+    result.label_start = suffix.starts_with("SMS");
+    if (suffix.size() > 3) {
+      const auto day = suffix.substr(4);
+      int parsed = 0;
+      const auto conversion = std::from_chars(day.data(), day.data() + day.size(), parsed);
+      if (conversion.ec != std::errc{} || conversion.ptr != day.data() + day.size())
+        throw std::invalid_argument("log_to_features: invalid semi-month day");
+      result.month_day = parsed;
+    }
+    if (result.month_day < (result.label_start ? 2 : 1) || result.month_day > 27)
+      throw std::invalid_argument("log_to_features: semi-month day outside supported range");
+  } else if (suffix.starts_with("WOM-")) {
+    static const std::map<std::string, int> weekdays{{"SUN",0},{"MON",1},{"TUE",2},{"WED",3},{"THU",4},{"FRI",5},{"SAT",6}};
+    if (suffix.size() != 8 || suffix[4] < '1' || suffix[4] > '4' || !weekdays.contains(suffix.substr(5)))
+      throw std::invalid_argument("log_to_features: invalid week-of-month frequency");
+    result.unit = TemporalFrequencyUnit::kWeekOfMonth;
+    result.month_week = suffix[4] - '0';
+    result.week_end_day = weekdays.at(suffix.substr(5));
+  } else if (suffix == "B") {
     result.unit = TemporalFrequencyUnit::kDay;
     result.business = true;
   } else if (suffix == "S" || suffix == "SEC" || suffix == "SECOND" ||
@@ -527,6 +551,31 @@ std::int64_t business_day_label(std::int64_t ordinal) {
   return epoch_seconds(sys_days{days{static_cast<days::rep>(day_index)}});
 }
 
+std::int64_t monthly_offset_label(std::int64_t ordinal, const TemporalFrequency& frequency) {
+  if (frequency.unit == TemporalFrequencyUnit::kSemiMonth) {
+    const auto month = floor_division(ordinal, 2);
+    const bool second = ordinal % 2 != 0;
+    if (!frequency.label_start && second) return temporal_month_label(month, false);
+    const int day = frequency.label_start && !second ? 1 : frequency.month_day;
+    return temporal_month_label(month, true) + static_cast<std::int64_t>(day - 1) * 86400;
+  }
+  const auto first = temporal_month_label(ordinal, true);
+  const auto weekday = utc_calendar(static_cast<double>(first)).tm_wday;
+  const auto day_offset = (frequency.week_end_day - weekday + 7) % 7 + (frequency.month_week - 1) * 7;
+  return first + static_cast<std::int64_t>(day_offset) * 86400;
+}
+
+std::int64_t monthly_offset_ordinal(double seconds, const TemporalFrequency& frequency) {
+  const auto calendar = utc_calendar(seconds);
+  const auto month = static_cast<std::int64_t>(calendar.tm_year + 1900) * 12 + calendar.tm_mon;
+  const auto date = epoch_seconds(calendar_day(calendar));
+  if (frequency.unit == TemporalFrequencyUnit::kWeekOfMonth)
+    return month - (date < monthly_offset_label(month, frequency));
+  const auto first = month * 2;
+  if (date < monthly_offset_label(first, frequency)) return first - 1;
+  return first + (date >= monthly_offset_label(first + 1, frequency));
+}
+
 std::int64_t natural_temporal_bucket_label(double seconds,
                                    const TemporalFrequency& frequency) {
   using namespace std::chrono;
@@ -583,6 +632,8 @@ std::int64_t natural_temporal_bucket_label(double seconds,
       }
       return temporal_month_label(label_month, frequency.label_start, frequency.business);
     }
+    case TemporalFrequencyUnit::kSemiMonth:
+    case TemporalFrequencyUnit::kWeekOfMonth: break;
   }
   throw std::invalid_argument("log_to_features: invalid temporal frequency");
 }
@@ -598,6 +649,8 @@ std::int64_t temporal_frequency_span(const TemporalFrequency& frequency) {
     case TemporalFrequencyUnit::kMonth: break;
     case TemporalFrequencyUnit::kQuarter: scale = 3; break;
     case TemporalFrequencyUnit::kYear: scale = 12; break;
+    case TemporalFrequencyUnit::kSemiMonth:
+    case TemporalFrequencyUnit::kWeekOfMonth: break;
   }
   if (frequency.multiple > std::numeric_limits<std::int64_t>::max() / scale)
     throw std::invalid_argument("log_to_features: temporal frequency overflows calendar range");
@@ -622,6 +675,11 @@ std::int64_t temporal_month_label(std::int64_t month_index, bool label_start, bo
 
 std::int64_t temporal_bucket_label(double seconds, const TemporalFrequency& frequency,
                                    double origin) {
+  if (frequency.unit == TemporalFrequencyUnit::kSemiMonth || frequency.unit == TemporalFrequencyUnit::kWeekOfMonth) {
+    const auto first = monthly_offset_ordinal(origin, frequency);
+    const auto current = monthly_offset_ordinal(seconds, frequency);
+    return monthly_offset_label(first + floor_division(current - first, frequency.multiple) * frequency.multiple, frequency);
+  }
   if (frequency.business && frequency.unit == TemporalFrequencyUnit::kDay) {
     const auto first = business_day_ordinal(epoch_seconds(calendar_day(utc_calendar(origin))) / 86400);
     const auto current = business_day_ordinal(epoch_seconds(calendar_day(utc_calendar(seconds))) / 86400);
@@ -659,6 +717,12 @@ std::int64_t temporal_bucket_label(double seconds, const TemporalFrequency& freq
 }
 
 std::int64_t next_temporal_bucket_label(std::int64_t label, const TemporalFrequency& frequency) {
+  if (frequency.unit == TemporalFrequencyUnit::kSemiMonth || frequency.unit == TemporalFrequencyUnit::kWeekOfMonth) {
+    const auto ordinal = monthly_offset_ordinal(static_cast<double>(label), frequency);
+    if (ordinal > 0 && frequency.multiple > std::numeric_limits<std::int64_t>::max() - ordinal)
+      throw std::invalid_argument("log_to_features: monthly offset grid overflows calendar range");
+    return monthly_offset_label(ordinal + frequency.multiple, frequency);
+  }
   if (frequency.business && frequency.unit == TemporalFrequencyUnit::kDay) {
     const auto ordinal = business_day_ordinal(label / 86400);
     if (ordinal > 0 && frequency.multiple > std::numeric_limits<std::int64_t>::max() - ordinal)
