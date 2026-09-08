@@ -880,9 +880,73 @@ void set_values_export_as_strings() {
   assert(table_copy.traces[0].events[0].attributes == event.attributes);
 }
 
+void date_export_preserves_source_precision() {
+  using namespace minera;
+  const std::vector<std::pair<std::string, std::string>> dates{
+      {"2024-01-01T00:00:00.000001Z", "2024-01-01T00:00:00.000001Z"},
+      {"2024-01-01T00:00:00.000999Z", "2024-01-01T00:00:00.000999Z"},
+      {"2024-01-01T00:00:00.001001Z", "2024-01-01T00:00:00.001001Z"},
+      {"2024-01-01T00:00:00.123456Z", "2024-01-01T00:00:00.123456Z"},
+      {"1969-12-31T23:59:59.999999Z", "1969-12-31T23:59:59.999999Z"},
+      {"2500-01-01T00:00:00.000001Z", "2500-01-01T00:00:00.000001Z"},
+      {"2024-01-01T00:00:00.123456+05:30", "2023-12-31T18:30:00.123456Z"},
+      {"2024-01-01T00:00:00.999999-04:00", "2024-01-01T04:00:00.999999Z"}};
+  for (const auto& [source, expected] : dates) {
+    EventAttribute date{"date", "stale", AttributeKind::kDate};
+    date.typed_value = NativeDate{source};
+    EventLog log;
+    log.attributes = {date};
+    Trace trace{"c", {}};
+    trace.attributes = {date};
+    Event event{"c", "A", "stale", "r"};
+    event.timestamp_attribute = date;
+    event.timestamp_attribute->key = "time:timestamp";
+    event.timestamp_state = FirstClassAttributeState::kPresent;
+    EventAttribute nested{"nested", ""};
+    nested.container = AttributeContainerKind::kContainer;
+    nested.children = {date};
+    event.attributes = {date, nested, {"legacy", source, AttributeKind::kDate}};
+    trace.events = {event};
+    log.traces = {trace};
+    for (const auto variant : {XesExportVariant::LINE_BY_LINE, XesExportVariant::ETREE}) {
+      for (const bool compressed : {false, true}) {
+        XesExportOptions options;
+        options.variant = variant;
+        options.compress = compressed;
+        const auto bytes = serialize_xes(log, options);
+        if (!compressed) assert(occurrences(bytes, "value=\"" + expected + "\"") == 6);
+        std::istringstream input(bytes);
+        const auto restored = import_xes_event_log(input);
+        const auto& restored_event = restored.traces[0].events[0];
+        assert(restored_event.timestamp == expected);
+        assert(restored.attributes[0].value == expected);
+        assert(restored.traces[0].attributes[0].value == expected);
+        assert(find_attribute(restored_event.attributes, "date")->value == expected);
+        assert(find_attribute(restored_event.attributes, "legacy")->value == expected);
+        assert(find_attribute(restored_event.attributes, "nested")->children[0].value == expected);
+      }
+    }
+  }
+  EventLog precise;
+  precise.traces.push_back(Trace{"c", {Event{"c", "A"}}});
+  EventAttribute nanos{"precise", "stale", AttributeKind::kDate};
+  nanos.typed_value = NativeDate{"1969-12-31T23:59:59.999999999Z", NativeDateResolution::kNanosecond};
+  precise.traces[0].events[0].attributes = {nanos};
+  for (const auto variant : {XesExportVariant::LINE_BY_LINE, XesExportVariant::ETREE}) {
+    XesExportOptions options;
+    options.variant = variant;
+    const auto xml = serialize_xes(precise, options);
+    assert(xml.find("1969-12-31T23:59:59.999999999Z") != std::string::npos);
+    std::istringstream input(xml);
+    const auto restored = import_xes_event_log(input);
+    assert(restored.traces[0].events[0].attributes[0].value == "1969-12-31T23:59:59.999999Z");
+  }
+}
+
 }  // namespace
 
 int main() {
+  date_export_preserves_source_precision();
   {
     std::istringstream input(R"(<log><trace><string key="concept:name" value="c"/>
       <event><string key="concept:name" value="A"/><date key="time:timestamp" value="2024-01-01T00:00:00.000999Z"/></event>
