@@ -4963,6 +4963,14 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
     for (const auto& row : result.temporal_rows) {
       if (!std::isfinite(row.timestamp) || !valid_row(row.values))
         throw std::invalid_argument("log_to_features: invalid temporal result row");
+      if (row.timestamp_ns) {
+        const auto& exact = *row.timestamp_ns;
+        const auto first = !exact.empty() && exact.front() == '-' ? std::size_t{1} : std::size_t{0};
+        if (first == exact.size() ||
+            (exact[first] == '0' && (first != 0 || exact.size() != 1)) ||
+            !std::all_of(exact.begin() + first, exact.end(), [](char digit) { return digit >= '0' && digit <= '9'; }))
+          throw std::invalid_argument("log_to_features: invalid exact temporal timestamp");
+      }
       for (std::size_t i = 0; i < row.values.size(); ++i)
         if (const auto* value = std::get_if<std::string>(&row.values[i]); value &&
             (!value->empty() || result.feature_names[i] != "total_number_of_reworked_activities"))
@@ -5110,7 +5118,12 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
     for (std::size_t i = 0; i < result.temporal_rows.size(); ++i) {
       if (i) out << ',';
       const auto& row = result.temporal_rows[i];
-      out << "{\"timestamp\":" << row.timestamp << ",\"values\":[";
+      out << "{\"timestamp\":" << row.timestamp;
+      if (row.timestamp_ns) {
+        out << ",\"timestamp_ns\":";
+        write_json_string(out, *row.timestamp_ns);
+      }
+      out << ",\"values\":[";
       for (std::size_t j = 0; j < row.values.size(); ++j) {
         if (j) out << ',';
         if (const auto* value = std::get_if<double>(&row.values[j])) write_number(*value);

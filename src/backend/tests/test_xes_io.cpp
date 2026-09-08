@@ -883,6 +883,23 @@ void set_values_export_as_strings() {
 }  // namespace
 
 int main() {
+  {
+    std::istringstream input(R"(<log><trace><string key="concept:name" value="c"/>
+      <event><string key="concept:name" value="A"/><date key="time:timestamp" value="2024-01-01T00:00:00.000999Z"/></event>
+      <event><string key="concept:name" value="A"/><date key="time:timestamp" value="2024-01-01T00:00:00.001001Z"/></event>
+      <event><string key="concept:name" value="A"/><date key="time:timestamp" value="2024-01-01T00:00:00.123456789Z"/></event>
+      <event><string key="concept:name" value="A"/><date key="time:timestamp" value="1969-12-31T23:59:59.999999Z"/></event>
+      </trace></log>)");
+    const auto imported = minera::import_xes_event_log(input);
+    const std::vector<std::string> expected{
+      "2024-01-01T00:00:00.000999Z", "2024-01-01T00:00:00.001001Z",
+      "2024-01-01T00:00:00.123456Z", "1969-12-31T23:59:59.999999Z"};
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+      const auto& event = imported.traces[0].events[i];
+      assert(event.timestamp == expected[i]);
+      assert(std::get<minera::NativeDate>(event.timestamp_attribute->typed_value).value == expected[i]);
+    }
+  }
   set_values_export_as_strings();
   variants_and_gzip_round_trip();
   imports_external_dynamic_huffman_gzip();

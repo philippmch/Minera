@@ -1031,6 +1031,17 @@ describe("isProfileClusteringResult", () => {
 });
 
 describe("isLogToFeaturesResult", () => {
+  it("preserves exact nanosecond labels when numeric timestamps coincide", () => {
+    const result = { family: "LOG_TO_FEATURES", variant: "temporal", feature_names: ["num_events"] };
+    const temporal_rows = ["1704067200000000001", "1704067200000000002"].map((timestamp_ns) =>
+      ({ timestamp: 1704067200, timestamp_ns, values: [1] }));
+    expect(isLogToFeaturesResult({ ...result, temporal_rows })).toBe(true);
+    expect(temporal_rows[0].timestamp_ns).not.toBe(temporal_rows[1].timestamp_ns);
+    for (const timestamp_ns of ["0", "-1", "-1000000001"])
+      expect(isLogToFeaturesResult({ ...result, temporal_rows: [{ timestamp: 0, timestamp_ns, values: [1] }] })).toBe(true);
+    for (const timestamp_ns of ["", "-0", "01", "+1", "1.5", "1e9", "1\n", 1, null])
+      expect(isLogToFeaturesResult({ ...result, temporal_rows: [{ timestamp: 0, timestamp_ns, values: [1] }] })).toBe(false);
+  });
   it("preserves empty temporal rework cells only in the rework column", () => {
     const result = { family: "LOG_TO_FEATURES", variant: "temporal", feature_names: ["num_events", "total_number_of_reworked_activities"] };
     expect(isLogToFeaturesResult({ ...result, temporal_rows: [{ timestamp: 1, values: [1, ""] }] })).toBe(true);
