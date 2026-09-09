@@ -1,22 +1,29 @@
 #include "minera/petri_usage_comparison.hpp"
+#include "petri_replay_internal.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <limits>
 #include <queue>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <tuple>
 
 namespace minera {
 namespace {
 
 using Marking = std::vector<std::uint64_t>;
+using MarkingKeys = std::vector<bool>;
 constexpr std::size_t kSilentSearchCap = 4096;
+using detail::CleaningComponents;
+using detail::cleaning_components;
+using detail::silent_place_paths;
 
 struct Rgb {
   double red;
@@ -47,7 +54,10 @@ std::string direction_color(double direction) {
       Rgb{1.0, 228.0 / 255.0, 225.0 / 255.0},
       Rgb{250.0 / 255.0, 128.0 / 255.0, 114.0 / 255.0},
       Rgb{1.0, 99.0 / 255.0, 71.0 / 255.0}};
-  const double position = std::clamp(0.5 + 0.5 * direction, 0.0, 1.0);
+  const double normalized = std::clamp(0.5 + 0.5 * direction, 0.0, 1.0);
+  // The public palette samples a 256-entry lookup table, including both ends.
+  const auto bin = std::min(255, static_cast<int>(std::floor(normalized * 256.0)));
+  const double position = static_cast<double>(bin) / 255.0;
   std::size_t segment = 0;
   while (segment + 1 < stops.size() && position > stops[segment + 1])
     ++segment;
@@ -75,47 +85,37 @@ std::string occurrence_label(std::uint64_t log1, std::uint64_t log2,
 // the common resource, timestamp, and lifecycle values in dedicated fields;
 // aliases for those fields therefore need to be handled before falling back
 // to the generic attribute bag.
-const std::string* selected_activity_value(const Event& event,
-                                           std::string_view attribute) {
-  if (attribute.empty() || attribute == "activity" ||
-      attribute == "concept:name") {
-    return &event.activity;
-  }
-  const auto selected_first_class = [&](std::string_view source_key,
-                                        FirstClassAttributeState state,
-                                        const std::string& value)
-      -> const std::string* {
-    if (source_key != attribute) return nullptr;
-    if (state == FirstClassAttributeState::kNull ||
-        (state == FirstClassAttributeState::kMissing && value.empty()))
-      return nullptr;
-    return &value;
+struct SelectedActivity {
+  const std::string* value = nullptr;
+  bool present = false;
+};
+
+SelectedActivity selected_activity_value(const Event& event, std::string_view attribute) {
+  const auto projected = [](const std::string& value, FirstClassAttributeState state) {
+    if (state == FirstClassAttributeState::kNull) return SelectedActivity{nullptr, true};
+    if (state == FirstClassAttributeState::kMissing && value.empty()) return SelectedActivity{};
+    return SelectedActivity{&value, true};
   };
-  if (const auto* value = selected_first_class(
-          event.activity_source_key, event.activity_state, event.activity))
-    return value;
-  if (const auto* value = selected_first_class(
-          event.resource_source_key, event.resource_state, event.resource))
-    return value;
-  if (const auto* value = selected_first_class(
-          event.timestamp_source_key, event.timestamp_state, event.timestamp))
-    return value;
-  if (const auto* value = selected_first_class(
-          event.lifecycle_source_key, event.lifecycle_state, event.lifecycle))
-    return value;
-  if (const auto* value = selected_first_class(
-          event.case_id_source_key, event.case_id_state, event.case_id))
-    return value;
-  if (attribute == "resource" || attribute == "org:resource") {
-    return &event.resource;
+  if (attribute.empty() || attribute == "activity" || attribute == "concept:name")
+    return projected(event.activity, event.activity_state);
+  // The first matching present projection wins for both values and nulls.
+  // This is the same priority as the native first-class alias resolution.
+  for (const auto& [source, value, state] : {
+      std::tuple{std::string_view(event.activity_source_key), &event.activity, event.activity_state},
+      std::tuple{std::string_view(event.resource_source_key), &event.resource, event.resource_state},
+      std::tuple{std::string_view(event.timestamp_source_key), &event.timestamp, event.timestamp_state},
+      std::tuple{std::string_view(event.lifecycle_source_key), &event.lifecycle, event.lifecycle_state},
+      std::tuple{std::string_view(event.case_id_source_key), &event.case_id, event.case_id_state}}) {
+    if (source != attribute) continue;
+    const auto result = projected(*value, state);
+    if (result.present) return result;
   }
-  if (attribute == "timestamp" || attribute == "time:timestamp") {
-    return &event.timestamp;
-  }
-  if (attribute == "lifecycle" || attribute == "lifecycle:transition") {
-    return &event.lifecycle;
-  }
-  return event.attribute(attribute);
+  if (attribute == "resource" || attribute == "org:resource") return projected(event.resource, event.resource_state);
+  if (attribute == "timestamp" || attribute == "time:timestamp") return projected(event.timestamp, event.timestamp_state);
+  if (attribute == "lifecycle" || attribute == "lifecycle:transition") return projected(event.lifecycle, event.lifecycle_state);
+  for (const auto& field : event.attributes)
+    if (field.key == attribute) return {field.is_null ? nullptr : &field.value, true};
+  return {};
 }
 
 std::string normalize_activity_attribute(std::string_view attribute) {
@@ -153,8 +153,8 @@ void checked_token_add(std::uint64_t& destination) {
 }
 
 void validate_net(const PetriNet& net) {
-  if (net.place_count() == 0 || net.source() >= net.place_count() ||
-      net.sink() >= net.place_count()) {
+  if (net.place_count() != 0 && (net.source() >= net.place_count() ||
+      net.sink() >= net.place_count())) {
     throw std::invalid_argument("Petri net source/sink place index is invalid");
   }
   for (std::size_t t = 0; t < net.transitions().size(); ++t) {
@@ -213,7 +213,7 @@ void apply_marking(Marking& marking, const PetriTransition& transition) {
   for (const auto place : transition.outputs) checked_token_add(marking[place]);
 }
 
-void fire(Marking& marking, std::size_t transition_id, const PetriNet& net,
+void fire(Marking& marking, MarkingKeys& keys, std::size_t transition_id, const PetriNet& net,
           ReplayUsage& usage, std::vector<std::size_t>& activated) {
   const auto& transition = net.transitions()[transition_id];
   checked_add(usage.transitions[transition_id]);
@@ -225,6 +225,10 @@ void fire(Marking& marking, std::size_t transition_id, const PetriNet& net,
     checked_add(usage.places[place], marking[place]);
   }
   apply_marking(marking, transition);
+  // Consumed entries disappear at zero; untouched explicit zero entries stay.
+  for (const auto place : transition.inputs) keys[place] = marking[place] != 0;
+  for (const auto place : transition.reset_inputs) keys[place] = marking[place] != 0;
+  for (const auto place : transition.outputs) keys[place] = marking[place] != 0;
 }
 
 Marking resolve_marking(const std::vector<std::uint32_t>& configured,
@@ -232,7 +236,7 @@ Marking resolve_marking(const std::vector<std::uint32_t>& configured,
                         std::string_view name) {
   if (configured.empty()) {
     Marking result(place_count, 0);
-    result[fallback] = 1;
+    if (place_count != 0) result[fallback] = 1;
     return result;
   }
   if (configured.size() != place_count) {
@@ -240,6 +244,20 @@ Marking resolve_marking(const std::vector<std::uint32_t>& configured,
                                 " must contain one entry per place");
   }
   return Marking(configured.begin(), configured.end());
+}
+
+MarkingKeys resolve_marking_keys(const MarkingKeys& configured,
+                                const Marking& marking, std::string_view name) {
+  if (!configured.empty() && configured.size() != marking.size())
+    throw std::invalid_argument(std::string(name) + " must contain one entry per place");
+  MarkingKeys result = configured.empty() ? MarkingKeys(marking.size(), false) : configured;
+  for (std::size_t place = 0; place < marking.size(); ++place) {
+    if (marking[place] == 0) continue;
+    if (!configured.empty() && !configured[place])
+      throw std::invalid_argument(std::string(name) + " must include every positive-token place");
+    result[place] = true;
+  }
+  return result;
 }
 
 // Finds a shortest deterministic silent path to a marking enabling one target.
@@ -305,14 +323,58 @@ std::vector<std::size_t> silent_path(const Marking& start,
   return {};
 }
 
+void route_hidden_before_event(Marking& marking, MarkingKeys& keys, std::size_t target,
+                               const PetriNet& net, ReplayUsage& usage,
+                               std::vector<std::size_t>& activated,
+                               const std::vector<std::string>& place_names) {
+  std::vector<bool> fired(net.transitions().size(), false);
+  std::vector<bool> pending(net.transitions().size(), false);
+  std::size_t calls = 0;
+  const auto enable_target = [&](auto&& self, std::size_t selected, std::size_t depth) -> bool {
+    if (enabled(marking, net.transitions()[selected])) return true;
+    if (pending[selected]) return false;
+    if (depth > 128)
+      throw std::runtime_error("Petri usage replay exceeded the pre-event dependency depth limit");
+    if (++calls > kSilentSearchCap)
+      throw std::runtime_error("Petri usage replay exceeded the pre-event routing state limit");
+    pending[selected] = true;
+    Marking required(marking.size(), 0);
+    for (const auto place : net.transitions()[selected].inputs) checked_token_add(required[place]);
+    for (std::size_t place = 0; place < required.size(); ++place)
+      if (marking[place] >= required[place]) required[place] = 0;
+    // Public pre-event routing admits paths of up to 51 silent transitions.
+    // A blocked join may recursively route its deficient inputs, while a
+    // hidden transition fires at most once for this visible event.
+    const auto paths = silent_place_paths(keys, resolve_marking_keys({}, required, "required"), net, place_names, 51);
+    for (const auto& path : paths) {
+      for (const auto transition : path.transitions) {
+        if (fired[transition]) continue;
+        if (!self(self, transition, depth + 1)) break;
+        fire(marking, keys, transition, net, usage, activated);
+        fired[transition] = true;
+        if (enabled(marking, net.transitions()[selected])) break;
+      }
+      if (enabled(marking, net.transitions()[selected])) break;
+    }
+    pending[selected] = false;
+    return enabled(marking, net.transitions()[selected]);
+  };
+  (void)enable_target(enable_target, target, 0);
+}
+
 ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
                        const std::unordered_map<std::string, std::size_t>& activities,
                        const Marking& initial_marking,
                        const Marking& final_marking,
+                       const MarkingKeys& initial_keys,
+                       const MarkingKeys& final_keys,
                        std::string_view activity_attribute,
                        bool walk_through_hidden_trans,
                        bool try_to_reach_final_marking_through_hidden,
-                       bool stop_immediately_unfit) {
+                       bool stop_immediately_unfit,
+                       const CleaningComponents& components,
+                       const std::vector<std::string>& place_names,
+                       const std::vector<std::string>& transition_names) {
   ReplayUsage usage{std::vector<std::uint64_t>(net.transitions().size(), 0),
                     std::vector<std::uint64_t>(net.place_count(), 0)};
   std::vector<std::vector<std::size_t>> transitions_by_activity(net.activities().size());
@@ -321,98 +383,111 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
       transitions_by_activity[*net.transitions()[t].activity].push_back(t);
     }
   }
+  for (auto& transitions : transitions_by_activity) {
+    std::sort(transitions.begin(), transitions.end(), [&](const auto left, const auto right) {
+      return std::tie(transition_names[left], left) < std::tie(transition_names[right], right);
+    });
+  }
+  // Public replay validates the activity sequence before processing it, so
+  // immediate-stop cannot hide a missing field later in the log.
+  for (const auto& trace : log.traces) {
+    for (const auto& event : trace.events) {
+      if (!selected_activity_value(event, activity_attribute).present)
+        throw std::invalid_argument("Petri usage event is missing activity attribute: " +
+                                    std::string(activity_attribute.empty() ? "concept:name" : activity_attribute));
+    }
+  }
 
   for (const auto& trace : log.traces) {
     Marking marking = initial_marking;
+    MarkingKeys keys = initial_keys;
     std::vector<std::size_t> activated;
     for (const auto& event : trace.events) {
-      const auto* selected_activity =
-          selected_activity_value(event, activity_attribute);
-      if (!selected_activity) {
-        if (stop_immediately_unfit) break;
-        continue;
-      }
-      const auto activity = activities.find(*selected_activity);
+      const auto selected = selected_activity_value(event, activity_attribute);
+      if (!selected.value) continue;
+      const auto activity = activities.find(*selected.value);
       if (activity == activities.end() || transitions_by_activity[activity->second].empty()) {
-        // An unknown log activity is a deviation but activates no model
-        // element. Immediate-stop mode prevents later events from contributing.
-        if (stop_immediately_unfit) break;
+        // Unknown labels do not activate a transition or trigger the
+        // disabled-transition immediate-stop control.
         continue;
       }
       const auto& targets = transitions_by_activity[activity->second];
-      if (!std::any_of(targets.begin(), targets.end(), [&](const auto t) {
-            return enabled(marking, net.transitions()[t]);
-          }) && walk_through_hidden_trans) {
-        const auto path = silent_path(marking, targets, net);
-        for (const auto t : path) fire(marking, t, net, usage, activated);
-      }
-      std::size_t chosen = targets.front();
-      bool forced = true;
-      for (const auto t : targets) {
-        if (enabled(marking, net.transitions()[t])) {
-          chosen = t;
-          forced = false;
+      std::size_t chosen = targets.back();
+      for (const auto transition : targets) {
+        if (enabled(marking, net.transitions()[transition])) {
+          chosen = transition;
           break;
         }
       }
-      fire(marking, chosen, net, usage, activated);
-      if (forced && stop_immediately_unfit) break;
-    }
-
-    const auto is_final_marking = [&](const Marking& candidate) {
-      return candidate == final_marking;
-    };
-    if (try_to_reach_final_marking_through_hidden &&
-        !is_final_marking(marking)) {
-      // Route silently until the exact workflow final marking is reached.
-      struct FinishNode {
-        Marking marking;
-        std::size_t transition = std::numeric_limits<std::size_t>::max();
-        std::size_t parent = std::numeric_limits<std::size_t>::max();
-      };
-      std::vector<FinishNode> arena;
-      std::unordered_set<Marking, MarkingHash> seen{marking};
-      std::queue<std::size_t> frontier;
-      frontier.push(std::numeric_limits<std::size_t>::max());
-      std::vector<std::size_t> path;
-      std::size_t generated = 1;
-      std::size_t expanded = 0;
-      while (!frontier.empty() && expanded++ < kSilentSearchCap && path.empty()) {
-        const auto parent = frontier.front();
-        frontier.pop();
-        const Marking current = parent == std::numeric_limits<std::size_t>::max()
-                                    ? marking
-                                    : arena[parent].marking;
-        for (std::size_t t = 0; t < net.transitions().size(); ++t) {
-          if (!net.transitions()[t].silent() || !enabled(current, net.transitions()[t])) continue;
-          Marking next = current;
-          apply_marking(next, net.transitions()[t]);
-          if (!seen.insert(next).second) continue;
-          if (generated++ >= kSilentSearchCap) {
-            throw std::runtime_error(
-                "Petri usage replay exceeded the silent-routing state limit");
-          }
-          arena.push_back(FinishNode{std::move(next), t, parent});
-          const auto found = arena.size() - 1;
-          if (is_final_marking(arena[found].marking)) {
-            for (auto i = found; i != std::numeric_limits<std::size_t>::max();
-                 i = arena[i].parent) path.push_back(arena[i].transition);
-            std::reverse(path.begin(), path.end());
-            break;
-          }
-          frontier.push(found);
+      if (!enabled(marking, net.transitions()[chosen]) && walk_through_hidden_trans) {
+        if (!net.has_extended_arcs()) {
+          route_hidden_before_event(marking, keys, chosen, net, usage, activated, place_names);
+        } else {
+          const auto path = silent_path(marking, {chosen}, net);
+          for (const auto t : path) fire(marking, keys, t, net, usage, activated);
         }
       }
-      if (path.empty() && !frontier.empty()) {
-        throw std::runtime_error(
-            "Petri usage replay exceeded the silent-routing state limit");
+      // Keep the selected duplicate-label transition even when routing makes
+      // another candidate enabled along the way.
+      const bool forced = !enabled(marking, net.transitions()[chosen]);
+      if (forced && stop_immediately_unfit) break;
+      const MarkingKeys before_cleaning = forced && !components.empty()
+          ? keys : MarkingKeys{};
+      if (forced) {
+        std::vector<std::uint64_t> required(marking.size(), 0);
+        for (const auto place : net.transitions()[chosen].inputs) checked_token_add(required[place]);
+        for (std::size_t place = 0; place < marking.size(); ++place)
+          if (marking[place] < required[place]) checked_add(marking[place], required[place]);
       }
-      for (const auto t : path) fire(marking, t, net, usage, activated);
+      fire(marking, keys, chosen, net, usage, activated);
+      if (!before_cleaning.empty()) {
+        // A forced activation can leave an old place marked alongside a
+        // newly marked place in the same structural component. Remove the
+        // stale marking, recording one remaining occurrence for that place.
+        // Key presence matters: increasing an already marked output does
+        // not introduce a new place, even when its token count changes.
+        for (const auto& component : components) {
+          const bool introduced_place = std::any_of(component.begin(), component.end(),
+              [&](const auto place) { return keys[place] && !before_cleaning[place]; });
+          if (!introduced_place) continue;
+          for (const auto place : component) {
+            if (keys[place] && before_cleaning[place]) {
+              marking[place] = 0;
+              keys[place] = false;
+              checked_add(usage.places[place]);
+            }
+          }
+        }
+      }
     }
-    // Place usage includes tokens in the reached final marking, just as it
-    // includes residual tokens when silent completion is unreachable.
+
+    const auto is_final_marking = [&]() {
+      for (std::size_t place = 0; place < keys.size(); ++place)
+        if (final_keys[place] && !keys[place]) return false;
+      return true;
+    };
+    if (try_to_reach_final_marking_through_hidden &&
+        !is_final_marking()) {
+      // Public staged-join probes retain prefixes over at most six passes.
+      // This is independent of the number of transitions in a single path.
+      for (std::size_t pass = 0; pass < 6 && !is_final_marking(); ++pass) {
+        const auto paths = silent_place_paths(keys, final_keys, net, place_names);
+        bool fired = false;
+        for (const auto& path : paths) {
+          for (const auto t : path.transitions) {
+            if (!enabled(marking, net.transitions()[t])) break;
+            fire(marking, keys, t, net, usage, activated);
+            fired = true;
+          }
+          if (is_final_marking()) break;
+        }
+        if (!fired) break;
+      }
+    }
+    // Final marking demand contributes even when replay could not reach it;
+    // surplus residual tokens remain part of the place usage.
     for (std::size_t p = 0; p < marking.size(); ++p) {
-      checked_add(usage.places[p], marking[p]);
+      checked_add(usage.places[p], std::max(marking[p], final_marking[p]));
     }
   }
   return usage;
@@ -438,11 +513,27 @@ PetriUsageRecord record(std::size_t id, std::uint64_t log1, std::uint64_t log2,
                  occurrence_label(result.log1_occurrences,
                                    result.log2_occurrences,
                                    result.total_occurrences);
-  result.color = direction_color(result.direction);
+  result.color = petri_usage_direction_color(result.direction);
   return result;
 }
 
 }  // namespace
+
+std::string petri_usage_direction_color_static(double direction) {
+  if (!std::isfinite(direction) || direction < -1.0 || direction > 1.0)
+    throw std::invalid_argument("Petri usage direction must be finite and within [-1, 1]");
+  if (direction <= -0.5) return "#4444FF";
+  if (direction <= -0.1) return "#AAAAFF";
+  if (direction <= 0.0) return "#CCCCCC";
+  if (direction <= 0.5) return "#FFAAAA";
+  return "#FF4444";
+}
+
+std::string petri_usage_direction_color(double direction) {
+  if (!std::isfinite(direction) || direction < -1.0 || direction > 1.0)
+    throw std::invalid_argument("Petri usage direction must be finite and within [-1, 1]");
+  return direction_color(direction);
+}
 
 PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& log1,
                                          const EventLog& log2,
@@ -454,20 +545,38 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
       options.initial_marking, net.place_count(), net.source(), "initial_marking");
   const auto final_marking = resolve_marking(
       options.final_marking, net.place_count(), net.sink(), "final_marking");
+  const auto initial_keys = resolve_marking_keys(options.initial_marking_keys, initial_marking, "initial_marking_keys");
+  const auto final_keys = resolve_marking_keys(options.final_marking_keys, final_marking, "final_marking_keys");
+  auto place_names = options.place_names;
+  if (place_names.empty()) {
+    for (std::size_t place = 0; place < net.place_count(); ++place)
+      place_names.push_back("p" + std::to_string(place));
+  } else if (place_names.size() != net.place_count()) {
+    throw std::invalid_argument("place_names must contain one entry per place");
+  }
+  auto transition_names = options.transition_names;
+  if (transition_names.empty()) {
+    for (std::size_t transition = 0; transition < net.transitions().size(); ++transition)
+      transition_names.push_back("t" + std::to_string(transition));
+  } else if (transition_names.size() != net.transitions().size()) {
+    throw std::invalid_argument("transition_names must contain one entry per transition");
+  }
+  const auto components = options.cleaning_token_flood
+      ? cleaning_components(net, initial_keys, final_keys) : CleaningComponents{};
   std::unordered_map<std::string, std::size_t> activities;
   for (std::size_t i = 0; i < net.activities().size(); ++i) {
     activities.emplace(net.activities()[i], i);
   }
   const auto usage1 = replay_log(log1, net, activities, initial_marking,
-                                 final_marking, activity_attribute,
+                                 final_marking, initial_keys, final_keys, activity_attribute,
                                  options.walk_through_hidden_trans,
                                  options.try_to_reach_final_marking_through_hidden,
-                                 options.stop_immediately_unfit);
+                                 options.stop_immediately_unfit, components, place_names, transition_names);
   const auto usage2 = replay_log(log2, net, activities, initial_marking,
-                                 final_marking, activity_attribute,
+                                 final_marking, initial_keys, final_keys, activity_attribute,
                                  options.walk_through_hidden_trans,
                                  options.try_to_reach_final_marking_through_hidden,
-                                 options.stop_immediately_unfit);
+                                 options.stop_immediately_unfit, components, place_names, transition_names);
   PetriUsageComparison result;
   result.places.reserve(net.place_count());
   for (std::size_t p = 0; p < net.place_count(); ++p) {

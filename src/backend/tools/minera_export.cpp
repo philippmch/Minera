@@ -1040,6 +1040,7 @@ int usage(const char* program) {
                "  --emd-strict-equal-mass <bool> Reject unequal language masses\n"
                "  --emd-use-fast-emd <bool> Select accelerated EMD when available\n"
                "  --compare-petri-reference <file> Compare Petri element usage with CSV/XES log\n"
+               "  --compare-petri-model <file>    Use a supplied PNML net and its markings\n"
                "  --compare-petri-miner <id>      inductive (default), alpha, heuristic, or powl\n"
                "  --compare-petri-activity-attribute <name>\n"
                "                            Event attribute used as the activity label\n"
@@ -1048,6 +1049,7 @@ int usage(const char* program) {
                "  --compare-petri-walk-through-hidden <bool> Route silently before visible events\n"
                "  --compare-petri-reach-final-through-hidden <bool> Route silently after a trace\n"
                "  --compare-petri-stop-immediately-unfit <bool> Stop a trace after its first deviation\n"
+               "  --compare-petri-cleaning-token-flood <bool> Clean excess tokens during comparison replay (default false)\n"
                "  --align-process-tree     Embed process-tree alignments\n"
                "  --pt-alignment-activity-attribute <name> Activity selector\n"
                "  --pt-alignment-variant <id> SEARCH_GRAPH_PT (default),\n"
@@ -1757,7 +1759,9 @@ int main(int argc, char** argv) {
   bool petri_analysis_requested = false;
   std::filesystem::path emd_reference;
   std::filesystem::path compare_petri_reference;
+  std::filesystem::path compare_petri_model;
   std::string compare_petri_miner = "inductive";
+  bool compare_petri_miner_used = false;
   std::string compare_petri_activity_attribute;
   std::vector<std::uint32_t> compare_petri_initial_marking;
   std::vector<std::uint32_t> compare_petri_final_marking;
@@ -1766,6 +1770,7 @@ int main(int argc, char** argv) {
   bool compare_petri_walk_through_hidden = true;
   bool compare_petri_reach_final_through_hidden = true;
   bool compare_petri_stop_immediately_unfit = false;
+  bool compare_petri_cleaning_token_flood = false;
   bool compare_petri_replay_option_used = false;
   // Select the public default explicitly at the CLI boundary. EXACT remains
   // available when --emd-variant exact is supplied.
@@ -3548,10 +3553,17 @@ int main(int argc, char** argv) {
       compare_petri_reference = value;
       continue;
     }
+    if (arg == "--compare-petri-model") {
+      const auto* value = next();
+      if (!value || *value == '\0') return usage(argv[0]);
+      compare_petri_model = value;
+      continue;
+    }
     if (arg == "--compare-petri-miner") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       compare_petri_miner = value;
+      compare_petri_miner_used = true;
       if (compare_petri_miner != "inductive" && compare_petri_miner != "alpha" &&
           compare_petri_miner != "heuristic" && compare_petri_miner != "powl") {
         std::cerr << "error: --compare-petri-miner expects inductive, alpha, heuristic, or powl\n";
@@ -3593,7 +3605,8 @@ int main(int argc, char** argv) {
     }
     if (arg == "--compare-petri-walk-through-hidden" ||
         arg == "--compare-petri-reach-final-through-hidden" ||
-        arg == "--compare-petri-stop-immediately-unfit") {
+        arg == "--compare-petri-stop-immediately-unfit" ||
+        arg == "--compare-petri-cleaning-token-flood") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       try {
@@ -3602,8 +3615,10 @@ int main(int argc, char** argv) {
           compare_petri_walk_through_hidden = parsed;
         } else if (arg == "--compare-petri-reach-final-through-hidden") {
           compare_petri_reach_final_through_hidden = parsed;
-        } else {
+        } else if (arg == "--compare-petri-stop-immediately-unfit") {
           compare_petri_stop_immediately_unfit = parsed;
+        } else {
+          compare_petri_cleaning_token_flood = parsed;
         }
         compare_petri_replay_option_used = true;
       } catch (const std::invalid_argument& error) {
@@ -5207,11 +5222,15 @@ int main(int argc, char** argv) {
     return 2;
   }
   if (compare_petri_reference.empty() &&
-      (compare_petri_miner != "inductive" ||
+      (!compare_petri_model.empty() || compare_petri_miner != "inductive" ||
        !compare_petri_activity_attribute.empty() ||
        compare_petri_initial_marking_used || compare_petri_final_marking_used ||
        compare_petri_replay_option_used)) {
     std::cerr << "error: --compare-petri options require --compare-petri-reference <file>\n";
+    return 2;
+  }
+  if (!compare_petri_model.empty() && compare_petri_miner_used) {
+    std::cerr << "error: choose --compare-petri-model or --compare-petri-miner\n";
     return 2;
   }
   if (evaluation_requested) {
@@ -6589,6 +6608,64 @@ int main(int argc, char** argv) {
       std::cout << minera::interval_tree_json(query) << '\n';
       return 0;
     }
+    if (!compare_petri_model.empty()) {
+      if (!ends_with_ci(compare_petri_reference.string(), ".csv") &&
+          !is_xes_path(compare_petri_reference))
+        throw std::invalid_argument("--compare-petri-reference expects a .csv or .xes file");
+      minera::PnmlImportOptions model_options;
+      model_options.infer_initial_marking = false;
+      model_options.infer_final_marking = false;
+      model_options.require_workflow_boundaries = false;
+      const auto document = minera::import_pnml_document(compare_petri_model, model_options);
+      const auto reference = [&]() {
+        if (is_xes_path(compare_petri_reference)) {
+          minera::XesImportOptions reference_options;
+          if (!compare_petri_activity_attribute.empty())
+            reference_options.activity_attribute = compare_petri_activity_attribute;
+          return minera::import_xes_event_log(compare_petri_reference, reference_options);
+        }
+        auto reference_options = options;
+        reference_options.allow_case_id_aliases = true;
+        if (!compare_petri_activity_attribute.empty() &&
+            compare_petri_activity_attribute != "activity")
+          reference_options.activity_column = compare_petri_activity_attribute;
+        return minera::import_csv_event_log(compare_petri_reference, reference_options);
+      }();
+      const auto marking = [](const std::vector<std::int64_t>& source) {
+        std::vector<std::uint32_t> result;
+        for (const auto count : source) {
+          if (count < 0 || static_cast<std::uint64_t>(count) > std::numeric_limits<std::uint32_t>::max())
+            throw std::invalid_argument("PNML comparison marking exceeds the supported token range");
+          result.push_back(static_cast<std::uint32_t>(count));
+        }
+        return result;
+      };
+      minera::PetriUsageComparisonOptions comparison_options;
+      comparison_options.place_names = document.place_ids;
+      comparison_options.transition_names = document.transition_ids;
+      comparison_options.activity_attribute = compare_petri_activity_attribute;
+      comparison_options.walk_through_hidden_trans = compare_petri_walk_through_hidden;
+      comparison_options.try_to_reach_final_marking_through_hidden = compare_petri_reach_final_through_hidden;
+      comparison_options.stop_immediately_unfit = compare_petri_stop_immediately_unfit;
+      comparison_options.cleaning_token_flood = compare_petri_cleaning_token_flood;
+      comparison_options.initial_marking = compare_petri_initial_marking_used
+          ? compare_petri_initial_marking : marking(document.initial_marking);
+      comparison_options.final_marking = compare_petri_final_marking_used
+          ? compare_petri_final_marking : marking(document.final_marking);
+      if (!compare_petri_initial_marking_used)
+        comparison_options.initial_marking_keys = document.initial_marking_keys;
+      if (!compare_petri_final_marking_used)
+        comparison_options.final_marking_keys = document.final_marking_keys;
+      const auto body = minera::petri_usage_comparison_json(
+          minera::compare_petri_usage(document.net, log, reference, comparison_options));
+      if (output.empty()) std::cout << body << '\n';
+      else {
+        std::ofstream file(output);
+        if (!file) throw std::runtime_error("Cannot open output file " + output.string());
+        file << body << '\n';
+      }
+      return 0;
+    }
     auto graph = minera::discover_directly_follows_graph(log);
     register_activity_selector_values(graph, log,
                                       token_replay_options.activity_attribute);
@@ -6956,6 +7033,7 @@ int main(int argc, char** argv) {
                                               reference_options);
         }
         auto reference_options = options;
+        reference_options.allow_case_id_aliases = true;
         if (!selector.empty() && selector != "activity")
           reference_options.activity_column = selector;
         return minera::import_csv_event_log(compare_petri_reference,
@@ -6969,6 +7047,7 @@ int main(int argc, char** argv) {
           compare_petri_reach_final_through_hidden;
       comparison_options.stop_immediately_unfit =
           compare_petri_stop_immediately_unfit;
+      comparison_options.cleaning_token_flood = compare_petri_cleaning_token_flood;
       if (compare_petri_initial_marking_used)
         comparison_options.initial_marking = compare_petri_initial_marking;
       if (compare_petri_final_marking_used)

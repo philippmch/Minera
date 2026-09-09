@@ -19,6 +19,9 @@ struct CsvImportOptions {
   bool has_header = true;
   bool trim_fields = true;
   char delimiter = ',';
+  // Opt-in fallback between case_id and case:concept:name. An exact column
+  // match always wins; custom case selectors remain exact.
+  bool allow_case_id_aliases = false;
 };
 
 // The CSV adapter keeps both projections of one parse.  `log` retains the

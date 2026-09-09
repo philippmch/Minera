@@ -1,0 +1,2052 @@
+{
+  "reference": "2.7.22",
+  "cases": [
+    {
+      "name": "zerokey_fixture_zero_boundary_keys_empty_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_fixture_zero_boundary_keys_empty_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_fixture_zero_boundary_keys_visible_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_fixture_zero_boundary_keys_visible_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_fixture_multiple_keys_one_positive_empty_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_fixture_multiple_keys_one_positive_empty_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_fixture_multiple_keys_one_positive_visible_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_fixture_multiple_keys_one_positive_visible_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_fixture_all_zero_markings_empty_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p0": 0,
+          "p1": 0
+        },
+        "initial": {
+          "p0": 0,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_fixture_all_zero_markings_empty_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p0": 0,
+          "p1": 0
+        },
+        "initial": {
+          "p0": 0,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_fixture_all_zero_markings_visible_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p0": 0,
+          "p1": 0
+        },
+        "initial": {
+          "p0": 0,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_fixture_all_zero_markings_visible_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p0": 0,
+          "p1": 0
+        },
+        "initial": {
+          "p0": 0,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_single_initial_zero_empty_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 0
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_single_initial_zero_empty_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 0
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_single_initial_zero_visible_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 0
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_single_initial_zero_visible_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 0
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_mixed_initial_isolated_zero_empty_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1,
+          "z": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "z"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_mixed_initial_isolated_zero_empty_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1,
+          "z": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "z"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_mixed_initial_isolated_zero_visible_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1,
+          "z": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "z"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_mixed_initial_isolated_zero_visible_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1,
+          "z": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "z"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_single_final_zero_empty_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_single_final_zero_empty_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_single_final_zero_visible_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_single_final_zero_visible_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_mixed_final_zero_positive_empty_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p0": 0,
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_mixed_final_zero_positive_empty_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p0": 0,
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_mixed_final_zero_positive_visible_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p0": 0,
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_mixed_final_zero_positive_visible_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p0": 0,
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_silent_zero_final_only_empty_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "tau",
+            1
+          ],
+          [
+            "tau",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "tau",
+            null
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_silent_zero_final_only_empty_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "tau",
+            1
+          ],
+          [
+            "tau",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "tau",
+            null
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_silent_zero_final_only_visible_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "tau",
+            1
+          ],
+          [
+            "tau",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "tau",
+            null
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_silent_zero_final_only_visible_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "tau",
+            1
+          ],
+          [
+            "tau",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "tau",
+            null
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_silent_mixed_final_zero_positive_empty_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "tau",
+            1
+          ],
+          [
+            "tau",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "tau",
+            null
+          ],
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_silent_mixed_final_zero_positive_empty_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "tau",
+            1
+          ],
+          [
+            "tau",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "tau",
+            null
+          ],
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_silent_mixed_final_zero_positive_visible_trace_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "tau",
+            1
+          ],
+          [
+            "tau",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "tau",
+            null
+          ],
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_silent_mixed_final_zero_positive_visible_trace_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "tau",
+            1
+          ],
+          [
+            "tau",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "tau",
+            null
+          ],
+          [
+            "a",
+            "A"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "A"
+        ]
+      ],
+      "right": [
+        [
+          "A"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_tau_existing_zero_initial_and_final_clean_False",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "tau",
+            1
+          ],
+          [
+            "tau",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "tau",
+            null
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        []
+      ],
+      "parameters": {
+        "cleaning_token_flood": false
+      }
+    },
+    {
+      "name": "zerokey_tau_existing_zero_initial_and_final_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "tau",
+            1
+          ],
+          [
+            "tau",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "tau",
+            null
+          ]
+        ]
+      },
+      "left": [
+        []
+      ],
+      "right": [
+        []
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_chain_initial_zero_trace_B_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p2": 1
+        },
+        "initial": {
+          "p0": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "B"
+        ]
+      ],
+      "right": [
+        [
+          "A",
+          "B"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    },
+    {
+      "name": "zerokey_chain_initial_p0_and_zero_p2_trace_B_clean_True",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p2": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      },
+      "left": [
+        [
+          "B"
+        ]
+      ],
+      "right": [
+        [
+          "A",
+          "B"
+        ]
+      ],
+      "parameters": {
+        "cleaning_token_flood": true
+      }
+    }
+  ]
+}

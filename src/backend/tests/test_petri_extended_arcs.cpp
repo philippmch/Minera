@@ -237,6 +237,8 @@ void import_options_and_stochastic_metadata() {
   const auto inferred = parse_pnml_document(xml);
   assert(inferred.initial_marking == std::vector<std::int64_t>({1, 0}));
   assert(inferred.final_marking == std::vector<std::int64_t>({0, 1}));
+  assert(inferred.initial_marking_keys == std::vector<bool>({true, false}));
+  assert(inferred.final_marking_keys == std::vector<bool>({false, true}));
   assert(!inferred.stochastic_map.has_value());
 
   StochasticMap map;
@@ -278,6 +280,75 @@ void equation_guard_and_workflow_topology() {
   assert(check_workflow_net(net).valid);
 }
 
+void general_pnml_preserves_empty_markings() {
+  PnmlImportOptions options;
+  options.infer_initial_marking = false;
+  options.infer_final_marking = false;
+  options.require_workflow_boundaries = false;
+  const auto empty = parse_pnml_document("<pnml><net id=\"empty\"/></pnml>", options);
+  assert(empty.net.place_count() == 0 && empty.net.transitions().empty());
+  assert(empty.initial_marking.empty() && empty.final_marking.empty());
+  assert(empty.initial_marking_keys.empty() && empty.final_marking_keys.empty());
+  assert(empty.place_ids.empty());
+  const auto isolated = parse_pnml_document(
+      "<pnml><net id=\"isolated\"><place id=\"p0\"/><place id=\"p1\"/>"
+      "<finalmarkings><marking><place idref=\"p0\"><text>0</text></place>"
+      "</marking></finalmarkings></net></pnml>", options);
+  assert(isolated.net.place_count() == 2 && isolated.net.transitions().empty());
+  assert(isolated.initial_marking == std::vector<std::int64_t>({0, 0}));
+  assert(isolated.place_ids == std::vector<std::string>({"p0", "p1"}));
+  assert(isolated.final_marking == std::vector<std::int64_t>({0, 0}));
+  assert(isolated.initial_marking_keys == std::vector<bool>({false, false}));
+  assert(isolated.final_marking_keys == std::vector<bool>({true, false}));
+  const auto transition_only = parse_pnml_document(
+      "<pnml><net id=\"n\"><transition id=\"a\"><name><text>A</text>"
+      "</name></transition></net></pnml>", options);
+  assert(transition_only.net.place_count() == 0);
+  assert(transition_only.net.transitions().size() == 1);
+  assert(transition_only.transition_ids == std::vector<std::string>({"a"}));
+  assert(!transition_only.net.transitions()[0].silent());
+  for (const auto xml : {"<pnml/>",
+       "<pnml><net id=\"n\"><arc source=\"missing\" target=\"a\"/></net></pnml>"}) {
+    bool rejected = false;
+    try { (void)parse_pnml_document(xml, options); }
+    catch (const std::runtime_error&) { rejected = true; }
+    assert(rejected);
+  }
+  bool rejected = false;
+  try { (void)parse_pnml_document("<pnml><net id=\"empty\"/></pnml>"); }
+  catch (const std::runtime_error&) { rejected = true; }
+  assert(rejected);
+}
+
+void pnml_marking_key_presence() {
+  PnmlImportOptions options;
+  options.infer_initial_marking = false;
+  options.infer_final_marking = false;
+  options.require_workflow_boundaries = false;
+  const auto document = parse_pnml_document(R"(<pnml><net id="keys">
+    <place id="zero"><initialMarking><text>0</text></initialMarking></place>
+    <place id="omitted"/>
+    <place id="positive"><initialMarking><text>2</text></initialMarking></place>
+    <place id="empty"><initialMarking/></place>
+    <finalmarkings>
+      <marking><place idref="zero"><text>0</text></place>
+        <place idref="positive"><text>3</text></place></marking>
+      <marking><place idref="omitted"><text>4</text></place>
+        <place idref="empty"><text>0</text></place></marking>
+    </finalmarkings>
+  </net></pnml>)", options);
+  assert(document.initial_marking == std::vector<std::int64_t>({0, 0, 2, 0}));
+  assert(document.final_marking == std::vector<std::int64_t>({0, 0, 3, 0}));
+  assert(document.initial_marking_keys == std::vector<bool>({true, false, true, true}));
+  assert(document.final_marking_keys == std::vector<bool>({true, false, true, false}));
+  const auto empty_first = parse_pnml_document(R"(<pnml><net id="first">
+    <place id="p"/><finalmarkings><marking/>
+      <marking><place idref="p"><text>2</text></place></marking>
+    </finalmarkings></net></pnml>)", options);
+  assert(empty_first.final_marking == std::vector<std::int64_t>({0}));
+  assert(empty_first.final_marking_keys == std::vector<bool>({false}));
+}
+
 void normal_alignment_smoke() {
   PetriNet net;
   net.set_activities({"A", "B"});
@@ -296,6 +367,8 @@ int main() {
   playout_and_pnml_round_trip();
   weighted_arc_round_trip();
   import_options_and_stochastic_metadata();
+  general_pnml_preserves_empty_markings();
+  pnml_marking_key_presence();
   equation_guard_and_workflow_topology();
   normal_alignment_smoke();
 }

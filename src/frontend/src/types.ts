@@ -2652,6 +2652,8 @@ export interface PetriUsageComparisonOptions {
   try_to_reach_final_marking_through_hidden?: boolean;
   /** Stop replaying a trace after its first deviation. */
   stop_immediately_unfit?: boolean;
+  /** Clean excess tokens during comparison replay; defaults to false. */
+  cleaning_token_flood?: boolean;
 }
 
 /** Recursive POWL model emitted by the POWL discovery miner. */

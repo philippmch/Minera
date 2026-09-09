@@ -5054,6 +5054,8 @@ void handle_compare_petri(const httplib::Request& request,
     comparison_options.stop_immediately_unfit = comparison_bool(
         "stop_immediately_unfit",
         comparison_options.stop_immediately_unfit);
+    comparison_options.cleaning_token_flood = comparison_bool(
+        "cleaning_token_flood", comparison_options.cleaning_token_flood);
     const auto selector = comparison_options.activity_attribute;
     minera::EventLog reference;
     if (minera::looks_like_xes(reference_file.filename, reference_file.content)) {
@@ -5073,6 +5075,7 @@ void handle_compare_petri(const httplib::Request& request,
     } else {
       std::istringstream input(reference_file.content);
       minera::CsvImportOptions reference_options;
+      reference_options.allow_case_id_aliases = true;
       if (miner == "powl") {
         reference_options.case_id_column = session->powl_case_id_key;
         reference_options.timestamp_column = session->powl_timestamp_key;

@@ -437,6 +437,7 @@ function PetriUsageComparisonPanel() {
   const [walkThroughHidden, setWalkThroughHidden] = useState(true);
   const [reachFinalThroughHidden, setReachFinalThroughHidden] = useState(true);
   const [stopImmediatelyUnfit, setStopImmediatelyUnfit] = useState(false);
+  const [cleaningTokenFlood, setCleaningTokenFlood] = useState(false);
   const [result, setResult] = useState<PetriUsageComparison | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -455,6 +456,7 @@ function PetriUsageComparisonPanel() {
         walk_through_hidden_trans: walkThroughHidden,
         try_to_reach_final_marking_through_hidden: reachFinalThroughHidden,
         stop_immediately_unfit: stopImmediatelyUnfit,
+        cleaning_token_flood: cleaningTokenFlood,
       }));
     }
     catch (cause) { setResult(null); setError(cause instanceof Error ? cause.message : String(cause)); }
@@ -474,6 +476,7 @@ function PetriUsageComparisonPanel() {
       <label className="checkbox-label"><input type="checkbox" checked={walkThroughHidden} onChange={e => { setWalkThroughHidden(e.target.checked); setResult(null); }} /> Route hidden transitions before events</label>
       <label className="checkbox-label"><input type="checkbox" checked={reachFinalThroughHidden} onChange={e => { setReachFinalThroughHidden(e.target.checked); setResult(null); }} /> Route hidden transitions after traces</label>
       <label className="checkbox-label"><input type="checkbox" checked={stopImmediatelyUnfit} onChange={e => { setStopImmediatelyUnfit(e.target.checked); setResult(null); }} /> Stop each trace at first deviation</label>
+      <label className="checkbox-label"><input type="checkbox" checked={cleaningTokenFlood} onChange={e => { setCleaningTokenFlood(e.target.checked); setResult(null); }} /> Clean excess tokens during replay</label>
     </div>
     <button className="button" disabled={!reference || busy} onClick={() => void run()}>{busy ? "Comparing…" : "Compare element usage"}</button>
     {error && <p className="conf-inline-note">{error}</p>}

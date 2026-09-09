@@ -4498,6 +4498,7 @@ std::string imported_model_json(const ModelConformance& model,
 
 std::string petri_usage_comparison_json(const PetriUsageComparison& result) {
   std::ostringstream out;
+  out << std::setprecision(std::numeric_limits<double>::max_digits10);
   out << "{\"family\":\"PETRI_USAGE_COMPARISON\",\"places\":[";
   for (std::size_t i = 0; i < result.places.size(); ++i) {
     if (i) out << ',';

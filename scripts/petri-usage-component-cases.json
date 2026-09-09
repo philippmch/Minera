@@ -1,0 +1,1626 @@
+{
+  "description": "Independently constructed public component-probe input nets; zero-valued boundary keys are Python Marking representation cases.",
+  "cases": [
+    {
+      "name": "sequence",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "weighted_sequence",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            3
+          ],
+          [
+            "a",
+            "p1",
+            2
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "loop",
+      "net": {
+        "arcs": [
+          [
+            "p",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p",
+            1
+          ]
+        ],
+        "final": {
+          "p": 1
+        },
+        "initial": {
+          "p": 1
+        },
+        "places": [
+          "p"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "parallel_join",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "split",
+            1
+          ],
+          [
+            "split",
+            "p1",
+            1
+          ],
+          [
+            "split",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p3",
+            1
+          ],
+          [
+            "p2",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p4",
+            1
+          ],
+          [
+            "p3",
+            "join",
+            1
+          ],
+          [
+            "p4",
+            "join",
+            1
+          ],
+          [
+            "join",
+            "p5",
+            1
+          ]
+        ],
+        "final": {
+          "p5": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5"
+        ],
+        "transitions": [
+          [
+            "split",
+            null
+          ],
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ],
+          [
+            "join",
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "name": "weighted_multi_output_split",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "split",
+            1
+          ],
+          [
+            "split",
+            "p1",
+            3
+          ],
+          [
+            "split",
+            "p2",
+            2
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "split",
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "name": "sink_with_residual_cleanup",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "tau",
+            1
+          ],
+          [
+            "p2",
+            "tau",
+            1
+          ],
+          [
+            "tau",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "tau",
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "name": "xor_choice",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "left",
+            1
+          ],
+          [
+            "p0",
+            "right",
+            1
+          ],
+          [
+            "left",
+            "p1",
+            1
+          ],
+          [
+            "right",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "la",
+            1
+          ],
+          [
+            "la",
+            "p3",
+            1
+          ],
+          [
+            "p2",
+            "rb",
+            1
+          ],
+          [
+            "rb",
+            "p3",
+            1
+          ]
+        ],
+        "final": {
+          "p3": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3"
+        ],
+        "transitions": [
+          [
+            "left",
+            null
+          ],
+          [
+            "right",
+            null
+          ],
+          [
+            "la",
+            "A"
+          ],
+          [
+            "rb",
+            "B"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "xor_two_finals",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "left",
+            1
+          ],
+          [
+            "p0",
+            "right",
+            1
+          ],
+          [
+            "left",
+            "p1",
+            1
+          ],
+          [
+            "right",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "la",
+            1
+          ],
+          [
+            "p2",
+            "rb",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1,
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "left",
+            null
+          ],
+          [
+            "right",
+            null
+          ],
+          [
+            "la",
+            "A"
+          ],
+          [
+            "rb",
+            "B"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "and_split_deadend",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "split",
+            1
+          ],
+          [
+            "split",
+            "p1",
+            1
+          ],
+          [
+            "split",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p3",
+            1
+          ]
+        ],
+        "final": {
+          "p3": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3"
+        ],
+        "transitions": [
+          [
+            "split",
+            null
+          ],
+          [
+            "a",
+            "A"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "xor_deadend",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "left",
+            1
+          ],
+          [
+            "p0",
+            "right",
+            1
+          ],
+          [
+            "left",
+            "p1",
+            1
+          ],
+          [
+            "right",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p3",
+            1
+          ]
+        ],
+        "final": {
+          "p3": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3"
+        ],
+        "transitions": [
+          [
+            "left",
+            null
+          ],
+          [
+            "right",
+            null
+          ],
+          [
+            "a",
+            "A"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "loop_with_exit",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "again",
+            1
+          ],
+          [
+            "again",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "exit",
+            1
+          ],
+          [
+            "exit",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "again",
+            null
+          ],
+          [
+            "exit",
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "name": "disconnected",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ],
+          [
+            "q0",
+            "q",
+            1
+          ],
+          [
+            "q",
+            "q1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "q0",
+          "q1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "q",
+            "Q"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "connected_deadend",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "good",
+            1
+          ],
+          [
+            "p0",
+            "bad",
+            1
+          ],
+          [
+            "good",
+            "p1",
+            1
+          ],
+          [
+            "bad",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p3",
+            1
+          ]
+        ],
+        "final": {
+          "p3": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3"
+        ],
+        "transitions": [
+          [
+            "good",
+            null
+          ],
+          [
+            "bad",
+            null
+          ],
+          [
+            "a",
+            "A"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mixed_choice_split",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "split",
+            1
+          ],
+          [
+            "split",
+            "p1",
+            1
+          ],
+          [
+            "split",
+            "p2",
+            1
+          ],
+          [
+            "p0",
+            "alt",
+            1
+          ],
+          [
+            "alt",
+            "p3",
+            1
+          ],
+          [
+            "p1",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p4",
+            1
+          ],
+          [
+            "p2",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p4",
+            1
+          ]
+        ],
+        "final": {
+          "p4": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4"
+        ],
+        "transitions": [
+          [
+            "split",
+            null
+          ],
+          [
+            "alt",
+            null
+          ],
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "two_splits_same_place",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "split_left",
+            1
+          ],
+          [
+            "split_left",
+            "p1",
+            1
+          ],
+          [
+            "split_left",
+            "p2",
+            1
+          ],
+          [
+            "p0",
+            "split_right",
+            1
+          ],
+          [
+            "split_right",
+            "p3",
+            1
+          ],
+          [
+            "split_right",
+            "p4",
+            1
+          ],
+          [
+            "p1",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p5",
+            1
+          ],
+          [
+            "p3",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p6",
+            1
+          ]
+        ],
+        "final": {
+          "p5": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4",
+          "p5",
+          "p6"
+        ],
+        "transitions": [
+          [
+            "split_left",
+            null
+          ],
+          [
+            "split_right",
+            null
+          ],
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "and_split_join_only",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "split",
+            1
+          ],
+          [
+            "split",
+            "p1",
+            1
+          ],
+          [
+            "split",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "join",
+            1
+          ],
+          [
+            "p2",
+            "join",
+            1
+          ],
+          [
+            "join",
+            "p3",
+            1
+          ]
+        ],
+        "final": {
+          "p3": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3"
+        ],
+        "transitions": [
+          [
+            "split",
+            null
+          ],
+          [
+            "join",
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "name": "and_join_multi_output",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "split",
+            1
+          ],
+          [
+            "split",
+            "p1",
+            1
+          ],
+          [
+            "split",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "join",
+            1
+          ],
+          [
+            "p2",
+            "join",
+            1
+          ],
+          [
+            "join",
+            "p3",
+            1
+          ],
+          [
+            "join",
+            "p4",
+            1
+          ]
+        ],
+        "final": {
+          "p3": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4"
+        ],
+        "transitions": [
+          [
+            "split",
+            null
+          ],
+          [
+            "join",
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "name": "source_transition",
+      "net": {
+        "arcs": [
+          [
+            "source",
+            "p0",
+            1
+          ],
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "source",
+            null
+          ],
+          [
+            "a",
+            "A"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "sink_transition",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "sink",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "sink",
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "name": "unreachable_final",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ],
+          [
+            "q0",
+            "q",
+            1
+          ],
+          [
+            "q",
+            "q1",
+            1
+          ]
+        ],
+        "final": {
+          "q1": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "q0",
+          "q1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "q",
+            "Q"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "zero_boundary_keys",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "long_chain",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ],
+          [
+            "p2",
+            "c",
+            1
+          ],
+          [
+            "c",
+            "p3",
+            1
+          ],
+          [
+            "p3",
+            "d",
+            1
+          ],
+          [
+            "d",
+            "p4",
+            1
+          ]
+        ],
+        "final": {
+          "p4": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ],
+          [
+            "c",
+            "C"
+          ],
+          [
+            "d",
+            "D"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "late_split",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "prefix",
+            1
+          ],
+          [
+            "prefix",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "split",
+            1
+          ],
+          [
+            "split",
+            "p2",
+            1
+          ],
+          [
+            "split",
+            "p3",
+            1
+          ],
+          [
+            "p2",
+            "left",
+            1
+          ],
+          [
+            "left",
+            "p4",
+            1
+          ],
+          [
+            "p3",
+            "right",
+            1
+          ],
+          [
+            "right",
+            "p4",
+            1
+          ]
+        ],
+        "final": {
+          "p4": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4"
+        ],
+        "transitions": [
+          [
+            "prefix",
+            null
+          ],
+          [
+            "split",
+            null
+          ],
+          [
+            "left",
+            "A"
+          ],
+          [
+            "right",
+            "B"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "multiple_keys_one_positive",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "multiple_initial",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "multiple_final",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ],
+          [
+            "p0",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p2",
+            1
+          ]
+        ],
+        "final": {
+          "p1": 1,
+          "p2": 1
+        },
+        "initial": {
+          "p0": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "multiple_boundaries",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p0",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p3",
+            1
+          ],
+          [
+            "p1",
+            "c",
+            1
+          ],
+          [
+            "c",
+            "p2",
+            1
+          ],
+          [
+            "p1",
+            "d",
+            1
+          ],
+          [
+            "d",
+            "p3",
+            1
+          ]
+        ],
+        "final": {
+          "p2": 1,
+          "p3": 1
+        },
+        "initial": {
+          "p0": 1,
+          "p1": 1
+        },
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ],
+          [
+            "c",
+            "C"
+          ],
+          [
+            "d",
+            "D"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "all_zero_markings",
+      "net": {
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ]
+        ],
+        "final": {
+          "p0": 0,
+          "p1": 0
+        },
+        "initial": {
+          "p0": 0,
+          "p1": 0
+        },
+        "places": [
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -154,7 +154,14 @@ CsvEventData import_csv_event_data_impl(
   const auto header =
       parse_csv_row(line, options.delimiter, options.trim_fields);
   auto columns = header_index(header);
-  const auto case_index = required_column(columns, options.case_id_column);
+  std::optional<std::size_t> case_alias_index;
+  if (options.allow_case_id_aliases && !columns.contains(options.case_id_column)) {
+    const auto alias = options.case_id_column == "case_id" ? "case:concept:name"
+        : options.case_id_column == "case:concept:name" ? "case_id" : "";
+    if (*alias != '\0') case_alias_index = optional_selector_column(columns, alias);
+  }
+  const auto case_index = case_alias_index.has_value()
+      ? *case_alias_index : required_column(columns, options.case_id_column);
   const auto activity_index =
       required_selector_column(columns, options.activity_column);
   auto timestamp_index =
