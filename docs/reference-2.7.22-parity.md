@@ -120,7 +120,7 @@ are reconciled.
 | Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Complete** — native marking/extended-equation/workflow/soundness cores expose the classic continuous state-equation optimum (including fractional solutions) with realizability recovery only for integral vectors, deterministic structural pair diagnostics, explicit Woflan selection, short-circuit construction, reachability liveness projection, strong-connectivity diagnostics, single-place marking validation, early unsound-witness return, and strict CLI/server/frontend adapters; focused contracts independently prove every selector and graph, pair, and invariant support projection |
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; deterministic seeded mode and opt-in OS-backed secure randomness are available, while differential edge-contract review remains |
 | Clustering | `SKLEARN_PROFILES` profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — the explicit `SKLEARN_PROFILES` selector and deterministic seeded profile clustering have bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering, independently match DMM activity and succession components, omit missing grouping attributes, and preserve linkage child order across the same adapters; broader differential review remains |
-| Comparison | Petri-net element-usage comparison | **Partial (implemented core; proof pending)** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters, including explicit initial/final markings, every ordinary/reset/inhibitor arc, a selectable event activity attribute, element labels, and signed-direction colors |
+| Comparison | Petri-net element-usage comparison | **Partial (remaining replay proof)** — native place/transition/arc usage deltas, supplied-PNML CLI input, explicit markings including zero-valued key metadata, selectors, weighted/extended arcs, color helpers, and token-flood cleaning have registered coverage; partial hidden routes and replay limits have public evidence, while resource-unresolved models remain outside the comparison proof |
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Partial (implemented core; proof pending)** — the explicit `BOSE` selector covers relation-count features, seeded permutation windows, ranked/capped drift boundaries, boundary-partitioned result logs, optional timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Partial (implemented core; proof pending)** — all six variants are explicitly selectable; less-memory Dijkstra with legacy unit costs is the generic default, with named event activity fields available at replay time |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors |
@@ -1289,14 +1289,20 @@ cover both arc kinds, transport, replay, playout, and that guard.
 
 ## Petri usage comparison evidence
 
-Element-usage comparison replays two logs on a selected discovered Petri net
+Element-usage comparison replays two logs on a selected or supplied Petri net
 and emits deterministic place, transition, and arc records with both log
 counts, totals, and signed direction. The CLI supports CSV/XES references and
-inductive, Alpha, heuristic, and POWL model selection; the local server accepts
+inductive, Alpha, heuristic, and POWL model selection. The CLI also accepts
+`--compare-petri-model model.pnml`, preserving the file's complete initial and
+final markings, including zero markings and empty or disconnected general
+nets. Explicit CLI markings override the corresponding PNML marking. The
+general-net import mode is opt-in; workflow import defaults retain their
+existing structural requirements. The local server accepts
 the same reference as multipart `reference_log` against its cached session;
 both adapters accept comma-separated initial and final place markings, while
 the frontend exposes those controls beside the reference upload. Pre-event
-hidden routing, post-trace final-marking routing, and immediate-stop replay
+hidden routing, post-trace final-marking routing, immediate-stop replay, and
+token-flood cleaning
 controls retain their established defaults and are selectable through native,
 CLI, local-server, and frontend surfaces. An optional
 trimmed activity selector applies to both replay logs; resource, timestamp,
@@ -1308,12 +1314,133 @@ preserves weighted arcs in the usage records. Ordinary input/output, reset,
 and inhibitor arcs are emitted separately with an explicit kind; the legacy
 input projection remains true for every place-to-transition arc. Every element carries a
 deterministic `(log1/log2/total)` label and a signed-direction color generated
-from the bounded blue-to-red palette; arc decorations mirror their owning
+from the public 256-bin blue-to-red palette; arc decorations mirror their owning
 transition.
-Native replay, importer coverage, standalone JSON, CLI, server, and frontend
-request/response guards cover zero-use elements, duplicate labels, weighted
-ordinary arcs, custom markings, silent routing, deviations, exact palette
-endpoints, both extended arc kinds, and every replay-control branch.
+Place counts include consumed tokens and, for each place, the greater of
+residual tokens and required final tokens, plus cleaning removals when enabled.
+Final demand contributes even to an incomplete trace. Hidden final routing
+stops once every required final place has a marking entry, including an explicit
+zero-valued entry, even when its requested token count is larger. Immediate-stop mode stops before firing a disabled transition;
+unknown activity labels are skipped, while missing selected activity fields
+are rejected before replay, including fields after an immediate-stop event.
+Present null values are skipped, and first-class projection
+precedence applies to nulls and values alike. A forced weighted activation
+adds the full input weight to each deficient place before consumption,
+preserving a partially available token count. JSON directions retain double
+precision. The static color helper exposes the separate five-color public
+palette, including its asymmetric neutral interval `(-0.1, 0]`.
+
+The public comparison capture and native PNML differential scripts are
+`scripts/capture-petri-element-usage-reference.py` and
+`scripts/check-petri-element-usage-native.py`. Element identities are
+canonicalized by PNML IDs. A public weighted arc corresponds to native
+unit-arc records with repeated endpoints; the checker verifies the exact
+multiplicity and identical activation statistics before collapsing them,
+without summing their firing counts. Native regression coverage additionally
+checks reset/inhibitor arcs, selector aliases, malformed nets, and the
+explicit silent-search budget. `comparison_module_contract` directly
+exercises both native comparison entry points and JSON serialization.
+
+The expanded public corpus contains 570 observations. All 566 cases mapped to
+the native replay controls match, covering weighted deficits, silent routing,
+incomplete traces, empty nets, zero/multiple markings, duplicate labels,
+parallel joins, custom keys, and missing-key rejection. Four observations of
+`disable_variants` and `consider_remaining_in_fitness` are explicitly skipped
+by the CLI checker because these parameters have no native option. Registered
+tests also check 2,766 dynamic-color and 2,013 static-color observations, plus
+typed-null and alias-collision cases. The transport checker
+`scripts/check-petri-element-usage-transports.py` verifies 128 server/CLI
+combinations (four miners, CSV/XES, and every combination of four replay flags),
+32 observable cleaning effects, two custom activity-selector cases, and ten
+rejection paths. Comparison
+CSV references opt into fallback between `case_id` and `case:concept:name`;
+exact matches win and custom selectors remain strict.
+The reviewed Release build, all 150 registered native tests, and the normal
+catalogue verifier pass for this comparison increment.
+
+The combined cleaning, component, final-routing, pre-event, and marking-key corpus contains
+1,374 completed public observations, all of which match native output: 1,371
+by element identity and three under an explicitly declared net automorphism.
+The latter exchange equivalent silent branches in the six- and eight-stage
+parallel fixtures. Fifteen additional bounded public calls, varying insertion
+order and branch names, observed both choices; their complete usage records
+agree after the branch exchange. The checker first attempts identity matching
+and permits a declared exchange only after validating a bijection that preserves
+node kinds, visible labels, the weighted arc multiset, and both markings.
+Only element keys are renamed; every usage field remains checked. Nine focused
+checker tests cover valid exchanges, invalid declarations, and count mismatches.
+The checker reports these matches separately, and capture metadata distinguishes
+declared equivalences from captured public results. Independent review found no
+actionable issues in this normalization.
+
+Token-flood cleaning is selectable through the native option,
+`--compare-petri-cleaning-token-flood`, the server's `cleaning_token_flood`
+query, and the frontend checkbox. It defaults to false. After a forced visible
+activation introduces a new marked place in a structural component, cleaning
+removes old places that remain marked in that component and records one
+remaining occurrence per removed place, irrespective of its token count.
+Increasing an already marked output does not introduce a new place. Enabled
+firings, silent firings, and immediate-stop events do not trigger cleaning.
+For a `p0-A-p1-B-p2` net and trace `B,A`, cleaning raises both endpoint usage
+counts from one to two.
+
+The independent component model matched 196 public observations across 28
+nets and depth limits zero through six. The traversal saturates one-output
+routes, retains prefixes, and explores each split output independently; its
+default depth limit is six. It differs from Woflan invariant supports.
+Multiple boundary marking keys disable components; an empty initial marking
+otherwise rejects cleaning. Native component generation explicitly reports
+its 4,096-expansion or one-million-stored-place resource limits.
+
+Hidden final routing retains enabled prefixes of shortest structural paths,
+including progress toward a join that remains disabled. It makes at most six
+passes, with at most 51 silent transitions in each candidate path. Competing paths
+prefer shorter routes and then place names. The supplied-PNML comparison route
+preserves original place and transition IDs for these choices. Pre-event
+routing separately targets deficient transition inputs, retains enabled
+prefixes, and recursively supplies blocked joins. Candidate paths have at most
+51 silent transitions, and a hidden transition is not repeatedly fired to
+fill a weighted deficit during one event. The selected visible transition
+remains fixed while that routing runs. Disabled duplicate-label candidates
+use the greatest transition name; when several candidates are already enabled,
+the reference can choose either according to its set iteration. Native replay
+uses the least enabled transition name as a deterministic choice.
+Native structural searches report their 4,096-place and one-million-stored-step
+limits explicitly. Pre-event dependency routing additionally limits recursive
+depth to 128 and attempted calls to 4,096; these native resource guards are
+separate from the observed public path and final-pass limits.
+
+Native comparison and PNML documents preserve optional per-place initial and
+final marking-key metadata, including explicit zero-valued entries. Omitting
+comparison metadata derives keys from positive token counts; supplied metadata
+must match the place dimensions and include every positive place. PNML input
+preserves explicit entries, while explicit CLI marking overrides replace the
+corresponding imported membership with positive-token membership. Firing removes
+consumed keys at zero and retains untouched zero keys. Component selection,
+cleaning, and final routing use membership independently of token quantity.
+For a silent `p0-p1` route with a zero-valued final `p1`, an absent initial `p1`
+causes routing, while an explicit zero-valued initial `p1` stops it. Removing a
+stale zero key during cleaning contributes one occurrence. Forty targeted public
+observations cover these distinctions, and the three formerly excluded component
+models now participate in the combined comparison corpus. All completed cases
+match native output, and no models remain excluded for marking representation.
+Four CLI checks separately verify imported membership and independent numeric
+initial/final overrides against public usage records. Independent review found
+no actionable issues in the marking-key implementation.
+
+The row remains partial. Source-transition and token-producing-loop reference calls that
+exceed their execution budgets are unresolved, rather than expected errors or
+passing comparisons: 18 cases remain unresolved in the combined corpus.
+Separate nested-dependency probes also left comparison calls unresolved within
+their execution limits; direct token-replay results do not substitute for
+comparison observations or establish a public recursion limit.
+The resumable capture script
+`scripts/capture-petri-usage-cleaning-reference.py` preserves completed
+observations and records unresolved cases separately, using one bounded child
+per model with a 20-second and 512-MiB resident-memory limit, polled every 50 ms.
+Resuming refreshes pending-case accounting without implicitly retrying unresolved
+groups, and rejects nonfinite timeouts. The native differential report carries
+that unresolved and excluded accounting.
 
 ## Concept-drift evidence
 

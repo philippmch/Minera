@@ -17,12 +17,23 @@ struct PnmlDocument {
   std::vector<std::int64_t> initial_marking;
   std::vector<std::int64_t> final_marking;
   std::optional<StochasticMap> stochastic_map;
+  // Original PNML element IDs in the corresponding native index order.
+  std::vector<std::string> place_ids;
+  std::vector<std::string> transition_ids;
+  // One entry per place: explicit marking keys (including zero tokens), plus
+  // any positive marking introduced by inference. Numeric export is unchanged.
+  std::vector<bool> initial_marking_keys;
+  std::vector<bool> final_marking_keys;
 };
 
 struct PnmlImportOptions {
   bool infer_initial_marking = true;
   bool infer_final_marking = true;
   bool import_stochastic_map = false;
+  // General-net consumers can preserve empty markings without requiring
+  // workflow source/sink places. Structural inference remains independently
+  // controlled by the two options above.
+  bool require_workflow_boundaries = true;
 };
 
 // Serializes a workflow net as PNML (the Petri Net Markup Language, ISO/IEC
@@ -74,6 +85,8 @@ void write_pnml(std::ostream& out, const PetriNet& net,
 // final markings. When a marking is omitted, the unique structural source or
 // sink receives one token. Unlike parse_pnml, this accepts markings spanning
 // multiple places and token counts greater than one.
+// Disable require_workflow_boundaries and both inference flags to accept
+// general or empty nets and preserve omitted markings as zero vectors.
 [[nodiscard]] PnmlDocument parse_pnml_document(
     std::string_view xml, const PnmlImportOptions& options = {});
 

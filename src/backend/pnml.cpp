@@ -238,6 +238,7 @@ namespace {
 struct ParsedPlace {
   std::string id;
   std::uint64_t initial_tokens = 0;
+  bool has_initial_marking = false;
 };
 
 struct ParsedTransition {
@@ -337,6 +338,9 @@ PnmlDocument parse_pnml_document(std::string_view xml,
           final_marking.emplace_back(*idref, 1);
         }
       }
+    } else if (token.name == "initialMarking" &&
+               stack_ends_with(stack, {"place"}) && !places.empty()) {
+      places.back().has_initial_marking = true;
     } else if (token.name == "transition") {
       const auto* id = detail::attribute(token.attributes, "id");
       if (!id) throw std::runtime_error("PNML transition is missing its id");
@@ -446,7 +450,8 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     if (token.name == "net") in_net = false;
   }
 
-  if (places.empty() || transitions.empty()) {
+  if (!nets_seen || (options.require_workflow_boundaries &&
+                     (places.empty() || transitions.empty()))) {
     throw std::runtime_error("PNML input contains no net (or an empty one)");
   }
 
@@ -514,8 +519,12 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   net.set_activities(std::move(activities));
 
   PnmlDocument document;
+  for (const auto& place : places) document.place_ids.push_back(place.id);
+  for (const auto& transition : transitions) document.transition_ids.push_back(transition.id);
   document.initial_marking.assign(places.size(), 0);
   document.final_marking.assign(places.size(), 0);
+  document.initial_marking_keys.assign(places.size(), false);
+  document.final_marking_keys.assign(places.size(), false);
   std::vector<std::size_t> marked;
   for (std::size_t p = 0; p < places.size(); ++p) {
     if (places[p].initial_tokens >
@@ -524,6 +533,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     }
     document.initial_marking[p] =
         static_cast<std::int64_t>(places[p].initial_tokens);
+    document.initial_marking_keys[p] = places[p].has_initial_marking;
     if (places[p].initial_tokens > 0) marked.push_back(p);
   }
   if (!marked.empty()) {
@@ -539,13 +549,14 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     }
     net.set_source(sources.front());
     document.initial_marking[sources.front()] = 1;
+    document.initial_marking_keys[sources.front()] = true;
   } else {
     std::vector<std::size_t> sources;
     for (std::size_t p = 0; p < places.size(); ++p)
       if (!place_has_in[p]) sources.push_back(p);
-    if (sources.size() != 1)
+    if (sources.size() != 1 && options.require_workflow_boundaries)
       throw std::runtime_error("PNML has no unique structural source place");
-    net.set_source(sources.front());
+    if (!sources.empty()) net.set_source(sources.front());
   }
 
   if (!final_marking.empty()) {
@@ -565,14 +576,16 @@ PnmlDocument parse_pnml_document(std::string_view xml,
         throw std::runtime_error("PNML final marking exceeds signed range");
       }
       document.final_marking[it->second] += signed_tokens;
+      document.final_marking_keys[it->second] = true;
     }
     const auto first = std::find_if(
         document.final_marking.begin(), document.final_marking.end(),
         [](std::int64_t tokens) { return tokens > 0; });
-    if (first == document.final_marking.end()) {
+    if (first == document.final_marking.end() && options.require_workflow_boundaries) {
       throw std::runtime_error("PNML final marking contains no tokens");
     }
-    net.set_sink(static_cast<std::size_t>(first - document.final_marking.begin()));
+    if (first != document.final_marking.end())
+      net.set_sink(static_cast<std::size_t>(first - document.final_marking.begin()));
   } else if (options.infer_final_marking) {
     std::vector<std::size_t> sinks;
     for (std::size_t p = 0; p < places.size(); ++p) {
@@ -584,13 +597,14 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     }
     net.set_sink(sinks.front());
     document.final_marking[sinks.front()] = 1;
+    document.final_marking_keys[sinks.front()] = true;
   } else {
     std::vector<std::size_t> sinks;
     for (std::size_t p = 0; p < places.size(); ++p)
       if (!place_has_out[p]) sinks.push_back(p);
-    if (sinks.size() != 1)
+    if (sinks.size() != 1 && options.require_workflow_boundaries)
       throw std::runtime_error("PNML has no unique structural sink place");
-    net.set_sink(sinks.front());
+    if (!sinks.empty()) net.set_sink(sinks.front());
   }
 
   if (options.import_stochastic_map) {

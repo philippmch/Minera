@@ -319,6 +319,19 @@ describe("XES export API", () => {
 });
 
 describe("Petri usage comparison API", () => {
+  it.each([true, false, undefined])("preserves cleaning_token_flood=%s in multipart options", async (cleaning) => {
+    vi.stubGlobal("fetch", vi.fn(async (_path: string, init?: RequestInit) => {
+      const form = init?.body as FormData;
+      expect(form.get("cleaning_token_flood")).toBe(cleaning === undefined ? null : String(cleaning));
+      return { ok: true, json: async () => ({ family: "PETRI_USAGE_COMPARISON", places: [], transitions: [], arcs: [] }) };
+    }));
+    try {
+      await comparePetriUsage(new File(["case_id,activity\nc1,A\n"], "reference.csv"), "alpha", {
+        cleaning_token_flood: cleaning,
+      });
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it("serializes explicit replay markings in the multipart request", async () => {
     const payload = {
       family: "PETRI_USAGE_COMPARISON", places: [], transitions: [], arcs: [],

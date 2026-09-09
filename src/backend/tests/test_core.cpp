@@ -6442,7 +6442,39 @@ void pripel_json_is_standalone_and_escapes_diagnostics() {
   assert(json.find("\"traces\":[]") != std::string::npos);
 }
 
+void csv_case_aliases_are_opt_in_and_exact_columns_win() {
+  const std::string qualified = "case:concept:name,activity\ncase-1,A\n";
+  bool rejected = false;
+  try {
+    std::istringstream input(qualified);
+    (void)minera::import_csv_event_log(input);
+  } catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+  minera::CsvImportOptions options;
+  options.allow_case_id_aliases = true;
+  std::istringstream input(qualified);
+  const auto imported = minera::import_csv_event_log(input, options);
+  assert(imported.traces.size() == 1 && imported.traces[0].case_id == "case-1");
+  assert(imported.traces[0].case_id_source_key == "case:concept:name");
+  options.case_id_column = "case:concept:name";
+  std::istringstream short_header("case_id,activity\nshort-case,A\n");
+  assert(minera::import_csv_event_log(short_header, options).traces[0].case_id == "short-case");
+  const std::string both = "case_id,case:concept:name,activity\nx,joined,A\ny,joined,B\n";
+  std::istringstream exact_qualified(both);
+  assert(minera::import_csv_event_log(exact_qualified, options).traces.size() == 1);
+  options.case_id_column = "case_id";
+  std::istringstream exact_short(both);
+  assert(minera::import_csv_event_log(exact_short, options).traces.size() == 2);
+  options.case_id_column = "order_id";
+  std::istringstream missing_custom(both);
+  rejected = false;
+  try { (void)minera::import_csv_event_log(missing_custom, options); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+}
+
 int main() {
+  csv_case_aliases_are_opt_in_and_exact_columns_win();
   ilp_json_is_standalone_and_deterministic();
   trace_variant_query_json_is_standalone_and_deterministic();
   pripel_json_is_standalone_and_escapes_diagnostics();
