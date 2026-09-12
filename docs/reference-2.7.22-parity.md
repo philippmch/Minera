@@ -2626,6 +2626,68 @@ randomized branching, general cyclic nets, platform-dependent timestamp behavior
 and the previously named Monte Carlo gaps remain open. The catalogue remains at
 234 incomplete coverage units.
 
+## Monte Carlo signed activation weights and branching
+
+`scripts/capture-monte-carlo-branch-reference.py` and
+`docs/monte-carlo-branch-reference-fixtures.json` retain 26 valid public cases,
+each with 2,048 trace paths: 53,248 raw path observations. The matrix covers
+unequal two- and three-way weights, all-zero weights, all-negative weights,
+negative/zero forced choices, exact signed cancellation, subnormal weights,
+priority permutations, sparse maps, a second seed, and sequential branching.
+Sequential cases include opposite weight signs in different enabled subsets,
+zero-total cancellation, forced paths, and three-way choices. Six invalid cases
+retain public `ValueError` outcomes for negative normalized probabilities,
+positive/negative sum overflow, NaN, and infinity.
+
+Monte Carlo now accepts finite signed activation weights in explicit vectors
+and supplied maps. Request parsing and the frontend defer probability validity
+to simulation, because only transitions enabled together contribute to a choice.
+For each enabled subset, the native simulator sums weights in double precision.
+A zero total selects uniformly, including exact cancellation between opposite
+signs. Otherwise, each probability is its weight divided by the total. Negative
+or nonfinite normalized probabilities and a nonfinite total are rejected.
+Thus all-negative weights select proportionally to their magnitudes, and a
+negative weight with zero competitors selects that branch. The reference also
+accepts extreme mixed signs when the tiny opposite-sign probability rounds to
+negative zero; both captured examples select the dominant branch exactly.
+
+Missing map records retain weight one, and complete explicit weight vectors
+override map weights. Supplied priority values remain metadata and do not alter
+selection in the tested `PETRI_SEMAPH_FIFO` cases. Generic stochastic-map fitting
+and validation outside Monte Carlo retain their existing contracts. Native tests
+cover signed/subnormal proportions, two-/three-way cancellation, sparse defaults,
+overrides, finite metadata, and errors deferred until an invalid subset is enabled.
+
+`scripts/check-monte-carlo-branch-reference.py` verifies both each stage's marginal
+probabilities and the joint trace-path distribution. It rejects impossible paths
+exactly, and forced paths therefore require exact counts. Preselected absolute
+probability limits are 0.065 against the analytical law and 0.09 between public
+and native path frequencies. Five incorrect-law controls fail: uniform selection
+for unequal weights, priority filtering, negative-weight clamping, forcing the
+positive branch after cancellation, and correlated sequential choices.
+
+All 250 branch checks pass: 32 public-evidence checks, 156 valid native transport
+and parameter-mode checks, 36 invalid transport/mode checks, and 26 native seed
+equivalence checks. Native modes cover explicit weights, supplied maps, and
+supplied maps with explicit weight overrides through both CLI and HTTP. Identical
+native seeds must yield equal complete path vectors across these modes. Fixed
+zero duration vectors isolate native branch selection; this evidence does not
+assert public/native timestamp equality or identical RNG streams.
+
+The isolated checkpoint also passes all 327 previous duration-law checks, all
+825 scheduler/marking/topology/PNML transport comparisons, four native suites,
+201 frontend tests, TypeScript, and the catalogue audit. Independent review
+reports no actionable findings. Six relevant runtime modules match the pinned
+Git objects after opaque byte comparison and newline normalization, without
+inspecting reference implementation text.
+
+Global finite-metadata validation remains a native policy, including unused map
+records. Extreme cancellation can depend on floating-point addition order, and
+native transition indices do not reproduce arbitrary public object-set ordering.
+More complex branching, general cyclic nets, wider error contracts,
+platform-dependent timestamps, and the previously named Monte Carlo gaps remain
+open. The catalogue remains at 234 incomplete coverage units.
+
 ## Token-replay parity evidence
 
 Forward replay now shares the independently observed structural routing,

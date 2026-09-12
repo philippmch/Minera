@@ -1726,6 +1726,32 @@ describe("Monte Carlo API", () => {
     }
   });
 
+  it("passes finite signed Monte Carlo weights to runtime selection", () => {
+    for (const weights of [[-1, -3], [-1, 0], [-1, 1], [-1, 2], [0, 0]]) {
+      expect(new URLSearchParams(monteCarloQuery({ transition_weights: weights }))
+        .get("monte_carlo_transition_weights")).toBe(weights.join(","));
+    }
+    for (const weight of [Infinity, -Infinity, NaN]) {
+      expect(() => monteCarloQuery({ transition_weights: [1, weight] }))
+        .toThrow(/finite numbers/);
+    }
+  });
+
+  it("accepts finite signed map weights alongside explicit overrides", () => {
+    const transition = { transition: 0, timing: "timed" as const,
+      distribution: "normal" as const, parameter: 0, secondary_parameter: 0,
+      tertiary_parameter: 0, activation_weight: -1, priority: 0 };
+    const query = new URLSearchParams(monteCarloQuery({
+      provided_stochastic_map: [transition], transition_weights: [1, 3],
+    }));
+    expect(query.get("monte_carlo_provided_stochastic_map"))
+      .toBe("0:timed:normal:0:0:0:-1:0");
+    expect(query.get("monte_carlo_transition_weights")).toBe("1,3");
+    expect(() => monteCarloQuery({ provided_stochastic_map: [
+      { ...transition, activation_weight: NaN },
+    ] })).toThrow(/invalid numeric fields/);
+  });
+
   it("serializes selectors, markings, sparse maps, and compatibility controls", () => {
     const query = new URLSearchParams(monteCarloQuery({
       case_arrival_ratio: 15,

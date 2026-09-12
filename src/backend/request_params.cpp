@@ -4052,14 +4052,11 @@ MonteCarloParams parse_monte_carlo_params(
       const auto first = token.find_first_not_of(" \t\r\n");
       if (first == std::string_view::npos)
         throw std::invalid_argument(
-            "monte_carlo_transition_weights: expected non-negative values");
+            "monte_carlo_transition_weights: expected finite values");
       const auto last = token.find_last_not_of(" \t\r\n");
       const double weight = parse_finite_double(
           token.substr(first, last - first + 1),
           "monte_carlo_transition_weights");
-      if (weight < 0.0)
-        throw std::invalid_argument(
-            "monte_carlo_transition_weights must be non-negative");
       params.transition_weights.push_back(weight);
       begin = i + 1;
     }

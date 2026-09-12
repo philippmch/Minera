@@ -5319,6 +5319,8 @@ export interface MonteCarloOptions {
   start?: number;
   default_duration_seconds?: number;
   force_distribution?: "normal" | "uniform" | "exponential";
+  // Finite signed weights normalize over the currently enabled transitions.
+  // A zero total chooses uniformly; negative normalized probabilities fail.
   transition_weights?: number[];
   transition_durations?: Array<{
     distribution: "deterministic" | "exponential" | "constant0" | "immediate" |

@@ -95,7 +95,10 @@ struct MonteCarloOptions {
   // A missing duration vector uses this deterministic service time.
   double default_duration_seconds = 1.0;
   // Transition weights are indexed by PetriNet::transitions().  An empty
-  // vector means uniform choice among the enabled transitions.
+  // vector uses map weights when supplied, otherwise uniform choice. Finite
+  // signed weights are normalized by the sum over currently enabled
+  // transitions. A zero sum selects uniformly; a nonfinite sum or negative
+  // normalized probability is rejected when that enabled set is reached.
   std::vector<double> transition_weights;
   // A missing duration entry uses default_duration_seconds.  When supplied,
   // this vector must contain one entry per transition.
