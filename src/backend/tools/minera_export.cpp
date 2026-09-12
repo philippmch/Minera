@@ -19,7 +19,10 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <type_traits>
 #include <vector>
+
+#include "pnml_model_options.hpp"
 
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
@@ -676,11 +679,11 @@ int usage(const char* program) {
                 "                            parity (default: case:concept:name)\n"
                 "  --pnml <path>             Also write a model as PNML to <path>\n"
                "  --check-pnml <path>       Also check the log against the\n"
-               "                            workflow net in this PNML file\n"
+               "                            marked net in this PNML file\n"
                "                            (conformance id: imported)\n"
                "  --pnml-miner <id>         Which model to export as PNML:\n"
                "                            inductive (default), alpha, heuristic,\n"
-               "                            or powl\n"
+               "                            powl, or imported\n"
                "  --process-tree-variant <id>\n"
                "                            Process-tree Petri conversion:\n"
                "                            standard (default) or transition_bordered\n"
@@ -1044,7 +1047,7 @@ int usage(const char* program) {
                "  --compare-petri-reference <file> Compare Petri element usage with CSV/XES log\n"
                "  --compare-petri-model <file>    Use a supplied PNML net and its markings\n"
                "  --token-replay-model <file>     Standalone CSV/XES replay on general PNML; emit trace JSON\n"
-               "  --compare-petri-miner <id>      inductive (default), alpha, heuristic, or powl\n"
+               "  --compare-petri-miner <id>      inductive (default), alpha, heuristic, powl, or imported\n"
                "  --compare-petri-activity-attribute <name>\n"
                "                            Event attribute used as the activity label\n"
                "  --compare-petri-initial-marking <n,...> Initial place marking\n"
@@ -1106,7 +1109,7 @@ int usage(const char* program) {
                "  --decomposed-use-cache <bool>  --decomposed-clear-cache <bool>\n"
                "  --align-petri-anti         Embed version_discounted_a_star anti-alignment\n"
                "  --align-petri-multi        Embed version_discounted_a_star multi-alignment\n"
-               "  --advanced-petri-miner <id> inductive, alpha, heuristic, or powl\n"
+               "  --advanced-petri-miner <id> inductive, alpha, heuristic, powl, or imported\n"
                "  --petri-activity-attribute <name> Activity selector for anti/multi\n"
                "  --petri-exponent <f>        Discount exponent (>1)\n"
                "  --petri-epsilon <f>         Anti-alignment epsilon\n"
@@ -1242,7 +1245,7 @@ int usage(const char* program) {
                "  --playout <path>          Simulate a discovered model to XES\n"
                "  --playout-miner <id>      Model for --playout: inductive\n"
                "                            (default), alpha, heuristic, powl,\n"
-               "                            declare, process_tree, dfg,\n"
+               "                            imported, declare, process_tree, dfg,\n"
                "                            stochastic, or monte_carlo\n"
                "  --playout-variant <id>   Process-tree variant: TOPBOTTOM (default),\n"
                "                            BASIC_PLAYOUT, EXTENSIVE, or stochastic\n"
@@ -3584,8 +3587,9 @@ int main(int argc, char** argv) {
       compare_petri_miner = value;
       compare_petri_miner_used = true;
       if (compare_petri_miner != "inductive" && compare_petri_miner != "alpha" &&
-          compare_petri_miner != "heuristic" && compare_petri_miner != "powl") {
-        std::cerr << "error: --compare-petri-miner expects inductive, alpha, heuristic, or powl\n";
+          compare_petri_miner != "heuristic" && compare_petri_miner != "powl" &&
+          compare_petri_miner != "imported") {
+        std::cerr << "error: --compare-petri-miner expects inductive, alpha, heuristic, powl, or imported\n";
         return 2;
       }
       continue;
@@ -3936,7 +3940,8 @@ int main(int argc, char** argv) {
       if (advanced_petri_miner != "inductive" &&
           advanced_petri_miner != "alpha" &&
           advanced_petri_miner != "heuristic" &&
-          advanced_petri_miner != "powl") {
+          advanced_petri_miner != "powl" &&
+          advanced_petri_miner != "imported") {
         return usage(argv[0]);
       }
       continue;
@@ -7001,7 +7006,8 @@ int main(int argc, char** argv) {
                    "large or badly fitting log this can take minutes "
                    "(--no-alignments skips this export section)\n";
     }
-    const auto model = [&](std::string id, const minera::PetriNet& petri) {
+    const auto model = [&](std::string id, const minera::PetriNet& petri,
+                           const minera::PnmlDocument* document = nullptr) {
       const bool is_powl = id == "powl";
       const bool is_inductive = id == "inductive";
       const bool is_alpha = id == "alpha";
@@ -7015,6 +7021,11 @@ int main(int argc, char** argv) {
       auto model_alignment_options = alignment_options;
       if (is_powl && !alignment_activity_option_used)
         model_alignment_options.activity_attribute = powl_options.activity_key;
+      if (document) {
+        replay_options = minera::tools::pnml_replay_options(*document, replay_options);
+        model_alignment_options = minera::tools::pnml_alignment_options(
+            *document, model_alignment_options);
+      }
       std::optional<minera::EventLog> replay_powl_log;
       std::optional<minera::EventLog> alignment_powl_log;
       const minera::EventLog* conformance_log = &log;
@@ -7036,16 +7047,18 @@ int main(int argc, char** argv) {
         alignment_log = &*alignment_powl_log;
       }
       return minera::ModelConformance{
-          std::move(id), minera::final_marking_reachable(petri),
+          std::move(id), minera::final_marking_reachable(
+              petri, model_alignment_options.initial_marking,
+              model_alignment_options.final_marking),
            minera::check_conformance(*conformance_log, petri, replay_options),
            is_powl ? minera::check_footprints(powl_log, petri)
            : is_inductive ? minera::check_footprints(inductive_log, petri)
            : is_alpha ? minera::check_footprints(alpha_log, petri)
-                      : minera::check_footprints(log, petri),
+                      : minera::check_footprints(log, petri, replay_options.initial_marking),
            no_alignments ? std::optional<minera::AlignmentResult>{}
                          : std::optional<minera::AlignmentResult>(
                                (is_powl || is_inductive || is_alpha ||
-                                alignment_option_used)
+                                alignment_option_used || document)
                                    ? minera::check_alignment(
                                          *alignment_log, petri,
                                          model_alignment_options)
@@ -7061,7 +7074,7 @@ int main(int argc, char** argv) {
                             {"powl", &powl_net}};
 
     // Optionally check the log against a user-supplied model too — a PNML
-    // workflow net, a BPMN 2.0 process, or a PTML process tree, all landing
+    // marked net, a BPMN 2.0 process, or a PTML process tree, all landing
     // under the single "imported" conformance id. Its activities are
     // registered in the id registry first, so the ones the log never shows
     // still resolve to names in the export.
@@ -7069,6 +7082,18 @@ int main(int argc, char** argv) {
                             (check_bpmn.empty() ? 0 : 1) +
                             (check_ptml.empty() ? 0 : 1);
     std::optional<minera::PetriNet> imported_net;
+    std::optional<minera::PnmlDocument> imported_document;
+    // Explicit nonempty caller vectors, including all-zero markings, win.
+    const auto apply_imported_markings = [&](auto& options) {
+      if (!imported_document) return;
+      using Integer = typename std::decay_t<decltype(options.initial_marking)>::value_type;
+      if (options.initial_marking.empty())
+        options.initial_marking = minera::tools::pnml_marking<Integer>(
+            imported_document->initial_marking);
+      if (options.final_marking.empty())
+        options.final_marking = minera::tools::pnml_marking<Integer>(
+            imported_document->final_marking);
+    };
     if (check_flags > 1) {
       std::cerr << "error: pass only one of --check-pnml, --check-bpmn, and "
                    "--check-ptml (they share the conformance id "
@@ -7076,15 +7101,18 @@ int main(int argc, char** argv) {
       return 2;
     }
     if (check_flags == 1) {
-      imported_net =
-          !check_pnml.empty()   ? minera::import_pnml(check_pnml)
-          : !check_bpmn.empty() ? minera::import_bpmn(check_bpmn)
-                                : minera::to_petri_net(
-                                      minera::import_ptml(check_ptml));
+      if (!check_pnml.empty()) {
+        imported_document = minera::tools::import_pnml_model(check_pnml);
+        imported_net = imported_document->net;
+      } else {
+        imported_net = !check_bpmn.empty() ? minera::import_bpmn(check_bpmn)
+            : minera::to_petri_net(minera::import_ptml(check_ptml));
+      }
       for (const auto& activity : imported_net->activities()) {
         graph.ensure_activity(activity);
       }
-      conformance.push_back(model("imported", *imported_net));
+      conformance.push_back(model("imported", *imported_net,
+          imported_document ? &*imported_document : nullptr));
       available_models.emplace_back("imported", &*imported_net);
     }
     if (!compare_petri_reference.empty()) {
@@ -7132,10 +7160,17 @@ int main(int argc, char** argv) {
           compare_petri_stop_immediately_unfit;
       comparison_options.cleaning_token_flood = compare_petri_cleaning_token_flood;
       comparison_options.exhaustive_invisible_exploration = compare_petri_exhaustive_invisible_exploration;
-      if (compare_petri_initial_marking_used)
+      if (compare_petri_miner == "imported" && imported_document)
+        comparison_options = minera::tools::pnml_comparison_options(
+            *imported_document, comparison_options);
+      if (compare_petri_initial_marking_used) {
         comparison_options.initial_marking = compare_petri_initial_marking;
-      if (compare_petri_final_marking_used)
+        comparison_options.initial_marking_keys.clear();
+      }
+      if (compare_petri_final_marking_used) {
         comparison_options.final_marking = compare_petri_final_marking;
+        comparison_options.final_marking_keys.clear();
+      }
       std::optional<minera::EventLog> normalized_comparison_log;
       const minera::EventLog* comparison_log = &log;
       if (compare_petri_miner == "powl") {
@@ -7191,6 +7226,7 @@ int main(int argc, char** argv) {
           minera::MarkingEquationOptions options;
           options.initial_marking = request.initial_marking;
           options.final_marking = request.final_marking;
+          if (request.miner == "imported") apply_imported_markings(options);
           options.transition_costs = request.transition_costs;
           options.realizability_limit = request.max_states;
           result_json = minera::petri_analysis_json(
@@ -7211,6 +7247,7 @@ int main(int argc, char** argv) {
           minera::ExtendedMarkingEquationOptions options;
           options.initial_marking = request.initial_marking;
           options.final_marking = request.final_marking;
+          if (request.miner == "imported") apply_imported_markings(options);
           options.model_transition_costs = request.model_transition_costs;
           options.synchronous_transition_costs =
               request.synchronous_transition_costs;
@@ -7239,6 +7276,7 @@ int main(int argc, char** argv) {
                                 : minera::SoundnessVariant::kSoundness;
           options.initial_marking = request.initial_marking;
           options.final_marking = request.final_marking;
+          if (request.miner == "imported") apply_imported_markings(options);
           options.max_states = request.max_states;
           options.invariant_search_limit = request.invariant_search_limit;
           options.diagnostics = request.diagnostics;
@@ -7273,32 +7311,40 @@ int main(int argc, char** argv) {
                       : miner == "alpha" ? alpha_log : log;
         minera::ModelEvaluation result;
         result.miner = miner;
-        switch (evaluation_params->family) {
+        auto model_evaluation = *evaluation_params;
+        if (miner == "imported") {
+          apply_imported_markings(model_evaluation.replay_fitness_options);
+          apply_imported_markings(model_evaluation.precision_options);
+          apply_imported_markings(model_evaluation.generalization_options);
+          apply_imported_markings(model_evaluation.simplicity_options);
+          apply_imported_markings(model_evaluation.composite_options);
+        }
+        switch (model_evaluation.family) {
           case minera::EvaluationFamily::kReplayFitness:
             result.replay_fitness = minera::evaluate_replay_fitness(
                 evaluation_log, *petri,
-                evaluation_params->replay_fitness_variant,
-                evaluation_params->replay_fitness_options);
+                model_evaluation.replay_fitness_variant,
+                model_evaluation.replay_fitness_options);
             break;
           case minera::EvaluationFamily::kPrecision:
             result.precision = minera::evaluate_precision(
-                evaluation_log, *petri, evaluation_params->precision_variant,
-                evaluation_params->precision_options);
+                evaluation_log, *petri, model_evaluation.precision_variant,
+                model_evaluation.precision_options);
             break;
           case minera::EvaluationFamily::kGeneralization:
             result.generalization = minera::evaluate_generalization(
                 evaluation_log, *petri,
-                evaluation_params->generalization_variant,
-                evaluation_params->generalization_options);
+                model_evaluation.generalization_variant,
+                model_evaluation.generalization_options);
             break;
           case minera::EvaluationFamily::kSimplicity:
             result.simplicity = minera::evaluate_simplicity(
-                *petri, evaluation_params->simplicity_variant,
-                evaluation_params->simplicity_options);
+                *petri, model_evaluation.simplicity_variant,
+                model_evaluation.simplicity_options);
             break;
           case minera::EvaluationFamily::kComposite:
             result.composite = minera::evaluate_composite(
-                evaluation_log, *petri, evaluation_params->composite_options);
+                evaluation_log, *petri, model_evaluation.composite_options);
             break;
         }
         evaluation->push_back(std::move(result));
@@ -7408,6 +7454,14 @@ int main(int argc, char** argv) {
     if (advanced_petri_miner == "alpha") advanced_net = &net;
     else if (advanced_petri_miner == "heuristic") advanced_net = &heuristic_net;
     else if (advanced_petri_miner == "powl") advanced_net = &powl_net;
+    else if (advanced_petri_miner == "imported") {
+      if (!imported_net) throw std::invalid_argument(
+          "--advanced-petri-miner imported requires a supplied model");
+      advanced_net = &*imported_net;
+      apply_imported_markings(decomposed_options);
+      apply_imported_markings(petri_anti_options);
+      apply_imported_markings(petri_multi_options);
+    }
     const minera::EventLog* advanced_log =
         advanced_petri_miner == "powl"
             ? &powl_log
@@ -7454,13 +7508,15 @@ int main(int argc, char** argv) {
       if (playout_miner == "alpha") selected = &net;
       else if (playout_miner == "heuristic") selected = &heuristic_net;
       else if (playout_miner == "powl") selected = &powl_net;
+      else if (playout_miner == "imported" && imported_net) selected = &*imported_net;
       else if (playout_miner != "inductive" &&
                playout_miner != "monte_carlo") {
         std::cerr << "error: unknown Monte Carlo model '" << playout_miner
-                  << "' (expected inductive, alpha, heuristic, or powl)\n";
+                  << "' (expected inductive, alpha, heuristic, powl, or imported)\n";
         return 2;
       }
       auto effective_options = monte_carlo_options;
+      if (playout_miner == "imported") apply_imported_markings(effective_options);
       std::optional<minera::EventLog> projected_monte_carlo_log;
       const minera::EventLog* simulation_log = &log;
       if (playout_miner == "powl") {
@@ -7583,9 +7639,11 @@ int main(int argc, char** argv) {
         selected = &heuristic_net;
       } else if (pnml_miner == "powl") {
         selected = &powl_net;
+      } else if (pnml_miner == "imported" && imported_net) {
+        selected = &*imported_net;
       } else {
         std::cerr << "error: unknown --pnml-miner '" << pnml_miner
-                  << "' (expected inductive, alpha, heuristic, or powl)\n";
+                  << "' (expected inductive, alpha, heuristic, powl, or imported)\n";
         return 1;
       }
       std::ofstream pnml_file(pnml_output);
@@ -7599,7 +7657,10 @@ int main(int argc, char** argv) {
                   minera::ProcessTreePetriNetVariant::kStandard
               ? pnml_miner + " net"
               : pnml_miner + " net (transition_bordered)";
-      minera::write_pnml(pnml_file, *selected, pnml_name);
+      if (pnml_miner == "imported" && imported_document)
+        minera::write_pnml(pnml_file, *imported_document, pnml_name);
+      else
+        minera::write_pnml(pnml_file, *selected, pnml_name);
     }
 
     // Optionally emit one discovered model as BPMN. The inductive tree maps
@@ -7693,6 +7754,16 @@ int main(int argc, char** argv) {
         selected = &heuristic_net;
       else if (model_miner == "powl")
         selected = &powl_net;
+      else if (model_miner == "imported" && imported_net) {
+        selected = &*imported_net;
+        apply_imported_markings(basic_playout_options);
+        apply_imported_markings(extensive_playout_options);
+        apply_imported_markings(stochastic_playout_options);
+        apply_imported_markings(monte_carlo_options);
+        if (imported_document && stochastic_petri_options.initial_marking.empty())
+          stochastic_petri_options.initial_marking =
+              minera::tools::pnml_marking<std::uint32_t>(imported_document->initial_marking);
+      }
       else if (model_miner == "declare")
         generated =
             minera::declare_playout(declare, declare_playout_options);
@@ -7714,7 +7785,7 @@ int main(int argc, char** argv) {
       }
       else {
         std::cerr << "error: unknown --playout-miner '" << playout_miner
-                  << "' (expected inductive, alpha, heuristic, powl, or "
+                  << "' (expected inductive, alpha, heuristic, powl, imported, "
                      "declare, process_tree, or dfg)\n";
         return 1;
       }
