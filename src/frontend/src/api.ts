@@ -4650,7 +4650,7 @@ export function monteCarloQuery(options: MonteCarloOptions = {}): string {
   for (const name of ["max_steps", "seed", "default_resources_per_place"] as const) {
     const value = options[name];
     if (value !== undefined) {
-      validatePlayoutNumber(name, value as number, name === "default_resources_per_place");
+      validatePlayoutNumber(name, value as number);
       params.set(`monte_carlo_${name}`, String(value));
     }
   }
@@ -4742,8 +4742,8 @@ export function monteCarloQuery(options: MonteCarloOptions = {}): string {
   if (options.resources_per_place !== undefined) {
     if (!options.resources_per_place || typeof options.resources_per_place !== "object" ||
         Object.entries(options.resources_per_place).some(([place, count]) =>
-          !/^\d+$/.test(place) || !Number.isSafeInteger(count) || count <= 0)) {
-      throw new Error("resources_per_place must map non-negative places to positive integers");
+          !/^\d+$/.test(place) || !Number.isSafeInteger(count) || count < 0)) {
+      throw new Error("resources_per_place must map non-negative places to non-negative integers");
     }
     const entries = Object.entries(options.resources_per_place)
       .sort(([left], [right]) => Number(left) - Number(right));

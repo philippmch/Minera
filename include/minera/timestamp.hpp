@@ -26,4 +26,9 @@ namespace minera {
 // expect. Locale- and timezone-independent; the inverse of parse_timestamp.
 [[nodiscard]] std::string format_timestamp(double epoch_seconds);
 
+// Formats finite epoch seconds to microseconds for simulation event timestamps.
+// Rounds the fractional second without first multiplying the whole epoch.
+// Throws when the rounded result lies outside calendar years 1 through 9999.
+[[nodiscard]] std::string format_timestamp_microseconds(double epoch_seconds);
+
 }  // namespace minera

@@ -470,8 +470,11 @@ Monte Carlo simulation evidence: the native `monte_carlo` core implements the
 `PETRI_SEMAPH_FIFO` virtual-time scheduler over workflow nets, seeded transition
 selection, deterministic, exponential, constant-zero, immediate, normal, uniform,
 lognormal, and gamma service times, bounded case/step and live-allocation
-budgets, shared output-place resource pools, completion/deadlock diagnostics,
-and deterministic EventLog output. Arbitrary multi-token initial/final markings
+budgets, shared place timestamp heaps and signed occupancy counts,
+completion/deadlock diagnostics, and deterministic EventLog output. Cases are
+primed through their first firing before continuations are ordered by nominal
+finish time and generation index. Capacity waits enter transition diagnostics
+without delaying event timestamps. Arbitrary multi-token initial/final markings
 use componentwise final coverage. Sparse supplied stochastic maps support every distribution and
 define missing transitions as uniform, immediate choices; explicit weight and
 duration vectors retain precedence. Source-log fitting honors custom activity
@@ -488,7 +491,11 @@ server exposes both `/api/playout?mode=monte_carlo` (XES) and `/api/monte-carlo`
 (JSON), and the frontend offers typed query/result guards, interval-tree
 validation, markings, selectors, replay, arrival, and compatibility controls.
 Dedicated POST adapters keep supplied stochastic maps out of request-size-limited
-URLs while the legacy GET routes remain available.
+URLs while the legacy GET routes remain available. The default simulation epoch
+is 1,000,000 UTC seconds and generated timestamps retain microseconds. Public
+visible-event duration fields remain populated when diagnostics are disabled;
+that flag controls only the legacy elapsed-time vector. Zero capacities are
+accepted, while zero cases and traces without visible events return errors.
 
 Object-centric Petri-net simulation evidence: the bounded native adapter
 enumerates per-object-type workflow-net traces, combines object choices into
@@ -2306,10 +2313,62 @@ branch check asserts generated AB versus overridden AC event paths even when
 immediate durations make aggregate timing summaries identical. Independent
 review reports no actionable findings; TypeScript and the catalogue audit pass.
 
-Exact likelihood ties, extreme finite inputs, broader parameter behavior, and
-the full Monte Carlo scheduler/resource contract still require proof. Both
-catalogue modules remain partial; this checkpoint does not promote coverage
-rows or establish full parity.
+Exact likelihood ties, extreme finite inputs, and broader parameter behavior
+still require proof. The scheduler evidence below covers deterministic cases;
+randomized choices and wider net/marking behavior remain open. Both catalogue
+modules remain partial; these checkpoints do not promote coverage rows or
+establish full parity.
+
+## Monte Carlo scheduler and resource observations
+
+`scripts/capture-monte-carlo-scheduler-reference.py` and
+`docs/monte-carlo-scheduler-reference-fixtures.json` retain 70 calls to the pinned
+public Monte Carlo API. The matrix covers single and multiple cases, simultaneous
+and spaced arrivals, zero/one/two resource capacities, object and string resource
+keys, hidden prefix/middle/suffix transitions, microsecond service times,
+multiple initial tokens, weighted arcs, a deterministic parallel join, diagnostic
+controls, and empty-output errors. Captures require `TZ=UTC` and record that
+runtime setting so local timestamp conversion is reproducible.
+
+The independently observed scheduler primes every case through its first firing
+in generation order, then schedules continuations by nominal finish and case
+index. Shared timestamp heaps and signed occupancy counters are separate from
+each case's numeric marking. Initial arrival timestamps append before heap
+operations; the captured positive initial markings initialize one timestamp on
+the first initial place, irrespective of token multiplicity. Input consumption
+and output capacity reservation update timing once per distinct place. Completion
+releases occupancy for remaining marked places without removing timestamps.
+Resource waits record blocked intervals and leave nominal event times unchanged.
+Finite intervals with nonpositive length are omitted. These rules also explain
+the otherwise surprising intervals seen when cases arrive far apart.
+
+Native simulation, CLI, and HTTP now follow those observations. Numeric weighted
+arcs and per-case markings remain authoritative for firing; shared timing does
+not transfer numeric tokens between cases. The bounded reset/inhibitor extensions
+retain their marking behavior. Runtime limits account for shared timestamp and
+interval growth, as well as dense per-case marking allocation independently of
+resource capacity. Explicit stochastic maps and vectors retain their precedence.
+
+`format_timestamp_microseconds` preserves simulation event precision, including
+fractional rounding, negative epochs, and second carry. The existing millisecond
+formatter remains available to other callers. Visible-event duration fields are
+always computed, and the legacy elapsed-time vector still honors the diagnostic
+flag. Zero resource capacities pass native, request, server, and frontend guards;
+upper bounds and malformed-value rejection remain enforced.
+
+The isolated checkpoint passes all four focused native suites, 140 CLI/HTTP
+scheduler comparisons, 29 existing supplied-PNML transport checks, 196 frontend
+tests, TypeScript, and the catalogue audit. Independent review reports no
+actionable findings. Successful scheduler comparisons check every public result
+field and generated activity/timestamp sequence. Four public error cases are
+checked for failure on each transport; their exception classes/messages are not
+claimed equivalent across languages.
+
+Randomized branch selection, broader initial marking-key order, general cyclic
+nets, platform-dependent local timestamp behavior, and wider parameter/error
+contracts still require proof. The native envelope also retains its explicit
+case identifiers and bounded diagnostics. Monte Carlo remains partial, and the
+catalogue still has 234 incomplete coverage units.
 
 ## Token-replay parity evidence
 

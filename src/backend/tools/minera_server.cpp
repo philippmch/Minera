@@ -392,7 +392,6 @@ void validate_monte_carlo_server_limits(
     const minera::MonteCarloOptions& options, const minera::PetriNet& net) {
   if (options.simulations > kServerMonteCarloMaxSimulations ||
       options.max_steps > kServerMonteCarloMaxSteps ||
-      options.default_resources_per_place == 0 ||
       options.default_resources_per_place > kServerMonteCarloMaxResourceCapacity) {
     throw std::invalid_argument(
         "Monte Carlo bounds exceed the server safety limits");
@@ -409,7 +408,7 @@ void validate_monte_carlo_server_limits(
       throw std::invalid_argument(
           "Monte Carlo resource place index is invalid");
     }
-    if (capacity == 0 || capacity > kServerMonteCarloMaxResourceCapacity) {
+    if (capacity > kServerMonteCarloMaxResourceCapacity) {
       throw std::invalid_argument(
           "Monte Carlo resource capacity exceeds the server safety limit");
     }
