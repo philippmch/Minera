@@ -5323,7 +5323,10 @@ export interface MonteCarloOptions {
   transition_durations?: Array<{
     distribution: "deterministic" | "exponential" | "constant0" | "immediate" |
       "normal" | "uniform" | "lognormal" | "gamma";
+    // Exponential uses scale here, retaining the mean for a zero location.
     value_seconds: number;
+    // Exponential: optional signed location, default zero. A zero scale
+    // returns this location and requires it to be nonnegative.
     secondary_seconds?: number;
     tertiary_seconds?: number;
   }>;

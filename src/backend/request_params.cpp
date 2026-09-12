@@ -4143,7 +4143,9 @@ MonteCarloParams parse_monte_carlo_params(
                         kind == MonteCarloDurationDistribution::kGamma
                     ? 3
                     : 1;
-      if ((!zero_arity && values.size() != expected_arity) ||
+      const bool exponential = kind == MonteCarloDurationDistribution::kExponential;
+      if ((!zero_arity && values.size() != expected_arity &&
+           !(exponential && values.size() == 2)) ||
           (zero_arity && values.size() > 1))
         throw std::invalid_argument(
             "monte_carlo_transition_durations: wrong parameter count for '" +
@@ -4158,7 +4160,7 @@ MonteCarloParams parse_monte_carlo_params(
       const bool shape_family = kind == MonteCarloDurationDistribution::kLogNormal ||
                                 kind == MonteCarloDurationDistribution::kGamma;
       if ((!signed_location && duration.value_seconds < 0.0) ||
-          (!shape_family && duration.secondary_seconds < 0.0) ||
+          (!shape_family && !exponential && duration.secondary_seconds < 0.0) ||
           duration.tertiary_seconds < 0.0)
         throw std::invalid_argument(
             "monte_carlo_transition_durations: invalid negative parameter");
@@ -4172,6 +4174,9 @@ MonteCarloParams parse_monte_carlo_params(
             duration.value_seconds + duration.secondary_seconds <= 0.0)))
         throw std::invalid_argument(
             "monte_carlo_transition_durations: uniform requires finite non-negative support");
+      if (exponential && duration.value_seconds == 0.0 && duration.secondary_seconds < 0.0)
+        throw std::invalid_argument(
+            "monte_carlo_transition_durations: exponential has no non-negative support");
       if (shape_family &&
           (duration.value_seconds <= 0.0 ||
            (duration.tertiary_seconds == 0.0 && duration.secondary_seconds < 0.0)))

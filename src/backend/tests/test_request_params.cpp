@@ -3979,6 +3979,17 @@ void parse_stochastic_playout_params_rejects_bad_values() {
 }
 
 void parse_monte_carlo_params_maps_controls() {
+  const auto exponential_laws = minera::parse_monte_carlo_params(fields({
+      {"monte_carlo_transition_durations", "exponential:2,exponential:2;-3,exponential:1;2,exponential:0;3,exponential:0;0"}}));
+  assert(exponential_laws.transition_durations.size() == 5);
+  assert(exponential_laws.transition_durations[0].value_seconds == 2.0);
+  assert(exponential_laws.transition_durations[0].secondary_seconds == 0.0);
+  assert(exponential_laws.transition_durations[1].value_seconds == 2.0);
+  assert(exponential_laws.transition_durations[1].secondary_seconds == -3.0);
+  assert(exponential_laws.transition_durations[2].secondary_seconds == 2.0);
+  assert(exponential_laws.transition_durations[3].value_seconds == 0.0);
+  assert(exponential_laws.transition_durations[3].secondary_seconds == 3.0);
+  assert(exponential_laws.transition_durations[4].secondary_seconds == 0.0);
   const auto shifted_laws = minera::parse_monte_carlo_params(fields({
       {"monte_carlo_transition_durations", "lognormal:0.5;-1;2,gamma:2;-1;2,lognormal:1;0;0,gamma:2;3;0"}}));
   assert(shifted_laws.transition_durations[0].secondary_seconds == -1.0);
@@ -4054,6 +4065,11 @@ void parse_monte_carlo_params_rejects_bad_values() {
            std::pair{"monte_carlo_force_distribution", "deterministic"},
            std::pair{"monte_carlo_transition_weights", "1,"},
            std::pair{"monte_carlo_transition_durations", "normal:1"},
+           std::pair{"monte_carlo_transition_durations", "exponential:-1;0"},
+           std::pair{"monte_carlo_transition_durations", "exponential:0;-1"},
+           std::pair{"monte_carlo_transition_durations", "exponential:1;2;3"},
+           std::pair{"monte_carlo_transition_durations", "exponential:1;"},
+           std::pair{"monte_carlo_transition_durations", "exponential:1;inf"},
            std::pair{"monte_carlo_transition_durations", "lognormal:0;0;0"},
            std::pair{"monte_carlo_transition_durations", "lognormal:1;-1;0"},
            std::pair{"monte_carlo_transition_durations", "gamma:0;0;0"},

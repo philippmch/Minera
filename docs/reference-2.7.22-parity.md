@@ -2568,6 +2568,64 @@ Wider distribution/error contracts, randomized branching, general cyclic nets,
 platform-dependent timestamps, and the previously named Monte Carlo gaps remain
 open. The catalogue remains at 234 incomplete coverage units.
 
+## Monte Carlo shifted exponential service laws
+
+`scripts/capture-monte-carlo-exponential-reference.py` and
+`docs/monte-carlo-exponential-reference-fixtures.json` retain 12 exponential laws
+with 2,048 raw public draws and 2,048 simulation timestamps each: 49,152 sample
+observations. Locations cover negative, zero, and positive values; scales range
+from 0.001 to 10, plus exact zero-scale laws at locations zero and three. Three
+negative-scale cases retain six public `ValueError` outcomes. Arrivals are
+100,000 seconds apart, exceeding every captured service duration. Captures pin
+the Python/NumPy seeds, UTC timezone, and PM4Py 2.7.22 reference revision.
+
+Native direct duration vectors and the CLI/HTTP syntax now accept
+`exponential:scale;location`. The existing `exponential:scale` syntax keeps its
+zero location, so existing callers retain their service law. In C++ and the typed
+frontend, `value_seconds` remains the scale and `secondary_seconds` carries the
+optional location. The public `Exponential` constructor takes `(loc=1, scale=1)`;
+those defaults are represented explicitly by `exponential:1;1`, without changing
+the established native shorthand. Zero scale returns a nonnegative location
+exactly. Negative scale and negative-location fixed laws are rejected.
+
+For positive scale, the native law is the shifted exponential conditioned on
+nonnegative service time. From the
+[documented exponential density and location/scale transform](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.expon.html),
+conditioning a negatively shifted exponential yields an ordinary zero-location
+exponential with the same scale. The implementation samples this law directly,
+avoiding rare-event rejection and cancellation of a large negative location.
+Positive locations are added to the sampled duration. A scaled unit-exponential
+fallback avoids an overflowing reciprocal rate for subnormal scales. Native
+regressions exercise conditional CDFs, exact same-seed equivalence for negative
+locations including extreme cutoffs, zero-scale laws, and subnormal durations.
+
+`scripts/check-monte-carlo-exponential-reference.py` checks raw draws against
+their untruncated CDF and simulation draws against the conditional CDF. It uses
+the preselected one-sample and public/native two-sample KS limits of 0.065 and
+0.09, accounts for one-microsecond timestamp rounding, and checks fixed laws
+exactly. Three deliberately incorrect all-zero, untruncated, or incorrectly shifted
+simulation controls fail. Exponential maps store a finite positive rate and have
+no location field, so map checks cover the three positive-scale zero-location
+laws. Same native seeds must give identical duration vectors across transports
+and representable map/direct modes; cross-runtime RNG identity is not claimed.
+
+The previous checkpoint failed all 24 direct transport cases using the optional
+location syntax. All 75 checks now pass: 27 public-evidence checks, 30 valid native
+transport/mode checks, six invalid native transport checks, and 12 native seed
+equivalence checks. The isolated checkpoint also passes the previous 154 shifted
+gamma/lognormal and 98 normal/uniform duration checks, all 825 existing
+scheduler/marking/topology/PNML transport comparisons, four native suites, 199
+frontend tests, TypeScript, and the catalogue audit. Independent review reports
+no actionable findings. Opaque reference-runtime bytes match the pinned Git
+objects after newline normalization, without inspecting implementation text.
+
+Negative fixed-law rejection remains a bounded native policy because a public
+simulation can fail to terminate. Finite-duration and timestamp-range guards
+still apply; sub-microsecond event times can round to zero. Wider error contracts,
+randomized branching, general cyclic nets, platform-dependent timestamp behavior,
+and the previously named Monte Carlo gaps remain open. The catalogue remains at
+234 incomplete coverage units.
+
 ## Token-replay parity evidence
 
 Forward replay now shares the independently observed structural routing,

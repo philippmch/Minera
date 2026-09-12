@@ -48,10 +48,14 @@ enum class MonteCarloDurationDistribution {
 struct MonteCarloDuration {
   MonteCarloDurationDistribution distribution =
       MonteCarloDurationDistribution::kDeterministic;
-  // Seconds for a deterministic value, mean for an exponential value, mean
+  // Seconds for a deterministic value, scale for an exponential value, mean
   // for a normal value, lower bound for a uniform value, or shape for a
   // lognormal/gamma value. Constant-zero and immediate durations ignore it.
   double value_seconds = 1.0;
+  // Exponential: optional signed location (default zero). Positive-scale
+  // draws condition on nonnegative service time; zero scale returns location
+  // and requires it to be nonnegative. value_seconds retains its scale/mean
+  // meaning for existing callers that omit this location.
   // Normal: standard deviation (must be non-negative); signed means are
   // allowed with positive deviation. Samples condition on nonnegative values.
   // Uniform: interval width/scale (must be non-negative). A negative lower

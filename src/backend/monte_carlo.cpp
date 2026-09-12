@@ -487,11 +487,16 @@ PreparedOptions prepare_options(const PetriNet& net,
     }
     switch (duration.distribution) {
       case MonteCarloDurationDistribution::kDeterministic:
-      case MonteCarloDurationDistribution::kExponential:
         if (duration.value_seconds < 0.0) {
           throw std::invalid_argument(
               "Monte Carlo transition duration must be non-negative");
         }
+        break;
+      case MonteCarloDurationDistribution::kExponential:
+        if (duration.value_seconds < 0.0 ||
+            (duration.value_seconds == 0.0 && duration.secondary_seconds < 0.0))
+          throw std::invalid_argument(
+              "Monte Carlo exponential requires nonnegative scale and conditional support");
         break;
       case MonteCarloDurationDistribution::kConstant0:
       case MonteCarloDurationDistribution::kImmediate:
@@ -771,10 +776,17 @@ PreparedOptions prepare_options(const PetriNet& net,
   switch (duration.distribution) {
     case MonteCarloDurationDistribution::kDeterministic:
       return duration.value_seconds;
-    case MonteCarloDurationDistribution::kExponential:
-      if (duration.value_seconds == 0.0) return 0.0;
-      return std::exponential_distribution<double>(
-          1.0 / duration.value_seconds)(rng);
+    case MonteCarloDurationDistribution::kExponential: {
+      if (duration.value_seconds == 0.0) return duration.secondary_seconds;
+      // Memorylessness removes a negative location after conditioning on
+      // nonnegative service time. This avoids rare-event rejection and
+      // cancellation even when the location is far into the exponential tail.
+      const double rate = 1.0 / duration.value_seconds;
+      const double draw = std::isfinite(rate)
+          ? std::exponential_distribution<double>(rate)(rng)
+          : duration.value_seconds * unit_exponential(rng);
+      return std::max(0.0, duration.secondary_seconds) + draw;
+    }
     case MonteCarloDurationDistribution::kConstant0:
     case MonteCarloDurationDistribution::kImmediate:
       return 0.0;
