@@ -21,7 +21,7 @@ struct PnmlDocument {
   std::vector<std::string> place_ids;
   std::vector<std::string> transition_ids;
   // One entry per place: explicit marking keys (including zero tokens), plus
-  // any positive marking introduced by inference. Numeric export is unchanged.
+  // any positive marking introduced by inference. Document export preserves keys.
   std::vector<bool> initial_marking_keys;
   std::vector<bool> final_marking_keys;
 };
@@ -67,6 +67,16 @@ void write_pnml(std::ostream& out, const PetriNet& net,
     const std::vector<std::int64_t>& final_marking,
     const StochasticMap& stochastic_map,
     std::string_view name = "net");
+
+// Exports complete document markings and node IDs, including explicit zero keys.
+// Distinct arc endpoints retain first-occurrence order when weights are grouped.
+// Empty ID/key metadata derives pN/tN IDs and positive-token keys. Supplied
+// metadata must have exact dimensions; IDs must be nonempty and globally unique,
+// and supplied keys must include every positive token. Validation precedes output.
+void write_pnml(std::ostream& out, const PnmlDocument& document,
+                std::string_view name = "net");
+[[nodiscard]] std::string to_pnml(const PnmlDocument& document,
+                                  std::string_view name = "net");
 
 // Parses a PNML workflow net, so a model discovered or drawn elsewhere can be
 // checked against a log. Reads the first <net>: places, transitions, and arcs

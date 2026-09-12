@@ -2131,6 +2131,37 @@ whereas strict or fallback execution retains the equal-total precondition;
 normalization is reported in the result. The selected variant and execution
 mode are carried through native, JSON, CLI, server, and typed frontend contracts.
 
+## PNML document export evidence
+
+`write_pnml` and `to_pnml` accept a complete `PnmlDocument`, retaining numeric
+markings, explicit zero-token marking keys, original node IDs, weighted and
+extended arcs, and optional stochastic metadata. Document export preserves
+first-occurrence endpoint order when combining arc weights, so serialization
+does not change the hidden-routing tie choices observed on the saved inputs.
+The legacy net overload retains its sorted endpoint order. Empty nets export
+safely. Metadata dimensions, positive-token membership, node IDs, and arc
+indices are checked before output; generated IDs avoid node-ID collisions.
+XML attribute whitespace is escaped numerically, keeping newline, tab, carriage
+return, and literal-space IDs distinct. Stochastic values retain double precision.
+
+`--inspect-pnml input.pnml --pnml output.pnml` writes the document and emits
+inspection JSON with optional ID and marking-key arrays. The inspection option
+`--pnml-require-workflow-boundaries false`, together with both marking-inference
+options set to false, admits general and empty nets with their original markings.
+`scripts/check-pnml-document-native.py` verifies nine saved public exporter
+fixtures in `docs/pnml-document-export-fixtures.json`, including explicit zeros,
+weighted multi-place markings, escaped IDs, whitespace IDs, and empty nets.
+All 203 saved baseline/nested replay inputs retain their native trace results
+after document export and re-import. Four focused native suites pass, including
+stochastic metadata, reduction, collision rejection, XML whitespace, and routing
+regressions. Independent review reports no remaining actionable findings.
+
+The public exporter preserves explicit zero marking entries, while the public
+importer drops them. These separately captured observations do not establish
+importer parity: Minera's document parser retains the XML membership metadata.
+Display layout, arbitrary PNML extensions, and the supplied-model conformance
+routes remain outside this export checkpoint. No catalogue row is promoted.
+
 ## Token-replay parity evidence
 
 Forward replay now shares the independently observed structural routing,
@@ -2201,9 +2232,9 @@ initialization, strict exhaustive booleans, and retained backwards behavior.
 Independent review reports no actionable findings, and the catalogue verifier
 passes without coverage promotion.
 
-Downstream precision/evaluation proof remains partial. The legacy
-model-check routes and PNML writing do not yet carry all general-net marking-key
-metadata. This checkpoint does not promote any catalogue row.
+Downstream precision/evaluation proof remains partial. The legacy model-check
+routes do not yet carry all general-net marking-key metadata. Document export
+preservation is covered above; this checkpoint does not promote any catalogue row.
 
 The backwards token-replay variation independently follows the pinned legacy
 behavior: unknown labels are ignored, same-label transitions are evaluated
