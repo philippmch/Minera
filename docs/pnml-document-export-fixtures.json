@@ -1,0 +1,407 @@
+{
+  "reference": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "observations": [
+    {
+      "name": "sequence_positive",
+      "net": {
+        "places": [
+          "entry",
+          "exit"
+        ],
+        "initial": {
+          "entry": 1
+        },
+        "final": {
+          "exit": 1
+        },
+        "arcs": [
+          [
+            "entry",
+            "move",
+            1
+          ],
+          [
+            "move",
+            "exit",
+            1
+          ]
+        ]
+      },
+      "pnml": "<?xml version='1.0' encoding='utf-8'?>\n<pnml><net id=\"sequence_positive\" type=\"http://www.pnml.org/version-2009/grammar/pnmlcoremodel\"><name><text>sequence_positive</text></name><page id=\"n0\"><place id=\"entry\"><name><text>entry</text></name><initialMarking><text>1</text></initialMarking></place><place id=\"exit\"><name><text>exit</text></name></place><transition id=\"move\"><name><text>A</text></name></transition><arc id=\"3235007578384\" source=\"entry\" target=\"move\"/><arc id=\"3235002156048\" source=\"move\" target=\"exit\"/></page><finalmarkings><marking><place idref=\"exit\"><text>1</text></place></marking></finalmarkings></net></pnml>",
+      "exported_initial": {
+        "entry": 1
+      },
+      "exported_final": {
+        "exit": 1
+      },
+      "exported_place_ids": [
+        "entry",
+        "exit"
+      ],
+      "exported_transition_ids": [
+        "move"
+      ],
+      "roundtrip_initial": {
+        "entry": 1
+      },
+      "roundtrip_final": {
+        "exit": 1
+      }
+    },
+    {
+      "name": "sequence_zero_keys",
+      "net": {
+        "places": [
+          "entry",
+          "exit"
+        ],
+        "initial": {
+          "entry": 1,
+          "exit": 0
+        },
+        "final": {
+          "entry": 0,
+          "exit": 1
+        },
+        "arcs": [
+          [
+            "entry",
+            "move",
+            1
+          ],
+          [
+            "move",
+            "exit",
+            1
+          ]
+        ]
+      },
+      "pnml": "<?xml version='1.0' encoding='utf-8'?>\n<pnml><net id=\"sequence_zero_keys\" type=\"http://www.pnml.org/version-2009/grammar/pnmlcoremodel\"><name><text>sequence_zero_keys</text></name><page id=\"n0\"><place id=\"entry\"><name><text>entry</text></name><initialMarking><text>1</text></initialMarking></place><place id=\"exit\"><name><text>exit</text></name><initialMarking><text>0</text></initialMarking></place><transition id=\"move\"><name><text>A</text></name></transition><arc id=\"3235007585808\" source=\"entry\" target=\"move\"/><arc id=\"3235007584528\" source=\"move\" target=\"exit\"/></page><finalmarkings><marking><place idref=\"entry\"><text>0</text></place><place idref=\"exit\"><text>1</text></place></marking></finalmarkings></net></pnml>",
+      "exported_initial": {
+        "entry": 1,
+        "exit": 0
+      },
+      "exported_final": {
+        "entry": 0,
+        "exit": 1
+      },
+      "exported_place_ids": [
+        "entry",
+        "exit"
+      ],
+      "exported_transition_ids": [
+        "move"
+      ],
+      "roundtrip_initial": {
+        "entry": 1
+      },
+      "roundtrip_final": {
+        "exit": 1
+      }
+    },
+    {
+      "name": "sequence_zero_boundaries",
+      "net": {
+        "places": [
+          "entry",
+          "exit"
+        ],
+        "initial": {
+          "entry": 0
+        },
+        "final": {
+          "exit": 0
+        },
+        "arcs": [
+          [
+            "entry",
+            "move",
+            1
+          ],
+          [
+            "move",
+            "exit",
+            1
+          ]
+        ]
+      },
+      "pnml": "<?xml version='1.0' encoding='utf-8'?>\n<pnml><net id=\"sequence_zero_boundaries\" type=\"http://www.pnml.org/version-2009/grammar/pnmlcoremodel\"><name><text>sequence_zero_boundaries</text></name><page id=\"n0\"><place id=\"entry\"><name><text>entry</text></name><initialMarking><text>0</text></initialMarking></place><place id=\"exit\"><name><text>exit</text></name></place><transition id=\"move\"><name><text>A</text></name></transition><arc id=\"3235007580240\" source=\"entry\" target=\"move\"/><arc id=\"3235007580624\" source=\"move\" target=\"exit\"/></page><finalmarkings><marking><place idref=\"exit\"><text>0</text></place></marking></finalmarkings></net></pnml>",
+      "exported_initial": {
+        "entry": 0
+      },
+      "exported_final": {
+        "exit": 0
+      },
+      "exported_place_ids": [
+        "entry",
+        "exit"
+      ],
+      "exported_transition_ids": [
+        "move"
+      ],
+      "roundtrip_initial": {},
+      "roundtrip_final": {}
+    },
+    {
+      "name": "sequence_empty_markings",
+      "net": {
+        "places": [
+          "entry",
+          "exit"
+        ],
+        "initial": {},
+        "final": {},
+        "arcs": [
+          [
+            "entry",
+            "move",
+            1
+          ],
+          [
+            "move",
+            "exit",
+            1
+          ]
+        ]
+      },
+      "pnml": "<?xml version='1.0' encoding='utf-8'?>\n<pnml><net id=\"sequence_empty_markings\" type=\"http://www.pnml.org/version-2009/grammar/pnmlcoremodel\"><name><text>sequence_empty_markings</text></name><page id=\"n0\"><place id=\"entry\"><name><text>entry</text></name></place><place id=\"exit\"><name><text>exit</text></name></place><transition id=\"move\"><name><text>A</text></name></transition><arc id=\"3235007585296\" source=\"entry\" target=\"move\"/><arc id=\"3235007588112\" source=\"move\" target=\"exit\"/></page></net></pnml>",
+      "exported_initial": {},
+      "exported_final": {},
+      "exported_place_ids": [
+        "entry",
+        "exit"
+      ],
+      "exported_transition_ids": [
+        "move"
+      ],
+      "roundtrip_initial": {},
+      "roundtrip_final": {
+        "exit": 1
+      }
+    },
+    {
+      "name": "weighted_multiplace",
+      "net": {
+        "places": [
+          "entry",
+          "extra",
+          "exit"
+        ],
+        "initial": {
+          "entry": 3,
+          "extra": 2,
+          "exit": 0
+        },
+        "final": {
+          "entry": 0,
+          "extra": 1,
+          "exit": 2
+        },
+        "arcs": [
+          [
+            "entry",
+            "move",
+            2
+          ],
+          [
+            "extra",
+            "move",
+            1
+          ],
+          [
+            "move",
+            "exit",
+            2
+          ]
+        ]
+      },
+      "pnml": "<?xml version='1.0' encoding='utf-8'?>\n<pnml><net id=\"weighted_multiplace\" type=\"http://www.pnml.org/version-2009/grammar/pnmlcoremodel\"><name><text>weighted_multiplace</text></name><page id=\"n0\"><place id=\"entry\"><name><text>entry</text></name><initialMarking><text>3</text></initialMarking></place><place id=\"exit\"><name><text>exit</text></name><initialMarking><text>0</text></initialMarking></place><place id=\"extra\"><name><text>extra</text></name><initialMarking><text>2</text></initialMarking></place><transition id=\"move\"><name><text>A</text></name></transition><arc id=\"3235007591824\" source=\"entry\" target=\"move\"><inscription><text>2</text></inscription></arc><arc id=\"3235007592976\" source=\"move\" target=\"exit\"><inscription><text>2</text></inscription></arc><arc id=\"3235007592784\" source=\"extra\" target=\"move\"/></page><finalmarkings><marking><place idref=\"entry\"><text>0</text></place><place idref=\"extra\"><text>1</text></place><place idref=\"exit\"><text>2</text></place></marking></finalmarkings></net></pnml>",
+      "exported_initial": {
+        "entry": 3,
+        "exit": 0,
+        "extra": 2
+      },
+      "exported_final": {
+        "entry": 0,
+        "extra": 1,
+        "exit": 2
+      },
+      "exported_place_ids": [
+        "entry",
+        "exit",
+        "extra"
+      ],
+      "exported_transition_ids": [
+        "move"
+      ],
+      "roundtrip_initial": {
+        "entry": 3,
+        "extra": 2
+      },
+      "roundtrip_final": {
+        "extra": 1,
+        "exit": 2
+      }
+    },
+    {
+      "name": "cyclic_empty_markings",
+      "net": {
+        "places": [
+          "left",
+          "right"
+        ],
+        "initial": {},
+        "final": {},
+        "arcs": [
+          [
+            "left",
+            "move",
+            1
+          ],
+          [
+            "move",
+            "left",
+            1
+          ]
+        ]
+      },
+      "pnml": "<?xml version='1.0' encoding='utf-8'?>\n<pnml><net id=\"cyclic_empty_markings\" type=\"http://www.pnml.org/version-2009/grammar/pnmlcoremodel\"><name><text>cyclic_empty_markings</text></name><page id=\"n0\"><place id=\"left\"><name><text>left</text></name></place><place id=\"right\"><name><text>right</text></name></place><transition id=\"move\"><name><text>A</text></name></transition><arc id=\"3235007594384\" source=\"left\" target=\"move\"/><arc id=\"3235007616912\" source=\"move\" target=\"left\"/></page></net></pnml>",
+      "exported_initial": {},
+      "exported_final": {},
+      "exported_place_ids": [
+        "left",
+        "right"
+      ],
+      "exported_transition_ids": [
+        "move"
+      ],
+      "roundtrip_initial": {},
+      "roundtrip_final": {
+        "right": 1
+      }
+    },
+    {
+      "name": "escaped_ids",
+      "net": {
+        "places": [
+          "entry&\"",
+          "exit<"
+        ],
+        "initial": {
+          "entry&\"": 1
+        },
+        "final": {
+          "exit<": 1
+        },
+        "arcs": [
+          [
+            "entry&\"",
+            "move",
+            1
+          ],
+          [
+            "move",
+            "exit<",
+            1
+          ]
+        ]
+      },
+      "pnml": "<?xml version='1.0' encoding='utf-8'?>\n<pnml><net id=\"escaped_ids\" type=\"http://www.pnml.org/version-2009/grammar/pnmlcoremodel\"><name><text>escaped_ids</text></name><page id=\"n0\"><place id=\"entry&amp;&quot;\"><name><text>entry&amp;\"</text></name><initialMarking><text>1</text></initialMarking></place><place id=\"exit&lt;\"><name><text>exit&lt;</text></name></place><transition id=\"move\"><name><text>A</text></name></transition><arc id=\"3235007584592\" source=\"entry&amp;&quot;\" target=\"move\"/><arc id=\"3235007581328\" source=\"move\" target=\"exit&lt;\"/></page><finalmarkings><marking><place idref=\"exit&lt;\"><text>1</text></place></marking></finalmarkings></net></pnml>",
+      "exported_initial": {
+        "entry&\"": 1
+      },
+      "exported_final": {
+        "exit<": 1
+      },
+      "exported_place_ids": [
+        "entry&\"",
+        "exit<"
+      ],
+      "exported_transition_ids": [
+        "move"
+      ],
+      "roundtrip_initial": {
+        "entry&\"": 1
+      },
+      "roundtrip_final": {
+        "exit<": 1
+      }
+    },
+    {
+      "name": "empty_net",
+      "net": {
+        "places": [],
+        "initial": {},
+        "final": {},
+        "arcs": []
+      },
+      "pnml": "<?xml version='1.0' encoding='utf-8'?>\n<pnml><net id=\"empty_net\" type=\"http://www.pnml.org/version-2009/grammar/pnmlcoremodel\"><name><text>empty_net</text></name><page id=\"n0\"/></net></pnml>",
+      "exported_initial": {},
+      "exported_final": {},
+      "exported_place_ids": [],
+      "exported_transition_ids": [],
+      "roundtrip_initial": {},
+      "roundtrip_final": {}
+    },
+    {
+      "name": "whitespace_ids",
+      "net": {
+        "places": [
+          "a\nb",
+          "a b",
+          "a\tb",
+          "a\rb"
+        ],
+        "initial": {
+          "a\nb": 1,
+          "a\tb": 0
+        },
+        "final": {
+          "a b": 1,
+          "a\rb": 0
+        },
+        "arcs": [
+          [
+            "a\nb",
+            "move",
+            1
+          ],
+          [
+            "move",
+            "a b",
+            1
+          ]
+        ]
+      },
+      "pnml": "<?xml version='1.0' encoding='utf-8'?>\n<pnml><net id=\"whitespace_ids\" type=\"http://www.pnml.org/version-2009/grammar/pnmlcoremodel\"><name><text>whitespace_ids</text></name><page id=\"n0\"><place id=\"a&#10;b\"><name><text>a\nb</text></name><initialMarking><text>1</text></initialMarking></place><place id=\"a&#13;b\"><name><text>a&#13;b</text></name></place><place id=\"a b\"><name><text>a b</text></name></place><place id=\"a&#9;b\"><name><text>a\tb</text></name><initialMarking><text>0</text></initialMarking></place><transition id=\"move\"><name><text>A</text></name></transition><arc id=\"2853547347536\" source=\"a&#10;b\" target=\"move\"/><arc id=\"2853547347664\" source=\"move\" target=\"a b\"/></page><finalmarkings><marking><place idref=\"a b\"><text>1</text></place><place idref=\"a&#13;b\"><text>0</text></place></marking></finalmarkings></net></pnml>",
+      "exported_initial": {
+        "a\nb": 1,
+        "a\tb": 0
+      },
+      "exported_final": {
+        "a b": 1,
+        "a\rb": 0
+      },
+      "exported_place_ids": [
+        "a\tb",
+        "a\nb",
+        "a\rb",
+        "a b"
+      ],
+      "exported_transition_ids": [
+        "move"
+      ],
+      "roundtrip_initial": {
+        "a\nb": 1
+      },
+      "roundtrip_final": {
+        "a b": 1
+      }
+    }
+  ],
+  "public_apis": [
+    "pm4py.objects.petri_net.exporter.exporter.serialize",
+    "pm4py.objects.petri_net.importer.importer.deserialize"
+  ]
+}

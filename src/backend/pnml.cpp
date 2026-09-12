@@ -6,13 +6,14 @@
 #include <fstream>
 #include <iterator>
 #include <limits>
+#include <locale>
 #include <numeric>
 #include <optional>
-#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "xml_pull_parser.hpp"
@@ -22,9 +23,13 @@ namespace {
 
 // Escapes the five XML metacharacters so activity names containing '&', '<',
 // quotes, etc. produce well-formed PNML.
-void write_xml_escaped(std::ostream& out, std::string_view value) {
+void write_xml_escaped(std::ostream& out, std::string_view value,
+                       bool attribute = false) {
   for (const char c : value) {
     switch (c) {
+      case '\t': if (attribute) out << "&#9;"; else out << c; break;
+      case '\n': if (attribute) out << "&#10;"; else out << c; break;
+      case '\r': out << "&#13;"; break;
       case '&': out << "&amp;"; break;
       case '<': out << "&lt;"; break;
       case '>': out << "&gt;"; break;
@@ -41,7 +46,8 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
                      const std::vector<std::int64_t>& initial_marking,
                      const std::vector<std::int64_t>& final_marking,
                      const StochasticMap* stochastic_map,
-                     std::string_view name) {
+                     std::string_view name,
+                     const PnmlDocument* document = nullptr) {
   if (initial_marking.size() != net.place_count() ||
       final_marking.size() != net.place_count())
     throw std::invalid_argument("PNML marking size must match the place count");
@@ -52,20 +58,75 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
     throw std::invalid_argument("PNML markings must be non-negative");
   if (stochastic_map)
     validate_stochastic_map(*stochastic_map, net.transitions().size());
+  std::unordered_set<std::string> used_ids;
+  const auto resolve_ids = [&](const std::vector<std::string>& configured,
+                                std::size_t count, const char* prefix) {
+    if (!configured.empty() && configured.size() != count)
+      throw std::invalid_argument("PNML ID count must match the node count");
+    std::vector<std::string> result;
+    for (std::size_t i = 0; i < count; ++i) {
+      auto id = configured.empty() ? std::string(prefix) + std::to_string(i)
+                                   : configured[i];
+      if (id.empty() || !used_ids.insert(id).second)
+        throw std::invalid_argument("PNML node IDs must be nonempty and unique");
+      result.push_back(std::move(id));
+    }
+    return result;
+  };
+  const std::vector<std::string> no_ids;
+  const auto place_ids = resolve_ids(document ? document->place_ids : no_ids,
+                                     net.place_count(), "p");
+  const auto transition_ids = resolve_ids(document ? document->transition_ids : no_ids,
+                                          net.transitions().size(), "t");
+  const auto validate_keys = [&](const std::vector<bool>& keys,
+                                  const std::vector<std::int64_t>& marking) {
+    if (keys.empty()) return;
+    if (keys.size() != marking.size())
+      throw std::invalid_argument("PNML marking key count must match the place count");
+    for (std::size_t i = 0; i < keys.size(); ++i)
+      if (marking[i] > 0 && !keys[i])
+        throw std::invalid_argument("PNML marking keys must include positive tokens");
+  };
+  if (document) {
+    validate_keys(document->initial_marking_keys, initial_marking);
+    validate_keys(document->final_marking_keys, final_marking);
+  }
+  for (const auto& transition : net.transitions()) {
+    if (transition.activity && *transition.activity >= net.activities().size())
+      throw std::invalid_argument("PNML transition activity index is invalid");
+    for (const auto* places : {&transition.inputs, &transition.outputs,
+                              &transition.reset_inputs, &transition.inhibitor_inputs})
+      for (const auto place : *places)
+        if (place >= net.place_count())
+          throw std::invalid_argument("PNML arc place index is invalid");
+  }
+  const auto unique_id = [&](std::string base) {
+    std::string id = base;
+    std::size_t suffix = 0;
+    while (!used_ids.insert(id).second) id = base + "_" + std::to_string(++suffix);
+    return id;
+  };
+  const auto net_id = unique_id("net1");
+  const auto page_id = unique_id("page1");
   out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   out << "<pnml xmlns=\"http://www.pnml.org/version-2009/grammar/pnml\">\n";
-  out << "  <net id=\"net1\" "
+  out << "  <net id=\"" << net_id << "\" "
          "type=\"http://www.pnml.org/version-2009/grammar/pnmlcoremodel\">\n";
   out << "    <name><text>";
   write_xml_escaped(out, name);
   out << "</text></name>\n";
-  out << "    <page id=\"page1\">\n";
+  out << "    <page id=\"" << page_id << "\">\n";
 
   // Places. The source carries the single initial token.
   for (std::size_t place = 0; place < net.place_count(); ++place) {
-    out << "      <place id=\"p" << place << "\">\n";
-    out << "        <name><text>p" << place << "</text></name>\n";
-    if (initial_marking[place] != 0)
+    out << "      <place id=\"";
+    write_xml_escaped(out, place_ids[place], true);
+    out << "\">\n";
+    out << "        <name><text>";
+    write_xml_escaped(out, place_ids[place]);
+    out << "</text></name>\n";
+    if (initial_marking[place] != 0 || (document &&
+        !document->initial_marking_keys.empty() && document->initial_marking_keys[place]))
       out << "        <initialMarking><text>" << initial_marking[place]
           << "</text></initialMarking>\n";
     out << "      </place>\n";
@@ -78,7 +139,9 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
   const auto& activities = net.activities();
   for (std::size_t t = 0; t < transitions.size(); ++t) {
     const auto& transition = transitions[t];
-    out << "      <transition id=\"t" << t << "\">\n";
+    out << "      <transition id=\"";
+    write_xml_escaped(out, transition_ids[t], true);
+    out << "\">\n";
     out << "        <name><text>";
     if (transition.silent()) {
       out << "tau";
@@ -88,8 +151,9 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
     out << "</text></name>\n";
     if (transition.silent()) {
       out << "        <toolspecific tool=\"ProM\" version=\"6.4\" "
-             "activity=\"$invisible$\" localNodeID=\"t"
-          << t << "\"/>\n";
+             "activity=\"$invisible$\" localNodeID=\"";
+      write_xml_escaped(out, transition_ids[t], true);
+      out << "\"/>\n";
     }
     if (stochastic_map) {
       const auto& record = stochastic_map->transitions[t];
@@ -129,11 +193,28 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
   // Arcs: every input place -> transition, then transition -> every output
   // place. Extended input arcs carry a compact type annotation. Arc ids are
   // unique across the whole net.
+  // Document export retains first-occurrence endpoint order: equal-length
+  // silent routes can depend on it. Legacy net overloads retain sorted arcs.
+  const auto weighted_endpoints = [&](const std::vector<std::size_t>& endpoints) {
+    std::vector<std::pair<std::size_t, std::size_t>> weights;
+    std::unordered_map<std::size_t, std::size_t> positions;
+    for (const auto place : endpoints) {
+      const auto [it, inserted] = positions.emplace(place, weights.size());
+      if (inserted) weights.emplace_back(place, 1);
+      else ++weights[it->second].second;
+    }
+    if (!document) std::sort(weights.begin(), weights.end());
+    return weights;
+  };
   std::size_t arc_id = 0;
   const auto write_input_arc = [&](std::size_t place, std::size_t t,
                                    PetriArcType type, std::size_t weight = 1) {
-    out << "      <arc id=\"a" << arc_id++ << "\" source=\"p" << place
-        << "\" target=\"t" << t << "\"";
+    out << "      <arc id=\"" << unique_id("a" + std::to_string(arc_id++))
+        << "\" source=\"";
+    write_xml_escaped(out, place_ids[place], true);
+    out << "\" target=\"";
+    write_xml_escaped(out, transition_ids[t], true);
+    out << "\"";
     if (type == PetriArcType::kNormal && weight == 1) {
       out << "/>\n";
     } else {
@@ -149,19 +230,19 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
   };
   for (std::size_t t = 0; t < transitions.size(); ++t) {
     const auto& transition = transitions[t];
-    std::map<std::size_t, std::size_t> input_weights;
-    for (const auto place : transition.inputs) ++input_weights[place];
-    for (const auto& [place, weight] : input_weights)
+    for (const auto& [place, weight] : weighted_endpoints(transition.inputs))
       write_input_arc(place, t, PetriArcType::kNormal, weight);
     for (const auto place : transition.reset_inputs)
       write_input_arc(place, t, PetriArcType::kReset);
     for (const auto place : transition.inhibitor_inputs)
       write_input_arc(place, t, PetriArcType::kInhibitor);
-    std::map<std::size_t, std::size_t> output_weights;
-    for (const auto place : transition.outputs) ++output_weights[place];
-    for (const auto& [place, weight] : output_weights) {
-      out << "      <arc id=\"a" << arc_id++ << "\" source=\"t" << t
-          << "\" target=\"p" << place << "\"";
+    for (const auto& [place, weight] : weighted_endpoints(transition.outputs)) {
+      out << "      <arc id=\"" << unique_id("a" + std::to_string(arc_id++))
+          << "\" source=\"";
+      write_xml_escaped(out, transition_ids[t], true);
+      out << "\" target=\"";
+      write_xml_escaped(out, place_ids[place], true);
+      out << "\"";
       if (weight == 1) out << "/>\n";
       else out << "><inscription><text>" << weight
                << "</text></inscription></arc>\n";
@@ -173,9 +254,12 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
   out << "    <finalmarkings>\n";
   out << "      <marking>\n";
   for (std::size_t place = 0; place < final_marking.size(); ++place)
-    if (final_marking[place] != 0)
-      out << "        <place idref=\"p" << place << "\"><text>"
-          << final_marking[place] << "</text></place>\n";
+    if (final_marking[place] != 0 || (document &&
+        !document->final_marking_keys.empty() && document->final_marking_keys[place])) {
+      out << "        <place idref=\"";
+      write_xml_escaped(out, place_ids[place], true);
+      out << "\"><text>" << final_marking[place] << "</text></place>\n";
+    }
   out << "      </marking>\n";
   out << "    </finalmarkings>\n";
 
@@ -187,8 +271,12 @@ void write_pnml(std::ostream& out, const PetriNet& net,
                 std::string_view name) {
   std::vector<std::int64_t> initial(net.place_count(), 0);
   std::vector<std::int64_t> final(net.place_count(), 0);
-  initial[net.source()] = 1;
-  final[net.sink()] = 1;
+  if (net.place_count() != 0) {
+    if (net.source() >= net.place_count() || net.sink() >= net.place_count())
+      throw std::invalid_argument("PNML workflow boundary index is invalid");
+    initial[net.source()] = 1;
+    final[net.sink()] = 1;
+  }
   write_pnml_impl(out, net, initial, final, nullptr, name);
 }
 
@@ -205,6 +293,24 @@ void write_pnml(std::ostream& out, const PetriNet& net,
                 const StochasticMap& stochastic_map, std::string_view name) {
   write_pnml_impl(out, net, initial_marking, final_marking, &stochastic_map,
                   name);
+}
+
+void write_pnml(std::ostream& out, const PnmlDocument& document,
+                std::string_view name) {
+  std::ostringstream serialized;
+  serialized.imbue(std::locale::classic());
+  serialized.precision(std::numeric_limits<double>::max_digits10);
+  write_pnml_impl(serialized, document.net, document.initial_marking,
+                  document.final_marking,
+                  document.stochastic_map ? &*document.stochastic_map : nullptr,
+                  name, &document);
+  out << serialized.str();
+}
+
+std::string to_pnml(const PnmlDocument& document, std::string_view name) {
+  std::ostringstream out;
+  write_pnml(out, document, name);
+  return out.str();
 }
 
 std::string to_pnml(const PetriNet& net, std::string_view name) {

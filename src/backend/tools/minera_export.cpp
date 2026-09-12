@@ -833,8 +833,10 @@ int usage(const char* program) {
                "  --interval-query-end <f> Range diagnostic upper bound\n"
                "  --reduce-petri-net <file> Reduce a PNML model and emit JSON\n"
                "  --inspect-pnml <file>      Parse a PNML model and emit JSON\n"
+               "                            With --pnml <file>, also export its document metadata\n"
                "  --pnml-infer-initial-marking <bool>\n"
                "  --pnml-infer-final-marking <bool>\n"
+               "  --pnml-require-workflow-boundaries <bool> (default true)\n"
                "  --pnml-import-stochastic-map <bool>\n"
                "  --petri-reduction-initial-marking <m> Comma-separated marking\n"
                "  --petri-reduction-final-marking <m> Comma-separated marking\n"
@@ -2246,6 +2248,7 @@ int main(int argc, char** argv) {
     }
     if (arg == "--pnml-infer-initial-marking" ||
         arg == "--pnml-infer-final-marking" ||
+        arg == "--pnml-require-workflow-boundaries" ||
         arg == "--pnml-import-stochastic-map") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -5691,9 +5694,18 @@ int main(int argc, char** argv) {
           boolean("--pnml-infer-final-marking", true);
       options.import_stochastic_map =
           boolean("--pnml-import-stochastic-map", false);
-      std::cout << minera::pnml_document_json(
-                       minera::import_pnml_document(pnml_inspection_input, options))
-                << '\n';
+      options.require_workflow_boundaries =
+          boolean("--pnml-require-workflow-boundaries", true);
+      const auto document = minera::import_pnml_document(pnml_inspection_input, options);
+      const auto json = minera::pnml_document_json(document);
+      if (!pnml_output.empty()) {
+        const auto xml = minera::to_pnml(document);
+        std::ofstream file(pnml_output);
+        if (!file) throw std::runtime_error("Cannot open PNML output file " + pnml_output.string());
+        file << xml;
+        if (!file) throw std::runtime_error("Cannot write PNML output file " + pnml_output.string());
+      }
+      std::cout << json << '\n';
       return 0;
     }
     if (random_tree_requested) {

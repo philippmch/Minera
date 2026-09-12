@@ -4638,7 +4638,30 @@ std::string pnml_document_json(const PnmlDocument& document) {
     if (i) out << ',';
     out << document.final_marking[i];
   }
-  out << "],\"transitions\":[";
+  out << ']';
+  const auto names = [&](const char* key, const std::vector<std::string>& values) {
+    if (values.empty()) return;
+    out << ",\"" << key << "\":[";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i) out << ',';
+      write_json_string(out, values[i]);
+    }
+    out << ']';
+  };
+  const auto keys = [&](const char* key, const std::vector<bool>& values) {
+    if (values.empty()) return;
+    out << ",\"" << key << "\":[";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i) out << ',';
+      out << (values[i] ? "true" : "false");
+    }
+    out << ']';
+  };
+  names("place_ids", document.place_ids);
+  names("transition_ids", document.transition_ids);
+  keys("initial_marking_keys", document.initial_marking_keys);
+  keys("final_marking_keys", document.final_marking_keys);
+  out << ",\"transitions\":[";
   for (std::size_t i = 0; i < document.net.transitions().size(); ++i) {
     if (i) out << ',';
     const auto& transition = document.net.transitions()[i];
