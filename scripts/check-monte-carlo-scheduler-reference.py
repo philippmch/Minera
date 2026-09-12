@@ -93,7 +93,8 @@ def check_http_rows(executable, directory, log, rows):
             for row in rows:
                 case = row['spec']
                 model = support.pnml(case['places'], case['transitions'], case['arcs'],
-                                     case['initial'], case['final'])
+                                     case.get('pnml_initial', case['initial']),
+                                     case.get('pnml_final', case['final']))
                 status, body = request('/api/check-model', model.encode())
                 assert status == 200, body
                 parameters = dict(miner='imported', monte_carlo_simulations=str(case['simulations']),
@@ -107,6 +108,10 @@ def check_http_rows(executable, directory, log, rows):
                 if case.get('resource_key_type') == 'object':
                     parameters['monte_carlo_resources_per_place'] = ','.join(
                         f'{case["places"].index(name)}={value}' for name, value in case['resources'].items())
+                for which in ['initial', 'final']:
+                    if f'native_{which}_marking' in case:
+                        parameters[f'monte_carlo_{which}_marking'] = ','.join(
+                            map(str, case[f'native_{which}_marking']))
                 query = urllib.parse.urlencode(parameters)
                 status, body = request('/api/monte-carlo?' + query, b'')
                 check = dict(name=case['name'], route='http')
@@ -165,7 +170,8 @@ def main():
             case = row['spec']
             model, output = directory / 'model.pnml', directory / 'generated.xes'
             model.write_text(support.pnml(case['places'], case['transitions'], case['arcs'],
-                                          case['initial'], case['final']), encoding='utf-8')
+                                          case.get('pnml_initial', case['initial']),
+                                          case.get('pnml_final', case['final'])), encoding='utf-8')
             durations = ','.join('normal:' + str(case['durations'][t[0]]) + ';0'
                                  for t in case['transitions'])
             weights = ','.join(str(case.get('weights', {}).get(t[0], 1)) for t in case['transitions'])
@@ -180,6 +186,10 @@ def main():
                 resources = ','.join(f'{case["places"].index(name)}={value}'
                                      for name, value in case['resources'].items())
                 arguments += ['--monte-carlo-resources-per-place', resources]
+            for which in ['initial', 'final']:
+                if f'native_{which}_marking' in case:
+                    arguments += [f'--monte-carlo-{which}-marking',
+                                  ','.join(map(str, case[f'native_{which}_marking']))]
             completed = subprocess.run([*arguments, '--monte-carlo-json'], capture_output=True,
                                        text=True, encoding='utf-8', timeout=30)
             check = dict(name=case['name'], route='cli')

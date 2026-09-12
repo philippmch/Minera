@@ -1,0 +1,8567 @@
+{
+  "reference": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "public_api": "pm4py.algo.simulation.montecarlo.algorithm.apply",
+  "environment": {
+    "TZ": "UTC"
+  },
+  "observations": [
+    {
+      "spec": {
+        "name": "positive_positive_1",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_zero_source_1",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_zero_middle_1",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_empty_1",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_first_positive_1",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p0": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_first_zero_source_1",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p0": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_first_zero_middle_1",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p0": [],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_first_empty_1",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_first_positive_1",
+        "places": [
+          "p2",
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p0": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p0": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_first_zero_source_1",
+        "places": [
+          "p2",
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p0": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p0": [],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_first_zero_middle_1",
+        "places": [
+          "p2",
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p0": 1
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p0": [],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_first_empty_1",
+        "places": [
+          "p2",
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p0": 1
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_last_positive_1",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_last_zero_source_1",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_last_zero_middle_1",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_last_empty_1",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_last_positive_1",
+        "places": [
+          "p0",
+          "p2",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p2": 0
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_last_zero_source_1",
+        "places": [
+          "p0",
+          "p2",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p2": 0
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_last_zero_middle_1",
+        "places": [
+          "p0",
+          "p2",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p2": 0
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_last_empty_1",
+        "places": [
+          "p0",
+          "p2",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p2": 0
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "both_zero_first_positive_1",
+        "places": [
+          "p2",
+          "p1",
+          "p0"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p0": [],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "both_zero_first_zero_source_1",
+        "places": [
+          "p2",
+          "p1",
+          "p0"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p0": [],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "both_zero_first_zero_middle_1",
+        "places": [
+          "p2",
+          "p1",
+          "p0"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p0": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "both_zero_first_empty_1",
+        "places": [
+          "p2",
+          "p1",
+          "p0"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "middle_first_positive_1",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 1,
+          "p0": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p0": [],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "middle_first_zero_source_1",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 1,
+          "p0": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:48+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000008.0,
+              "data": {}
+            }
+          ],
+          "p0": [],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          6.0
+        ],
+        "median_cases_ex_time": 6.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 6.0
+      }
+    },
+    {
+      "spec": {
+        "name": "middle_first_zero_middle_1",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 1,
+          "p0": 1
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p0": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "middle_first_empty_1",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 1,
+          "p0": 1
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "source_first_positive_1",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "source_first_zero_source_1",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:48+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000008.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          6.0
+        ],
+        "median_cases_ex_time": 6.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 6.0
+      }
+    },
+    {
+      "spec": {
+        "name": "source_first_zero_middle_1",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 1
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "source_first_empty_1",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 1
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "initial_override_preserves_other_side_1",
+        "places": [
+          "p2",
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "pnml_initial": {
+          "p2": 0,
+          "p0": 1,
+          "p1": 1
+        },
+        "pnml_final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_initial_marking": [
+          0,
+          1,
+          1
+        ]
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:48+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000008.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          6.0
+        ],
+        "median_cases_ex_time": 6.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 6.0
+      }
+    },
+    {
+      "spec": {
+        "name": "final_override_preserves_other_side_1",
+        "places": [
+          "p2",
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p0": 1,
+          "p1": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 1,
+        "arrival": 1,
+        "capacity": 1,
+        "pnml_initial": {
+          "p2": 0,
+          "p0": 1,
+          "p1": 1
+        },
+        "pnml_final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          1,
+          0,
+          0
+        ]
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000002.0,
+              "end": 1000005.0,
+              "data": {}
+            }
+          ],
+          "p0": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 3.0
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_positive_3",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_zero_source_3",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_zero_middle_3",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_empty_3",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_first_positive_3",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p1": [
+            {
+              "start": 1000002,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_first_zero_source_3",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p1": [
+            {
+              "start": 1000002,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_first_zero_middle_3",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p1": [
+            {
+              "start": 1000002,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_first_empty_3",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_first_positive_3",
+        "places": [
+          "p2",
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p0": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_first_zero_source_3",
+        "places": [
+          "p2",
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p0": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_first_zero_middle_3",
+        "places": [
+          "p2",
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p0": 1
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_first_empty_3",
+        "places": [
+          "p2",
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p0": 1
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_last_positive_3",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_last_zero_source_3",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_last_zero_middle_3",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_middle_last_empty_3",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 0
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_last_positive_3",
+        "places": [
+          "p0",
+          "p2",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p2": 0
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_last_zero_source_3",
+        "places": [
+          "p0",
+          "p2",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p2": 0
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_last_zero_middle_3",
+        "places": [
+          "p0",
+          "p2",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p2": 0
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_sink_last_empty_3",
+        "places": [
+          "p0",
+          "p2",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p2": 0
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "both_zero_first_positive_3",
+        "places": [
+          "p2",
+          "p1",
+          "p0"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "both_zero_first_zero_source_3",
+        "places": [
+          "p2",
+          "p1",
+          "p0"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "both_zero_first_zero_middle_3",
+        "places": [
+          "p2",
+          "p1",
+          "p0"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "both_zero_first_empty_3",
+        "places": [
+          "p2",
+          "p1",
+          "p0"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p1": 0,
+          "p0": 1
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "middle_first_positive_3",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 1,
+          "p0": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p1": [
+            {
+              "start": 1000002,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "middle_first_zero_source_3",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 1,
+          "p0": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:48+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:49+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:50+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p1": [
+            {
+              "start": 1000002,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000007.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000008.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000009.0,
+              "data": {}
+            },
+            {
+              "start": 1000007.0,
+              "end": 1000010.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000007.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000008.0,
+              "data": {}
+            },
+            {
+              "start": 1000007.0,
+              "end": 1000009.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          6.0,
+          6.0,
+          6.0
+        ],
+        "median_cases_ex_time": 6.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 8.0
+      }
+    },
+    {
+      "spec": {
+        "name": "middle_first_zero_middle_3",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 1,
+          "p0": 1
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p1": [
+            {
+              "start": 1000002,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "middle_first_empty_3",
+        "places": [
+          "p1",
+          "p0",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p1": 1,
+          "p0": 1
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "source_first_positive_3",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "source_first_zero_source_3",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:48+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:49+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:50+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            },
+            {
+              "start": 1000007.0,
+              "end": 1000008.0,
+              "data": {}
+            },
+            {
+              "start": 1000008.0,
+              "end": 1000009.0,
+              "data": {}
+            },
+            {
+              "start": 1000009.0,
+              "end": 1000010.0,
+              "data": {}
+            }
+          ],
+          "p2": []
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000007.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000008.0,
+              "data": {}
+            },
+            {
+              "start": 1000007.0,
+              "end": 1000009.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          6.0,
+          6.0,
+          6.0
+        ],
+        "median_cases_ex_time": 6.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 8.0
+      }
+    },
+    {
+      "spec": {
+        "name": "source_first_zero_middle_3",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 1
+        },
+        "final": {
+          "p1": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        }
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    },
+    {
+      "spec": {
+        "name": "source_first_empty_3",
+        "places": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 1
+        },
+        "final": {},
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          0,
+          0,
+          0
+        ]
+      },
+      "error": {
+        "type": "IndexError",
+        "message": "list index out of range"
+      }
+    },
+    {
+      "spec": {
+        "name": "initial_override_preserves_other_side_3",
+        "places": [
+          "p2",
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p0": 1,
+          "p1": 1
+        },
+        "final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "pnml_initial": {
+          "p2": 0,
+          "p0": 1,
+          "p1": 1
+        },
+        "pnml_final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_initial_marking": [
+          0,
+          1,
+          1
+        ]
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:48+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:49+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:50+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p0": [
+            {
+              "start": 1000000,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000001,
+              "end": 1000004.0,
+              "data": {}
+            },
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            },
+            {
+              "start": 1000007.0,
+              "end": 1000008.0,
+              "data": {}
+            },
+            {
+              "start": 1000008.0,
+              "end": 1000009.0,
+              "data": {}
+            },
+            {
+              "start": 1000009.0,
+              "end": 1000010.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": [
+            {
+              "start": 1000003.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000004.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000007.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000008.0,
+              "data": {}
+            },
+            {
+              "start": 1000007.0,
+              "end": 1000009.0,
+              "data": {}
+            }
+          ]
+        },
+        "cases_ex_time": [
+          6.0,
+          6.0,
+          6.0
+        ],
+        "median_cases_ex_time": 6.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 8.0
+      }
+    },
+    {
+      "spec": {
+        "name": "final_override_preserves_other_side_3",
+        "places": [
+          "p2",
+          "p0",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "t0",
+            "A"
+          ],
+          [
+            "t1",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "t0",
+            1
+          ],
+          [
+            "t0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "t1",
+            1
+          ],
+          [
+            "t1",
+            "p2",
+            1
+          ]
+        ],
+        "initial": {
+          "p2": 0,
+          "p0": 1,
+          "p1": 1
+        },
+        "final": {
+          "p2": 1
+        },
+        "traces": [],
+        "durations": {
+          "t0": 2,
+          "t1": 3
+        },
+        "simulations": 3,
+        "arrival": 1,
+        "capacity": 1,
+        "pnml_initial": {
+          "p2": 0,
+          "p0": 1,
+          "p1": 1
+        },
+        "pnml_final": {
+          "p0": 0,
+          "p2": 1
+        },
+        "weights": {
+          "t0": 1,
+          "t1": 0
+        },
+        "native_final_marking": [
+          1,
+          0,
+          0
+        ]
+      },
+      "log": [
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:42+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:45+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:43+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:46+00:00"
+            }
+          ]
+        },
+        {
+          "attributes": {},
+          "events": [
+            {
+              "concept:name": "A",
+              "time:timestamp": "1970-01-12T13:46:44+00:00"
+            },
+            {
+              "concept:name": "B",
+              "time:timestamp": "1970-01-12T13:46:47+00:00"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "output_places_interval_trees": {
+          "p2": [],
+          "p1": [
+            {
+              "start": 1000004.0,
+              "end": 1000005.0,
+              "data": {}
+            },
+            {
+              "start": 1000005.0,
+              "end": 1000006.0,
+              "data": {}
+            },
+            {
+              "start": 1000006.0,
+              "end": 1000007.0,
+              "data": {}
+            }
+          ],
+          "p0": [
+            {
+              "start": 1000002.0,
+              "end": 1000003.0,
+              "data": {}
+            },
+            {
+              "start": 1000003.0,
+              "end": 1000004.0,
+              "data": {}
+            }
+          ]
+        },
+        "output_transitions_interval_trees": {
+          "t0": [
+            {
+              "start": 1000001,
+              "end": 1000002.0,
+              "data": {}
+            },
+            {
+              "start": 1000002,
+              "end": 1000003.0,
+              "data": {}
+            }
+          ],
+          "t1": []
+        },
+        "cases_ex_time": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "median_cases_ex_time": 3.0,
+        "case_arrival_ratio": 1,
+        "total_cases_time": 5.0
+      }
+    }
+  ],
+  "public_marking_comparisons": [
+    {
+      "required": {},
+      "reached": {
+        "p2": 1
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {},
+      "reached": {
+        "p2": 2
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {},
+      "reached": {
+        "p1": 1,
+        "p2": 1
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {},
+      "reached": {
+        "p0": 0,
+        "p2": 1
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {},
+      "reached": {
+        "p0": 1,
+        "p2": 1
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {
+        "p2": 1
+      },
+      "reached": {
+        "p2": 1
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {
+        "p2": 1
+      },
+      "reached": {
+        "p2": 2
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {
+        "p2": 1
+      },
+      "reached": {
+        "p1": 1,
+        "p2": 1
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {
+        "p2": 1
+      },
+      "reached": {
+        "p0": 0,
+        "p2": 1
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {
+        "p2": 1
+      },
+      "reached": {
+        "p0": 1,
+        "p2": 1
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {
+        "p0": 0,
+        "p2": 1
+      },
+      "reached": {
+        "p2": 1
+      },
+      "required_le_reached": false
+    },
+    {
+      "required": {
+        "p0": 0,
+        "p2": 1
+      },
+      "reached": {
+        "p2": 2
+      },
+      "required_le_reached": false
+    },
+    {
+      "required": {
+        "p0": 0,
+        "p2": 1
+      },
+      "reached": {
+        "p1": 1,
+        "p2": 1
+      },
+      "required_le_reached": false
+    },
+    {
+      "required": {
+        "p0": 0,
+        "p2": 1
+      },
+      "reached": {
+        "p0": 0,
+        "p2": 1
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {
+        "p0": 0,
+        "p2": 1
+      },
+      "reached": {
+        "p0": 1,
+        "p2": 1
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {
+        "p1": 0,
+        "p2": 1
+      },
+      "reached": {
+        "p2": 1
+      },
+      "required_le_reached": false
+    },
+    {
+      "required": {
+        "p1": 0,
+        "p2": 1
+      },
+      "reached": {
+        "p2": 2
+      },
+      "required_le_reached": false
+    },
+    {
+      "required": {
+        "p1": 0,
+        "p2": 1
+      },
+      "reached": {
+        "p1": 1,
+        "p2": 1
+      },
+      "required_le_reached": true
+    },
+    {
+      "required": {
+        "p1": 0,
+        "p2": 1
+      },
+      "reached": {
+        "p0": 0,
+        "p2": 1
+      },
+      "required_le_reached": false
+    },
+    {
+      "required": {
+        "p1": 0,
+        "p2": 1
+      },
+      "reached": {
+        "p0": 1,
+        "p2": 1
+      },
+      "required_le_reached": false
+    }
+  ]
+}

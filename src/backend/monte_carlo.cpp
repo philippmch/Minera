@@ -27,6 +27,7 @@ struct CaseState {
   double arrival = 0.0;
   double now = 0.0;
   Marking marking;
+  std::vector<bool> marking_keys;
   Trace trace;
   std::size_t steps = 0;
   bool finished = false;
@@ -54,6 +55,8 @@ struct PreparedOptions {
   std::vector<std::size_t> capacities;
   Marking initial_marking;
   Marking final_marking;
+  std::vector<bool> initial_keys;
+  std::vector<bool> final_keys;
 };
 
 struct RuntimeBudget {
@@ -136,10 +139,13 @@ void validate_force_distribution(const MonteCarloOptions& options) {
 }
 
 [[nodiscard]] bool is_final_marking(const Marking& marking,
-                                    const Marking& final_marking) {
+                                    const Marking& final_marking,
+                                    const std::vector<bool>& keys,
+                                    const std::vector<bool>& final_keys) {
   if (marking.size() != final_marking.size()) return false;
   for (std::size_t place = 0; place < marking.size(); ++place) {
-    if (marking[place] < final_marking[place]) return false;
+    if ((final_keys[place] && !keys[place]) ||
+        marking[place] < final_marking[place]) return false;
   }
   return true;
 }
@@ -337,6 +343,21 @@ void validate_stochastic_map_sparse(const StochasticMap& map,
   return result;
 }
 
+[[nodiscard]] std::vector<bool> resolve_marking_keys(
+    const Marking& marking, const std::vector<bool>& supplied, const char* name) {
+  if (!supplied.empty() && supplied.size() != marking.size())
+    throw std::invalid_argument(std::string("Monte Carlo ") + name +
+                                " marking keys must match the place count");
+  auto keys = supplied.empty() ? std::vector<bool>(marking.size(), false) : supplied;
+  for (std::size_t place = 0; place < marking.size(); ++place) {
+    if (supplied.empty()) keys[place] = marking[place] != 0;
+    else if (marking[place] != 0 && !keys[place])
+      throw std::invalid_argument(std::string("Monte Carlo ") + name +
+                                  " positive marking must have a key");
+  }
+  return keys;
+}
+
 void validate_scheduler_budgets(const PetriNet& net,
                                 const MonteCarloOptions& options,
                                 const Marking& initial_marking,
@@ -496,6 +517,10 @@ PreparedOptions prepare_options(const PetriNet& net,
       options.initial_marking, net.place_count(), net.source(), "initial");
   prepared.final_marking = resolve_marking(
       options.final_marking, net.place_count(), net.sink(), "final");
+  prepared.initial_keys = resolve_marking_keys(prepared.initial_marking,
+                                               options.initial_marking_keys, "initial");
+  prepared.final_keys = resolve_marking_keys(prepared.final_marking,
+                                             options.final_marking_keys, "final");
   prepared.weights.assign(transition_count, 1.0);
   prepared.durations.assign(
       transition_count,
@@ -683,7 +708,7 @@ double pop_timestamp(std::vector<double>& values, RuntimeBudget& budget) {
 }
 
 void fire_transition(const PetriTransition& transition,
-                     Marking& marking) {
+                     Marking& marking, std::vector<bool>& keys) {
   if (!petri_transition_enabled(transition, marking))
     throw std::runtime_error("Monte Carlo fired a disabled transition");
   std::vector<std::uint64_t> required(marking.size(), 0);
@@ -699,10 +724,12 @@ void fire_transition(const PetriTransition& transition,
       throw std::runtime_error("Monte Carlo fired a disabled transition");
     }
     marking[place] -= required[place];
+    if (required[place] != 0 && marking[place] == 0) keys[place] = false;
   }
   for (const auto place : transition.reset_inputs) {
     if (place >= marking.size()) throw std::runtime_error("Monte Carlo reset place is invalid");
     marking[place] = 0;
+    keys[place] = false;
   }
   for (const auto place : transition.outputs) {
     if (place >= marking.size() ||
@@ -710,6 +737,7 @@ void fire_transition(const PetriTransition& transition,
       throw std::overflow_error("Monte Carlo marking token overflow");
     }
     ++marking[place];
+    keys[place] = true;
   }
 }
 
@@ -817,6 +845,7 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
     state.arrival = arrival;
     state.now = arrival;
     state.marking = prepared.initial_marking;
+    state.marking_keys = prepared.initial_keys;
     state.trace.case_id = "case_" + std::to_string(index + 1);
     cases.push_back(std::move(state));
   }
@@ -826,10 +855,11 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
   std::mt19937_64 rng(options.seed);
   auto advance = [&](CaseState& state) {
     if (options.stop_at_final &&
-        is_final_marking(state.marking, prepared.final_marking)) {
+        is_final_marking(state.marking, prepared.final_marking,
+                         state.marking_keys, prepared.final_keys)) {
       state.completed = true;
       for (std::size_t place = 0; place < state.marking.size(); ++place)
-        if (state.marking[place] != 0) --occupied[place];
+        if (state.marking_keys[place]) --occupied[place];
       finalize_case(state, result.diagnostics, options,
                     &result.diagnostics.case_execution_seconds);
       return;
@@ -893,7 +923,7 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
       push_timestamp(timestamps[place], finish, runtime_budget);
       ++occupied[place];
     }
-    fire_transition(transition, state.marking);
+    fire_transition(transition, state.marking, state.marking_keys);
     state.now = finish;
     ++state.steps;
 
@@ -916,12 +946,12 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
     queue.push({state.now, state.index, serial++});
   };
   // First firings are primed in generation order, before any continuation.
-  const auto first_initial = std::find_if(prepared.initial_marking.begin(),
-      prepared.initial_marking.end(), [](auto tokens) { return tokens != 0; });
+  const auto first_initial = std::find(prepared.initial_keys.begin(),
+      prepared.initial_keys.end(), true);
   for (auto& state : cases) {
-    if (first_initial != prepared.initial_marking.end()) {
+    if (first_initial != prepared.initial_keys.end()) {
       const auto place = static_cast<std::size_t>(
-          first_initial - prepared.initial_marking.begin());
+          first_initial - prepared.initial_keys.begin());
       push_timestamp(timestamps[place], state.arrival, runtime_budget, true);
       ++occupied[place];
     }
@@ -1008,6 +1038,17 @@ MonteCarloOptions fit_monte_carlo_options(const EventLog& input_log,
   validate_selectors(options);
   validate_arrival_aliases(options);
   validate_force_distribution(options);
+  // Marking membership also controls simulation with supplied distributions.
+  // Validate it before any fitting bypass; node names remain fitting-only.
+  if (!options.initial_marking_keys.empty() || !options.final_marking_keys.empty()) {
+    validate_net(net);
+    if (!options.initial_marking_keys.empty())
+      (void)resolve_marking_keys(resolve_marking(options.initial_marking,
+          net.place_count(), net.source(), "initial"), options.initial_marking_keys, "initial");
+    if (!options.final_marking_keys.empty())
+      (void)resolve_marking_keys(resolve_marking(options.final_marking,
+          net.place_count(), net.sink(), "final"), options.final_marking_keys, "final");
+  }
   MonteCarloOptions fitted = options;
   if (!fitted.case_arrival_ratio && !fitted.case_arrival_seconds) {
     fitted.case_arrival_ratio =
