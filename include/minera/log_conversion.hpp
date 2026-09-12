@@ -147,4 +147,8 @@ struct LogConversionResult {
 [[nodiscard]] std::string log_conversion_json(
     const LogConversionResult& result);
 
+struct XesImportResult;
+// Serializes the selected import result, including raw table dtype metadata.
+[[nodiscard]] std::string xes_import_result_json(const XesImportResult& result);
+
 }  // namespace minera

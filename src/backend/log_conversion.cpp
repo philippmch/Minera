@@ -1,4 +1,5 @@
 #include "minera/log_conversion.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -1437,6 +1438,34 @@ LogConversionResult convert_event_log(const EventLog& log,
       break;
   }
   return result;
+}
+
+std::string xes_import_result_json(const XesImportResult& result) {
+  LogConversionResult converted;
+  const bool legacy = result.kind == EventDataKind::kEventLog;
+  const bool lazy = result.kind == EventDataKind::kLazyEventTable;
+  if (!legacy && !lazy && result.kind != EventDataKind::kEventTable)
+    throw std::invalid_argument("Unsupported XES import result kind");
+  converted.variant = legacy ? LogConversionVariant::kToEventLog
+                             : LogConversionVariant::kToDataFrame;
+  if (legacy) converted.log = result.log;
+  else if (lazy) {
+    converted.lazy_table = result.lazy_table;
+    converted.table = result.lazy_table.materialize();
+  } else converted.table = result.table;
+  if (!legacy) converted.table.validate();
+  if (!legacy && result.dtypes.size() != converted.table.columns.size())
+    throw std::invalid_argument("XES import dtype count does not match columns");
+  std::ostringstream output;
+  output << "{\"family\":\"XES_IMPORT\",\"type\":\""
+         << (legacy ? "EventLog" : lazy ? "LazyFrame" : "DataFrame")
+         << "\",\"dtypes\":[";
+  for (std::size_t i = 0; i < result.dtypes.size(); ++i) {
+    if (i) output << ',';
+    output << '"' << json_escape(result.dtypes[i]) << '"';
+  }
+  output << "],\"result\":" << log_conversion_json(converted) << '}';
+  return output.str();
 }
 
 std::string log_conversion_json(const LogConversionResult& result) {

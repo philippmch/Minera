@@ -499,6 +499,18 @@ int usage(const char* program) {
                "  --xes-import-variant <id> iterparse, line_by_line,\n"
                "                            iterparse_mem_compressed, iterparse_20,\n"
                "                            chunk_regex, or rustxes\n"
+               "  --xes-return-legacy-log-object <bool> Emit XES import result JSON\n"
+               "  --xes-return-pl-lazyframe <bool> Select lazy raw RUSTXES table\n"
+               "  --xes-conversion-case-id-key <key> RUSTXES legacy grouping column\n"
+               "  --xes-conversion-case-attribute-prefix <prefix> RUSTXES trace fields\n"
+               "  --xes-conversion-null-case-id-key <bool> Use a null grouping key\n"
+               "  --xes-conversion-null-case-attribute-prefix <bool> Use a null prefix\n"
+               "  --xes-conversion-stream-postprocessing <bool> RUSTXES compatibility flag\n"
+               "  --xes-conversion-deepcopy <bool> RUSTXES compatibility flag\n"
+               "  --xes-conversion-include-case-attributes <bool> RUSTXES compatibility flag\n"
+               "  --xes-conversion-compress <bool> RUSTXES compatibility flag\n"
+               "  --xes-conversion-infer-extensions <bool> Infer or clear RUSTXES extensions\n"
+               "  --xes-conversion-extension <name> <prefix> <uri> Add an explicit extension\n"
                "  --xes-timestamp-sort <bool> Sort events and traces by timestamp\n"
                "  --xes-reverse-sort <bool> Reverse requested timestamp ordering\n"
                "  --xes-max-traces <n>      Import at most n traces\n"
@@ -1860,6 +1872,7 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> variant_statistics_fields;
   minera::CsvImportOptions options;
   minera::XesImportOptions xes_options;
+  bool xes_import_result_requested = false;
   minera::XesExportOptions xes_export_options;
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
@@ -4061,6 +4074,18 @@ int main(int argc, char** argv) {
     }
 
     if (arg == "--xes-import-variant" || arg == "--xes-timestamp-sort" ||
+        arg == "--xes-return-legacy-log-object" ||
+        arg == "--xes-return-pl-lazyframe" ||
+        arg == "--xes-conversion-case-id-key" ||
+        arg == "--xes-conversion-case-attribute-prefix" ||
+        arg == "--xes-conversion-null-case-id-key" ||
+        arg == "--xes-conversion-null-case-attribute-prefix" ||
+        arg == "--xes-conversion-stream-postprocessing" ||
+        arg == "--xes-conversion-deepcopy" ||
+        arg == "--xes-conversion-include-case-attributes" ||
+        arg == "--xes-conversion-compress" ||
+        arg == "--xes-conversion-infer-extensions" ||
+        arg == "--xes-conversion-extension" ||
         arg == "--xes-reverse-sort" || arg == "--xes-max-traces" ||
         arg == "--xes-attributes-to-read" || arg == "--xes-case-attribute" ||
         arg == "--xes-activity-attribute" ||
@@ -4074,6 +4099,44 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       try {
+        if (arg == "--xes-return-legacy-log-object") {
+          xes_options.return_legacy_log_object = parse_boolean(value, arg);
+          xes_import_result_requested = true;
+        }
+        if (arg == "--xes-return-pl-lazyframe") {
+          xes_options.return_pl_lazyframe = parse_boolean(value, arg);
+          xes_import_result_requested = true;
+        }
+        if (arg == "--xes-conversion-case-id-key")
+          xes_options.conversion_case_id_key = value;
+        if (arg == "--xes-conversion-case-attribute-prefix")
+          xes_options.conversion_case_attribute_prefix = value;
+        if (arg == "--xes-conversion-null-case-id-key")
+          xes_options.conversion_case_id_key = parse_boolean(value, arg)
+              ? std::nullopt : std::optional<std::string>{"case:concept:name"};
+        if (arg == "--xes-conversion-null-case-attribute-prefix")
+          xes_options.conversion_case_attribute_prefix = parse_boolean(value, arg)
+              ? std::nullopt : std::optional<std::string>{"case:"};
+        if (arg == "--xes-conversion-stream-postprocessing")
+          xes_options.conversion_stream_postprocessing = parse_boolean(value, arg);
+        if (arg == "--xes-conversion-deepcopy")
+          xes_options.conversion_deepcopy = parse_boolean(value, arg);
+        if (arg == "--xes-conversion-include-case-attributes")
+          xes_options.conversion_include_case_attributes = parse_boolean(value, arg);
+        if (arg == "--xes-conversion-compress")
+          xes_options.conversion_compress = parse_boolean(value, arg);
+        if (arg == "--xes-conversion-infer-extensions") {
+          if (parse_boolean(value, arg)) xes_options.conversion_extensions.reset();
+          else xes_options.conversion_extensions = std::vector<minera::LogExtension>{};
+        }
+        if (arg == "--xes-conversion-extension") {
+          const auto* prefix = next();
+          if (!prefix) return usage(argv[0]);
+          const auto* uri = next();
+          if (!uri) return usage(argv[0]);
+          if (!xes_options.conversion_extensions) xes_options.conversion_extensions.emplace();
+          xes_options.conversion_extensions->push_back({value, prefix, uri});
+        }
         if (arg == "--xes-import-variant")
           xes_options.variant = minera::parse_xes_import_variant(value);
         if (arg == "--xes-timestamp-sort")
@@ -4105,13 +4168,6 @@ int main(int argc, char** argv) {
           xes_export_options.infer_metadata = parse_boolean(value, arg);
         if (arg == "--xes-preserve-nulls")
           xes_export_options.preserve_nulls = parse_boolean(value, arg);
-        if ((arg == "--xes-case-attribute" ||
-             arg == "--xes-activity-attribute" ||
-             arg == "--xes-timestamp-attribute" ||
-             arg == "--xes-resource-attribute" ||
-             arg == "--xes-lifecycle-attribute") && value[0] == '\0') {
-          return usage(argv[0]);
-        }
       } catch (const std::exception& error) {
         std::cerr << "error: " << error.what() << '\n';
         return 2;
@@ -5282,7 +5338,7 @@ int main(int argc, char** argv) {
        compare_petri_miner_used || compare_petri_replay_option_used ||
        compare_petri_initial_marking_used || compare_petri_final_marking_used ||
        !compare_petri_activity_attribute.empty() || !check_pnml.empty() ||
-       log_conversion_requested || alpha_plus_result ||
+       xes_import_result_requested || log_conversion_requested || alpha_plus_result ||
        browser_history_requested || windows_events_requested || repository_history_requested ||
        workflow_history_requested || enterprise_history_requested || communication_history_requested ||
        random_tree_requested || merge_requested || timestamp_interleavings_requested ||
@@ -5866,6 +5922,21 @@ int main(int argc, char** argv) {
     }
     // A .xes file is read as XES; everything else is treated as CSV.
     const bool input_is_xes = is_xes_path(input);
+    if (xes_import_result_requested) {
+      if (!input_is_xes)
+        throw std::invalid_argument("XES import result requires an XES input");
+      const auto body = minera::xes_import_result_json(
+          minera::import_xes_result(input, xes_options));
+      if (output.empty()) std::cout << body << '\n';
+      else {
+        std::ofstream file(output);
+        if (!file) throw std::runtime_error("Cannot open output file " + output.string());
+        file << body << '\n';
+        file.flush();
+        if (!file) throw std::runtime_error("Cannot write output file " + output.string());
+      }
+      return 0;
+    }
     if (input_is_xes) {
       log = minera::import_xes_event_log(input, xes_options);
     } else if (!correlation_variants.empty()) {
