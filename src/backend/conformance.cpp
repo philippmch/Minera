@@ -1,4 +1,5 @@
 #include "minera/conformance.hpp"
+#include "petri_replay_internal.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -138,9 +139,17 @@ bool valid_alignment_cost_profile(AlignmentCostProfile profile) {
 // Holds the net plus the lookups token replay needs and drives both the
 // fitness and precision passes over a single shared translation.
 class Replayer {
+  struct ForwardConfiguration {
+    detail::ReplayMarkingKeys initial_keys;
+    detail::ReplayMarkingKeys final_keys;
+    std::vector<std::string> place_names;
+    std::vector<std::string> transition_names;
+    detail::CleaningComponents components;
+  };
  public:
   explicit Replayer(const PetriNet& net, const Marking& initial = {},
-                    const Marking& final = {})
+                    const Marking& final = {},
+                    const TokenReplayOptions* replay_options = nullptr)
       : net_(net),
         initial_(resolve_workflow_marking(net, initial, true)),
         final_(resolve_workflow_marking(net, final, false)) {
@@ -157,6 +166,8 @@ class Replayer {
       }
     }
     build_place_closure();
+    if (replay_options && replay_options->variant == TokenReplayVariant::kForward)
+      forward_configuration_ = prepare_forward(*replay_options);
   }
 
   [[nodiscard]] std::optional<std::size_t> activity_id(
@@ -202,6 +213,14 @@ class Replayer {
       const TokenReplayOptions& options = {},
       TokenReplayTraceDiagnostics* diagnostics = nullptr) const {
     Marking marking = initial_marking();
+    std::optional<ForwardConfiguration> local_configuration;
+    if (!forward_configuration_) local_configuration = prepare_forward(options);
+    const auto& configuration = forward_configuration_ ? *forward_configuration_ : *local_configuration;
+    auto keys = configuration.initial_keys;
+    const auto& final_keys = configuration.final_keys;
+    const auto& place_names = configuration.place_names;
+    const auto& transition_names = configuration.transition_names;
+    const auto& components = configuration.components;
     Counts counts;
     counts.forward_replay = true;
     counts.places.resize(net_.place_count());
@@ -210,7 +229,14 @@ class Replayer {
       counts.produced += tokens;
       counts.places[place].produced += tokens;
     }
-
+    const auto emit = [&](std::size_t transition, bool event) {
+      forward_fire(marking, keys, transition, counts);
+      if (executions) ++(*executions)[transition];
+      if (diagnostics) {
+        diagnostics->activated_transitions.push_back(transition);
+        if (event) diagnostics->event_diagnostics.back().activated_transitions.push_back(transition);
+      }
+    };
     for (const auto& step : trace) {
       if (diagnostics) {
         diagnostics->event_diagnostics.push_back({diagnostics->replayed_events, {}, {}});
@@ -220,60 +246,87 @@ class Replayer {
         counts.has_unknown_activity = true;
         if (diagnostics)
           diagnostics->unknown_event_indices.push_back(diagnostics->replayed_events - 1);
-        // Unknown labels never change the marking or token counters. Their
-        // optional fit classification is applied after replay, without stopping.
         continue;
       }
-      const Step& result = cached_step(marking, *step,
-                                      options.walk_through_hidden_transitions);
-      if (result.missing != 0 && options.stop_immediately_unfit) {
-        // Immediate-stop replay records the first blocked known activity as a
-        // deviation without weak-firing its transition.
-        ++counts.missing;
-        if (diagnostics) {
-          diagnostics->replay_stopped = true;
-          diagnostics->transitions_with_problems.push_back(result.fired.back());
-          diagnostics->event_diagnostics.back().transitions_with_problems.push_back(result.fired.back());
+      auto targets = transitions_by_activity_[*step];
+      std::sort(targets.begin(), targets.end(), [&](auto left, auto right) {
+        return std::tie(transition_names[left], left) < std::tie(transition_names[right], right);
+      });
+      auto chosen = targets.back();
+      for (const auto transition : targets) {
+        if (enabled(marking, transition)) { chosen = transition; break; }
+      }
+      if (!enabled(marking, chosen) && options.walk_through_hidden_transitions) {
+        if (net_.has_extended_arcs()) {
+          const auto path = silent_path(marking, [&](const Marking& candidate) { return enabled(candidate, chosen); });
+          if (path) for (const auto transition : *path) emit(transition, true);
+        } else {
+          forward_route_hidden(marking, keys, chosen, place_names,
+                               options.exhaustive_invisible_exploration,
+                               [&](auto transition) { emit(transition, true); });
         }
+      }
+      const bool forced = !enabled(marking, chosen);
+      if (forced && diagnostics) {
+        diagnostics->transitions_with_problems.push_back(chosen);
+        diagnostics->event_diagnostics.back().transitions_with_problems.push_back(chosen);
+      }
+      if (forced && options.stop_immediately_unfit) {
+        ++counts.missing;
+        if (diagnostics) diagnostics->replay_stopped = true;
         break;
       }
-      marking = result.marking;
-      counts.produced += result.produced;
-      counts.consumed += result.consumed;
-      counts.missing += result.missing;
-      add_place_counts(counts.places, result.places);
-      if (diagnostics) {
-        diagnostics->activated_transitions.insert(
-            diagnostics->activated_transitions.end(), result.fired.begin(), result.fired.end());
-        diagnostics->event_diagnostics.back().activated_transitions = result.fired;
-        if (result.missing != 0) {
-          diagnostics->transitions_with_problems.push_back(result.fired.back());
-          diagnostics->event_diagnostics.back().transitions_with_problems.push_back(result.fired.back());
+      const auto before_cleaning = forced && !components.empty()
+          ? keys : detail::ReplayMarkingKeys{};
+      emit(chosen, true);
+      if (!before_cleaning.empty()) {
+        for (const auto& component : components) {
+          const bool introduced = std::any_of(component.begin(), component.end(),
+              [&](auto place) { return keys[place] && !before_cleaning[place]; });
+          if (!introduced) continue;
+          for (const auto place : component) {
+            if (keys[place] && before_cleaning[place]) {
+              marking[place] = 0;
+              keys[place] = false;
+              ++counts.remaining;
+              ++counts.places[place].remaining;
+            }
+          }
         }
       }
-      if (executions) {
-        for (const std::size_t t : result.fired) ++(*executions)[t];
-      }
     }
-
-    // Route whatever is left toward the requested final marking, then consume
-    // its required tokens and retain any surplus as remaining tokens.
+    const auto final_present = [&]() {
+      for (std::size_t place = 0; place < keys.size(); ++place)
+        if (final_keys[place] && !keys[place]) return false;
+      return true;
+    };
     if (options.try_to_reach_final_marking_through_hidden) {
-      const Step& finish = cached_finish(marking);
-      marking = finish.marking;
-      counts.produced += finish.produced;
-      counts.consumed += finish.consumed;
-      counts.missing += finish.missing;
-      add_place_counts(counts.places, finish.places);
-      if (diagnostics)
-        diagnostics->activated_transitions.insert(
-            diagnostics->activated_transitions.end(), finish.fired.begin(), finish.fired.end());
-      if (executions) {
-        for (const std::size_t t : finish.fired) ++(*executions)[t];
+      if (net_.has_extended_arcs()) {
+        // Inhibitor/reset-only transitions need not be reachable from a
+        // marked ordinary input. Preserve enabled-state routing for these nets.
+        const auto path = silent_path(marking, [&](const Marking& candidate) {
+          return marking_has_final_places(candidate, final_);
+        });
+        if (path) for (const auto transition : *path) emit(transition, false);
+      } else for (std::size_t pass = 0; pass < 6 && !final_present(); ++pass) {
+        const auto paths = detail::silent_place_paths(keys, final_keys, net_, place_names);
+        bool fired = false;
+        for (const auto& path : paths) {
+          for (const auto transition : path.transitions) {
+            if (!enabled(marking, transition)) break;
+            emit(transition, false);
+            fired = true;
+          }
+          if (final_present()) break;
+        }
+        if (!fired) break;
       }
     }
     counts.missing_before_final_check = counts.missing;
-    if (diagnostics) diagnostics->reached_marking = marking;
+    if (diagnostics) {
+      diagnostics->reached_marking = marking;
+      diagnostics->reached_marking_keys = keys;
+    }
     for (std::size_t place = 0; place < marking.size(); ++place) {
       const auto required = static_cast<std::uint64_t>(final_[place]);
       counts.consumed += required;
@@ -457,10 +510,9 @@ class Replayer {
 
   [[nodiscard]] Marking initial_marking() const { return initial_; }
 
-  // Advances `marking` by replaying one activity — the same step `replay`
-  // takes, so walking a trace with `advance` reaches exactly the markings a
-  // full replay would. Lets the precision pass extend a parent prefix's
-  // marking by one step instead of replaying every prefix from scratch.
+  // Advances a precision prefix using its enabled-state routing cache. The
+  // forward trace replay separately retains partial structural routes and
+  // key-aware cleaning; precision's prefix contract is independently audited.
   [[nodiscard]] bool advance(
       Marking& marking, std::optional<std::size_t> activity,
       bool walk_through_hidden_transitions = true) const {
@@ -567,13 +619,72 @@ class Replayer {
   }
 
  private:
-  // One replay step's outcome — the marking it leads to and the token
+  ForwardConfiguration prepare_forward(const TokenReplayOptions& options) const {
+    ForwardConfiguration result;
+    result.initial_keys = detail::resolve_replay_marking_keys(options.initial_marking_keys, initial_, "initial_marking_keys");
+    result.final_keys = detail::resolve_replay_marking_keys(options.final_marking_keys, final_, "final_marking_keys");
+    result.place_names = detail::replay_element_names(options.place_names, net_.place_count(), "p", "place_names");
+    result.transition_names = detail::replay_element_names(options.transition_names, net_.transitions().size(), "t", "transition_names");
+    if (options.cleaning_token_flood)
+      result.components = detail::cleaning_components(net_, result.initial_keys, result.final_keys);
+    return result;
+  }
+
+  void forward_fire(Marking& marking, detail::ReplayMarkingKeys& keys,
+                    std::size_t transition, Counts& counts) const {
+    Marking required(marking.size(), 0);
+    for (const auto place : net_.transitions()[transition].inputs) {
+      if (required[place] == std::numeric_limits<int>::max())
+        throw std::overflow_error("token replay input multiplicity exceeds signed range");
+      ++required[place];
+    }
+    for (std::size_t place = 0; place < marking.size(); ++place) {
+      if (marking[place] >= required[place]) continue;
+      const auto missing = static_cast<std::uint64_t>(required[place] - marking[place]);
+      counts.missing += missing;
+      counts.places[place].missing += missing;
+      // Public forward repair adds the full input weight before consumption,
+      // retaining any partially available tokens after the firing.
+      if (required[place] > std::numeric_limits<int>::max() - marking[place])
+        throw std::overflow_error("token replay marking exceeds signed range");
+      marking[place] += required[place];
+    }
+    fire(marking, transition, counts);
+    const auto& fired = net_.transitions()[transition];
+    for (const auto place : fired.inputs) keys[place] = marking[place] != 0;
+    for (const auto place : fired.reset_inputs) keys[place] = marking[place] != 0;
+    for (const auto place : fired.outputs) keys[place] = marking[place] != 0;
+  }
+
+  template <class Emit>
+  void forward_route_hidden(Marking& marking, detail::ReplayMarkingKeys& keys,
+                            std::size_t target,
+                            const std::vector<std::string>& place_names,
+                            bool exhaustive,
+                            const Emit& emit) const {
+    const auto candidates = [&](std::size_t selected) {
+      Marking required(marking.size(), 0);
+      for (const auto place : net_.transitions()[selected].inputs) {
+        if (required[place] == std::numeric_limits<int>::max())
+          throw std::overflow_error("token replay input multiplicity exceeds signed range");
+        ++required[place];
+      }
+      for (std::size_t place = 0; place < required.size(); ++place)
+        if (marking[place] >= required[place]) required[place] = 0;
+      const auto required_keys = detail::resolve_replay_marking_keys({}, required, "required");
+      return detail::silent_place_paths(keys, required_keys, net_, place_names);
+    };
+    detail::route_hidden_dependencies(net_.transitions().size(), target, exhaustive,
+        candidates, [&](auto transition) { return enabled(marking, transition); }, emit);
+  }
+
+  // One precision/clean-run search step's outcome — its marking and token
   // bookkeeping it added. Replay is a deterministic function of the marking
   // and the activity, and real logs repeat the same steps constantly (shared
   // variant prefixes, recurring states), so each distinct step is computed
   // (with its silent-routing search) once and replayed from the cache after
-  // that. The fitness and precision passes share the caches through the one
-  // Replayer a conformance check builds.
+  // that. These caches support prefix precision and clean-run searches; the
+  // forward diagnostics path also retains incomplete routing and cleaning.
   struct Step {
     Marking marking;
     std::uint64_t produced = 0;
@@ -762,6 +873,8 @@ class Replayer {
       }
     }
     for (const std::size_t place : transition.outputs) {
+      if (marking[place] == std::numeric_limits<int>::max())
+        throw std::overflow_error("token replay marking exceeds signed range");
       ++marking[place];
       ++counts.produced;
       ++counts.places[place].produced;
@@ -957,6 +1070,7 @@ class Replayer {
   const PetriNet& net_;
   Marking initial_;
   Marking final_;
+  std::optional<ForwardConfiguration> forward_configuration_;
   std::unordered_map<std::string, std::size_t> name_to_activity_;
   std::vector<std::vector<std::size_t>> transitions_by_activity_;
   std::vector<std::size_t> silent_transitions_;
@@ -2731,7 +2845,7 @@ ConformanceResult check_conformance(const EventLog& event_log,
   if (!valid_token_replay_variant(options.variant)) {
     throw std::invalid_argument("unsupported token replay variant");
   }
-  const Replayer replayer(net, options.initial_marking, options.final_marking);
+  const Replayer replayer(net, options.initial_marking, options.final_marking, &options);
   const std::string activity_attribute =
       options.activity_attribute.empty() ? "concept:name"
                                          : options.activity_attribute;
@@ -2828,7 +2942,7 @@ TokenReplayDiagnostics replay_token_diagnostics(
   if (!valid_token_replay_variant(options.variant)) {
     throw std::invalid_argument("unsupported token replay variant");
   }
-  const Replayer replayer(net, options.initial_marking, options.final_marking);
+  const Replayer replayer(net, options.initial_marking, options.final_marking, &options);
   const std::string activity_attribute =
       options.activity_attribute.empty() ? "concept:name"
                                          : options.activity_attribute;
@@ -2878,7 +2992,7 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
   validate_token_replay_event_limit(event_log, options);
   if (!valid_token_replay_variant(options.variant))
     throw std::invalid_argument("unsupported token replay variant");
-  const Replayer replayer(net, options.initial_marking, options.final_marking);
+  const Replayer replayer(net, options.initial_marking, options.final_marking, &options);
   const auto activity_attribute = options.activity_attribute.empty()
                                       ? std::string("concept:name")
                                       : options.activity_attribute;

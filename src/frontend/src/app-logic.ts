@@ -134,6 +134,8 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       options.tokenReplayMaxRowsToMaterialize !== undefined ||
       Boolean(options.tokenReplayCaseIdAttribute?.trim() &&
         options.tokenReplayCaseIdAttribute.trim() !== "case:concept:name") ||
+      options.tokenReplayCleaningTokenFlood === true ||
+      options.tokenReplayExhaustiveInvisibleExploration === true ||
       options.tokenReplayWalkThroughHiddenTransitions === false ||
       options.tokenReplayIncludeTraceDiagnostics === true ||
       options.tokenReplayIncludeDurationDiagnostics === true ||

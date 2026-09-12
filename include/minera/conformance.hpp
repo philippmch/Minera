@@ -67,6 +67,9 @@ struct TokenReplayTraceDiagnostics {
   std::size_t replayed_events = 0;
   // One row per examined event, including unknown labels and blocked events.
   std::vector<TokenReplayEventDiagnostics> event_diagnostics;
+  // Membership of the reached marking, including explicit zero-token keys.
+  // Forward replay supplies one entry per place; older/backwards rows may omit it.
+  std::vector<bool> reached_marking_keys;
 };
 
 struct TokenReplayDurationComparison {
@@ -213,6 +216,21 @@ struct TokenReplayOptions {
   std::string timestamp_attribute = "time:timestamp";
   bool include_root_cause_diagnostics = false;
   RootCauseOptions root_cause;
+  // Forward replay can remove stale marking entries after forced firings.
+  // Each removed entry contributes one remaining occurrence; off by default.
+  bool cleaning_token_flood = false;
+  // Optional model IDs used for deterministic routing and duplicate labels.
+  // Empty defaults to p0, p1, ... and t0, t1, ... respectively.
+  std::vector<std::string> place_names;
+  std::vector<std::string> transition_names;
+  // Optional membership of initial/final markings, retaining zero-token keys.
+  // Empty derives membership from positive counts. Nonempty vectors must have
+  // one entry per place and include every positive-token place.
+  std::vector<bool> initial_marking_keys;
+  std::vector<bool> final_marking_keys;
+  // Forward pre-event routing policy. The public exhaustive mode limits
+  // recursive dependency exploration to the outer invocation.
+  bool exhaustive_invisible_exploration = false;
 };
 
 [[nodiscard]] std::vector<TokenReplayTransitionRootCauseDiagnostics>

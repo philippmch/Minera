@@ -9,15 +9,22 @@ import { alphaOptionsFromForm, alphaSettingsAreDirty, attributeOccurrenceValidat
 
 describe("token replay policy controls", () => {
   it("disables only forward-only policies backwards without changing retained values", () => {
-    const policies = { ...TOKEN_REPLAY_POLICY_DEFAULTS, tokenReplayConsiderRemainingInFitness: false };
+    const policies = { ...TOKEN_REPLAY_POLICY_DEFAULTS, tokenReplayConsiderRemainingInFitness: false, tokenReplayCleaningTokenFlood: true, tokenReplayExhaustiveInvisibleExploration: true };
     const render = (variant: "forward" | "backwards") => renderToStaticMarkup(
       createElement(TokenReplayPolicyControls, { variant, policies, onChange: () => {} }),
     );
     const backwards = render("backwards");
-    expect(backwards.match(/disabled=""/g)).toHaveLength(3);
+    expect(backwards.match(/disabled=""/g)).toHaveLength(5);
     expect(backwards).toContain("ignored in backwards replay");
     expect(backwards).toContain("Require no remaining tokens for a fitting trace");
     const labels = backwards.match(/<label[\s\S]*?<\/label>/g)!;
+    expect(labels[7]).toContain("Clean token flooding during replay");
+    expect(labels[7]).toContain('type="checkbox"');
+    expect(labels[7]).toContain('checked=""');
+    expect(labels[7]).toContain('disabled=""');
+    expect(labels[8]).toContain("Exhaustive hidden exploration");
+    expect(labels[8]).toContain('checked=""');
+    expect(labels[8]).toContain('disabled=""');
     expect(labels[0]).toContain('<option value="false" selected="">');
     expect(labels[3]).not.toContain("disabled");
     expect(labels[4]).not.toContain("disabled");
@@ -28,6 +35,10 @@ describe("token replay policy controls", () => {
     expect(forward).not.toContain("disabled");
     expect(forward).not.toContain("ignored in backwards replay");
     expect(forward.match(/<label[\s\S]*?<\/label>/g)![0]).toContain('<option value="false" selected="">');
+    expect(forward.match(/<label[\s\S]*?<\/label>/g)![7]).toContain('checked=""');
+    expect(policies.tokenReplayCleaningTokenFlood).toBe(true);
+    expect(forward.match(/<label[\s\S]*?<\/label>/g)![8]).toContain('checked=""');
+    expect(policies.tokenReplayExhaustiveInvisibleExploration).toBe(true);
     expect(policies.tokenReplayConsiderRemainingInFitness).toBe(false);
   });
 
@@ -51,6 +62,8 @@ describe("token replay policy controls", () => {
       tokenReplayConsiderRemainingInFitness: false,
       tokenReplayTryToReachFinalMarkingThroughHidden: false,
       tokenReplayConsiderActivitiesNotInModelInFitness: true,
+      tokenReplayCleaningTokenFlood: true,
+      tokenReplayExhaustiveInvisibleExploration: true,
       tokenReplayWalkThroughHiddenTransitions: false,
       tokenReplayIncludeTraceDiagnostics: true,
       tokenReplayIncludeDurationDiagnostics: true,

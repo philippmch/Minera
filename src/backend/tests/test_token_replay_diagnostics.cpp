@@ -1,4 +1,7 @@
 #include "minera/conformance.hpp"
+#include "minera/bpmn.hpp"
+#include "minera/pnml.hpp"
+#include "minera/petri_usage_comparison.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -566,9 +569,354 @@ void replay_variant_keys_are_unambiguous() {
   }
   assert(ordinary == 2 && combined == 1);
 }
+
+void forward_cleaning_public_counter_contract() {
+  const auto net = sequential();
+  TokenReplayOptions options;
+  const auto log = log_of({{"b", "a"}});
+  const auto ordinary = replay_token_traces(log, net, options).front();
+  options.cleaning_token_flood = true;
+  const auto cleaned = replay_token_traces(log, net, options).front();
+  assert(cleaned.produced == 3 && cleaned.consumed == 3);
+  assert(cleaned.missing == 3 && cleaned.remaining == 3 && cleaned.trace_fitness == 0.0);
+  assert(cleaned.remaining > ordinary.remaining);
+  assert((cleaned.reached_marking == std::vector<int>{0, 1, 0}));
+  assert((cleaned.reached_marking_keys == std::vector<bool>{false, true, false}));
+  for (const auto& place : cleaned.places)
+    assert(place.produced == 1 && place.consumed == 1 && place.missing == 1 && place.remaining == 1);
+  consistent(log, net, options);
+
+  options.initial_marking = {3, 0, 0};
+  auto row = replay_token_traces(log_of({{"b"}}), net, options).front();
+  assert(row.produced == 4 && row.consumed == 2 && row.missing == 1 && row.remaining == 1);
+  assert(row.trace_fitness == 0.625 && row.places[0].remaining == 1);
+  options.initial_marking = {0, 0, 0};
+  options.initial_marking_keys = {true, false, false};
+  row = replay_token_traces(log_of({{"b"}}), net, options).front();
+  assert(row.produced == 1 && row.consumed == 2 && row.missing == 1 && row.remaining == 1);
+  assert(row.places[0].remaining == 1 && row.trace_fitness == 0.25);
+  consistent(log_of({{"b"}}), net, options);
+
+  options = {};
+  options.variant = TokenReplayVariant::kBackwards;
+  const auto backwards = replay_token_traces(log, net, options).front();
+  options.cleaning_token_flood = true;
+  const auto unchanged = replay_token_traces(log, net, options).front();
+  assert(unchanged.reached_marking == backwards.reached_marking);
+  assert(unchanged.missing == backwards.missing && unchanged.remaining == backwards.remaining);
+}
+
+void forward_weighted_repair_and_partial_stop_contract() {
+  PetriNet weighted;
+  weighted.add_place(); weighted.add_place();
+  weighted.set_source(0); weighted.set_sink(1); weighted.set_activities({"a"});
+  weighted.add_transition(0, {0, 0, 0}, {1});
+  const auto repaired = replay_token_traces(log_of({{"a"}}), weighted).front();
+  assert(repaired.produced == 2 && repaired.consumed == 4);
+  assert(repaired.missing == 2 && repaired.remaining == 1 && repaired.trace_fitness == 0.5);
+  assert((repaired.reached_marking == std::vector<int>{1, 1}));
+  consistent(log_of({{"a"}}), weighted, {});
+
+  PetriNet partial;
+  for (int i = 0; i < 5; ++i) partial.add_place();
+  partial.set_source(0); partial.set_sink(4); partial.set_activities({"a"});
+  partial.add_transition(std::nullopt, {0}, {1});
+  partial.add_transition(std::nullopt, {1, 2}, {3});
+  partial.add_transition(0, {3}, {4});
+  TokenReplayOptions options;
+  options.try_to_reach_final_marking_through_hidden = false;
+  options.stop_immediately_unfit = true;
+  const auto stopped = replay_token_traces(log_of({{"a"}}), partial, options).front();
+  assert(stopped.replay_stopped && stopped.replayed_events == 1);
+  assert((stopped.activated_transitions == std::vector<std::size_t>{0}));
+  assert((stopped.transitions_with_problems == std::vector<std::size_t>{2}));
+  assert(stopped.produced == 2 && stopped.consumed == 2);
+  assert(stopped.missing == 2 && stopped.remaining == 1 && stopped.trace_fitness == 0.25);
+  consistent(log_of({{"a"}}), partial, options);
+}
+
+void forward_final_zero_key_and_path_boundary_contract() {
+  PetriNet silent;
+  silent.add_place(); silent.add_place();
+  silent.set_source(0); silent.set_sink(1);
+  silent.add_transition(std::nullopt, {0}, {1});
+  TokenReplayOptions options;
+  options.final_marking = {0, 0};
+  options.final_marking_keys = {false, true};
+  const auto absent = replay_token_traces(log_of({{}}), silent, options).front();
+  assert((absent.activated_transitions == std::vector<std::size_t>{0}));
+  assert(absent.produced == 2 && absent.consumed == 1 && absent.remaining == 1);
+  options.initial_marking_keys = {true, true};
+  const auto present = replay_token_traces(log_of({{}}), silent, options).front();
+  assert(present.activated_transitions.empty());
+  assert((present.reached_marking_keys == std::vector<bool>{true, true}));
+  assert(present.produced == 1 && present.consumed == 0 && present.trace_fitness == 1.0);
+  consistent(log_of({{}}), silent, options);
+  for (const std::size_t depth : {51, 52}) {
+    PetriNet chain;
+    for (std::size_t place = 0; place <= depth; ++place) chain.add_place();
+    chain.set_source(0); chain.set_sink(depth);
+    for (std::size_t place = 0; place < depth; ++place)
+      chain.add_transition(std::nullopt, {place}, {place + 1});
+    const auto row = replay_token_traces(log_of({{}}), chain).front();
+    assert(row.activated_transitions.size() == (depth == 51 ? depth : 0));
+    assert(row.missing == (depth == 51 ? 0 : 1));
+  }
+}
+
+void forward_empty_log_cleaning_initialization_contract() {
+  for (const bool empty_net : {false, true}) {
+    const auto net = empty_net ? PetriNet{} : sequential();
+    TokenReplayOptions options;
+    options.initial_marking.assign(net.place_count(), 0);
+    options.initial_marking_keys.assign(net.place_count(), false);
+    const EventLog log;
+    assert(replay_token_traces(log, net, options).empty());
+    consistent(log, net, options);
+    options.cleaning_token_flood = true;
+    for (int api = 0; api < 3; ++api) {
+      bool rejected = false;
+      try {
+        if (api == 0) (void)replay_token_traces(log, net, options);
+        else if (api == 1) (void)replay_token_diagnostics(log, net, options);
+        else (void)check_conformance(log, net, options);
+      } catch (const std::invalid_argument& error) {
+        rejected = std::string(error.what()).find("initial marking") != std::string::npos;
+      }
+      assert(rejected);
+    }
+    if (!empty_net) {
+      options.initial_marking_keys[0] = true;
+      assert(replay_token_traces(log, net, options).empty());
+      consistent(log, net, options);
+    }
+  }
+}
+
+void forward_extended_arc_silent_completion_contract() {
+  for (const bool reset : {false, true}) {
+    PetriNet net;
+    net.add_place(); net.add_place();
+    net.set_source(0); net.set_sink(1);
+    const auto transition = net.add_transition(std::nullopt, {}, {1});
+    if (reset) net.add_reset_arc(transition, 0);
+    else net.add_inhibitor_arc(transition, 0);
+    TokenReplayOptions options;
+    options.initial_marking = {reset ? 2 : 0, 0};
+    const auto log = log_of({{}});
+    const auto row = replay_token_traces(log, net, options).front();
+    assert((row.activated_transitions == std::vector<std::size_t>{transition}));
+    assert((row.reached_marking == std::vector<int>{0, 1}));
+    assert(row.missing == 0 && row.remaining == 0 && row.trace_is_fit);
+    assert(row.event_diagnostics.empty());
+    consistent(log, net, options);
+    options.try_to_reach_final_marking_through_hidden = false;
+    const auto unrouted = replay_token_traces(log, net, options).front();
+    assert(unrouted.activated_transitions.empty() && unrouted.missing == 1);
+  }
+}
+
+void forward_bpmn_greedy_routing_public_contract() {
+  const ProcessTree inclusive(
+      {"a", "b"},
+      {ProcessTreeOperator::kInclusiveChoice, 0,
+       {ProcessTreeNode::leaf(0), ProcessTreeNode::tau(), ProcessTreeNode::leaf(1)}});
+  // The public probe imports this exact PNML. Serialization orders arc
+  // endpoints, which fixes the tie between equally short silent paths.
+  const auto inclusive_net = parse_pnml(to_pnml(parse_bpmn(to_bpmn(inclusive))));
+  const auto empty = log_of({{}});
+  const auto skipped = replay_token_traces(empty, inclusive_net).front();
+  assert(!skipped.trace_is_fit);
+  assert(skipped.consumed == 6 && skipped.produced == 9);
+  assert(skipped.missing == 1 && skipped.remaining == 4);
+  assert(std::abs(skipped.trace_fitness - 25.0 / 36.0) < 1e-12);
+  assert((skipped.activated_transitions == std::vector<std::size_t>{0, 2, 7, 4}));
+  assert(skipped.transitions_with_problems.empty() && skipped.event_diagnostics.empty());
+  consistent(empty, inclusive_net, {});
+
+  const ProcessTree interleaving(
+      {"a", "b", "c", "d"},
+      {ProcessTreeOperator::kInterleaving, 0,
+       {{ProcessTreeOperator::kSequence, 0, {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}},
+        {ProcessTreeOperator::kSequence, 0, {ProcessTreeNode::leaf(2), ProcessTreeNode::leaf(3)}}}});
+  const auto interleaving_net = parse_pnml(to_pnml(parse_bpmn(to_bpmn(interleaving))));
+  const auto log = log_of({{"a", "b", "c", "d"}, {"c", "d", "a", "b"}});
+  for (const auto& row : replay_token_traces(log, interleaving_net)) {
+    assert(!row.trace_is_fit && row.trace_fitness == 0.6);
+    assert(row.consumed == 5 && row.produced == 5);
+    assert(row.missing == 2 && row.remaining == 2);
+    assert(row.activated_transitions.size() == 4 && row.transitions_with_problems.size() == 2);
+  }
+  consistent(log, interleaving_net, {});
+}
+
+// Public 2.7.22 nested-AND probes: blocked joins remain visited, while later
+// steps of their paths can still fire. These are routing, not language, tests.
+struct NestedRoutingNet {
+  PetriNet net;
+  TokenReplayOptions options;
+};
+NestedRoutingNet nested_routing_net(int depth, bool prefired, bool tail) {
+  NestedRoutingNet fixture;
+  auto& net = fixture.net;
+  auto& options = fixture.options;
+  net.set_activities({"A"});
+  auto place = [&](const std::string& name) {
+    options.place_names.push_back(name);
+    return net.add_place();
+  };
+  auto suffix = [](int i) { return std::string("0") + std::to_string(i); };
+  place("entry"); place("block_out_00");
+  for (int i = 0; i < depth; ++i)
+    for (const auto* prefix : {"direct_branch_", "direct_end_", "nested_branch_", "nested_end_"})
+      place(prefix + suffix(i));
+  const auto sink = place("sink");
+  if (tail) place("tail");
+  auto id = [&](const std::string& name) {
+    const auto found = std::find(options.place_names.begin(), options.place_names.end(), name);
+    assert(found != options.place_names.end());
+    return static_cast<std::size_t>(found - options.place_names.begin());
+  };
+  auto transition = [&](const std::string& name, std::vector<std::size_t> inputs,
+                        std::vector<std::size_t> outputs, bool visible = false) {
+    options.transition_names.push_back(name);
+    net.add_transition(visible ? std::optional<std::size_t>{0} : std::nullopt,
+                       std::move(inputs), std::move(outputs));
+  };
+  for (int i = 0; i < depth; ++i) {
+    const auto n = suffix(i);
+    transition("split_" + n, {id(i == 0 ? "entry" : "nested_branch_" + suffix(i - 1))},
+               {id("direct_branch_" + n), id("nested_branch_" + n)});
+    transition("direct_" + n, {id("direct_branch_" + n)}, {id("direct_end_" + n)});
+    transition("join_" + n, {id("direct_end_" + n), id("nested_end_" + n)},
+               {id(i == 0 ? "block_out_00" : "nested_end_" + suffix(i - 1))});
+  }
+  const auto last = suffix(depth - 1);
+  transition("nested_" + last, {id("nested_branch_" + last)}, {id("nested_end_" + last)});
+  transition("visible", {id(tail ? "tail" : "block_out_00")}, {sink}, true);
+  if (tail) transition("tail_move", {id("block_out_00")}, {id("tail")});
+  net.set_source(0); net.set_sink(sink);
+  options.initial_marking.assign(net.place_count(), 0);
+  if (prefired) {
+    options.initial_marking[id("direct_branch_00")] = 1;
+    options.initial_marking[id("nested_branch_00")] = 1;
+  } else options.initial_marking[0] = 1;
+  options.final_marking.assign(net.place_count(), 0);
+  options.final_marking[sink] = 1;
+  options.try_to_reach_final_marking_through_hidden = false;
+  return fixture;
+}
+
+void forward_nested_hidden_routing_public_contract() {
+  struct Expected {
+    int depth;
+    bool prefired, tail, exhaustive, stop;
+    std::uint64_t consumed, produced, missing, remaining;
+    double fitness;
+    bool fit;
+    std::vector<std::string> activated;
+    std::vector<int> marking;
+    std::vector<std::uint64_t> place_usage; // Empty when only replay was probed.
+  };
+  // Exact public results from token-replay-nested-followup-reference.json,
+  // token-replay-nested-routing-reference.json and both comparison captures.
+  const std::vector<Expected> cases{
+    {2, false, false, false, false, 11, 11, 0, 0, 1.0, true,
+     {"split_00", "direct_00", "split_01", "direct_01", "nested_01", "join_01", "join_00", "visible"},
+     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}},
+    {2, false, false, false, true, 11, 11, 0, 0, 1.0, true,
+     {"split_00", "direct_00", "split_01", "direct_01", "nested_01", "join_01", "join_00", "visible"},
+     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}},
+    {2, false, false, true, true, 5, 7, 2, 3, 0.5857142857142856, false,
+     {"split_00", "direct_00", "split_01", "direct_01"},
+     {0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0}, {1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1}},
+    {3, false, false, false, false, 13, 14, 1, 2, 0.8901098901098902, false,
+     {"split_00", "direct_00", "split_01", "direct_01", "split_02", "direct_02", "nested_02", "join_02", "join_01", "visible"},
+     {0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1}, {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}},
+    {3, false, false, false, true, 12, 13, 2, 2, 0.8397435897435898, false,
+     {"split_00", "direct_00", "split_01", "direct_01", "split_02", "direct_02", "nested_02", "join_02", "join_01"},
+     {0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}},
+    {3, false, false, true, true, 5, 7, 2, 3, 0.5857142857142856, false,
+     {"split_00", "direct_00", "split_01", "direct_01"},
+     {0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0}, {1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1}},
+    {4, false, false, false, false, 10, 14, 1, 5, 0.7714285714285714, false,
+     {"split_00", "direct_00", "split_01", "direct_01", "split_02", "direct_02", "split_03", "direct_03", "visible"},
+     {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1}, {1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1}},
+    {4, false, false, false, true, 9, 13, 2, 5, 0.6965811965811965, false,
+     {"split_00", "direct_00", "split_01", "direct_01", "split_02", "direct_02", "split_03", "direct_03"},
+     {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0}, {1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1}},
+    {4, false, false, true, true, 5, 7, 2, 3, 0.5857142857142856, false,
+     {"split_00", "direct_00", "split_01", "direct_01"},
+     {0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}},
+    {3, true, false, false, true, 11, 12, 2, 2, 0.8257575757575757, false,
+     {"direct_00", "split_01", "direct_01", "split_02", "direct_02", "nested_02", "join_02", "join_01"},
+     {0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {}},
+    {3, false, true, false, true, 12, 13, 2, 2, 0.8397435897435898, false,
+     {"split_00", "direct_00", "split_01", "direct_01", "split_02", "direct_02", "nested_02", "join_02", "join_01"},
+     {0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {}},
+    {4, true, false, false, true, 13, 15, 2, 3, 0.823076923076923, false,
+     {"direct_00", "split_01", "direct_01", "split_02", "direct_02", "split_03", "direct_03", "nested_03", "join_03", "join_02"},
+     {0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {}},
+    {4, false, true, false, true, 16, 17, 2, 2, 0.8786764705882353, false,
+     {"split_00", "direct_00", "split_01", "direct_01", "split_02", "direct_02", "split_03", "direct_03", "nested_03", "join_03", "join_02", "join_01"},
+     {0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {}},
+  };
+  const auto log = log_of({{"A"}});
+  for (const auto& expected : cases) {
+    auto fixture = nested_routing_net(expected.depth, expected.prefired, expected.tail);
+    auto& options = fixture.options;
+    options.exhaustive_invisible_exploration = expected.exhaustive;
+    options.stop_immediately_unfit = expected.stop;
+    const auto row = replay_token_traces(log, fixture.net, options).front();
+    std::vector<std::string> activated;
+    for (const auto t : row.activated_transitions) activated.push_back(options.transition_names[t]);
+    assert(activated == expected.activated);
+    assert(row.reached_marking == expected.marking);
+    assert(row.reached_marking_keys.size() == expected.marking.size());
+    for (std::size_t i = 0; i < expected.marking.size(); ++i)
+      assert(row.reached_marking_keys[i] == (expected.marking[i] > 0));
+    assert(row.consumed == expected.consumed && row.produced == expected.produced);
+    assert(row.missing == expected.missing && row.remaining == expected.remaining);
+    assert(std::abs(row.trace_fitness - expected.fitness) < 1e-12);
+    assert(row.trace_is_fit == expected.fit);
+    assert(row.replay_stopped == (expected.stop && !expected.fit));
+    assert(row.event_diagnostics.size() == 1);
+    assert(row.transitions_with_problems.size() == (expected.fit ? 0U : 1U));
+    consistent(log, fixture.net, options);
+    if (!expected.place_usage.empty()) {
+      PetriUsageComparisonOptions comparison_options;
+      comparison_options.initial_marking.assign(options.initial_marking.begin(), options.initial_marking.end());
+      comparison_options.final_marking.assign(options.final_marking.begin(), options.final_marking.end());
+      comparison_options.place_names = options.place_names;
+      comparison_options.transition_names = options.transition_names;
+      comparison_options.try_to_reach_final_marking_through_hidden = false;
+      comparison_options.stop_immediately_unfit = expected.stop;
+      comparison_options.exhaustive_invisible_exploration = expected.exhaustive;
+      const auto comparison = compare_petri_usage(fixture.net, log, EventLog{}, comparison_options);
+      assert(comparison.places.size() == expected.place_usage.size());
+      for (const auto& place : comparison.places) {
+        assert(place.log1_occurrences == expected.place_usage[place.id]);
+        assert(place.log2_occurrences == 0 && place.total_occurrences == place.log1_occurrences);
+      }
+      for (const auto& transition : comparison.transitions) {
+        const auto count = static_cast<std::uint64_t>(std::count(
+            expected.activated.begin(), expected.activated.end(), options.transition_names[transition.id]));
+        assert(transition.log1_occurrences == count);
+        assert(transition.log2_occurrences == 0 && transition.total_occurrences == count);
+      }
+    }
+  }
+}
 }  // namespace
 
 int main() {
+  forward_nested_hidden_routing_public_contract();
+  forward_cleaning_public_counter_contract();
+  forward_weighted_repair_and_partial_stop_contract();
+  forward_final_zero_key_and_path_boundary_contract();
+  forward_empty_log_cleaning_initialization_contract();
+  forward_extended_arc_silent_completion_contract();
+  forward_bpmn_greedy_routing_public_contract();
   ordered_trace_rows_and_markings();
   hidden_routing_policies_and_enabled_ids();
   deviations_unknowns_and_stopping();

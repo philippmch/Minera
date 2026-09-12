@@ -774,7 +774,9 @@ void replay_selector_changes_fitted_activation_counts() {
   backwards.token_replay_variant = minera::TokenReplayVariant::kBackwards;
   const auto b = minera::fit_monte_carlo_options(input, net, backwards);
   assert(f.transition_weights.size() == 3);
-  assert(f.transition_weights[2] == 0.0);
+  // Public forward replay fixes the greatest disabled duplicate name before
+  // routing, so t2 receives the activation rather than t1.
+  assert((f.transition_weights == std::vector<double>{1.0, 0.0, 1.0}));
   // The backwards variation interrupts on the ambiguous duplicate label,
   // leaving no activation-weight fit; forward replay selects one branch.
   assert(b.transition_weights.empty());

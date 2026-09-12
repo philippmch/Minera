@@ -5054,6 +5054,8 @@ void handle_compare_petri(const httplib::Request& request,
     comparison_options.stop_immediately_unfit = comparison_bool(
         "stop_immediately_unfit",
         comparison_options.stop_immediately_unfit);
+    comparison_options.exhaustive_invisible_exploration = comparison_bool(
+        "exhaustive_invisible_exploration", comparison_options.exhaustive_invisible_exploration);
     comparison_options.cleaning_token_flood = comparison_bool(
         "cleaning_token_flood", comparison_options.cleaning_token_flood);
     const auto selector = comparison_options.activity_attribute;

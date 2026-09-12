@@ -20,6 +20,8 @@ export const TOKEN_REPLAY_POLICY_DEFAULTS = {
   tokenReplayConsiderRemainingInFitness: true,
   tokenReplayTryToReachFinalMarkingThroughHidden: true,
   tokenReplayConsiderActivitiesNotInModelInFitness: false,
+  tokenReplayCleaningTokenFlood: false,
+  tokenReplayExhaustiveInvisibleExploration: false,
   tokenReplayWalkThroughHiddenTransitions: true,
   tokenReplayIncludeTraceDiagnostics: false,
   tokenReplayIncludeDurationDiagnostics: false,
@@ -70,7 +72,7 @@ export function TokenReplayPolicyControls({ variant, policies, onChange }: {
 }) {
   const backwards = variant === "backwards";
   return <>
-    {backwards && <p className="conf-inline-note">Final-state fit classification, unknown-activity classification, and final-marking routing policies apply only to forward replay and are ignored in backwards replay. Their settings are retained when switching back.</p>}
+    {backwards && <p className="conf-inline-note">Final-state fit classification, unknown-activity classification, final-marking routing, token-flood cleaning, and exhaustive hidden exploration policies apply only to forward replay and are ignored in backwards replay. Their settings are retained when switching back.</p>}
     <div className="filters-row">
       {([
         ["tokenReplayConsiderRemainingInFitness", "Require no remaining tokens for a fitting trace", true],
@@ -90,6 +92,16 @@ export function TokenReplayPolicyControls({ variant, policies, onChange }: {
           </select>
         </label>
       ))}
+      <label className="filters-field">
+        <span>Clean token flooding during replay</span>
+        <input type="checkbox" checked={policies.tokenReplayCleaningTokenFlood} disabled={backwards}
+          onChange={(event) => onChange("tokenReplayCleaningTokenFlood", event.target.checked)} />
+      </label>
+      <label className="filters-field">
+        <span>Exhaustive hidden exploration</span>
+        <input type="checkbox" checked={policies.tokenReplayExhaustiveInvisibleExploration} disabled={backwards}
+          onChange={(event) => onChange("tokenReplayExhaustiveInvisibleExploration", event.target.checked)} />
+      </label>
     </div>
   </>;
 }

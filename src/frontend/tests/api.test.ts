@@ -44,6 +44,8 @@ describe("Token replay policy request options", () => {
     ["tokenReplayConsiderRemainingInFitness", "token_replay_consider_remaining_in_fitness"],
     ["tokenReplayTryToReachFinalMarkingThroughHidden", "token_replay_try_to_reach_final_marking_through_hidden"],
     ["tokenReplayConsiderActivitiesNotInModelInFitness", "token_replay_consider_activities_not_in_model_in_fitness"],
+    ["tokenReplayCleaningTokenFlood", "token_replay_cleaning_token_flood"],
+    ["tokenReplayExhaustiveInvisibleExploration", "token_replay_exhaustive_invisible_exploration"],
     ["tokenReplayWalkThroughHiddenTransitions", "token_replay_walk_through_hidden_transitions"],
     ["tokenReplayIncludeTraceDiagnostics", "token_replay_include_trace_diagnostics"],
     ["tokenReplayIncludeDurationDiagnostics", "token_replay_include_duration_diagnostics"],
@@ -319,15 +321,19 @@ describe("XES export API", () => {
 });
 
 describe("Petri usage comparison API", () => {
-  it.each([true, false, undefined])("preserves cleaning_token_flood=%s in multipart options", async (cleaning) => {
+  it.each([
+    [true, false], [false, true], [undefined, undefined],
+  ] as const)("preserves separate comparison cleaning=%s and exhaustive=%s policies", async (cleaning, exhaustive) => {
     vi.stubGlobal("fetch", vi.fn(async (_path: string, init?: RequestInit) => {
       const form = init?.body as FormData;
       expect(form.get("cleaning_token_flood")).toBe(cleaning === undefined ? null : String(cleaning));
+      expect(form.get("exhaustive_invisible_exploration")).toBe(exhaustive === undefined ? null : String(exhaustive));
       return { ok: true, json: async () => ({ family: "PETRI_USAGE_COMPARISON", places: [], transitions: [], arcs: [] }) };
     }));
     try {
       await comparePetriUsage(new File(["case_id,activity\nc1,A\n"], "reference.csv"), "alpha", {
         cleaning_token_flood: cleaning,
+        exhaustive_invisible_exploration: exhaustive,
       });
     } finally { vi.unstubAllGlobals(); }
   });
