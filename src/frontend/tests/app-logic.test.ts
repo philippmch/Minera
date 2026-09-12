@@ -488,6 +488,15 @@ describe("DFG and edit-distance contracts", () => {
     expect(p.get("dfg_timestamp_attribute")).toBe("occurred_at");
     expect(p.get("dfg_sync_cost")).toBe("A=1,B=2");
     expect(p.get("projection")).toBe("metrics");
+    expect(parseDfgCostMapInput(" ")).toBeUndefined();
+    expect(parseDfgCostMapInput(" {} ")).toEqual({});
+    const specialNames = parseDfgCostMapInput("__proto__=2,constructor=3,__proto__=4")!;
+    expect(Object.keys(specialNames)).toEqual(["__proto__", "constructor"]);
+    expect(new URLSearchParams(dfgAlignmentQuery({ sync_cost: specialNames })).get("dfg_sync_cost"))
+      .toBe("__proto__=4,constructor=3");
+    const emptyCosts = new URLSearchParams(dfgAlignmentQuery({ sync_cost: {}, model_move_cost: {}, log_move_cost: {}, internal_log_move_cost: {} }));
+    for (const key of ["dfg_sync_cost", "dfg_model_move_cost", "dfg_log_move_cost", "dfg_internal_log_move_cost"])
+      expect(emptyCosts.get(key)).toBe("{}");
     expect(new URLSearchParams(dfgAlignmentQuery({ max_states: 0, max_time_ms: -1 })).toString()).toBe("");
     const escaped = new URLSearchParams(dfgAlignmentQuery({ sync_cost: { "A,B": 1, "A=B": 2, "A:B": 3, "A\\B": 4 } }));
     expect(escaped.get("dfg_sync_cost")).toBe("A\\,B=1,A\\:B=3,A\\=B=2,A\\\\B=4");
@@ -506,9 +515,23 @@ describe("DFG and edit-distance contracts", () => {
     expect(() => editDistanceFormEntries({ activity_attribute: "" })).toThrow(/must not be empty/);
   });
   it("guards compatible alignment results and rejects wrong families", () => {
-    const dfg = { family: "DFG", variant: "CLASSIC", unique_variants: 1, alignments: [{ cost: 0, internal_cost: 0, fitness: 1, best_worst_cost: 0, visited_states: 1, closed: 1, closed_states: 1, moves: [{ log: "A", model: "A" }] }] };
+    const dfg = { family: "DFG", variant: "CLASSIC", unique_variants: 1, alignments: [{ computed: true, cost: 0, internal_cost: 0, fitness: 1, best_worst_cost: 0, visited_states: 1, closed: 1, closed_states: 1, moves: [{ log: "A", model: "A" }] }] };
     expect(isDfgAlignmentResult(dfg)).toBe(true);
     expect(isDfgAlignmentResult({ ...dfg, family: "EDIT_DISTANCE" })).toBe(false);
+    const unavailable = { ...dfg, alignments: [{ computed: false }] };
+    expect(isDfgAlignmentResult(unavailable)).toBe(true);
+    expect(isDfgAlignmentResult({ ...unavailable, projected_log: {} })).toBe(false);
+    expect(isDfgAlignmentResult({ ...unavailable, projected_dfg: {} })).toBe(false);
+    for (const key of ["cost", "fitness", "moves", "closed", "best_worst_cost"]) {
+      expect(isDfgAlignmentResult({ ...unavailable, alignments: [{ computed: false, [key]: key === "moves" ? [] : 0 }] })).toBe(false);
+    }
+    for (const computed of [undefined, null, "false", 0])
+      expect(isDfgAlignmentResult({ ...dfg, alignments: [{ ...dfg.alignments[0], computed }] })).toBe(false);
+    for (const [key, invalid] of [["cost", -1], ["internal_cost", Infinity], ["fitness", NaN],
+      ["visited_states", 0.5], ["closed_states", -1], ["closed", undefined], ["best_worst_cost", -1]])
+      expect(isDfgAlignmentResult({ ...dfg, alignments: [{ ...dfg.alignments[0], [key as string]: invalid }] })).toBe(false);
+    expect(isDfgAlignmentResult({ ...dfg, unique_variants: -1 })).toBe(false);
+    expect(isDfgAlignmentResult({ ...dfg, unique_variants: 2 })).toBe(false);
     const edit = { family: "EDIT_DISTANCE", variant: "EDIT_DISTANCE", anti: false, source_count: 1, alignments: [{ source_variant: ["A"], target_variant: ["A"], target_index: 0, cost: 0, fitness: 1, best_worst_cost: 0, bwc: 0, denominator: 0, moves: [{ type: "sync", log: "A", model: "A" }] }] };
     expect(isEditDistanceResult(edit)).toBe(true);
   });

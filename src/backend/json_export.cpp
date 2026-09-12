@@ -4411,12 +4411,26 @@ void write_projected_log(std::ostream& out, const EventLog& log) {
 std::string dfg_alignment_json(const DfgAlignmentLogResult& result,
                                const DfgAlignmentProjection* projection,
                                const EventLog* projected_log) {
+  if (result.unique_variants > result.alignments.size())
+    throw std::invalid_argument("DFG alignment unique variants exceed trace count");
   std::ostringstream out;
   out << "{\"family\": \"DFG\", \"variant\": \"CLASSIC\", \"unique_variants\": "
       << result.unique_variants << ", \"alignments\": [";
   for (std::size_t i = 0; i < result.alignments.size(); ++i) {
     const auto& a = result.alignments[i];
-    out << "{\"cost\": " << a.cost << ", \"internal_cost\": " << a.internal_cost
+    if (!a.computed) {
+      if (projection != nullptr || projected_log != nullptr)
+        throw std::invalid_argument("DFG projection requires computed alignments");
+      out << "{\"computed\": false}";
+      if (i + 1 < result.alignments.size()) out << ',';
+      continue;
+    }
+    if (!std::isfinite(a.cost) || a.cost < 0 ||
+        !std::isfinite(a.internal_cost) || a.internal_cost < 0 ||
+        !std::isfinite(a.fitness) || !std::isfinite(a.best_worst_cost) ||
+        a.best_worst_cost < 0)
+      throw std::invalid_argument("DFG alignment result has invalid numeric values");
+    out << "{\"computed\": true, \"cost\": " << a.cost << ", \"internal_cost\": " << a.internal_cost
         << ", \"fitness\": " << a.fitness << ", \"best_worst_cost\": "
         << a.best_worst_cost << ", \"visited_states\": " << a.visited_states
         << ", \"closed\": " << a.closed << ", \"closed_states\": " << a.closed_states

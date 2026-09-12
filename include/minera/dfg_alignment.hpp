@@ -18,7 +18,10 @@ enum class DfgAlignmentVariant {
 
 struct DfgAlignmentMove {
   std::string log;    // ">>" denotes a move on model
-  std::string model;  // ">>" denotes a move on log
+  // ">>" denotes a move on log. CLASSIC can expose an early sink transition;
+  // its generated identity is canonicalized to "@@dfg_sink", appending '_'
+  // until the name differs from every model and trace activity.
+  std::string model;
 };
 
 struct DfgAlignmentOptions {
@@ -34,17 +37,27 @@ struct DfgAlignmentOptions {
   // first-class Event projections; other names resolve to generic attributes.
   std::string activity_attribute = "concept:name";
   std::string timestamp_attribute = "time:timestamp";
+  // Nonempty maps are always supplied. These flags distinguish an explicitly
+  // empty cost function from an omitted function that receives default costs.
+  bool sync_cost_supplied = false;
+  bool model_move_cost_supplied = false;
+  bool log_move_cost_supplied = false;
+  bool internal_log_move_cost_supplied = false;
 };
 
 struct DfgAlignmentResult {
   std::vector<DfgAlignmentMove> alignment;
   double cost = 0.0;
   double internal_cost = 0.0;
+  // Only log alignment computes fitness and best/worst cost. Raw trace
+  // alignment leaves both as NaN, matching the reference's absent fields.
   double fitness = 1.0;
   double best_worst_cost = 0.0;
   std::size_t visited_states = 0;
   std::size_t closed = 0;
   std::size_t closed_states = 0;
+  // False when the supplied graph has no accepting path. Scores are undefined.
+  bool computed = true;
 };
 
 struct DfgAlignmentLogResult {
@@ -92,11 +105,32 @@ struct DfgAlignmentProjection {
     const std::map<std::string, std::uint64_t>& end_activities,
     const DfgAlignmentOptions& options = {});
 
+// Project a previously computed log alignment.  Supplying the result keeps
+// projection tied to the exact routes selected by the alignment search.  The
+// options argument remains explicit so legacy fifth-argument `{}` calls stay
+// unambiguous.
+[[nodiscard]] EventLog project_log_on_dfg(
+    const EventLog& log, const DfgFrequency& dfg,
+    const std::map<std::string, std::uint64_t>& start_activities,
+    const std::map<std::string, std::uint64_t>& end_activities,
+    const DfgAlignmentLogResult& result,
+    const DfgAlignmentOptions& options);
+
 [[nodiscard]] DfgAlignmentProjection project_alignments_on_dfg(
     const EventLog& log, const DfgFrequency& dfg,
     const std::map<std::string, std::uint64_t>& start_activities,
     const std::map<std::string, std::uint64_t>& end_activities,
     const DfgAlignmentOptions& options = {});
+
+// Aggregate metrics from a previously computed log alignment.  The supplied
+// result must contain one computed alignment for every source trace.  The
+// options argument is explicit for the same overload compatibility reason.
+[[nodiscard]] DfgAlignmentProjection project_alignments_on_dfg(
+    const EventLog& log, const DfgFrequency& dfg,
+    const std::map<std::string, std::uint64_t>& start_activities,
+    const std::map<std::string, std::uint64_t>& end_activities,
+    const DfgAlignmentLogResult& result,
+    const DfgAlignmentOptions& options);
 
 // Convenience aliases.
 inline DfgAlignmentResult apply_trace(const std::vector<std::string>& t,

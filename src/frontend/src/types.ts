@@ -3218,7 +3218,8 @@ export interface DfgAlignmentOptions {
   projection?: DfgAlignmentProjection;
 }
 export interface DfgAlignmentMove { log: string; model: string; }
-export interface DfgAlignmentTrace {
+export interface DfgComputedAlignmentTrace {
+  computed: true;
   cost: number;
   internal_cost: number;
   fitness: number;
@@ -3228,6 +3229,7 @@ export interface DfgAlignmentTrace {
   closed_states: number;
   moves: DfgAlignmentMove[];
 }
+export type DfgAlignmentTrace = DfgComputedAlignmentTrace | { computed: false };
 export interface DfgProjectedEdge { source: string; target: string; sync: number; model_move: number; }
 export interface DfgProjectedActivity { activity: string; sync: number; model_move: number; log_move: number; }
 export interface DfgAlignmentProjectionResult {
@@ -3530,9 +3532,18 @@ export function isPetriUsageComparison(value: unknown): value is PetriUsageCompa
 }
 export function isDfgAlignmentResult(value: unknown): value is DfgAlignmentResult {
   if (!isRecord(value) || value.family !== "DFG" || value.variant !== "CLASSIC" ||
-      !Number.isInteger(value.unique_variants) || !Array.isArray(value.alignments)) return false;
-  return value.alignments.every((a) => isRecord(a) && finite(a.cost) && finite(a.internal_cost) &&
-    finite(a.fitness) && Array.isArray(a.moves) && a.moves.every((m) => isRecord(m) && typeof m.log === "string" && typeof m.model === "string"));
+      !Number.isSafeInteger(value.unique_variants) || (value.unique_variants as number) < 0 ||
+      !Array.isArray(value.alignments) || (value.unique_variants as number) > value.alignments.length) return false;
+  return value.alignments.every((a) => {
+    if (!isRecord(a) || typeof a.computed !== "boolean") return false;
+    if (!a.computed) return value.projected_dfg === undefined && value.projected_log === undefined &&
+      ["cost", "internal_cost", "fitness", "best_worst_cost",
+      "visited_states", "closed", "closed_states", "moves"].every(key => a[key] === undefined);
+    return finite(a.cost) && a.cost >= 0 && finite(a.internal_cost) && a.internal_cost >= 0 &&
+      finite(a.fitness) && finite(a.best_worst_cost) && a.best_worst_cost >= 0 &&
+      [a.visited_states, a.closed, a.closed_states].every(n => Number.isSafeInteger(n) && (n as number) >= 0) &&
+      Array.isArray(a.moves) && a.moves.every((m) => isRecord(m) && typeof m.log === "string" && typeof m.model === "string");
+  });
 }
 export function isDfgPrecisionResult(value: unknown): value is DfgPrecisionResult {
   if (!isRecord(value) || value.family !== "DFG_PRECISION" ||

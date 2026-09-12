@@ -5634,8 +5634,8 @@ void handle_align_dfg(const httplib::Request& request, httplib::Response& respon
     minera::DfgStatisticalOptions dopt; dopt.window = 1; dopt.activity_attribute = options.activity_attribute; dopt.timestamp_attribute = options.timestamp_attribute; const auto dfg = minera::discover_frequency_dfg(session->log, dopt);
     std::map<std::string,std::uint64_t> starts, ends; for (const auto& t:session->log.traces) if(!t.events.empty()){ const auto* first = minera::dfg_event_field_value(t.events.front(), options.activity_attribute); const auto* last = minera::dfg_event_field_value(t.events.back(), options.activity_attribute); if (!first || !last) throw std::invalid_argument("DFG alignment: event is missing activity attribute '" + options.activity_attribute + "'"); ++starts[*first];++ends[*last]; }
     const auto result = minera::align_log_on_dfg(session->log, dfg, starts, ends, options);
-    if (projection == "log") { const auto projected = minera::project_log_on_dfg(session->log, dfg, starts, ends, options); response.set_content(minera::dfg_alignment_json(result, nullptr, &projected), "application/json"); }
-    else if (projection == "metrics") { const auto metrics = minera::project_alignments_on_dfg(session->log, dfg, starts, ends, options); response.set_content(minera::dfg_alignment_json(result, &metrics), "application/json"); }
+    if (projection == "log") { const auto projected = minera::project_log_on_dfg(session->log, dfg, starts, ends, result, options); response.set_content(minera::dfg_alignment_json(result, nullptr, &projected), "application/json"); }
+    else if (projection == "metrics") { const auto metrics = minera::project_alignments_on_dfg(session->log, dfg, starts, ends, result, options); response.set_content(minera::dfg_alignment_json(result, &metrics), "application/json"); }
     else response.set_content(minera::dfg_alignment_json(result), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }

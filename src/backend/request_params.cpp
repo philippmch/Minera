@@ -555,15 +555,20 @@ DfgAlignmentOptions parse_dfg_alignment_params(const FieldLookup& field,
           "dfg_timestamp_attribute: expected a non-empty attribute name");
   }
   const auto map_field = [&](std::string_view canonical, std::initializer_list<std::string_view> aliases,
-                             std::map<std::string,double>& dst) {
+                             std::map<std::string,double>& dst, bool& cost_supplied) {
     std::string_view found = canonical;
     if (!supplied(found)) for (auto a : aliases) if (supplied(a)) { found = a; break; }
-    if (supplied(found)) dst = parse_cost_map(require(found), found);
+    if (supplied(found)) {
+      const auto value = require(found);
+      dst = trim_text(value) == "{}" ? std::map<std::string,double>{}
+                                     : parse_cost_map(value, found);
+      cost_supplied = true;
+    }
   };
-  map_field("dfg_sync_cost", {"sync_cost", "sync_costs", "dfg_sync_costs"}, o.sync_cost);
-  map_field("dfg_model_move_cost", {"model_move_cost", "model_costs", "dfg_model_cost", "dfg_model_move_costs"}, o.model_move_cost);
-  map_field("dfg_log_move_cost", {"log_move_cost", "log_costs", "dfg_log_cost", "dfg_log_move_costs"}, o.log_move_cost);
-  map_field("dfg_internal_log_move_cost", {"internal_log_move_cost", "internal_costs", "dfg_internal_cost", "dfg_internal_log_move_costs"}, o.internal_log_move_cost);
+  map_field("dfg_sync_cost", {"sync_cost", "sync_costs", "dfg_sync_costs"}, o.sync_cost, o.sync_cost_supplied);
+  map_field("dfg_model_move_cost", {"model_move_cost", "model_costs", "dfg_model_cost", "dfg_model_move_costs"}, o.model_move_cost, o.model_move_cost_supplied);
+  map_field("dfg_log_move_cost", {"log_move_cost", "log_costs", "dfg_log_cost", "dfg_log_move_costs"}, o.log_move_cost, o.log_move_cost_supplied);
+  map_field("dfg_internal_log_move_cost", {"internal_log_move_cost", "internal_costs", "dfg_internal_cost", "dfg_internal_log_move_costs"}, o.internal_log_move_cost, o.internal_log_move_cost_supplied);
   return o;
 }
 
