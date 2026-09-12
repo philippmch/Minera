@@ -1782,6 +1782,7 @@ function escapeCostActivity(name: string): string {
 /** Parse the escaped activity=cost syntax used by DFG cost controls. */
 export function parseDfgCostMapInput(value: string): Record<string, number> | undefined {
   if (!value.trim()) return undefined;
+  if (value.trim() === "{}") return {};
   const items: string[] = [];
   let begin = 0;
   let escaped = false;
@@ -1820,7 +1821,7 @@ export function parseDfgCostMapInput(value: string): Record<string, number> | un
     const cost = Number(rawCost);
     if (!activity || activity === ">>" || !rawCost || !Number.isFinite(cost) || cost < 0)
       throw new Error(`invalid cost entry "${item}"; costs must be finite and non-negative`);
-    result[activity] = cost;
+    Object.defineProperty(result, activity, { value: cost, enumerable: true, writable: true, configurable: true });
   }
   return result;
 }
@@ -1833,14 +1834,14 @@ export function parseMarkingInput(value: string): number[] | undefined {
   return entries.map((part) => Number(part));
 }
 
-function encodeCostMap(map?: Record<string, number>): string | undefined {
+function encodeCostMap(map?: Record<string, number>, preserveEmpty = false): string | undefined {
   if (!map) return undefined;
   const entries = Object.entries(map).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
   for (const [name, value] of entries) {
     if (!name || name === ">>" || !Number.isFinite(value) || value < 0)
       throw new Error("DFG cost maps require non-gap activities and finite non-negative costs");
   }
-  return entries.length ? entries.map(([name, value]) => `${escapeCostActivity(name)}=${value}`).join(",") : undefined;
+  return entries.length ? entries.map(([name, value]) => `${escapeCostActivity(name)}=${value}`).join(",") : preserveEmpty ? "{}" : undefined;
 }
 
 /** Deterministic query serialization for classic DFG alignment requests. */
@@ -1860,10 +1861,10 @@ export function dfgAlignmentQuery(options: DfgAlignmentOptions = {}): string {
   const maxTimeMs = options.max_time_ms;
   if (typeof maxStates === "number" && Number.isInteger(maxStates) && maxStates > 0) add("dfg_max_states", maxStates);
   if (typeof maxTimeMs === "number" && Number.isInteger(maxTimeMs) && maxTimeMs > 0) add("dfg_max_time_ms", maxTimeMs);
-  add("dfg_sync_cost", encodeCostMap(options.sync_cost));
-  add("dfg_model_move_cost", encodeCostMap(options.model_move_cost));
-  add("dfg_log_move_cost", encodeCostMap(options.log_move_cost));
-  add("dfg_internal_log_move_cost", encodeCostMap(options.internal_log_move_cost));
+  add("dfg_sync_cost", encodeCostMap(options.sync_cost, true));
+  add("dfg_model_move_cost", encodeCostMap(options.model_move_cost, true));
+  add("dfg_log_move_cost", encodeCostMap(options.log_move_cost, true));
+  add("dfg_internal_log_move_cost", encodeCostMap(options.internal_log_move_cost, true));
   add("projection", options.projection);
   return q.toString();
 }

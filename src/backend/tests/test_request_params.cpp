@@ -3245,6 +3245,18 @@ void parse_dfg_and_edit_alignment_params_contract() {
   assert(d.sync_cost.at("A\tB") == 10.0);
   assert(d.model_move_cost.at("A") == 4.0 && d.log_move_cost.at("B") == 5.0);
   assert(d.internal_log_move_cost.at("A") == 0.25);
+  assert(d.sync_cost_supplied && d.model_move_cost_supplied &&
+         d.log_move_cost_supplied && d.internal_log_move_cost_supplied);
+  const auto omitted = minera::parse_dfg_alignment_params(fields({}));
+  assert(!omitted.sync_cost_supplied && !omitted.model_move_cost_supplied &&
+         !omitted.log_move_cost_supplied && !omitted.internal_log_move_cost_supplied);
+  const auto empty_costs = minera::parse_dfg_alignment_params(fields({
+      {"sync_costs", "{}"}, {"model_costs", " {} "},
+      {"log_costs", "{}"}, {"internal_costs", "{}"}}));
+  assert(empty_costs.sync_cost.empty() && empty_costs.sync_cost_supplied &&
+         empty_costs.model_move_cost.empty() && empty_costs.model_move_cost_supplied &&
+         empty_costs.log_move_cost.empty() && empty_costs.log_move_cost_supplied &&
+         empty_costs.internal_log_move_cost.empty() && empty_costs.internal_log_move_cost_supplied);
   const auto e = minera::parse_edit_distance_params(fields({
       {"edit_variant", "Variants.EDIT_DISTANCE"}, {"anti", "1"},
       {"deviation_cost", "7"}, {"edit_activity_attribute", " phase "},

@@ -1321,6 +1321,13 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_dfg_alignment_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_dfg_alignment_tests COMMAND minera_dfg_alignment_tests)
 
+  # Line-oriented driver for the public/native DFG parity audit script.
+  add_executable(minera_dfg_alignment_probe
+    src/backend/tests/dfg_alignment_probe.cpp
+  )
+  target_link_libraries(minera_dfg_alignment_probe PRIVATE minera::core)
+  target_compile_features(minera_dfg_alignment_probe PRIVATE cxx_std_20)
+
   add_executable(minera_alpha_result_json_tests src/backend/tests/test_alpha_result_json.cpp)
   target_link_libraries(minera_alpha_result_json_tests PRIVATE minera::core)
   target_compile_features(minera_alpha_result_json_tests PRIVATE cxx_std_20)

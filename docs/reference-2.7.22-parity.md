@@ -3768,13 +3768,17 @@ binary-loop rejection.
 DFG alignment implements the pinned `CLASSIC` variant over a complete
 start/DFG/end frequency model. Start and end activity maps are included even
 when a supplied frequency is zero; edge frequencies are informational rather
-than hidden enablement flags. The model is validated as connected from its
-starts to its ends, and disconnected graphs or graphs without a start-to-end
-path fail explicitly. Default alignment costs are zero for synchronous moves
+than hidden enablement flags. Disconnected nodes are accepted; a graph without
+an accepting path returns `computed: false` from raw trace alignment, without
+fabricated moves or scores. Whole-log alignment and projections fail when that
+path is unavailable for their fitness baseline. Default alignment costs are zero for synchronous moves
 and 10,000 for visible model/log moves. Per-activity synchronous, model, log,
 and internal-log costs are configurable: the reported cost can differ from the
 search's internal cost (for example, unknown labels may have a free internal
-move), and both are serialized.
+move), and both are serialized. Supplied cost maps are strict: a missing
+requested activity raises an error. Explicitly empty maps are represented by
+native presence flags and `{}` in HTTP, CLI, and frontend controls; omitted
+maps retain defaults.
 
 Trace alignment uses a strict configurable activity selector, while log
 projection also accepts a strict timestamp selector. Projected original-trace
@@ -3783,15 +3787,101 @@ retain compatible typed metadata. The selected activity is also used to build
 the server-side DFG boundaries and edges, preventing model/log alphabet drift.
 
 Whole-log alignment caches exact activity variants in an ordered map, reports
-`unique_variants`, and restores results to the original trace order. Trace
-results include fitness, best/worst cost, visited and closed-state diagnostics;
+`unique_variants`, and restores results to the original trace order. Raw trace
+results contain cost and state diagnostics; fitness and best/worst cost remain
+undefined (NaN). Whole-log calls add those scores using an empty-trace baseline,
+including its cost-map errors even for empty logs. A zero fitness denominator
+raises an error instead of producing an invented fitness value. This preserves the public
+distinction where an exact trace can accept a partial model cost map but a log
+call fails while calculating its baseline. In both APIs,
 visited-state and elapsed-time bounds are enforced and report a bounded-search
-failure instead of fabricating an optimum. The log projection preserves event,
-trace, and scalar log attributes, replaces reserved projection metadata, keeps
-synchronous timestamps/resources/lifecycle values, and marks
-`@@is_conforming`. The metrics projection counts synchronous/model/log activity
-moves and DFG edge moves, including a final log-only move (the corrected
-last-move accounting).
+failure instead of fabricating an optimum. Log projection requires selected
+timestamps, drops unrelated event/trace/log attributes, records the supplied DFG
+in `@@aligned_dfg`, and marks projected events with `@@is_conforming`.
+Metrics follow the public final-move exclusion and do not bridge intervening
+log moves when counting edges; activity counters initialize from DFG edges.
+
+A pinned public audit captured 723 observations using
+`scripts/capture-dfg-alignment-reference.py`. Native reconstruction now returns
+an empty move list for empty traces while retaining model-path cost, omits
+leading model moves as observed publicly, and represents exposed synthetic sink
+moves with a collision-safe deterministic name instead of the reference's random
+UUID. Focused regressions cover these cases, unavailable alignments, projection
+context and timestamps, metrics, and ordinary/custom costs.
+
+The search prioritizes farther trace positions at equal cost, retains pending
+duplicates, and prunes positions dominated by an already closed position at the
+same node. `visited_states` records the pop counter when the winning goal was
+queued; `closed` counts accepted expansions. This reproduces the audited `aba`
+4/5 and `ba` 6/5 diagnostics, rather than forcing both counters to be equal.
+`scripts/capture-dfg-search-reference.py` compares a clean-room search model with
+public calls over 5,730 graph/cost/trace cases, matching both costs and counters.
+Forty-five named native cases plus branching, reconstruction, and state-limit
+regressions test the implementation directly. Metric activity accounting uses
+the log label of exposed sink moves, preserving the public repeated-activity
+counts; model labels still determine edges.
+
+`scripts/capture-dfg-native-reference.py` runs the compiled
+`minera_dfg_alignment_probe` against public APIs. Its base matrix matches all
+5,730 cases for each of raw traces, enriched log results, projected logs, and
+metrics (22,920 comparisons). The extended matrix adds
+empty/unreachable/disconnected models, self-loops, multiple starts, zero
+frequencies, and empty/partial/zero/equal cost functions. It records
+single-call differences, including randomly selected tied routes; the repeated
+audit below separately checks sampled outcome support. Error class/message
+equality is not asserted across languages.
+
+Tied searches use independent UUIDv4 source/sink routing names for each raw
+search, including the baseline and each uncached log variant. The queue orders
+internal cost, descending trace position, parent pop counter, reported cost,
+node name, and insertion sequence. This reproduces the observed variation
+under zero and equal costs, while duplicate variants retain their cached result.
+The exposed sink label remains canonicalized independently of routing order.
+
+`scripts/capture-dfg-zero-tie-reference.py` compares repeated native/public
+outcomes and their frequencies. Across 648 model/cost/trace cases with 200 calls
+per side, sampled outcome sets matched, and no frequency difference exceeded
+five pooled standard errors. A broader clean-room candidate audit covered
+4,275 cases and 137,824 public calls. Native regressions also force both UUID
+ordering boundaries using activity labels outside the hexadecimal range,
+without relying on chance to exercise each branch.
+
+CLI and HTTP responses derive projections from the same computed alignment
+result that they serialize. Result-consuming native overloads preserve this
+relationship for callers; standalone projection APIs retain their own search.
+Deterministic regression cases supply alternative routes and verify projected
+timestamps, activities, and metrics without relying on random tie selection.
+
+The integrated checkpoint repeated all 22,920 base native/public comparisons
+and the 648-case, 200-call tie audit. Both passed. The extended matrix made
+39,797 calls for each of the four operations and retained 1,512 single-call
+differences. Repeating each differing operation 200 times produced 302,400
+observations per implementation with matching sampled outcome sets and no frequency
+difference above five pooled standard errors. Numeric JSON spellings such as
+`1` and `1.0` share an outcome key; the saved draws were rechecked after fixing
+that distinction, without resampling. The original counts remain preserved.
+The evidence gates fail on mismatches, malformed results, and flagged frequency
+differences; they record binary/module hashes and retain paired error details.
+Error comparisons establish rejection presence, not identical exception causes.
+
+Durable compressed JSON evidence is stored in
+`docs/dfg-classic-reference-fixtures.json.gz` (boundary/base/tie captures, opaque
+module verification, and original extended samples),
+`docs/dfg-classic-extended-reference.json.gz` (the extended single-call report,
+including both errors for matched rejections), and
+`docs/dfg-classic-extended-support.json.gz` (the rechecked repeated outcomes).
+`scripts/check-dfg-extended-support.py` accepts the compressed extended report
+and reproduces the bounded repeated audit. These files retain the configured
+reference pin separately from the verified newline-normalized module bytes and
+tested executable hashes. The Release build, 150 native suites, 613 frontend tests, TypeScript,
+production frontend build, and CLI/server smoke checks passed. Another 32 tied
+HTTP projection responses matched their serialized alignment routes.
+
+Full `CLASSIC` parity remains unproven: finite samples establish neither
+exhaustive outcome support nor exact probabilities. Arbitrary graphs, labels,
+and cost functions remain beyond the bounded matrices; cross-language error
+class/message equivalence is not asserted. The dispatcher and implementation
+module remain partial.
 
 `EDIT_DISTANCE` computes Levenshtein distance for every source variant and picks
 the minimum (or maximum when `perform_anti_alignment` is enabled); duplicate

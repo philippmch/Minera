@@ -4328,7 +4328,27 @@ int main(int argc, char** argv) {
           if (arg == "--dfg-max-states") { dfg_alignment_options.max_visited_states = parse_nonnegative_size(value, arg); align_dfg = true; }
           else if (arg == "--dfg-max-time-ms") { dfg_alignment_options.max_time_ms = static_cast<std::uint64_t>(parse_nonnegative_size(value, arg)); align_dfg = true; }
           else if (arg == "--dfg-projection") { dfg_projection = value; if (dfg_projection != "none" && dfg_projection != "log" && dfg_projection != "metrics") throw std::invalid_argument("--dfg-projection expects none, log, or metrics"); align_dfg = true; }
-          else if (arg == "--dfg-sync-cost" || arg == "--dfg-model-move-cost" || arg == "--dfg-log-move-cost" || arg == "--dfg-internal-log-move-cost") { const auto kv = parse_dfg_cost(value, arg); if (arg == "--dfg-sync-cost") dfg_alignment_options.sync_cost[kv.first] = kv.second; else if (arg == "--dfg-model-move-cost") dfg_alignment_options.model_move_cost[kv.first] = kv.second; else if (arg == "--dfg-log-move-cost") dfg_alignment_options.log_move_cost[kv.first] = kv.second; else dfg_alignment_options.internal_log_move_cost[kv.first] = kv.second; align_dfg = true; }
+          else if (arg == "--dfg-sync-cost" || arg == "--dfg-model-move-cost" || arg == "--dfg-log-move-cost" || arg == "--dfg-internal-log-move-cost") {
+            auto* costs = &dfg_alignment_options.sync_cost;
+            auto* supplied = &dfg_alignment_options.sync_cost_supplied;
+            if (arg == "--dfg-model-move-cost") {
+              costs = &dfg_alignment_options.model_move_cost;
+              supplied = &dfg_alignment_options.model_move_cost_supplied;
+            } else if (arg == "--dfg-log-move-cost") {
+              costs = &dfg_alignment_options.log_move_cost;
+              supplied = &dfg_alignment_options.log_move_cost_supplied;
+            } else if (arg == "--dfg-internal-log-move-cost") {
+              costs = &dfg_alignment_options.internal_log_move_cost;
+              supplied = &dfg_alignment_options.internal_log_move_cost_supplied;
+            }
+            if (std::string_view(value) == "{}") costs->clear();
+            else {
+              const auto kv = parse_dfg_cost(value, arg);
+              (*costs)[kv.first] = kv.second;
+            }
+            *supplied = true;
+            align_dfg = true;
+          }
           else if (arg == "--align-edit-distance") edit_reference = value;
           else if (arg == "--edit-deviation-cost") { edit_options.deviation_cost = static_cast<std::uint64_t>(parse_positive_size(value, arg)); edit_option_used = true; }
           else { edit_projection = value; if (edit_projection != "none" && edit_projection != "log") throw std::invalid_argument("--edit-projection expects none or log"); edit_option_used = true; }
@@ -6813,8 +6833,14 @@ int main(int argc, char** argv) {
         ++ends[*last];
       }
       dfg_alignment_result = minera::align_log_on_dfg(log, dfg, starts, ends, dfg_alignment_options);
-      if (dfg_projection == "metrics") dfg_projection_result = minera::project_alignments_on_dfg(log, dfg, starts, ends, dfg_alignment_options);
-      if (dfg_projection == "log") dfg_projected_log = minera::project_log_on_dfg(log, dfg, starts, ends, dfg_alignment_options);
+      if (dfg_projection == "metrics")
+        dfg_projection_result = minera::project_alignments_on_dfg(
+            log, dfg, starts, ends, *dfg_alignment_result,
+            dfg_alignment_options);
+      if (dfg_projection == "log")
+        dfg_projected_log = minera::project_log_on_dfg(
+            log, dfg, starts, ends, *dfg_alignment_result,
+            dfg_alignment_options);
     }
     std::optional<std::vector<minera::EditDistanceAlignment>> edit_result;
     std::optional<minera::EventLog> edit_projected_log;

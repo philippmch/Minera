@@ -501,7 +501,12 @@ Frontend and HTTP DFG cost maps accept `activity=value` entries separated by
 commas; escape `,`, `:`, `=`, and `\` inside an activity name with a backslash,
 and encode whitespace as `\s`, `\t`, `\n`, or `\r`. CLI cost options each carry
 one pair, use the rightmost `=` as their separator, and therefore need no such
-escaping. Edit-distance `log` projection selects and records the appropriate
+escaping. Omitted cost maps use defaults; supplied maps must contain every
+activity cost the search requests. Use `{}` to supply an explicitly empty map
+(a blank frontend field omits it). Raw native trace alignment returns search
+results without fitness; whole-log alignment adds fitness and its empty-trace
+baseline, and fails if that baseline has no accepting path or the fitness
+denominator is zero. Edit-distance `log` projection selects and records the appropriate
 reference variant independently for each source trace, including heterogeneous
 logs.
 

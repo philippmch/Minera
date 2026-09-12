@@ -6147,7 +6147,9 @@ void transition_system_positional_options_and_invalid_enums() {
 
 void json_export_carries_dfg_and_edit_alignment_contract() {
   minera::EventLog log;
-  minera::Trace t; t.case_id = "c1"; t.events.push_back({"c1", "A"}); t.events.push_back({"c1", "C"});
+  minera::Trace t; t.case_id = "c1";
+  t.events.push_back({"c1", "A", "2026-01-01T00:00:00Z"});
+  t.events.push_back({"c1", "C", "2026-01-01T00:00:01Z"});
   log.traces.push_back(t); log.attributes.push_back({"log_tag", "x", minera::AttributeKind::kString});
   minera::DfgFrequency dfg{{{"A", "B"}, 1}};
   std::map<std::string, std::uint64_t> starts{{"A",1}}, ends{{"B",1}};
@@ -6158,8 +6160,28 @@ void json_export_carries_dfg_and_edit_alignment_contract() {
   assert(dj.find("\"family\": \"DFG\"") != std::string::npos);
   assert(dj.find("\"variant\": \"CLASSIC\"") != std::string::npos);
   assert(dj.find("\"unique_variants\": 1") != std::string::npos);
+  assert(dj.find("\"computed\": true") != std::string::npos);
+  assert(dj.find("log_tag") == std::string::npos);
   assert(dj.find("\"cost\"") != std::string::npos && dj.find("\"visited_states\"") != std::string::npos);
   assert(dj.find("\"projected_dfg\"") != std::string::npos && dj.find("\"projected_log\"") != std::string::npos);
+  auto unavailable = d;
+  unavailable.alignments.front().computed = false;
+  const auto absent_json = minera::dfg_alignment_json(unavailable);
+  assert(absent_json == "{\"family\": \"DFG\", \"variant\": \"CLASSIC\", \"unique_variants\": 1, \"alignments\": [{\"computed\": false}]}");
+  assert(throws([&] { (void)minera::dfg_alignment_json(unavailable, &metrics); }));
+  assert(throws([&] { (void)minera::dfg_alignment_json(unavailable, nullptr, &projected); }));
+  auto invalid = d;
+  invalid.unique_variants = 2;
+  assert(throws([&] { (void)minera::dfg_alignment_json(invalid); }));
+  invalid = d;
+  invalid.alignments.front().cost = std::numeric_limits<double>::infinity();
+  assert(throws([&] { (void)minera::dfg_alignment_json(invalid); }));
+  invalid = d;
+  invalid.alignments.front().fitness = std::numeric_limits<double>::quiet_NaN();
+  assert(throws([&] { (void)minera::dfg_alignment_json(invalid); }));
+  invalid = d;
+  invalid.alignments.front().internal_cost = -1;
+  assert(throws([&] { (void)minera::dfg_alignment_json(invalid); }));
   minera::EventLog target; minera::Trace tt; tt.case_id = "r"; tt.events.push_back({"r", "B"}); target.traces.push_back(tt);
   const auto e = minera::align_edit_distance(log, target);
   const auto ej = minera::edit_distance_json(e, false);
