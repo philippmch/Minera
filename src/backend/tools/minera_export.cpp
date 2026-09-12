@@ -1041,6 +1041,7 @@ int usage(const char* program) {
                "  --emd-use-fast-emd <bool> Select accelerated EMD when available\n"
                "  --compare-petri-reference <file> Compare Petri element usage with CSV/XES log\n"
                "  --compare-petri-model <file>    Use a supplied PNML net and its markings\n"
+               "  --token-replay-model <file>     Standalone CSV/XES replay on general PNML; emit trace JSON\n"
                "  --compare-petri-miner <id>      inductive (default), alpha, heuristic, or powl\n"
                "  --compare-petri-activity-attribute <name>\n"
                "                            Event attribute used as the activity label\n"
@@ -1050,6 +1051,7 @@ int usage(const char* program) {
                "  --compare-petri-reach-final-through-hidden <bool> Route silently after a trace\n"
                "  --compare-petri-stop-immediately-unfit <bool> Stop a trace after its first deviation\n"
                "  --compare-petri-cleaning-token-flood <bool> Clean excess tokens during comparison replay (default false)\n"
+               "  --compare-petri-exhaustive-invisible-exploration <bool> Exhaustive hidden exploration (default false)\n"
                "  --align-process-tree     Embed process-tree alignments\n"
                "  --pt-alignment-activity-attribute <name> Activity selector\n"
                "  --pt-alignment-variant <id> SEARCH_GRAPH_PT (default),\n"
@@ -1122,6 +1124,10 @@ int usage(const char* program) {
                "                            Count unknown activities as deviations\n"
                "  --token-replay-walk-through-hidden-transitions <bool>\n"
                "                            Use silent routing between visible events\n"
+               "  --token-replay-cleaning-token-flood <bool>\n"
+               "                            Clean stale markings after forced forward firings\n"
+               "  --token-replay-exhaustive-invisible-exploration <bool>\n"
+               "                            Select exhaustive hidden exploration (default false)\n"
                "  --token-replay-include-trace-diagnostics <bool>\n"
                "                            Include per-case replay details in JSON\n"
                "  --token-replay-include-duration-diagnostics <bool>\n"
@@ -1760,6 +1766,7 @@ int main(int argc, char** argv) {
   std::filesystem::path emd_reference;
   std::filesystem::path compare_petri_reference;
   std::filesystem::path compare_petri_model;
+  std::filesystem::path token_replay_model;
   std::string compare_petri_miner = "inductive";
   bool compare_petri_miner_used = false;
   std::string compare_petri_activity_attribute;
@@ -1771,6 +1778,7 @@ int main(int argc, char** argv) {
   bool compare_petri_reach_final_through_hidden = true;
   bool compare_petri_stop_immediately_unfit = false;
   bool compare_petri_cleaning_token_flood = false;
+  bool compare_petri_exhaustive_invisible_exploration = false;
   bool compare_petri_replay_option_used = false;
   // Select the public default explicitly at the CLI boundary. EXACT remains
   // available when --emd-variant exact is supplied.
@@ -2127,6 +2135,8 @@ int main(int argc, char** argv) {
              {"--token-replay-try-to-reach-final-marking-through-hidden", &token_replay_options.try_to_reach_final_marking_through_hidden},
              {"--token-replay-consider-activities-not-in-model-in-fitness", &token_replay_options.consider_activities_not_in_model_in_fitness},
              {"--token-replay-walk-through-hidden-transitions", &token_replay_options.walk_through_hidden_transitions},
+             {"--token-replay-cleaning-token-flood", &token_replay_options.cleaning_token_flood},
+             {"--token-replay-exhaustive-invisible-exploration", &token_replay_options.exhaustive_invisible_exploration},
              {"--token-replay-include-trace-diagnostics", &token_replay_options.include_trace_diagnostics},
              {"--token-replay-include-duration-diagnostics", &token_replay_options.include_duration_diagnostics},
              {"--token-replay-include-root-cause-diagnostics", &token_replay_options.include_root_cause_diagnostics},
@@ -3553,6 +3563,12 @@ int main(int argc, char** argv) {
       compare_petri_reference = value;
       continue;
     }
+    if (arg == "--token-replay-model") {
+      const auto* value = next();
+      if (!value || *value == '\0') return usage(argv[0]);
+      token_replay_model = value;
+      continue;
+    }
     if (arg == "--compare-petri-model") {
       const auto* value = next();
       if (!value || *value == '\0') return usage(argv[0]);
@@ -3606,7 +3622,8 @@ int main(int argc, char** argv) {
     if (arg == "--compare-petri-walk-through-hidden" ||
         arg == "--compare-petri-reach-final-through-hidden" ||
         arg == "--compare-petri-stop-immediately-unfit" ||
-        arg == "--compare-petri-cleaning-token-flood") {
+        arg == "--compare-petri-cleaning-token-flood" ||
+        arg == "--compare-petri-exhaustive-invisible-exploration") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       try {
@@ -3617,8 +3634,10 @@ int main(int argc, char** argv) {
           compare_petri_reach_final_through_hidden = parsed;
         } else if (arg == "--compare-petri-stop-immediately-unfit") {
           compare_petri_stop_immediately_unfit = parsed;
-        } else {
+        } else if (arg == "--compare-petri-cleaning-token-flood") {
           compare_petri_cleaning_token_flood = parsed;
+        } else {
+          compare_petri_exhaustive_invisible_exploration = parsed;
         }
         compare_petri_replay_option_used = true;
       } catch (const std::invalid_argument& error) {
@@ -5221,6 +5240,21 @@ int main(int argc, char** argv) {
     std::cerr << "error: EMD options require --emd-reference <file>\n";
     return 2;
   }
+  if (!token_replay_model.empty() &&
+      (!compare_petri_reference.empty() || !compare_petri_model.empty() ||
+       compare_petri_miner_used || compare_petri_replay_option_used ||
+       compare_petri_initial_marking_used || compare_petri_final_marking_used ||
+       !compare_petri_activity_attribute.empty() || !check_pnml.empty() ||
+       log_conversion_requested ||
+       browser_history_requested || windows_events_requested || repository_history_requested ||
+       workflow_history_requested || enterprise_history_requested || communication_history_requested ||
+       random_tree_requested || merge_requested || timestamp_interleavings_requested ||
+       !check_bpmn.empty() || !check_ptml.empty() || !pnml_to_ptml_input.empty() ||
+       !bpmn_to_ptml_input.empty() || !petri_reduction_input.empty() || !pnml_inspection_input.empty() ||
+       !dfg_dataframe_output.empty())) {
+    std::cerr << "error: --token-replay-model cannot be combined with another model or standalone output mode\n";
+    return 2;
+  }
   if (compare_petri_reference.empty() &&
       (!compare_petri_model.empty() || compare_petri_miner != "inductive" ||
        !compare_petri_activity_attribute.empty() ||
@@ -5927,6 +5961,42 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_mine_params(lookup, present);
       if (params.ltl_enabled && params.ltl)
         log = minera::filter_ltl_event_log(log, *params.ltl);
+    }
+    if (!token_replay_model.empty()) {
+      if (!ends_with_ci(input.string(), ".csv") && !is_xes_path(input))
+        throw std::invalid_argument("--token-replay-model expects CSV or XES input");
+      minera::PnmlImportOptions model_options;
+      model_options.infer_initial_marking = false;
+      model_options.infer_final_marking = false;
+      model_options.require_workflow_boundaries = false;
+      const auto document = minera::import_pnml_document(token_replay_model, model_options);
+      auto replay_options = token_replay_options;
+      const auto marking = [](const std::vector<std::int64_t>& source) {
+        std::vector<int> result;
+        result.reserve(source.size());
+        for (const auto count : source) {
+          if (count < 0 || count > std::numeric_limits<int>::max())
+            throw std::invalid_argument("PNML replay marking exceeds the supported token range");
+          result.push_back(static_cast<int>(count));
+        }
+        return result;
+      };
+      replay_options.initial_marking = marking(document.initial_marking);
+      replay_options.final_marking = marking(document.final_marking);
+      replay_options.initial_marking_keys = document.initial_marking_keys;
+      replay_options.final_marking_keys = document.final_marking_keys;
+      replay_options.place_names = document.place_ids;
+      replay_options.transition_names = document.transition_ids;
+      const auto body = minera::token_replay_traces_json(
+          minera::replay_token_traces(log, document.net, replay_options), replay_options.variant);
+      if (output.empty()) std::cout << body << '\n';
+      else {
+        std::ofstream file(output);
+        if (!file) throw std::runtime_error("Cannot open output file " + output.string());
+        file << body << '\n';
+        if (!file) throw std::runtime_error("Cannot write output file " + output.string());
+      }
+      return 0;
     }
     if (!dfg_dataframe_output.empty()) {
       const auto lookup = [&](std::string_view name) {
@@ -6648,6 +6718,7 @@ int main(int argc, char** argv) {
       comparison_options.try_to_reach_final_marking_through_hidden = compare_petri_reach_final_through_hidden;
       comparison_options.stop_immediately_unfit = compare_petri_stop_immediately_unfit;
       comparison_options.cleaning_token_flood = compare_petri_cleaning_token_flood;
+      comparison_options.exhaustive_invisible_exploration = compare_petri_exhaustive_invisible_exploration;
       comparison_options.initial_marking = compare_petri_initial_marking_used
           ? compare_petri_initial_marking : marking(document.initial_marking);
       comparison_options.final_marking = compare_petri_final_marking_used
@@ -7048,6 +7119,7 @@ int main(int argc, char** argv) {
       comparison_options.stop_immediately_unfit =
           compare_petri_stop_immediately_unfit;
       comparison_options.cleaning_token_flood = compare_petri_cleaning_token_flood;
+      comparison_options.exhaustive_invisible_exploration = compare_petri_exhaustive_invisible_exploration;
       if (compare_petri_initial_marking_used)
         comparison_options.initial_marking = compare_petri_initial_marking;
       if (compare_petri_final_marking_used)

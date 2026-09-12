@@ -1112,6 +1112,10 @@ void write_heuristics_net(std::ostream& out,
 
 void write_token_replay_trace(std::ostream& out,
                               const TokenReplayTraceDiagnostics& trace) {
+  if (!trace.reached_marking_keys.empty() &&
+      trace.reached_marking_keys.size() != trace.reached_marking.size())
+    throw std::invalid_argument("reached marking key count must match marking size");
+  const auto previous_precision = out.precision(std::numeric_limits<double>::max_digits10);
   out << "{\"trace_index\": " << trace.trace_index << ", \"case_id\": ";
   write_json_string(out, trace.case_id);
   out << ", \"trace_is_fit\": " << (trace.trace_is_fit ? "true" : "false")
@@ -1136,6 +1140,14 @@ void write_token_replay_trace(std::ostream& out,
   numbers("transitions_with_problems", trace.transitions_with_problems);
   numbers("enabled_transitions", trace.enabled_transitions);
   numbers("reached_marking", trace.reached_marking);
+  if (!trace.reached_marking_keys.empty()) {
+    out << ", \"reached_marking_keys\": [";
+    for (std::size_t i = 0; i < trace.reached_marking_keys.size(); ++i) {
+      if (i) out << ", ";
+      out << (trace.reached_marking_keys[i] ? "true" : "false");
+    }
+    out << ']';
+  }
   numbers("unknown_event_indices", trace.unknown_event_indices);
   out << ", \"event_diagnostics\": [";
   for (std::size_t i = 0; i < trace.event_diagnostics.size(); ++i) {
@@ -1167,6 +1179,7 @@ void write_token_replay_trace(std::ostream& out,
         << ", \"produced\": " << place.produced << '}';
   }
   out << "]}";
+  out.precision(previous_precision);
 }
 
 void write_token_replay_duration_comparison(
@@ -3473,6 +3486,23 @@ void write_overlap(
 }
 
 }  // namespace
+
+std::string token_replay_traces_json(
+    const std::vector<TokenReplayTraceDiagnostics>& traces,
+    TokenReplayVariant variant) {
+  if (variant != TokenReplayVariant::kForward && variant != TokenReplayVariant::kBackwards)
+    throw std::invalid_argument("unsupported token replay variant");
+  std::ostringstream out;
+  out << "{\"family\":\"TOKEN_REPLAY\",\"variant\":\""
+      << (variant == TokenReplayVariant::kForward ? "forward" : "backwards")
+      << "\",\"traces\":[";
+  for (std::size_t i = 0; i < traces.size(); ++i) {
+    if (i) out << ',';
+    write_token_replay_trace(out, traces[i]);
+  }
+  out << "]}";
+  return out.str();
+}
 
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,

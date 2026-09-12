@@ -1923,7 +1923,9 @@ void parse_bpmn_supports_inclusive_gateway_blocks() {
   assert(minera::check_conformance(tree_fitting, reread).fitness == 1.0);
   // Selecting only the silent branch is a valid non-empty subset, so the
   // visible empty trace remains in the language of this exported tree.
-  assert(minera::check_conformance(log_from_variants({{}}), reread).fitness ==
+  // Greedy token replay may select every skip instead; use exact alignment
+  // to verify the exported model's language.
+  assert(minera::check_alignment(log_from_variants({{}}), reread).fitness ==
          1.0);
 
   // Nested inclusive blocks pair by reachability, not by gateway names.  The

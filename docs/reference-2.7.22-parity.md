@@ -1406,9 +1406,18 @@ use the greatest transition name; when several candidates are already enabled,
 the reference can choose either according to its set iteration. Native replay
 uses the least enabled transition name as a deterministic choice.
 Native structural searches report their 4,096-place and one-million-stored-step
-limits explicitly. Pre-event dependency routing additionally limits recursive
-depth to 128 and attempted calls to 4,096; these native resource guards are
-separate from the observed public path and final-pass limits.
+limits explicitly. Pre-event dependency routing reports its 4,096-call guard
+separately from the observed public path and final-pass limits.
+
+Pre-event routing first fires enabled path prefixes until a candidate yields
+no new firing, then recomputes candidates and explores blocked dependencies.
+Visited targets remain visited even if they never fire, and a blocked step
+does not discard later steps of its path. Public helper observations support
+two invocation levels by default and one with
+`exhaustive_invisible_exploration=true`; the latter can leave more tokens
+unrouted. This option defaults to false and is available in the native API,
+`--compare-petri-exhaustive-invisible-exploration`, strict server parsing, and
+the frontend comparison controls.
 
 Native comparison and PNML documents preserve optional per-place initial and
 final marking-key metadata, including explicit zero-valued entries. Omitting
@@ -1431,9 +1440,15 @@ no actionable issues in the marking-key implementation.
 The row remains partial. Source-transition and token-producing-loop reference calls that
 exceed their execution budgets are unresolved, rather than expected errors or
 passing comparisons: 18 cases remain unresolved in the combined corpus.
-Separate nested-dependency probes also left comparison calls unresolved within
-their execution limits; direct token-replay results do not substitute for
-comparison observations or establish a public recursion limit.
+Fresh file-backed nested-dependency probes completed 12 separate comparison
+calls and 55 direct replay calls without resource failures. The earlier nested
+runner polled an undrained output pipe, so its timeouts did not establish
+comparison nontermination. All 12 comparisons now match by identity, including
+depths two through four, both stop policies, and both exhaustive settings.
+`docs/petri-usage-nested-fixtures.json` retains these inputs and full public
+results separately from the 1,374-case corpus. The direct replay observations
+also match by identity, including prefired splits, shortened and padded paths,
+linear tails, repeated calls, and both PLTR modes for the baseline cases.
 The resumable capture script
 `scripts/capture-petri-usage-cleaning-reference.py` preserves completed
 observations and records unresolved cases separately, using one bounded child
@@ -2117,6 +2132,78 @@ normalization is reported in the result. The selected variant and execution
 mode are carried through native, JSON, CLI, server, and typed frontend contracts.
 
 ## Token-replay parity evidence
+
+Forward replay now shares the independently observed structural routing,
+token-flood cleaning, and marking-key rules with Petri usage comparison.
+Forced weighted firing records the token deficit while adding the full input
+weight before consumption. Immediate stop retains hidden firings already made
+toward a blocked visible transition. Final routing retains partial paths,
+limits candidate paths to 51 silent transitions and makes at most six passes.
+Explicit zero-valued marking keys affect cleaning and final routing separately
+from token counts. Cleaning configuration is initialized even for a zero-trace
+log: an empty initial key set rejects cleaning, while a single zero-valued key
+is accepted. Extended reset/inhibitor nets retain enabled-state silent routing,
+including completion without an ordinary marked input.
+
+`--token-replay-model model.pnml` emits standalone `TOKEN_REPLAY` trace JSON
+after the normal CSV/XES import and log filters. It imports general nets with
+complete markings, original element names, and zero-key membership, then calls
+the replay API directly. The JSON retains ordered firings, event diagnostics,
+full-precision fitness, and optional reached-marking key metadata. Cleaning is
+available through `TokenReplayOptions.cleaning_token_flood`, the CLI's
+`--token-replay-cleaning-token-flood`, strict request parsing, and the frontend
+replay controls. It defaults to false and does not change backwards replay.
+The exhaustive hidden-exploration policy follows the observed pre-event
+dependency limits described above. It is exposed through
+`TokenReplayOptions.exhaustive_invisible_exploration`,
+`--token-replay-exhaustive-invisible-exploration`, strict request parsing, and
+the frontend. It also defaults to false and is ignored in backwards replay.
+
+`scripts/capture-token-replay-reference.py` captured 320 completed public calls
+over 160 distinct inputs, separately using both `enable_pltr_fitness` settings
+in fresh bounded children. All successful pairs returned identical complete
+trace dictionaries. `scripts/check-token-replay-native.py` matches all 320
+observations: 304 by identity, ten after adjacent swaps of independent silent
+transitions, and six under declared net automorphisms. Swaps require disjoint
+incident places and never move a visible transition. Automorphisms must preserve
+node kinds, labels, weighted arcs, and both markings; invalid declarations are
+rejected even when identity matches. All trace fields and aggregate place
+consumed/produced/missing/remaining counters remain checked. Twelve focused
+checker tests cover positive and negative equivalences. Twelve additional
+zero-trace public calls establish cleaning initialization behavior.
+
+Twelve exact-PNML calls, retained in
+`docs/token-replay-forward-downstream-fixtures.json`, additionally confirm inclusive-choice silent skips,
+interleaving duplicate choices, and activation counts used by Monte Carlo
+fitting. Native results match all trace fields and PLTR place counters by
+identity. The conversion tests now use exact alignment to verify accepted
+languages independently of greedy replay; separate replay regressions retain
+the observed deficits and firing choices. The full 150-suite native run passes.
+
+`docs/token-replay-forward-nested-fixtures.json` retains 55 additional public
+observations. All match by identity after the shared hidden-routing fix,
+including the partial markings at depths three and four. Eighteen direct
+public-helper observations and 79 replay observations match the independent
+routing prototype used to distinguish visitation, recursion, and path passes.
+Thirteen native regressions retain exact activation order, markings, token
+counters, fitness, and stopping behavior; nine also check independently captured
+comparison place and transition usage.
+
+The checkpoint passes all 150 native suites in the integrated worktree and
+seven focused suites built from the isolated staged source. The isolated build
+also matches all 387 completed replay observations and 1,386 completed
+comparison observations, retaining the 18 unresolved comparison calls
+separately. Its frontend passes 309 focused tests and the production build.
+The expanded comparison transport matrix passes 256 server/CLI comparisons,
+two custom-selector checks, and 14 rejection checks; standalone replay checks
+cover CSV/XES equivalence, filtered/custom activities, file output, empty-log
+initialization, strict exhaustive booleans, and retained backwards behavior.
+Independent review reports no actionable findings, and the catalogue verifier
+passes without coverage promotion.
+
+Downstream precision/evaluation proof remains partial. The legacy
+model-check routes and PNML writing do not yet carry all general-net marking-key
+metadata. This checkpoint does not promote any catalogue row.
 
 The backwards token-replay variation independently follows the pinned legacy
 behavior: unknown labels are ignored, same-label transitions are evaluated

@@ -193,7 +193,9 @@ int main() {
   const auto interleaving_json = random_tree_json(interleaving);
   assert(interleaving_json.find("\"interleaving\"") != std::string::npos);
   const auto interleaving_bpmn = parse_bpmn(to_bpmn(interleaving));
-  assert(check_conformance(interleaving_log, interleaving_bpmn).fitness == 1.0);
+  // Roundtrip routing changes which duplicate is immediately enabled.
+  // Exact alignment verifies the language independently of replay's choice.
+  assert(check_alignment(interleaving_log, interleaving_bpmn).fitness == 1.0);
   assert(check_conformance(mixed, interleaving_bpmn).fitting_traces == 0);
 
   ProcessTree inclusive(

@@ -517,6 +517,8 @@ export interface MinerOptions {
   tokenReplayConsiderRemainingInFitness?: boolean;
   tokenReplayTryToReachFinalMarkingThroughHidden?: boolean;
   tokenReplayConsiderActivitiesNotInModelInFitness?: boolean;
+  tokenReplayCleaningTokenFlood?: boolean;
+  tokenReplayExhaustiveInvisibleExploration?: boolean;
   tokenReplayWalkThroughHiddenTransitions?: boolean;
   tokenReplayIncludeTraceDiagnostics?: boolean;
   tokenReplayIncludeDurationDiagnostics?: boolean;
@@ -1125,6 +1127,8 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     ["tokenReplayConsiderRemainingInFitness", "token_replay_consider_remaining_in_fitness"],
     ["tokenReplayTryToReachFinalMarkingThroughHidden", "token_replay_try_to_reach_final_marking_through_hidden"],
     ["tokenReplayConsiderActivitiesNotInModelInFitness", "token_replay_consider_activities_not_in_model_in_fitness"],
+    ["tokenReplayCleaningTokenFlood", "token_replay_cleaning_token_flood"],
+    ["tokenReplayExhaustiveInvisibleExploration", "token_replay_exhaustive_invisible_exploration"],
     ["tokenReplayWalkThroughHiddenTransitions", "token_replay_walk_through_hidden_transitions"],
     ["tokenReplayIncludeTraceDiagnostics", "token_replay_include_trace_diagnostics"],
     ["tokenReplayIncludeDurationDiagnostics", "token_replay_include_duration_diagnostics"],
@@ -4340,6 +4344,7 @@ export async function comparePetriUsage(
     ["try_to_reach_final_marking_through_hidden", options.try_to_reach_final_marking_through_hidden],
     ["stop_immediately_unfit", options.stop_immediately_unfit],
     ["cleaning_token_flood", options.cleaning_token_flood],
+    ["exhaustive_invisible_exploration", options.exhaustive_invisible_exploration],
   ] as const) {
     if (value !== undefined) form.append(name, value ? "true" : "false");
   }

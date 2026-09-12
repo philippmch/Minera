@@ -1349,6 +1349,8 @@ describe("mineFormEntries", () => {
       tokenReplayConsiderRemainingInFitness: true,
       tokenReplayTryToReachFinalMarkingThroughHidden: true,
       tokenReplayConsiderActivitiesNotInModelInFitness: false,
+      tokenReplayCleaningTokenFlood: false,
+      tokenReplayExhaustiveInvisibleExploration: false,
       tokenReplayWalkThroughHiddenTransitions: true,
       tokenReplayIncludeTraceDiagnostics: false,
     })).toBe(false);
@@ -1359,6 +1361,8 @@ describe("mineFormEntries", () => {
     ] as const) {
       expect(hasActiveMinerOptions({ [key]: false })).toBe(true);
     }
+    expect(hasActiveMinerOptions({ tokenReplayCleaningTokenFlood: true })).toBe(true);
+    expect(hasActiveMinerOptions({ tokenReplayExhaustiveInvisibleExploration: true })).toBe(true);
     expect(hasActiveMinerOptions({ tokenReplayIncludeTraceDiagnostics: true })).toBe(true);
     expect(hasActiveMinerOptions({ tokenReplayIncludeDurationDiagnostics: true })).toBe(true);
     expect(hasActiveMinerOptions({ tokenReplayIncludeDurationDiagnostics: false })).toBe(false);

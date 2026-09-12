@@ -32,6 +32,8 @@ void replay_policy_request_contract() {
   assert(defaults.case_id_attribute == "case:concept:name");
   assert(!defaults.max_rows_to_materialize);
   assert(defaults.walk_through_hidden_transitions);
+  assert(!defaults.cleaning_token_flood);
+  assert(!defaults.exhaustive_invisible_exploration);
   assert(!defaults.include_trace_diagnostics);
   assert(!defaults.include_duration_diagnostics);
   assert(!defaults.include_root_cause_diagnostics);
@@ -45,6 +47,8 @@ void replay_policy_request_contract() {
       {"token_replay_consider_remaining_in_fitness", "false"},
       {"token_replay_try_to_reach_final_marking_through_hidden", "0"},
       {"token_replay_consider_activities_not_in_model_in_fitness", "false"},
+      {"token_replay_cleaning_token_flood", "true"},
+      {"token_replay_exhaustive_invisible_exploration", "true"},
       {"token_replay_walk_through_hidden_transitions", "false"},
       {"token_replay_include_trace_diagnostics", "true"},
       {"token_replay_include_duration_diagnostics", "true"},
@@ -56,6 +60,8 @@ void replay_policy_request_contract() {
       {"token_replay_case_id_attribute", " group "},
       {"token_replay_max_rows_to_materialize", "0"}};
   const auto options = minera::parse_token_replay_params(lookup(configured), presence(configured));
+  assert(options.cleaning_token_flood);
+  assert(options.exhaustive_invisible_exploration);
   assert(options.variant == minera::TokenReplayVariant::kBackwards);
   assert(options.activity_attribute == "phase" && options.stop_immediately_unfit);
   assert(!options.consider_remaining_in_fitness);
@@ -69,6 +75,8 @@ void replay_policy_request_contract() {
   assert(options.case_id_attribute == "group");
   assert(options.max_rows_to_materialize && *options.max_rows_to_materialize == 0);
   const auto mine = minera::parse_mine_params(lookup(configured), presence(configured));
+  assert(mine.token_replay.cleaning_token_flood);
+  assert(mine.token_replay.exhaustive_invisible_exploration);
   assert(mine.token_replay_activity_attribute_supplied);
   assert(mine.token_replay.include_trace_diagnostics);
   assert(mine.token_replay.include_duration_diagnostics);
@@ -82,6 +90,8 @@ void replay_policy_request_contract() {
          "token_replay_stop_immediately_unfit", "token_replay_consider_remaining_in_fitness",
          "token_replay_try_to_reach_final_marking_through_hidden",
          "token_replay_consider_activities_not_in_model_in_fitness",
+         "token_replay_cleaning_token_flood",
+         "token_replay_exhaustive_invisible_exploration",
          "token_replay_walk_through_hidden_transitions", "token_replay_include_trace_diagnostics",
          "token_replay_include_duration_diagnostics", "token_replay_timestamp_attribute",
          "token_replay_include_root_cause_diagnostics", "token_replay_root_cause_enable_multiplier",
@@ -101,6 +111,12 @@ void replay_policy_request_contract() {
       catch (const std::invalid_argument&) { rejected = true; }
       assert(rejected);
     }
+  }
+  for (const auto* value : {"false", "0"}) {
+    const Fields exhaustive_fields{{"token_replay_exhaustive_invisible_exploration", value}};
+    assert(!minera::parse_token_replay_params(lookup(exhaustive_fields), presence(exhaustive_fields)).exhaustive_invisible_exploration);
+    const Fields fields{{"token_replay_cleaning_token_flood", value}};
+    assert(!minera::parse_token_replay_params(lookup(fields), presence(fields)).cleaning_token_flood);
   }
   for (const auto* value : {"-1", "0.5", "184467440737095516160"}) {
     const Fields invalid{{"token_replay_max_rows_to_materialize", value}};
@@ -321,6 +337,37 @@ void replay_null_labels_survive_json() {
   assert(json.find("\"activities\": [null]") != std::string::npos);
   assert(json.find("\"activities\": [0]") != std::string::npos);
 }
+void standalone_replay_json_contract() {
+  minera::TokenReplayTraceDiagnostics trace;
+  trace.case_id = "case\"quoted";
+  trace.trace_fitness = 1.0 / 3.0;
+  trace.reached_marking = {0, 2, 0};
+  trace.reached_marking_keys = {true, true, false};
+  trace.activated_transitions = {2, 0, 2};
+  const auto json = minera::token_replay_traces_json({trace});
+  assert(json.find("\"family\":\"TOKEN_REPLAY\"") != std::string::npos);
+  assert(json.find("\"variant\":\"forward\"") != std::string::npos);
+  assert(json.find("\"trace_fitness\": 0.33333333333333331") != std::string::npos);
+  assert(json.find("\"reached_marking_keys\": [true, true, false]") != std::string::npos);
+  assert(json.find("\"reached_marking\": [0, 2, 0]") != std::string::npos);
+  assert(json.find("\"activated_transitions\": [2, 0, 2]") != std::string::npos);
+  assert(json.find("case\\\"quoted") != std::string::npos);
+  trace.reached_marking_keys.clear();
+  const auto backwards = minera::token_replay_traces_json(
+      {trace}, minera::TokenReplayVariant::kBackwards);
+  assert(backwards.find("\"variant\":\"backwards\"") != std::string::npos);
+  assert(backwards.find("reached_marking_keys") == std::string::npos);
+  assert(minera::token_replay_traces_json({}).find("\"traces\":[]") != std::string::npos);
+  bool rejected = false;
+  try { (void)minera::token_replay_traces_json({}, static_cast<minera::TokenReplayVariant>(-1)); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+  trace.reached_marking_keys = {true};
+  rejected = false;
+  try { (void)minera::token_replay_traces_json({trace}); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+}
 }  // namespace
 
 int main() {
@@ -329,4 +376,5 @@ int main() {
   replay_duration_json_contract();
   replay_root_cause_json_contract();
   replay_null_labels_survive_json();
+  standalone_replay_json_contract();
 }

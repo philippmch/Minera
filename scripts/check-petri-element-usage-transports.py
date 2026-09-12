@@ -84,10 +84,11 @@ def main():
                         reference = directory / ('reference.' + extension)
                         reference.write_text(convert([['A', 'B']] * 4 + [['B', 'A']]), encoding='utf-8')
                         body, headers = multipart('reference_log', reference.name, reference.read_text(encoding='utf-8'))
-                        for walk, finish, stop, clean in itertools.product((False, True), repeat=4):
+                        for walk, finish, stop, exhaustive, clean in itertools.product((False, True), repeat=5):
                             params = dict(miner=miner, walk_through_hidden_trans=str(walk).lower(),
                                           try_to_reach_final_marking_through_hidden=str(finish).lower(),
                                           stop_immediately_unfit=str(stop).lower(),
+                                          exhaustive_invisible_exploration=str(exhaustive).lower(),
                                           cleaning_token_flood=str(clean).lower())
                             status, response = request('/api/compare-petri?' + urllib.parse.urlencode(params), body, headers)
                             assert status == 200, response
@@ -95,6 +96,7 @@ def main():
                                        '--compare-petri-reference', str(reference), '--compare-petri-walk-through-hidden', str(walk).lower(),
                                        '--compare-petri-reach-final-through-hidden', str(finish).lower(),
                                        '--compare-petri-stop-immediately-unfit', str(stop).lower(),
+                                       '--compare-petri-exhaustive-invisible-exploration', str(exhaustive).lower(),
                                        '--compare-petri-cleaning-token-flood', str(clean).lower()]
                             native = subprocess.run(command, capture_output=True, text=True, encoding='utf-8')
                             assert native.returncode == 0, native.stderr
@@ -103,7 +105,8 @@ def main():
                                 if json.loads(response) != uncleaned: cleaning_effects += 1
                             else:
                                 uncleaned = json.loads(response)
-                            checks.append(dict(miner=miner, format=extension, walk=walk, finish=finish, stop=stop, clean=clean))
+                            checks.append(dict(miner=miner, format=extension, walk=walk, finish=finish, stop=stop,
+                                               exhaustive=exhaustive, clean=clean))
                 assert cleaning_effects > 0, 'cleaning never changed a transported result'
                 native = subprocess.run([str(args.native.resolve()), str(source), '--compare-petri-model', str(model),
                     '--compare-petri-reference', str(reference)], capture_output=True, text=True, encoding='utf-8')
@@ -119,12 +122,16 @@ def main():
                     assert native.returncode == 0, native.stderr
                     assert custom_expected == json.loads(native.stdout), (selector, custom_expected, native.stdout)
                 for params in ({'miner': 'missing'}, {'activity_attribute': ' '}, {'stop_immediately_unfit': 'invalid'},
-                               {'cleaning_token_flood': 'invalid'}):
+                               {'cleaning_token_flood': 'invalid'},
+                               {'exhaustive_invisible_exploration': 'invalid'},
+                               {'exhaustive_invisible_exploration': ''}):
                     status, response = request('/api/compare-petri?' + urllib.parse.urlencode(params), body, headers)
                     assert status == 400, response
                 assert request('/api/compare-petri', b'')[0] == 400
                 for extra in ([], ['--compare-petri-reference', str(reference), '--compare-petri-miner', 'alpha'],
                               ['--compare-petri-reference', str(reference), '--compare-petri-cleaning-token-flood', 'invalid'],
+                              ['--compare-petri-reference', str(reference), '--compare-petri-exhaustive-invisible-exploration', 'invalid'],
+                              ['--compare-petri-reference', str(reference), '--compare-petri-exhaustive-invisible-exploration'],
                               ['--compare-petri-reference', str(reference), '--compare-petri-cleaning-token-flood']):
                     native = subprocess.run([str(args.native.resolve()), str(source), '--compare-petri-model', str(model), *extra],
                                             capture_output=True, text=True, encoding='utf-8')
@@ -132,8 +139,8 @@ def main():
             finally:
                 server.terminate()
                 server.wait(timeout=10)
-    args.output.write_text(json.dumps(dict(checks=checks, cleaning_effects=cleaning_effects, custom_selector_checks=2, rejection_checks=10), indent=2) + '\n', encoding='utf-8')
-    print(f'{len(checks)} server/CLI comparisons, {cleaning_effects} observed cleaning effects, 2 custom-selector checks and 10 rejection checks passed')
+    args.output.write_text(json.dumps(dict(checks=checks, cleaning_effects=cleaning_effects, custom_selector_checks=2, rejection_checks=14), indent=2) + '\n', encoding='utf-8')
+    print(f'{len(checks)} server/CLI comparisons, {cleaning_effects} observed cleaning effects, 2 custom-selector checks and 14 rejection checks passed')
 
 
 if __name__ == '__main__':

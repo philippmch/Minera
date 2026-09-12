@@ -88,6 +88,8 @@ struct PetriUsageComparisonOptions {
   // vectors must have one entry per place and include every positive place.
   std::vector<bool> initial_marking_keys;
   std::vector<bool> final_marking_keys;
+  // Select the public exhaustive pre-event hidden-routing policy.
+  bool exhaustive_invisible_exploration = false;
 };
 
 // Dynamic comparison palette for a finite direction in [-1, 1]. Uses the

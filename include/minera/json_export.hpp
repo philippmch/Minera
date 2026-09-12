@@ -76,6 +76,10 @@
 #include "minera/local_diagnostics.hpp"
 
 namespace minera {
+// Standalone per-trace token replay without discovery or aggregate analysis.
+[[nodiscard]] std::string token_replay_traces_json(
+    const std::vector<TokenReplayTraceDiagnostics>& traces,
+    TokenReplayVariant variant = TokenReplayVariant::kForward);
 
 // Serializes an analysis (the imported event log plus its discovered
 // directly-follows graph) into the JSON document consumed by the frontend.

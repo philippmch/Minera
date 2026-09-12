@@ -20,6 +20,37 @@ using ReplayMarkingKeys = std::vector<bool>;
 using CleaningComponents = std::vector<std::vector<std::size_t>>;
 inline constexpr std::size_t kReplayStructuralSearchCap = 4096;
 
+template <class Integer>
+ReplayMarkingKeys resolve_replay_marking_keys(
+    const ReplayMarkingKeys& configured, const std::vector<Integer>& marking,
+    std::string_view name) {
+  if (!configured.empty() && configured.size() != marking.size())
+    throw std::invalid_argument(std::string(name) + " must contain one entry per place");
+  auto result = configured.empty() ? ReplayMarkingKeys(marking.size(), false) : configured;
+  for (std::size_t place = 0; place < marking.size(); ++place) {
+    if (marking[place] == 0) continue;
+    if (!configured.empty() && !configured[place])
+      throw std::invalid_argument(std::string(name) + " must include every positive-token place");
+    result[place] = true;
+  }
+  return result;
+}
+
+inline std::vector<std::string> replay_element_names(
+    const std::vector<std::string>& configured, std::size_t count,
+    std::string_view prefix, std::string_view name) {
+  if (!configured.empty()) {
+    if (configured.size() != count)
+      throw std::invalid_argument(std::string(name) + " has the wrong element count");
+    return configured;
+  }
+  std::vector<std::string> result;
+  result.reserve(count);
+  for (std::size_t index = 0; index < count; ++index)
+    result.push_back(std::string(prefix) + std::to_string(index));
+  return result;
+}
+
 inline CleaningComponents cleaning_components(const PetriNet& net,
                                        const ReplayMarkingKeys& initial_keys,
                                        const ReplayMarkingKeys& final_keys) {
@@ -148,6 +179,52 @@ inline std::vector<HiddenPlacePath> silent_place_paths(
          < std::tuple{right.transitions.size(), std::string_view(place_names[right.target]), std::string_view(place_names[right.source]), right.target, right.source};
   });
   return result;
+}
+
+// Public hidden routing first fires enabled path prefixes, then recomputes
+// paths and explores blocked dependencies. Visiting a target is distinct from
+// firing it: a failed recursive attempt still suppresses later visits.
+template <class Candidates, class Enabled, class Emit>
+void route_hidden_dependencies(std::size_t transition_count, std::size_t target,
+                               bool exhaustive, const Candidates& candidates,
+                               const Enabled& enabled, const Emit& emit) {
+  std::vector<bool> visited(transition_count, false);
+  const std::size_t recursion_limit = exhaustive ? 1 : 2;
+  std::size_t calls = 0;
+  const auto explore = [&](auto&& self, std::size_t selected, std::size_t depth) -> void {
+    if (depth >= recursion_limit || visited[selected]) return;
+    if (++calls > kReplayStructuralSearchCap)
+      throw std::runtime_error("Petri replay exceeded the pre-event routing state limit");
+    visited[selected] = true;
+    const auto initial_paths = candidates(selected);
+    for (const auto& path : initial_paths) {
+      bool progressed = false;
+      for (const auto transition : path.transitions) {
+        if (visited[transition]) continue;
+        if (!enabled(transition)) break;
+        emit(transition);
+        visited[transition] = true;
+        progressed = true;
+      }
+      if (!progressed) break;
+    }
+    const auto paths = candidates(selected);
+    for (const auto& path : paths) {
+      for (const auto transition : path.transitions) {
+        if (visited[transition]) continue;
+        if (!enabled(transition)) self(self, transition, depth + 1);
+        // Recursion may have visited this transition without firing it.
+        if (enabled(transition)) {
+          emit(transition);
+          visited[transition] = true;
+        }
+        // A still-blocked dependency does not discard later path steps.
+        if (enabled(selected)) break;
+      }
+      if (enabled(selected)) break;
+    }
+  };
+  explore(explore, target, 0);
 }
 
 }  // namespace minera::detail

@@ -2654,6 +2654,7 @@ export interface PetriUsageComparisonOptions {
   stop_immediately_unfit?: boolean;
   /** Clean excess tokens during comparison replay; defaults to false. */
   cleaning_token_flood?: boolean;
+  exhaustive_invisible_exploration?: boolean;
 }
 
 /** Recursive POWL model emitted by the POWL discovery miner. */

@@ -438,6 +438,7 @@ function PetriUsageComparisonPanel() {
   const [reachFinalThroughHidden, setReachFinalThroughHidden] = useState(true);
   const [stopImmediatelyUnfit, setStopImmediatelyUnfit] = useState(false);
   const [cleaningTokenFlood, setCleaningTokenFlood] = useState(false);
+  const [exhaustiveInvisibleExploration, setExhaustiveInvisibleExploration] = useState(false);
   const [result, setResult] = useState<PetriUsageComparison | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -457,6 +458,7 @@ function PetriUsageComparisonPanel() {
         try_to_reach_final_marking_through_hidden: reachFinalThroughHidden,
         stop_immediately_unfit: stopImmediatelyUnfit,
         cleaning_token_flood: cleaningTokenFlood,
+        exhaustive_invisible_exploration: exhaustiveInvisibleExploration,
       }));
     }
     catch (cause) { setResult(null); setError(cause instanceof Error ? cause.message : String(cause)); }
@@ -477,6 +479,7 @@ function PetriUsageComparisonPanel() {
       <label className="checkbox-label"><input type="checkbox" checked={reachFinalThroughHidden} onChange={e => { setReachFinalThroughHidden(e.target.checked); setResult(null); }} /> Route hidden transitions after traces</label>
       <label className="checkbox-label"><input type="checkbox" checked={stopImmediatelyUnfit} onChange={e => { setStopImmediatelyUnfit(e.target.checked); setResult(null); }} /> Stop each trace at first deviation</label>
       <label className="checkbox-label"><input type="checkbox" checked={cleaningTokenFlood} onChange={e => { setCleaningTokenFlood(e.target.checked); setResult(null); }} /> Clean excess tokens during replay</label>
+      <label className="checkbox-label"><input type="checkbox" checked={exhaustiveInvisibleExploration} onChange={e => { setExhaustiveInvisibleExploration(e.target.checked); setResult(null); }} /> Exhaustive hidden exploration</label>
     </div>
     <button className="button" disabled={!reference || busy} onClick={() => void run()}>{busy ? "Comparing…" : "Compare element usage"}</button>
     {error && <p className="conf-inline-note">{error}</p>}

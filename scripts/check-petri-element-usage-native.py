@@ -138,6 +138,7 @@ def main():
             parameters = observation['parameters']
             flags = {'stop_immediately_unfit': '--compare-petri-stop-immediately-unfit',
                      'cleaning_token_flood': '--compare-petri-cleaning-token-flood',
+                     'exhaustive_invisible_exploration': '--compare-petri-exhaustive-invisible-exploration',
                      'walk_through_hidden_trans': '--compare-petri-walk-through-hidden',
                      'try_to_reach_final_marking_through_hidden': '--compare-petri-reach-final-through-hidden',
                      'pm4py:param:activity_key': '--compare-petri-activity-attribute'}

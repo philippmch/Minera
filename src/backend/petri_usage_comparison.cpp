@@ -326,40 +326,18 @@ std::vector<std::size_t> silent_path(const Marking& start,
 void route_hidden_before_event(Marking& marking, MarkingKeys& keys, std::size_t target,
                                const PetriNet& net, ReplayUsage& usage,
                                std::vector<std::size_t>& activated,
-                               const std::vector<std::string>& place_names) {
-  std::vector<bool> fired(net.transitions().size(), false);
-  std::vector<bool> pending(net.transitions().size(), false);
-  std::size_t calls = 0;
-  const auto enable_target = [&](auto&& self, std::size_t selected, std::size_t depth) -> bool {
-    if (enabled(marking, net.transitions()[selected])) return true;
-    if (pending[selected]) return false;
-    if (depth > 128)
-      throw std::runtime_error("Petri usage replay exceeded the pre-event dependency depth limit");
-    if (++calls > kSilentSearchCap)
-      throw std::runtime_error("Petri usage replay exceeded the pre-event routing state limit");
-    pending[selected] = true;
+                               const std::vector<std::string>& place_names,
+                               bool exhaustive) {
+  const auto candidates = [&](std::size_t selected) {
     Marking required(marking.size(), 0);
     for (const auto place : net.transitions()[selected].inputs) checked_token_add(required[place]);
     for (std::size_t place = 0; place < required.size(); ++place)
       if (marking[place] >= required[place]) required[place] = 0;
-    // Public pre-event routing admits paths of up to 51 silent transitions.
-    // A blocked join may recursively route its deficient inputs, while a
-    // hidden transition fires at most once for this visible event.
-    const auto paths = silent_place_paths(keys, resolve_marking_keys({}, required, "required"), net, place_names, 51);
-    for (const auto& path : paths) {
-      for (const auto transition : path.transitions) {
-        if (fired[transition]) continue;
-        if (!self(self, transition, depth + 1)) break;
-        fire(marking, keys, transition, net, usage, activated);
-        fired[transition] = true;
-        if (enabled(marking, net.transitions()[selected])) break;
-      }
-      if (enabled(marking, net.transitions()[selected])) break;
-    }
-    pending[selected] = false;
-    return enabled(marking, net.transitions()[selected]);
+    return silent_place_paths(keys, resolve_marking_keys({}, required, "required"), net, place_names, 51);
   };
-  (void)enable_target(enable_target, target, 0);
+  detail::route_hidden_dependencies(net.transitions().size(), target, exhaustive,
+      candidates, [&](auto transition) { return enabled(marking, net.transitions()[transition]); },
+      [&](auto transition) { fire(marking, keys, transition, net, usage, activated); });
 }
 
 ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
@@ -372,6 +350,7 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
                        bool walk_through_hidden_trans,
                        bool try_to_reach_final_marking_through_hidden,
                        bool stop_immediately_unfit,
+                       bool exhaustive_invisible_exploration,
                        const CleaningComponents& components,
                        const std::vector<std::string>& place_names,
                        const std::vector<std::string>& transition_names) {
@@ -421,7 +400,8 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
       }
       if (!enabled(marking, net.transitions()[chosen]) && walk_through_hidden_trans) {
         if (!net.has_extended_arcs()) {
-          route_hidden_before_event(marking, keys, chosen, net, usage, activated, place_names);
+          route_hidden_before_event(marking, keys, chosen, net, usage, activated,
+                                    place_names, exhaustive_invisible_exploration);
         } else {
           const auto path = silent_path(marking, {chosen}, net);
           for (const auto t : path) fire(marking, keys, t, net, usage, activated);
@@ -571,12 +551,14 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
                                  final_marking, initial_keys, final_keys, activity_attribute,
                                  options.walk_through_hidden_trans,
                                  options.try_to_reach_final_marking_through_hidden,
-                                 options.stop_immediately_unfit, components, place_names, transition_names);
+                                 options.stop_immediately_unfit, options.exhaustive_invisible_exploration,
+                                 components, place_names, transition_names);
   const auto usage2 = replay_log(log2, net, activities, initial_marking,
                                  final_marking, initial_keys, final_keys, activity_attribute,
                                  options.walk_through_hidden_trans,
                                  options.try_to_reach_final_marking_through_hidden,
-                                 options.stop_immediately_unfit, components, place_names, transition_names);
+                                 options.stop_immediately_unfit, options.exhaustive_invisible_exploration,
+                                 components, place_names, transition_names);
   PetriUsageComparison result;
   result.places.reserve(net.place_count());
   for (std::size_t p = 0; p < net.place_count(); ++p) {
