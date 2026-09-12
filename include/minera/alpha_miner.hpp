@@ -89,6 +89,32 @@ struct AlphaMinerOptions {
 [[nodiscard]] PetriNet discover_alpha_plus(
     const EventLog& event_log, const AlphaMinerOptions& options = {});
 
+// Names are structural: distinct places may carry the same maximal-pair name.
+struct AlphaPlaceName {
+  std::string boundary;
+  std::vector<std::string> before;
+  std::vector<std::string> after;
+  bool operator==(const AlphaPlaceName&) const = default;
+};
+struct AlphaDetachedMarking {
+  AlphaPlaceName name;
+  std::uint64_t tokens = 1;
+};
+struct AlphaPlusDiscoveryResult {
+  PetriNet net;
+  std::vector<AlphaPlaceName> place_names;
+  std::vector<std::uint64_t> initial_marking;
+  std::vector<std::uint64_t> final_marking;
+  std::vector<AlphaDetachedMarking> detached_initial_marking;
+  std::vector<AlphaDetachedMarking> detached_final_marking;
+};
+// Preserves markings on places removed by boundary cleanup. Marking vectors
+// index live net places; detached entries never identify live same-name places.
+// A detached initial marking leaves net.has_source() false.
+// discover_alpha_plus rejects results that lack live workflow markings.
+[[nodiscard]] AlphaPlusDiscoveryResult discover_alpha_plus_result(
+    const EventLog& event_log, const AlphaMinerOptions& options = {});
+
 [[nodiscard]] PetriNet discover_petri_net(
     const EventDataView& data, const AlphaMinerOptions& options = {});
 [[nodiscard]] PetriNet discover_petri_net(

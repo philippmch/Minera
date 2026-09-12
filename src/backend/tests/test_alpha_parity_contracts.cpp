@@ -201,6 +201,15 @@ void plus_empty_trace_retains_both_boundaries() {
 
 void plus_reduced_self_loops_retain_degenerate_boundaries() {
   for (const bool remove : {false, true}) {
+    const auto raw = discover_alpha_plus_result(make_log({{"a", "L", "L", "a"}}),
+                                                {.remove_unconnected = remove});
+    assert(raw.detached_initial_marking.empty());
+    assert(raw.detached_final_marking.empty());
+    assert(raw.place_names.size() == 2);
+    assert(raw.place_names[raw.net.source()].boundary == "start");
+    assert(raw.place_names[raw.net.sink()].boundary == "end");
+    assert(raw.initial_marking[raw.net.source()] == 1);
+    assert(raw.final_marking[raw.net.sink()] == 1);
     const auto net = discover_alpha_plus(make_log({{"a", "L", "L", "a"}}),
                                          {.remove_unconnected = remove});
     const std::multiset<PlaceShape> expected{

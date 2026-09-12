@@ -32,6 +32,7 @@
 #include "httplib.h"
 #include "embedding_runtime.hpp"
 #include "minera/alpha_miner.hpp"
+#include "minera/alpha_result_json.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/attribute_kde.hpp"
 #include "minera/attribute_statistics.hpp"
@@ -5557,6 +5558,55 @@ void handle_reduce_process_tree(const httplib::Request& request, httplib::Respon
   try { if(!request.has_param("trace_index")) throw std::invalid_argument("trace_index: expected a non-negative integer"); const auto text=request.get_param_value("trace_index"); std::size_t idx=0; const auto r=std::from_chars(text.data(),text.data()+text.size(),idx); if(r.ec!=std::errc{}||r.ptr!=text.data()+text.size()||idx>=session->inductive_log.traces.size()) throw std::invalid_argument("trace_index: out of range"); const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_process_tree_reduction_params(lookup,present); const auto reduced=minera::reduce_process_tree(session->tree,session->inductive_log.traces[idx],o); response.set_content(minera::process_tree_reduction_json(reduced,session->graph,idx),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
 }
 
+void handle_alpha_plus_result(const httplib::Request& request, httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed{
+        "alpha_activity_attribute", "alpha_remove_unconnected",
+        "alpha_max_rows_to_materialize"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key)) throw std::invalid_argument("unknown Alpha+ result parameter: " + key);
+    }
+    for (const auto& [key, value] : request.files) {
+      (void)value;
+      if (key != "log" && !allowed.contains(key))
+        throw std::invalid_argument("unknown Alpha+ result field: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      if (request.has_param(key)) return request.get_param_value(key);
+      if (request.has_file(key)) return request.get_file_value(key).content;
+      return std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name)) || request.has_file(std::string(name));
+    };
+    const auto options = minera::parse_mine_params(lookup, present).alpha;
+    minera::EventLog log;
+    if (request.has_file("log") || (!request.is_multipart_form_data() && !request.body.empty())) {
+      const auto body = request.has_file("log") ? request.get_file_value("log").content : request.body;
+      const auto filename = request.has_file("log") ? request.get_file_value("log").filename : std::string{};
+      std::stringstream input(body);
+      log = minera::looks_like_xes(filename, body) ? minera::import_xes_event_log(input)
+                                                 : minera::import_csv_event_log(input);
+    } else {
+      std::shared_ptr<const MinedSession> session;
+      { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+      if (!session) {
+        response.status = 409;
+        response.set_content(error_json("no mined log; upload a log or mine one first"), "application/json");
+        return;
+      }
+      log = session->log;
+    }
+    response.set_content(minera::alpha_plus_result_json(
+        minera::discover_alpha_plus_result(log, options)), "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_align_dfg(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
@@ -7601,6 +7651,7 @@ int main(int argc, char** argv) {
   server.Options("/api/reduce-process-tree", preflight);
   server.Options("/api/reduce-petri-net", preflight);
   server.Options("/api/align-dfg", preflight);
+  server.Options("/api/discover-alpha-plus", preflight);
   server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
   server.Options("/api/decision-tables", preflight);
@@ -7702,6 +7753,7 @@ int main(int argc, char** argv) {
   server.Post("/api/reduce-process-tree", handle_reduce_process_tree);
   server.Post("/api/reduce-petri-net", handle_reduce_petri_net);
   server.Post("/api/align-dfg", handle_align_dfg);
+  server.Post("/api/discover-alpha-plus", handle_alpha_plus_result);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/decision-tables", handle_decision_tables);
