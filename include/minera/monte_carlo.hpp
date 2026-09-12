@@ -115,11 +115,13 @@ struct MonteCarloOptions {
   std::size_t diagnostic_interval = 32;
   double small_scale_factor = 864000.0;
   double max_thread_execution_time = 60.0;
-  // Model IDs and zero-token marking membership used only by automatic
-  // stochastic-map fitting. Empty values use the replay defaults. Explicit
-  // maps or both explicit vectors bypass fitting and ignore these fields.
+  // Model IDs used by automatic stochastic-map fitting. Explicit maps or
+  // both explicit vectors bypass fitting and ignore these names.
   std::vector<std::string> place_names;
   std::vector<std::string> transition_names;
+  // Marking key membership is used by both fitting and simulation, including
+  // explicit zero-token keys. Empty vectors infer membership from positive
+  // counts. Positive counts require keys when membership is supplied.
   std::vector<bool> initial_marking_keys;
   std::vector<bool> final_marking_keys;
 };

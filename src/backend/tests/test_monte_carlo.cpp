@@ -930,8 +930,6 @@ void replay_context_validation_is_limited_to_map_fitting() {
   options = {}; options.final_marking = {1}; reject_only_fitting(options);
   options = {}; options.place_names = {"one"}; reject_only_fitting(options);
   options = {}; options.transition_names = {"one", "two"}; reject_only_fitting(options);
-  options = {}; options.initial_marking_keys = {false, false}; reject_only_fitting(options);
-  options = {}; options.final_marking_keys = {false}; reject_only_fitting(options);
   options = {}; options.initial_marking = {std::numeric_limits<std::uint32_t>::max(), 0};
   reject_only_fitting(options);
   options = {}; options.final_marking = {0, std::numeric_limits<std::uint32_t>::max()};
@@ -940,6 +938,59 @@ void replay_context_validation_is_limited_to_map_fitting() {
   // is unnecessary (initial-token allocation has its own independent budget).
   options.simulations = 0;
   assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
+}
+
+void marking_membership_controls_runtime_and_is_always_validated() {
+  const auto net = sequential_net();
+  minera::MonteCarloOptions options;
+  options.simulations = 1;
+  options.initial_marking = {1,1,0};
+  options.final_marking = {0,0,1};
+  options.final_marking_keys = {true,false,true};
+  options.transition_weights = {1,0};
+  options.transition_durations = {
+      {minera::MonteCarloDurationDistribution::kDeterministic,2},
+      {minera::MonteCarloDurationDistribution::kDeterministic,3}};
+  const auto retained_zero_requirement = minera::monte_carlo(net, options);
+  const auto& events = retained_zero_requirement.log.traces.front().events;
+  assert(events.size() == 3 && events[0].activity == "A" &&
+         events[1].activity == "B" && events[2].activity == "B");
+  assert(retained_zero_requirement.diagnostics.deadlocked_cases == 1);
+  assert(retained_zero_requirement.diagnostics.cases_ex_time == std::vector<double>{6});
+  options.final_marking_keys.clear();
+  assert(minera::monte_carlo(net, options).log.traces.front().events.size() == 2);
+
+  // A retained zero key before the positive source owns the arrival timestamp.
+  minera::PetriNet reordered;
+  for (int i = 0; i < 3; ++i) reordered.add_place();
+  reordered.set_source(1); reordered.set_sink(2); reordered.set_activities({"A", "B"});
+  reordered.add_transition(0, {1}, {0}); reordered.add_transition(1, {0}, {2});
+  options.initial_marking = {0,1,0}; options.initial_marking_keys = {true,true,false};
+  const auto zero_first = minera::monte_carlo(reordered, options);
+  assert(zero_first.output_places_interval_trees[1].intervals.empty());
+  assert(zero_first.output_places_interval_trees[0].intervals ==
+      (std::vector<minera::MonteCarloInterval>{{1000002,1000005}}));
+
+  for (bool supplied_map : {false,true}) {
+    for (bool initial : {false,true}) {
+      for (bool wrong_size : {false,true}) {
+        minera::MonteCarloOptions invalid;
+        invalid.simulations = 1;
+        invalid.transition_weights = {1,1};
+        invalid.transition_durations = options.transition_durations;
+        if (supplied_map) invalid.stochastic_map = minera::StochasticMap{};
+        auto& keys = initial ? invalid.initial_marking_keys : invalid.final_marking_keys;
+        keys = wrong_size ? std::vector<bool>{true} : std::vector<bool>{false,false,false};
+        assert(throws_invalid([&] { (void)minera::monte_carlo(net, invalid); }));
+        assert(throws_invalid([&] { (void)minera::fit_monte_carlo_options({}, net, invalid); }));
+      }
+    }
+  }
+  // Name metadata remains fitting-only under the explicit-vector bypass.
+  options.initial_marking_keys.clear(); options.initial_marking.clear();
+  options.place_names = {"ignored"}; options.transition_names = {"ignored"};
+  (void)minera::fit_monte_carlo_options({}, net, options);
+  assert(minera::monte_carlo(net, options).diagnostics.completed_cases == 1);
 }
 
 void invalid_options_are_rejected() {
@@ -1181,6 +1232,7 @@ int main() {
   replay_context_validation_is_limited_to_map_fitting();
   compatibility_controls_validate_without_runtime_effects();
   signed_fitted_metadata_retains_simulation_domain_validation();
+  marking_membership_controls_runtime_and_is_always_validated();
   invalid_options_are_rejected();
   diagnostics_can_be_disabled();
   public_scheduler_sequences_and_weighted_arcs();

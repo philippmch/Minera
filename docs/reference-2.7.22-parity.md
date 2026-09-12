@@ -475,7 +475,8 @@ completion/deadlock diagnostics, and deterministic EventLog output. Cases are
 primed through their first firing before continuations are ordered by nominal
 finish time and generation index. Capacity waits enter transition diagnostics
 without delaying event timestamps. Arbitrary multi-token initial/final markings
-use componentwise final coverage. Sparse supplied stochastic maps support every distribution and
+require final-key membership and componentwise token coverage.
+Sparse supplied stochastic maps support every distribution and
 define missing transitions as uniform, immediate choices; explicit weight and
 duration vectors retain precedence. Source-log fitting honors custom activity
 and timestamp selectors, selectable forward/backwards token replay, automatic
@@ -2364,11 +2365,47 @@ field and generated activity/timestamp sequence. Four public error cases are
 checked for failure on each transport; their exception classes/messages are not
 claimed equivalent across languages.
 
-Randomized branch selection, broader initial marking-key order, general cyclic
-nets, platform-dependent local timestamp behavior, and wider parameter/error
-contracts still require proof. The native envelope also retains its explicit
-case identifiers and bounded diagnostics. Monte Carlo remains partial, and the
-catalogue still has 234 incomplete coverage units.
+Randomized branch selection, general cyclic nets, platform-dependent local
+timestamp behavior, and wider parameter/error contracts still require proof.
+The native envelope also retains its explicit case identifiers and bounded
+diagnostics. Monte Carlo remains partial, and the catalogue still has 234
+incomplete coverage units.
+
+## Monte Carlo marking-key membership
+
+`scripts/capture-monte-carlo-marking-reference.py` and
+`docs/monte-carlo-marking-reference-fixtures.json` add 68 public simulation calls
+and 20 direct public Marking comparisons. The simulation matrix combines one or
+three cases with reordered positive/zero initial keys, multiple marked places,
+zero final keys, and empty final markings. PNML place order matches the captured
+initial-key order. Empty final markings use an explicit all-zero native override
+so the supplied-model adapter's absent-boundary inference does not alter the
+comparison input.
+
+The first initial key receives the arrival timing record even when its token
+count is zero. Each case now retains key membership separately from token
+counts: consuming a place's last ordinary token removes its key; producing a
+token introduces its key. Completion requires every final key to exist, including
+zero-token keys, alongside componentwise token coverage. Thus an initial marking
+with source and middle tokens and a final zero source key can produce ABB where
+count-only completion previously stopped at AB. Completion releases occupancy
+for every remaining key, including a retained zero entry.
+
+Existing PNML key vectors now govern simulation as well as source-log fitting,
+including calls with explicit maps or duration/weight vectors. Their dimensions
+and positive-token membership are validated before scheduling. Empty key metadata
+derives keys from positive counts; explicit marking overrides clear the inherited
+membership on only that side. Four captured override cases verify clearing the
+changed side while preserving the other side's zero keys and timing behavior.
+Original model IDs remain available to fitting.
+
+The isolated checkpoint passes four focused native suites, all 136 marking
+CLI/HTTP comparisons, the existing 140 scheduler comparisons, 29 supplied-PNML
+transport checks, and the catalogue audit. Independent review reports no
+actionable findings. Successful comparisons include every public result field
+and each generated activity/timestamp sequence. Error cases establish failure
+behavior only. These observations close the captured marking-key gaps without
+promoting the broader Monte Carlo module.
 
 ## Token-replay parity evidence
 
