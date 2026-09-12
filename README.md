@@ -460,6 +460,23 @@ column names and delimiters, plus log-filtering flags applied before discovery
 ./build/minera_export my_event_log.csv --top-variants 5 -o my_export.json
 ```
 
+To export the raw RUSTXES table before case grouping, use
+`minera_export log.xes --xes-import-variant rustxes --xes-return-legacy-log-object false`.
+Add `--xes-return-pl-lazyframe true` for the Polars-compatible table schema.
+Either return flag selects import-result JSON, including column dtypes and cells;
+`-o` writes that result to a file. Legacy mode takes precedence when both flags
+are true. The native lazy API scans an in-memory table; JSON output materializes
+its rows.
+
+RUSTXES legacy conversion accepts `--xes-conversion-case-id-key <column>` to group
+table rows by an event or case column. Use
+`--xes-conversion-case-attribute-prefix <prefix>` to select trace attributes.
+For example, grouping by `concept:name`
+groups rows by activity. Raw table return modes ignore these conversion options.
+`--xes-conversion-infer-extensions false` clears extension metadata; repeated
+`--xes-conversion-extension <name> <prefix> <uri>` arguments supply explicit
+extensions, with the last value winning for duplicate names.
+
 `--check-pnml model.pnml` additionally checks the log against the workflow net
 in that PNML file; its results appear in the export under the conformance id
 `imported`, next to the discovered models. `--check-bpmn model.bpmn` and

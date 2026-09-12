@@ -870,7 +870,41 @@ void empty_scalar_wrappers_survive_conversion() {
   }
 }
 
+void xes_result_serialization_preserves_missing_cells_and_schema() {
+  minera::XesImportResult result;
+  result.kind = minera::EventDataKind::kEventTable;
+  result.table.columns = {"case:concept:name", "flag"};
+  result.table.rows = {{minera::EventAttribute{"case:concept:name", "c"}, std::nullopt}};
+  result.dtypes = {"str", "object"};
+  auto json = minera::xes_import_result_json(result);
+  assert(json.find("\"type\":\"DataFrame\"") != std::string::npos);
+  assert(json.find("\"dtypes\":[\"str\",\"object\"]") != std::string::npos);
+  assert(json.find(",null]") != std::string::npos);
+  result.kind = minera::EventDataKind::kLazyEventTable;
+  result.lazy_table = minera::LazyEventTable::from_table(result.table);
+  result.table = {};
+  result.dtypes = {"String", "Boolean"};
+  json = minera::xes_import_result_json(result);
+  assert(json.find("\"type\":\"LazyFrame\"") != std::string::npos);
+  assert(json.find("\"lazy\":true") != std::string::npos);
+  assert(json.find("case:concept:name") != std::string::npos);
+  result.dtypes.clear();
+  bool rejected = false;
+  try { (void)minera::xes_import_result_json(result); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+  result.kind = minera::EventDataKind::kEventTable;
+  result.table.columns = {"one", "two"};
+  result.table.rows = {{std::nullopt}};
+  result.dtypes = {"Null", "Null"};
+  rejected = false;
+  try { (void)minera::xes_import_result_json(result); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+}
+
 int main() {
+  xes_result_serialization_preserves_missing_cells_and_schema();
   empty_scalar_wrappers_survive_conversion();
   stream_round_trip_preserves_typed_attributes();
   empty_prefix_and_trace_properties_follow_flattening_contract();

@@ -2,6 +2,7 @@
 
 #include "gzip_codec.hpp"
 #include "xml_pull_parser.hpp"
+#include "rust_xes_unicode.hpp"
 
 #include <algorithm>
 #include <array>
@@ -11,11 +12,15 @@
 #include <fstream>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <optional>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <unordered_map>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -167,6 +172,259 @@ void skip_element(detail::XmlPullParser& parser,
   }
 }
 
+
+struct RustXesNode {
+  std::string key;
+  std::string tag;
+  std::string value;
+  bool has_value = false;
+  std::vector<RustXesNode> contents;
+  std::vector<RustXesNode> own;
+};
+
+std::string rust_debug_string(std::string_view value) {
+  std::string result = "\"";
+  for (std::size_t i = 0; i < value.size();) {
+    const auto begin = i;
+    const auto first = static_cast<unsigned char>(value[i++]);
+    std::uint32_t cp = first;
+    unsigned more = 0;
+    if (first >= 0xf0) { cp = first & 7; more = 3; }
+    else if (first >= 0xe0) { cp = first & 15; more = 2; }
+    else if (first >= 0xc0) { cp = first & 31; more = 1; }
+    while (more-- && i < value.size()) cp = (cp << 6) | (static_cast<unsigned char>(value[i++]) & 63);
+    if (cp == '"') result += "\\\"";
+    else if (cp == '\\') result += "\\\\";
+    else if (cp == '\n') result += "\\n";
+    else if (cp == '\r') result += "\\r";
+    else if (cp == '\t') result += "\\t";
+    else if (cp == 0) result += "\\0";
+    else if (detail::rust_xes_debug_escape(cp)) {
+      char hex[16];
+      const auto converted = std::to_chars(hex, hex + sizeof(hex), cp, 16);
+      result += "\\u{" + std::string(hex, converted.ptr) + "}";
+    } else result.append(value.substr(begin, i - begin));
+  }
+  return result + '"';
+}
+
+std::string rust_debug_float(double value) {
+  if (std::isnan(value)) return "NaN";
+  if (std::isinf(value)) return value < 0 ? "-inf" : "inf";
+  char buffer[128];
+  const auto converted = std::to_chars(buffer, buffer + sizeof(buffer), value,
+                                     std::chars_format::scientific);
+  std::string scientific(buffer, converted.ptr);
+  const auto exponent_at = scientific.find('e');
+  const auto exponent = std::stoi(scientific.substr(exponent_at + 1));
+  auto mantissa = scientific.substr(0, exponent_at);
+  if (exponent < -4 || exponent >= 16)
+    return mantissa + 'e' + std::to_string(exponent);
+  const bool negative = mantissa.starts_with('-');
+  if (negative) mantissa.erase(0, 1);
+  std::erase(mantissa, '.');
+  const auto position = exponent + 1;
+  if (position <= 0) mantissa = "0." + std::string(-position, '0') + mantissa;
+  else if (static_cast<std::size_t>(position) >= mantissa.size())
+    mantissa += std::string(position - mantissa.size(), '0') + ".0";
+  else mantissa.insert(position, ".");
+  return (negative ? "-" : "") + mantissa;
+}
+
+std::string rust_debug_date(std::string value) {
+  if (value.size() < 19 || (value[10] != 'T' && value[10] != 't' && value[10] != ' '))
+    throw std::invalid_argument("RUSTXES date requires a complete clock");
+  const auto offset = value.find_first_of("+-", 19);
+  if (offset != std::string::npos &&
+      (value.size() - offset != 6 || value[offset + 3] != ':'))
+    throw std::invalid_argument("RUSTXES date offset requires a colon");
+  auto validation = value;
+  if (validation.substr(17, 2) == "60") validation.replace(17, 2, "59");
+  (void)parse_native_value(AttributeKind::kDate, validation, XesImportVariant::kRustXes);
+  if (value.ends_with('Z') || value.ends_with('z')) value.replace(value.size() - 1, 1, "+00:00");
+  else if (offset == std::string::npos) value += "+00:00";
+  if (value.size() > 10) value[10] = 'T';
+  const auto dot = value.find('.');
+  if (dot != std::string::npos) {
+    const auto end = value.find_first_not_of("0123456789", dot + 1);
+    auto fraction = value.substr(dot + 1, end - dot - 1);
+    while (!fraction.empty() && fraction.back() == '0') fraction.pop_back();
+    if (fraction.empty()) value.erase(dot, end - dot);
+    else {
+      fraction.resize(fraction.size() <= 3 ? 3 : fraction.size() <= 6 ? 6 : 9, '0');
+      value.replace(dot + 1, end - dot - 1, fraction);
+    }
+  }
+  return value;
+}
+
+double rust_float_value(std::string_view lexical) {
+  try {
+    return std::get<double>(parse_native_value(AttributeKind::kFloat, lexical,
+                                               XesImportVariant::kRustXes));
+  } catch (const std::invalid_argument&) {}
+  auto text = lexical;
+  if (text.starts_with('+')) text.remove_prefix(1);
+  double ignored = 0;
+  const auto parsed = std::from_chars(text.data(), text.data() + text.size(), ignored);
+  if (parsed.ec != std::errc::result_out_of_range || parsed.ptr != text.data() + text.size()) return 0;
+  const bool negative = text.starts_with('-');
+  if (negative) text.remove_prefix(1);
+  const auto exponent_at = text.find_first_of("eE");
+  const auto mantissa = text.substr(0, exponent_at);
+  // Saturation only bounds arithmetic; range failures already establish that
+  // the exact result lies outside the finite representable interval.
+  std::int64_t exponent = 0;
+  if (exponent_at != std::string_view::npos) {
+    auto digits = text.substr(exponent_at + 1);
+    const bool exponent_negative = digits.starts_with('-');
+    if (digits.starts_with('-') || digits.starts_with('+')) digits.remove_prefix(1);
+    for (const auto digit : digits)
+      exponent = std::min<std::int64_t>(1000000000, exponent * 10 + digit - '0');
+    if (exponent_negative) exponent = -exponent;
+  }
+  const auto dot = mantissa.find('.');
+  const auto integer_digits = dot == std::string_view::npos ? mantissa.size() : dot;
+  std::size_t digit_index = 0;
+  for (const auto digit : mantissa) {
+    if (digit == '.') continue;
+    if (digit != '0') break;
+    ++digit_index;
+  }
+  const auto magnitude = exponent + static_cast<std::int64_t>(integer_digits) -
+      static_cast<std::int64_t>(digit_index) - 1;
+  const auto result = magnitude >= 0 ? std::numeric_limits<double>::infinity() : 0.0;
+  return negative ? -result : result;
+}
+
+// The table adapter's heterogeneous-column display is distinct from Rust
+// container Debug output: short decimals survive, longer ones are rounded.
+std::string rust_mixed_float(double value) {
+  if (!std::isfinite(value)) return rust_debug_float(value);
+  char buffer[768];
+  auto converted = std::to_chars(buffer, buffer + sizeof(buffer), value,
+                                 std::chars_format::fixed);
+  std::string text(buffer, converted.ptr);
+  const auto scientific = [&](bool rounded) {
+    const auto result = rounded ?
+        std::to_chars(buffer, buffer + sizeof(buffer), value, std::chars_format::scientific, 4) :
+        std::to_chars(buffer, buffer + sizeof(buffer), value, std::chars_format::scientific);
+    std::string out(buffer, result.ptr);
+    const auto at = out.find('e');
+    return out.substr(0, at + 1) + std::to_string(std::stoi(out.substr(at + 1)));
+  };
+  if (text.size() <= 9) {
+    if (std::abs(value) >= 1e6) return scientific(false);
+    if (text.find('.') == std::string::npos) text += ".0";
+    return text;
+  }
+  if (std::abs(value) > 999999 || (value != 0 && std::abs(value) < 1e-6))
+    return scientific(true);
+  converted = std::to_chars(buffer, buffer + sizeof(buffer), value,
+                            std::chars_format::fixed, 6);
+  text.assign(buffer, converted.ptr);
+  while (text.ends_with('0') && text[text.size() - 2] != '.') text.pop_back();
+  return text;
+}
+
+RustXesNode parse_rust_node(detail::XmlPullParser& parser,
+                            const detail::XmlPullParser::Token& start,
+                            std::size_t depth);
+
+void parse_rust_contents(detail::XmlPullParser& parser, std::string_view end_name,
+                         std::vector<RustXesNode>& contents, std::size_t depth) {
+  if (depth > 128) throw std::invalid_argument("XES attribute nesting exceeds the maximum depth");
+  bool finished_values = false;
+  while (true) {
+    const auto token = parser.next();
+    if (token.kind == detail::XmlPullParser::Kind::EndOfInput)
+      throw std::runtime_error("RUSTXES container is not closed");
+    if (token.kind == detail::XmlPullParser::Kind::EndElement && local_name(token.name) == end_name) return;
+    if (token.kind != detail::XmlPullParser::Kind::StartElement) continue;
+    if (finished_values) { skip_element(parser, token); continue; }
+    if (local_name(token.name) == "values") {
+      if (!token.self_closing) parse_rust_contents(parser, "values", contents, depth + 1);
+      finished_values = true;
+    } else contents.push_back(parse_rust_node(parser, token, depth + 1));
+  }
+}
+
+RustXesNode parse_rust_node(detail::XmlPullParser& parser,
+                            const detail::XmlPullParser::Token& start,
+                            std::size_t depth) {
+  if (depth > 128) throw std::invalid_argument("XES attribute nesting exceeds the maximum depth");
+  RustXesNode result;
+  result.tag = local_name(start.name);
+  if (const auto* key = detail::attribute(start.attributes, "key")) result.key = *key;
+  if (const auto* value = detail::attribute(start.attributes, "value")) {
+    result.value = *value;
+    result.has_value = true;
+  }
+  if (start.self_closing) return result;
+  if (result.tag == "list" || result.tag == "container") {
+    parse_rust_contents(parser, result.tag, result.contents, depth);
+  } else {
+    while (true) {
+      const auto token = parser.next();
+      if (token.kind == detail::XmlPullParser::Kind::EndOfInput)
+        throw std::runtime_error("RUSTXES attribute is not closed");
+      if (token.kind == detail::XmlPullParser::Kind::EndElement && local_name(token.name) == result.tag) break;
+      if (token.kind == detail::XmlPullParser::Kind::StartElement)
+        result.own.push_back(parse_rust_node(parser, token, depth + 1));
+    }
+  }
+  return result;
+}
+
+std::string rust_uuid_value(const std::string& input) {
+  auto id = input;
+    if (id.starts_with("urn:uuid:")) id.erase(0, 9);
+    else if (id.size() == 38 && id.front() == '{' && id.back() == '}')
+      id = id.substr(1, 36);
+    std::transform(id.begin(), id.end(), id.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    const bool layout = id.size() == 32 ||
+        (id.size() == 36 && id[8] == '-' && id[13] == '-' && id[18] == '-' && id[23] == '-');
+    std::erase(id, '-');
+    if (layout && id.size() == 32 && std::all_of(id.begin(), id.end(),
+        [](unsigned char c) { return std::isxdigit(c) != 0; })) {
+      id.insert(20, "-"); id.insert(16, "-"); id.insert(12, "-"); id.insert(8, "-");
+    } else id = "00000000-0000-0000-0000-000000000000";
+  return id;
+}
+
+std::string rust_debug_nodes(const std::vector<RustXesNode>& nodes);
+std::string rust_debug_node(const RustXesNode& node) {
+  std::string value = "None";
+  if (!node.has_value && node.tag != "list" && node.tag != "container") {}
+  else if (node.tag == "string") value = "String(" + rust_debug_string(node.value) + ")";
+  else if (node.tag == "id") {
+    value = "ID(" + rust_uuid_value(node.value) + ")";
+  } else if (node.tag == "date") {
+    try { value = "Date(" + rust_debug_date(node.value) + ")"; }
+    catch (const std::invalid_argument&) { value = "None"; }
+  } else if (node.tag == "int") {
+    std::int64_t number = 0;
+    try { number = std::get<std::int64_t>(parse_native_value(AttributeKind::kInt, node.value, XesImportVariant::kRustXes)); }
+    catch (const std::invalid_argument&) {}
+    value = "Int(" + std::to_string(number) + ")";
+  } else if (node.tag == "float") {
+    const double number = rust_float_value(node.value);
+    value = "Float(" + rust_debug_float(number) + ")";
+  }
+  else if (node.tag == "boolean") value = node.value == "true" ? "Boolean(true)" : "Boolean(false)";
+  else if (node.tag == "list" || node.tag == "container") value = (node.tag == "list" ? "List(" : "Container(") + rust_debug_nodes(node.contents) + ")";
+  return "Attribute { key: " + rust_debug_string(node.key) + ", value: " + value +
+      ", own_attributes: " + (node.own.empty() ? "None" : "Some(" + rust_debug_nodes(node.own) + ")") + " }";
+}
+std::string rust_debug_nodes(const std::vector<RustXesNode>& nodes) {
+  std::string result = "[";
+  for (const auto& node : nodes) {
+    if (result.size() != 1) result += ", ";
+    result += rust_debug_node(node);
+  }
+  return result + ']';
+}
+
 std::optional<EventAttribute> parse_attribute_node(
     detail::XmlPullParser& parser,
     const detail::XmlPullParser::Token& start,
@@ -179,15 +437,67 @@ std::optional<EventAttribute> parse_attribute_node(
   const auto kind = attribute_kind_of(element);
   const bool list = element == "list";
   const bool container = element == "container";
+  if (variant == XesImportVariant::kRustXes && (list || container)) {
+    const auto node = parse_rust_node(parser, start, depth);
+    return EventAttribute{node.key, rust_debug_nodes(node.contents), AttributeKind::kString};
+  }
+
   if (!kind && !list && !container) {
     skip_element(parser, start);
+    if (variant == XesImportVariant::kRustXes)
+      if (const auto* key = detail::attribute(start.attributes, "key"))
+        return EventAttribute{*key, "", AttributeKind::kString, true};
     return std::nullopt;
   }
 
+  const std::string empty_key;
   const auto* key = detail::attribute(start.attributes, "key");
+  if (!key && variant == XesImportVariant::kRustXes) key = &empty_key;
   if (!key) {
     skip_element(parser, start);
     return std::nullopt;
+  }
+  if (variant == XesImportVariant::kRustXes && kind) {
+    const auto* raw = detail::attribute(start.attributes, "value");
+    skip_element(parser, start);
+    if (!raw) return EventAttribute{*key, "", *kind, true};
+    EventAttribute result{*key, *raw, *kind};
+    if (*kind == AttributeKind::kInt) {
+      std::int64_t value = 0;
+      try { value = std::get<std::int64_t>(parse_native_value(*kind, *raw, variant)); }
+      catch (const std::invalid_argument&) {}
+      result.typed_value = value;
+      result.value = std::to_string(value);
+    } else if (*kind == AttributeKind::kFloat) {
+      const double value = rust_float_value(*raw);
+
+      result.typed_value = value;
+      result.value = rust_debug_float(value);
+    } else if (*kind == AttributeKind::kDate) {
+      try {
+        auto date = rust_debug_date(*raw);
+        if (date.substr(17, 2) == "60") {
+          // Scalar table dates carry the leap second into the next instant;
+          // the container debug representation deliberately retains :60.
+          date.replace(17, 2, "59");
+          const auto dot = date.find('.');
+          std::string fraction;
+          if (dot != std::string::npos) {
+            const auto end = date.find_first_not_of("0123456789", dot + 1);
+            fraction = date.substr(dot, end - dot);
+            date.erase(dot, end - dot);
+          }
+          date = format_timestamp(*parse_timestamp(date) + 1);
+          if (!fraction.empty()) date.replace(date.find('.'), 4, fraction);
+        }
+        result.typed_value = parse_native_value(*kind, date, variant);
+        result.value = std::get<NativeDate>(result.typed_value).value;
+      } catch (const std::invalid_argument&) { result.is_null = true; }
+    } else if (*kind == AttributeKind::kId) {
+      result.kind = AttributeKind::kString;
+      result.value = rust_uuid_value(*raw);
+    } else result.typed_value = parse_native_value(*kind, *raw, variant);
+    return result;
   }
   const bool is_null = true_attribute(start.attributes, "null") ||
                        true_attribute(start.attributes, "is_null");
@@ -572,13 +882,24 @@ std::string_view xes_import_variant_name(XesImportVariant variant) {
   throw std::invalid_argument("XES import: unsupported parser variant");
 }
 
-EventLog import_xes_event_log(
+static EventLog import_xes_impl(
     std::istream& input,
-    const XesImportOptions& options) {
+    const XesImportOptions& options, XesImportResult* raw_result = nullptr) {
   validate_variant(options.variant);
-  if (options.case_attribute.empty() || options.activity_attribute.empty() ||
+  const auto apply_extension_override = [&](EventLog& output) {
+    if (!options.conversion_extensions) return;
+    output.metadata.extensions.clear();
+    std::unordered_map<std::string, std::size_t> indices;
+    for (const auto& extension : *options.conversion_extensions) {
+      const auto [at, inserted] = indices.emplace(extension.name, output.metadata.extensions.size());
+      if (inserted) output.metadata.extensions.push_back(extension);
+      else output.metadata.extensions[at->second] = extension;
+    }
+  };
+  if (options.variant != XesImportVariant::RUSTXES &&
+      (options.case_attribute.empty() || options.activity_attribute.empty() ||
       options.timestamp_attribute.empty() || options.resource_attribute.empty() ||
-      options.lifecycle_attribute.empty()) {
+      options.lifecycle_attribute.empty())) {
     throw std::invalid_argument("XES import selectors must not be empty");
   }
   std::unordered_set<std::string> attributes_to_read(
@@ -727,11 +1048,15 @@ EventLog import_xes_event_log(
 
       if (element == "trace" && parent == "log") {
         if (log.traces.size() >= options.max_traces) break;
+        if (options.variant == XesImportVariant::kRustXes && token.self_closing && log.traces.empty())
+          throw std::invalid_argument("RUSTXES: Failed to parse XES: MissingLastTrace");
         if (in_trace) {
           throw std::runtime_error("XES input nests a <trace> inside a <trace>");
         }
         in_trace = true;
       } else if (element == "event" && in_trace && parent == "trace") {
+        if (options.variant == XesImportVariant::kRustXes && token.self_closing)
+          throw std::invalid_argument("RUSTXES: Empty event not handled?!");
         in_event = true;
       } else if (!in_trace && parent == "log" && element == "extension") {
         // Keep declarations in document order.  Missing optional values are
@@ -845,6 +1170,485 @@ EventLog import_xes_event_log(
         options.timestamp_attribute + "')");
   }
 
+  if (options.variant == XesImportVariant::kRustXes) {
+    // Event columns with the table's reserved case prefix are discarded;
+    // they neither supply a grouping ID nor override trace attributes.
+    // Table column order is shared by auto-generated event names and trace
+    // reconstruction. Include null-only columns and empty source traces.
+    std::vector<std::string> table_columns;
+    std::unordered_set<std::string> known_columns;
+    const auto add_column = [&](const std::string& key) {
+      if (known_columns.insert(key).second) table_columns.push_back(key);
+    };
+    for (const auto& trace : log.traces) {
+      if (trace.case_id_attribute) add_column("case:" + trace.case_id_attribute->key);
+      for (const auto& attribute : trace.attributes) add_column("case:" + attribute.key);
+      for (const auto& event : trace.events) {
+        for (const auto& attribute : event.attributes) add_column(attribute.key);
+        for (const auto* selected : {&event.activity_attribute, &event.timestamp_attribute,
+                                    &event.resource_attribute, &event.lifecycle_attribute})
+          if (*selected) add_column((*selected)->key);
+      }
+    }
+    // A global shuffle preserves observed cross-group correlations, while
+    // backend allocation/hash probabilities remain unverified.
+    static thread_local std::mt19937_64 column_order_generator(std::random_device{}());
+    std::shuffle(table_columns.begin(), table_columns.end(), column_order_generator);
+    std::unordered_map<std::string, std::size_t> column_rank;
+    for (std::size_t i = 0; i < table_columns.size(); ++i) column_rank.emplace(table_columns[i], i);
+    std::string empty_event_name;
+    if (const auto empty = column_rank.find(""); empty != column_rank.end()) {
+      empty_event_name = "column_" + std::to_string(empty->second);
+      if (known_columns.contains(empty_event_name))
+        throw std::invalid_argument("RUSTXES: duplicate column " + empty_event_name);
+    }
+    const auto normalize_rows = [](const std::vector<std::vector<EventAttribute*>>& rows, bool promote_missing = true) {
+      std::unordered_map<std::string, std::vector<EventAttribute*>> columns;
+      std::unordered_map<std::string, std::size_t> present_rows;
+      for (const auto& row : rows) {
+        std::unordered_set<std::string> seen;
+        for (auto* cell : row) {
+          columns[cell->key].push_back(cell);
+          if (!cell->is_null && seen.insert(cell->key).second) ++present_rows[cell->key];
+        }
+      }
+      for (const auto& [key, cells] : columns) {
+        (void)key;
+        std::set<AttributeKind> kinds;
+        const auto present = present_rows[key];
+        for (const auto* cell : cells) {
+          if (cell->is_null) continue;
+          kinds.insert(cell->kind);
+        }
+        const bool numeric = std::all_of(kinds.begin(), kinds.end(), [](auto kind) {
+          return kind == AttributeKind::kInt || kind == AttributeKind::kFloat;
+        });
+        for (auto* cell : cells) {
+          if (cell->is_null) continue;
+          if (numeric && cell->kind == AttributeKind::kInt &&
+              (kinds.contains(AttributeKind::kFloat) || (promote_missing && present < rows.size()))) {
+            const auto value = static_cast<double>(std::get<std::int64_t>(cell->typed_value));
+            cell->kind = AttributeKind::kFloat;
+            cell->typed_value = value;
+            cell->value = rust_debug_float(value);
+          } else if (!numeric && kinds.size() > 1) {
+            std::string text = cell->value;
+            if (cell->kind == AttributeKind::kString || cell->kind == AttributeKind::kId)
+              text = '"' + text + '"';
+            else if (cell->kind == AttributeKind::kBoolean)
+              text = std::get<bool>(cell->typed_value) ? "true" : "false";
+            else if (cell->kind == AttributeKind::kFloat)
+              text = rust_mixed_float(std::get<double>(cell->typed_value));
+            else if (cell->kind == AttributeKind::kDate) {
+              text = std::get<NativeDate>(cell->typed_value).value;
+              if (text.ends_with('Z')) text.pop_back();
+              if (text.size() > 10) text[10] = ' ';
+              const auto dot = text.find('.');
+              if (dot != std::string::npos) {
+                if (text.find_first_not_of('0', dot + 1) == std::string::npos) text.erase(dot);
+                else text.resize(dot + 7, '0');
+              }
+            }
+            cell->kind = AttributeKind::kString;
+            cell->value = std::move(text);
+            cell->typed_value = std::monostate{};
+          }
+        }
+      }
+    };
+    const bool custom_conversion = !raw_result &&
+        (options.conversion_case_id_key != std::optional<std::string>{"case:concept:name"} ||
+         options.conversion_case_attribute_prefix != std::optional<std::string>{"case:"});
+    XesImportResult converted_result;
+    auto* table_result = raw_result ? raw_result : &converted_result;
+    if (raw_result || custom_conversion) {
+      EventTable table;
+      std::vector<std::optional<std::string>> case_projection_keys;
+      table.columns = table_columns;
+      for (auto& column : table.columns) if (column.empty()) column = empty_event_name;
+      for (const auto& trace : log.traces) {
+        for (const auto& event : trace.events) {
+          EventTable::Row row(table.columns.size());
+          const auto set = [&](const EventAttribute& source, bool trace_scope) {
+            const auto key = trace_scope ? "case:" + source.key : source.key;
+            if (!trace_scope && key.starts_with("case:")) return;
+            auto value = source;
+            value.key = key.empty() ? empty_event_name : key;
+            row[column_rank.at(key)] = std::move(value);
+          };
+          for (const auto& value : trace.attributes) set(value, true);
+          if (trace.case_id_attribute) set(*trace.case_id_attribute, true);
+          for (const auto& value : event.attributes) set(value, false);
+          for (const auto* selected : {&event.activity_attribute, &event.timestamp_attribute,
+                                      &event.resource_attribute, &event.lifecycle_attribute})
+            if (*selected) set(**selected, false);
+          table.rows.push_back(std::move(row));
+          case_projection_keys.push_back(trace.case_id_attribute ? std::optional<std::string>{trace.case_id_attribute->key} : std::nullopt);
+        }
+      }
+      std::vector<std::vector<EventAttribute*>> rows;
+      for (auto& row : table.rows) {
+        auto& cells = rows.emplace_back();
+        for (auto& cell : row) if (cell) cells.push_back(&*cell);
+      }
+      const bool lazy = raw_result && options.return_pl_lazyframe;
+      normalize_rows(rows, !lazy);
+      for (std::size_t column = 0; column < table.columns.size(); ++column) {
+        std::optional<AttributeKind> kind;
+        std::size_t present = 0;
+        for (const auto& row : table.rows)
+          if (row[column] && !row[column]->is_null) {
+            kind = row[column]->kind;
+            ++present;
+          }
+        std::string dtype = lazy ? "Null" : "object";
+        if (kind) switch (*kind) {
+          case AttributeKind::kInt: dtype = lazy ? "Int64" : "int64"; break;
+          case AttributeKind::kFloat: dtype = lazy ? "Float64" : "float64"; break;
+          case AttributeKind::kBoolean:
+            dtype = lazy ? "Boolean" : present == table.rows.size() ? "bool" : "object"; break;
+          case AttributeKind::kDate:
+            dtype = lazy ? "Datetime(time_unit='us', time_zone='UTC')" : "datetime64[us, UTC]"; break;
+          default: dtype = lazy ? "String" : "str"; break;
+        }
+        table_result->dtypes.push_back(std::move(dtype));
+        for (auto& row : table.rows) {
+          auto& cell = row[column];
+          if (cell && !cell->is_null) continue;
+          cell.reset();
+          if (!lazy && (kind == AttributeKind::kFloat || kind == AttributeKind::kString || kind == AttributeKind::kId)) {
+            cell = EventAttribute{table.columns[column], "NaN", AttributeKind::kFloat};
+            cell->typed_value = std::numeric_limits<double>::quiet_NaN();
+          } else if (!lazy && kind == AttributeKind::kDate) {
+            cell = EventAttribute{table.columns[column], "NaT", AttributeKind::kDate};
+            cell->typed_value = NativeDate{"NaT"};
+          }
+        }
+      }
+      if (custom_conversion) {
+        const auto& glue = options.conversion_case_id_key;
+        if (!glue && !table.rows.empty()) throw std::invalid_argument("RUSTXES: missing None");
+        const auto& prefix = options.conversion_case_attribute_prefix;
+        const auto missing = [](const std::optional<EventAttribute>& cell) {
+          if (!cell || cell->is_null) return true;
+          if (const auto* value = std::get_if<double>(&cell->typed_value)) return std::isnan(*value);
+          if (const auto* value = std::get_if<NativeDate>(&cell->typed_value)) return value->value == "NaT";
+          return false;
+        };
+        const auto group_column = std::find(table.columns.begin(), table.columns.end(), glue.value_or(""));
+        if (group_column == table.columns.end() && !table.rows.empty())
+          throw std::invalid_argument("RUSTXES: missing " + *glue);
+        EventLog converted;
+        converted.attributes = {{"origin", "csv"}};
+        std::map<std::pair<AttributeKind, std::string>, std::size_t> groups;
+        const auto project = [](auto& object, const std::string& selector, auto& value, auto& state,
+                                auto& source, auto& metadata, bool case_scope = false) {
+          auto selected = object.attributes.end();
+          int best = 0;
+          for (auto at = object.attributes.begin(); at != object.attributes.end(); ++at) {
+            const int rank = case_scope ? case_selector_match_rank(at->key, selector) : selector_match_rank(at->key, selector);
+            if (rank > best) { best = rank; selected = at; }
+          }
+          if (selected == object.attributes.end()) return;
+          value = selected->value; source = selected->key; metadata = *selected;
+          state = FirstClassAttributeState::kPresent;
+        };
+        for (const auto& row : table.rows) {
+          const auto& identifier = row[group_column - table.columns.begin()];
+          if (missing(identifier)) throw std::invalid_argument("RUSTXES: missing " + *glue);
+          if (!prefix) throw std::invalid_argument("RUSTXES: startswith requires a string prefix");
+          std::string key = identifier->value;
+          if (identifier->kind == AttributeKind::kFloat) {
+            const auto number = std::get<double>(identifier->typed_value);
+            key = rust_debug_float(number == 0 ? 0 : number);
+          } else if (identifier->kind == AttributeKind::kBoolean) {
+            key = std::get<bool>(identifier->typed_value) ? "true" : "false";
+          } else if (identifier->kind == AttributeKind::kDate) {
+            key = std::get<NativeDate>(identifier->typed_value).value;
+            if (key.find('.') != std::string::npos && key.ends_with('Z')) {
+              key.pop_back();
+              while (key.ends_with('0')) key.pop_back();
+              if (key.ends_with('.')) key.pop_back();
+              key += 'Z';
+            }
+          }
+          const auto [position, inserted] = groups.emplace(std::pair{identifier->kind, key}, converted.traces.size());
+          if (inserted) {
+            Trace trace;
+            for (std::size_t column = 0; column < table.columns.size(); ++column) {
+              if (missing(row[column]) || !table.columns[column].starts_with(*prefix)) continue;
+              auto attribute = *row[column];
+              if (!prefix->empty()) {
+                std::size_t at = 0;
+                while ((at = attribute.key.find(*prefix, at)) != std::string::npos) attribute.key.erase(at, prefix->size());
+              }
+              replace_attribute(trace.attributes, std::move(attribute));
+            }
+            if (std::none_of(trace.attributes.begin(), trace.attributes.end(), [](const auto& value) { return value.key == "concept:name"; })) {
+              auto name = *identifier; name.key = "concept:name";
+              trace.attributes.push_back(std::move(name));
+            }
+            auto case_selector = options.case_attribute;
+            bool has_case_projection = true;
+            if (case_selector != "concept:name") {
+              const auto& original = case_projection_keys[&row - table.rows.data()];
+              has_case_projection = original.has_value();
+              if (original) {
+                case_selector = "case:" + *original;
+                has_case_projection = case_selector.starts_with(*prefix);
+                if (!prefix->empty()) {
+                  std::size_t at = 0;
+                  while ((at = case_selector.find(*prefix, at)) != std::string::npos) case_selector.erase(at, prefix->size());
+                }
+              }
+            }
+            if (has_case_projection)
+              project(trace, case_selector, trace.case_id, trace.case_id_state,
+                      trace.case_id_source_key, trace.case_id_attribute, true);
+            if (trace.case_id_attribute) std::erase_if(trace.attributes, [&](const auto& attribute) {
+              return attribute.key == trace.case_id_attribute->key;
+            });
+            converted.traces.push_back(std::move(trace));
+          }
+          Event event;
+          event.input_order = static_cast<std::size_t>(&row - table.rows.data());
+          for (std::size_t column = 0; column < table.columns.size(); ++column)
+            if (!missing(row[column]) && !table.columns[column].starts_with(*prefix)) event.attributes.push_back(*row[column]);
+          project(event, options.activity_attribute.empty() ? empty_event_name : options.activity_attribute, event.activity, event.activity_state, event.activity_source_key, event.activity_attribute);
+          project(event, options.timestamp_attribute.empty() ? empty_event_name : options.timestamp_attribute, event.timestamp, event.timestamp_state, event.timestamp_source_key, event.timestamp_attribute);
+          project(event, options.resource_attribute.empty() ? empty_event_name : options.resource_attribute, event.resource, event.resource_state, event.resource_source_key, event.resource_attribute);
+          project(event, options.lifecycle_attribute.empty() ? empty_event_name : options.lifecycle_attribute, event.lifecycle, event.lifecycle_state, event.lifecycle_source_key, event.lifecycle_attribute);
+          std::erase_if(event.attributes, [&](const auto& attribute) {
+            return (event.activity_attribute && attribute.key == event.activity_attribute->key) ||
+                   (event.timestamp_attribute && attribute.key == event.timestamp_attribute->key) ||
+                   (event.resource_attribute && attribute.key == event.resource_attribute->key) ||
+                   (event.lifecycle_attribute && attribute.key == event.lifecycle_attribute->key);
+          });
+          auto& trace = converted.traces[position->second];
+          copy_event_case_context(trace, event);
+          trace.events.push_back(std::move(event));
+        }
+        std::unordered_set<std::string> extension_prefixes;
+        for (auto key : table_columns) {
+          std::size_t at = 0;
+          while ((at = key.find("case:", at)) != std::string::npos) key.erase(at, 5);
+          if (const auto colon = key.find(':'); colon != std::string::npos) extension_prefixes.insert(key.substr(0, colon));
+        }
+        const std::pair<std::string_view, std::string_view> standards[] = {
+            {"concept", "Concept"}, {"time", "Time"}, {"org", "Organizational"},
+            {"lifecycle", "Lifecycle"}, {"cost", "Cost"}, {"identity", "Identity"},
+            {"artifactlifecycle", "ArtifactLifecycle"}, {"micro", "Micro"},
+            {"semantic", "Semantic"}, {"swcomm", "Software Communication"},
+            {"swevent", "Software Event"}, {"swtelemetry", "Software Telemetry"}};
+        for (const auto& [prefix, name] : standards)
+          if (extension_prefixes.contains(std::string(prefix)))
+            converted.metadata.extensions.push_back({std::string(name), std::string(prefix),
+                "http://www.xes-standard.org/" + std::string(prefix) + ".xesext"});
+        apply_extension_override(converted);
+        if (options.timestamp_sort) sort_log_by_timestamp(converted, options.reverse_sort);
+        return converted;
+      }
+      // Parsing is eager; the lazy result is a restartable scanner over the
+      // immutable in-memory table, not a deferred XML parser.
+      if (lazy) {
+        table_result->kind = EventDataKind::kLazyEventTable;
+        table_result->lazy_table = LazyEventTable::from_table(table);
+      } else {
+        table_result->kind = EventDataKind::kEventTable;
+        table_result->table = std::move(table);
+      }
+      return {};
+    }
+    for (auto& trace : log.traces) {
+      for (auto& event : trace.events) {
+        std::erase_if(event.attributes, [](const EventAttribute& value) {
+          return value.key.starts_with("case:");
+        });
+        for (auto* selected : {&event.activity_attribute, &event.timestamp_attribute,
+                              &event.resource_attribute, &event.lifecycle_attribute})
+          if (*selected && (*selected)->key.starts_with("case:")) (*selected)->is_null = true;
+      }
+    }
+    // The public adapter materializes a table before rebuilding the EventLog;
+    // source declarations and log attributes are not carried through it.
+    std::unordered_set<std::string> prefixes;
+    for (auto key : table_columns) {
+      std::size_t at = 0;
+      while ((at = key.find("case:", at)) != std::string::npos) key.erase(at, 5);
+      if (const auto colon = key.find(':'); colon != std::string::npos) prefixes.insert(key.substr(0, colon));
+    }
+    const auto add_key = [&](std::string_view key) {
+      const auto colon = key.find(':');
+      if (colon != std::string_view::npos) prefixes.emplace(key.substr(0, colon));
+    };
+    const auto add_trace_key = [&](std::string key) {
+      std::size_t at = 0;
+      while ((at = key.find("case:", at)) != std::string::npos) key.erase(at, 5);
+      add_key(key);
+    };
+    for (const auto& trace : log.traces) {
+      if (trace.case_id_state != FirstClassAttributeState::kMissing || !trace.case_id.empty())
+        add_trace_key(trace.case_id_source_key.empty() ? "concept:name" : trace.case_id_source_key);
+      for (const auto& attribute : trace.attributes) add_trace_key(attribute.key);
+      for (const auto& event : trace.events) {
+        for (const auto& attribute : event.attributes) add_key(attribute.key);
+        if (event.activity_attribute) add_key(event.activity_attribute->key);
+        if (event.timestamp_attribute) add_key(event.timestamp_attribute->key);
+        if (event.resource_attribute) add_key(event.resource_attribute->key);
+        if (event.lifecycle_attribute) add_key(event.lifecycle_attribute->key);
+      }
+    }
+    std::vector<std::vector<EventAttribute*>> trace_rows, event_rows;
+    for (auto& trace : log.traces) {
+      if (trace.events.empty()) continue;
+      auto& trace_row = trace_rows.emplace_back();
+      for (auto& attribute : trace.attributes) trace_row.push_back(&attribute);
+      if (trace.case_id_attribute) trace_row.push_back(&*trace.case_id_attribute);
+      for (auto& event : trace.events) {
+        auto& row = event_rows.emplace_back();
+        for (auto& attribute : event.attributes) row.push_back(&attribute);
+        for (auto* selected : {&event.activity_attribute, &event.timestamp_attribute,
+                              &event.resource_attribute, &event.lifecycle_attribute})
+          if (*selected) row.push_back(&**selected);
+      }
+    }
+    normalize_rows(trace_rows);
+    normalize_rows(event_rows);
+    const auto omitted = [](const EventAttribute& cell) {
+      const auto* value = std::get_if<double>(&cell.typed_value);
+      return cell.is_null || (value && std::isnan(*value));
+    };
+    const auto sync_projection = [&](auto& selected, auto& value, auto& state, auto& source) {
+      if (!selected) return;
+      if (omitted(*selected)) {
+        selected.reset(); value.clear(); source.clear();
+        state = FirstClassAttributeState::kMissing;
+      } else value = selected->value;
+    };
+    for (auto& trace : log.traces) {
+      std::erase_if(trace.attributes, omitted);
+      sync_projection(trace.case_id_attribute, trace.case_id, trace.case_id_state, trace.case_id_source_key);
+      for (auto& event : trace.events) {
+        std::erase_if(event.attributes, omitted);
+        sync_projection(event.activity_attribute, event.activity, event.activity_state, event.activity_source_key);
+        sync_projection(event.timestamp_attribute, event.timestamp, event.timestamp_state, event.timestamp_source_key);
+        sync_projection(event.resource_attribute, event.resource, event.resource_state, event.resource_source_key);
+        sync_projection(event.lifecycle_attribute, event.lifecycle, event.lifecycle_state, event.lifecycle_source_key);
+        if (!empty_event_name.empty()) {
+          for (auto& attribute : event.attributes)
+            if (attribute.key.empty()) attribute.key = empty_event_name;
+          const auto rename_selected = [&](auto& selected, auto& source) {
+            if (selected && selected->key.empty()) {
+              selected->key = empty_event_name;
+              source = empty_event_name;
+            }
+          };
+          rename_selected(event.activity_attribute, event.activity_source_key);
+          rename_selected(event.timestamp_attribute, event.timestamp_source_key);
+          rename_selected(event.resource_attribute, event.resource_source_key);
+          rename_selected(event.lifecycle_attribute, event.lifecycle_source_key);
+        }
+        copy_event_case_context(trace, event);
+      }
+    }
+    std::map<std::pair<AttributeKind, std::string>, std::size_t> grouped;
+    std::vector<Trace> reconstructed;
+    for (auto& trace : log.traces) {
+      if (trace.events.empty()) continue;
+      const EventAttribute* identifier = nullptr;
+      if (trace.case_id_attribute && trace.case_id_attribute->key == "concept:name")
+        identifier = &*trace.case_id_attribute;
+      else {
+        const auto found = std::find_if(trace.attributes.begin(), trace.attributes.end(),
+            [](const EventAttribute& value) { return value.key == "concept:name"; });
+        if (found != trace.attributes.end()) identifier = &*found;
+      }
+      if (!identifier || omitted(*identifier))
+        throw std::invalid_argument("RUSTXES: missing case:concept:name");
+      auto key = identifier->value;
+      if (identifier->kind == AttributeKind::kBoolean)
+        key = std::get<bool>(identifier->typed_value) ? "true" : "false";
+      else if (identifier->kind == AttributeKind::kFloat) {
+        const auto value = std::get<double>(identifier->typed_value);
+        key = rust_debug_float(value == 0 ? 0 : value);
+      } else if (identifier->kind == AttributeKind::kDate) {
+        key = std::get<NativeDate>(identifier->typed_value).value;
+        const auto dot = key.find('.');
+        if (dot != std::string::npos && key.ends_with('Z')) {
+          key.pop_back();
+          while (key.ends_with('0')) key.pop_back();
+          if (key.ends_with('.')) key.pop_back();
+          key += 'Z';
+        }
+      }
+      const auto [position, inserted] = grouped.emplace(
+          std::pair{identifier->kind, key}, reconstructed.size());
+      if (inserted) {
+        // The table reconstruction removes every occurrence of the prefix.
+        // Colliding output names share the same column priority in every group.
+        auto selected_key = trace.case_id_source_key;
+        const auto normalize_key = [](std::string key) {
+          std::size_t at = 0;
+          while ((at = key.find("case:", at)) != std::string::npos) key.erase(at, 5);
+          return key;
+        };
+        selected_key = normalize_key(selected_key);
+        std::vector<const EventAttribute*> present;
+        if (trace.case_id_attribute) present.push_back(&*trace.case_id_attribute);
+        for (const auto& attribute : trace.attributes)
+          if (!trace.case_id_attribute || attribute.key != trace.case_id_attribute->key)
+            present.push_back(&attribute);
+        std::sort(present.begin(), present.end(), [&](const auto* left, const auto* right) {
+          return column_rank.at("case:" + left->key) < column_rank.at("case:" + right->key);
+        });
+        std::vector<EventAttribute> attributes;
+        std::unordered_map<std::string, std::size_t> output_index;
+        for (const auto* original : present) {
+          auto attribute = *original;
+          attribute.key = normalize_key(attribute.key);
+          const auto [entry, fresh] = output_index.emplace(attribute.key, attributes.size());
+          if (fresh) attributes.push_back(std::move(attribute));
+          else attributes[entry->second] = std::move(attribute);
+        }
+        if (const auto named = output_index.find(selected_key);
+            trace.case_id_attribute && named != output_index.end()) {
+          const auto& selected = attributes[named->second];
+          trace.case_id_attribute = selected;
+          trace.case_id = selected.value;
+          trace.case_id_state = FirstClassAttributeState::kPresent;
+          trace.case_id_source_key = selected_key;
+          attributes.erase(attributes.begin() + named->second);
+        }
+        trace.attributes = std::move(attributes);
+        for (auto& event : trace.events) copy_event_case_context(trace, event);
+        reconstructed.push_back(std::move(trace));
+      }
+      else {
+        auto& target = reconstructed[position->second];
+        for (auto& event : trace.events) {
+          copy_event_case_context(target, event);
+          target.events.push_back(std::move(event));
+        }
+      }
+    }
+    log.traces = std::move(reconstructed);
+    log.attributes = {{"origin", "csv"}};
+    log.metadata = {};
+    const std::pair<std::string_view, std::string_view> extensions[] = {
+        {"concept", "Concept"}, {"time", "Time"}, {"org", "Organizational"},
+        {"lifecycle", "Lifecycle"}, {"cost", "Cost"}, {"identity", "Identity"},
+        {"artifactlifecycle", "ArtifactLifecycle"}, {"micro", "Micro"},
+        {"semantic", "Semantic"}, {"swcomm", "Software Communication"},
+        {"swevent", "Software Event"}, {"swtelemetry", "Software Telemetry"}};
+    for (const auto& [prefix, name] : extensions) {
+      if (prefixes.contains(std::string(prefix)))
+        log.metadata.extensions.push_back({std::string(name), std::string(prefix),
+            "http://www.xes-standard.org/" + std::string(prefix) + ".xesext"});
+    }
+    apply_extension_override(log);
+    std::erase_if(log.traces, [](const Trace& trace) { return trace.events.empty(); });
+  }
+
   // Materialize the legacy projections after all arbitrary scopes have been
   // parsed. Duplicate trace/event scopes retain their document order by
   // concatenating their attributes in the compatibility vectors.
@@ -860,6 +1664,23 @@ EventLog import_xes_event_log(
     sort_log_by_timestamp(log, options.reverse_sort);
 
   return log;
+}
+
+EventLog import_xes_event_log(std::istream& input, const XesImportOptions& options) {
+  return import_xes_impl(input, options);
+}
+
+XesImportResult import_xes_result(std::istream& input, const XesImportOptions& options) {
+  XesImportResult result;
+  const bool raw = options.variant == XesImportVariant::kRustXes && !options.return_legacy_log_object;
+  result.log = import_xes_impl(input, options, raw ? &result : nullptr);
+  return result;
+}
+
+XesImportResult import_xes_result(const std::filesystem::path& path, const XesImportOptions& options) {
+  std::ifstream input(path, std::ios::binary);
+  if (!input) throw std::runtime_error("Unable to open XES event log: " + path.string());
+  return import_xes_result(input, options);
 }
 
 EventLog import_xes_event_log(

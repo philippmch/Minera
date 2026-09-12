@@ -266,6 +266,14 @@ void metadata_import_export_import_round_trip() {
       assert(variant_log.attributes.empty());
       continue;
     }
+    if (variant == minera::XesImportVariant::RUSTXES) {
+      assert(variant_log.metadata.classifiers.empty());
+      assert(variant_log.metadata.globals.empty());
+      assert(variant_log.metadata.trace_globals.empty());
+      assert(variant_log.metadata.event_globals.empty());
+      assert(variant_log.attributes == std::vector<minera::EventAttribute>({{"origin", "csv"}}));
+      continue;
+    }
     assert(variant_log.metadata.extensions == log.metadata.extensions);
     assert(variant_log.metadata.classifiers == log.metadata.classifiers);
     assert(variant_log.metadata.trace_globals == log.metadata.trace_globals);
@@ -806,6 +814,39 @@ void null_containers_keep_recursive_children() {
          round_tags->children.size() == 1);
 }
 
+void null_scalar_list_children_preserve_order_and_duplicates() {
+  using namespace minera;
+  EventLog log;
+  EventAttribute ordered{"probe", "true", AttributeKind::kBoolean, true};
+  ordered.scalar_children_list = true;
+  ordered.children = {
+      {"same", "first", AttributeKind::kString},
+      {"same", "2", AttributeKind::kInt},
+  };
+  log.attributes.push_back(ordered);
+
+  XesExportOptions preserved_options;
+  preserved_options.variant = XesExportVariant::ETREE;
+  preserved_options.preserve_nulls = true;
+  const auto preserved = serialize_xes(log, preserved_options);
+  assert(occurrences(preserved, "key=\"same\"") == 2);
+  assert(preserved.find("value=\"first\"") < preserved.find("value=\"2\""));
+  assert(preserved.find("key=\"probe\" null=\"true\"") != std::string::npos);
+
+  for (const auto variant : {XesExportVariant::ETREE, XesExportVariant::LINE_BY_LINE}) {
+    XesExportOptions options;
+    options.variant = variant;
+    const auto default_nulls = serialize_xes(log, options);
+    assert(default_nulls.find("null=\"true\"") == std::string::npos);
+    assert(occurrences(default_nulls, "key=\"same\"") == 2);
+    assert(default_nulls.find("value=\"first\"") < default_nulls.find("value=\"2\""));
+  }
+
+  XesExportOptions line_preserved = preserved_options;
+  line_preserved.variant = XesExportVariant::LINE_BY_LINE;
+  assert(throws([&] { (void)serialize_xes(log, line_preserved); }));
+}
+
 void typed_first_class_selectors_survive_flat_adapters() {
   const std::string xml =
       "<log><trace><int key=\"case.number\" value=\"42\"><string "
@@ -1313,41 +1354,377 @@ void date_export_preserves_source_precision() {
 
 }  // namespace
 
-void null_scalar_list_children_preserve_order_and_duplicates() {
-  using namespace minera;
-  EventLog log;
-  EventAttribute ordered{"probe", "true", AttributeKind::kBoolean, true};
-  ordered.scalar_children_list = true;
-  ordered.children = {
-      {"same", "first", AttributeKind::kString},
-      {"same", "2", AttributeKind::kInt},
-  };
-  log.attributes.push_back(ordered);
+int main() {
+  {
+    using namespace minera;
+    const std::string xml = "<log><trace><string key=\"concept:name\" value=\"c\"/>"
+        "<event><string key=\"concept:name\" value=\"A\"/><string key=\"group\" value=\"X\"/></event>"
+        "<event><string key=\"concept:name\" value=\"B\"/><string key=\"group\" value=\"Y\"/></event>"
+        "<event><string key=\"concept:name\" value=\"C\"/><string key=\"group\" value=\"X\"/></event></trace></log>";
+    for (const bool gzip : {false, true}) {
+      const auto read = [&](XesImportOptions options) {
+        std::istringstream input(gzip ? detail::gzip_compress(xml) : xml);
+        return import_xes_result(input, options);
+      };
+      XesImportOptions options;
+      options.variant = XesImportVariant::RUSTXES;
+      options.conversion_case_id_key = "group";
+      options.conversion_extensions = std::vector<LogExtension>{};
+      assert(read(options).log.metadata.extensions.empty());
+      options.conversion_extensions = std::vector<LogExtension>{{"Custom", "custom", "urn:custom"}};
+      assert(read(options).log.metadata.extensions[0].uri == "urn:custom");
+      options.conversion_extensions = std::vector<LogExtension>{{"Custom", "custom", "urn:first"},
+          {"Other", "custom", "urn:other"}, {"Custom", "last", "urn:last"}};
+      const auto extensions = read(options).log.metadata.extensions;
+      assert(extensions.size() == 2 && extensions[0].name == "Custom");
+      assert(extensions[0].uri == "urn:last" && extensions[1].name == "Other");
 
-  XesExportOptions preserved_options;
-  preserved_options.variant = XesExportVariant::ETREE;
-  preserved_options.preserve_nulls = true;
-  const auto preserved = serialize_xes(log, preserved_options);
-  assert(occurrences(preserved, "key=\"same\"") == 2);
-  assert(preserved.find("value=\"first\"") < preserved.find("value=\"2\""));
-  assert(preserved.find("key=\"probe\" null=\"true\"") != std::string::npos);
+      options.conversion_extensions.reset();
+      const auto grouped = read(options).log;
+      assert(grouped.traces.size() == 2 && grouped.traces[0].events.size() == 2);
+      assert(grouped.traces[0].events[1].activity == "C");
+      assert(grouped.traces[0].events[1].input_order == 2);
+      assert(grouped.traces[0].case_id == "c" && grouped.traces[1].case_id == "c");
+      assert(grouped.traces[0].events[0].attribute("group") && *grouped.traces[0].events[0].attribute("group") == "X");
+      options.conversion_case_attribute_prefix = "x:";
+      const auto retained = read(options).log;
+      assert(retained.traces[0].case_id == "X");
+      assert(retained.traces[0].events[0].attribute("case:concept:name"));
+      options.conversion_case_attribute_prefix = "";
+      const auto swallowed = read(options).log;
+      assert(swallowed.traces[0].case_id == "A");
+      assert(swallowed.traces[0].events[0].activity.empty());
+      assert(swallowed.traces[0].events[0].attributes.empty());
+      options.conversion_case_id_key.reset();
+      assert(throws([&] { (void)read(options); }));
+      options.return_legacy_log_object = false;
+      assert(read(options).kind == EventDataKind::kEventTable);
+      options.return_legacy_log_object = true;
+      options.conversion_case_id_key = "group";
+      options.conversion_case_attribute_prefix.reset();
+      assert(throws([&] { (void)read(options); }));
+      options.conversion_case_attribute_prefix = "case:";
+      options.conversion_case_id_key = "date-group";
+      const std::string dates = "<log><trace><event><date key=\"date-group\" value=\"2024-01-01T00:00:00Z\"/></event>"
+          "<event><date key=\"date-group\" value=\"2024-01-01T00:00:00.000000Z\"/></event></trace></log>";
+      std::istringstream date_input(gzip ? detail::gzip_compress(dates) : dates);
+      const auto date_log = import_xes_result(date_input, options).log;
+      assert(date_log.traces.size() == 1 && date_log.traces[0].events.size() == 2);
+      options.case_attribute = "case:custom";
+      options.activity_attribute = "";
+      options.conversion_case_id_key = "group";
+      const std::string custom = "<log><trace><string key=\"case:custom\" value=\"selected\"/>"
+          "<event><string key=\"group\" value=\"X\"/><string key=\"\" value=\"empty-activity\"/></event></trace></log>";
+      std::istringstream custom_input(gzip ? detail::gzip_compress(custom) : custom);
+      const auto custom_log = import_xes_result(custom_input, options).log;
+      assert(custom_log.traces[0].case_id == "selected");
+      assert(custom_log.traces[0].case_id_attribute->key == "custom");
+      assert(custom_log.traces[0].events[0].activity == "empty-activity");
+      assert(custom_log.traces[0].events[0].activity_source_key.starts_with("column_"));
+      assert(custom_log.traces[0].events[0].case_id == "selected");
 
-  for (const auto variant : {XesExportVariant::ETREE, XesExportVariant::LINE_BY_LINE}) {
-    XesExportOptions options;
-    options.variant = variant;
-    const auto default_nulls = serialize_xes(log, options);
-    assert(default_nulls.find("null=\"true\"") == std::string::npos);
-    assert(occurrences(default_nulls, "key=\"same\"") == 2);
-    assert(default_nulls.find("value=\"first\"") < default_nulls.find("value=\"2\""));
+
+    }
   }
 
-  XesExportOptions line_preserved = preserved_options;
-  line_preserved.variant = XesExportVariant::LINE_BY_LINE;
-  assert(throws([&] { (void)serialize_xes(log, line_preserved); }));
-}
+  {
+    using namespace minera;
+    for (const bool gzip : {false, true}) for (const bool lazy : {false, true}) {
+      const std::string xml = "<log><trace><string key=\"unused\" value=\"schema\"/></trace>"
+          "<trace><event><string key=\"concept:name\" value=\"A\"/><int key=\"n\" value=\"1\"/>"
+          "<string key=\"case:extra\" value=\"discard\"/></event></trace>"
+          "<trace><event><string key=\"concept:name\" value=\"B\"/><int key=\"n\"/></event></trace></log>";
+      std::istringstream input(gzip ? detail::gzip_compress(xml) : xml);
+      XesImportOptions options;
+      options.variant = XesImportVariant::RUSTXES;
+      options.return_legacy_log_object = false;
+      options.return_pl_lazyframe = lazy;
+      const auto result = import_xes_result(input, options);
+      assert(result.kind == (lazy ? EventDataKind::kLazyEventTable : EventDataKind::kEventTable));
+      const auto table = lazy ? result.lazy_table.materialize() : result.table;
+      assert(table.rows.size() == 2 && table.columns.size() == 4);
+      const auto n = table.column_index("n");
+      assert(result.dtypes[n] == (lazy ? "Int64" : "float64"));
+      assert(table.rows[0][table.column_index("concept:name")]->value == "A");
+      assert(table.rows[1][table.column_index("concept:name")]->value == "B");
+      assert(!table.rows[0][table.column_index("case:unused")]);
+      assert(!table.rows[0][table.column_index("case:extra")]);
+      if (lazy) {
+        assert(!table.rows[1][n]);
+        assert(table.rows[0][n]->kind == AttributeKind::kInt);
+        assert(result.lazy_table.materialize().rows.size() == 2);
+      } else {
+        assert(table.rows[0][n]->kind == AttributeKind::kFloat);
+        assert(std::isnan(std::get<double>(table.rows[1][n]->typed_value)));
+      }
+      std::istringstream legacy("<log><trace><string key=\"concept:name\" value=\"c\"/><event></event></trace></log>");
+      options.return_legacy_log_object = true;
+      options.return_pl_lazyframe = true;
+      assert(import_xes_result(legacy, options).kind == EventDataKind::kEventLog);
+      options.return_legacy_log_object = false;
+      std::istringstream convenience("<log><trace><event></event></trace></log>");
+      assert(throws([&] { (void)import_xes_event_log(convenience, options); }));
+      options.variant = XesImportVariant::ITERPARSE;
+      std::istringstream other("<log><trace><event></event></trace></log>");
+      assert(import_xes_result(other, options).kind == EventDataKind::kEventLog);
 
-int main() {
-  null_scalar_list_children_preserve_order_and_duplicates();
+    }
+  }
+
+  {
+    using namespace minera;
+    for (const bool compressed : {false, true}) {
+      const auto read = [&](const std::string& body, const std::string& case_key = "concept:name") {
+        const auto xml = "<log>" + body + "</log>";
+        std::istringstream input(compressed ? detail::gzip_compress(xml) : xml);
+        XesImportOptions options;
+        options.variant = XesImportVariant::RUSTXES;
+        options.case_attribute = case_key;
+        return import_xes_event_log(input, options);
+      };
+      const auto trace = [](const std::string& id, const std::string& activity, const std::string& extra = "") {
+        return "<trace><string key=\"concept:name\" value=\"" + id + "\"/>" + extra +
+            "<event><string key=\"concept:name\" value=\"" + activity + "\"/><string key=\"case:probe\" value=\"discard\"/></event></trace>";
+      };
+      const auto grouped = read(trace("b", "A") + trace("a", "B") + trace("b", "C", "<string key=\"late\" value=\"ignored\"/>"));
+      assert(grouped.traces.size() == 2);
+      assert(grouped.traces[0].case_id == "b" && grouped.traces[1].case_id == "a");
+      assert(grouped.traces[0].events.size() == 2);
+      assert(grouped.traces[0].events[1].activity == "C");
+      assert(!find_attribute(grouped.traces[0].attributes, "late"));
+      assert(grouped.traces[0].events[0].attributes.empty());
+      assert(throws([&] { (void)read("<trace><event></event></trace>"); }));
+      assert(throws([&] { (void)read("<trace><string key=\"case:concept:name\" value=\"alias\"/><event></event></trace>"); }));
+      const auto prefixed = read(trace("c", "A", "<string key=\"showcase:probe\" value=\"v\"/>"));
+      assert(find_attribute(prefixed.traces[0].attributes, "showprobe")->value == "v");
+      const auto extension = read("<trace><string key=\"case:org:resource\" value=\"r\"/></trace>");
+      assert(extension.traces.empty());
+      assert(extension.metadata.extensions.size() == 1);
+      assert(extension.metadata.extensions[0].name == "Organizational");
+      for (int selector = 0; selector < 5; ++selector) {
+        XesImportOptions options;
+        options.variant = XesImportVariant::RUSTXES;
+        auto* key = selector == 0 ? &options.case_attribute : selector == 1 ? &options.activity_attribute :
+            selector == 2 ? &options.timestamp_attribute : selector == 3 ? &options.resource_attribute : &options.lifecycle_attribute;
+        key->clear();
+        const std::string xml = "<log><trace><string key=\"concept:name\" value=\"c\"/><string key=\"\" value=\"trace-empty\"/>"
+            "<event><string key=\"concept:name\" value=\"A\"/><string key=\"\" value=\"event-empty\"/></event></trace></log>";
+        std::istringstream input(compressed ? detail::gzip_compress(xml) : xml);
+        const auto selected_log = import_xes_event_log(input, options);
+        const auto& selected_trace = selected_log.traces[0];
+        const auto& event = selected_trace.events[0];
+        const auto& metadata = selector == 0 ? selected_trace.case_id_attribute : selector == 1 ? event.activity_attribute :
+            selector == 2 ? event.timestamp_attribute : selector == 3 ? event.resource_attribute : event.lifecycle_attribute;
+        const auto state = selector == 0 ? selected_trace.case_id_state : selector == 1 ? event.activity_state :
+            selector == 2 ? event.timestamp_state : selector == 3 ? event.resource_state : event.lifecycle_state;
+        assert(metadata);
+        assert(selector == 0 ? metadata->key.empty() : metadata->key.starts_with("column_"));
+        assert(metadata->value == (selector == 0 ? "trace-empty" : "event-empty"));
+        assert(state == FirstClassAttributeState::kPresent);
+        assert(event.case_id == selected_trace.case_id);
+        if (selector == 0) assert(selected_trace.case_id == "trace-empty");
+        if (selector == 1) assert(event.activity == "event-empty");
+        if (selector == 2) assert(event.timestamp == "event-empty");
+        if (selector == 3) assert(event.resource == "event-empty");
+        if (selector == 4) assert(event.lifecycle == "event-empty");
+      }
+      for (int sample = 0; sample < 24; ++sample) {
+        const std::string body = "<trace><string key=\"concept:name\" value=\"c\"/><event>"
+            "<string key=\"concept:name\" value=\"A\"/><string key=\"\" value=\"empty\"/>"
+            "<string key=\"column_0\" value=\"explicit\"/></event></trace>";
+        try {
+          const auto collision = read(body);
+          const auto& attributes = collision.traces[0].events[0].attributes;
+          assert(find_attribute(attributes, "column_0")->value == "explicit");
+          const auto generated = std::find_if(attributes.begin(), attributes.end(), [](const auto& value) {
+            return value.value == "empty";
+          });
+          assert(generated != attributes.end());
+          assert(generated->key == "column_1" || generated->key == "column_2" || generated->key == "column_3");
+        } catch (const std::invalid_argument& error) {
+          assert(std::string(error.what()).find("duplicate column column_0") != std::string::npos);
+        }
+      }
+      const auto missing_key = read("<trace><string key=\"concept:name\" value=\"c\"/><string value=\"trace-no-key\"/>"
+          "<event><string key=\"concept:name\" value=\"A\"/><string value=\"event-no-key\"/></event></trace>");
+      assert(find_attribute(missing_key.traces[0].attributes, "")->value == "trace-no-key");
+      assert(missing_key.traces[0].events[0].attributes.size() == 1);
+      assert(missing_key.traces[0].events[0].attributes[0].key.starts_with("column_"));
+      assert(missing_key.traces[0].events[0].attributes[0].value == "event-no-key");
+      for (const auto& [source, expected] : std::vector<std::pair<std::string, std::string>>{
+          {"2016-12-31T23:59:60Z", "2017-01-01T00:00:00.000Z"},
+          {"2024-01-01T23:59:60.123456Z", "2024-01-02T00:00:00.123456Z"},
+          {"2024-01-01T23:59:60.123456+05:30", "2024-01-01T18:30:00.123456Z"}}) {
+        const auto leap = read("<trace><string key=\"concept:name\" value=\"c\"/><event><date key=\"time:timestamp\" value=\"" + source + "\"/></event></trace>");
+        assert(leap.traces[0].events[0].timestamp == expected);
+        assert(std::get<NativeDate>(leap.traces[0].events[0].timestamp_attribute->typed_value).value == expected);
+      }
+      assert(throws([&] { (void)read("<trace><string key=\"concept:name\" value=\"c\"/><event/></trace>"); }));
+      assert(throws([&] { (void)read("<trace/>"); }));
+      assert(throws([&] { (void)read("<trace/>" + trace("c", "A")); }));
+      assert(read("<trace></trace><trace/>").traces.empty());
+      assert(read(trace("c", "A") + "<trace/><trace/>").traces.size() == 1);
+      const auto reserved_extension = read("<trace><string key=\"concept:name\" value=\"c\"/><event><string key=\"case:org:resource\" value=\"r\"/></event></trace>");
+      assert(std::any_of(reserved_extension.metadata.extensions.begin(), reserved_extension.metadata.extensions.end(),
+          [](const auto& extension) { return extension.name == "Organizational"; }));
+      const auto missing_custom = read(trace("c", "A", "<string key=\"\" value=\"unrelated\"/>"), "missing");
+      assert(!missing_custom.traces[0].case_id_attribute);
+      assert(missing_custom.traces[0].case_id.empty());
+      assert(find_attribute(missing_custom.traces[0].attributes, "")->value == "unrelated");
+      assert(missing_custom.traces[0].events[0].case_id.empty());
+      const auto custom = read(trace("c", "A", "<string key=\"case:custom\" value=\"selected\"/>"), "case:custom");
+      assert(custom.traces[0].case_id == "selected");
+      assert(custom.traces[0].case_id_source_key == "custom");
+      assert(custom.traces[0].case_id_attribute->key == "custom");
+      assert(!find_attribute(custom.traces[0].attributes, "custom"));
+      assert(custom.traces[0].events[0].case_id == "selected");
+      for (int sample = 0; sample < 24; ++sample) {
+        const auto custom_collision = read(trace("c", "A", "<string key=\"case:custom\" value=\"selected\"/><string key=\"custom\" value=\"other\"/>"), "case:custom");
+        const auto& selected = custom_collision.traces[0];
+        assert(selected.case_id == "selected" || selected.case_id == "other");
+        assert(selected.case_id_source_key == "custom" && selected.case_id_attribute->key == "custom");
+        assert(selected.case_id_attribute->value == selected.case_id);
+        assert(!find_attribute(selected.attributes, "custom"));
+        assert(selected.events[0].case_id == selected.case_id);
+
+        const auto collision = read(trace("c", "A", "<string key=\"case:concept:name\" value=\"alias\"/>") +
+                                    trace("d", "B", "<string key=\"case:concept:name\" value=\"alias\"/>"));
+        assert(collision.traces.size() == 2);
+        assert((collision.traces[0].case_id == "c" && collision.traces[1].case_id == "d") ||
+               (collision.traces[0].case_id == "alias" && collision.traces[1].case_id == "alias"));
+        assert(collision.traces[0].events[0].case_id == collision.traces[0].case_id);
+      }
+    }
+  }
+  {
+    using namespace minera;
+    for (const bool compressed : {false, true}) {
+      const auto read = [&](const std::string& attributes, const std::string& second) {
+        const auto xml = "<log><trace><string key=\"concept:name\" value=\"c\"/><event>" + attributes + "</event><event>" + second + "</event></trace></log>";
+        std::istringstream input(compressed ? detail::gzip_compress(xml) : xml);
+        XesImportOptions options;
+        options.variant = XesImportVariant::RUSTXES;
+        return import_xes_event_log(input, options);
+      };
+      const auto nullable = read("<int key=\"probe\" value=\"42\"/>", "");
+      for (const auto& [lexical, expected] : std::vector<std::pair<std::string, std::string>>{
+          {"1.2345678901234567", "1.234568"}, {"1e20", "1.0000e20"},
+          {"1e-10", "1.0000e-10"}, {"1e-7", "0.0000001"},
+          {"-1e-7", "-1.0000e-7"}, {"1e6", "1e6"},
+          {"1.0000001", "1.0000001"}, {"-1.0000001", "-1.0"},
+          {"999999.123456789", "1.0000e6"}, {"999998.9999999", "999999.0"}}) {
+        const auto display = read("<float key=\"probe\" value=\"" + lexical + "\"/>",
+                                  "<string key=\"probe\" value=\"s\"/>");
+        assert(find_attribute(display.traces[0].events[0].attributes, "probe")->value == expected);
+      }
+      const auto* promoted = find_attribute(nullable.traces[0].events[0].attributes, "probe");
+      assert(promoted && promoted->kind == AttributeKind::kFloat);
+      assert(std::get<double>(promoted->typed_value) == 42.0);
+      const auto mixed = read("<int key=\"concept:name\" value=\"42\"/><float key=\"probe\" value=\"NaN\"/>",
+          "<string key=\"concept:name\" value=\"A\"/><string key=\"probe\" value=\"text\"/>");
+      assert(mixed.traces[0].events[0].activity == "42");
+      assert(mixed.traces[0].events[1].activity == "\"A\"");
+      assert(find_attribute(mixed.traces[0].events[0].attributes, "probe")->value == "NaN");
+      const auto missing = read("<int key=\"probe\"/><int key=\"probe\" value=\"42\"/>",
+          "<float key=\"probe\" value=\"NaN\"/>");
+      assert(missing.traces[0].events[0].attributes.empty());
+      assert(missing.traces[0].events[1].attributes.empty());
+      const auto fallback = read("<int key=\"i\" value=\"bad\"/><float key=\"f\" value=\"1e999\"/><date key=\"d\" value=\"bad\"/><id key=\"id\" value=\"bad\"/>", "");
+      const auto& attrs = fallback.traces[0].events[0].attributes;
+      assert(std::get<double>(find_attribute(attrs, "i")->typed_value) == 0);
+      assert(std::isinf(std::get<double>(find_attribute(attrs, "f")->typed_value)));
+      assert(!find_attribute(attrs, "d"));
+      assert(find_attribute(attrs, "id")->kind == AttributeKind::kString);
+      for (const auto& [lexical, infinite] : std::vector<std::pair<std::string, bool>>{
+          {"+1e999", true}, {"0." + std::string(400, '0') + "1", false},
+          {std::string(400, '9') + "e-1", true}}) {
+        const auto ranged = read("<float key=\"probe\" value=\"" + lexical + "\"/>", "");
+        const auto number = std::get<double>(find_attribute(ranged.traces[0].events[0].attributes, "probe")->typed_value);
+        assert(infinite ? std::isinf(number) : number == 0.0);
+      }
+      const std::string shared_xml = "<log><trace><string key=\"concept:name\" value=\"c\"/><event><int key=\"x\" value=\"42\"/></event><event></event></trace></log>";
+      std::istringstream shared_input(compressed ? detail::gzip_compress(shared_xml) : shared_xml);
+      XesImportOptions shared_options;
+      shared_options.variant = XesImportVariant::RUSTXES;
+      shared_options.activity_attribute = shared_options.resource_attribute = "x";
+      const auto shared = import_xes_event_log(shared_input, shared_options);
+      const auto& shared_event = shared.traces[0].events[0];
+      assert(shared_event.activity_attribute->kind == AttributeKind::kFloat);
+      assert(shared_event.resource_attribute->kind == AttributeKind::kFloat);
+      assert(shared_event.activity == "42.0" && shared_event.resource == "42.0");
+    }
+  }
+  {
+    using namespace minera;
+    const std::vector<std::pair<std::string, std::string>> shapes{
+      {"", "[]"},
+      {"<date key=\"d\" value=\"2024-01-01\"/><date key=\"leap\" value=\"2016-12-31t23:59:60z\"/><id key=\"id\" value=\"urn:uuid:ABCDEF00-1234-5678-1234-567812345678\"/>",
+       "[Attribute { key: \"d\", value: None, own_attributes: None }, Attribute { key: \"leap\", value: Date(2016-12-31T23:59:60+00:00), own_attributes: None }, Attribute { key: \"id\", value: ID(abcdef00-1234-5678-1234-567812345678), own_attributes: None }]"},
+      {"<int key=\"i\" value=\"bad\"/><float key=\"f\" value=\"bad\"/><date key=\"d\" value=\"bad\"/><id key=\"id\" value=\"bad\"/>",
+       "[Attribute { key: \"i\", value: Int(0), own_attributes: None }, Attribute { key: \"f\", value: Float(0.0), own_attributes: None }, Attribute { key: \"d\", value: None, own_attributes: None }, Attribute { key: \"id\", value: ID(00000000-0000-0000-0000-000000000000), own_attributes: None }]"},
+      {"<string key=\"x\" value=\"a\"/><string key=\"x\" value=\"b\"/>",
+       "[Attribute { key: \"x\", value: String(\"a\"), own_attributes: None }, Attribute { key: \"x\", value: String(\"b\"), own_attributes: None }]"},
+      {"<string key=\"x\" value=\"a\"><int key=\"n\" value=\"2\"/></string>",
+       "[Attribute { key: \"x\", value: String(\"a\"), own_attributes: Some([Attribute { key: \"n\", value: Int(2), own_attributes: None }]) }]"},
+      {"<float key=\"f\" value=\"1e16\"/><date key=\"d\" value=\"2024-01-01T00:00:00.1Z\"/>",
+       "[Attribute { key: \"f\", value: Float(1e16), own_attributes: None }, Attribute { key: \"d\", value: Date(2024-01-01T00:00:00.100+00:00), own_attributes: None }]"},
+      {"<int key=\"n\"/><id key=\"id\" value=\"ABCDEF00123456781234567812345678\"/>",
+       "[Attribute { key: \"n\", value: None, own_attributes: None }, Attribute { key: \"id\", value: ID(abcdef00-1234-5678-1234-567812345678), own_attributes: None }]"},
+      {"<string key=\"x\" value=\"&#160;&#769;&#10;\"/>",
+       "[Attribute { key: \"x\", value: String(\"\\u{a0}\\u{301}\\n\"), own_attributes: None }]"}
+    };
+    for (const auto& [children, expected] : shapes) {
+      for (const std::string container : {"list", "container"}) {
+        for (const bool wrapped : {false, true}) {
+          const auto attribute = "<" + container + " key=\"probe\">" +
+              (wrapped ? "<values>" : "") + children +
+              (wrapped ? "</values>" : "") + "</" + container + ">";
+          const auto xml = "<log><trace><string key=\"concept:name\" value=\"c\"/>" + attribute +
+              "<event><string key=\"concept:name\" value=\"A\"/>" + attribute + "</event></trace></log>";
+          for (const bool compressed : {false, true}) {
+            std::istringstream input(compressed ? detail::gzip_compress(xml) : xml);
+            XesImportOptions options;
+            options.variant = XesImportVariant::RUSTXES;
+            const auto log = import_xes_event_log(input, options);
+            const auto* trace_value = find_attribute(log.traces[0].attributes, "probe");
+            const auto* event_value = find_attribute(log.traces[0].events[0].attributes, "probe");
+            assert(trace_value && event_value);
+            assert(trace_value->value == expected && event_value->value == expected);
+            assert(event_value->kind == AttributeKind::kString);
+            assert(event_value->container == AttributeContainerKind::kScalar && event_value->children.empty());
+          }
+        }
+      }
+    }
+  }
+  {
+    using namespace minera;
+    for (const bool compressed : {false, true}) {
+      const auto read = [&](const std::string& xml) {
+        std::istringstream input(compressed ? detail::gzip_compress(xml) : xml);
+        XesImportOptions options;
+        options.variant = XesImportVariant::RUSTXES;
+        return import_xes_event_log(input, options);
+      };
+      const auto empty = read("<log/>");
+      assert(empty.traces.empty() && empty.metadata.extensions.empty());
+      assert(empty.attributes == std::vector<EventAttribute>({{"origin", "csv"}}));
+      const auto empty_trace = read("<log><trace><string key=\"concept:name\" value=\"c\"/></trace></log>");
+      assert(empty_trace.traces.empty());
+      assert(empty_trace.metadata.extensions.size() == 1);
+      assert(empty_trace.metadata.extensions[0].name == "Concept");
+      const auto projected = read("<log><string key=\"origin\" value=\"source\"/><extension name=\"Custom\" prefix=\"custom\" uri=\"urn:custom\"/><classifier name=\"Class\" keys=\"concept:name\"/><global scope=\"event\"><string key=\"default\" value=\"drop\"/></global><trace><string key=\"concept:name\" value=\"c\"/><event><string key=\"concept:name\" value=\"A\"/><string key=\"custom:probe\" value=\"keep\"/></event></trace></log>");
+      assert(projected.attributes == std::vector<EventAttribute>({{"origin", "csv"}}));
+      assert(projected.metadata.extensions.size() == 1);
+      assert(projected.metadata.extensions[0].prefix == "concept");
+      assert(projected.metadata.classifiers.empty() && projected.metadata.globals.empty());
+      assert(projected.traces[0].events[0].activity == "A");
+      assert(find_attribute(projected.traces[0].events[0].attributes, "custom:probe")->value == "keep");
+      const auto artifact = read("<log><trace><string key=\"concept:name\" value=\"c\"/><event><string key=\"artifactlifecycle:state\" value=\"active\"/></event></trace></log>");
+      assert(artifact.metadata.extensions.size() == 2);
+      assert(artifact.metadata.extensions[1].name == "ArtifactLifecycle");
+    }
+  }
   {
     using namespace minera;
     for (int shape = 0; shape < 8; ++shape) {
@@ -1651,6 +2028,7 @@ int main() {
   conflicting_projection_aliases_are_retained();
   inferred_metadata_completes_empty_and_partial_globals();
   null_containers_keep_recursive_children();
+  null_scalar_list_children_preserve_order_and_duplicates();
   typed_first_class_selectors_survive_flat_adapters();
   return 0;
 }

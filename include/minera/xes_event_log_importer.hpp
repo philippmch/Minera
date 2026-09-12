@@ -3,11 +3,12 @@
 #include <filesystem>
 #include <istream>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "minera/event_log.hpp"
+#include "minera/event_data.hpp"
 
 namespace minera {
 
@@ -38,8 +39,8 @@ enum class XesImportVariant {
 // activity name, and timestamp via their standard `concept:name` /
 // `time:timestamp` keys.
 struct XesImportOptions {
-  // Parser strategy selector. All strategies produce the same native EventLog
-  // contract; the pull parser is the shared standards-compliant backend.
+  // Parser strategy selector. The EventLog convenience API retains its
+  // native log contract; the result API also exposes Rust table modes.
   XesImportVariant variant = XesImportVariant::kIterparse;
   // Trace-level attribute that identifies the case.
   std::string case_attribute = "concept:name";
@@ -65,7 +66,38 @@ struct XesImportOptions {
   std::vector<std::string> attributes_to_read;
   // Bounds transparent gzip expansion before XML parsing.
   std::size_t max_decompressed_bytes = 512ULL * 1024ULL * 1024ULL;
+  // Rust table return modes; other variants continue returning an EventLog.
+  // Legacy takes precedence when both are true.
+  // The EventLog-only convenience API always retains its legacy contract.
+  bool return_legacy_log_object = true;
+  bool return_pl_lazyframe = false;
+  // Rust legacy table-conversion parameters, separate from native projection
+  // selectors. nullopt represents an explicit Python None; raw modes ignore these.
+  std::optional<std::string> conversion_case_id_key = "case:concept:name";
+  std::optional<std::string> conversion_case_attribute_prefix = "case:";
+  // Accepted public conversion switches have no observed effect in RustXES.
+  bool conversion_stream_postprocessing = false;
+  bool conversion_deepcopy = false;
+  bool conversion_include_case_attributes = true;
+  bool conversion_compress = false;
+  // nullopt infers standard extensions; an empty list suppresses them.
+  std::optional<std::vector<LogExtension>> conversion_extensions;
 };
+
+struct XesImportResult {
+  EventDataKind kind = EventDataKind::kEventLog;
+  EventLog log;
+  EventTable table;
+  // Restartable scanner over eagerly parsed, owned in-memory rows.
+  LazyEventTable lazy_table;
+  // Public table dtype spellings, aligned with the selected table's columns.
+  std::vector<std::string> dtypes;
+};
+
+[[nodiscard]] XesImportResult import_xes_result(
+    std::istream& input, const XesImportOptions& options = {});
+[[nodiscard]] XesImportResult import_xes_result(
+    const std::filesystem::path& path, const XesImportOptions& options = {});
 
 [[nodiscard]] EventLog import_xes_event_log(
     std::istream& input,
