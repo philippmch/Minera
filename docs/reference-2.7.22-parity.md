@@ -4245,9 +4245,9 @@ Ordered pair lists retain duplicates; mapping children use last-value replacemen
 at the first insertion position. Recursive writers and first-class projections
 carry the selected variation. Permanent tests cover these rules at all four
 scopes and both first-class name projections, with plain and gzip output.
-This checkpoint retains the native explicit-null extension. Public None-child
-omission and exporter-specific boolean/date lexical formatting remain open;
-the exporter coverage units are still partial.
+The scalar-wrapper checkpoint below adds default null omission and bounded
+exporter-specific boolean/date lexical behavior. The explicit-null extension
+remains opt-in, and the exporter coverage units are still partial.
 The public Rust wrapper lacks string deserialization; complete file/string
 adapter and result-type equivalence remains unproven.
 Calendar metric destination options expose arrival, finish, service, waiting,
@@ -4338,3 +4338,43 @@ result sizes share the native, CLI (`--windows-events`), local
 `POST /api/windows-events`, and typed frontend contracts. The connector reads
 only an explicitly supplied XML file; it does not query the live event service,
 request elevation, start a management process, or create subscriptions.
+
+
+## XES scalar-wrapper checkpoint
+
+`EventAttribute` retains scalar-wrapper identity and ordered scalar children
+through native conversion, projections, and typed JSON. Ordered children preserve
+duplicate keys; mapping children retain last-value replacement. Public null
+scalars are omitted by default, while wrapped nulls become list structures.
+`preserve_nulls`, CLI `--xes-preserve-nulls`, HTTP `xes_preserve_nulls`, and the
+frontend download control retain the native explicit-null extension. Its ETREE
+ordered children also preserve duplicate keys.
+
+Boolean/date export spelling depends on the exporter and wrapper shape. Dates
+retain source clock fields and offsets, with six-digit microseconds and native
+nine-digit submicrosecond precision. LINE_BY_LINE import now follows the public
+lexical line behavior, including packed tags and entity text, rather than
+assuming the ordinary XML parser's interpretation.
+
+`docs/xes-foundation-reference-fixtures.json.gz` retains six reproducible public
+captures: 128 null export observations; 96 boolean exports and 120 imports;
+276 date exports and one construction rejection; 60 empty-wrapper imports;
+45 scalar-child imports and 24 exports; and 124 plain/gzip line-import cases.
+Native comparisons match all 45 scalar-child and 124 line-import cases. Error
+comparisons establish rejection only, not exception-class/message equivalence.
+The other captures supply public observations for native regression fixtures,
+not automatic exhaustive cross-implementation comparisons.
+
+The artifact records runtime settings, native executable hashes where used,
+and opaque normalized byte verification for 22 available XES/log/date modules
+against PM4Py 2.7.22 commit `0715c31f3f1d85924107d6aa5329806db69df899`.
+The optional `cs8601.py` module is absent from this runtime and is not verified.
+Coverage remains partial: these finite corpora do not establish arbitrary XML,
+timezone/date-range, Rust raw-table, or complete importer/exporter equivalence.
+
+Validation passed: all 150 Release CTest suites, 617 frontend tests, TypeScript
+checking, production frontend build, and 23 evidence-script tests (including
+five focused tests repeated under Python optimization). CLI/HTTP checks cover
+null defaults, opt-in preservation, gzip, and invalid options. Independent
+review findings were corrected and reviewed again. The structural catalogue
+remains 44/86 dispatchers and 195/387 non-dispatcher modules complete.

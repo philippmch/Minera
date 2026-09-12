@@ -819,7 +819,59 @@ void selectors_json_and_failures_are_strict() {
 
 }  // namespace
 
+void empty_scalar_wrappers_survive_conversion() {
+  auto log = attributed_log();
+  minera::EventAttribute wrapped{"flag", "true", minera::AttributeKind::kBoolean};
+  wrapped.typed_value = true;
+  wrapped.scalar_wrapper = true;
+  wrapped.scalar_children_list = true;
+  log.attributes.push_back(wrapped);
+  log.traces.front().events.front().attributes.push_back(wrapped);
+  auto selected = wrapped;
+  selected.key = "concept:name";
+  selected.kind = minera::AttributeKind::kString;
+  selected.value = "A";
+  selected.typed_value = std::monostate{};
+  log.traces.front().events.front().activity_attribute = selected;
+  const auto stream = minera::event_log_to_event_stream(log);
+  assert(stream.events.front().field("flag")->scalar_wrapper);
+  assert(stream.events.front().field("flag")->scalar_children_list);
+  assert(stream.events.front().field("concept:name")->scalar_wrapper);
+  assert(stream.events.front().field("concept:name")->scalar_children_list);
+  auto legacy = log;
+  legacy.traces.front().events.front().activity_attribute.reset();
+  legacy.traces.front().events.front().attributes.push_back(selected);
+  assert(minera::event_log_to_event_stream(legacy).events.front().field("concept:name")->scalar_wrapper);
+  const auto restored = minera::event_stream_to_event_log(stream);
+  assert(restored.traces.front().events.front().activity_attribute->scalar_wrapper);
+  assert(restored.traces.front().events.front().activity_attribute->scalar_children_list);
+  assert(minera::log_conversion_json(minera::convert_event_log(restored)).find(
+      "\"scalar_wrapper\":true") != std::string::npos);
+  assert(minera::log_conversion_json(minera::convert_event_log(restored)).find(
+      "\"scalar_children_list\":true") != std::string::npos);
+
+  for (auto variant : {minera::XesImportVariant::kIterparse,
+                       minera::XesImportVariant::kIterparseMemoryCompressed,
+                       minera::XesImportVariant::kIterparse20,
+                       minera::XesImportVariant::kLineByLine,
+                       minera::XesImportVariant::kChunkRegex}) {
+    for (const auto inner : {std::string{}, std::string{"<values/>"}, std::string{"<values></values>"}}) {
+      std::istringstream xml("<log>\n<trace>\n<event>\n<boolean key=\"flag\" value=\"true\">" + inner +
+                             "</boolean>\n</event>\n</trace>\n</log>");
+      minera::XesImportOptions options;
+      options.variant = variant;
+      const auto imported = minera::import_xes_event_log(xml, options);
+      const auto& field = imported.traces.front().events.front().attributes.front();
+      const bool iterparse = variant != minera::XesImportVariant::kLineByLine &&
+                             variant != minera::XesImportVariant::kChunkRegex;
+      assert(field.scalar_wrapper == (iterparse && !inner.empty()));
+      assert(field.scalar_children_list == (iterparse && variant != minera::XesImportVariant::kIterparse20 && !inner.empty()));
+    }
+  }
+}
+
 int main() {
+  empty_scalar_wrappers_survive_conversion();
   stream_round_trip_preserves_typed_attributes();
   empty_prefix_and_trace_properties_follow_flattening_contract();
   stream_grouping_is_first_seen_and_first_event_wins();

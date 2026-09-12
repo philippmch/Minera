@@ -751,6 +751,8 @@ export interface LogConversionAttribute {
   null?: boolean;
   typed_value?: LogConversionTypedValue;
   children?: LogConversionAttribute[];
+  scalar_wrapper?: boolean;
+  scalar_children_list?: boolean;
   first_class_role?: LogConversionFirstClassRole;
   first_class_state?: LogConversionFirstClassState;
   first_class_source_key?: string;
@@ -824,6 +826,8 @@ export interface LogConversionTableCell {
   null?: boolean;
   typed_value?: LogConversionTypedValue;
   children?: LogConversionAttribute[];
+  scalar_wrapper?: boolean;
+  scalar_children_list?: boolean;
   first_class_role?: LogConversionFirstClassRole;
   first_class_state?: LogConversionFirstClassState;
   first_class_source_key?: string;
@@ -872,6 +876,8 @@ function isLogConversionAttribute(value: unknown): value is LogConversionAttribu
        !(["scalar", "list", "container", "tuple", "set", "frozenset"] as const)
          .includes(candidate.container as LogConversionContainer)) ||
       (candidate.null !== undefined && typeof candidate.null !== "boolean") ||
+      (candidate.scalar_wrapper !== undefined && typeof candidate.scalar_wrapper !== "boolean") ||
+      (candidate.scalar_children_list !== undefined && typeof candidate.scalar_children_list !== "boolean") ||
       (candidate.typed_value !== undefined && candidate.typed_value !== null &&
        typeof candidate.typed_value !== "number" &&
        typeof candidate.typed_value !== "string" &&
@@ -1016,6 +1022,8 @@ export interface LogUtilityAttribute {
   null?: boolean;
   typed_value?: LogConversionTypedValue;
   children?: LogUtilityAttribute[];
+  scalar_wrapper?: boolean;
+  scalar_children_list?: boolean;
   first_class_role?: LogConversionFirstClassRole;
   first_class_state?: LogConversionFirstClassState;
   first_class_source_key?: string;
@@ -1080,6 +1088,8 @@ function isLogConversionTableCell(value: unknown): value is LogConversionTableCe
       typeof cell.typed_value === "string" ||
       typeof cell.typed_value === "boolean" ||
       (typeof cell.typed_value === "number" && Number.isFinite(cell.typed_value))) &&
+    (cell.scalar_wrapper === undefined || typeof cell.scalar_wrapper === "boolean") &&
+    (cell.scalar_children_list === undefined || typeof cell.scalar_children_list === "boolean") &&
     (cell.children === undefined ||
       (Array.isArray(cell.children) && cell.children.every(isLogConversionAttribute)));
 }
@@ -3589,6 +3599,10 @@ function isDfgDataframeAttribute(
       !dfgDataframeStates.has(value.first_class_state as DfgDataframeAttributeState)) return false;
   if (value.first_class_source_key !== undefined &&
       typeof value.first_class_source_key !== "string") return false;
+  if (value.scalar_wrapper !== undefined &&
+      typeof value.scalar_wrapper !== "boolean") return false;
+  if (value.scalar_children_list !== undefined &&
+      typeof value.scalar_children_list !== "boolean") return false;
   if (value.children !== undefined &&
       (!Array.isArray(value.children) ||
        !value.children.every((child) => isDfgDataframeAttribute(child, depth + 1)))) return false;
@@ -4679,6 +4693,8 @@ export interface DfgDataframeAttribute {
   container: DfgDataframeAttributeContainer;
   null: boolean;
   typed_value?: DfgDataframeTypedValue;
+  scalar_wrapper?: boolean;
+  scalar_children_list?: boolean;
   first_class_role?: DfgDataframeAttributeRole;
   first_class_state?: DfgDataframeAttributeState;
   first_class_source_key?: string;

@@ -6792,6 +6792,8 @@ void handle_xes(const httplib::Request& request, httplib::Response& response) {
     }
     options.infer_metadata =
         ocel_query_bool(request, "xes_infer_metadata", false);
+    options.preserve_nulls =
+        ocel_query_bool(request, "xes_preserve_nulls", false);
     const bool compressed = options.compress.value_or(false);
     response.set_content(minera::serialize_xes(session->log, options),
                          compressed ? "application/gzip" : "application/xml");

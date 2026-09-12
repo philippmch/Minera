@@ -32,6 +32,8 @@ struct XesExportOptions {
   // the conventional fallback name and standard declarations.
   std::string name;
   bool infer_metadata = false;
+  // Opt into Minera null markers; reference exporters omit plain nulls.
+  bool preserve_nulls = false;
 };
 
 // Serializes an event log as XES (eXtensible Event Stream, IEEE 1849-2016) —
@@ -39,7 +41,7 @@ struct XesExportOptions {
 // process-mining tools. Each trace carries its case id as `concept:name`;
 // each event carries its activity as `concept:name`, its timestamp as
 // `time:timestamp`, and — when present — its resource as `org:resource`.
-// Timestamps that parse as instants are normalized to ISO-8601 UTC and
+// Timestamps that parse as instants retain their clock fields and offset and
 // written as <date> attributes; a non-empty timestamp in an unrecognized
 // format is preserved verbatim as a <string> so no data is lost, and an
 // empty one is omitted. Explicit date attributes must contain a valid instant

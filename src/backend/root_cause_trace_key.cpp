@@ -230,16 +230,20 @@ bool attribute_equal(const EventAttribute& left, const EventAttribute& right) {
       if (!attribute_equal(left.children[i], right.children[i])) return false;
     return true;
   }
-  const bool left_nested = left.container != AttributeContainerKind::kScalar || !left.children.empty();
-  const bool right_nested = right.container != AttributeContainerKind::kScalar || !right.children.empty();
+  const bool left_nested = left.container != AttributeContainerKind::kScalar || left.scalar_wrapper || left.scalar_children_list || !left.children.empty();
+  const bool right_nested = right.container != AttributeContainerKind::kScalar || right.scalar_wrapper || right.scalar_children_list || !right.children.empty();
   if (left_nested != right_nested) return false;
   if (!left_nested) return scalar_equal(left, right);
-  const bool left_list = left.container == AttributeContainerKind::kList;
-  const bool right_list = right.container == AttributeContainerKind::kList;
+  const bool left_list = left.container == AttributeContainerKind::kList || left.scalar_children_list;
+  const bool right_list = right.container == AttributeContainerKind::kList || right.scalar_children_list;
   if (left_list != right_list) return false;
   auto left_scalar = left, right_scalar = right;
   left_scalar.children.clear();
   right_scalar.children.clear();
+  left_scalar.scalar_wrapper = false;
+  right_scalar.scalar_wrapper = false;
+  left_scalar.scalar_children_list = false;
+  right_scalar.scalar_children_list = false;
   left_scalar.is_null = left_scalar.is_null || left.container != AttributeContainerKind::kScalar;
   right_scalar.is_null = right_scalar.is_null || right.container != AttributeContainerKind::kScalar;
   if (!scalar_equal(left_scalar, right_scalar)) return false;
@@ -313,14 +317,16 @@ std::string attribute_fingerprint(const EventAttribute& value) {
     for (const auto& child : value.children) append_part(result, attribute_fingerprint(child));
     return result;
   }
-  if (value.container == AttributeContainerKind::kScalar && value.children.empty())
+  if (value.container == AttributeContainerKind::kScalar && value.children.empty() && !value.scalar_wrapper && !value.scalar_children_list)
     return scalar_fingerprint(value);
   auto scalar = value;
   scalar.children.clear();
+  scalar.scalar_wrapper = false;
+  scalar.scalar_children_list = false;
   scalar.is_null = scalar.is_null || value.container != AttributeContainerKind::kScalar;
   std::string result = "C";
   append_part(result, scalar_fingerprint(scalar));
-  if (value.container == AttributeContainerKind::kList) {
+  if (value.container == AttributeContainerKind::kList || value.scalar_children_list) {
     result += 'L';
     for (const auto& child : value.children) {
       append_part(result, child.key);
@@ -361,7 +367,7 @@ bool root_cause_key_is_hashable(const EventAttribute& value) {
       if (!root_cause_key_is_hashable(child)) return false;
     return true;
   }
-  return value.container == AttributeContainerKind::kScalar && value.children.empty();
+  return value.container == AttributeContainerKind::kScalar && value.children.empty() && !value.scalar_wrapper && !value.scalar_children_list;
 }
 
 bool root_cause_scalar_keys_equal(const EventAttribute& left, const EventAttribute& right) {
@@ -376,7 +382,7 @@ std::string root_cause_scalar_key_fingerprint(const EventAttribute& value) {
 }
 
 NativeScalarOrderKind native_scalar_order_kind(const EventAttribute& value) {
-  if (value.container != AttributeContainerKind::kScalar || !value.children.empty())
+  if (value.container != AttributeContainerKind::kScalar || value.scalar_wrapper || value.scalar_children_list || !value.children.empty())
     return NativeScalarOrderKind::kUnsupported;
   switch (scalar_kind(value)) {
     case Scalar::kString: return NativeScalarOrderKind::kString;

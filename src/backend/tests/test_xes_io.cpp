@@ -27,6 +27,15 @@ bool throws(const auto& operation) {
   return false;
 }
 
+std::string separate_xes_tags(std::string xml) {
+  std::size_t at = 0;
+  while ((at = xml.find("><", at)) != std::string::npos) {
+    xml.insert(at + 1, "\n");
+    at += 3;
+  }
+  return xml;
+}
+
 std::string decode_base64(std::string_view encoded) {
   static constexpr std::string_view alphabet =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -250,6 +259,13 @@ void metadata_import_export_import_round_trip() {
     std::istringstream variant_input(xml);
     const auto variant_log =
         minera::import_xes_event_log(variant_input, options);
+    if (variant == minera::XesImportVariant::LINE_BY_LINE) {
+      assert(variant_log.metadata.extensions.empty());
+      assert(variant_log.metadata.classifiers.empty());
+      assert(variant_log.metadata.globals.empty());
+      assert(variant_log.attributes.empty());
+      continue;
+    }
     assert(variant_log.metadata.extensions == log.metadata.extensions);
     assert(variant_log.metadata.classifiers == log.metadata.classifiers);
     assert(variant_log.metadata.trace_globals == log.metadata.trace_globals);
@@ -348,7 +364,7 @@ void explicit_nulls_round_trip_but_empty_strings_are_emitted() {
       {"null-event", "ignored", minera::AttributeKind::kString, true});
   log.traces.push_back(std::move(trace));
 
-  const auto xml = minera::to_xes(log);
+  const auto xml = minera::serialize_xes(log, {.preserve_nulls = true});
   assert(xml.find("key=\"empty-log\" value=\"\"") != std::string::npos);
   assert(xml.find("key=\"empty-trace-global\" value=\"\"") !=
          std::string::npos);
@@ -504,8 +520,7 @@ void typed_nested_attributes_and_first_class_states_round_trip() {
 
 void invalid_typed_values_are_rejected_explicitly() {
   for (const auto& scalar : {"<int key=\"x\" value=\"nope\"/>",
-                             "<float key=\"x\" value=\"nope\"/>",
-                             "<boolean key=\"x\" value=\"nope\"/>"}) {
+                             "<float key=\"x\" value=\"nope\"/>"}) {
     const auto xml = std::string("<log><trace><event><string key=\"concept:name\" value=\"A\"/>") +
                      scalar + "</event></trace></log>";
     assert(throws([&] {
@@ -566,7 +581,7 @@ void standards_lists_round_trip_recursive_typed_children() {
          nested_null->children.size() == 1);
   assert(std::get<std::int64_t>(nested_null->children[0].typed_value) == 2);
 
-  const auto exported = minera::to_xes(log);
+  const auto exported = minera::serialize_xes(log, {.preserve_nulls = true});
   assert(exported.find("<list key=\"tags\">") != std::string::npos);
   assert(exported.find("<values>") != std::string::npos);
   assert(exported.find("<list key=\"labels\">") != std::string::npos);
@@ -775,7 +790,7 @@ void null_containers_keep_recursive_children() {
       find_attribute(log.traces[0].events[0].attributes, "payload");
   assert(tags != nullptr && tags->is_null && tags->children.size() == 1);
   assert(payload != nullptr && payload->is_null && payload->children.size() == 1);
-  const auto exported = minera::to_xes(log);
+  const auto exported = minera::serialize_xes(log, {.preserve_nulls = true});
   assert(exported.find("<list key=\"tags\" null=\"true\">") !=
          std::string::npos);
   assert(exported.find("<container key=\"payload\" null=\"true\">") !=
@@ -955,11 +970,13 @@ void date_import_variations_retain_wall_clock_fields() {
             XesImportOptions options;
             options.variant = variant;
             options.timestamp_attribute = "when";
-            std::istringstream input(compressed ? detail::gzip_compress(xml) : xml);
+            const auto formatted = variant == XesImportVariant::LINE_BY_LINE ? separate_xes_tags(xml) : xml;
+            std::istringstream input(compressed ? detail::gzip_compress(formatted) : formatted);
             const auto log = import_xes_event_log(input, options);
             const auto& trace = log.traces[0];
             const auto& event = trace.events[0];
-            assert(log.attributes[0].value == expected);
+            if (variant == XesImportVariant::LINE_BY_LINE) assert(log.attributes.empty());
+            else assert(log.attributes[0].value == expected);
             assert(find_attribute(trace.attributes, "when")->value == expected);
             const bool flat = variant == XesImportVariant::LINE_BY_LINE || variant == XesImportVariant::CHUNK_REGEX;
             const auto& trace_children = find_attribute(trace.attributes, "nested")->children;
@@ -991,7 +1008,7 @@ void date_import_sorting_uses_exact_fields_and_variant_rules() {
       options.variant = variant;
       options.timestamp_sort = true;
       options.reverse_sort = reverse;
-      std::istringstream input(xml);
+      std::istringstream input(variant == XesImportVariant::LINE_BY_LINE ? separate_xes_tags(xml) : xml);
       const auto log = import_xes_event_log(input, options);
       const bool late_first = reverse || variant == XesImportVariant::CHUNK_REGEX;
       assert(log.traces[0].events[0].activity == (late_first ? "late" : "early"));
@@ -1090,20 +1107,142 @@ void nested_export_variants_match_public_mapping_shapes() {
         "<listkey=\"nested\"><values><intkey=\"ab\"value=\"7\"/></values></list>");
 }
 
+void boolean_import_spelling_matches_public_variants() {
+  using namespace minera;
+  for (const auto variant : {XesImportVariant::ITERPARSE, XesImportVariant::LINE_BY_LINE,
+      XesImportVariant::ITERPARSE_MEM_COMPRESSED, XesImportVariant::ITERPARSE_20,
+      XesImportVariant::CHUNK_REGEX, XesImportVariant::RUSTXES}) {
+    for (const std::string lexical : {"true", "false", "True", "False", "TRUE",
+        "FALSE", "tRuE", "1", "0", "yes", "", " true "}) {
+      const std::string xml = "<log>\n<trace>\n<string key=\"concept:name\" value=\"c\"/>\n<boolean key=\"flag\" value=\"" + lexical +
+          "\"/>\n<event>\n<boolean key=\"flag\" value=\"" +
+          lexical + "\"/>\n</event>\n</trace>\n</log>";
+      const bool exact = variant == XesImportVariant::LINE_BY_LINE ||
+          variant == XesImportVariant::CHUNK_REGEX || variant == XesImportVariant::RUSTXES;
+      const bool expected = lexical == "true" || (!exact &&
+          (lexical == "True" || lexical == "TRUE" || lexical == "tRuE"));
+      for (const bool compressed : {false, true}) {
+        const auto bytes = compressed ? detail::gzip_compress(xml) : xml;
+        std::istringstream input(bytes);
+        XesImportOptions options;
+        options.variant = variant;
+        const auto log = import_xes_event_log(input, options);
+        const auto* attribute = find_attribute(log.traces.at(0).events.at(0).attributes, "flag");
+        assert(attribute != nullptr);
+        assert(std::get<bool>(attribute->typed_value) == expected);
+        assert(attribute->value == lexical);
+        const auto* trace_attribute = find_attribute(log.traces.at(0).attributes, "flag");
+        assert(trace_attribute != nullptr);
+        assert(std::get<bool>(trace_attribute->typed_value) == expected);
+        assert(trace_attribute->value == lexical);
+      }
+    }
+  }
+}
+
+void boolean_export_spelling_matches_variant_and_scalar_shape() {
+  using namespace minera;
+  for (const bool truth : {false, true}) {
+    for (int source = 0; source != 3; ++source) {
+      for (const bool nested : {false, true}) {
+        EventAttribute value{"flag", source == 0 ? "stale" :
+            source == 1 ? (truth ? "true" : "false") : (truth ? "1" : "0"),
+            AttributeKind::kBoolean};
+        if (source == 0) value.typed_value = truth;
+        if (nested) {
+          EventAttribute child{"child", truth ? "0" : "1", AttributeKind::kBoolean};
+          EventAttribute branch{"branch", value.value, AttributeKind::kBoolean};
+          branch.typed_value = value.typed_value;
+          branch.children = {child};
+          value.children = {child, branch};
+        }
+        for (int scope = 0; scope != 9; ++scope) {
+          EventLog log;
+          log.traces = {Trace{"c", {Event{"c", "A"}}}};
+          auto selected = value;
+          auto& trace = log.traces[0];
+          auto& event = trace.events[0];
+          if (scope == 0) log.attributes = {value};
+          if (scope == 1) log.metadata.globals.push_back({"event", {value}});
+          if (scope == 2) trace.attributes = {value};
+          if (scope == 3) event.attributes = {value};
+          if (scope >= 4) {
+            const std::string keys[] = {"concept:name", "concept:name", "time:timestamp",
+                                        "org:resource", "lifecycle:transition"};
+            selected.key = keys[scope - 4];
+            std::string* projections[] = {&trace.case_id, &event.activity, &event.timestamp,
+                                          &event.resource, &event.lifecycle};
+            FirstClassAttributeState* states[] = {&trace.case_id_state, &event.activity_state,
+                &event.timestamp_state, &event.resource_state, &event.lifecycle_state};
+            std::optional<EventAttribute>* metadata[] = {&trace.case_id_attribute,
+                &event.activity_attribute, &event.timestamp_attribute, &event.resource_attribute,
+                &event.lifecycle_attribute};
+            *projections[scope - 4] = value.value;
+            *states[scope - 4] = FirstClassAttributeState::kPresent;
+            *metadata[scope - 4] = selected;
+          }
+          for (const auto variant : {XesExportVariant::LINE_BY_LINE, XesExportVariant::ETREE}) {
+            for (const bool compressed : {false, true}) {
+              XesExportOptions options;
+              options.variant = variant;
+              options.compress = compressed;
+              const auto bytes = serialize_xes(log, options);
+              const auto xml = compressed ? detail::gzip_decompress(bytes, 1024 * 1024) : bytes;
+              const std::string expected = nested && variant == XesExportVariant::ETREE
+                  ? (truth ? "True" : "False") : (truth ? "true" : "false");
+              assert(occurrences(xml, "<boolean key=\"" + selected.key + "\" value=\"" +
+                  expected + (nested ? "\">" : "\"/>")) == 1);
+              assert(xml.find("stale") == std::string::npos);
+              if (nested) {
+                assert(occurrences(xml, std::string("<boolean key=\"child\" value=\"") +
+                    (truth ? "false" : "true") + "\"/>") == 2);
+                assert(occurrences(xml, "<boolean key=\"branch\" value=\"" + expected + "\">") == 1);
+              }
+              if (scope < 4) {
+                std::istringstream input(bytes);
+                const auto restored = import_xes_event_log(input);
+                const auto& attributes = scope == 0 ? restored.attributes :
+                    scope == 1 ? restored.metadata.globals.at(0).attributes :
+                    scope == 2 ? restored.traces.at(0).attributes :
+                    restored.traces.at(0).events.at(0).attributes;
+                const auto* flag = find_attribute(attributes, "flag");
+                assert(flag != nullptr && std::get<bool>(flag->typed_value) == truth);
+                if (nested) {
+                  const auto* child = find_attribute(flag->children, "child");
+                  const auto* branch = find_attribute(flag->children, "branch");
+                  assert(child && std::get<bool>(child->typed_value) == !truth);
+                  assert(branch && std::get<bool>(branch->typed_value) == truth);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 void date_export_preserves_source_precision() {
   using namespace minera;
   const std::vector<std::pair<std::string, std::string>> dates{
-      {"2024-01-01T00:00:00.000001Z", "2024-01-01T00:00:00.000001Z"},
-      {"2024-01-01T00:00:00.000999Z", "2024-01-01T00:00:00.000999Z"},
-      {"2024-01-01T00:00:00.001001Z", "2024-01-01T00:00:00.001001Z"},
-      {"2024-01-01T00:00:00.123456Z", "2024-01-01T00:00:00.123456Z"},
-      {"1969-12-31T23:59:59.999999Z", "1969-12-31T23:59:59.999999Z"},
-      {"2500-01-01T00:00:00.000001Z", "2500-01-01T00:00:00.000001Z"},
-      {"2024-01-01T00:00:00.123456+05:30", "2023-12-31T18:30:00.123456Z"},
-      {"2024-01-01T00:00:00.999999-04:00", "2024-01-01T04:00:00.999999Z"}};
+      {"2024-01-01T00:00:00", "2024-01-01T00:00:00"},
+      {"2024-01-01T00:00:00.000000Z", "2024-01-01T00:00:00+00:00"},
+      {"2024-01-01T00:00:00.1Z", "2024-01-01T00:00:00.100000+00:00"},
+      {"2024-01-01T00:00:00.000001Z", "2024-01-01T00:00:00.000001+00:00"},
+      {"2024-01-01T00:00:00.000999Z", "2024-01-01T00:00:00.000999+00:00"},
+      {"2024-01-01T00:00:00.001001Z", "2024-01-01T00:00:00.001001+00:00"},
+      {"2024-01-01T00:00:00.123456789Z", "2024-01-01T00:00:00.123456+00:00"},
+      {"1969-12-31T23:59:59.999999Z", "1969-12-31T23:59:59.999999+00:00"},
+      {"2500-01-01T00:00:00.000001Z", "2500-01-01T00:00:00.000001+00:00"},
+      {"0001-01-01T00:00:00Z", "0001-01-01T00:00:00+00:00"},
+      {"2024-01-01T00:00:00.123456+05:30", "2024-01-01T00:00:00.123456+05:30"},
+      {"2024-01-01T00:00:00.999999-04:00", "2024-01-01T00:00:00.999999-04:00"}};
   for (const auto& [source, expected] : dates) {
     EventAttribute date{"date", "stale", AttributeKind::kDate};
     date.typed_value = NativeDate{source};
+    const auto fraction_end = expected.find_first_of("+-", 19);
+    const auto wall_clock = expected.substr(0, fraction_end);
+    const auto imported = wall_clock + (wall_clock.size() == 19 ? ".000Z" : "Z");
     EventLog log;
     log.attributes = {date};
     Trace trace{"c", {}};
@@ -1114,7 +1253,10 @@ void date_export_preserves_source_precision() {
     event.timestamp_state = FirstClassAttributeState::kPresent;
     EventAttribute nested{"nested", "outer"};
     nested.children = {date};
-    event.attributes = {date, nested, {"legacy", source, AttributeKind::kDate}};
+    auto wrapper = date;
+    wrapper.key = "wrapper";
+    wrapper.children = {{"child", "metadata"}};
+    event.attributes = {date, nested, {"legacy", source, AttributeKind::kDate}, wrapper};
     trace.events = {event};
     log.traces = {trace};
     for (const auto variant : {XesExportVariant::LINE_BY_LINE, XesExportVariant::ETREE}) {
@@ -1123,38 +1265,350 @@ void date_export_preserves_source_precision() {
         options.variant = variant;
         options.compress = compressed;
         const auto bytes = serialize_xes(log, options);
-        if (!compressed) assert(occurrences(bytes, "value=\"" + expected + "\"") == 6);
+        if (!compressed) {
+          const bool etree = variant == XesExportVariant::ETREE;
+          assert(occurrences(bytes, "value=\"" + expected + "\"") == (etree ? 6 : 7));
+          auto wrapper_value = expected;
+          if (etree) wrapper_value[10] = ' ';
+          assert(bytes.find("key=\"wrapper\" value=\"" + wrapper_value + "\"") != std::string::npos);
+        }
         std::istringstream input(bytes);
         const auto restored = import_xes_event_log(input);
         const auto& restored_event = restored.traces[0].events[0];
-        assert(restored_event.timestamp == expected);
-        assert(restored.attributes[0].value == expected);
-        assert(restored.traces[0].attributes[0].value == expected);
-        assert(find_attribute(restored_event.attributes, "date")->value == expected);
-        assert(find_attribute(restored_event.attributes, "legacy")->value == expected);
-        assert(find_attribute(restored_event.attributes, "nested")->children[0].value == expected);
+        assert(restored_event.timestamp == imported);
+        assert(restored.attributes[0].value == imported);
+        assert(restored.traces[0].attributes[0].value == imported);
+        assert(find_attribute(restored_event.attributes, "date")->value == imported);
+        assert(find_attribute(restored_event.attributes, "legacy")->value == imported);
+        assert(find_attribute(restored_event.attributes, "nested")->children[0].value == imported);
       }
     }
   }
-  EventLog precise;
-  precise.traces.push_back(Trace{"c", {Event{"c", "A"}}});
-  EventAttribute nanos{"precise", "stale", AttributeKind::kDate};
-  nanos.typed_value = NativeDate{"1969-12-31T23:59:59.999999999Z", NativeDateResolution::kNanosecond};
-  precise.traces[0].events[0].attributes = {nanos};
-  for (const auto variant : {XesExportVariant::LINE_BY_LINE, XesExportVariant::ETREE}) {
-    XesExportOptions options;
-    options.variant = variant;
-    const auto xml = serialize_xes(precise, options);
-    assert(xml.find("1969-12-31T23:59:59.999999999Z") != std::string::npos);
-    std::istringstream input(xml);
-    const auto restored = import_xes_event_log(input);
-    assert(restored.traces[0].events[0].attributes[0].value == "1969-12-31T23:59:59.999999Z");
+  for (const auto& [source, expected] : std::vector<std::pair<std::string, std::string>>{
+      {"2024-01-01T00:00:00.000000000", "2024-01-01T00:00:00"},
+      {"2024-01-01T00:00:00.1Z", "2024-01-01T00:00:00.100000+00:00"},
+      {"2024-01-01T00:00:00.123456000Z", "2024-01-01T00:00:00.123456+00:00"},
+      {"2024-01-01T00:00:00.000000001+05:30", "2024-01-01T00:00:00.000000001+05:30"},
+      {"1969-12-31T23:59:59.999999999-04:00", "1969-12-31T23:59:59.999999999-04:00"},
+      {"2500-01-01T00:00:00.000000001Z", "2500-01-01T00:00:00.000000001+00:00"}}) {
+    EventLog precise;
+    precise.traces.push_back(Trace{"c", {Event{"c", "A"}}});
+    EventAttribute nanos{"precise", "stale", AttributeKind::kDate};
+    nanos.typed_value = NativeDate{source, NativeDateResolution::kNanosecond};
+    auto wrapper = nanos;
+    wrapper.key = "wrapper";
+    wrapper.children = {{"child", "metadata"}};
+    precise.traces[0].events[0].attributes = {nanos, wrapper};
+    for (const auto variant : {XesExportVariant::LINE_BY_LINE, XesExportVariant::ETREE}) {
+      XesExportOptions options;
+      options.variant = variant;
+      const auto xml = serialize_xes(precise, options);
+      assert(xml.find("key=\"precise\" value=\"" + expected + "\"") != std::string::npos);
+      auto wrapper_value = expected;
+      if (variant == XesExportVariant::ETREE) wrapper_value[10] = ' ';
+      assert(xml.find("key=\"wrapper\" value=\"" + wrapper_value + "\"") != std::string::npos);
+    }
   }
 }
 
 }  // namespace
 
+void null_scalar_list_children_preserve_order_and_duplicates() {
+  using namespace minera;
+  EventLog log;
+  EventAttribute ordered{"probe", "true", AttributeKind::kBoolean, true};
+  ordered.scalar_children_list = true;
+  ordered.children = {
+      {"same", "first", AttributeKind::kString},
+      {"same", "2", AttributeKind::kInt},
+  };
+  log.attributes.push_back(ordered);
+
+  XesExportOptions preserved_options;
+  preserved_options.variant = XesExportVariant::ETREE;
+  preserved_options.preserve_nulls = true;
+  const auto preserved = serialize_xes(log, preserved_options);
+  assert(occurrences(preserved, "key=\"same\"") == 2);
+  assert(preserved.find("value=\"first\"") < preserved.find("value=\"2\""));
+  assert(preserved.find("key=\"probe\" null=\"true\"") != std::string::npos);
+
+  for (const auto variant : {XesExportVariant::ETREE, XesExportVariant::LINE_BY_LINE}) {
+    XesExportOptions options;
+    options.variant = variant;
+    const auto default_nulls = serialize_xes(log, options);
+    assert(default_nulls.find("null=\"true\"") == std::string::npos);
+    assert(occurrences(default_nulls, "key=\"same\"") == 2);
+    assert(default_nulls.find("value=\"first\"") < default_nulls.find("value=\"2\""));
+  }
+
+  XesExportOptions line_preserved = preserved_options;
+  line_preserved.variant = XesExportVariant::LINE_BY_LINE;
+  assert(throws([&] { (void)serialize_xes(log, line_preserved); }));
+}
+
 int main() {
+  null_scalar_list_children_preserve_order_and_duplicates();
+  {
+    using namespace minera;
+    for (int shape = 0; shape < 8; ++shape) {
+      EventAttribute value{"probe", "true", AttributeKind::kBoolean, shape < 5};
+      value.scalar_wrapper = shape != 0;
+      value.scalar_children_list = shape == 2 || shape == 4 || shape == 6;
+      if (shape >= 3) value.children = {{"child", "", AttributeKind::kString, true}, {"kept", "value"}};
+      if (shape == 7) {
+        value.kind = AttributeKind::kString;
+        value.value = "parent";
+        EventAttribute nested{"child", "", AttributeKind::kString, true};
+        nested.scalar_wrapper = true;
+        nested.children = {{"kept", "value"}};
+        value.children = {nested};
+      }
+      for (int scope = 0; scope < 4; ++scope) {
+        EventLog log;
+        log.traces.push_back(Trace{"c", {Event{"c", "A"}}});
+        if (scope == 0) log.attributes = {value};
+        if (scope == 1) log.metadata.globals.push_back({"event", {value}});
+        if (scope == 2) log.traces[0].attributes = {value};
+        if (scope == 3) log.traces[0].events[0].attributes = {value};
+        for (const auto variant : {XesExportVariant::ETREE, XesExportVariant::LINE_BY_LINE}) {
+          for (const bool compressed : {false, true}) {
+            XesExportOptions options;
+            options.variant = variant;
+            options.compress = compressed;
+            if (shape == 6 && variant == XesExportVariant::LINE_BY_LINE) {
+              assert(throws([&] { (void)serialize_xes(log, options); }));
+              continue;
+            }
+            const auto bytes = serialize_xes(log, options);
+            const auto xml = compressed ? detail::gzip_decompress(bytes, 1024 * 1024) : bytes;
+            assert(xml.find("null=\"true\"") == std::string::npos);
+            assert((xml.find("key=\"probe\"") != std::string::npos) == (shape != 0));
+            if (shape > 0 && shape < 5) assert(xml.find("<list key=\"probe\">") != std::string::npos);
+            if (shape >= 3 && !(shape == 3 && variant == XesExportVariant::LINE_BY_LINE) &&
+                !(shape == 7 && variant == XesExportVariant::LINE_BY_LINE))
+              assert(xml.find("key=\"kept\" value=\"value\"") != std::string::npos);
+            if (shape == 3 && variant == XesExportVariant::LINE_BY_LINE)
+              assert(xml.find("key=\"c\" value=\"h\"") != std::string::npos);
+          }
+        }
+      }
+    }
+    EventLog selected;
+    Trace trace;
+    trace.case_id_state = FirstClassAttributeState::kNull;
+    Event event;
+    event.activity_state = event.timestamp_state = event.resource_state =
+        event.lifecycle_state = FirstClassAttributeState::kNull;
+    trace.events.push_back(event);
+    selected.traces.push_back(trace);
+    assert(to_xes(selected).find("null=\"true\"") == std::string::npos);
+    assert(occurrences(serialize_xes(selected, {.preserve_nulls = true}), "null=\"true\"") == 5);
+    for (const auto kind : {AttributeContainerKind::kTuple, AttributeContainerKind::kSet,
+                            AttributeContainerKind::kFrozenSet}) {
+      EventLog null_container;
+      EventAttribute value{"probe", "stale", AttributeKind::kString, true};
+      value.container = kind;
+      value.children = {{"x", "invalid-date", AttributeKind::kDate}};
+      null_container.attributes.push_back(value);
+      for (const auto variant : {XesExportVariant::ETREE, XesExportVariant::LINE_BY_LINE}) {
+        assert(serialize_xes(null_container, {.variant = variant}).find("key=\"probe\"") == std::string::npos);
+        const auto preserved = serialize_xes(null_container, {.variant = variant, .preserve_nulls = true});
+        assert(preserved.find("key=\"probe\" null=\"true\"") != std::string::npos);
+        assert(preserved.find("invalid-date") == std::string::npos);
+      }
+    }
+  }
+  {
+    using namespace minera;
+    const std::string body = "<log>\n<trace>\n<event>\n";
+    const std::string tail = "\n</event>\n</trace>\n</log>";
+    for (const bool compressed : {false, true}) {
+      const auto read = [&](const std::string& xml, XesImportOptions options = {}) {
+        options.variant = XesImportVariant::LINE_BY_LINE;
+        std::istringstream input(compressed ? detail::gzip_compress(xml) : xml);
+        return import_xes_event_log(input, options);
+      };
+      assert(read("<log><trace><event/></trace></log>").traces.empty());
+      assert(read("<log>\n<trace>\n<event/>\n</trace>\n</log>").traces.empty());
+      assert(throws([&] { (void)read(body + "<int key=\"bad\" value=\"invalid\"/>"); }));
+      assert(read("<log>\n<int key=\"bad\" value=\"invalid\"/>\n</log>").traces.empty());
+      const auto packed = read(body + "<boolean key=\"parent\" value=\"true\"><string key=\"child\" value=\"v\"/></boolean>" + tail);
+      assert(packed.traces.size() == 1 && packed.traces[0].events.size() == 1);
+      assert(packed.traces[0].events[0].attributes.empty());
+      const auto flat = read(body + "<boolean key=\"parent\" value=\"true\">\n<string key=\"child\" value=\"v\"/>\n</boolean>" + tail);
+      assert(find_attribute(flat.traces[0].events[0].attributes, "parent"));
+      assert(find_attribute(flat.traces[0].events[0].attributes, "child"));
+      const auto lexical = read(body + "<string value=\"v\" key=\"k\"/>\n<string key=\"entity\" value=\"&amp;&#65;\"/>\n<string key='ignored' value='v'/>" + tail);
+      assert(find_attribute(lexical.traces[0].events[0].attributes, "v")->value == "k");
+      assert(find_attribute(lexical.traces[0].events[0].attributes, "entity")->value == "&amp;&#65;");
+      assert(!find_attribute(lexical.traces[0].events[0].attributes, "ignored"));
+      const auto kinds = read(body + "<boolean key=\"flag\" value=\"true\"></unknown>\n<unknown key=\"text\" value=\"true\"></boolean>" + tail);
+      assert(find_attribute(kinds.traces[0].events[0].attributes, "flag")->kind == AttributeKind::kBoolean);
+      assert(find_attribute(kinds.traces[0].events[0].attributes, "text")->kind == AttributeKind::kString);
+      XesImportOptions selected;
+      selected.activity_attribute = "custom";
+      selected.attributes_to_read = {"keep"};
+      const auto projected = read(body + "<string key=\"custom\" value=\"A\"/>\n<string key=\"drop\" value=\"x\"/>" + tail, selected);
+      assert(projected.traces[0].events[0].activity == "A");
+      assert(projected.traces[0].events[0].attributes.empty());
+      selected.require_timestamp = true;
+      assert(throws([&] { (void)read(body + tail, selected); }));
+      XesImportOptions limited;
+      limited.max_traces = 0;
+      assert(read(body + tail, limited).traces.empty());
+    }
+  }
+  {
+    using namespace minera;
+    const std::string children = "<string key=\"same\" value=\"first\"/><int key=\"same\" value=\"2\"/>";
+    for (const auto variant : {XesImportVariant::kIterparse,
+         XesImportVariant::kIterparseMemoryCompressed, XesImportVariant::kIterparse20}) {
+      for (const bool compressed : {false, true}) {
+        for (int shape = 0; shape < 4; ++shape) {
+          const auto inner = shape == 0 ? "<values/>" : shape == 1 ?
+              "<values>" + children + "</values><values>" + children + "</values>" :
+              shape == 2 ? children + "<values/>" : "<values/>" + children;
+          const auto xml = "<log><trace><event><boolean key=\"probe\" value=\"true\">" + inner + "</boolean></event></trace></log>";
+          std::istringstream input(compressed ? detail::gzip_compress(xml) : xml);
+          XesImportOptions options;
+          options.variant = variant;
+          const auto log = import_xes_event_log(input, options);
+          const auto* probe = find_attribute(log.traces[0].events[0].attributes, "probe");
+          assert(probe);
+          const bool list = variant != XesImportVariant::kIterparse20 && shape != 2;
+          assert(probe->scalar_children_list == list);
+          assert(probe->children.size() == ((shape == 2 || shape == 3 ||
+                  (shape == 1 && list)) ? 2 : 0));
+        }
+      }
+    }
+    EventAttribute pairs{"probe", "true", AttributeKind::kBoolean};
+    pairs.scalar_children_list = true;
+    for (const bool populated : {false, true}) {
+      if (populated) pairs.children = {{"same", "first"}, {"same", "2", AttributeKind::kInt}};
+      auto mapping = pairs;
+      mapping.scalar_children_list = false;
+      assert(mapping != pairs);
+      for (int scope = 0; scope < 5; ++scope) {
+        EventLog log;
+        log.traces.push_back(Trace{"c", {Event{"c", "true"}}});
+        if (scope == 0) log.attributes = {pairs};
+        if (scope == 1) log.traces[0].attributes = {pairs};
+        if (scope == 2) {
+          EventAttribute outer{"outer", "v"}; outer.children = {pairs};
+          log.traces[0].events[0].attributes = {outer};
+        }
+        if (scope == 3) {
+          auto& event = log.traces[0].events[0];
+          event.activity_attribute = pairs;
+          event.activity_source_key = "probe";
+        }
+        if (scope == 4) log.metadata.globals.push_back({"event", {pairs}});
+        for (const bool compressed : {false, true}) {
+          XesExportOptions options;
+          options.compress = compressed;
+          options.variant = XesExportVariant::ETREE;
+          const auto bytes = serialize_xes(log, options);
+          const auto xml = compressed ? detail::gzip_decompress(bytes, 1024 * 1024) : bytes;
+          assert(xml.find("key=\"probe\" value=\"True\"") != std::string::npos);
+          assert(occurrences(xml, "key=\"same\"") == (populated ? 2 : 0));
+          options.variant = XesExportVariant::LINE_BY_LINE;
+          assert(throws([&] { (void)serialize_xes(log, options); }));
+        }
+      }
+    }
+    Trace scalarized;
+    scalarized.case_id_attribute = pairs;
+    set_trace_case_id(scalarized, "new");
+    assert(!scalarized.case_id_attribute->scalar_children_list);
+    Event source, target;
+    source.activity_attribute = pairs;
+    set_event_activity_context(source, "new", target);
+    assert(!target.activity_attribute->scalar_children_list);
+  }
+  {
+    using namespace minera;
+    for (const auto kind : {AttributeKind::kBoolean, AttributeKind::kDate}) {
+      EventAttribute wrapped{"wrapped", kind == AttributeKind::kBoolean ?
+          "true" : "2024-01-01T00:00:00Z", kind};
+      auto scalar = wrapped;
+      wrapped.scalar_wrapper = true;
+      assert(wrapped != scalar);
+      assert(EventAttribute(wrapped) == wrapped);
+      for (int scope = 0; scope < 11; ++scope) {
+        EventLog log;
+        log.traces.push_back(Trace{"c", {Event{"c", "A"}}});
+        auto& trace = log.traces[0];
+        auto& event = trace.events[0];
+        if (scope == 0) log.attributes = {wrapped};
+        if (scope == 1) log.metadata.globals.push_back({"event", {wrapped}});
+        if (scope == 2) trace.attributes = {wrapped};
+        if (scope == 3) event.attributes = {wrapped};
+        if (scope == 4) {
+          EventAttribute parent{"outer", "metadata"};
+          parent.children = {wrapped};
+          event.attributes = {parent};
+        }
+        if (scope == 5 || scope == 6) {
+          event.activity = wrapped.value;
+          event.activity_source_key = wrapped.key;
+          event.activity_state = FirstClassAttributeState::kPresent;
+          if (scope == 5) event.activity_attribute = wrapped;
+          else event.attributes = {wrapped};
+        }
+        if (scope == 7) {
+          event.timestamp = wrapped.value;
+          event.timestamp_source_key = wrapped.key;
+          event.timestamp_state = FirstClassAttributeState::kPresent;
+          event.timestamp_attribute = wrapped;
+        }
+        if (scope == 8) {
+          trace.case_id = wrapped.value;
+          trace.case_id_source_key = wrapped.key;
+          trace.case_id_state = FirstClassAttributeState::kPresent;
+          trace.case_id_attribute = wrapped;
+        }
+        if (scope == 9) {
+          event.resource = wrapped.value;
+          event.resource_source_key = wrapped.key;
+          event.resource_state = FirstClassAttributeState::kPresent;
+          event.resource_attribute = wrapped;
+        }
+        if (scope == 10) {
+          event.lifecycle = wrapped.value;
+          event.lifecycle_source_key = wrapped.key;
+          event.lifecycle_state = FirstClassAttributeState::kPresent;
+          event.lifecycle_attribute = wrapped;
+        }
+        for (const auto variant : {XesExportVariant::ETREE, XesExportVariant::LINE_BY_LINE}) {
+          for (const bool compressed : {false, true}) {
+            XesExportOptions options;
+            options.variant = variant;
+            options.compress = compressed;
+            const auto bytes = serialize_xes(log, options);
+            const auto xml = compressed ? detail::gzip_decompress(bytes, 1024 * 1024) : bytes;
+            const std::string expected = kind == AttributeKind::kBoolean ?
+                (variant == XesExportVariant::ETREE ? "True" : "true") :
+                (variant == XesExportVariant::ETREE ? "2024-01-01 00:00:00+00:00" : "2024-01-01T00:00:00+00:00");
+            assert(occurrences(xml, "key=\"wrapped\" value=\"" + expected + "\"") == 1);
+          }
+        }
+      }
+      Trace trace;
+      trace.case_id_attribute = wrapped;
+      set_trace_case_id(trace, "derived");
+      assert(!trace.case_id_attribute->scalar_wrapper);
+      Event source, target;
+      source.activity_attribute = wrapped;
+      set_event_activity_context(source, "derived", target);
+      assert(!target.activity_attribute->scalar_wrapper);
+      source.timestamp_attribute = wrapped;
+      copy_event_timestamp_context(source, target);
+      assert(target.timestamp_attribute->scalar_wrapper);
+    }
+  }
+  boolean_import_spelling_matches_public_variants();
+  boolean_export_spelling_matches_variant_and_scalar_shape();
   nested_attribute_variations_match_public_categories();
   date_import_sorting_uses_exact_fields_and_variant_rules();
   date_import_variations_retain_wall_clock_fields();

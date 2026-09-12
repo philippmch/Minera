@@ -260,7 +260,7 @@ int main() {
   assert(typed_xes.find("<string key=\"activity.code\" value=\"x\"/>") !=
          std::string::npos);
   assert(typed_xes.find(
-             "<date key=\"when.value\" value=\"2026-01-01T00:00:00.000Z\"/>") !=
+             "<date key=\"when.value\" value=\"2026-01-01T00:00:00+00:00\"/>") !=
          std::string::npos);
 
   // A non-default activity key drives source/target variants, and the same

@@ -13,6 +13,31 @@ const metadata = {
 };
 
 describe("traditional log conversion API", () => {
+  it("retains empty scalar wrapper metadata and rejects invalid markers", () => {
+    const payload = (scalar_wrapper: unknown) => ({
+      family: "LOG_CONVERSION", variant: "TO_EVENT_STREAM",
+      stream: { attributes: [], metadata, events: [{ fields: [{ ...attribute, scalar_wrapper }] }] },
+    });
+    expect(isLogConversionResult(payload(true))).toBe(true);
+    expect(isLogConversionResult(payload(false))).toBe(true);
+    expect(isLogConversionResult(payload("true"))).toBe(false);
+    const ordered = payload(true);
+    Object.assign(ordered.stream.events[0].fields[0], { scalar_children_list: true });
+    expect(isLogConversionResult(ordered)).toBe(true);
+    Object.assign(ordered.stream.events[0].fields[0], { scalar_children_list: "true" });
+    expect(isLogConversionResult(ordered)).toBe(false);
+  });
+
+  it("validates scalar metadata on compact table cells", () => {
+    const payload = (metadata: Record<string, unknown>) => ({
+      family: "LOG_CONVERSION", variant: "TO_DATA_FRAME",
+      table: { columns: ["concept:name"], rows: [[{ value: "A", kind: "string", ...metadata }]] },
+    });
+    expect(isLogConversionResult(payload({ scalar_wrapper: true, scalar_children_list: false }))).toBe(true);
+    expect(isLogConversionResult(payload({ scalar_wrapper: "true" }))).toBe(false);
+    expect(isLogConversionResult(payload({ scalar_children_list: "false" }))).toBe(false);
+  });
+
   it("serializes every option deterministically and escapes attribute lists", () => {
     const query = logConversionQuery({
       log_conversion_variant: "to_nx",

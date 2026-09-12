@@ -94,6 +94,8 @@ void add_projection(std::vector<EventAttribute>& attributes,
     projection.typed_value = metadata->typed_value;
     projection.container = metadata->container;
     projection.children = metadata->children;
+    projection.scalar_wrapper = metadata->scalar_wrapper;
+    projection.scalar_children_list = metadata->scalar_children_list;
   }
   projection.first_class_role = role;
   projection.first_class_state = effective_state;
@@ -112,11 +114,13 @@ void append_or_merge_attribute(std::vector<EventAttribute>& fields,
     return;
   }
   if (found->first_class_role == FirstClassAttributeRole::kNone ||
-      attribute.children.empty())
+      (attribute.children.empty() && !attribute.scalar_wrapper && !attribute.scalar_children_list))
     return;
   // A selected scalar can still carry nested/meta attributes. Preserve those
   // children on the projected cell without creating a duplicate column.
   found->children = attribute.children;
+  found->scalar_wrapper = attribute.scalar_wrapper;
+  found->scalar_children_list = attribute.scalar_children_list;
 }
 
 std::vector<EventAttribute> event_fields(const Event& event) {
@@ -405,7 +409,7 @@ Event record_to_event(const LogConversionRecord& record,
     metadata->first_class_role = FirstClassAttributeRole::kNone;
     metadata->first_class_state = FirstClassAttributeState::kMissing;
     metadata->first_class_source_key.clear();
-    if (!field.children.empty()) {
+    if (field.scalar_wrapper || field.scalar_children_list || !field.children.empty()) {
       auto preserved = field;
       preserved.key = source_key;
       preserved.first_class_role = FirstClassAttributeRole::kNone;
@@ -668,6 +672,8 @@ void write_attribute(std::ostream& output, const EventAttribute& attribute) {
                   std::get_if<NativeDate>(&attribute.typed_value))
       output << '"' << json_escape(date_value->value) << '"';
   }
+  if (attribute.scalar_wrapper) output << ",\"scalar_wrapper\":true";
+  if (attribute.scalar_children_list) output << ",\"scalar_children_list\":true";
   if (!attribute.children.empty()) {
     output << ",\"children\":";
     write_attributes(output, attribute.children);
@@ -724,6 +730,8 @@ void write_attribute_detail(std::ostream& output,
                  std::get_if<NativeDate>(&attribute.typed_value))
       output << '"' << json_escape(date_value->value) << '"';
   }
+  if (attribute.scalar_wrapper) output << ",\"scalar_wrapper\":true";
+  if (attribute.scalar_children_list) output << ",\"scalar_children_list\":true";
   if (!attribute.children.empty()) {
     output << ",\"children\":";
     write_attribute_details(output, attribute.children);
@@ -1060,7 +1068,7 @@ EventLog event_stream_to_event_log(const ConvertedEventStream& stream,
       selected_case.first_class_state = FirstClassAttributeState::kMissing;
       selected_case.first_class_source_key.clear();
       trace.case_id_attribute = std::move(selected_case);
-      if (!glue->children.empty()) {
+      if (glue->scalar_wrapper || glue->scalar_children_list || !glue->children.empty()) {
         auto selected_attribute = *glue;
         selected_attribute.key = row_case_source_key;
         selected_attribute.first_class_role = FirstClassAttributeRole::kNone;

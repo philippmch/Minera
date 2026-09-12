@@ -2191,7 +2191,7 @@ void parse_ptml_rejects_malformed_trees() {
 
 void xes_export_round_trips_the_log() {
   // A log written by to_xes and read back by the XES importer must carry the
-  // same cases, activities, resources, and timestamp instants — including
+  // same cases, activities, resources, and timestamp clock fields — including
   // XML metacharacters in every field.
   minera::EventLog log;
   minera::Trace trace;
@@ -2220,15 +2220,22 @@ void xes_export_round_trips_the_log() {
   assert(reread.traces[0].events[1].activity == second.activity);
   assert(reread.traces[0].events[1].resource.empty());
 
-  // Timestamps are normalized to UTC on export, so compare instants.
+  // Export retains the offset. The default reference importer attaches UTC to
+  // clock fields, whereas the Rust importer preserves the absolute instant.
+  assert(xes.find("2024-03-01T10:00:00+02:00") != std::string::npos);
+  assert(reread.traces[0].events[0].timestamp == "2024-03-01T10:00:00.000Z");
+  assert(reread.traces[0].events[1].timestamp == "2024-03-01T09:30:00.250000Z");
+  std::istringstream rust_input(xes);
+  minera::XesImportOptions rust_options;
+  rust_options.variant = minera::XesImportVariant::RUSTXES;
+  const auto rust_reread = minera::import_xes_event_log(rust_input, rust_options);
   for (std::size_t i = 0; i < 2; ++i) {
     const auto before = minera::parse_timestamp(trace.events[i].timestamp);
     const auto after =
-        minera::parse_timestamp(reread.traces[0].events[i].timestamp);
+        minera::parse_timestamp(rust_reread.traces[0].events[i].timestamp);
     assert(before && after && *before == *after);
   }
-  // The offset timestamp reads back as its UTC instant in ISO form.
-  assert(reread.traces[0].events[0].timestamp == "2024-03-01T08:00:00.000Z");
+  assert(rust_reread.traces[0].events[0].timestamp == "2024-03-01T08:00:00.000Z");
 }
 
 void xes_export_keeps_unparseable_timestamps_verbatim() {
@@ -4261,7 +4268,7 @@ void xes_export_round_trips_generic_attributes() {
   assert(xes.find("<string key=\"@@aligned_variant\" value=\"a,b\"/>") !=
          std::string::npos);
   assert(xes.find("<int key=\"amount\" value=\"100\"/>") != std::string::npos);
-  assert(xes.find("<date key=\"due\" value=\"2026-03-01T10:00:00.000Z\"/>") !=
+  assert(xes.find("<date key=\"due\" value=\"2026-03-01T10:00:00+00:00\"/>") !=
          std::string::npos);
 
   auto invalid = log;
@@ -5030,7 +5037,7 @@ void filter_preserves_typed_first_class_projection_context() {
   assert(exported.find("<int key=\"case.number\" value=\"42\"/>") !=
          std::string::npos);
   assert(exported.find(
-             "<date key=\"when.value\" value=\"2026-01-01T00:00:00.000Z\"/>") !=
+             "<date key=\"when.value\" value=\"2026-01-01T00:00:00+00:00\"/>") !=
          std::string::npos);
   std::istringstream round_input(exported);
   const auto round = minera::import_xes_event_log(round_input, import_options);

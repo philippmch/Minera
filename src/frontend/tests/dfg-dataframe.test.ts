@@ -131,6 +131,30 @@ describe("table-backed DFG response guards", () => {
     expect(isDfgDataframeResult({ operation: "concurrent_events", backend: "pandas", columns: { max_start: "max" }, pairs: [] })).toBe(false);
   });
 
+  it("accepts scalar metadata and rejects malformed scalar flags", () => {
+    const attribute = {
+      key: "payload", value: "", kind: "string" as const, container: "scalar" as const,
+      null: true, scalar_wrapper: true, scalar_children_list: false,
+    };
+    const withAttribute = {
+      ...partial,
+      pairs: [{ ...partial.pairs[0], source: { ...partial.pairs[0].source, attributes: [attribute] } }],
+    };
+    expect(isDfgDataframeResult(withAttribute)).toBe(true);
+    expect(isDfgDataframeResult({
+      ...withAttribute,
+      pairs: [{ ...withAttribute.pairs[0], source: {
+        ...withAttribute.pairs[0].source, attributes: [{ ...attribute, scalar_wrapper: "true" }],
+      } }],
+    })).toBe(false);
+    expect(isDfgDataframeResult({
+      ...withAttribute,
+      pairs: [{ ...withAttribute.pairs[0], target: {
+        ...withAttribute.pairs[0].target, attributes: [{ ...attribute, scalar_children_list: 1 }],
+      } }],
+    })).toBe(false);
+  });
+
   it("accepts the typed request response and uses GET", async () => {
     const fetchMock = vi.fn(async (path: string, init?: RequestInit) => {
       expect(path).toBe("/api/dfg-dataframe?dfg_operation=partial_order");

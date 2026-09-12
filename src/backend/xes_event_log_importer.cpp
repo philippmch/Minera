@@ -4,6 +4,7 @@
 #include "xml_pull_parser.hpp"
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cctype>
 #include <cmath>
@@ -92,11 +93,18 @@ NativeAttributeValue parse_native_value(AttributeKind kind,
       }
       return parsed;
     }
-    case AttributeKind::kBoolean:
-      if (value == "true" || value == "1") return true;
-      if (value == "false" || value == "0") return false;
-      throw std::invalid_argument("XES boolean attribute has an invalid value: " +
-                                  std::string(value));
+    case AttributeKind::kBoolean: {
+      if (variant == XesImportVariant::kLineByLine ||
+          variant == XesImportVariant::kChunkRegex ||
+          variant == XesImportVariant::kRustXes)
+        return value == "true";
+      // Iterparse accepts case-insensitive true; every other lexical value
+      // (including the XSD spelling 1) is false in the pinned reference.
+      return value.size() == 4 && (value[0] == 't' || value[0] == 'T') &&
+          (value[1] == 'r' || value[1] == 'R') &&
+          (value[2] == 'u' || value[2] == 'U') &&
+          (value[3] == 'e' || value[3] == 'E');
+    }
     case AttributeKind::kDate: {
       auto parsed = parse_timestamp(value);
       if (!parsed) {
@@ -220,6 +228,33 @@ std::optional<EventAttribute> parse_attribute_node(
       continue;
     }
     if (token.kind != detail::XmlPullParser::Kind::StartElement) continue;
+    if (kind && local_name(token.name) == "values" &&
+        (variant == XesImportVariant::kIterparse ||
+         variant == XesImportVariant::kIterparseMemoryCompressed ||
+         variant == XesImportVariant::kIterparse20)) {
+      if (result.scalar_wrapper || !result.children.empty()) {
+        skip_element(parser, token);
+        continue;
+      }
+      result.scalar_wrapper = true;
+      if (variant == XesImportVariant::kIterparse20) {
+        skip_element(parser, token);
+        continue;
+      }
+      result.scalar_children_list = true;
+      if (token.self_closing) continue;
+      while (true) {
+        const auto child_token = parser.next();
+        if (child_token.kind == detail::XmlPullParser::Kind::EndOfInput)
+          throw std::runtime_error("XES scalar <values> element is not closed");
+        if (child_token.kind == detail::XmlPullParser::Kind::EndElement &&
+            local_name(child_token.name) == "values") break;
+        if (child_token.kind == detail::XmlPullParser::Kind::StartElement)
+          if (const auto child = parse_attribute_node(parser, child_token, variant, depth + 1))
+            result.children.push_back(*child);
+      }
+      continue;
+    }
     if (!kind) {
       // Wrapped and direct list entries have different result shapes across
       // the parser variations, even when their scalar contents are identical.
@@ -276,6 +311,8 @@ void emit_imported_attribute(EventAttribute attribute, XesImportVariant variant,
   }
   auto children = std::move(attribute.children);
   attribute.children.clear();
+  attribute.scalar_wrapper = false;
+  attribute.scalar_children_list = false;
   if (attribute.container == AttributeContainerKind::kScalar)
     emit(std::move(attribute));
   for (auto& child : children)
@@ -367,6 +404,76 @@ void validate_variant(XesImportVariant variant) {
       return;
   }
   throw std::invalid_argument("XES import: unsupported parser variant");
+}
+
+// LINE_BY_LINE is a lexical reader. It considers one physical LF-delimited
+// line at a time, takes the final tag spelling, and extracts two double-quoted
+// fields by position. Normalize that flat stream for the shared projection code.
+std::string line_by_line_xml(std::string_view source, std::size_t max_traces) {
+  std::string result = "<log>";
+  std::string trace, event;
+  bool in_trace = false, in_event = false;
+  std::size_t traces = 0;
+  const auto escaped = [](std::string_view value) {
+    std::string out;
+    for (const auto ch : value) {
+      if (ch == '&') out += "&amp;";
+      else if (ch == '<') out += "&lt;";
+      else if (ch == '>') out += "&gt;";
+      else if (ch == '"') out += "&quot;";
+      else out += ch;
+    }
+    return out;
+  };
+  while (!source.empty() && traces < max_traces) {
+    const auto end = source.find('\n');
+    const auto line = source.substr(0, end);
+    source = end == std::string_view::npos ? std::string_view{} : source.substr(end + 1);
+    const auto open = line.rfind('<');
+    if (open == std::string_view::npos) continue;
+    const auto tag_text = line.substr(open + 1);
+    const auto tag = tag_text.substr(0, tag_text.find_first_of(" >\t\r"));
+    std::array<std::size_t, 4> quotes{};
+    std::size_t quote_count = 0;
+    for (std::size_t i = 0; i < line.size(); ++i) {
+      if (line[i] != '"') continue;
+      if (quote_count == quotes.size()) { ++quote_count; break; }
+      quotes[quote_count++] = i;
+    }
+    if (quote_count == 4) {
+      if (!in_trace) continue;
+      const auto scalar_open = line.rfind('<', quotes[0]);
+      const auto scalar_text = line.substr(scalar_open + 1);
+      const auto scalar_tag = scalar_text.substr(0, scalar_text.find_first_of(" >\t\r"));
+      auto kind = attribute_kind_of(scalar_tag);
+      const auto type = kind ? std::string(scalar_tag) : std::string("string");
+      const auto key = line.substr(quotes[0] + 1, quotes[1] - quotes[0] - 1);
+      const auto value = line.substr(quotes[2] + 1, quotes[3] - quotes[2] - 1);
+      // Conversion errors occur while reading the line, even if the trace
+      // is never closed and therefore never appended to the result.
+      if (kind) (void)parse_native_value(*kind, std::string(value), XesImportVariant::kLineByLine);
+      (in_event ? event : trace) += "<" + type + " key=\"" + escaped(key) +
+          "\" value=\"" + escaped(value) + "\"/>";
+      continue;
+    }
+    if (quote_count != 0) continue;
+    if (in_event) {
+      if (tag == "/event") {
+        trace += "<event>" + event + "</event>";
+        event.clear();
+        in_event = false;
+      }
+    } else if (in_trace) {
+      if (tag == "event" || tag == "event/") in_event = true;
+      else if (tag == "/trace") {
+        result += "<trace>" + trace + "</trace>";
+        trace.clear();
+        in_trace = false;
+        ++traces;
+      }
+    } else if (tag == "trace" || tag == "trace/") in_trace = true;
+  }
+  return result + "</log>";
 }
 
 using TimestampOrderKey = std::pair<std::int64_t, std::int64_t>;
@@ -492,6 +599,8 @@ EventLog import_xes_event_log(
     xml.erase(0, 3);
   }
 
+  if (options.variant == XesImportVariant::kLineByLine)
+    xml = line_by_line_xml(xml, options.max_traces);
   detail::XmlPullParser parser(xml);
   EventLog log;
   std::vector<std::string> stack;
@@ -517,7 +626,7 @@ EventLog import_xes_event_log(
     const auto found = std::find_if(
         attributes.begin(), attributes.end(),
         [&](const auto& attribute) { return attribute.key == key; });
-    if (found != attributes.end() && found->children.empty())
+    if (found != attributes.end() && found->children.empty() && !found->scalar_wrapper)
       attributes.erase(found);
   };
 

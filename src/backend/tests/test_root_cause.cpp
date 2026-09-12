@@ -1052,6 +1052,56 @@ void test_set_values() {
 }
 
 int main() {
+  {
+    minera::EventAttribute scalar{"flag", "true", minera::AttributeKind::kBoolean};
+    scalar.typed_value = true;
+    auto wrapped = scalar;
+    wrapped.scalar_wrapper = true;
+    assert(!minera::root_cause_key_is_hashable(wrapped));
+    assert(minera::native_scalar_order_kind(wrapped) == minera::NativeScalarOrderKind::kUnsupported);
+    assert(minera::root_cause_attribute_category(wrapped) == "{'value': True, 'children': {}}");
+    minera::Trace plain_trace, wrapped_trace;
+    plain_trace.attributes.push_back(scalar);
+    wrapped_trace.attributes.push_back(wrapped);
+    assert(!minera::root_cause_traces_equal(plain_trace, wrapped_trace));
+    assert(minera::root_cause_trace_fingerprint(plain_trace) != minera::root_cause_trace_fingerprint(wrapped_trace));
+    auto integer_wrapper = wrapped;
+    integer_wrapper.kind = minera::AttributeKind::kInt;
+    integer_wrapper.value = "1";
+    integer_wrapper.typed_value = std::int64_t{1};
+    minera::Trace integer_trace;
+    integer_trace.attributes.push_back(integer_wrapper);
+    assert(minera::root_cause_traces_equal(wrapped_trace, integer_trace));
+    assert(minera::root_cause_trace_fingerprint(wrapped_trace) == minera::root_cause_trace_fingerprint(integer_trace));
+    auto date_wrapper = wrapped;
+    date_wrapper.kind = minera::AttributeKind::kDate;
+    date_wrapper.value = "2024-01-01T00:00:00Z";
+    date_wrapper.typed_value = minera::NativeDate{date_wrapper.value};
+    minera::Trace date_trace;
+    date_trace.attributes.push_back(date_wrapper);
+    const auto copied_date_trace = date_trace;
+    assert(minera::root_cause_traces_equal(date_trace, copied_date_trace));
+    assert(minera::root_cause_trace_fingerprint(date_trace) == minera::root_cause_trace_fingerprint(copied_date_trace));
+    auto ordered = wrapped;
+    ordered.scalar_wrapper = false;  // Ordered children alone imply wrapping.
+    ordered.scalar_children_list = true;
+    assert(!minera::root_cause_key_is_hashable(ordered));
+    assert(minera::root_cause_attribute_category(ordered) == "{'value': True, 'children': []}");
+    minera::Trace ordered_trace;
+    ordered_trace.attributes.push_back(ordered);
+    assert(!minera::root_cause_traces_equal(wrapped_trace, ordered_trace));
+    assert(minera::root_cause_trace_fingerprint(wrapped_trace) != minera::root_cause_trace_fingerprint(ordered_trace));
+    ordered_trace.attributes[0].children = {{"same", "first"}, {"same", "second"}};
+    const auto ordered_copy = ordered_trace;
+    assert(minera::root_cause_traces_equal(ordered_trace, ordered_copy));
+    assert(minera::root_cause_trace_fingerprint(ordered_trace) == minera::root_cause_trace_fingerprint(ordered_copy));
+    std::reverse(ordered_trace.attributes[0].children.begin(), ordered_trace.attributes[0].children.end());
+    assert(!minera::root_cause_traces_equal(ordered_trace, ordered_copy));
+    bool rejected = false;
+    try { (void)minera::native_attribute_number(wrapped); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
   test_set_values();
   test_byte_values();
   test_integer_float_overflow();

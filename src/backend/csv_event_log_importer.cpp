@@ -448,6 +448,8 @@ EventTable project_csv_event_table(const EventTable& source,
           replacement.typed_value = (*metadata)->typed_value;
           replacement.container = (*metadata)->container;
           replacement.children = (*metadata)->children;
+          replacement.scalar_wrapper = (*metadata)->scalar_wrapper;
+          replacement.scalar_children_list = (*metadata)->scalar_children_list;
         } else if (!source_cell || source_cell->value != replacement.value ||
                    source_cell->is_null != replacement.is_null) {
           // A transformed projection without matching typed metadata is a new
@@ -456,6 +458,8 @@ EventTable project_csv_event_table(const EventTable& source,
           replacement.typed_value = std::monostate{};
           replacement.container = AttributeContainerKind::kScalar;
           replacement.children.clear();
+          replacement.scalar_wrapper = false;
+          replacement.scalar_children_list = false;
         }
         row[index] = std::move(replacement);
         continue;

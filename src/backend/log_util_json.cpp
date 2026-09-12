@@ -108,6 +108,8 @@ void write_attributes(std::ostream& out,
                    std::get_if<NativeDate>(&attribute.typed_value))
         write_json_string(out, date_value->value);
     }
+    if (attribute.scalar_wrapper) out << ",\"scalar_wrapper\":true";
+    if (attribute.scalar_children_list) out << ",\"scalar_children_list\":true";
     if (!attribute.children.empty()) {
       out << ",\"children\":";
       write_attributes(out, attribute.children);
@@ -151,6 +153,8 @@ void write_attribute_detail(std::ostream& out,
                  std::get_if<NativeDate>(&attribute.typed_value))
       write_json_string(out, date_value->value);
   }
+  if (attribute.scalar_wrapper) out << ",\"scalar_wrapper\":true";
+  if (attribute.scalar_children_list) out << ",\"scalar_children_list\":true";
   if (!attribute.children.empty()) {
     out << ",\"children\":";
     out << '[';

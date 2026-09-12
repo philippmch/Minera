@@ -112,7 +112,7 @@ void grouping_resolves_custom_first_class_selectors() {
   assert(exported.find("<string key=\"activity.code\" value=\"7+8\"/>") !=
          std::string::npos);
   assert(exported.find(
-             "<date key=\"when.value\" value=\"2026-01-01T00:00:00.000Z\"/>") !=
+             "<date key=\"when.value\" value=\"2026-01-01T00:00:00+00:00\"/>") !=
          std::string::npos);
   std::istringstream round_input(exported);
   const auto round = minera::import_xes_event_log(round_input, import_options);

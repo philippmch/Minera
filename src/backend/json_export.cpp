@@ -4213,6 +4213,8 @@ void write_attribute_detail(std::ostream& out,
     out << ",\"typed_value\":";
     write_typed_attribute_value(out, attribute.typed_value);
   }
+  if (attribute.scalar_wrapper) out << ",\"scalar_wrapper\":true";
+  if (attribute.scalar_children_list) out << ",\"scalar_children_list\":true";
   if (!attribute.children.empty()) {
     out << ",\"children\":";
     write_attribute_details(out, attribute.children);

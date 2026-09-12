@@ -338,9 +338,9 @@ std::string attribute_category(const EventAttribute& value, bool nested) {
     if (value.children.size() == 1) result += ',';
     return result + ')';
   }
-  if (value.container == AttributeContainerKind::kScalar && value.children.empty())
+  if (value.container == AttributeContainerKind::kScalar && value.children.empty() && !value.scalar_wrapper && !value.scalar_children_list)
     return scalar_category(value, nested);
-  const bool list = value.container == AttributeContainerKind::kList;
+  const bool list = value.container == AttributeContainerKind::kList || value.scalar_children_list;
   std::string result = "{'value': " + (value.container == AttributeContainerKind::kScalar ? scalar_category(value, true) : "None") + ", 'children': ";
   result += list ? '[' : '{';
   std::vector<const EventAttribute*> children;
@@ -418,7 +418,7 @@ double decimal_number(const std::string& source, const std::string& key) {
 }
 
 double attribute_number(const EventAttribute* value, const std::string& key) {
-  if (!value || value->is_null || value->container != AttributeContainerKind::kScalar || !value->children.empty() ||
+  if (!value || value->is_null || value->container != AttributeContainerKind::kScalar || value->scalar_wrapper || value->scalar_children_list || !value->children.empty() ||
       value->kind == AttributeKind::kDate ||
       (value->kind != AttributeKind::kBytes && std::holds_alternative<NativeDate>(value->typed_value)))
     throw std::invalid_argument("root cause: missing or invalid numeric attribute: " + key);

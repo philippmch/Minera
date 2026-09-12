@@ -71,6 +71,9 @@ describe("native alignment adapters", () => {
       .toBe("xes_export_variant=etree&xes_compress=true&xes_infer_metadata=true");
     expect(() => xesExportQuery({ variant: "unknown" as "etree" }))
       .toThrow(/not supported/);
+    expect(xesExportQuery({ preserveNulls: false })).toBe("xes_preserve_nulls=false");
+    expect(xesExportQuery({ preserveNulls: true })).toBe("xes_preserve_nulls=true");
+    expect(() => xesExportQuery({ preserveNulls: "true" as never })).toThrow(/boolean/);
   });
 
   it("serializes opt-in overlap controls and marks them active", () => {

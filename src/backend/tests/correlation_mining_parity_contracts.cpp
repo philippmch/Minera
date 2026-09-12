@@ -555,6 +555,18 @@ void csv_projection_reconciles_transformed_typed_cells() {
   const auto nested_table = project_csv_event_table(imported.table, transformed);
   assert(nested_table.rows[0][activity_index]->container == AttributeContainerKind::kFrozenSet);
   assert(nested_table.rows[0][activity_index]->children[0].value == "7");
+  auto wrapped = field("phase", "nested");
+  wrapped.scalar_wrapper = true;
+  wrapped.scalar_children_list = true;
+  selected.activity_attribute = wrapped;
+  const auto wrapped_table = project_csv_event_table(imported.table, transformed);
+  assert(wrapped_table.rows[0][activity_index]->scalar_wrapper);
+  assert(wrapped_table.rows[0][activity_index]->scalar_children_list);
+  wrapped.scalar_wrapper = false;
+  wrapped.scalar_children_list = false;
+  selected.activity_attribute = wrapped;
+  assert(!project_csv_event_table(wrapped_table, transformed).rows[0][activity_index]->scalar_wrapper);
+  assert(!project_csv_event_table(wrapped_table, transformed).rows[0][activity_index]->scalar_children_list);
   selected.activity_state = FirstClassAttributeState::kNull;
   nested.is_null = true; selected.activity_attribute = nested;
   const auto typed_null = project_csv_event_table(imported.table, transformed);
