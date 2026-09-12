@@ -2503,9 +2503,70 @@ Entirely negative fixed or uniform laws can fail to terminate in the public
 runtime; their native rejection is a bounded-execution policy, not an assertion
 of identical reference exceptions. Extreme samples still obey finite-duration
 and timestamp-range guards, and values below representable precision can round
-to zero. Wider shifted/degenerate distribution contracts, randomized branching,
-and the previously named Monte Carlo gaps remain open. The catalogue remains at
-234 incomplete coverage units.
+to zero. The following checkpoint extends signed locations and zero-scale
+contracts to gamma and lognormal laws. Wider distribution contracts, randomized
+branching, and the previously named Monte Carlo gaps remain open. The catalogue
+remains at 234 incomplete coverage units.
+
+## Monte Carlo shifted gamma and lognormal service laws
+
+`scripts/capture-monte-carlo-shifted-reference.py` and
+`docs/monte-carlo-shifted-reference-fixtures.json` retain 20 gamma/lognormal laws
+with 2,048 raw public draws and 2,048 public simulation timestamps each: 81,920
+sample observations. The matrix includes signed, zero, and positive locations,
+gamma shapes below one, and four zero-scale fixed laws. Eight invalid parameter
+sets retain 16 public `ValueError` outcomes from raw draws and simulation calls.
+Another 276 saved public SciPy CDF/survival points check the independent numerical
+CDF implementation. Arrivals are 100,000 seconds apart; every observed service
+duration is smaller than this spacing, excluding resource waits from the samples.
+
+Direct gamma and lognormal durations now accept negative locations with positive
+scale. Shape must remain positive. Zero scale returns the nonnegative location
+exactly; negative scale and nonpositive shape are rejected. Request parsing and
+frontend serialization use the same domains. Monte Carlo gamma maps additionally
+accept zero scale with positive shape. Existing map formats have no location
+field, and lognormal maps store `log(scale)`, so their finite representation cannot
+encode zero scale. Transport evidence therefore checks shifted laws through direct
+vectors and checks the seven representable zero-location laws through maps too.
+Explicit duration vectors continue to override unused map-duration conversion.
+
+Native negative-location lognormal sampling transforms a truncated normal draw,
+using logarithmic excess calculations to avoid cancellation and intermediate
+underflow. Conditional gamma sampling uses ordinary rejection near the mean, a
+power-law/body and exponential-tail mixture for small shapes below one, and an
+exponential tangent envelope farther into the tail. Rejection loops are bounded
+at 10,000 attempts. Native regressions exercise conditional CDFs, small shapes,
+extreme tails, zero-scale behavior, map equivalence, and override precedence.
+
+`scripts/check-monte-carlo-shifted-reference.py` checks raw draws against the
+untruncated laws and simulation samples against the laws conditioned on
+nonnegative duration. The gamma CDF calculation uses the
+[lower incomplete-gamma series](https://dlmf.nist.gov/8.11#E4) and
+[upper incomplete-gamma continued fraction](https://dlmf.nist.gov/8.9#E2).
+Preselected one-sample and public/native two-sample KS limits are 0.065 and 0.09.
+Simulation one-sample checks account for the saved one-microsecond timestamp
+rounding interval; fixed laws require exact durations and timestamps. Same-seed
+native durations must agree across routes and available map/direct modes.
+Four deliberately incorrect clamped or untruncated simulation-law controls are
+rejected. This validates the stated sampled laws, not cross-runtime RNG identity.
+
+All 154 shifted-law checks pass: 64 public-evidence checks, 54 valid native
+transport/parameter-mode checks, 16 invalid native transport checks, and 20 native
+seed-equivalence checks. The isolated checkpoint also passes the previous 98
+duration-law checks, all 825 scheduler/marking/topology/PNML transport comparisons,
+four native suites, 198 frontend tests, TypeScript, and the catalogue audit.
+Independent review reports no actionable findings. Opaque runtime module bytes
+match the pinned Git objects after newline normalization, without inspecting
+reference implementation text.
+
+Negative-location zero-scale laws remain rejected by the native bounded-execution
+policy because public simulation calls may not terminate. Extremely large gamma
+shapes near their mean inherit the standard-library sampler's floating-point
+precision. Overflow, timestamp range, and rejection-budget failures remain
+explicit errors; floating-point extremes are outside this sampled-law evidence.
+Wider distribution/error contracts, randomized branching, general cyclic nets,
+platform-dependent timestamps, and the previously named Monte Carlo gaps remain
+open. The catalogue remains at 234 incomplete coverage units.
 
 ## Token-replay parity evidence
 

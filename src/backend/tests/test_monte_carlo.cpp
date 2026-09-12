@@ -1063,7 +1063,7 @@ void invalid_options_are_rejected() {
                minera::MonteCarloDurationDistribution::kLogNormal, 0.0, 0.0,
                1.0},
            minera::MonteCarloDuration{
-               minera::MonteCarloDurationDistribution::kGamma, 1.0, 0.0,
+               minera::MonteCarloDurationDistribution::kGamma, 0.0, 0.0,
                0.0}}) {
     rejected = false;
     try {
@@ -1370,6 +1370,84 @@ void signed_uniform_map_preserves_original_upper_endpoint() {
   assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
 }
 
+void shifted_positive_service_laws_match_conditional_cdfs() {
+  const auto net = linear_net();
+  minera::MonteCarloOptions options;
+  options.start = 0; options.simulations = 1000; options.max_steps = 1;
+  options.case_arrival_ratio = 0; options.resources_per_place[net.sink()] = 1000;
+  const auto check = [&](minera::MonteCarloDuration duration, double cutoff, double cdf) {
+    options.transition_durations = {duration};
+    const auto result = minera::monte_carlo(net, options);
+    std::size_t below = 0, positive = 0;
+    for (double value : result.diagnostics.case_execution_seconds) {
+      assert(std::isfinite(value) && value >= 0);
+      below += value <= cutoff;
+      positive += value > 0;
+    }
+    assert(positive == options.simulations);
+    assert(std::abs(static_cast<double>(below) / options.simulations - cdf) < 0.065);
+  };
+  // Shifted exponential is memoryless, including a far-tail cutoff.
+  check({minera::MonteCarloDurationDistribution::kGamma,1,-1000,1},1,1-std::exp(-1.0));
+  // Shape one-half survival is erfc(sqrt(x)).
+  check({minera::MonteCarloDurationDistribution::kGamma,0.5,-0.2,1},0.5,
+        1-std::erfc(std::sqrt(0.7))/std::erfc(std::sqrt(0.2)));
+  // Shape two survival is exp(-x)*(1+x).
+  check({minera::MonteCarloDurationDistribution::kGamma,2,-2,1},1,
+        1-std::exp(-1.0)*4.0/3.0);
+  const auto normal_tail = [](double z) { return 0.5*std::erfc(z/std::sqrt(2.0)); };
+  check({minera::MonteCarloDurationDistribution::kLogNormal,1,-2,1},1,
+        1-normal_tail(std::log(3.0))/normal_tail(std::log(2.0)));
+  check({minera::MonteCarloDurationDistribution::kLogNormal,0.5,-1,2},1,
+        1-normal_tail(0)/normal_tail(std::log(0.5)/0.5));
+}
+
+void shifted_service_extremes_and_zero_scales_are_bounded() {
+  const auto net = linear_net();
+  minera::MonteCarloOptions options;
+  options.start = 0; options.simulations = 16; options.max_steps = 1;
+  options.case_arrival_ratio = 0; options.resources_per_place[net.sink()] = 16;
+  for (const auto duration : {
+      minera::MonteCarloDuration{minera::MonteCarloDurationDistribution::kGamma,0.1,-1e100,1},
+      minera::MonteCarloDuration{minera::MonteCarloDurationDistribution::kGamma,2,-1e300,1},
+      minera::MonteCarloDuration{minera::MonteCarloDurationDistribution::kGamma,1e100,-1e101,1},
+      minera::MonteCarloDuration{minera::MonteCarloDurationDistribution::kGamma,
+          std::numeric_limits<double>::denorm_min(),-std::numeric_limits<double>::denorm_min(),1},
+      minera::MonteCarloDuration{minera::MonteCarloDurationDistribution::kLogNormal,1e-200,-1e308,1},
+      minera::MonteCarloDuration{minera::MonteCarloDurationDistribution::kLogNormal,1e-300,-1e300,1e300}}) {
+    options.transition_durations = {duration};
+    const auto result = minera::monte_carlo(net, options);
+    for (double value : result.diagnostics.case_execution_seconds)
+      assert(std::isfinite(value) && value >= 0 && value < 100);
+  }
+  for (const auto distribution : {minera::MonteCarloDurationDistribution::kGamma,
+                                  minera::MonteCarloDurationDistribution::kLogNormal}) {
+    for (double location : {0.0,3.0}) {
+      options.transition_durations = {{distribution,2,location,0}};
+      const auto result = minera::monte_carlo(net, options);
+      for (double value : result.diagnostics.case_execution_seconds) assert(value == location);
+    }
+    for (const auto invalid : {minera::MonteCarloDuration{distribution,0,0,0},
+                              minera::MonteCarloDuration{distribution,2,-1,0},
+                              minera::MonteCarloDuration{distribution,2,0,-1}}) {
+      options.transition_durations = {invalid};
+      assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
+    }
+  }
+  options.transition_durations.clear();
+  options.stochastic_map = minera::StochasticMap{};
+  options.stochastic_map->transitions.push_back({0,minera::StochasticMapTiming::kTimed,
+      minera::StochasticMapDistribution::kGamma,0,2,0,1,0});
+  const auto zero_map = minera::monte_carlo(net, options);
+  auto direct = options;
+  direct.stochastic_map.reset();
+  direct.transition_durations = {{minera::MonteCarloDurationDistribution::kGamma,2,0,0}};
+  assert_same_logs(zero_map.log, minera::monte_carlo(net, direct).log);
+  options.transition_durations = {{minera::MonteCarloDurationDistribution::kDeterministic,3}};
+  const auto overridden = minera::monte_carlo(net, options);
+  for (double value : overridden.diagnostics.case_execution_seconds) assert(value == 3);
+}
+
 void json_contract_is_stable() {
   const auto result = minera::monte_carlo(linear_net(), minera::MonteCarloOptions{});
   const auto json = minera::monte_carlo_json(result);
@@ -1425,5 +1503,7 @@ int main() {
   signed_service_laws_are_conditioned_without_clamping();
   conditional_service_domains_and_extreme_tails_are_bounded();
   signed_uniform_map_preserves_original_upper_endpoint();
+  shifted_positive_service_laws_match_conditional_cdfs();
+  shifted_service_extremes_and_zero_scales_are_bounded();
   json_contract_is_stable();
 }

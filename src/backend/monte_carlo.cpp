@@ -241,10 +241,10 @@ void validate_stochastic_map_record(const StochasticMapTransition& transition,
       break;
     case StochasticMapDistribution::kGamma:
       // parameter is scale and secondary_parameter is shape.
-      if (transition.parameter <= 0.0 ||
+      if (transition.parameter < 0.0 ||
           transition.secondary_parameter <= 0.0) {
         throw std::invalid_argument(
-            "Monte Carlo stochastic_map gamma scale and shape must be positive");
+            "Monte Carlo stochastic_map gamma requires nonnegative scale and positive shape");
       }
       break;
     case StochasticMapDistribution::kConstant0:
@@ -502,20 +502,11 @@ PreparedOptions prepare_options(const PetriNet& net,
         validate_conditional_duration(duration);
         break;
       case MonteCarloDurationDistribution::kLogNormal:
-        if (duration.value_seconds <= 0.0 ||
-            duration.secondary_seconds < 0.0 ||
-            duration.tertiary_seconds <= 0.0) {
-          throw std::invalid_argument(
-              "Monte Carlo lognormal shape must be positive with a positive scale");
-        }
-        break;
       case MonteCarloDurationDistribution::kGamma:
-        if (duration.value_seconds <= 0.0 ||
-            duration.secondary_seconds < 0.0 ||
-            duration.tertiary_seconds <= 0.0) {
+        if (duration.value_seconds <= 0.0 || duration.tertiary_seconds < 0.0 ||
+            (duration.tertiary_seconds == 0.0 && duration.secondary_seconds < 0.0))
           throw std::invalid_argument(
-              "Monte Carlo lognormal/gamma shape and scale must be positive, with a non-negative location");
-        }
+              "Monte Carlo lognormal/gamma requires positive shape and nonnegative conditional support");
         break;
       default:
         throw std::invalid_argument("Monte Carlo duration distribution is invalid");
@@ -617,7 +608,8 @@ PreparedOptions prepare_options(const PetriNet& net,
 // alpha-a=1/alpha avoids cancellation: Z-alpha=(E-1)/alpha,
 // and physical duration is sigma*E/alpha, never mu+sigma*Z.
 [[nodiscard]] double sample_negative_mean_normal(double mu, double sigma,
-                                                  std::mt19937_64& rng) {
+                                                  std::mt19937_64& rng,
+                                                  double* log_draw = nullptr) {
   const double a = (-mu) / sigma;
   double inverse_alpha;
   if (std::isfinite(a)) {
@@ -643,11 +635,135 @@ PreparedOptions prepare_options(const PetriNet& net,
           sigma_exponent + inverse_exponent + draw_exponent);
       if (!std::isfinite(draw))
         throw std::runtime_error("Monte Carlo normal sample exceeds finite duration range");
+      if (log_draw != nullptr) {
+        const double log_inverse = inverse_alpha > 0.0 ? std::log(inverse_alpha)
+            : std::log(sigma) - std::log(-mu);
+        *log_draw = std::log(sigma) + log_inverse + std::log(exponential);
+      }
       // An excess smaller than the representable double range rounds to zero.
       return draw;
     }
   }
   throw std::runtime_error("Monte Carlo normal rejection sampling budget exceeded");
+}
+
+[[nodiscard]] double unit_exponential(std::mt19937_64& rng) {
+  return -std::log1p(-std::generate_canonical<double, 53>(rng));
+}
+
+[[nodiscard]] double log_positive_ratio(double numerator, double denominator) {
+  const double ratio = numerator / denominator;
+  if (ratio >= 0.5 && ratio <= 2.0)
+    return std::log1p((numerator - denominator) / denominator);
+  return std::log(numerator) - std::log(denominator);
+}
+
+// Compute b*(exp(t)-1) from log(t), preserving tiny t whose product with b
+// is representable, and large t whose exponential alone would overflow.
+[[nodiscard]] double physical_excess(double b, double log_t) {
+  if (log_t == -std::numeric_limits<double>::infinity()) return 0.0;
+  if (log_t > std::log(2048.0))
+    throw std::runtime_error("Monte Carlo conditional sample exceeds finite duration range");
+  const double t = std::exp(log_t);
+  const double log_expm1 = t < 1e-5
+      ? log_t + std::log1p(t * (0.5 + t / 6.0))
+      : (t > 50.0 ? t + std::log1p(-std::exp(-t)) : std::log(std::expm1(t)));
+  const double result = std::exp(std::log(b) + log_expm1);
+  if (!std::isfinite(result))
+    throw std::runtime_error("Monte Carlo conditional sample exceeds finite duration range");
+  return result;
+}
+
+[[nodiscard]] double sample_shifted_lognormal(double shape, double location,
+                                              double scale, std::mt19937_64& rng) {
+  const double b = -location;
+  const double threshold = log_positive_ratio(b, scale);
+  double log_excess;
+  if (threshold > 0.0) {
+    (void)sample_negative_mean_normal(-threshold, shape, rng, &log_excess);
+  } else {
+    std::normal_distribution<double> standard(0.0, 1.0);
+    bool accepted = false;
+    for (std::size_t attempt = 0; attempt < 10000; ++attempt) {
+      const double z = standard(rng);
+      if (threshold == 0.0) {
+        if (z < 0.0) continue;
+        log_excess = std::log(shape) + std::log(z);
+      } else {
+        const double excess = std::fma(shape, z, -threshold);
+        if (excess < 0.0) continue;
+        log_excess = std::log(excess);
+      }
+      accepted = true;
+      break;
+    }
+    if (!accepted)
+      throw std::runtime_error("Monte Carlo lognormal rejection sampling budget exceeded");
+  }
+  return physical_excess(b, log_excess);
+}
+
+[[nodiscard]] double sample_shifted_gamma(double shape, double location,
+                                          double scale, std::mt19937_64& rng) {
+  const double b = -location;
+  const double threshold = b / scale;
+  // At or below mean+sd, ordinary gamma rejection retains substantial mass.
+  if (shape >= 1.0 && threshold <= shape + std::sqrt(shape)) {
+    std::gamma_distribution<double> gamma(shape, 1.0);
+    for (std::size_t attempt = 0; attempt < 10000; ++attempt) {
+      const double result = std::fma(scale, gamma(rng), -b);
+      if (result >= 0.0) return result;
+    }
+  } else if (shape < 1.0 && threshold < 1.0) {
+    // Envelope x^(shape-1) on [a,1], exp(-x) on [1,infinity).
+    // On the bounded part acceptance is exp(-x)>=exp(-1); the tail
+    // accepts x^(shape-1). Its mixture avoids rare tiny-shape survival.
+    const double log_a = log_positive_ratio(b, scale);
+    const double q = -shape * log_a;
+    const double body = -log_a * (q == 0.0 ? 1.0 : -std::expm1(-q) / q);
+    const double body_probability = body / (body + std::exp(-1.0));
+    for (std::size_t attempt = 0; attempt < 10000; ++attempt) {
+      if (std::generate_canonical<double, 53>(rng) < body_probability) {
+        const double u = std::generate_canonical<double, 53>(rng);
+        double delta;
+        if (q < 1e-12) {
+          delta = -log_a * (u + 0.5 * u * (1.0 - u) * q);
+        } else if (q < 0.5) {
+          delta = std::log1p(u * std::expm1(q)) / shape;
+        } else {
+          const double log_x = std::log1p(-(1.0 - u) * (-std::expm1(-q))) / shape;
+          delta = log_x - log_a;
+        }
+        const double x = std::exp(log_a + delta);
+        if (unit_exponential(rng) >= x)
+          return physical_excess(b, std::log(std::max(0.0, delta)));
+      } else {
+        const double excess = unit_exponential(rng);
+        if (unit_exponential(rng) >= (1.0 - shape) * std::log1p(excess))
+          return std::fma(scale, excess, scale - b);
+      }
+    }
+  } else {
+    // For shape>=1 the density is log-concave: its tangent at a gives
+    // an exponential envelope. Farther than mean+sd its rate is well
+    // separated from zero. For shape<1,a>=1 use rate one instead.
+    const double rate = shape < 1.0 ? 1.0
+        : std::fma(-(shape - 1.0), scale, b) / b;
+    if (!(rate > 0.0) || !std::isfinite(rate))
+      throw std::runtime_error("Monte Carlo gamma conditional rate is not representable");
+    for (std::size_t attempt = 0; attempt < 10000; ++attempt) {
+      const double excess = unit_exponential(rng) / rate;
+      const double ratio = excess * (scale / b);
+      double log_acceptance;
+      if (shape < 1.0) log_acceptance = (shape - 1.0) * std::log1p(ratio);
+      else if (ratio < 1e-3)
+        log_acceptance = ((shape - 1.0) * ratio) * ratio *
+            (-0.5 + ratio * (1.0/3.0 + ratio * (-0.25 + ratio * 0.2)));
+      else log_acceptance = (shape - 1.0) * (std::log1p(ratio) - ratio);
+      if (unit_exponential(rng) >= -log_acceptance) return scale * excess;
+    }
+  }
+  throw std::runtime_error("Monte Carlo gamma rejection sampling budget exceeded");
 }
 
 [[nodiscard]] double sample_duration(const MonteCarloDuration& duration,
@@ -681,11 +797,19 @@ PreparedOptions prepare_options(const PetriNet& net,
           std::max(0.0, duration.value_seconds),
           duration.value_seconds + duration.secondary_seconds)(rng);
     case MonteCarloDurationDistribution::kLogNormal: {
+      if (duration.tertiary_seconds == 0.0) return duration.secondary_seconds;
+      if (duration.secondary_seconds < 0.0)
+        return sample_shifted_lognormal(duration.value_seconds, duration.secondary_seconds,
+                                        duration.tertiary_seconds, rng);
       const double draw = std::lognormal_distribution<double>(
           0.0, duration.value_seconds)(rng);
       return duration.secondary_seconds + duration.tertiary_seconds * draw;
     }
     case MonteCarloDurationDistribution::kGamma:
+      if (duration.tertiary_seconds == 0.0) return duration.secondary_seconds;
+      if (duration.secondary_seconds < 0.0)
+        return sample_shifted_gamma(duration.value_seconds, duration.secondary_seconds,
+                                    duration.tertiary_seconds, rng);
       return duration.secondary_seconds +
              std::gamma_distribution<double>(duration.value_seconds,
                                              duration.tertiary_seconds)(rng);
