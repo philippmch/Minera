@@ -4711,7 +4711,7 @@ export function monteCarloQuery(options: MonteCarloOptions = {}): string {
   if (options.transition_durations !== undefined) {
     if (!Array.isArray(options.transition_durations) || options.transition_durations.length === 0 ||
         options.transition_durations.some((duration) => {
-          if (!duration || !Number.isFinite(duration.value_seconds) || duration.value_seconds < 0) return true;
+          if (!duration || !Number.isFinite(duration.value_seconds)) return true;
           const distribution = duration.distribution;
           if (!["deterministic", "exponential", "constant0", "immediate", "normal", "uniform", "lognormal", "gamma"]
             .includes(distribution)) return true;
@@ -4720,6 +4720,12 @@ export function monteCarloQuery(options: MonteCarloOptions = {}): string {
           if (secondary !== undefined && (!Number.isFinite(secondary) || secondary < 0)) return true;
           if (tertiary !== undefined && (!Number.isFinite(tertiary) || tertiary <= 0)) return true;
           if ((distribution === "normal" || distribution === "uniform") && secondary === undefined) return true;
+          if (duration.value_seconds < 0 && distribution !== "normal" && distribution !== "uniform") return true;
+          if (distribution === "normal" && duration.value_seconds < 0 && secondary === 0) return true;
+          if (distribution === "uniform") {
+            const upper = duration.value_seconds + (secondary ?? 0);
+            if (!Number.isFinite(upper) || (duration.value_seconds < 0 && upper <= 0)) return true;
+          }
           if ((distribution === "lognormal" || distribution === "gamma") &&
               (duration.value_seconds <= 0 || (tertiary !== undefined && tertiary <= 0))) return true;
           return false;

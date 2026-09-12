@@ -4153,10 +4153,22 @@ MonteCarloParams parse_monte_carlo_params(
       if (!values.empty()) duration.value_seconds = values[0];
       if (values.size() > 1) duration.secondary_seconds = values[1];
       if (values.size() > 2) duration.tertiary_seconds = values[2];
-      if (duration.value_seconds < 0.0 || duration.secondary_seconds < 0.0 ||
-          duration.tertiary_seconds < 0.0)
+      const bool signed_location = kind == MonteCarloDurationDistribution::kNormal ||
+                                   kind == MonteCarloDurationDistribution::kUniform;
+      if ((!signed_location && duration.value_seconds < 0.0) ||
+          duration.secondary_seconds < 0.0 || duration.tertiary_seconds < 0.0)
         throw std::invalid_argument(
-            "monte_carlo_transition_durations must be non-negative");
+            "monte_carlo_transition_durations: invalid negative parameter");
+      if (kind == MonteCarloDurationDistribution::kNormal &&
+          duration.value_seconds < 0.0 && duration.secondary_seconds == 0.0)
+        throw std::invalid_argument(
+            "monte_carlo_transition_durations: normal has no non-negative support");
+      if (kind == MonteCarloDurationDistribution::kUniform &&
+          (!std::isfinite(duration.value_seconds + duration.secondary_seconds) ||
+           (duration.value_seconds < 0.0 &&
+            duration.value_seconds + duration.secondary_seconds <= 0.0)))
+        throw std::invalid_argument(
+            "monte_carlo_transition_durations: uniform requires finite non-negative support");
       if ((kind == MonteCarloDurationDistribution::kLogNormal ||
            kind == MonteCarloDurationDistribution::kGamma) &&
           (duration.value_seconds <= 0.0 || duration.tertiary_seconds <= 0.0))

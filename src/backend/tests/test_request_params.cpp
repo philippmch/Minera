@@ -3979,6 +3979,12 @@ void parse_stochastic_playout_params_rejects_bad_values() {
 }
 
 void parse_monte_carlo_params_maps_controls() {
+  const auto signed_laws = minera::parse_monte_carlo_params(fields({
+      {"monte_carlo_transition_durations", "normal:-2;1,uniform:-2;3,normal:0;0,uniform:0;0"}}));
+  assert(signed_laws.transition_durations[0].value_seconds == -2.0);
+  assert(signed_laws.transition_durations[0].secondary_seconds == 1.0);
+  assert(signed_laws.transition_durations[1].value_seconds == -2.0);
+  assert(signed_laws.transition_durations[1].secondary_seconds == 3.0);
   const auto zero_capacity = minera::parse_monte_carlo_params(fields({
       {"monte_carlo_default_resources_per_place", "0"},
       {"monte_carlo_resources_per_place", "0=0,1=2"}}));
@@ -4041,6 +4047,11 @@ void parse_monte_carlo_params_rejects_bad_values() {
            std::pair{"monte_carlo_force_distribution", "deterministic"},
            std::pair{"monte_carlo_transition_weights", "1,"},
            std::pair{"monte_carlo_transition_durations", "normal:1"},
+           std::pair{"monte_carlo_transition_durations", "normal:-2;0"},
+           std::pair{"monte_carlo_transition_durations", "normal:-2;-1"},
+           std::pair{"monte_carlo_transition_durations", "uniform:-2;2"},
+           std::pair{"monte_carlo_transition_durations", "uniform:-2;0"},
+           std::pair{"monte_carlo_transition_durations", "uniform:1e308;1e308"},
            std::pair{"monte_carlo_transition_durations", "lognormal:1;0;0"},
            std::pair{"monte_carlo_transition_durations", "unknown:1"},
            std::pair{"monte_carlo_resources_per_place", "1=-1"},

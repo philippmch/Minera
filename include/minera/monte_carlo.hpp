@@ -52,8 +52,10 @@ struct MonteCarloDuration {
   // for a normal value, lower bound for a uniform value, or shape for a
   // lognormal/gamma value. Constant-zero and immediate durations ignore it.
   double value_seconds = 1.0;
-  // Normal: standard deviation (must be non-negative).
-  // Uniform: interval width/scale (must be non-negative).
+  // Normal: standard deviation (must be non-negative); signed means are
+  // allowed with positive deviation. Samples condition on nonnegative values.
+  // Uniform: interval width/scale (must be non-negative). A negative lower
+  // bound requires a positive upper bound; samples condition on [0, upper].
   // Lognormal/gamma: location (must be non-negative).
   double secondary_seconds = 0.0;
   // Lognormal/gamma: positive scale. Unused by the other distributions.

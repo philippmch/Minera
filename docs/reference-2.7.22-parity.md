@@ -2291,9 +2291,11 @@ retain their meaning. The existing double timestamp API remains available.
 Signed normal means and ordered signed uniform bounds are valid map metadata.
 When their mean cannot form a CTMC, CLI/HTTP output retains the fitted map and
 returns an exhausted, empty reachability result with a CTMC diagnostic. Monte
-Carlo rejects unsupported negative service-time domains when used, while a
-complete explicit duration vector overrides unused map durations. Metadata and
-explicit vector validation still apply.
+Carlo conditions normal and uniform service laws on nonnegative values,
+including signed normal means with positive deviations and uniform ranges that
+cross zero. Laws without nonnegative support remain rejected by the native
+bounded-execution guard. A complete explicit duration vector overrides unused
+map durations; metadata and explicit vector validation still apply.
 
 `fit_monte_carlo_options` now reuses the shared map fitter for causal performance
 samples, activation/enabling weights, distribution selection, and complete replay
@@ -2454,6 +2456,56 @@ establish failure behavior on both routes without claiming equivalent exception
 classes or messages. The 825 transport checks close these observed topology and
 resource-timing gaps; Monte Carlo and the 234 incomplete catalogue units remain
 open for their broader contracts.
+
+## Monte Carlo conditional normal and uniform service laws
+
+`scripts/capture-monte-carlo-duration-reference.py` and
+`docs/monte-carlo-duration-reference-fixtures.json` retain 14 laws with 2,048 raw
+public random-variable draws and 2,048 public simulation timestamps each: 57,344
+sample observations. Raw `get_value()` calls can return negative values;
+simulation samples follow the same underlying distribution conditioned on
+nonnegative service times. The matrix includes signed/zero/positive normal means,
+uniform intervals crossing zero, positive intervals, and zero-width fixed laws.
+Simulations use arrivals 100 seconds apart and verify that every observed service
+time is below that spacing, preventing resource waits from changing the samples.
+Captures pin both Python/NumPy seeds and the UTC local-time environment.
+
+Native direct durations, request parsing, frontend serialization, and supplied
+stochastic maps now accept these signed conditional domains. A negative normal
+mean requires positive deviation. A negative uniform lower bound requires a
+positive upper bound, and uniform widths and upper bounds must remain finite.
+Normal sampling uses an independently implemented exponential proposal from
+[Robert's truncated-normal method](https://arxiv.org/pdf/0907.4010), with stable
+reciprocal and product arithmetic for extreme tails and a bounded rejection loop.
+Signed uniforms sample directly from their nonnegative interval. Uniform maps
+preserve their original positive upper endpoint before conversion, avoiding
+cancellation when the negative lower endpoint is much larger in magnitude.
+Explicit duration overrides continue to bypass unused map-duration conversion.
+
+`scripts/check-monte-carlo-duration-reference.py` checks raw draws against their
+untruncated CDF and simulation samples against the conditional CDF. Its thresholds
+were selected before native execution: one-sample Kolmogorov-Smirnov distance at
+most 0.065 and public/native two-sample distance at most 0.09 for 2,048 samples.
+Fixed laws require exact timestamps. Identical native seeds must produce equal
+durations across CLI/HTTP and direct/map modes. This evidence compares sampled
+laws, not identical random streams across C++ and NumPy.
+
+All 98 duration checks pass: 28 public distribution checks, 56 native transport
+and parameter-mode checks, and 14 native seed-equivalence checks. The isolated
+checkpoint also passes all 825 existing scheduler/marking/topology/PNML transport
+comparisons, four native suites, 197 frontend tests, TypeScript, and the catalogue
+audit. Independent review's uniform-bound cancellation finding is fixed and
+covered by regression tests; no actionable findings remain. The relevant runtime
+module bytes match the pinned Git objects after newline normalization, without
+inspecting implementation text.
+
+Entirely negative fixed or uniform laws can fail to terminate in the public
+runtime; their native rejection is a bounded-execution policy, not an assertion
+of identical reference exceptions. Extreme samples still obey finite-duration
+and timestamp-range guards, and values below representable precision can round
+to zero. Wider shifted/degenerate distribution contracts, randomized branching,
+and the previously named Monte Carlo gaps remain open. The catalogue remains at
+234 incomplete coverage units.
 
 ## Token-replay parity evidence
 

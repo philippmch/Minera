@@ -1646,6 +1646,27 @@ describe("trie-to-Petri conversion API", () => {
 });
 
 describe("Monte Carlo API", () => {
+  it("accepts signed service laws with nonnegative support", () => {
+    const query = new URLSearchParams(monteCarloQuery({ transition_durations: [
+      { distribution: "normal", value_seconds: -2, secondary_seconds: 1 },
+      { distribution: "uniform", value_seconds: -2, secondary_seconds: 3 },
+      { distribution: "normal", value_seconds: 0, secondary_seconds: 0 },
+      { distribution: "uniform", value_seconds: 0, secondary_seconds: 0 },
+    ] }));
+    expect(query.get("monte_carlo_transition_durations"))
+      .toBe("normal:-2;1,uniform:-2;3,normal:0;0,uniform:0;0");
+    for (const distribution of ["normal", "uniform"] as const) {
+      expect(() => monteCarloQuery({ transition_durations: [
+        { distribution, value_seconds: -2, secondary_seconds: 0 },
+      ] })).toThrow(/valid distribution parameters/);
+    }
+    for (const [lower, width] of [[-2, 2], [-2, -1], [1e308, 1e308]]) {
+      expect(() => monteCarloQuery({ transition_durations: [
+        { distribution: "uniform", value_seconds: lower, secondary_seconds: width },
+      ] })).toThrow(/valid distribution parameters/);
+    }
+  });
+
   it("serializes bounded virtual-time controls", () => {
     expect(monteCarloQuery({
       simulations: 4,
