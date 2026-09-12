@@ -4718,7 +4718,9 @@ export function monteCarloQuery(options: MonteCarloOptions = {}): string {
           const secondary = duration.secondary_seconds;
           const tertiary = duration.tertiary_seconds;
           const shapeFamily = distribution === "lognormal" || distribution === "gamma";
-          if (secondary !== undefined && (!Number.isFinite(secondary) || (!shapeFamily && secondary < 0))) return true;
+          const exponential = distribution === "exponential";
+          if (secondary !== undefined && (!Number.isFinite(secondary) || (!shapeFamily && !exponential && secondary < 0))) return true;
+          if (exponential && duration.value_seconds === 0 && (secondary ?? 0) < 0) return true;
           if (tertiary !== undefined && (!Number.isFinite(tertiary) || tertiary < 0 || (!shapeFamily && tertiary === 0))) return true;
           if ((distribution === "normal" || distribution === "uniform") && secondary === undefined) return true;
           if (duration.value_seconds < 0 && distribution !== "normal" && distribution !== "uniform") return true;
@@ -4737,6 +4739,9 @@ export function monteCarloQuery(options: MonteCarloOptions = {}): string {
       .map((duration) => {
         const distribution = duration.distribution;
         if (distribution === "constant0" || distribution === "immediate") return `${distribution}:0`;
+        if (distribution === "exponential" && duration.secondary_seconds !== undefined) {
+          return `${distribution}:${duration.value_seconds};${duration.secondary_seconds}`;
+        }
         if (distribution === "normal" || distribution === "uniform") {
           return `${distribution}:${duration.value_seconds};${duration.secondary_seconds}`;
         }

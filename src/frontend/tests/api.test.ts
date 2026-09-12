@@ -1709,6 +1709,23 @@ describe("Monte Carlo API", () => {
     })).toBe("monte_carlo_simulations=4&monte_carlo_max_steps=8&monte_carlo_seed=7&monte_carlo_case_arrival_seconds=2.5&monte_carlo_default_duration_seconds=3&monte_carlo_force_distribution=exponential&monte_carlo_transition_weights=0.25%2C1&monte_carlo_transition_durations=deterministic%3A1%2Cexponential%3A2%2Cnormal%3A3%3B1%2Clognormal%3A0.5%3B0%3B1&monte_carlo_resources_per_place=0%3D2%2C3%3D4&monte_carlo_enable_diagnostics=false");
   });
 
+  it("serializes exponential locations and preserves the single-scale form", () => {
+    const query = new URLSearchParams(monteCarloQuery({ transition_durations: [
+      { distribution: "exponential", value_seconds: 2 },
+      { distribution: "exponential", value_seconds: 2, secondary_seconds: -3 },
+      { distribution: "exponential", value_seconds: 1, secondary_seconds: 2 },
+      { distribution: "exponential", value_seconds: 0, secondary_seconds: 3 },
+      { distribution: "exponential", value_seconds: 0, secondary_seconds: 0 },
+    ] }));
+    expect(query.get("monte_carlo_transition_durations"))
+      .toBe("exponential:2,exponential:2;-3,exponential:1;2,exponential:0;3,exponential:0;0");
+    for (const [scale, location] of [[-1, 0], [0, -1], [1, Infinity], [1, NaN]]) {
+      expect(() => monteCarloQuery({ transition_durations: [
+        { distribution: "exponential", value_seconds: scale, secondary_seconds: location },
+      ] })).toThrow(/valid distribution parameters/);
+    }
+  });
+
   it("serializes selectors, markings, sparse maps, and compatibility controls", () => {
     const query = new URLSearchParams(monteCarloQuery({
       case_arrival_ratio: 15,

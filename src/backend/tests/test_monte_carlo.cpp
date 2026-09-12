@@ -1448,6 +1448,51 @@ void shifted_service_extremes_and_zero_scales_are_bounded() {
   for (double value : overridden.diagnostics.case_execution_seconds) assert(value == 3);
 }
 
+void shifted_exponential_service_laws_preserve_conditional_sampling() {
+  const auto net = linear_net();
+  minera::MonteCarloOptions options;
+  options.start = 0; options.simulations = 1000; options.max_steps = 1;
+  options.case_arrival_ratio = 0; options.resources_per_place[net.sink()] = 1000;
+  options.transition_durations = {{minera::MonteCarloDurationDistribution::kExponential,2}};
+  const auto baseline = minera::monte_carlo(net, options);
+  for (double location : {-2.0,-1000.0,-std::numeric_limits<double>::max(),0.0,3.0}) {
+    options.transition_durations.front().secondary_seconds = location;
+    const auto result = minera::monte_carlo(net, options);
+    std::size_t below = 0;
+    for (double value : result.diagnostics.case_execution_seconds) {
+      assert(std::isfinite(value) && value >= std::max(0.0, location));
+      below += value <= std::max(0.0, location) + 2;
+    }
+    assert(std::abs(static_cast<double>(below) / options.simulations -
+                    (1-std::exp(-1.0))) < 0.065);
+    if (location <= 0.0) {
+      assert(result.diagnostics.case_execution_seconds == baseline.diagnostics.case_execution_seconds);
+      assert_same_logs(result.log, baseline.log);
+    }
+  }
+  for (double location : {0.0,3.0}) {
+    options.transition_durations = {{minera::MonteCarloDurationDistribution::kExponential,0,location}};
+    for (double value : minera::monte_carlo(net, options).diagnostics.case_execution_seconds)
+      assert(value == location);
+  }
+  for (double scale : {1e-308,std::numeric_limits<double>::denorm_min()}) {
+    options.transition_durations = {{minera::MonteCarloDurationDistribution::kExponential,scale,-1}};
+    const auto result = minera::monte_carlo(net, options);
+    std::size_t positive = 0;
+    for (double value : result.diagnostics.case_execution_seconds) {
+      assert(std::isfinite(value) && value >= 0);
+      positive += value > 0;
+    }
+    assert(positive > 0);
+  }
+  for (const auto invalid : {
+      minera::MonteCarloDuration{minera::MonteCarloDurationDistribution::kExponential,-1,0},
+      minera::MonteCarloDuration{minera::MonteCarloDurationDistribution::kExponential,0,-1}}) {
+    options.transition_durations = {invalid};
+    assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
+  }
+}
+
 void json_contract_is_stable() {
   const auto result = minera::monte_carlo(linear_net(), minera::MonteCarloOptions{});
   const auto json = minera::monte_carlo_json(result);
@@ -1505,5 +1550,6 @@ int main() {
   signed_uniform_map_preserves_original_upper_endpoint();
   shifted_positive_service_laws_match_conditional_cdfs();
   shifted_service_extremes_and_zero_scales_are_bounded();
+  shifted_exponential_service_laws_preserve_conditional_sampling();
   json_contract_is_stable();
 }
