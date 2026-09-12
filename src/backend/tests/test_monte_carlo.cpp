@@ -798,6 +798,110 @@ void compatibility_controls_validate_without_runtime_effects() {
   assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
 }
 
+void fitted_weights_preserve_supplied_replay_context() {
+  auto net = duplicate_activity_net();
+  // Both A transitions are disabled at the workflow source; original IDs
+  // determine which duplicate receives the activation after hidden routing.
+  minera::EventLog input;
+  minera::Trace trace;
+  trace.case_id = "marked";
+  trace.events = {{"marked", "A", "2026-01-01T00:00:00Z"}};
+  input.traces.push_back(trace);
+  const auto check = [&](const minera::MonteCarloOptions& options) {
+    minera::TokenReplayOptions replay;
+    replay.variant = options.token_replay_variant;
+    replay.activity_attribute = options.activity_key;
+    replay.initial_marking.assign(options.initial_marking.begin(), options.initial_marking.end());
+    replay.final_marking.assign(options.final_marking.begin(), options.final_marking.end());
+    replay.place_names = options.place_names;
+    replay.transition_names = options.transition_names;
+    replay.initial_marking_keys = options.initial_marking_keys;
+    replay.final_marking_keys = options.final_marking_keys;
+    const auto diagnostics = minera::replay_token_diagnostics(input, net, replay);
+    std::vector<double> expected(net.transitions().size(), 0.0);
+    bool observed = false;
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+      if (!net.transitions()[i].activity) expected[i] = 1.0;
+      else {
+        expected[i] = static_cast<double>(diagnostics.transition_activations[i]);
+        observed = observed || expected[i] != 0.0;
+      }
+    }
+    if (!observed) expected.clear();
+    const auto fitted = minera::fit_monte_carlo_options(input, net, options);
+    assert(fitted.transition_weights == expected);
+    return fitted.transition_weights;
+  };
+  minera::MonteCarloOptions options;
+  options.place_names = {"source-id", "gate-id", "sink-id"};
+  options.transition_names = {"route", "z-original", "a-original"};
+  options.initial_marking = {1, 0, 0};
+  options.final_marking = {0, 0, 1};
+  options.initial_marking_keys = {true, false, false};
+  options.final_marking_keys = {false, false, true};
+  assert((check(options) == std::vector<double>{1.0, 1.0, 0.0}));
+  options.transition_names.clear();
+  assert((check(options) == std::vector<double>{1.0, 0.0, 1.0}));
+  // A supplied gate marking makes both duplicates immediately enabled.
+  options.initial_marking = {0, 2, 0};
+  options.initial_marking_keys = {false, true, true};
+  options.final_marking = {0, 0, 0};
+  check(options);
+  options.token_replay_variant = minera::TokenReplayVariant::kBackwards;
+  check(options);
+
+  // Distinct enabled branches make the numeric marking's effect observable.
+  net = minera::PetriNet{};
+  net.add_place(); net.add_place(); net.add_place();
+  net.set_source(0); net.set_sink(2); net.set_activities({"A"});
+  net.add_transition(0, {0}, {2});
+  net.add_transition(0, {1}, {2});
+  options = {};
+  assert((check(options) == std::vector<double>{1.0, 0.0}));
+  options.initial_marking = {0, 1, 0};
+  options.final_marking = {0, 0, 2};
+  assert((check(options) == std::vector<double>{0.0, 1.0}));
+}
+
+void replay_context_validation_is_limited_to_weight_fitting() {
+  const auto net = linear_net();
+  minera::EventLog input;
+  minera::Trace trace;
+  trace.case_id = "validation";
+  trace.events = {{"validation", "A", "2026-01-01T00:00:00Z"}};
+  input.traces.push_back(trace);
+  const auto reject_only_fitting = [&](minera::MonteCarloOptions options) {
+    assert(throws_invalid([&] { (void)minera::fit_monte_carlo_options(input, net, options); }));
+    // Explicit durations alone still require activation-weight replay.
+    options.transition_durations = {{minera::MonteCarloDurationDistribution::kDeterministic, 7.0}};
+    assert(throws_invalid([&] { (void)minera::fit_monte_carlo_options(input, net, options); }));
+    options.transition_weights = {3.0};
+    const auto fitted = minera::fit_monte_carlo_options(input, net, options);
+    assert(fitted.transition_weights == options.transition_weights);
+    assert(fitted.transition_durations.front().value_seconds == 7.0);
+    options.transition_weights.clear();
+    options.stochastic_map = minera::StochasticMap{};
+    assert(minera::fit_monte_carlo_options(input, net, options).stochastic_map.has_value());
+    options.stochastic_map.reset();
+    (void)minera::fit_monte_carlo_options({}, net, options);
+  };
+  minera::MonteCarloOptions options;
+  options.initial_marking = {1}; reject_only_fitting(options);
+  options = {}; options.final_marking = {1}; reject_only_fitting(options);
+  options = {}; options.place_names = {"one"}; reject_only_fitting(options);
+  options = {}; options.transition_names = {"one", "two"}; reject_only_fitting(options);
+  options = {}; options.initial_marking_keys = {false, false}; reject_only_fitting(options);
+  options = {}; options.final_marking_keys = {false}; reject_only_fitting(options);
+  options = {}; options.initial_marking = {std::numeric_limits<std::uint32_t>::max(), 0};
+  reject_only_fitting(options);
+  options = {}; options.final_marking = {0, std::numeric_limits<std::uint32_t>::max()};
+  reject_only_fitting(options);
+  // The simulator retains its wider unsigned final-marking range when replay
+  // is unnecessary (initial-token allocation has its own independent budget).
+  options.simulations = 0;
+  (void)minera::monte_carlo(net, options);
+}
+
 void invalid_options_are_rejected() {
   const auto net = linear_net();
   bool rejected = false;
@@ -937,6 +1041,8 @@ int main() {
   stochastic_map_distribution_parameters_are_converted();
   arrival_inference_and_custom_selectors_round_trip();
   replay_selector_changes_fitted_activation_counts();
+  fitted_weights_preserve_supplied_replay_context();
+  replay_context_validation_is_limited_to_weight_fitting();
   compatibility_controls_validate_without_runtime_effects();
   invalid_options_are_rejected();
   diagnostics_can_be_disabled();

@@ -240,6 +240,59 @@ def main():
                                 f'--compare-petri-{which}-marking', vector), which
                             assert metadata(get('/api/pnml?miner=imported', decode=False)) == expected, which
                             checks.append(dict(name=which + '_override', matched=True, cache_preserved=True))
+                # With disabled duplicate A transitions, original IDs choose
+                # the left branch while synthetic tN IDs choose the right.
+                # Automatic Monte Carlo fitting must retain the PNML identity.
+                named = pnml(['source', 'gate', 'left', 'right', 'sink'],
+                    [('route', None), ('z_original', 'A'), ('a_original', 'A'),
+                     ('b', 'B'), ('c', 'C')],
+                    [('source', 'route', 1), ('route', 'gate', 1),
+                     ('gate', 'z_original', 1), ('z_original', 'left', 1),
+                     ('gate', 'a_original', 1), ('a_original', 'right', 1),
+                     ('left', 'b', 1), ('b', 'sink', 1),
+                     ('right', 'c', 1), ('c', 'sink', 1)],
+                    {'source': 1, 'sink': 0}, {'source': 0, 'sink': 1})
+                source.write_text(named, encoding='utf-8')
+                get('/api/check-model', named.encode(), {'Content-Type': 'application/xml'})
+                params = {'miner': 'imported', 'monte_carlo_simulations': '3',
+                          'monte_carlo_seed': '7', 'monte_carlo_case_arrival_ratio': '3'}
+                mc_cli = [log, '--check-pnml', source, '--monte-carlo-json',
+                          '--playout-miner', 'imported', '--monte-carlo-simulations', '3',
+                          '--monte-carlo-seed', '7', '--monte-carlo-case-arrival-ratio', '3']
+                fitted = get('/api/monte-carlo?' + urllib.parse.urlencode(params), b'')
+                assert run(*mc_cli) == fitted
+                forced = dict(params, monte_carlo_transition_weights='1,1,0,1,0')
+                assert get('/api/monte-carlo?' + urllib.parse.urlencode(forced), b'') == fitted
+                assert run(*mc_cli, '--monte-carlo-transition-weights', '1,1,0,1,0') == fitted
+                alternate = dict(params, monte_carlo_transition_weights='1,0,1,1,0')
+                assert get('/api/monte-carlo?' + urllib.parse.urlencode(alternate), b'') != fitted
+                generated = get('/api/playout?' + urllib.parse.urlencode(dict(params, mode='monte_carlo')),
+                                b'', decode=False)
+                tree = ET.fromstring(generated)
+                for node in tree.iter():
+                    node.tag = node.tag.rsplit('}', 1)[-1]
+                words = [[next(node.attrib['value'] for node in event
+                               if node.attrib.get('key') == 'concept:name')
+                          for event in trace.findall('event')] for trace in tree.findall('trace')]
+                assert words == [['A', 'B']] * 3, words
+                mc_playout = directory / 'monte-carlo.xes'
+                run(*[arg for arg in mc_cli if arg != '--monte-carlo-json'], '--playout', mc_playout)
+                cli_tree = ET.fromstring(mc_playout.read_text(encoding='utf-8'))
+                for node in cli_tree.iter():
+                    node.tag = node.tag.rsplit('}', 1)[-1]
+                cli_words = [[next(node.attrib['value'] for node in event
+                                   if node.attrib.get('key') == 'concept:name')
+                              for event in trace.findall('event')] for trace in cli_tree.findall('trace')]
+                assert cli_words == words
+                checks.append(dict(name='monte_carlo_named_fit', cli=True, server=True,
+                                   explicit_weights_match=True, alternate_weights_differ=True, playout=True))
+                # New positive keys must replace inherited zero-only membership
+                # on just the explicitly overridden side.
+                for which, vector in [('initial', '1,1,0,0,0'), ('final', '0,0,1,0,1')]:
+                    overridden = get('/api/monte-carlo?' + urllib.parse.urlencode(
+                        dict(params, **{'monte_carlo_' + which + '_marking': vector})), b'')
+                    assert run(*mc_cli, '--monte-carlo-' + which + '-marking', vector) == overridden, which
+                    checks.append(dict(name='monte_carlo_' + which + '_override', cli_server_match=True))
                 # Replacing PNML must discard its document sidecar. Each replacement
                 # follows a fresh explicit-zero document to expose stale markings.
                 zero = next(case for case in fixtures() if case['name'] == 'explicit_zero')
