@@ -101,6 +101,25 @@ inline PnmlImportOptions pnml_model_import_options() {
   return base;
 }
 
+// Fitting and CTMC analysis share a caller-supplied initial marking. Imported
+// IDs and the independently supplied final marking still guide token replay.
+[[nodiscard]] inline TokenReplayOptions stochastic_map_replay_options(
+    TokenReplayOptions base, const std::vector<std::uint32_t>& initial_marking,
+    const PnmlDocument* document = nullptr) {
+  if (document) base = pnml_replay_options(*document, std::move(base));
+  if (!initial_marking.empty()) {
+    base.initial_marking.clear();
+    base.initial_marking.reserve(initial_marking.size());
+    for (const auto tokens : initial_marking) {
+      if (tokens > static_cast<std::uint32_t>(std::numeric_limits<int>::max()))
+        throw std::invalid_argument("stochastic map initial marking exceeds replay token range");
+      base.initial_marking.push_back(static_cast<int>(tokens));
+    }
+    base.initial_marking_keys.clear();
+  }
+  return base;
+}
+
 [[nodiscard]] inline PetriUsageComparisonOptions pnml_comparison_options(
     const PnmlDocument& document, PetriUsageComparisonOptions base = {}) {
   base.initial_marking = pnml_marking<std::uint32_t>(document.initial_marking);

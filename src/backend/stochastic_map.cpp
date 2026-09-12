@@ -19,7 +19,6 @@
 namespace minera {
 namespace {
 
-constexpr std::size_t kReplayStateLimit = 200000;
 constexpr double kEpsilon = 1e-12;
 
 double positive_duration(double mean) {
@@ -79,104 +78,6 @@ void validate_performance_options(const StochasticMapPerformanceOptions& options
       options.default_parameter <= 0.0)
     throw std::invalid_argument(
         "stochastic map: gamma default_parameter must be positive");
-}
-
-bool transition_matches(const PetriNet& net, const PetriTransition& transition,
-                        std::string_view activity) {
-  return transition.activity &&
-         *transition.activity < net.activities().size() &&
-         net.activities()[*transition.activity] == activity;
-}
-
-bool fire_checked(const PetriTransition& transition,
-                  std::vector<std::uint32_t>& marking) {
-  if (!petri_transition_enabled(transition, marking)) return false;
-  for (const auto place : transition.inputs) {
-    if (place >= marking.size() || marking[place] == 0) return false;
-    --marking[place];
-  }
-  for (const auto place : transition.reset_inputs) {
-    if (place >= marking.size()) return false;
-    marking[place] = 0;
-  }
-  for (const auto place : transition.outputs) {
-    if (place >= marking.size() ||
-        marking[place] == std::numeric_limits<std::uint32_t>::max())
-      return false;
-    ++marking[place];
-  }
-  return true;
-}
-
-std::vector<std::uint32_t> default_marking(const PetriNet& net) {
-  if (net.place_count() == 0 || net.source() >= net.place_count() ||
-      net.sink() >= net.place_count())
-    throw std::invalid_argument(
-        "stochastic map: net has no valid source or sink place");
-  std::vector<std::uint32_t> marking(net.place_count(), 0);
-  marking[net.source()] = 1;
-  return marking;
-}
-
-struct ReplayState {
-  std::vector<std::uint32_t> marking;
-  std::size_t event = 0;
-  std::vector<std::size_t> path;
-};
-
-struct ReplayKey {
-  std::vector<std::uint32_t> marking;
-  std::size_t event = 0;
-
-  friend bool operator<(const ReplayKey& left, const ReplayKey& right) {
-    if (left.event != right.event) return left.event < right.event;
-    return left.marking < right.marking;
-  }
-};
-
-std::optional<std::vector<std::size_t>> replay_trace(
-    const Trace& trace, const PetriNet& net) {
-  ReplayState initial{default_marking(net), 0, {}};
-  std::deque<ReplayState> queue;
-  queue.push_back(std::move(initial));
-  std::map<ReplayKey, bool> visited;
-  visited.emplace(ReplayKey{queue.front().marking, 0}, true);
-  std::size_t explored = 0;
-
-  while (!queue.empty()) {
-    ReplayState current = std::move(queue.front());
-    queue.pop_front();
-    if (++explored > kReplayStateLimit) return std::nullopt;
-    if (current.event == trace.events.size()) {
-      bool final_marking = net.sink() < current.marking.size() &&
-                           current.marking[net.sink()] == 1;
-      for (std::size_t place = 0; place < current.marking.size(); ++place)
-        if (place != net.sink() && current.marking[place] != 0)
-          final_marking = false;
-      if (final_marking) return current.path;
-    }
-
-    const Event* event = current.event < trace.events.size()
-                             ? &trace.events[current.event]
-                             : nullptr;
-    for (std::size_t index = 0; index < net.transitions().size(); ++index) {
-      const auto& transition = net.transitions()[index];
-      const bool silent = !transition.activity;
-      if (!silent && (!event ||
-                      !transition_matches(net, transition, event->activity)))
-        continue;
-      auto next_marking = current.marking;
-      if (!fire_checked(transition, next_marking)) continue;
-      const auto next_event = silent ? current.event : current.event + 1;
-      ReplayKey key{next_marking, next_event};
-      if (!visited.emplace(std::move(key), true).second) continue;
-      auto next_path = current.path;
-      next_path.push_back(index);
-      queue.push_back(
-          ReplayState{std::move(next_marking), next_event, std::move(next_path)});
-    }
-  }
-  return std::nullopt;
 }
 
 double mean_equivalent(const StochasticMapTransition& transition) {
@@ -421,14 +322,13 @@ const char* stochastic_map_distribution_name(
   return distribution_name(distribution);
 }
 
-void validate_stochastic_map(const StochasticMap& map,
+void validate_sparse_stochastic_map(const StochasticMap& map,
                              std::size_t expected_transition_count) {
-  if (map.transitions.size() != expected_transition_count)
-    throw std::invalid_argument(
-        "stochastic map: transition record count does not match the net");
   for (std::size_t index = 0; index < map.transitions.size(); ++index) {
     const auto& transition = map.transitions[index];
-    if (transition.transition != index)
+    if (transition.transition >= expected_transition_count ||
+        (index > 0 && transition.transition <=
+                          map.transitions[index - 1].transition))
       throw std::invalid_argument(
           "stochastic map: transition records must be index ordered");
     validate_finite_nonnegative(transition.activation_weight,
@@ -486,58 +386,161 @@ void validate_stochastic_map(const StochasticMap& map,
   }
 }
 
+void validate_stochastic_map(const StochasticMap& map,
+                             std::size_t expected_transition_count) {
+  validate_sparse_stochastic_map(map, expected_transition_count);
+  if (map.transitions.size() != expected_transition_count)
+    throw std::invalid_argument(
+        "stochastic map: transition record count does not match the net");
+}
+
 StochasticMapFitResult fit_stochastic_map_with_report(
     const EventLog& log, const PetriNet& net,
     const StochasticMapFitOptions& options) {
   validate_options(options);
-  if (net.transitions().empty())
-    throw std::invalid_argument("stochastic map: net has no transitions");
+  // Replay owns routing, duplicate-label selection and context validation. Unfit
+  // traces still supply the activated path used by the public statistics.
+  const auto rows = replay_token_traces(log, net, options.replay);
   StochasticMapFitResult result;
-  result.map.transitions.reserve(net.transitions().size());
-  for (std::size_t index = 0; index < net.transitions().size(); ++index)
-    result.map.transitions.push_back(default_transition(net, index, options));
-
-  std::vector<std::size_t> activations(net.transitions().size(), 0);
-  std::vector<std::vector<double>> samples(net.transitions().size());
-  for (const auto& trace : log.traces) {
-    const auto path = replay_trace(trace, net);
-    if (!path) {
-      ++result.skipped_traces;
-      continue;
+  std::vector<StochasticMapTransitionStatistics> statistics(net.transitions().size());
+  for (std::size_t index = 0; index < statistics.size(); ++index)
+    statistics[index].transition = index;
+  auto selected_attribute = [](const Event& event, std::string_view key)
+      -> const EventAttribute* {
+    const EventAttribute* selected = nullptr;
+    int priority = 0;
+    for (const auto& attribute : event.attributes) {
+      const int candidate = attribute.key == key ? 3 :
+          (!attribute.first_class_source_key.empty() &&
+           attribute.first_class_source_key == key ? 2 : 0);
+      if (candidate > priority) { selected = &attribute; priority = candidate; }
     }
+    return selected;
+  };
+  auto selected_time = [&](const Event& event) -> std::optional<double> {
+    const auto key = options.replay.timestamp_attribute.empty()
+        ? std::string_view("time:timestamp")
+        : std::string_view(options.replay.timestamp_attribute);
+    if (const auto* value = selected_attribute(event, key)) {
+      if (value->is_null || value->first_class_state == FirstClassAttributeState::kNull)
+        return std::nullopt;
+      return parse_timestamp(value->value);
+    }
+    if (key == "time:timestamp" || key == "timestamp" ||
+        key == event.timestamp_source_key) {
+      if (event.timestamp_state == FirstClassAttributeState::kNull) return std::nullopt;
+      return parse_timestamp(event.timestamp);
+    }
+    return std::nullopt;
+  };
+  auto selected_activity = [&](const Event& event) -> std::optional<std::string> {
+    const auto key = options.replay.activity_attribute.empty()
+        ? std::string_view("concept:name")
+        : std::string_view(options.replay.activity_attribute);
+    if (const auto* attribute = selected_attribute(event, key)) {
+      if (attribute->is_null || attribute->first_class_state == FirstClassAttributeState::kNull)
+        return std::nullopt;
+      return attribute->value;
+    }
+    if (event.activity_state == FirstClassAttributeState::kNull) return std::nullopt;
+    if (key == "concept:name" || key == "activity" ||
+        key == event.activity_source_key) return event.activity;
+    return std::nullopt;
+  };
+  for (std::size_t trace_index = 0; trace_index < rows.size(); ++trace_index) {
     ++result.replayed_traces;
+    const auto& trace = log.traces[trace_index];
+    std::vector<std::uint64_t> marking(net.place_count(), 0);
+    if (options.replay.initial_marking.empty()) {
+      if (net.source() < marking.size()) marking[net.source()] = 1;
+    } else {
+      std::copy(options.replay.initial_marking.begin(),
+                options.replay.initial_marking.end(), marking.begin());
+    }
+    std::vector<std::deque<std::optional<double>>> arrivals(net.place_count());
+    auto initial_arrivals = marking;
+    const auto first_time = trace.events.empty() ? std::nullopt
+                                                 : selected_time(trace.events.front());
     std::size_t event_index = 0;
-    std::optional<double> previous_time;
-    for (const auto transition_index : *path) {
-      if (transition_index >= activations.size()) continue;
-      ++activations[transition_index];
+    for (const auto transition_index : rows[trace_index].activated_transitions) {
+      for (std::size_t index = 0; index < statistics.size(); ++index)
+        if (index == transition_index ||
+            petri_transition_enabled(net.transitions()[index], marking))
+          ++statistics[index].enablings;
+      auto& stats = statistics[transition_index];
+      ++stats.activations;
       const auto& transition = net.transitions()[transition_index];
-      if (!transition.activity || event_index >= trace.events.size()) continue;
-      const auto& event = trace.events[event_index++];
-      const auto instant = parse_timestamp(event.timestamp);
-      if (instant && previous_time && *instant >= *previous_time)
-        samples[transition_index].push_back(*instant - *previous_time);
-      if (instant) previous_time = *instant;
+      std::optional<double> arrival;
+      std::vector<bool> consumed(net.place_count(), false);
+      for (const auto place : transition.inputs) {
+        if (!consumed[place]) {
+          std::optional<double> consumed_time;
+          if (initial_arrivals[place] > 0) {
+            --initial_arrivals[place];
+            consumed_time = first_time;
+          } else if (!arrivals[place].empty()) {
+            consumed_time = arrivals[place].front();
+            arrivals[place].pop_front();
+          }
+          if (consumed_time && (!arrival || *consumed_time > *arrival))
+            arrival = consumed_time;
+        }
+        consumed[place] = true;
+        if (marking[place] > 0) --marking[place];
+      }
+      for (const auto place : transition.reset_inputs) {
+        marking[place] = 0;
+        arrivals[place].clear();
+        initial_arrivals[place] = 0;
+      }
+      std::optional<double> time;
+      if (transition.activity && event_index < trace.events.size()) {
+        const auto& event = trace.events[event_index];
+        time = selected_time(event);
+        if (time && arrival) {
+          stats.performance.push_back(*time - *arrival);
+          stats.log_indices.push_back(trace_index);
+        }
+        const auto activity = selected_activity(event);
+        if (activity && *activity == net.activities()[*transition.activity])
+          ++event_index;
+      }
+      std::vector<bool> produced(net.place_count(), false);
+      for (const auto place : transition.outputs) {
+        if (marking[place] == std::numeric_limits<std::uint64_t>::max())
+          throw std::overflow_error("stochastic map: marking overflow");
+        ++marking[place];
+        if (!produced[place]) arrivals[place].push_back(time);
+        produced[place] = true;
+      }
     }
   }
-
-  if (options.fit_activation_weights) {
-    const auto maximum = activations.empty()
-                             ? 0U
-                             : *std::max_element(activations.begin(),
-                                                 activations.end());
-    for (std::size_t index = 0; index < activations.size(); ++index)
-      result.map.transitions[index].activation_weight =
-          maximum == 0 ? 1.0
-                       : static_cast<double>(activations[index]) /
-                             static_cast<double>(maximum);
+  for (const auto& stats : statistics) {
+    if (stats.enablings == 0 && stats.activations == 0) continue;
+    auto record = default_transition(net, stats.transition, options);
+    if (options.fit_activation_weights)
+      record.activation_weight = static_cast<double>(stats.activations) /
+                                 static_cast<double>(stats.enablings);
+    if (options.fit_timing &&
+        (net.transitions()[stats.transition].activity ||
+         options.silent_transitions_immediate)) {
+      const double mean = stats.performance.empty() ? 0.0 :
+          std::accumulate(stats.performance.begin(), stats.performance.end(), 0.0) /
+              static_cast<double>(stats.performance.size());
+      if (options.distribution == StochasticMapDistribution::kExponential &&
+          options.zero_duration_immediate && mean <= 0.0) {
+        set_zero_duration(record);
+        record.distribution = StochasticMapDistribution::kImmediate;
+        record.priority = options.default_priority == 0 ? 1 : options.default_priority;
+      } else {
+        set_fitted_parameter(record, stats.performance,
+                             options.zero_duration_immediate);
+      }
+    }
+    result.map.transitions.push_back(record);
+    result.statistics.push_back(stats);
   }
-  if (options.fit_timing) {
-    for (std::size_t index = 0; index < samples.size(); ++index)
-      set_fitted_parameter(result.map.transitions[index], samples[index],
-                           options.zero_duration_immediate);
-  }
-  validate_stochastic_map(result.map, net.transitions().size());
+  validate_sparse_stochastic_map(result.map, net.transitions().size());
   return result;
 }
 
@@ -611,8 +614,23 @@ StochasticPetriOptions stochastic_map_to_options(
   return options;
 }
 
+StochasticPetriOptions stochastic_map_to_options(
+    const PetriNet& net, const StochasticMap& map,
+    const StochasticMapFitOptions& fit_options,
+    std::vector<std::uint32_t> initial_marking, std::size_t max_states) {
+  validate_options(fit_options);
+  validate_sparse_stochastic_map(map, net.transitions().size());
+  StochasticMap dense;
+  dense.transitions.reserve(net.transitions().size());
+  for (std::size_t index = 0; index < net.transitions().size(); ++index)
+    dense.transitions.push_back(default_transition(net, index, fit_options));
+  for (const auto& record : map.transitions)
+    dense.transitions[record.transition] = record;
+  return stochastic_map_to_options(dense, std::move(initial_marking), max_states);
+}
+
 std::string serialize_stochastic_map_json(const StochasticMap& map) {
-  validate_stochastic_map(map, map.transitions.size());
+  validate_sparse_stochastic_map(map, std::numeric_limits<std::size_t>::max());
   std::ostringstream out;
   out << "{\"family\":\"STOCHASTIC_MAP\",\"transitions\":[";
   for (std::size_t index = 0; index < map.transitions.size(); ++index) {

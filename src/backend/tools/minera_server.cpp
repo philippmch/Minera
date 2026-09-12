@@ -6178,6 +6178,10 @@ void handle_stochastic_map(const httplib::Request& request,
             session->powl_timestamp_key, session->powl_case_id_key);
         fit_log = &*projected_powl_log;
       }
+      params.fit.replay = minera::tools::stochastic_map_replay_options(
+          params.fit.replay, params.initial_marking,
+          miner == "imported" && session->imported_document
+              ? &*session->imported_document : nullptr);
       const auto report = minera::fit_stochastic_map_with_report(
           *fit_log, it->second, params.fit);
       map = report.map;
@@ -6199,7 +6203,7 @@ void handle_stochastic_map(const httplib::Request& request,
       params.initial_marking = minera::tools::pnml_marking<std::uint32_t>(
           session->imported_document->initial_marking);
     const auto stochastic_options = minera::stochastic_map_to_options(
-        map, params.initial_marking, params.max_states);
+        *owned_net, map, params.fit, params.initial_marking, params.max_states);
     const auto reachability = minera::stochastic_petri_reachability(
         *owned_net, stochastic_options);
     std::ostringstream out;

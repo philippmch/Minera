@@ -2193,7 +2193,7 @@ transport checks. The catalogue audit passes; independent review's overflow
 finding was fixed and reviewed again with no remaining actionable findings.
 
 Evaluation APIs currently accept numeric vectors but not all identity/key
-metadata. Stochastic-map log fitting lacks marking options. Monte Carlo
+metadata. Stochastic-map log fitting now preserves replay context. Monte Carlo
 automatic weight fitting now retains its supplied context as described below.
 Decision mining, streaming replay, and BPMN/PTML conversion require separate context work.
 These limitations remain open; this checkpoint does not promote catalogue rows.
@@ -2218,18 +2218,46 @@ one-sided marking overrides remain effective.
 The isolated checkpoint passes four focused native suites, all 29 transport
 checks, and the catalogue audit. Independent review reports no actionable findings.
 
-`scripts/capture-stochastic-fit-reference.py` records nine public calls to the
-pinned `get_map_from_log_and_net` API in
-`docs/stochastic-fit-reference-fixtures.json`. These observations expose broader
-fitting differences still requiring implementation: token-shortage and unknown
-events can contribute, an unvisited tail may be absent from the returned map,
-the first zero-duration transition is immediate with priority one, and a
-multiply marked example gives transition B weight 0.5 despite equal activation
-counts for A and B. The current native stochastic-map fitter uses strict
-workflow search and global activation normalization; Monte Carlo still fits
-raw activation counts and adjacent-event durations. Context propagation alone
-does not establish public stochastic fitting parity. Both catalogue modules
-remain partial, and the saved calls guide the remaining fitting work.
+## Stochastic-map fitting statistics
+
+The native fitter now uses shared token replay with supplied initial/final
+markings, original place/transition IDs, zero-token key membership, and replay
+selectors. Unfit replay paths contribute statistics. Each firing counts the
+currently enabled transitions and the activated transition; fitted weights use
+activations divided by enablings. The returned map contains only transitions
+encountered in those statistics, retaining their original native indices.
+
+Timestamp queues follow causal token arrival, with FIFO consumption and one
+timestamp per distinct input/output place even when numeric arcs have weights.
+Initial tokens receive the first event time; hidden outputs have no timestamp.
+Unknown events retain the observed source-cursor behavior, and negative samples
+remain in the statistics. Forced EXPONENTIAL fitting maps empty/nonpositive
+means to immediate transitions with priority one and positive means to rates.
+Other distribution families and explicit fitting flags retain native policies.
+
+Imported CLI and cached HTTP fitting preserve document context. An explicit
+initial marking applies to fitting and CTMC analysis and clears inherited
+initial key membership. The net-aware CTMC converter supplies defaults only
+inside its dense option vectors; JSON and the frontend preserve sparse records.
+The existing complete-map validator and PNML writer contract remain intact.
+
+`scripts/capture-stochastic-fit-reference.py` and
+`docs/stochastic-fit-reference-fixtures.json` retain 32 model/log cases from
+public `get_map_from_log_and_net` and `single_element_statistics` calls against
+the pinned reference. One identical-label/arc duplicate case also records the
+alternative choice observed when public transition-set insertion order changes.
+The checker accepts a complete observed outcome, never arbitrary mixed fields.
+The native probe verifies map records and statistics; CLI/HTTP comparisons
+cover nonempty logs, sparse output, hidden/weighted/multiple-token nets, negative
+durations, unknown events, and an observable initial-marking override.
+
+The isolated checkpoint passes four focused native suites, 92 fitting and
+transport comparisons, 29 existing PNML consumer checks, and 189 frontend tests.
+Independent review reports no actionable findings and the catalogue audit passes.
+This is forced-EXPONENTIAL evidence, not full stochastic fitting parity:
+automatic distribution selection and broader distribution/parameter cases remain
+open. Monte Carlo automatic fitting still uses raw activation counts and
+adjacent-event durations. Both catalogue modules remain partial.
 
 ## Token-replay parity evidence
 

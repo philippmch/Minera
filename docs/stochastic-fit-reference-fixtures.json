@@ -86,7 +86,57 @@
           "weight": 1.0,
           "priority": 0
         }
-      }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            2.0,
+            4.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
     },
     {
       "spec": {
@@ -170,7 +220,57 @@
           "weight": 1.0,
           "priority": 0
         }
-      }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            2.0,
+            4.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
     },
     {
       "spec": {
@@ -254,7 +354,59 @@
           "weight": 1.0,
           "priority": 0
         }
-      }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            2.0,
+            4.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": false,
+          "reached": {
+            "source": 1,
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": false,
+          "reached": {
+            "source": 1,
+            "sink": 1
+          }
+        }
+      ]
     },
     {
       "spec": {
@@ -340,7 +492,59 @@
           "weight": 0.5,
           "priority": 0
         }
-      }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            2.0,
+            4.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 4,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "middle": 1,
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "middle": 1,
+            "sink": 1
+          }
+        }
+      ]
     },
     {
       "spec": {
@@ -426,7 +630,57 @@
           "weight": 1.0,
           "priority": 0
         }
-      }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            2.0,
+            4.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
     },
     {
       "spec": {
@@ -510,7 +764,51 @@
           "weight": 1.0,
           "priority": 0
         }
-      }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            2.0,
+            4.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": false,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": false,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
     },
     {
       "spec": {
@@ -574,7 +872,31 @@
           "weight": 1.0,
           "priority": 1
         }
-      }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a"
+          ],
+          "fit": false,
+          "reached": {
+            "middle": 1
+          }
+        }
+      ]
     },
     {
       "spec": {
@@ -652,7 +974,43 @@
           "weight": 1.0,
           "priority": 0
         }
-      }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            1.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
     },
     {
       "spec": {
@@ -756,7 +1114,3141 @@
           "weight": 1.0,
           "priority": 0
         }
-      }
+      },
+      "statistics": {
+        "z_first_A": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "a_second_A": {
+          "count": 0,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 0
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            2.0,
+            4.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "z_first_A",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "z_first_A",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ],
+      "alternatives": [
+        {
+          "spec": {
+            "name": "named_duplicates",
+            "places": [
+              "source",
+              "middle",
+              "sink"
+            ],
+            "transitions": [
+              [
+                "z_first_A",
+                "A"
+              ],
+              [
+                "a_second_A",
+                "A"
+              ],
+              [
+                "b",
+                "B"
+              ]
+            ],
+            "arcs": [
+              [
+                "source",
+                "z_first_A",
+                1
+              ],
+              [
+                "z_first_A",
+                "middle",
+                1
+              ],
+              [
+                "source",
+                "a_second_A",
+                1
+              ],
+              [
+                "a_second_A",
+                "middle",
+                1
+              ],
+              [
+                "middle",
+                "b",
+                1
+              ],
+              [
+                "b",
+                "sink",
+                1
+              ]
+            ],
+            "initial": {
+              "source": 1
+            },
+            "final": {
+              "sink": 1
+            },
+            "traces": [
+              [
+                [
+                  "A",
+                  0
+                ],
+                [
+                  "B",
+                  2
+                ]
+              ],
+              [
+                [
+                  "A",
+                  10
+                ],
+                [
+                  "B",
+                  14
+                ]
+              ]
+            ],
+            "transition_insertion_order": [
+              "b",
+              "a_second_A",
+              "z_first_A"
+            ]
+          },
+          "records": {
+            "a_second_A": {
+              "distribution": "IMMEDIATE",
+              "parameters": "UNDEFINED",
+              "weight": 1.0,
+              "priority": 1
+            },
+            "z_first_A": {
+              "distribution": "IMMEDIATE",
+              "parameters": "UNDEFINED",
+              "weight": 0.0,
+              "priority": 1
+            },
+            "b": {
+              "distribution": "EXPONENTIAL",
+              "parameters": "0.3333333333333333",
+              "weight": 1.0,
+              "priority": 0
+            }
+          },
+          "statistics": {
+            "a_second_A": {
+              "count": 2,
+              "performance": [
+                0.0,
+                0.0
+              ],
+              "log_idx": [
+                0,
+                1
+              ],
+              "no_of_times_enabled": 2,
+              "no_of_times_activated": 2
+            },
+            "z_first_A": {
+              "count": 0,
+              "performance": [],
+              "log_idx": [],
+              "no_of_times_enabled": 2,
+              "no_of_times_activated": 0
+            },
+            "b": {
+              "count": 2,
+              "performance": [
+                2.0,
+                4.0
+              ],
+              "log_idx": [
+                0,
+                1
+              ],
+              "no_of_times_enabled": 2,
+              "no_of_times_activated": 2
+            }
+          },
+          "aligned_traces": [
+            {
+              "activated": [
+                "a_second_A",
+                "b"
+              ],
+              "fit": true,
+              "reached": {
+                "sink": 1
+              }
+            },
+            {
+              "activated": [
+                "a_second_A",
+                "b"
+              ],
+              "fit": true,
+              "reached": {
+                "sink": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "unknown_wide_gap",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "unknown",
+              1
+            ],
+            [
+              "B",
+              7
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "1.0",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            1.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "unknown_first",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "unknown",
+              0
+            ],
+            [
+              "A",
+              2
+            ],
+            [
+              "B",
+              7
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "double_unknown",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "unknown",
+              2
+            ],
+            [
+              "unknown",
+              5
+            ],
+            [
+              "B",
+              9
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.5",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            2.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "negative_duration",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              5
+            ],
+            [
+              "B",
+              1
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            -4.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "no_traces",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": []
+      },
+      "records": {},
+      "statistics": {},
+      "aligned_traces": []
+    },
+    {
+      "spec": {
+        "name": "empty_trace",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          []
+        ]
+      },
+      "records": {},
+      "statistics": {},
+      "aligned_traces": [
+        {
+          "activated": [],
+          "fit": false,
+          "reached": {
+            "source": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "hidden_chain",
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "h1",
+            null
+          ],
+          [
+            "h2",
+            null
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "h1",
+            1
+          ],
+          [
+            "h1",
+            "p2",
+            1
+          ],
+          [
+            "p2",
+            "h2",
+            1
+          ],
+          [
+            "h2",
+            "p3",
+            1
+          ],
+          [
+            "p3",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "p4",
+            1
+          ]
+        ],
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              10
+            ]
+          ]
+        ],
+        "initial": {
+          "p0": 1
+        },
+        "final": {
+          "p4": 1
+        }
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "h1": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "h2": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "h1": {
+          "count": 1,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "h2": {
+          "count": 1,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "h1",
+            "h2",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "p4": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "hidden_prefix_suffix",
+        "places": [
+          "p0",
+          "p1",
+          "p2",
+          "p3",
+          "p4"
+        ],
+        "transitions": [
+          [
+            "h0",
+            null
+          ],
+          [
+            "a",
+            "A"
+          ],
+          [
+            "h1",
+            null
+          ],
+          [
+            "h2",
+            null
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "h0",
+            1
+          ],
+          [
+            "h0",
+            "p1",
+            1
+          ],
+          [
+            "p1",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "p2",
+            1
+          ],
+          [
+            "p2",
+            "h1",
+            1
+          ],
+          [
+            "h1",
+            "p3",
+            1
+          ],
+          [
+            "p3",
+            "h2",
+            1
+          ],
+          [
+            "h2",
+            "p4",
+            1
+          ]
+        ],
+        "traces": [
+          [
+            [
+              "A",
+              10
+            ]
+          ]
+        ],
+        "initial": {
+          "p0": 1
+        },
+        "final": {
+          "p4": 1
+        }
+      },
+      "records": {
+        "h0": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "h1": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "h2": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "h0": {
+          "count": 1,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "a": {
+          "count": 1,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "h1": {
+          "count": 1,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "h2": {
+          "count": 1,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "h0",
+            "a",
+            "h1",
+            "h2"
+          ],
+          "fit": true,
+          "reached": {
+            "p4": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "parallel_join",
+        "places": [
+          "p0",
+          "b0",
+          "c0",
+          "b1",
+          "c1",
+          "p1"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ],
+          [
+            "c",
+            "C"
+          ],
+          [
+            "d",
+            "D"
+          ]
+        ],
+        "arcs": [
+          [
+            "p0",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "b0",
+            1
+          ],
+          [
+            "a",
+            "c0",
+            1
+          ],
+          [
+            "b0",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "b1",
+            1
+          ],
+          [
+            "c0",
+            "c",
+            1
+          ],
+          [
+            "c",
+            "c1",
+            1
+          ],
+          [
+            "b1",
+            "d",
+            1
+          ],
+          [
+            "c1",
+            "d",
+            1
+          ],
+          [
+            "d",
+            "p1",
+            1
+          ]
+        ],
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ],
+            [
+              "C",
+              5
+            ],
+            [
+              "D",
+              8
+            ]
+          ]
+        ],
+        "initial": {
+          "p0": 1
+        },
+        "final": {
+          "p1": 1
+        }
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.5",
+          "weight": 1.0,
+          "priority": 0
+        },
+        "c": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.2",
+          "weight": 0.5,
+          "priority": 0
+        },
+        "d": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            2.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "c": {
+          "count": 1,
+          "performance": [
+            5.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 1
+        },
+        "d": {
+          "count": 1,
+          "performance": [
+            3.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b",
+            "c",
+            "d"
+          ],
+          "fit": true,
+          "reached": {
+            "p1": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "looping",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ],
+          [
+            "c",
+            "C"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "source",
+            1
+          ],
+          [
+            "middle",
+            "c",
+            1
+          ],
+          [
+            "c",
+            "sink",
+            1
+          ]
+        ],
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3
+            ],
+            [
+              "A",
+              8
+            ],
+            [
+              "C",
+              10
+            ]
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        }
+      },
+      "records": {
+        "a": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.4",
+          "weight": 1.0,
+          "priority": 0
+        },
+        "c": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.5",
+          "weight": 0.5,
+          "priority": 0
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 0.5,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            5.0
+          ],
+          "log_idx": [
+            0,
+            0
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "c": {
+          "count": 1,
+          "performance": [
+            2.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            3.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b",
+            "a",
+            "c"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "weighted_parallel_tokens",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "A",
+              2
+            ],
+            [
+              "B",
+              5
+            ],
+            [
+              "B",
+              9
+            ]
+          ]
+        ],
+        "initial": {
+          "source": 2
+        },
+        "final": {
+          "sink": 2
+        }
+      },
+      "records": {
+        "a": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "1.0",
+          "weight": 1.0,
+          "priority": 0
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.16666666666666666",
+          "weight": 0.6666666666666666,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            2.0
+          ],
+          "log_idx": [
+            0,
+            0
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            5.0,
+            7.0
+          ],
+          "log_idx": [
+            0,
+            0
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "a",
+            "b",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 2
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "partial_unknown_join",
+        "places": [
+          "source",
+          "b0",
+          "h0",
+          "b1",
+          "h1",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ],
+          [
+            "h",
+            null
+          ],
+          [
+            "d",
+            "D"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "b0",
+            1
+          ],
+          [
+            "a",
+            "h0",
+            1
+          ],
+          [
+            "b0",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "b1",
+            1
+          ],
+          [
+            "h0",
+            "h",
+            1
+          ],
+          [
+            "h",
+            "h1",
+            1
+          ],
+          [
+            "b1",
+            "d",
+            1
+          ],
+          [
+            "h1",
+            "d",
+            1
+          ],
+          [
+            "d",
+            "sink",
+            1
+          ]
+        ],
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ],
+            [
+              "D",
+              9
+            ]
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        }
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "h": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 0.5,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.5",
+          "weight": 1.0,
+          "priority": 0
+        },
+        "d": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.14285714285714285",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "h": {
+          "count": 1,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            2.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "d": {
+          "count": 1,
+          "performance": [
+            7.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b",
+            "h",
+            "d"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "hidden_then_visible",
+        "places": [
+          "source",
+          "x",
+          "y",
+          "z",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "h",
+            null
+          ],
+          [
+            "b",
+            "B"
+          ],
+          [
+            "c",
+            "C"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "x",
+            1
+          ],
+          [
+            "x",
+            "h",
+            1
+          ],
+          [
+            "h",
+            "y",
+            1
+          ],
+          [
+            "y",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "z",
+            1
+          ],
+          [
+            "z",
+            "c",
+            1
+          ],
+          [
+            "c",
+            "sink",
+            1
+          ]
+        ],
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3
+            ],
+            [
+              "C",
+              8
+            ]
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        }
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "h": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "c": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.2",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "h": {
+          "count": 1,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "c": {
+          "count": 1,
+          "performance": [
+            5.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "h",
+            "b",
+            "c"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "weighted_join",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            2
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "A",
+              3
+            ],
+            [
+              "B",
+              6
+            ]
+          ]
+        ],
+        "initial": {
+          "source": 2
+        },
+        "final": {
+          "sink": 1
+        }
+      },
+      "records": {
+        "a": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.6666666666666666",
+          "weight": 1.0,
+          "priority": 0
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.16666666666666666",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            3.0
+          ],
+          "log_idx": [
+            0,
+            0
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            6.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "weighted_join_missing",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            2
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              6
+            ]
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        }
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.16666666666666666",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            6.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": false,
+          "reached": {
+            "middle": 1,
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "hidden_initial_only",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "h",
+            null
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "h",
+            1
+          ],
+          [
+            "h",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "traces": [
+          []
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        }
+      },
+      "records": {},
+      "statistics": {},
+      "aligned_traces": [
+        {
+          "activated": [],
+          "fit": false,
+          "reached": {
+            "source": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "consume_two_twice",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            2
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 4
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "A",
+              2
+            ],
+            [
+              "A",
+              4
+            ],
+            [
+              "A",
+              6
+            ],
+            [
+              "B",
+              10
+            ],
+            [
+              "B",
+              15
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 1.0,
+          "priority": 0
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.08695652173913043",
+          "weight": 0.5,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 4,
+          "performance": [
+            0.0,
+            2.0,
+            4.0,
+            6.0
+          ],
+          "log_idx": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "no_of_times_enabled": 4,
+          "no_of_times_activated": 4
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            10.0,
+            13.0
+          ],
+          "log_idx": [
+            0,
+            0
+          ],
+          "no_of_times_enabled": 4,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "a",
+            "a",
+            "a",
+            "b",
+            "b"
+          ],
+          "fit": false,
+          "reached": {
+            "sink": 2
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "produce_two_twice",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            2
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 2
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "A",
+              2
+            ],
+            [
+              "B",
+              5
+            ],
+            [
+              "B",
+              7
+            ],
+            [
+              "B",
+              10
+            ],
+            [
+              "B",
+              15
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "1.0",
+          "weight": 1.0,
+          "priority": 0
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.2",
+          "weight": 0.8,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            2.0
+          ],
+          "log_idx": [
+            0,
+            0
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 4,
+          "performance": [
+            5.0,
+            5.0
+          ],
+          "log_idx": [
+            0,
+            0
+          ],
+          "no_of_times_enabled": 5,
+          "no_of_times_activated": 4
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "a",
+            "b",
+            "b",
+            "b",
+            "b"
+          ],
+          "fit": false,
+          "reached": {
+            "sink": 4
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "produce_consume_two",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            2
+          ],
+          [
+            "middle",
+            "b",
+            2
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 2
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "A",
+              2
+            ],
+            [
+              "B",
+              5
+            ],
+            [
+              "B",
+              10
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "1.0",
+          "weight": 1.0,
+          "priority": 0
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.15384615384615385",
+          "weight": 0.6666666666666666,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            2.0
+          ],
+          "log_idx": [
+            0,
+            0
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            5.0,
+            8.0
+          ],
+          "log_idx": [
+            0,
+            0
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "a",
+            "b",
+            "b"
+          ],
+          "fit": false,
+          "reached": {
+            "sink": 2
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "missing_input_later",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3
+            ],
+            [
+              "B",
+              8
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            3.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b",
+            "b"
+          ],
+          "fit": false,
+          "reached": {
+            "sink": 2
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "first_activity_forced",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 0
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              3
+            ],
+            [
+              "B",
+              8
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.2",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            5.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": false,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "shortage_then_tail",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ],
+          [
+            "c",
+            "C"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            2
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ],
+          [
+            "source",
+            "c",
+            1
+          ],
+          [
+            "c",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "c": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 0.0,
+          "priority": 1
+        },
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "c": {
+          "count": 0,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 0
+        },
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            3.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": false,
+          "reached": {
+            "source": 1,
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "shortage_then_competitor",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ],
+          [
+            "c",
+            "C"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            2
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ],
+          [
+            "source",
+            "c",
+            1
+          ],
+          [
+            "c",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3
+            ],
+            [
+              "C",
+              8
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "c": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 0.5,
+          "priority": 1
+        },
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "c": {
+          "count": 1,
+          "performance": [],
+          "log_idx": [],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 1
+        },
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            3.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b",
+            "c"
+          ],
+          "fit": false,
+          "reached": {
+            "sink": 2
+          }
+        }
+      ]
     }
-  ]
+  ],
+  "statistics_public_api": "pm4py.objects.petri_net.utils.performance_map.single_element_statistics"
 }
