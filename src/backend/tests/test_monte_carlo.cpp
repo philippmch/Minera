@@ -799,7 +799,7 @@ void signed_fitted_metadata_retains_simulation_domain_validation() {
   assert(fitted_record(normal, 1).distribution == minera::StochasticMapDistribution::kNormal);
   assert(fitted_record(normal, 1).parameter == -3.0);
   assert(fitted_record(normal, 1).secondary_parameter == 1.0);
-  assert(throws_invalid([&] { (void)minera::monte_carlo(net, normal); }));
+  assert(minera::monte_carlo(net, normal).diagnostics.completed_cases == 1);
   options.force_distribution = minera::MonteCarloDurationDistribution::kUniform;
   const auto uniform = minera::fit_monte_carlo_options(input, net, options);
   assert(fitted_record(uniform, 1).parameter == -4.0);
@@ -1245,6 +1245,131 @@ void cycle_zero_capacity_and_overlapping_places() {
   assert(timed.diagnostics.cases_ex_time == (std::vector<double>{4,4,4}));
 }
 
+void signed_service_laws_are_conditioned_without_clamping() {
+  const auto net = linear_net();
+  minera::MonteCarloOptions options;
+  options.start = 0; options.simulations = 1000; options.max_steps = 1;
+  options.case_arrival_ratio = 0;
+  options.resources_per_place[net.sink()] = options.simulations;
+  options.transition_durations = {{minera::MonteCarloDurationDistribution::kNormal,-2,1}};
+  const auto normal = minera::monte_carlo(net, options);
+  double mean = 0;
+  std::size_t below_half = 0, zeros = 0;
+  for (double value : normal.diagnostics.case_execution_seconds) {
+    assert(std::isfinite(value) && value >= 0);
+    mean += value / options.simulations;
+    below_half += value <= 0.5;
+    zeros += value == 0;
+  }
+  // Conditional mean and CDF for N(-2,1) | X>=0. These distinguish the
+  // conditional law from a clamped Gaussian's large atom at zero.
+  assert(std::abs(mean - 0.3732155328228406) < 0.06);
+  const double cdf = 1 - std::erfc(2.5 / std::sqrt(2.0)) / std::erfc(2 / std::sqrt(2.0));
+  assert(std::abs(static_cast<double>(below_half) / options.simulations - cdf) < 0.06);
+  assert(zeros == 0);
+
+  options.transition_durations = {{minera::MonteCarloDurationDistribution::kUniform,-1,2}};
+  const auto uniform = minera::monte_carlo(net, options);
+  options.transition_durations = {{minera::MonteCarloDurationDistribution::kUniform,0,1}};
+  const auto positive_control = minera::monte_carlo(net, options);
+  assert_same_logs(uniform.log, positive_control.log);
+  mean = 0;
+  for (double value : uniform.diagnostics.case_execution_seconds) {
+    assert(value >= 0 && value <= 1);
+    mean += value / options.simulations;
+  }
+  assert(std::abs(mean - 0.5) < 0.05);
+
+  // Map uniforms store upper bounds rather than widths.
+  options.transition_durations.clear();
+  options.stochastic_map = minera::StochasticMap{};
+  options.stochastic_map->transitions.push_back({0,minera::StochasticMapTiming::kTimed,
+      minera::StochasticMapDistribution::kUniform,-1,1,0,1,0});
+  assert_same_logs(minera::monte_carlo(net, options).log, uniform.log);
+  auto& record = options.stochastic_map->transitions.front();
+  record.distribution = minera::StochasticMapDistribution::kNormal;
+  record.parameter = -2; record.secondary_parameter = 1;
+  assert_same_logs(minera::monte_carlo(net, options).log, normal.log);
+}
+
+void conditional_service_domains_and_extreme_tails_are_bounded() {
+  const auto net = linear_net();
+  minera::MonteCarloOptions options;
+  options.simulations = 16; options.max_steps = 1; options.start = 0;
+  options.case_arrival_ratio = 0; options.resources_per_place[net.sink()] = 16;
+  for (const auto& parameters : std::vector<std::pair<double,double>>{
+      {-100,1}, {-1e308,1e154}, {-std::numeric_limits<double>::max(),1},
+      {-std::numeric_limits<double>::max(),std::numeric_limits<double>::denorm_min()}}) {
+    options.transition_durations = {{minera::MonteCarloDurationDistribution::kNormal,
+        parameters.first,parameters.second}};
+    const auto result = minera::monte_carlo(net, options);
+    assert(result.diagnostics.completed_cases == options.simulations);
+    for (double value : result.diagnostics.case_execution_seconds)
+      assert(std::isfinite(value) && value >= 0 && value < 100);
+  }
+  for (const auto duration : {
+      minera::MonteCarloDuration{minera::MonteCarloDurationDistribution::kNormal,-2,0},
+      minera::MonteCarloDuration{minera::MonteCarloDurationDistribution::kUniform,-2,0},
+      minera::MonteCarloDuration{minera::MonteCarloDurationDistribution::kUniform,-2,1},
+      minera::MonteCarloDuration{minera::MonteCarloDurationDistribution::kUniform,-2,2}}) {
+    options.transition_durations = {duration};
+    assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
+  }
+  for (const auto distribution : {minera::StochasticMapDistribution::kNormal,
+                                  minera::StochasticMapDistribution::kUniform}) {
+    options.stochastic_map = minera::StochasticMap{};
+    options.stochastic_map->transitions.push_back({0,minera::StochasticMapTiming::kTimed,
+        distribution,-2,distribution == minera::StochasticMapDistribution::kNormal ? 0.0 : -1.0,
+        0,1,0});
+    options.transition_durations.clear();
+    assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
+    options.transition_durations = {{minera::MonteCarloDurationDistribution::kDeterministic,3}};
+    const auto overridden = minera::monte_carlo(net, options);
+    for (double value : overridden.diagnostics.case_execution_seconds) assert(value == 3);
+  }
+}
+
+void signed_uniform_map_preserves_original_upper_endpoint() {
+  const auto net = linear_net();
+  minera::MonteCarloOptions options;
+  options.simulations = 16; options.max_steps = 1; options.start = 0;
+  options.case_arrival_ratio = 0; options.resources_per_place[net.sink()] = 16;
+  for (const auto bounds : std::vector<std::pair<double,double>>{
+      {-1e16,1}, {-1e6,1e-12}, {-std::numeric_limits<double>::max(),1},
+      {-std::numeric_limits<double>::max(),
+                                std::numeric_limits<double>::max()}}) {
+    options.stochastic_map = minera::StochasticMap{};
+    options.stochastic_map->transitions.push_back({0,minera::StochasticMapTiming::kTimed,
+        minera::StochasticMapDistribution::kUniform,bounds.first,bounds.second,0,1,0});
+    // Finite conditional support remains valid when the original width
+    // overflows. A huge accepted sample reaches the calendar boundary;
+    // conversion itself must not reject its endpoints or width.
+    if (bounds.second == std::numeric_limits<double>::max()) {
+      options.transition_durations = {{minera::MonteCarloDurationDistribution::kDeterministic,1}};
+      assert(minera::monte_carlo(net, options).diagnostics.completed_cases == options.simulations);
+      options.transition_durations.clear();
+      bool date_range_reached = false;
+      try { (void)minera::monte_carlo(net, options); }
+      catch (const std::invalid_argument& error) {
+        date_range_reached = std::string(error.what()).find("timestamp") != std::string::npos;
+      }
+      assert(date_range_reached);
+      continue;
+    }
+    const auto mapped = minera::monte_carlo(net, options);
+    auto direct = options;
+    direct.stochastic_map.reset();
+    direct.transition_durations = {{minera::MonteCarloDurationDistribution::kUniform,0,bounds.second}};
+    const auto expected = minera::monte_carlo(net, direct);
+    assert(mapped.diagnostics.case_execution_seconds == expected.diagnostics.case_execution_seconds);
+    assert_same_logs(mapped.log, expected.log);
+  }
+  options.stochastic_map = minera::StochasticMap{};
+  options.stochastic_map->transitions.push_back({0,minera::StochasticMapTiming::kTimed,
+      minera::StochasticMapDistribution::kUniform,-1e16,0,0,1,0});
+  assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
+}
+
 void json_contract_is_stable() {
   const auto result = minera::monte_carlo(linear_net(), minera::MonteCarloOptions{});
   const auto json = minera::monte_carlo_json(result);
@@ -1297,5 +1422,8 @@ int main() {
   microsecond_events_and_empty_trace_errors();
   inputless_transitions_require_an_initial_key();
   cycle_zero_capacity_and_overlapping_places();
+  signed_service_laws_are_conditioned_without_clamping();
+  conditional_service_domains_and_extreme_tails_are_bounded();
+  signed_uniform_map_preserves_original_upper_endpoint();
   json_contract_is_stable();
 }

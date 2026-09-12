@@ -294,6 +294,16 @@ void validate_stochastic_map_sparse(const StochasticMap& map,
       return {MonteCarloDurationDistribution::kNormal, transition.parameter,
               transition.secondary_parameter};
     case StochasticMapDistribution::kUniform:
+      if (transition.parameter < 0.0) {
+        if (transition.secondary_parameter <= 0.0)
+          throw std::invalid_argument(
+              "Monte Carlo uniform duration must have nonnegative conditional support");
+        // Map parameters are endpoints. Condition before converting to a
+        // width, preserving a small positive upper endpoint and avoiding
+        // overflow when the original interval spans very wide signed bounds.
+        return {MonteCarloDurationDistribution::kUniform, 0.0,
+                transition.secondary_parameter};
+      }
       return {MonteCarloDurationDistribution::kUniform, transition.parameter,
               transition.secondary_parameter - transition.parameter};
     case StochasticMapDistribution::kLogNormal:
@@ -412,6 +422,21 @@ void validate_scheduler_budgets(const PetriNet& net,
   }
 }
 
+void validate_conditional_duration(const MonteCarloDuration& duration) {
+  if (duration.distribution == MonteCarloDurationDistribution::kNormal) {
+    if (duration.secondary_seconds < 0.0 ||
+        (duration.value_seconds < 0.0 && duration.secondary_seconds == 0.0))
+      throw std::invalid_argument(
+          "Monte Carlo normal duration must have nonnegative conditional support");
+  } else if (duration.distribution == MonteCarloDurationDistribution::kUniform) {
+    const double upper = duration.value_seconds + duration.secondary_seconds;
+    if (duration.secondary_seconds < 0.0 || !std::isfinite(upper) ||
+        (duration.value_seconds < 0.0 && upper <= 0.0))
+      throw std::invalid_argument(
+          "Monte Carlo uniform duration must have finite nonnegative conditional support");
+  }
+}
+
 PreparedOptions prepare_options(const PetriNet& net,
                                 const MonteCarloOptions& options) {
   validate_selectors(options);
@@ -473,23 +498,8 @@ PreparedOptions prepare_options(const PetriNet& net,
         // These distributions have no numeric parameter and always return 0.
         break;
       case MonteCarloDurationDistribution::kNormal:
-        if (duration.value_seconds < 0.0 ||
-            duration.secondary_seconds < 0.0) {
-          throw std::invalid_argument(
-              "Monte Carlo normal mean and standard deviation must be non-negative");
-        }
-        break;
       case MonteCarloDurationDistribution::kUniform:
-        if (duration.value_seconds < 0.0 ||
-            duration.secondary_seconds < 0.0) {
-          throw std::invalid_argument(
-              "Monte Carlo uniform lower bound and width must be non-negative");
-        }
-        if (!std::isfinite(duration.value_seconds +
-                           duration.secondary_seconds)) {
-          throw std::invalid_argument(
-              "Monte Carlo uniform upper bound must be finite");
-        }
+        validate_conditional_duration(duration);
         break;
       case MonteCarloDurationDistribution::kLogNormal:
         if (duration.value_seconds <= 0.0 ||
@@ -537,13 +547,6 @@ PreparedOptions prepare_options(const PetriNet& net,
       // Complete explicit duration vectors override map timing, including
       // conversion and runtime domain checks for those unused durations.
       if (!options.transition_durations.empty()) continue;
-      // Signed fitted metadata is representable, but the simulator retains
-      // its existing non-negative duration domain.
-      if ((transition.distribution == StochasticMapDistribution::kNormal ||
-           transition.distribution == StochasticMapDistribution::kUniform) &&
-          transition.parameter < 0.0)
-        throw std::invalid_argument(
-            "Monte Carlo stochastic_map duration mean or lower bound must be non-negative");
       const auto duration = duration_from_stochastic_map(transition);
       if (!std::isfinite(duration.value_seconds) ||
           !std::isfinite(duration.secondary_seconds) ||
@@ -551,6 +554,7 @@ PreparedOptions prepare_options(const PetriNet& net,
         throw std::invalid_argument(
             "Monte Carlo stochastic_map duration conversion is not finite");
       }
+      validate_conditional_duration(duration);
       prepared.durations[transition.transition] = duration;
     }
   }
@@ -607,6 +611,45 @@ PreparedOptions prepare_options(const PetriNet& net,
   return enabled[picked];
 }
 
+// Robert (2009), Proposition 2.3: https://arxiv.org/pdf/0907.4010.
+// For Z >= a >= 0, propose Z=a+E/alpha, E~Exp(1), where
+// alpha=(a+hypot(a,2))/2, accepting exp(-(Z-alpha)^2/2).
+// alpha-a=1/alpha avoids cancellation: Z-alpha=(E-1)/alpha,
+// and physical duration is sigma*E/alpha, never mu+sigma*Z.
+[[nodiscard]] double sample_negative_mean_normal(double mu, double sigma,
+                                                  std::mt19937_64& rng) {
+  const double a = (-mu) / sigma;
+  double inverse_alpha;
+  if (std::isfinite(a)) {
+    const double half = a * 0.5;
+    inverse_alpha = 1.0 / (half + std::hypot(half, 1.0));
+  } else {
+    // a exceeds double range. The correction alpha-a is below representable
+    // relative precision; compute the reciprocal without the overflowing a.
+    inverse_alpha = sigma / (-mu);
+  }
+  for (std::size_t attempt = 0; attempt < 10000; ++attempt) {
+    const double exponential = -std::log1p(-std::generate_canonical<double, 53>(rng));
+    const double difference = (exponential - 1.0) * inverse_alpha;
+    const double acceptance = -std::log1p(-std::generate_canonical<double, 53>(rng));
+    if (acceptance >= 0.5 * difference * difference) {
+      // Multiply in exponent/mantissa form so a subnormal intermediate scale
+      // cannot lose precision before multiplication by the exponential draw.
+      int sigma_exponent = 0, inverse_exponent = 0, draw_exponent = 0;
+      const double mantissa = std::frexp(sigma, &sigma_exponent) *
+          std::frexp(inverse_alpha, &inverse_exponent) *
+          std::frexp(exponential, &draw_exponent);
+      const double draw = std::scalbn(mantissa,
+          sigma_exponent + inverse_exponent + draw_exponent);
+      if (!std::isfinite(draw))
+        throw std::runtime_error("Monte Carlo normal sample exceeds finite duration range");
+      // An excess smaller than the representable double range rounds to zero.
+      return draw;
+    }
+  }
+  throw std::runtime_error("Monte Carlo normal rejection sampling budget exceeded");
+}
+
 [[nodiscard]] double sample_duration(const MonteCarloDuration& duration,
                                      std::mt19937_64& rng) {
   switch (duration.distribution) {
@@ -621,16 +664,21 @@ PreparedOptions prepare_options(const PetriNet& net,
       return 0.0;
     case MonteCarloDurationDistribution::kNormal: {
       if (duration.secondary_seconds == 0.0) return duration.value_seconds;
+      if (duration.value_seconds < 0.0)
+        return sample_negative_mean_normal(duration.value_seconds,
+                                            duration.secondary_seconds, rng);
       std::normal_distribution<double> distribution(duration.value_seconds,
                                                      duration.secondary_seconds);
-      double draw = distribution(rng);
-      while (draw < 0.0) draw = distribution(rng);
-      return draw;
+      for (std::size_t attempt = 0; attempt < 10000; ++attempt) {
+        const double draw = distribution(rng);
+        if (!(draw < 0.0)) return draw;
+      }
+      throw std::runtime_error("Monte Carlo normal rejection sampling budget exceeded");
     }
     case MonteCarloDurationDistribution::kUniform:
       if (duration.secondary_seconds == 0.0) return duration.value_seconds;
       return std::uniform_real_distribution<double>(
-          duration.value_seconds,
+          std::max(0.0, duration.value_seconds),
           duration.value_seconds + duration.secondary_seconds)(rng);
     case MonteCarloDurationDistribution::kLogNormal: {
       const double draw = std::lognormal_distribution<double>(
