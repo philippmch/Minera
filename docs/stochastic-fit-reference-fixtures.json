@@ -1,0 +1,762 @@
+{
+  "reference": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "public_api": "pm4py.algo.simulation.montecarlo.utils.replay.get_map_from_log_and_net",
+  "forced_distribution": "EXPONENTIAL",
+  "observations": [
+    {
+      "spec": {
+        "name": "sequence",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              10
+            ],
+            [
+              "B",
+              14
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 1.0,
+          "priority": 0
+        }
+      }
+    },
+    {
+      "spec": {
+        "name": "weighted",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            2
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 2
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              10
+            ],
+            [
+              "B",
+              14
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 1.0,
+          "priority": 0
+        }
+      }
+    },
+    {
+      "spec": {
+        "name": "weighted_shortage",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            2
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              10
+            ],
+            [
+              "B",
+              14
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 1.0,
+          "priority": 0
+        }
+      }
+    },
+    {
+      "spec": {
+        "name": "multimarked",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1,
+          "middle": 1
+        },
+        "final": {
+          "middle": 1,
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              10
+            ],
+            [
+              "B",
+              14
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 0.5,
+          "priority": 0
+        }
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_keys",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1,
+          "sink": 0
+        },
+        "final": {
+          "source": 0,
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              10
+            ],
+            [
+              "B",
+              14
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 1.0,
+          "priority": 0
+        }
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_boundaries",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 0
+        },
+        "final": {
+          "sink": 0
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              10
+            ],
+            [
+              "B",
+              14
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 1.0,
+          "priority": 0
+        }
+      }
+    },
+    {
+      "spec": {
+        "name": "missing_tail",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      }
+    },
+    {
+      "spec": {
+        "name": "unknown_event",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "unknown",
+              1
+            ],
+            [
+              "B",
+              2
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "1.0",
+          "weight": 1.0,
+          "priority": 0
+        }
+      }
+    },
+    {
+      "spec": {
+        "name": "named_duplicates",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "z_first_A",
+            "A"
+          ],
+          [
+            "a_second_A",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "z_first_A",
+            1
+          ],
+          [
+            "z_first_A",
+            "middle",
+            1
+          ],
+          [
+            "source",
+            "a_second_A",
+            1
+          ],
+          [
+            "a_second_A",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              10
+            ],
+            [
+              "B",
+              14
+            ]
+          ]
+        ]
+      },
+      "records": {
+        "z_first_A": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "a_second_A": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 0.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 1.0,
+          "priority": 0
+        }
+      }
+    }
+  ]
+}

@@ -115,6 +115,13 @@ struct MonteCarloOptions {
   std::size_t diagnostic_interval = 32;
   double small_scale_factor = 864000.0;
   double max_thread_execution_time = 60.0;
+  // Model IDs and zero-token marking membership used only by automatic
+  // activation-weight replay. Empty values use the replay defaults. These
+  // fields do not affect simulation or explicit weight/map inputs.
+  std::vector<std::string> place_names;
+  std::vector<std::string> transition_names;
+  std::vector<bool> initial_marking_keys;
+  std::vector<bool> final_marking_keys;
 };
 
 struct MonteCarloDiagnostics {

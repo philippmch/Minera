@@ -7094,6 +7094,16 @@ int main(int argc, char** argv) {
         options.final_marking = minera::tools::pnml_marking<Integer>(
             imported_document->final_marking);
     };
+    const auto apply_imported_monte_carlo_context = [&](minera::MonteCarloOptions& options) {
+      apply_imported_markings(options);
+      if (!imported_document) return;
+      options.place_names = imported_document->place_ids;
+      options.transition_names = imported_document->transition_ids;
+      options.initial_marking_keys = monte_carlo_fields.contains("monte_carlo_initial_marking")
+          ? std::vector<bool>{} : imported_document->initial_marking_keys;
+      options.final_marking_keys = monte_carlo_fields.contains("monte_carlo_final_marking")
+          ? std::vector<bool>{} : imported_document->final_marking_keys;
+    };
     if (check_flags > 1) {
       std::cerr << "error: pass only one of --check-pnml, --check-bpmn, and "
                    "--check-ptml (they share the conformance id "
@@ -7516,7 +7526,7 @@ int main(int argc, char** argv) {
         return 2;
       }
       auto effective_options = monte_carlo_options;
-      if (playout_miner == "imported") apply_imported_markings(effective_options);
+      if (playout_miner == "imported") apply_imported_monte_carlo_context(effective_options);
       std::optional<minera::EventLog> projected_monte_carlo_log;
       const minera::EventLog* simulation_log = &log;
       if (playout_miner == "powl") {
@@ -7759,7 +7769,7 @@ int main(int argc, char** argv) {
         apply_imported_markings(basic_playout_options);
         apply_imported_markings(extensive_playout_options);
         apply_imported_markings(stochastic_playout_options);
-        apply_imported_markings(monte_carlo_options);
+        apply_imported_monte_carlo_context(monte_carlo_options);
         if (imported_document && stochastic_petri_options.initial_marking.empty())
           stochastic_petri_options.initial_marking =
               minera::tools::pnml_marking<std::uint32_t>(imported_document->initial_marking);

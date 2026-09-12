@@ -1190,6 +1190,23 @@ MonteCarloOptions fit_monte_carlo_options(const EventLog& input_log,
     TokenReplayOptions replay_options;
     replay_options.variant = fitted.token_replay_variant;
     replay_options.activity_attribute = fitted.activity_key;
+    const auto replay_marking = [](const std::vector<std::uint32_t>& marking) {
+      std::vector<int> result;
+      result.reserve(marking.size());
+      for (const auto tokens : marking) {
+        if (tokens > static_cast<std::uint32_t>(std::numeric_limits<int>::max()))
+          throw std::invalid_argument(
+              "Monte Carlo activation-weight replay marking exceeds signed token range");
+        result.push_back(static_cast<int>(tokens));
+      }
+      return result;
+    };
+    replay_options.initial_marking = replay_marking(fitted.initial_marking);
+    replay_options.final_marking = replay_marking(fitted.final_marking);
+    replay_options.place_names = fitted.place_names;
+    replay_options.transition_names = fitted.transition_names;
+    replay_options.initial_marking_keys = fitted.initial_marking_keys;
+    replay_options.final_marking_keys = fitted.final_marking_keys;
     const auto replay =
         replay_token_diagnostics(input_log, net, replay_options);
     bool observed_transition = false;

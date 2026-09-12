@@ -2193,10 +2193,43 @@ transport checks. The catalogue audit passes; independent review's overflow
 finding was fixed and reviewed again with no remaining actionable findings.
 
 Evaluation APIs currently accept numeric vectors but not all identity/key
-metadata. Stochastic-map log fitting lacks marking options, and Monte Carlo
-automatic weight fitting still uses default replay markings. Decision mining,
-streaming replay, and BPMN/PTML conversion require separate context work.
+metadata. Stochastic-map log fitting lacks marking options. Monte Carlo
+automatic weight fitting now retains its supplied context as described below.
+Decision mining, streaming replay, and BPMN/PTML conversion require separate context work.
 These limitations remain open; this checkpoint does not promote catalogue rows.
+
+## Monte Carlo fitting context and reference observations
+
+`fit_monte_carlo_options` carries numeric initial/final markings, original
+place/transition names, and explicit zero-token key membership into automatic
+activation-weight replay. The context fields are appended to `MonteCarloOptions`.
+Signed conversion and replay validation occur only when missing weights require
+replay; explicit weights and sparse stochastic maps preserve their precedence,
+and simulation-only unsigned markings retain their existing range contract.
+Imported CLI and cached HTTP simulation routes pass the complete context.
+An explicit marking override clears only that vector's inherited key membership.
+
+Registered Monte Carlo regressions compare fitting with direct forward/backwards
+replay on duplicate and hidden branches, verify changed-marking effects, and
+exercise invalid metadata, token ranges, and explicit map/vector precedence.
+The transport harness verifies that original transition IDs change the fitted
+branch, matching explicit-weight controls through CLI/HTTP JSON and XES playout;
+one-sided marking overrides remain effective.
+The isolated checkpoint passes four focused native suites, all 29 transport
+checks, and the catalogue audit. Independent review reports no actionable findings.
+
+`scripts/capture-stochastic-fit-reference.py` records nine public calls to the
+pinned `get_map_from_log_and_net` API in
+`docs/stochastic-fit-reference-fixtures.json`. These observations expose broader
+fitting differences still requiring implementation: token-shortage and unknown
+events can contribute, an unvisited tail may be absent from the returned map,
+the first zero-duration transition is immediate with priority one, and a
+multiply marked example gives transition B weight 0.5 despite equal activation
+counts for A and B. The current native stochastic-map fitter uses strict
+workflow search and global activation normalization; Monte Carlo still fits
+raw activation counts and adjacent-event durations. Context propagation alone
+does not establish public stochastic fitting parity. Both catalogue modules
+remain partial, and the saved calls guide the remaining fitting work.
 
 ## Token-replay parity evidence
 

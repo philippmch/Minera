@@ -314,6 +314,21 @@ void cached_imported_markings(const httplib::Request& request,
   }
 }
 
+void cached_imported_monte_carlo_context(
+    const httplib::Request& request, const MinedSession& session,
+    std::string_view miner, minera::MonteCarloOptions& options) {
+  cached_imported_markings(request, session, miner, options,
+                           "monte_carlo_initial_marking", "monte_carlo_final_marking");
+  if (miner != "imported" || !session.imported_document) return;
+  const auto& document = *session.imported_document;
+  options.place_names = document.place_ids;
+  options.transition_names = document.transition_ids;
+  options.initial_marking_keys = request.has_param("monte_carlo_initial_marking")
+      ? std::vector<bool>{} : document.initial_marking_keys;
+  options.final_marking_keys = request.has_param("monte_carlo_final_marking")
+      ? std::vector<bool>{} : document.final_marking_keys;
+}
+
 // A selector is deliberately request-scoped: the cached inductive model and
 // its default conversion remain unchanged, while callers that need the
 // alternate construction receive a fresh value for the duration of a route.
@@ -5898,8 +5913,7 @@ void handle_monte_carlo_json(const httplib::Request& request,
         minera::kMonteCarloRequestMapMaxRecords);
     auto options = minera::parse_monte_carlo_params(
         lookup, present, map_record_limit);
-    cached_imported_markings(request, *session, selected_miner, options,
-                             "monte_carlo_initial_marking", "monte_carlo_final_marking");
+    cached_imported_monte_carlo_context(request, *session, selected_miner, options);
     validate_monte_carlo_server_limits(options, selected);
     std::optional<minera::EventLog> projected_powl_log;
     const minera::EventLog* simulation_log =
@@ -6290,8 +6304,7 @@ void handle_playout(const httplib::Request& request,
           minera::kMonteCarloRequestMapMaxRecords);
       auto options = minera::parse_monte_carlo_params(
           lookup, present, map_record_limit);
-      cached_imported_markings(request, *session, selected_miner, options,
-                               "monte_carlo_initial_marking", "monte_carlo_final_marking");
+      cached_imported_monte_carlo_context(request, *session, selected_miner, options);
       validate_monte_carlo_server_limits(options, selected);
       std::optional<minera::EventLog> projected_powl_log;
       const minera::EventLog* simulation_log =
