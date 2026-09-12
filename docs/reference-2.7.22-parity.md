@@ -2159,8 +2159,44 @@ regressions. Independent review reports no remaining actionable findings.
 The public exporter preserves explicit zero marking entries, while the public
 importer drops them. These separately captured observations do not establish
 importer parity: Minera's document parser retains the XML membership metadata.
-Display layout, arbitrary PNML extensions, and the supplied-model conformance
-routes remain outside this export checkpoint. No catalogue row is promoted.
+Display layout and arbitrary PNML extensions remain outside this export
+checkpoint. Supplied-model conformance propagation is described below.
+No catalogue row is promoted.
+
+## Supplied PNML model context
+
+`--check-pnml` and `/api/check-model` retain the imported document's numeric
+markings, explicit zero marking keys, original node IDs, and stochastic map.
+Replay and element-usage comparison receive the numeric and identity metadata;
+reachability, footprints, alignment, evaluation, analysis, and playout receive
+the marking vectors supported by their APIs. Subsequent imported-model PNML
+exports serialize the retained document. Replacing the cached model with BPMN
+or PTML clears its PNML metadata, and failed imports do not replace the cache.
+
+The supplied-model adapters infer a token only when the corresponding marking
+has no keys and there is exactly one structural boundary. Explicit zero keys
+suppress inference; ambiguous and empty nets retain empty markings. This is
+an adapter compatibility policy, not a claim of public PNML importer parity.
+The standalone replay/comparison routes keep their existing raw-document
+import policy. Explicit marking overrides take precedence independently for
+each vector; comparison overrides derive that vector's keys from positive
+entries. Firing beyond the native token range raises an error before overflow.
+
+`scripts/check-pnml-model-transports.py` covers weighted, multiple-place,
+nonboundary, zero, omitted, ambiguous, empty, and named-duplicate inputs across
+CLI and cached HTTP consumers. It checks document roundtrips, independent
+marking overrides, BPMN/PTML replacement, discovered-model defaults, and token
+range errors. Registered native regressions cover explicit footprints and
+reachability, adapter inference and key membership, and firing at token limits.
+The isolated checkpoint passes all 149 registered native suites and 26
+transport checks. The catalogue audit passes; independent review's overflow
+finding was fixed and reviewed again with no remaining actionable findings.
+
+Evaluation APIs currently accept numeric vectors but not all identity/key
+metadata. Stochastic-map log fitting lacks marking options, and Monte Carlo
+automatic weight fitting still uses default replay markings. Decision mining,
+streaming replay, and BPMN/PTML conversion require separate context work.
+These limitations remain open; this checkpoint does not promote catalogue rows.
 
 ## Token-replay parity evidence
 
@@ -2232,9 +2268,9 @@ initialization, strict exhaustive booleans, and retained backwards behavior.
 Independent review reports no actionable findings, and the catalogue verifier
 passes without coverage promotion.
 
-Downstream precision/evaluation proof remains partial. The legacy model-check
-routes do not yet carry all general-net marking-key metadata. Document export
-preservation is covered above; this checkpoint does not promote any catalogue row.
+Downstream precision/evaluation proof remains partial. Supplied-model marking
+propagation and its remaining consumer limitations are recorded above.
+This checkpoint does not promote any catalogue row.
 
 The backwards token-replay variation independently follows the pinned legacy
 behavior: unknown labels are ignored, same-label transitions are evaluated

@@ -383,6 +383,11 @@ struct FootprintResult {
 // unsound net.
 [[nodiscard]] FootprintResult check_footprints(const EventLog& event_log,
                                                const PetriNet& net);
+// An empty marking selects the workflow default; otherwise one nonnegative
+// token count is required per place, including for an explicit zero marking.
+[[nodiscard]] FootprintResult check_footprints(
+    const EventLog& event_log, const PetriNet& net,
+    const std::vector<int>& initial_marking);
 [[nodiscard]] FootprintResult check_footprints(const EventLog& event_log,
                                                const ProcessTree& tree);
 
@@ -552,6 +557,11 @@ struct ActivityDeviation {
 // alignment. Cheap: a single shortest-run search. The Alpha Miner can produce
 // nets that fail this (e.g. concurrent start/end activities overflow the sink).
 [[nodiscard]] bool final_marking_reachable(const PetriNet& net);
+// Empty markings select the corresponding workflow defaults. Nonempty
+// markings must contain one nonnegative token count per place.
+[[nodiscard]] bool final_marking_reachable(
+    const PetriNet& net, const std::vector<int>& initial_marking,
+    const std::vector<int>& final_marking);
 
 // Computes optimal alignments of every trace variant against the model using a
 // uniform-cost search over the synchronous product, and reports cost-based

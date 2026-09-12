@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -189,7 +190,11 @@ void fire_petri_transition(const PetriTransition& transition,
                            std::vector<Token>& marking) {
   for (const auto place : transition.inputs) --marking[place];
   for (const auto place : transition.reset_inputs) marking[place] = 0;
-  for (const auto place : transition.outputs) ++marking[place];
+  for (const auto place : transition.outputs) {
+    if (marking[place] == std::numeric_limits<Token>::max())
+      throw std::overflow_error("Petri firing exceeds supported token range");
+    ++marking[place];
+  }
 }
 
 // Translates a block-structured process tree into an equivalent workflow net.

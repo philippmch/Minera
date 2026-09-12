@@ -2684,7 +2684,8 @@ Relation log_footprint(const EventLog& log) {
 // silent edges to a fixpoint, so every marking's silent closure is computed
 // once for the whole graph rather than re-searched per query — which is what
 // keeps concurrent nets (whose marking spaces are large) tractable.
-Relation model_footprint(const PetriNet& net, bool& exhausted) {
+Relation model_footprint(const PetriNet& net, const Marking& initial,
+                         bool& exhausted) {
   const auto& names = net.activities();
   const std::size_t acts = names.size();
   const std::size_t words = (acts + 63) / 64;
@@ -2707,16 +2708,13 @@ Relation model_footprint(const PetriNet& net, bool& exhausted) {
     return next;
   };
 
-  Marking start(net.place_count(), 0);
-  start[net.source()] = 1;
-
   // Bounded breadth-first exploration. Only the silent edges are stored (for
   // the label propagation); visible successors are re-fired in the final pass
   // so the usually far larger visible edge set never has to be kept.
   std::vector<std::pair<std::uint32_t, std::uint32_t>> silent_edges;
   std::vector<char> was_expanded;
   std::queue<std::uint32_t> frontier;
-  frontier.push(intern(std::move(start)).first);
+  frontier.push(intern(initial).first);
   std::size_t expanded = 0;
   while (!frontier.empty()) {
     if (expanded++ >= kFootprintCap) {
@@ -2828,8 +2826,14 @@ FootprintResult compare_footprints(const Relation& log, const Relation& model,
 
 FootprintResult check_footprints(const EventLog& event_log,
                                  const PetriNet& net) {
+  return check_footprints(event_log, net, {});
+}
+
+FootprintResult check_footprints(const EventLog& event_log, const PetriNet& net,
+                                 const std::vector<int>& initial_marking) {
+  const auto initial = resolve_workflow_marking(net, initial_marking, true);
   bool exhausted = false;
-  const auto model = model_footprint(net, exhausted);
+  const auto model = model_footprint(net, initial, exhausted);
   return compare_footprints(log_footprint(event_log), model, exhausted);
 }
 
@@ -3336,9 +3340,18 @@ replay_firing_sequences(const PetriNet& net,
 }
 
 bool final_marking_reachable(const PetriNet& net) {
+  return final_marking_reachable(net, {}, {});
+}
+
+bool final_marking_reachable(const PetriNet& net,
+                             const std::vector<int>& initial_marking,
+                             const std::vector<int>& final_marking) {
   // The Aligner computes final-marking reachability in its constructor as the
   // precondition for scoring, so reuse it rather than duplicate the search.
-  return Aligner(net).reachable();
+  AlignmentOptions options;
+  options.initial_marking = initial_marking;
+  options.final_marking = final_marking;
+  return Aligner(net, options).reachable();
 }
 
 }  // namespace minera

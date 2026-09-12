@@ -2,6 +2,7 @@
 #include "minera/bpmn.hpp"
 #include "minera/pnml.hpp"
 #include "minera/petri_usage_comparison.hpp"
+#include "../tools/pnml_model_options.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -909,7 +910,194 @@ void forward_nested_hidden_routing_public_contract() {
 }
 }  // namespace
 
+namespace {
+void supplied_pnml_model_defaults_and_keys() {
+  const std::string skeleton = R"(<pnml><net id="n"><place id="start"/>
+    <place id="middle"/><place id="finish"/>
+    <transition id="visible-a"><name><text>a</text></name></transition>
+    <transition id="visible-b"><name><text>b</text></name></transition>
+    <arc source="start" target="visible-a"/><arc source="visible-a" target="middle"/>
+    <arc source="middle" target="visible-b"/><arc source="visible-b" target="finish"/>
+    </net></pnml>)";
+  const auto inferred = tools::parse_pnml_model(skeleton);
+  assert((inferred.initial_marking == std::vector<std::int64_t>{1, 0, 0}));
+  assert((inferred.final_marking == std::vector<std::int64_t>{0, 0, 1}));
+  assert((inferred.initial_marking_keys == std::vector<bool>{true, false, false}));
+  assert((inferred.final_marking_keys == std::vector<bool>{false, false, true}));
+  auto zero_xml = skeleton;
+  zero_xml.replace(zero_xml.find("<place id=\"start\"/>"),
+                   std::string("<place id=\"start\"/>").size(),
+                   "<place id=\"start\"><initialMarking><text>0</text>"
+                   "</initialMarking></place>");
+  zero_xml.insert(zero_xml.find("</net>"),
+      "<finalmarkings><marking><place idref=\"finish\"><text>0</text>"
+      "</place></marking></finalmarkings>");
+  const auto zero = tools::parse_pnml_model(zero_xml);
+  assert((zero.initial_marking == std::vector<std::int64_t>{0, 0, 0}));
+  assert(zero.initial_marking_keys == inferred.initial_marking_keys);
+  assert((zero.final_marking == std::vector<std::int64_t>{0, 0, 0}));
+  assert(zero.final_marking_keys == inferred.final_marking_keys);
+  const auto again = tools::parse_pnml_model(to_pnml(zero));
+  assert(again.initial_marking == zero.initial_marking);
+  assert(again.final_marking == zero.final_marking);
+
+  TokenReplayOptions replay_base;
+  replay_base.cleaning_token_flood = true;
+  replay_base.exhaustive_invisible_exploration = true;
+  replay_base.activity_attribute = "selected";
+  const auto replay = tools::pnml_replay_options(zero, replay_base);
+  assert(replay.cleaning_token_flood && replay.exhaustive_invisible_exploration);
+  assert(replay.activity_attribute == "selected");
+  assert(replay.place_names == zero.place_ids);
+  assert(replay.transition_names == zero.transition_ids);
+  assert(replay.initial_marking_keys == zero.initial_marking_keys);
+  assert(replay.final_marking_keys == zero.final_marking_keys);
+  AlignmentOptions alignment_base;
+  alignment_base.activity_attribute = "selected";
+  const auto alignment = tools::pnml_alignment_options(zero, alignment_base);
+  assert(alignment.initial_marking == replay.initial_marking);
+  assert(alignment.final_marking == replay.final_marking);
+  assert(alignment.activity_attribute == "selected");
+  PetriUsageComparisonOptions comparison_base;
+  comparison_base.stop_immediately_unfit = true;
+  const auto comparison = tools::pnml_comparison_options(zero, comparison_base);
+  assert(comparison.stop_immediately_unfit);
+  assert(comparison.place_names == zero.place_ids);
+  assert(comparison.transition_names == zero.transition_ids);
+  assert(comparison.initial_marking_keys == zero.initial_marking_keys);
+  assert(comparison.final_marking_keys == zero.final_marking_keys);
+
+  const auto ambiguous = tools::parse_pnml_model(
+      "<pnml><net id=\"n\"><place id=\"x\"/><place id=\"y\"/></net></pnml>");
+  assert((ambiguous.initial_marking == std::vector<std::int64_t>{0, 0}));
+  assert((ambiguous.final_marking == std::vector<std::int64_t>{0, 0}));
+  assert((ambiguous.initial_marking_keys == std::vector<bool>{false, false}));
+  const auto empty = tools::parse_pnml_model("<pnml><net id=\"n\"/></pnml>");
+  assert(empty.initial_marking.empty() && empty.final_marking.empty());
+
+  const auto rejects = [](const auto& query) {
+    bool rejected = false;
+    try { query(); } catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  assert(tools::pnml_marking<int>({2147483647}).front() == 2147483647);
+  rejects([] { (void)tools::pnml_marking<int>({2147483648}); });
+  rejects([] { (void)tools::pnml_marking<std::uint32_t>({-1}); });
+  rejects([] { (void)tools::pnml_marking<std::uint32_t>({4294967296}); });
+  rejects([] { (void)tools::parse_pnml_model(
+      "<pnml><net id=\"n\"><place id=\"x\"><initialMarking>"
+      "<text>2147483648</text></initialMarking></place></net></pnml>"); });
+}
+
+void explicit_marking_conformance_queries() {
+  PetriNet weighted;
+  weighted.set_activities({"a", "b"});
+  const auto source = weighted.add_place();
+  const auto middle = weighted.add_place();
+  const auto sink = weighted.add_place();
+  weighted.set_source(source);
+  weighted.set_sink(sink);
+  weighted.add_transition(0, {source, source}, {middle});
+  weighted.add_transition(1, {middle}, {sink});
+  const auto log = log_of({{"a", "b"}});
+  const auto defaults = check_footprints(log, weighted);
+  const auto explicit_default = check_footprints(log, weighted, {1, 0, 0});
+  assert(defaults.model_relations == 0 && defaults.fitness == 0.0);
+  assert(explicit_default.model_relations == defaults.model_relations);
+  assert(explicit_default.fitness == defaults.fitness);
+  const auto supplied = check_footprints(log, weighted, {2, 0, 0});
+  assert(supplied.model_relations == 1 && supplied.shared_relations == 1);
+  assert(supplied.fitness == 1.0 && supplied.precision == 1.0);
+  assert(supplied.log_only.empty() && supplied.model_only.empty());
+  assert(!supplied.exhausted);
+  assert(!final_marking_reachable(weighted));
+  assert(!final_marking_reachable(weighted, {1, 0, 0}, {0, 0, 1}));
+  assert(final_marking_reachable(weighted, {2, 0, 0}, {0, 0, 1}));
+  assert(!final_marking_reachable(weighted, {2, 0, 0}, {0, 0, 2}));
+
+  const auto sequence = sequential();
+  assert(final_marking_reachable(sequence));
+  assert(final_marking_reachable(sequence, {}, {}));
+  assert(final_marking_reachable(sequence, {1, 0, 0}, {0, 0, 1}));
+  assert(!final_marking_reachable(sequence, {0, 0, 0}, {0, 0, 1}));
+  assert(final_marking_reachable(sequence, {0, 0, 0}, {0, 0, 0}));
+  assert(check_footprints(log, sequence).shared_relations == 1);
+  assert(check_footprints(log, sequence, {}).shared_relations == 1);
+  assert(check_footprints(log, sequence, {0, 0, 0}).shared_relations == 0);
+
+  // An already marked sink must survive the run; the target is an exact
+  // marking, rather than a test for the presence of any sink token.
+  assert(final_marking_reachable(sequence, {1, 0, 1}, {0, 1, 1}));
+  assert(final_marking_reachable(sequence, {1, 0, 1}, {0, 0, 2}));
+  assert(!final_marking_reachable(sequence, {1, 0, 1}, {0, 0, 1}));
+  assert(check_footprints(log, sequence, {1, 0, 1}).shared_relations == 1);
+
+  const PetriNet empty;
+  const auto empty_footprint = check_footprints(EventLog{}, empty);
+  assert(empty_footprint.model_relations == 0 && !empty_footprint.exhausted);
+  assert(empty_footprint.fitness == 1.0 && empty_footprint.precision == 1.0);
+  assert(check_footprints(log, empty, {}).model_relations == 0);
+  assert(final_marking_reachable(empty));
+  assert(final_marking_reachable(empty, {}, {}));
+
+  const auto rejects = [](const auto& query) {
+    bool rejected = false;
+    try { query(); } catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  };
+  for (const auto& invalid : std::vector<std::vector<int>>{
+           {1}, {1, 0, 0, 0}, {0, -1, 0}}) {
+    rejects([&] { (void)check_footprints(log, sequence, invalid); });
+    rejects([&] { (void)final_marking_reachable(sequence, invalid, {0, 0, 1}); });
+    rejects([&] { (void)final_marking_reachable(sequence, {1, 0, 0}, invalid); });
+  }
+  rejects([&] { (void)check_footprints(log, empty, {0}); });
+  rejects([&] { (void)final_marking_reachable(empty, {0}, {}); });
+  rejects([&] { (void)final_marking_reachable(empty, {}, {0}); });
+}
+
+void supplied_marking_firing_overflow() {
+  PetriNet net;
+  net.set_activities({"a"});
+  net.add_place();
+  net.add_place();
+  net.add_transition(0, {1}, {0});
+  const std::vector<int> initial{std::numeric_limits<int>::max(), 1};
+  const auto rejects_overflow = [](const auto& query) {
+    bool rejected = false;
+    try { query(); } catch (const std::overflow_error&) { rejected = true; }
+    assert(rejected);
+  };
+  rejects_overflow([&] { (void)final_marking_reachable(net, initial, {0, 0}); });
+  rejects_overflow([&] { (void)check_footprints(log_of({{"a"}}), net, initial); });
+  TokenReplayOptions replay;
+  replay.initial_marking = initial;
+  replay.final_marking = {0, 0};
+  rejects_overflow([&] { (void)replay_token_traces(log_of({{"a"}}), net, replay); });
+  AlignmentOptions alignment;
+  alignment.initial_marking = initial;
+  alignment.final_marking = {0, 0};
+  rejects_overflow([&] { (void)check_alignment(log_of({{"a"}}), net, alignment); });
+  std::vector<std::uint32_t> unsigned_marking{
+      std::numeric_limits<std::uint32_t>::max(), 1};
+  rejects_overflow([&] { fire_petri_transition(net.transitions()[0], unsigned_marking); });
+
+  // Consume/reset before producing, so firings at the limit remain valid
+  // when their actual postmarking is representable.
+  PetriTransition self_loop{0, {0}, {0}, {}, {}};
+  auto at_limit = initial;
+  fire_petri_transition(self_loop, at_limit);
+  assert(at_limit == initial);
+  PetriTransition reset{0, {}, {0}, {0}, {}};
+  fire_petri_transition(reset, at_limit);
+  assert((at_limit == std::vector<int>{1, 1}));
+}
+}  // namespace
+
 int main() {
+  supplied_pnml_model_defaults_and_keys();
+  supplied_marking_firing_overflow();
+  explicit_marking_conformance_queries();
   forward_nested_hidden_routing_public_contract();
   forward_cleaning_public_counter_contract();
   forward_weighted_repair_and_partial_stop_contract();
