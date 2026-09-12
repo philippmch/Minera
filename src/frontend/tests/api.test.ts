@@ -1646,6 +1646,28 @@ describe("trie-to-Petri conversion API", () => {
 });
 
 describe("Monte Carlo API", () => {
+  it("accepts shifted and zero-scale lognormal/gamma services", () => {
+    for (const distribution of ["lognormal", "gamma"] as const) {
+      const query = new URLSearchParams(monteCarloQuery({ transition_durations: [
+        { distribution, value_seconds: 2, secondary_seconds: -1, tertiary_seconds: 3 },
+        { distribution, value_seconds: 2, secondary_seconds: 3, tertiary_seconds: 0 },
+      ] }));
+      expect(query.get("monte_carlo_transition_durations"))
+        .toBe(`${distribution}:2;-1;3,${distribution}:2;3;0`);
+      for (const [shape, location, scale] of [[0, 0, 0], [1, -1, 0], [1, 0, -1]]) {
+        expect(() => monteCarloQuery({ transition_durations: [
+          { distribution, value_seconds: shape, secondary_seconds: location, tertiary_seconds: scale },
+        ] })).toThrow(/valid distribution parameters/);
+      }
+    }
+    const record = { transition: 0, timing: "timed" as const, distribution: "gamma" as const,
+      parameter: 0, secondary_parameter: 2, tertiary_parameter: 0, activation_weight: 1, priority: 0 };
+    expect(new URLSearchParams(monteCarloQuery({ provided_stochastic_map: [record] }))
+      .get("monte_carlo_provided_stochastic_map")).toBe("0:timed:gamma:0:2:0:1:0");
+    expect(() => monteCarloQuery({ provided_stochastic_map: [{ ...record, secondary_parameter: 0 }] }))
+      .toThrow(/shape positive/);
+  });
+
   it("accepts signed service laws with nonnegative support", () => {
     const query = new URLSearchParams(monteCarloQuery({ transition_durations: [
       { distribution: "normal", value_seconds: -2, secondary_seconds: 1 },

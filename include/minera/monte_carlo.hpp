@@ -56,9 +56,11 @@ struct MonteCarloDuration {
   // allowed with positive deviation. Samples condition on nonnegative values.
   // Uniform: interval width/scale (must be non-negative). A negative lower
   // bound requires a positive upper bound; samples condition on [0, upper].
-  // Lognormal/gamma: location (must be non-negative).
+  // Lognormal/gamma: signed location; positive-scale draws condition on
+  // nonnegative service time. Zero scale requires a nonnegative location.
   double secondary_seconds = 0.0;
-  // Lognormal/gamma: positive scale. Unused by the other distributions.
+  // Lognormal/gamma: nonnegative scale; zero returns the location. Shape
+  // remains positive, including zero-scale laws. Unused by other distributions.
   double tertiary_seconds = 0.0;
 };
 

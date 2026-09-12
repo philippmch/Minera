@@ -4606,8 +4606,8 @@ function validateMonteCarloMapTransition(
         throw new Error("provided_stochastic_map duration means must be non-negative");
       break;
     case "gamma":
-      if (parameter <= 0 || secondary <= 0)
-        throw new Error("provided_stochastic_map gamma scale and shape must be positive");
+      if (parameter < 0 || secondary <= 0)
+        throw new Error("provided_stochastic_map gamma scale must be non-negative and shape positive");
       break;
     case "constant0":
     case "immediate":
@@ -4717,8 +4717,9 @@ export function monteCarloQuery(options: MonteCarloOptions = {}): string {
             .includes(distribution)) return true;
           const secondary = duration.secondary_seconds;
           const tertiary = duration.tertiary_seconds;
-          if (secondary !== undefined && (!Number.isFinite(secondary) || secondary < 0)) return true;
-          if (tertiary !== undefined && (!Number.isFinite(tertiary) || tertiary <= 0)) return true;
+          const shapeFamily = distribution === "lognormal" || distribution === "gamma";
+          if (secondary !== undefined && (!Number.isFinite(secondary) || (!shapeFamily && secondary < 0))) return true;
+          if (tertiary !== undefined && (!Number.isFinite(tertiary) || tertiary < 0 || (!shapeFamily && tertiary === 0))) return true;
           if ((distribution === "normal" || distribution === "uniform") && secondary === undefined) return true;
           if (duration.value_seconds < 0 && distribution !== "normal" && distribution !== "uniform") return true;
           if (distribution === "normal" && duration.value_seconds < 0 && secondary === 0) return true;
@@ -4726,8 +4727,8 @@ export function monteCarloQuery(options: MonteCarloOptions = {}): string {
             const upper = duration.value_seconds + (secondary ?? 0);
             if (!Number.isFinite(upper) || (duration.value_seconds < 0 && upper <= 0)) return true;
           }
-          if ((distribution === "lognormal" || distribution === "gamma") &&
-              (duration.value_seconds <= 0 || (tertiary !== undefined && tertiary <= 0))) return true;
+          if (shapeFamily && (duration.value_seconds <= 0 ||
+              (tertiary === 0 && (secondary ?? 0) < 0))) return true;
           return false;
         })) {
       throw new Error("transition_durations must contain valid distribution parameters");

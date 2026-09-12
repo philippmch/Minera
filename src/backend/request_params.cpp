@@ -4155,8 +4155,11 @@ MonteCarloParams parse_monte_carlo_params(
       if (values.size() > 2) duration.tertiary_seconds = values[2];
       const bool signed_location = kind == MonteCarloDurationDistribution::kNormal ||
                                    kind == MonteCarloDurationDistribution::kUniform;
+      const bool shape_family = kind == MonteCarloDurationDistribution::kLogNormal ||
+                                kind == MonteCarloDurationDistribution::kGamma;
       if ((!signed_location && duration.value_seconds < 0.0) ||
-          duration.secondary_seconds < 0.0 || duration.tertiary_seconds < 0.0)
+          (!shape_family && duration.secondary_seconds < 0.0) ||
+          duration.tertiary_seconds < 0.0)
         throw std::invalid_argument(
             "monte_carlo_transition_durations: invalid negative parameter");
       if (kind == MonteCarloDurationDistribution::kNormal &&
@@ -4169,11 +4172,11 @@ MonteCarloParams parse_monte_carlo_params(
             duration.value_seconds + duration.secondary_seconds <= 0.0)))
         throw std::invalid_argument(
             "monte_carlo_transition_durations: uniform requires finite non-negative support");
-      if ((kind == MonteCarloDurationDistribution::kLogNormal ||
-           kind == MonteCarloDurationDistribution::kGamma) &&
-          (duration.value_seconds <= 0.0 || duration.tertiary_seconds <= 0.0))
+      if (shape_family &&
+          (duration.value_seconds <= 0.0 ||
+           (duration.tertiary_seconds == 0.0 && duration.secondary_seconds < 0.0)))
         throw std::invalid_argument(
-            "monte_carlo_transition_durations lognormal/gamma shape and scale must be positive");
+            "monte_carlo_transition_durations lognormal/gamma require positive shape and nonnegative support");
       params.transition_durations.push_back(duration);
       begin = i + 1;
     }
