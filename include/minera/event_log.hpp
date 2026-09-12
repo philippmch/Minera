@@ -151,10 +151,17 @@ struct EventAttribute {
       FirstClassAttributeState::kMissing;
   std::string first_class_source_key;
 
+  // A scalar represented as a value/children wrapper retains its identity
+  // even when the child mapping is empty. Nonempty children imply wrapping.
+  bool scalar_wrapper = false;
+  // Ordered key/value child pairs, including duplicate keys; implies wrapping.
+  bool scalar_children_list = false;
+
   bool operator==(const EventAttribute& other) const {
     if (key != other.key || value != other.value || kind != other.kind ||
         is_null != other.is_null || container != other.container ||
-        children != other.children ||
+        children != other.children || scalar_wrapper != other.scalar_wrapper ||
+        scalar_children_list != other.scalar_children_list ||
         first_class_role != other.first_class_role ||
         first_class_state != other.first_class_state ||
         first_class_source_key != other.first_class_source_key)
@@ -374,6 +381,8 @@ inline void set_trace_case_id(Trace& trace, std::string value) {
     selected.is_null = false;
     selected.container = AttributeContainerKind::kScalar;
     selected.children.clear();
+    selected.scalar_wrapper = false;
+    selected.scalar_children_list = false;
     if (selected.kind == AttributeKind::kDate ||
         selected.kind == AttributeKind::kInt ||
         selected.kind == AttributeKind::kFloat ||
@@ -431,6 +440,8 @@ inline void set_event_activity_context(const Event& source, std::string value,
   selected.is_null = false;
   selected.container = AttributeContainerKind::kScalar;
   selected.children.clear();
+  selected.scalar_wrapper = false;
+  selected.scalar_children_list = false;
   if (selected.kind != AttributeKind::kString &&
       selected.kind != AttributeKind::kId) {
     selected.kind = AttributeKind::kString;

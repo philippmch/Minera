@@ -76,6 +76,8 @@ void set_event_value(Event& event, const std::string& key,
       attribute.is_null = false;
       attribute.container = AttributeContainerKind::kScalar;
       attribute.children.clear();
+      attribute.scalar_wrapper = false;
+      attribute.scalar_children_list = false;
       if (attribute.kind != AttributeKind::kString &&
           attribute.kind != AttributeKind::kId) {
         attribute.kind = AttributeKind::kString;

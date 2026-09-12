@@ -101,8 +101,9 @@ export function buildXesExportOptions(
   variant: XesExportOptions["variant"],
   compress: boolean,
   inferMetadata: boolean,
+  preserveNulls = false,
 ): XesExportOptions {
-  return { variant, compress, inferMetadata };
+  return { variant, compress, inferMetadata, preserveNulls };
 }
 
 export function XesButton({ dataset }: { dataset: string }) {
@@ -111,11 +112,12 @@ export function XesButton({ dataset }: { dataset: string }) {
   const [variant, setVariant] = useState<"line_by_line" | "etree">("line_by_line");
   const [compress, setCompress] = useState(false);
   const [inferMetadata, setInferMetadata] = useState(false);
+  const [preserveNulls, setPreserveNulls] = useState(false);
 
   const download = () => {
     setBusy(true);
     setError(null);
-    fetchXes(buildXesExportOptions(variant, compress, inferMetadata))
+    fetchXes(buildXesExportOptions(variant, compress, inferMetadata, preserveNulls))
       .then((blob) => {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
@@ -137,6 +139,7 @@ export function XesButton({ dataset }: { dataset: string }) {
       </select>
       <label><input type="checkbox" checked={compress} onChange={(event) => setCompress(event.target.checked)} /> gzip</label>
       <label><input aria-label="Infer XES metadata" type="checkbox" checked={inferMetadata} onChange={(event) => setInferMetadata(event.target.checked)} /> infer metadata</label>
+      <label><input aria-label="Preserve null markers" type="checkbox" checked={preserveNulls} onChange={(event) => setPreserveNulls(event.target.checked)} /> preserve null markers</label>
       <button className="btn-ghost" onClick={download} disabled={busy}>
         {busy ? "Exporting…" : "Download log as XES"}
       </button>

@@ -513,6 +513,7 @@ int usage(const char* program) {
                "  --xes-export-variant <id> line_by_line or etree\n"
                "  --xes-compress <bool>     Override .gz output detection\n"
                "  --xes-infer-metadata <bool> Add standard inferred declarations\n"
+               "  --xes-preserve-nulls <bool> Emit native explicit-null markers\n"
                "  --log-convert <id>       Event-log conversion selector\n"
                "                            to_event_log, to_event_stream,\n"
                "                            to_data_frame, to_nx, df_to_event_log_1v,\n"
@@ -4069,7 +4070,7 @@ int main(int argc, char** argv) {
         arg == "--xes-require-timestamp" ||
         arg == "--xes-max-decompressed-bytes" ||
         arg == "--xes-export-variant" || arg == "--xes-compress" ||
-        arg == "--xes-infer-metadata") {
+        arg == "--xes-infer-metadata" || arg == "--xes-preserve-nulls") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       try {
@@ -4102,6 +4103,8 @@ int main(int argc, char** argv) {
           xes_export_options.compress = parse_boolean(value, arg);
         if (arg == "--xes-infer-metadata")
           xes_export_options.infer_metadata = parse_boolean(value, arg);
+        if (arg == "--xes-preserve-nulls")
+          xes_export_options.preserve_nulls = parse_boolean(value, arg);
         if ((arg == "--xes-case-attribute" ||
              arg == "--xes-activity-attribute" ||
              arg == "--xes-timestamp-attribute" ||

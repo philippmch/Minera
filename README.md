@@ -16,7 +16,9 @@ and tracks every family as complete, partial, or missing.
   reading and writing the common `concept:name` / `time:timestamp` /
   `org:resource` attribute subset — so a log can be cleaned and filtered in
   Minera, then handed to any other XES-speaking tool (CLI `--xes`, or the
-  frontend's **Download log as XES** button). Scalar log-level, case-level, and
+  frontend's **Download log as XES** button). Null attributes are omitted by
+  default; `--xes-preserve-nulls true` or the download's **preserve null markers**
+  option retains Minera's explicit-null extension. Scalar log-level, case-level, and
   generic event attributes retain their XES types through import/export
   round-trips, including alignment projection metadata.
 - In-memory event log model grouped into traces.

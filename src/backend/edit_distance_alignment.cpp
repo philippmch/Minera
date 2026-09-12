@@ -274,6 +274,8 @@ EventAttribute projected_activity_attribute(const EventAttribute& source,
   result.is_null = false;
   result.container = AttributeContainerKind::kScalar;
   result.children.clear();
+  result.scalar_wrapper = false;
+  result.scalar_children_list = false;
   if (result.kind != AttributeKind::kString && result.kind != AttributeKind::kId)
     result.kind = AttributeKind::kString;
   result.typed_value = std::monostate{};

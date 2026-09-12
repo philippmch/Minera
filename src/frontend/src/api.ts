@@ -3303,6 +3303,7 @@ export async function fetchPtml(miner?: string): Promise<string> {
  * cached session, so it only works for a log mined this session.
  */
 export interface XesExportOptions {
+  preserveNulls?: boolean;
   variant?: "line_by_line" | "etree";
   compress?: boolean;
   inferMetadata?: boolean;
@@ -3374,6 +3375,11 @@ export function xesExportQuery(options: XesExportOptions = {}): string {
     query.set("xes_compress", String(options.compress));
   if (options.inferMetadata !== undefined)
     query.set("xes_infer_metadata", String(options.inferMetadata));
+  if (options.preserveNulls !== undefined) {
+    if (typeof options.preserveNulls !== "boolean")
+      throw new Error("XES preserveNulls must be boolean");
+    query.set("xes_preserve_nulls", String(options.preserveNulls));
+  }
   return query.toString();
 }
 

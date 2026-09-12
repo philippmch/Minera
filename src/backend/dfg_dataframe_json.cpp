@@ -160,6 +160,8 @@ void write_attribute(std::ostream& out, const EventAttribute& attribute) {
     out << ",\"first_class_source_key\":";
     write_string(out, attribute.first_class_source_key);
   }
+  if (attribute.scalar_wrapper) out << ",\"scalar_wrapper\":true";
+  if (attribute.scalar_children_list) out << ",\"scalar_children_list\":true";
   if (!attribute.children.empty()) {
     out << ",\"children\":";
     write_attributes(out, attribute.children);

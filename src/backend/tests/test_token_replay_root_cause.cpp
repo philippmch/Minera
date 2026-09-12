@@ -444,7 +444,13 @@ void tuple_key_contracts() {
   require(null_models[0].source_trace_indices.front() == 1,
           "retained null tuple metadata does not match the stale tuple contents");
   retained.is_null = true;
-  std::istringstream null_xml(to_xes(log));
+  std::istringstream default_xml(to_xes(log));
+  const auto default_import = import_xes_event_log(default_xml);
+  const auto& default_attributes = default_import.traces[0].events[0].attributes;
+  require(std::none_of(default_attributes.begin(), default_attributes.end(),
+                      [](const auto& value) { return value.key == "task"; }),
+          "tuple null metadata is omitted by default");
+  std::istringstream null_xml(serialize_xes(log, {.preserve_nulls = true}));
   const auto null_import = import_xes_event_log(null_xml);
   const auto& null_attributes = null_import.traces[0].events[0].attributes;
   const auto null_cell = std::find_if(null_attributes.begin(), null_attributes.end(),

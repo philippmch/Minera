@@ -232,6 +232,17 @@ describe("isLogUtilityResult", () => {
     expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "TO_ACTIVITIES", activities: ["C", "B"], logs: [log] })).toBe(false);
     expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "FEATURE_SELECTION", event_attributes: ["activity"], case_attributes: "region" })).toBe(false);
   });
+  it("accepts scalar metadata and rejects malformed scalar flags", () => {
+    const attribute = { key: "payload", value: "", kind: "string", scalar_wrapper: true, scalar_children_list: false };
+    const withAttribute = { ...log, attributes: [attribute] };
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "FIXED_PREFIXES", log: withAttribute })).toBe(true);
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "FIXED_PREFIXES", log: {
+      ...withAttribute, attributes: [{ ...attribute, scalar_wrapper: "true" }],
+    } })).toBe(false);
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "FIXED_PREFIXES", log: {
+      ...withAttribute, attributes: [{ ...attribute, scalar_children_list: 1 }],
+    } })).toBe(false);
+  });
 });
 
 describe("isStreamingDfgResult", () => {

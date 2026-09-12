@@ -96,29 +96,52 @@ bool parse_float_value(std::string_view value, double& result) {
 
 std::string xes_date_lexical_value(std::string_view text,
                                  NativeDateResolution resolution) {
-  const auto instant = parse_timestamp(text);
-  if (!instant)
+  if (!parse_timestamp(text) || text.substr(0, 4) == "0000")
     throw std::invalid_argument("XES date attribute has an invalid value: " +
                                 std::string(text));
-  const auto dot = text.find('.');
-  if (dot == std::string_view::npos) return format_timestamp(*instant);
-  auto end = dot + 1;
-  while (end < text.size() && std::isdigit(static_cast<unsigned char>(text[end]))) ++end;
-  if (end - dot - 1 <= 3) return format_timestamp(*instant);
-
-  // Normalize the whole second independently so a rounded double cannot carry
-  // a final fractional digit into the next second or lose distant-date bits.
-  auto integral = std::string(text);
-  integral.erase(dot, end - dot);
-  const auto whole = parse_timestamp(integral);
-  if (!whole) throw std::invalid_argument("XES date has an invalid integral instant");
-  auto normalized = format_timestamp(*whole);
-  normalized.resize(normalized.find('.'));
-  normalized += '.';
+  // Serialize the source fields, never a floating-point epoch conversion: that
+  // would discard offsets, timezone absence, and distant-date nanoseconds.
+  std::string result(text.substr(0, 10));
+  result += 'T';
+  std::size_t position = 10;
+  if (position < text.size() &&
+      (text[position] == 'T' || text[position] == 't' || text[position] == ' ')) {
+    ++position;
+    result += text.substr(position, 5);
+    position += 5;
+    if (position < text.size() && text[position] == ':') {
+      result += text.substr(position, 3);
+      position += 3;
+    } else result += ":00";
+  } else result += "00:00:00";
+  std::string fraction;
+  if (position < text.size() && text[position] == '.') {
+    const auto begin = ++position;
+    while (position < text.size() &&
+           std::isdigit(static_cast<unsigned char>(text[position]))) ++position;
+    fraction = text.substr(begin, position - begin);
+  }
   const auto precision = resolution == NativeDateResolution::kNanosecond ? 9u : 6u;
-  normalized += text.substr(dot + 1, std::min<std::size_t>(precision, end - dot - 1));
-  normalized += 'Z';
-  return normalized;
+  fraction.resize(precision, '0');
+  if (precision == 9 && fraction.substr(6) == "000") fraction.resize(6);
+  if (fraction.find_first_not_of('0') != std::string::npos)
+    result += '.' + fraction;
+  if (position < text.size() && (text[position] == 'Z' || text[position] == 'z'))
+    result += "+00:00";
+  else if (position < text.size() && (text[position] == '+' || text[position] == '-')) {
+    const char sign = text[position++];
+    const auto hours = text.substr(position, 2);
+    position += 2;
+    if (position < text.size() && text[position] == ':') ++position;
+    const auto minutes = position + 2 <= text.size() &&
+        std::isdigit(static_cast<unsigned char>(text[position]))
+        ? text.substr(position, 2) : std::string_view("00");
+    result += hours == "00" && minutes == "00" ? '+' : sign;
+    result += hours;
+    result += ':';
+    result += minutes;
+  }
+  return result;
 }
 
 std::string scalar_lexical_value(const EventAttribute& attribute) {
@@ -174,7 +197,7 @@ std::string scalar_lexical_value(const EventAttribute& attribute) {
           attribute.value != "1" && attribute.value != "0")
         throw std::invalid_argument(
             "XES boolean attribute has an invalid value: " + attribute.value);
-      return attribute.value;
+      return attribute.value == "true" || attribute.value == "1" ? "true" : "false";
     case AttributeKind::kDate: {
       return xes_date_lexical_value(attribute.value, NativeDateResolution::kMicrosecond);
     }
@@ -184,6 +207,8 @@ std::string scalar_lexical_value(const EventAttribute& attribute) {
     case AttributeKind::kBytes: {
       auto scalar = attribute;
       scalar.children.clear();
+      scalar.scalar_wrapper = false;
+      scalar.scalar_children_list = false;
       scalar.container = AttributeContainerKind::kScalar;
       return root_cause_attribute_category(scalar);
     }
@@ -232,12 +257,25 @@ std::pair<std::string_view, std::string_view> mapping_key_entry(std::string_view
 }
 
 void write_typed_attribute(std::ostream& out, std::string_view indent,
-                           const EventAttribute& attribute, XesExportVariant variant) {
+                           const EventAttribute& attribute, XesExportVariant variant, bool preserve_nulls) {
   if (attribute.container == AttributeContainerKind::kTuple ||
       attribute.container == AttributeContainerKind::kSet ||
       attribute.container == AttributeContainerKind::kFrozenSet) {
     write_typed_attribute(out, indent, EventAttribute{attribute.key, root_cause_attribute_category(attribute),
-        AttributeKind::kString, attribute.is_null}, variant);
+        AttributeKind::kString, attribute.is_null}, variant, preserve_nulls);
+    return;
+  }
+  if (attribute.is_null && !preserve_nulls) {
+    const bool wrapped = attribute.scalar_wrapper || attribute.scalar_children_list ||
+        !attribute.children.empty() || attribute.container != AttributeContainerKind::kScalar;
+    if (!wrapped) return;
+    auto list = attribute;
+    list.is_null = false;
+    list.container = attribute.scalar_children_list ? AttributeContainerKind::kList :
+        (attribute.container == AttributeContainerKind::kList ? AttributeContainerKind::kList : AttributeContainerKind::kContainer);
+    list.scalar_wrapper = false;
+    list.scalar_children_list = false;
+    write_typed_attribute(out, indent, list, variant, preserve_nulls);
     return;
   }
   if (attribute.container != AttributeContainerKind::kScalar) {
@@ -258,18 +296,18 @@ void write_typed_attribute(std::ostream& out, std::string_view indent,
     if (!native_null_container) out << child_indent << "<values>\n";
     if (native_null_container) {
       for (const auto* child : mapped_children(attribute))
-        write_typed_attribute(out, child_indent, *child, variant);
+        write_typed_attribute(out, child_indent, *child, variant, preserve_nulls);
     } else if (attribute.container == AttributeContainerKind::kList) {
       for (const auto& child : attribute.children)
-        write_typed_attribute(out, child_indent + "  ", child, variant);
+        write_typed_attribute(out, child_indent + "  ", child, variant, preserve_nulls);
     } else {
       for (const auto* child : mapped_children(attribute)) {
         if (variant == XesExportVariant::kElementTree)
-          write_typed_attribute(out, child_indent + "  ", *child, variant);
+          write_typed_attribute(out, child_indent + "  ", *child, variant, preserve_nulls);
         else {
           const auto [key, value] = mapping_key_entry(child->key);
           write_typed_attribute(out, child_indent + "  ",
-              EventAttribute{std::string(key), std::string(value)}, variant);
+              EventAttribute{std::string(key), std::string(value)}, variant, preserve_nulls);
         }
       }
     }
@@ -277,6 +315,8 @@ void write_typed_attribute(std::ostream& out, std::string_view indent,
     out << indent << "</" << element << ">\n";
     return;
   }
+  if (attribute.scalar_children_list && variant == XesExportVariant::LINE_BY_LINE)
+    throw std::invalid_argument("LINE_BY_LINE cannot export scalar list children");
   if (attribute.is_null) {
     out << indent << '<' << element_name(attribute.kind) << " key=\"";
     write_xml_escaped(out, attribute.key);
@@ -285,24 +325,44 @@ void write_typed_attribute(std::ostream& out, std::string_view indent,
     } else {
       out << "\" null=\"true\">\n";
       const auto child_indent = std::string(indent) + "  ";
-      for (const auto* child : mapped_children(attribute))
-        write_typed_attribute(out, child_indent, *child, variant);
+      if (attribute.scalar_children_list) {
+        for (const auto& child : attribute.children)
+          write_typed_attribute(out, child_indent, child, variant, preserve_nulls);
+      } else {
+        for (const auto* child : mapped_children(attribute))
+          write_typed_attribute(out, child_indent, *child, variant, preserve_nulls);
+      }
       out << indent << "</" << element_name(attribute.kind) << ">\n";
     }
     return;
   }
-  const auto lexical = scalar_lexical_value(attribute);
+  auto lexical = scalar_lexical_value(attribute);
+  // ETREE uses Python's boolean spelling for scalar values with child metadata.
+  if (variant == XesExportVariant::ETREE &&
+      attribute.kind == AttributeKind::kBoolean &&
+      (attribute.scalar_wrapper || attribute.scalar_children_list || !attribute.children.empty()))
+    lexical = lexical == "true" ? "True" : "False";
+  if (variant == XesExportVariant::ETREE &&
+      attribute.kind == AttributeKind::kDate &&
+      (attribute.scalar_wrapper || attribute.scalar_children_list || !attribute.children.empty()))
+    lexical[10] = ' ';
   out << indent << '<' << element_name(attribute.kind) << " key=\"";
   write_xml_escaped(out, attribute.key);
   out << "\" value=\"";
   write_xml_escaped(out, lexical);
-  if (attribute.children.empty()) {
+  if (attribute.children.empty() &&
+      !(variant == XesExportVariant::LINE_BY_LINE && attribute.scalar_wrapper)) {
     out << "\"/>\n";
   } else {
     out << "\">\n";
     const auto child_indent = std::string(indent) + "  ";
-    for (const auto* child : mapped_children(attribute))
-      write_typed_attribute(out, child_indent, *child, variant);
+    if (attribute.scalar_children_list) {
+      for (const auto& child : attribute.children)
+        write_typed_attribute(out, child_indent, child, variant, preserve_nulls);
+    } else {
+      for (const auto* child : mapped_children(attribute))
+        write_typed_attribute(out, child_indent, *child, variant, preserve_nulls);
+    }
     out << indent << "</" << element_name(attribute.kind) << ">\n";
   }
 }
@@ -357,7 +417,7 @@ bool has_classifier_name(const std::vector<LogClassifier>& classifiers,
 
 void write_global(std::ostream& out, std::string_view scope,
                   const std::vector<EventAttribute>& attributes,
-                  bool infer_default_name, XesExportVariant variant) {
+                  bool infer_default_name, XesExportVariant variant, bool preserve_nulls) {
   out << "  <global scope=\"";
   write_xml_escaped(out, scope);
   out << "\">\n";
@@ -366,7 +426,7 @@ void write_global(std::ostream& out, std::string_view scope,
     has_concept_name = has_concept_name ||
                        (attribute.key == "concept:name" &&
                         !attribute.is_null);
-    write_typed_attribute(out, "    ", attribute, variant);
+    write_typed_attribute(out, "    ", attribute, variant, preserve_nulls);
   }
   if (!has_concept_name && infer_default_name) {
     write_string_attribute(out, "    ", "concept:name", "");
@@ -611,12 +671,14 @@ void add_projection_prefixes(std::set<std::string>& prefixes,
 void write_projection(std::ostream& out, std::string_view indent,
                        std::string_view key, std::string_view value,
                        AttributeKind kind, FirstClassAttributeState state,
-                       XesExportVariant variant,
+                       XesExportVariant variant, bool preserve_nulls,
                        const EventAttribute* nested_metadata = nullptr) {
   EventAttribute attribute{std::string(key), std::string(value), kind,
                            state == FirstClassAttributeState::kNull};
   if (nested_metadata) {
     attribute.children = nested_metadata->children;
+    attribute.scalar_wrapper = nested_metadata->scalar_wrapper;
+    attribute.scalar_children_list = nested_metadata->scalar_children_list;
     // The parent container is part of the selected attribute's type. Keep it
     // even when the convenient first-class text projection is used for value.
     attribute.container = nested_metadata->container;
@@ -626,14 +688,15 @@ void write_projection(std::ostream& out, std::string_view indent,
       attribute.typed_value = nested_metadata->typed_value;
     }
   }
-  write_typed_attribute(out, indent, attribute, variant);
+  write_typed_attribute(out, indent, attribute, variant, preserve_nulls);
 }
 
 const EventAttribute* nested_projection_metadata(
     const std::vector<EventAttribute>& attributes, std::string_view key) {
   const auto found = std::find_if(
       attributes.begin(), attributes.end(), [&](const auto& attribute) {
-        return attribute.key == key && !attribute.children.empty();
+        return attribute.key == key &&
+               (attribute.scalar_wrapper || attribute.scalar_children_list || !attribute.children.empty());
       });
   return found == attributes.end() ? nullptr : &*found;
 }
@@ -653,10 +716,12 @@ bool is_selected_copy(const EventAttribute& attribute,
          attribute.is_null == selected->is_null &&
          attribute.kind == selected->kind &&
          attribute.container == selected->container &&
+         attribute.scalar_wrapper == selected->scalar_wrapper &&
+         attribute.scalar_children_list == selected->scalar_children_list &&
          attribute.children == selected->children;
 }
 
-void write_event_attributes(std::ostream& out, const Event& event, XesExportVariant variant) {
+void write_event_attributes(std::ostream& out, const Event& event, XesExportVariant variant, bool preserve_nulls) {
   std::set<const EventAttribute*> consumed;
   if (present(event.activity_state, event.activity)) {
     const auto key =
@@ -665,7 +730,7 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
         first_class_metadata(event.activity_attribute, event.attributes, key);
     write_projection(out, "      ", key,
                      event.activity,
-                     AttributeKind::kString, event.activity_state, variant, nested);
+                     AttributeKind::kString, event.activity_state, variant, preserve_nulls, nested);
     if (nested && !event.activity_attribute) consumed.insert(nested);
   }
   if (present(event.timestamp_state, event.timestamp)) {
@@ -680,7 +745,7 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
                                parse_timestamp(event.timestamp))
                           ? AttributeKind::kDate
                           : AttributeKind::kString,
-                     event.timestamp_state, variant, nested);
+                     event.timestamp_state, variant, preserve_nulls, nested);
     if (nested && !event.timestamp_attribute) consumed.insert(nested);
   }
   if (present(event.resource_state, event.resource)) {
@@ -690,7 +755,7 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
         first_class_metadata(event.resource_attribute, event.attributes, key);
     write_projection(out, "      ", key,
                      event.resource,
-                     AttributeKind::kString, event.resource_state, variant, nested);
+                     AttributeKind::kString, event.resource_state, variant, preserve_nulls, nested);
     if (nested && !event.resource_attribute) consumed.insert(nested);
   }
   if (present(event.lifecycle_state, event.lifecycle)) {
@@ -700,7 +765,7 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
                                               event.attributes, key);
     write_projection(out, "      ", key,
                      event.lifecycle,
-                     AttributeKind::kString, event.lifecycle_state, variant, nested);
+                     AttributeKind::kString, event.lifecycle_state, variant, preserve_nulls, nested);
     if (nested && !event.lifecycle_attribute) consumed.insert(nested);
   }
 
@@ -727,7 +792,7 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
                           projection_key(event.lifecycle_source_key,
                                          "lifecycle:transition")));
     if (!consumed.contains(&attribute) && !selected_copy)
-      write_typed_attribute(out, "      ", attribute, variant);
+      write_typed_attribute(out, "      ", attribute, variant, preserve_nulls);
   }
 }
 
@@ -740,7 +805,7 @@ const EventAttribute* stored_log_name(const EventLog& log) {
 
 void write_xes_with_options(std::ostream& out, const EventLog& log,
                             std::string_view requested_name,
-                            bool infer_metadata, XesExportVariant variant) {
+                            bool infer_metadata, XesExportVariant variant, bool preserve_nulls) {
   const auto globals = effective_globals(log.metadata);
   std::set<std::string> inferred_prefixes;
   if (infer_metadata) {
@@ -789,20 +854,20 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
     if (infer_metadata) {
       const auto completed = complete_inferred_globals(globals);
       for (const auto& global : completed)
-        write_global(out, global.scope, global.attributes, false, variant);
+        write_global(out, global.scope, global.attributes, false, variant, preserve_nulls);
     } else {
       for (const auto& global : globals)
-        write_global(out, global.scope, global.attributes, false, variant);
+        write_global(out, global.scope, global.attributes, false, variant, preserve_nulls);
     }
   } else {
     if (!log.metadata.trace_globals.empty())
-      write_global(out, "trace", log.metadata.trace_globals, infer_metadata, variant);
+      write_global(out, "trace", log.metadata.trace_globals, infer_metadata, variant, preserve_nulls);
     else if (infer_metadata)
-      write_global(out, "trace", {}, true, variant);
+      write_global(out, "trace", {}, true, variant, preserve_nulls);
     if (!log.metadata.event_globals.empty())
-      write_global(out, "event", log.metadata.event_globals, infer_metadata, variant);
+      write_global(out, "event", log.metadata.event_globals, infer_metadata, variant, preserve_nulls);
     else if (infer_metadata)
-      write_global(out, "event", {}, true, variant);
+      write_global(out, "event", {}, true, variant, preserve_nulls);
   }
 
   for (const auto& classifier : log.metadata.classifiers) {
@@ -815,7 +880,7 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
   if (!requested_name.empty()) {
     write_string_attribute(out, "  ", "concept:name", requested_name);
   } else if (stored_name) {
-    write_typed_attribute(out, "  ", *stored_name, variant);
+    write_typed_attribute(out, "  ", *stored_name, variant, preserve_nulls);
   } else if (infer_metadata) {
     write_string_attribute(out, "  ", "concept:name", "log");
   }
@@ -828,7 +893,7 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
       skipped_stored_name = true;
       continue;
     }
-    write_typed_attribute(out, "  ", attribute, variant);
+    write_typed_attribute(out, "  ", attribute, variant, preserve_nulls);
   }
 
   for (const auto& trace : log.traces) {
@@ -840,7 +905,7 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
     if (present(trace.case_id_state, trace.case_id))
       write_projection(out, "    ", case_key, trace.case_id,
                        AttributeKind::kString, trace.case_id_state,
-                       variant, nested_case);
+                       variant, preserve_nulls, nested_case);
     for (const auto& attribute : trace.attributes) {
       if (&attribute != nested_case &&
           !is_selected_copy(attribute,
@@ -848,11 +913,11 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
                                 ? &*trace.case_id_attribute
                                 : nullptr,
                             case_key))
-        write_typed_attribute(out, "    ", attribute, variant);
+        write_typed_attribute(out, "    ", attribute, variant, preserve_nulls);
     }
     for (const auto& event : trace.events) {
       out << "    <event>\n";
-      write_event_attributes(out, event, variant);
+      write_event_attributes(out, event, variant, preserve_nulls);
       out << "    </event>\n";
     }
     out << "  </trace>\n";
@@ -861,7 +926,7 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
 }
 
 void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
-  write_xes_with_options(out, log, name, false, XesExportVariant::kLineByLine);
+  write_xes_with_options(out, log, name, false, XesExportVariant::kLineByLine, false);
 }
 
 std::string to_xes(const EventLog& log, std::string_view name) {
@@ -874,7 +939,7 @@ std::string serialize_xes(const EventLog& log,
                            const XesExportOptions& options) {
   (void)xes_export_variant_name(options.variant);
   std::ostringstream out;
-  write_xes_with_options(out, log, options.name, options.infer_metadata, options.variant);
+  write_xes_with_options(out, log, options.name, options.infer_metadata, options.variant, options.preserve_nulls);
   const auto xml = out.str();
   return options.compress.value_or(false) ? detail::gzip_compress(xml) : xml;
 }

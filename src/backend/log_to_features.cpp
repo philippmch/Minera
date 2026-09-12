@@ -245,6 +245,8 @@ bool trace_inference_hashable(EventAttribute attribute) {
       value.is_null = true;
       value.container = AttributeContainerKind::kScalar;
       value.children.clear();
+      value.scalar_wrapper = false;
+      value.scalar_children_list = false;
       value.typed_value = std::monostate{};
     } else {
       for (auto& child : value.children) self(self, child);
@@ -1447,6 +1449,8 @@ LogToFeaturesResult log_to_features(const EventLog& log,
           cell.is_null = true;
           cell.container = AttributeContainerKind::kScalar;
           cell.children.clear();
+          cell.scalar_wrapper = false;
+          cell.scalar_children_list = false;
           cell.typed_value = std::monostate{};
         } else {
           for (auto& child : cell.children) self(self, child);
