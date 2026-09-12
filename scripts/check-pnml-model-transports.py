@@ -265,7 +265,8 @@ def main():
                 assert get('/api/monte-carlo?' + urllib.parse.urlencode(forced), b'') == fitted
                 assert run(*mc_cli, '--monte-carlo-transition-weights', '1,1,0,1,0') == fitted
                 alternate = dict(params, monte_carlo_transition_weights='1,0,1,1,0')
-                assert get('/api/monte-carlo?' + urllib.parse.urlencode(alternate), b'') != fitted
+                alternate_summary = get('/api/monte-carlo?' + urllib.parse.urlencode(alternate), b'')
+                assert run(*mc_cli, '--monte-carlo-transition-weights', '1,0,1,1,0') == alternate_summary
                 generated = get('/api/playout?' + urllib.parse.urlencode(dict(params, mode='monte_carlo')),
                                 b'', decode=False)
                 tree = ET.fromstring(generated)
@@ -275,6 +276,19 @@ def main():
                                if node.attrib.get('key') == 'concept:name')
                           for event in trace.findall('event')] for trace in tree.findall('trace')]
                 assert words == [['A', 'B']] * 3, words
+                # Immediate fitted durations can make different branches have
+                # identical aggregate timing summaries. Check the actual path.
+                alternate_xml = get('/api/playout?' + urllib.parse.urlencode(
+                    dict(alternate, mode='monte_carlo')), b'', decode=False)
+                alternate_tree = ET.fromstring(alternate_xml)
+                for node in alternate_tree.iter():
+                    node.tag = node.tag.rsplit('}', 1)[-1]
+                alternate_words = [[next(node.attrib['value'] for node in event
+                                         if node.attrib.get('key') == 'concept:name')
+                                    for event in trace.findall('event')]
+                                   for trace in alternate_tree.findall('trace')]
+                assert alternate_words == [['A', 'C']] * 3, alternate_words
+                assert alternate_words != words
                 mc_playout = directory / 'monte-carlo.xes'
                 run(*[arg for arg in mc_cli if arg != '--monte-carlo-json'], '--playout', mc_playout)
                 cli_tree = ET.fromstring(mc_playout.read_text(encoding='utf-8'))

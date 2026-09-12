@@ -165,6 +165,32 @@ std::optional<double> parse_timestamp(std::string_view text) {
   return seconds;
 }
 
+std::optional<std::int64_t> parse_timestamp_microseconds(std::string_view text) {
+  // Validate the original shape before removing its fractional part.
+  const auto parsed = parse_timestamp(text);
+  if (!parsed) return std::nullopt;
+  const auto dot = text.find('.');
+  if (dot == std::string_view::npos)
+    return static_cast<std::int64_t>(*parsed) * 1000000;
+  std::size_t end = dot + 1;
+  std::int64_t fraction = 0;
+  std::size_t digits = 0;
+  while (end < text.size() &&
+         std::isdigit(static_cast<unsigned char>(text[end])) != 0) {
+    if (digits < 6) fraction = fraction * 10 + (text[end] - '0');
+    ++digits;
+    ++end;
+  }
+  for (; digits < 6; ++digits) fraction *= 10;
+  std::string whole(text.substr(0, dot));
+  whole.append(text.substr(end));
+  // Four-digit years have exactly representable integral epoch seconds and
+  // remain within int64 microseconds, including timezone normalization.
+  const auto seconds = parse_timestamp(whole);
+  if (!seconds) return std::nullopt;
+  return static_cast<std::int64_t>(*seconds) * 1000000 + fraction;
+}
+
 std::string format_timestamp(double epoch_seconds) {
   long long milliseconds = std::llround(epoch_seconds * 1000.0);
   long long seconds = milliseconds / 1000;

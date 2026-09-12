@@ -3799,6 +3799,16 @@ void parse_stochastic_petri_params_maps_and_rejects_bad_values() {
 }
 
 void parse_stochastic_map_params_maps_and_rejects_bad_values() {
+  assert(!minera::parse_stochastic_map_params(fields({})).fit.distribution);
+  assert(!minera::parse_stochastic_map_params(fields({
+      {"stochastic_map_distribution", "automatic"}})).fit.distribution);
+  bool rejected_automatic = false;
+  try {
+    (void)minera::parse_stochastic_map_params(fields({
+        {"stochastic_map_source", "performance_dfg"},
+        {"stochastic_map_distribution", "automatic"}}));
+  } catch (const std::invalid_argument&) { rejected_automatic = true; }
+  assert(rejected_automatic);
   const auto parsed = minera::parse_stochastic_map_params(fields({
       {"stochastic_map_source", "performance_dfg"},
       {"stochastic_map_distribution", "exponential"},

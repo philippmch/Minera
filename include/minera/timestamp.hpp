@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -14,6 +15,11 @@ namespace minera {
 // nullopt when the text is empty or not recognizable, so callers can treat
 // untimed events as having no instant rather than guessing.
 [[nodiscard]] std::optional<double> parse_timestamp(std::string_view text);
+
+// Parses the same timestamp shapes into exact microseconds. Fractional digits
+// beyond six are truncated, matching datetime microsecond precision.
+[[nodiscard]] std::optional<std::int64_t> parse_timestamp_microseconds(
+    std::string_view text);
 
 // Formats seconds since the Unix epoch as ISO-8601 UTC with millisecond
 // precision ("2024-01-01T10:00:00.000Z"), the xs:dateTime shape XES tools

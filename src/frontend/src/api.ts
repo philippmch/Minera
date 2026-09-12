@@ -4585,7 +4585,7 @@ function validateMonteCarloMapTransition(
   const { parameter, secondary_parameter: secondary,
     tertiary_parameter: tertiary, activation_weight: weight, priority } = transition;
   if (![parameter, secondary, tertiary, weight].every(Number.isFinite) ||
-      secondary < 0 || tertiary < 0 || weight < 0 ||
+      (transition.distribution !== "uniform" && secondary < 0) || tertiary < 0 || weight < 0 ||
       !Number.isSafeInteger(priority) || priority < -2147483648 ||
       priority > 2147483647) {
     throw new Error("provided_stochastic_map contains invalid numeric fields");
@@ -4596,10 +4596,11 @@ function validateMonteCarloMapTransition(
         throw new Error("provided_stochastic_map exponential rates must be positive when timed");
       break;
     case "uniform":
-      if (parameter < 0 || secondary < parameter)
-        throw new Error("provided_stochastic_map uniform bounds must be ordered and non-negative");
+      if (secondary < parameter)
+        throw new Error("provided_stochastic_map uniform bounds must be ordered");
       break;
     case "normal":
+      break;
     case "deterministic":
       if (parameter < 0)
         throw new Error("provided_stochastic_map duration means must be non-negative");
@@ -5084,10 +5085,12 @@ export function stochasticMapQuery(options: StochasticMapOptions = {}): string {
     params.set("stochastic_map_source", options.source);
   }
   if (options.distribution !== undefined) {
-    const distributions = ["deterministic", "exponential", "constant0",
+    const distributions = ["automatic", "deterministic", "exponential", "constant0",
       "immediate", "normal", "uniform", "lognormal", "gamma"];
     if (!distributions.includes(options.distribution))
       throw new Error("distribution is not supported");
+    if (options.distribution === "automatic" && options.source === "performance_dfg")
+      throw new Error("automatic distribution requires source log");
     params.set("stochastic_map_distribution", options.distribution);
   }
   if (options.default_parameter !== undefined) {

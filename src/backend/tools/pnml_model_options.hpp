@@ -120,6 +120,25 @@ inline PnmlImportOptions pnml_model_import_options() {
   return base;
 }
 
+// Signed fitted durations are meaningful log statistics, but a negative mean
+// has no rate in the CTMC approximation. Preserve the fitted map and explain
+// why this separate analysis could not be produced.
+[[nodiscard]] inline StochasticPetriResult stochastic_map_reachability(
+    const PetriNet& net, const StochasticMap& map,
+    const StochasticMapFitOptions& fit, std::vector<std::uint32_t> initial_marking,
+    std::size_t max_states) {
+  try {
+    const auto options = stochastic_map_to_options(
+        net, map, fit, std::move(initial_marking), max_states);
+    return stochastic_petri_reachability(net, options);
+  } catch (const std::domain_error& error) {
+    StochasticPetriResult result;
+    result.exhausted = true;
+    result.diagnostic = std::string("CTMC unavailable: ") + error.what();
+    return result;
+  }
+}
+
 [[nodiscard]] inline PetriUsageComparisonOptions pnml_comparison_options(
     const PnmlDocument& document, PetriUsageComparisonOptions base = {}) {
   base.initial_marking = pnml_marking<std::uint32_t>(document.initial_marking);

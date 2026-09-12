@@ -475,9 +475,10 @@ and deterministic EventLog output. Arbitrary multi-token initial/final markings
 use componentwise final coverage. Sparse supplied stochastic maps support every distribution and
 define missing transitions as uniform, immediate choices; explicit weight and
 duration vectors retain precedence. Source-log fitting honors custom activity
-and timestamp selectors, selectable forward/backwards token replay, forced
-normal/uniform/exponential distributions, and deterministic degenerate
-fallbacks. Omitted arrival cadence is inferred from sorted case-start times,
+and timestamp selectors, selectable forward/backwards token replay, automatic
+or forced normal/uniform/exponential fitting, causal token timing, and
+activation/enabling ratios through the shared sparse stochastic-map fitter.
+Omitted arrival cadence is inferred from sorted case-start times,
 while an explicit ratio overrides inference. Generated XES retains typed aliases
 for custom selectors. Documented diagnostic interval, scale-factor, and legacy
 thread-limit controls are accepted and validated without introducing sleeping or
@@ -558,10 +559,11 @@ Dense propagation has a bounded work budget and a one-million-second wire-time
 limit so requests fail deterministically instead of exhausting the host.
 Probability envelopes use `STOCHASTIC_PETRI_DISTRIBUTION` with deterministic
 state ordering, diagnostics, and finite-or-null JSON number handling.
-A reusable stochastic-map layer now fits deterministic, exponential, constant,
-immediate, normal, uniform, lognormal, and gamma transition records from a
-replayed event log, retaining activation weights and priority metadata. A
-performance DFG can be converted to either classic workflow-net construction
+A reusable stochastic-map layer represents deterministic, exponential, constant,
+immediate, normal, uniform, lognormal, and gamma transition records. Replayed-log
+fitting selects normal, uniform, exponential, or immediate records automatically,
+or applies the observed forced-family rules, retaining activation weights and
+priority metadata. A performance DFG can be converted to either classic workflow-net construction
 with rates derived from edge means or the no-duplicate-activity construction;
 silent routing is represented as immediate when its duration is zero. The
 native map converts back to the existing tangible CTMC options, and
@@ -2202,10 +2204,12 @@ These limitations remain open; this checkpoint does not promote catalogue rows.
 
 `fit_monte_carlo_options` carries numeric initial/final markings, original
 place/transition names, and explicit zero-token key membership into automatic
-activation-weight replay. The context fields are appended to `MonteCarloOptions`.
-Signed conversion and replay validation occur only when missing weights require
-replay; explicit weights and sparse stochastic maps preserve their precedence,
-and simulation-only unsigned markings retain their existing range contract.
+weight and duration fitting through the shared sparse stochastic-map fitter.
+The context fields are appended to `MonteCarloOptions`. Signed conversion and
+replay validation occur only when fitting is required; an explicit stochastic
+map or both explicit vectors bypass fitting. A single explicit vector overrides
+its fitted counterpart, and simulation-only unsigned markings retain their
+existing range contract.
 Imported CLI and cached HTTP simulation routes pass the complete context.
 An explicit marking override clears only that vector's inherited key membership.
 
@@ -2233,7 +2237,8 @@ Initial tokens receive the first event time; hidden outputs have no timestamp.
 Unknown events retain the observed source-cursor behavior, and negative samples
 remain in the statistics. Forced EXPONENTIAL fitting maps empty/nonpositive
 means to immediate transitions with priority one and positive means to rates.
-Other distribution families and explicit fitting flags retain native policies.
+Automatic and forced fitting follow the distribution evidence below; explicit
+native fitting flags retain their documented policies.
 
 Imported CLI and cached HTTP fitting preserve document context. An explicit
 initial marking applies to fitting and CTMC analysis and clears inherited
@@ -2251,13 +2256,60 @@ The native probe verifies map records and statistics; CLI/HTTP comparisons
 cover nonempty logs, sparse output, hidden/weighted/multiple-token nets, negative
 durations, unknown events, and an observable initial-marking override.
 
-The isolated checkpoint passes four focused native suites, 92 fitting and
-transport comparisons, 29 existing PNML consumer checks, and 189 frontend tests.
-Independent review reports no actionable findings and the catalogue audit passes.
-This is forced-EXPONENTIAL evidence, not full stochastic fitting parity:
-automatic distribution selection and broader distribution/parameter cases remain
-open. Monte Carlo automatic fitting still uses raw activation counts and
-adjacent-event durations. Both catalogue modules remain partial.
+## Automatic distribution and Monte Carlo fitting
+
+`fit_stochastic_distribution` and default log-map fitting now select among
+normal, uniform, exponential, and immediate candidates by the observed public
+likelihood rules. Empty or single-sample automatic inputs yield immediate
+records. For two or more samples, automatic fitting rejects negative samples;
+the immediate candidate requires every absolute sample to be strictly below
+0.0001 seconds. NORMAL and UNIFORM forcing retain their fitted and immediate
+candidates. EXPONENTIAL forcing uses a positive mean's reciprocal and otherwise
+returns immediate. The observed remaining forced families return immediate;
+their map representation and sampling support remain available separately.
+Normal uses population standard deviation. Native uniform records retain lower
+and upper bounds, with the public lower/width parameterization converted by the
+reference checker. Nonfinite raw samples are rejected by the native API.
+
+Causal replay queues now use integer microseconds, preserving the exact
+0.0001-second boundary at contemporary epoch timestamps. Timestamp fractions
+are padded or truncated to six digits; timezone offsets and negative epochs
+retain their meaning. The existing double timestamp API remains available.
+
+Signed normal means and ordered signed uniform bounds are valid map metadata.
+When their mean cannot form a CTMC, CLI/HTTP output retains the fitted map and
+returns an exhausted, empty reachability result with a CTMC diagnostic. Monte
+Carlo rejects unsupported negative service-time domains when used, while a
+complete explicit duration vector overrides unused map durations. Metadata and
+explicit vector validation still apply.
+
+`fit_monte_carlo_options` now reuses the shared map fitter for causal performance
+samples, activation/enabling weights, distribution selection, and complete replay
+context. It returns a sparse fitted map; explicit maps and vectors retain their
+precedence. CLI, HTTP, and frontend fitting options expose `automatic` for log
+sources. Performance-DFG fitting keeps its explicit exponential default.
+
+`scripts/capture-random-variable-fit-reference.py` and
+`docs/random-variable-fit-reference-fixtures.json` retain 253 public raw fitting
+outcomes. `scripts/capture-stochastic-distribution-map-reference.py` and
+`docs/stochastic-distribution-map-reference-fixtures.json` retain 50 public
+map outcomes, including two automatic negative-sample errors. These captures
+record the pinned reference commit and NumPy 2.2.6/SciPy 1.14.1 runtime versions.
+The checkers compare distributions, parameters, priorities, weights, statistics,
+Monte Carlo fitted maps, and CLI/HTTP results where applicable. The existing
+32-case forced-exponential matrix also checks Monte Carlo fitted maps.
+
+The isolated checkpoint passes four focused native suites, 253 raw fitting
+comparisons, 178 distribution-map comparisons, 124 existing exponential-map
+comparisons, 29 supplied-PNML consumer checks, and 191 frontend tests. The PNML
+branch check asserts generated AB versus overridden AC event paths even when
+immediate durations make aggregate timing summaries identical. Independent
+review reports no actionable findings; TypeScript and the catalogue audit pass.
+
+Exact likelihood ties, extreme finite inputs, broader parameter behavior, and
+the full Monte Carlo scheduler/resource contract still require proof. Both
+catalogue modules remain partial; this checkpoint does not promote coverage
+rows or establish full parity.
 
 ## Token-replay parity evidence
 

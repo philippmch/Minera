@@ -7104,12 +7104,9 @@ int main(int argc, char** argv) {
           stochastic_map_params.initial_marking.empty())
         stochastic_map_params.initial_marking = minera::tools::pnml_marking<std::uint32_t>(
             imported_document->initial_marking);
-      const auto stochastic_options = minera::stochastic_map_to_options(
+      const auto reachability = minera::tools::stochastic_map_reachability(
           *stochastic_map_net, stochastic_map, stochastic_map_params.fit,
-          stochastic_map_params.initial_marking,
-          stochastic_map_params.max_states);
-      const auto reachability = minera::stochastic_petri_reachability(
-          *stochastic_map_net, stochastic_options);
+          stochastic_map_params.initial_marking, stochastic_map_params.max_states);
       std::ostringstream stochastic_map_json;
       stochastic_map_json
           << "{\"family\":\"STOCHASTIC_MAP\",\"source\":\""

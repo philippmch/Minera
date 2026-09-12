@@ -1,0 +1,9803 @@
+{
+  "reference": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "public_api": "pm4py.algo.simulation.montecarlo.utils.replay.get_map_from_log_and_net",
+  "dependencies": {
+    "numpy": "2.2.6",
+    "scipy": "1.14.1"
+  },
+  "observations": [
+    {
+      "spec": {
+        "name": "empty_None",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [],
+        "force_distribution": null
+      },
+      "records": {},
+      "statistics": {},
+      "aligned_traces": []
+    },
+    {
+      "spec": {
+        "name": "empty_EXPONENTIAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "records": {},
+      "statistics": {},
+      "aligned_traces": []
+    },
+    {
+      "spec": {
+        "name": "empty_NORMAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [],
+        "force_distribution": "NORMAL"
+      },
+      "records": {},
+      "statistics": {},
+      "aligned_traces": []
+    },
+    {
+      "spec": {
+        "name": "empty_UNIFORM",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [],
+        "force_distribution": "UNIFORM"
+      },
+      "records": {},
+      "statistics": {},
+      "aligned_traces": []
+    },
+    {
+      "spec": {
+        "name": "empty_GAMMA",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [],
+        "force_distribution": "GAMMA"
+      },
+      "records": {},
+      "statistics": {},
+      "aligned_traces": []
+    },
+    {
+      "spec": {
+        "name": "one_positive_None",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ]
+        ],
+        "force_distribution": null
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            2.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "one_positive_EXPONENTIAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ]
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.5",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            2.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "one_positive_NORMAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ]
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            2.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "one_positive_UNIFORM",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ]
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            2.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "one_positive_GAMMA",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ]
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 1,
+          "performance": [
+            0.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        },
+        "b": {
+          "count": 1,
+          "performance": [
+            2.0
+          ],
+          "log_idx": [
+            0
+          ],
+          "no_of_times_enabled": 1,
+          "no_of_times_activated": 1
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "positive_constant_None",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ]
+        ],
+        "force_distribution": null
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.5",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            2.0,
+            2.0,
+            2.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "positive_constant_EXPONENTIAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ]
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.5",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            2.0,
+            2.0,
+            2.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "positive_constant_NORMAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ]
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            2.0,
+            2.0,
+            2.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "positive_constant_UNIFORM",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ]
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            2.0,
+            2.0,
+            2.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "positive_constant_GAMMA",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ]
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            2.0,
+            2.0,
+            2.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "two_positive_None",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              4
+            ]
+          ]
+        ],
+        "force_distribution": null
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "UNIFORM",
+          "parameters": "2.0;2.0",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            2.0,
+            4.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "two_positive_EXPONENTIAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              4
+            ]
+          ]
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.3333333333333333",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            2.0,
+            4.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "two_positive_NORMAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              4
+            ]
+          ]
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "NORMAL",
+          "parameters": "3.0;1.0",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            2.0,
+            4.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "two_positive_UNIFORM",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              4
+            ]
+          ]
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "UNIFORM",
+          "parameters": "2.0;2.0",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            2.0,
+            4.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "two_positive_GAMMA",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              4
+            ]
+          ]
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            2.0,
+            4.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "normal_dominant_None",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              9
+            ]
+          ]
+        ],
+        "force_distribution": null
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "NORMAL",
+          "parameters": "5.0;1.2060453783110545",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 22,
+          "performance": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "no_of_times_enabled": 22,
+          "no_of_times_activated": 22
+        },
+        "b": {
+          "count": 22,
+          "performance": [
+            1.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            9.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "no_of_times_enabled": 22,
+          "no_of_times_activated": 22
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "normal_dominant_EXPONENTIAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              9
+            ]
+          ]
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.2",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 22,
+          "performance": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "no_of_times_enabled": 22,
+          "no_of_times_activated": 22
+        },
+        "b": {
+          "count": 22,
+          "performance": [
+            1.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            9.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "no_of_times_enabled": 22,
+          "no_of_times_activated": 22
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "normal_dominant_NORMAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              9
+            ]
+          ]
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "NORMAL",
+          "parameters": "5.0;1.2060453783110545",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 22,
+          "performance": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "no_of_times_enabled": 22,
+          "no_of_times_activated": 22
+        },
+        "b": {
+          "count": 22,
+          "performance": [
+            1.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            9.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "no_of_times_enabled": 22,
+          "no_of_times_activated": 22
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "normal_dominant_UNIFORM",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              9
+            ]
+          ]
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "UNIFORM",
+          "parameters": "1.0;8.0",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 22,
+          "performance": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "no_of_times_enabled": 22,
+          "no_of_times_activated": 22
+        },
+        "b": {
+          "count": 22,
+          "performance": [
+            1.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            9.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "no_of_times_enabled": 22,
+          "no_of_times_activated": 22
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "normal_dominant_GAMMA",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              9
+            ]
+          ]
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 22,
+          "performance": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "no_of_times_enabled": 22,
+          "no_of_times_activated": 22
+        },
+        "b": {
+          "count": 22,
+          "performance": [
+            1.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            9.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "no_of_times_enabled": 22,
+          "no_of_times_activated": 22
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "negative_varying_None",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -4
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -1
+            ]
+          ]
+        ],
+        "force_distribution": null
+      },
+      "error": {
+        "type": "FitDataError",
+        "message": "Invalid values in `data`.  Maximum likelihood estimation with 'expon' requires that 0 < (x - loc)/scale  < inf for each x in `data`."
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_varying_EXPONENTIAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -4
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -1
+            ]
+          ]
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            -4.0,
+            -2.0,
+            -1.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "negative_varying_NORMAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -4
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -1
+            ]
+          ]
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "NORMAL",
+          "parameters": "-2.3333333333333335;1.247219128924647",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            -4.0,
+            -2.0,
+            -1.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "negative_varying_UNIFORM",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -4
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -1
+            ]
+          ]
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "UNIFORM",
+          "parameters": "-4.0;3.0",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            -4.0,
+            -2.0,
+            -1.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "negative_varying_GAMMA",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -4
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -1
+            ]
+          ]
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            -4.0,
+            -2.0,
+            -1.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "positive_mixed_None",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3
+            ]
+          ]
+        ],
+        "force_distribution": null
+      },
+      "error": {
+        "type": "FitDataError",
+        "message": "Invalid values in `data`.  Maximum likelihood estimation with 'expon' requires that 0 < (x - loc)/scale  < inf for each x in `data`."
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_mixed_EXPONENTIAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3
+            ]
+          ]
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.75",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            -1.0,
+            2.0,
+            3.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "positive_mixed_NORMAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3
+            ]
+          ]
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "NORMAL",
+          "parameters": "1.3333333333333333;1.699673171197595",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            -1.0,
+            2.0,
+            3.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "positive_mixed_UNIFORM",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3
+            ]
+          ]
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "UNIFORM",
+          "parameters": "-1.0;4.0",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            -1.0,
+            2.0,
+            3.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "positive_mixed_GAMMA",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              -1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3
+            ]
+          ]
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 3,
+          "performance": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        },
+        "b": {
+          "count": 3,
+          "performance": [
+            -1.0,
+            2.0,
+            3.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2
+          ],
+          "no_of_times_enabled": 3,
+          "no_of_times_activated": 3
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside_None",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              9.999e-05
+            ]
+          ]
+        ],
+        "force_distribution": null
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "UNIFORM",
+          "parameters": "0.0;0.0001",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0001
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside_EXPONENTIAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              9.999e-05
+            ]
+          ]
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "20000.0",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0001
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside_NORMAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              9.999e-05
+            ]
+          ]
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "NORMAL",
+          "parameters": "5e-05;5e-05",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0001
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside_UNIFORM",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              9.999e-05
+            ]
+          ]
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "UNIFORM",
+          "parameters": "0.0;0.0001",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0001
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside_GAMMA",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              9.999e-05
+            ]
+          ]
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0001
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary_None",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.0001
+            ]
+          ]
+        ],
+        "force_distribution": null
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "UNIFORM",
+          "parameters": "0.0;0.0001",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0001
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary_EXPONENTIAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.0001
+            ]
+          ]
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "20000.0",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0001
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary_NORMAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.0001
+            ]
+          ]
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "NORMAL",
+          "parameters": "5e-05;5e-05",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0001
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary_UNIFORM",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.0001
+            ]
+          ]
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "UNIFORM",
+          "parameters": "0.0;0.0001",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0001
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary_GAMMA",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.0001
+            ]
+          ]
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        },
+        "b": {
+          "count": 2,
+          "performance": [
+            0.0,
+            0.0001
+          ],
+          "log_idx": [
+            0,
+            1
+          ],
+          "no_of_times_enabled": 2,
+          "no_of_times_activated": 2
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "long_tail_None",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.3
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.8
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              1.3
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2.1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3.4
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5.5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              8.9
+            ]
+          ]
+        ],
+        "force_distribution": null
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.4329004329004329",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 10,
+          "performance": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "no_of_times_enabled": 10,
+          "no_of_times_activated": 10
+        },
+        "b": {
+          "count": 10,
+          "performance": [
+            0.1,
+            0.2,
+            0.3,
+            0.5,
+            0.8,
+            1.3,
+            2.1,
+            3.4,
+            5.5,
+            8.9
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "no_of_times_enabled": 10,
+          "no_of_times_activated": 10
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "long_tail_EXPONENTIAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.3
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.8
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              1.3
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2.1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3.4
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5.5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              8.9
+            ]
+          ]
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "EXPONENTIAL",
+          "parameters": "0.4329004329004329",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 10,
+          "performance": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "no_of_times_enabled": 10,
+          "no_of_times_activated": 10
+        },
+        "b": {
+          "count": 10,
+          "performance": [
+            0.1,
+            0.2,
+            0.3,
+            0.5,
+            0.8,
+            1.3,
+            2.1,
+            3.4,
+            5.5,
+            8.9
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "no_of_times_enabled": 10,
+          "no_of_times_activated": 10
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "long_tail_NORMAL",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.3
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.8
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              1.3
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2.1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3.4
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5.5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              8.9
+            ]
+          ]
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "NORMAL",
+          "parameters": "2.31;2.7347577589249106",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 10,
+          "performance": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "no_of_times_enabled": 10,
+          "no_of_times_activated": 10
+        },
+        "b": {
+          "count": 10,
+          "performance": [
+            0.1,
+            0.2,
+            0.3,
+            0.5,
+            0.8,
+            1.3,
+            2.1,
+            3.4,
+            5.5,
+            8.9
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "no_of_times_enabled": 10,
+          "no_of_times_activated": 10
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "long_tail_UNIFORM",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.3
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.8
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              1.3
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2.1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3.4
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5.5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              8.9
+            ]
+          ]
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "UNIFORM",
+          "parameters": "0.1;8.8",
+          "weight": 1.0,
+          "priority": 0
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 10,
+          "performance": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "no_of_times_enabled": 10,
+          "no_of_times_activated": 10
+        },
+        "b": {
+          "count": 10,
+          "performance": [
+            0.1,
+            0.2,
+            0.3,
+            0.5,
+            0.8,
+            1.3,
+            2.1,
+            3.4,
+            5.5,
+            8.9
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "no_of_times_enabled": 10,
+          "no_of_times_activated": 10
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    },
+    {
+      "spec": {
+        "name": "long_tail_GAMMA",
+        "places": [
+          "source",
+          "middle",
+          "sink"
+        ],
+        "transitions": [
+          [
+            "a",
+            "A"
+          ],
+          [
+            "b",
+            "B"
+          ]
+        ],
+        "arcs": [
+          [
+            "source",
+            "a",
+            1
+          ],
+          [
+            "a",
+            "middle",
+            1
+          ],
+          [
+            "middle",
+            "b",
+            1
+          ],
+          [
+            "b",
+            "sink",
+            1
+          ]
+        ],
+        "initial": {
+          "source": 1
+        },
+        "final": {
+          "sink": 1
+        },
+        "traces": [
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.2
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.3
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              0.8
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              1.3
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              2.1
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              3.4
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              5.5
+            ]
+          ],
+          [
+            [
+              "A",
+              0
+            ],
+            [
+              "B",
+              8.9
+            ]
+          ]
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "records": {
+        "a": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        },
+        "b": {
+          "distribution": "IMMEDIATE",
+          "parameters": "UNDEFINED",
+          "weight": 1.0,
+          "priority": 1
+        }
+      },
+      "statistics": {
+        "a": {
+          "count": 10,
+          "performance": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "no_of_times_enabled": 10,
+          "no_of_times_activated": 10
+        },
+        "b": {
+          "count": 10,
+          "performance": [
+            0.1,
+            0.2,
+            0.3,
+            0.5,
+            0.8,
+            1.3,
+            2.1,
+            3.4,
+            5.5,
+            8.9
+          ],
+          "log_idx": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "no_of_times_enabled": 10,
+          "no_of_times_activated": 10
+        }
+      },
+      "aligned_traces": [
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        },
+        {
+          "activated": [
+            "a",
+            "b"
+          ],
+          "fit": true,
+          "reached": {
+            "sink": 1
+          }
+        }
+      ]
+    }
+  ]
+}

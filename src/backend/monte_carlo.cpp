@@ -194,7 +194,8 @@ void validate_stochastic_map_record(const StochasticMapTransition& transition,
       !std::isfinite(transition.parameter) ||
       !std::isfinite(transition.secondary_parameter) ||
       !std::isfinite(transition.tertiary_parameter) ||
-      transition.secondary_parameter < 0.0 ||
+      (transition.secondary_parameter < 0.0 &&
+       transition.distribution != StochasticMapDistribution::kUniform) ||
       transition.tertiary_parameter < 0.0) {
     throw std::invalid_argument(
         "Monte Carlo stochastic_map record values must be finite with non-negative auxiliary parameters and weight");
@@ -208,8 +209,9 @@ void validate_stochastic_map_record(const StochasticMapTransition& transition,
           "Monte Carlo stochastic_map record timing is invalid");
   }
   switch (transition.distribution) {
-    case StochasticMapDistribution::kDeterministic:
     case StochasticMapDistribution::kNormal:
+      break;
+    case StochasticMapDistribution::kDeterministic:
       if (transition.parameter < 0.0) {
         throw std::invalid_argument(
             "Monte Carlo stochastic_map duration mean must be non-negative");
@@ -224,8 +226,7 @@ void validate_stochastic_map_record(const StochasticMapTransition& transition,
       }
       break;
     case StochasticMapDistribution::kUniform:
-      if (transition.parameter < 0.0 ||
-          transition.secondary_parameter < transition.parameter) {
+      if (transition.secondary_parameter < transition.parameter) {
         throw std::invalid_argument(
             "Monte Carlo stochastic_map uniform bounds are invalid");
       }
@@ -516,6 +517,16 @@ PreparedOptions prepare_options(const PetriNet& net,
                                  0.0});
     for (const auto& transition : options.stochastic_map->transitions) {
       prepared.weights[transition.transition] = transition.activation_weight;
+      // Complete explicit duration vectors override map timing, including
+      // conversion and runtime domain checks for those unused durations.
+      if (!options.transition_durations.empty()) continue;
+      // Signed fitted metadata is representable, but the simulator retains
+      // its existing non-negative duration domain.
+      if ((transition.distribution == StochasticMapDistribution::kNormal ||
+           transition.distribution == StochasticMapDistribution::kUniform) &&
+          transition.parameter < 0.0)
+        throw std::invalid_argument(
+            "Monte Carlo stochastic_map duration mean or lower bound must be non-negative");
       const auto duration = duration_from_stochastic_map(transition);
       if (!std::isfinite(duration.value_seconds) ||
           !std::isfinite(duration.secondary_seconds) ||
@@ -814,13 +825,6 @@ void finalize_case(CaseState& state, MonteCarloDiagnostics& diagnostics,
   const auto middle = values.size() / 2;
   if (values.size() % 2 == 1) return values[middle];
   return (values[middle - 1] + values[middle]) / 2.0;
-}
-
-[[nodiscard]] std::optional<std::string> selected_activity_value(
-    const Event& event, std::string_view key) {
-  if (is_activity_alias(key)) return event.activity;
-  if (const auto* value = event.attribute(key)) return *value;
-  return std::nullopt;
 }
 
 [[nodiscard]] std::optional<std::string> selected_timestamp_value(
@@ -1152,147 +1156,47 @@ MonteCarloOptions fit_monte_carlo_options(const EventLog& input_log,
                                    net.transitions().size());
     return fitted;
   }
-  if (input_log.traces.empty()) return fitted;
-
-  std::map<std::string, double> elapsed_seconds;
-  std::map<std::string, std::size_t> elapsed_samples;
-  std::map<std::string, std::vector<double>> elapsed_values;
-  for (const auto& trace : input_log.traces) {
-    for (std::size_t index = 0; index < trace.events.size(); ++index) {
-      const auto& event = trace.events[index];
-      const auto activity =
-          selected_activity_value(event, fitted.activity_key);
-      if (!activity) continue;
-      if (index + 1 >= trace.events.size()) continue;
-      const auto current_value =
-          selected_timestamp_value(event, fitted.timestamp_key);
-      const auto next_value = selected_timestamp_value(
-          trace.events[index + 1], fitted.timestamp_key);
-      if (!current_value || !next_value) continue;
-      const auto current = parse_timestamp(*current_value);
-      const auto next = parse_timestamp(*next_value);
-      if (!current || !next || !std::isfinite(*current) ||
-          !std::isfinite(*next) || *next < *current) {
-        continue;
-      }
-      const double elapsed = *next - *current;
-      if (!std::isfinite(elapsed)) continue;
-      elapsed_seconds[*activity] += elapsed;
-      ++elapsed_samples[*activity];
-      elapsed_values[*activity].push_back(elapsed);
+  if (!fitted.transition_weights.empty() && !fitted.transition_durations.empty())
+    return fitted;
+  if (input_log.traces.empty()) {
+    fitted.stochastic_map = StochasticMap{};
+    return fitted;
+  }
+  StochasticMapFitOptions fit;
+  fit.fit_activation_weights = fitted.transition_weights.empty();
+  fit.fit_timing = fitted.transition_durations.empty();
+  if (fitted.force_distribution) {
+    switch (*fitted.force_distribution) {
+      case MonteCarloDurationDistribution::kNormal:
+        fit.distribution = StochasticMapDistribution::kNormal; break;
+      case MonteCarloDurationDistribution::kUniform:
+        fit.distribution = StochasticMapDistribution::kUniform; break;
+      case MonteCarloDurationDistribution::kExponential:
+        fit.distribution = StochasticMapDistribution::kExponential; break;
+      default: break;  // validate_force_distribution already rejected this.
     }
   }
-
-  if (fitted.transition_weights.empty()) {
-    // Replay activation counts include the selected forward/backwards
-    // routing semantics and therefore also distinguish duplicate-label or
-    // misfit branches in the fitted scheduler weights.
-    TokenReplayOptions replay_options;
-    replay_options.variant = fitted.token_replay_variant;
-    replay_options.activity_attribute = fitted.activity_key;
-    const auto replay_marking = [](const std::vector<std::uint32_t>& marking) {
-      std::vector<int> result;
-      result.reserve(marking.size());
-      for (const auto tokens : marking) {
-        if (tokens > static_cast<std::uint32_t>(std::numeric_limits<int>::max()))
-          throw std::invalid_argument(
-              "Monte Carlo activation-weight replay marking exceeds signed token range");
-        result.push_back(static_cast<int>(tokens));
-      }
-      return result;
-    };
-    replay_options.initial_marking = replay_marking(fitted.initial_marking);
-    replay_options.final_marking = replay_marking(fitted.final_marking);
-    replay_options.place_names = fitted.place_names;
-    replay_options.transition_names = fitted.transition_names;
-    replay_options.initial_marking_keys = fitted.initial_marking_keys;
-    replay_options.final_marking_keys = fitted.final_marking_keys;
-    const auto replay =
-        replay_token_diagnostics(input_log, net, replay_options);
-    bool observed_transition = false;
-    std::vector<double> weights(net.transitions().size(), 0.0);
-    for (std::size_t index = 0; index < net.transitions().size(); ++index) {
-      const auto& transition = net.transitions()[index];
-      if (!transition.activity ||
-          *transition.activity >= net.activities().size()) {
-        weights[index] = 1.0;
-        continue;
-      }
-      const auto activations = replay.transition_activations[index];
-      if (activations != 0) {
-        weights[index] = static_cast<double>(activations);
-        observed_transition = true;
-      }
+  fit.replay.variant = fitted.token_replay_variant;
+  fit.replay.activity_attribute = fitted.activity_key;
+  fit.replay.timestamp_attribute = fitted.timestamp_key;
+  const auto replay_marking = [](const std::vector<std::uint32_t>& marking) {
+    std::vector<int> result;
+    result.reserve(marking.size());
+    for (const auto tokens : marking) {
+      if (tokens > static_cast<std::uint32_t>(std::numeric_limits<int>::max()))
+        throw std::invalid_argument(
+            "Monte Carlo stochastic fitting marking exceeds signed token range");
+      result.push_back(static_cast<int>(tokens));
     }
-    if (observed_transition) fitted.transition_weights = std::move(weights);
-  }
-
-  if (fitted.transition_durations.empty()) {
-    std::vector<MonteCarloDuration> durations(
-        net.transitions().size(),
-        MonteCarloDuration{MonteCarloDurationDistribution::kDeterministic,
-                           fitted.default_duration_seconds});
-    for (std::size_t index = 0; index < net.transitions().size(); ++index) {
-      const auto& transition = net.transitions()[index];
-      if (!transition.activity ||
-          *transition.activity >= net.activities().size()) {
-        continue;
-      }
-      const auto activity = net.activities()[*transition.activity];
-      const auto samples = elapsed_samples.find(activity);
-      const auto total = elapsed_seconds.find(activity);
-      if (samples == elapsed_samples.end() || total == elapsed_seconds.end() ||
-          samples->second == 0) {
-        continue;
-      }
-      const double mean = total->second /
-                          static_cast<double>(samples->second);
-      if (!std::isfinite(mean) || mean < 0.0) continue;
-      const auto values = elapsed_values.find(activity);
-      const bool force_distribution = fitted.force_distribution.has_value();
-      if (!force_distribution || values == elapsed_values.end() ||
-          values->second.empty()) {
-        durations[index].value_seconds = mean;
-        continue;
-      }
-      const auto& samples_for_activity = values->second;
-      const auto [minimum, maximum] = std::minmax_element(
-          samples_for_activity.begin(), samples_for_activity.end());
-      const double width = *maximum - *minimum;
-      double variance = 0.0;
-      for (const double value : samples_for_activity) {
-        const double delta = value - mean;
-        variance += delta * delta;
-      }
-      variance /= static_cast<double>(samples_for_activity.size());
-      if (!std::isfinite(width) || !std::isfinite(variance) ||
-          width <= 0.0 || variance <= 0.0 || mean <= 0.0) {
-        durations[index].value_seconds = mean;
-        continue;
-      }
-      switch (*fitted.force_distribution) {
-        case MonteCarloDurationDistribution::kNormal:
-          durations[index] = MonteCarloDuration{
-              MonteCarloDurationDistribution::kNormal, mean,
-              std::sqrt(variance)};
-          break;
-        case MonteCarloDurationDistribution::kUniform:
-          durations[index] = MonteCarloDuration{
-              MonteCarloDurationDistribution::kUniform, *minimum, width};
-          break;
-        case MonteCarloDurationDistribution::kExponential:
-          durations[index] = MonteCarloDuration{
-              MonteCarloDurationDistribution::kExponential, mean};
-          break;
-        default:
-          // prepare_options validates this before simulation; retain a safe
-          // deterministic fit if this helper is called independently.
-          durations[index].value_seconds = mean;
-          break;
-      }
-    }
-    fitted.transition_durations = std::move(durations);
-  }
+    return result;
+  };
+  fit.replay.initial_marking = replay_marking(fitted.initial_marking);
+  fit.replay.final_marking = replay_marking(fitted.final_marking);
+  fit.replay.place_names = fitted.place_names;
+  fit.replay.transition_names = fitted.transition_names;
+  fit.replay.initial_marking_keys = fitted.initial_marking_keys;
+  fit.replay.final_marking_keys = fitted.final_marking_keys;
+  fitted.stochastic_map = fit_stochastic_map_with_report(input_log, net, fit).map;
   return fitted;
 }
 

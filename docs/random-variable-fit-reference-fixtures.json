@@ -1,0 +1,4586 @@
+{
+  "reference": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "public_api": "pm4py.objects.random_variables.random_variable.RandomVariable.calculate_parameters",
+  "dependencies": {
+    "numpy": "2.2.6",
+    "scipy": "1.14.1"
+  },
+  "observations": [
+    {
+      "spec": {
+        "name": "empty",
+        "values": [],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "empty",
+        "values": [],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "empty",
+        "values": [],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "empty",
+        "values": [],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "empty",
+        "values": [],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "empty",
+        "values": [],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "empty",
+        "values": [],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "empty",
+        "values": [],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "empty",
+        "values": [],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "empty",
+        "values": [],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "empty",
+        "values": [],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero",
+        "values": [
+          0
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero",
+        "values": [
+          0
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero",
+        "values": [
+          0
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero",
+        "values": [
+          0
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero",
+        "values": [
+          0
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero",
+        "values": [
+          0
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero",
+        "values": [
+          0
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero",
+        "values": [
+          0
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero",
+        "values": [
+          0
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero",
+        "values": [
+          0
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero",
+        "values": [
+          0
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zeros",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zeros",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zeros",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zeros",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zeros",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zeros",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zeros",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zeros",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zeros",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zeros",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zeros",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_positive",
+        "values": [
+          2
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_positive",
+        "values": [
+          2
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "0.5",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "one_positive",
+        "values": [
+          2
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_positive",
+        "values": [
+          2
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_positive",
+        "values": [
+          2
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_positive",
+        "values": [
+          2
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_positive",
+        "values": [
+          2
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_positive",
+        "values": [
+          2
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_positive",
+        "values": [
+          2
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_positive",
+        "values": [
+          2
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_positive",
+        "values": [
+          2
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_constant",
+        "values": [
+          2,
+          2,
+          2
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "0.5",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_constant",
+        "values": [
+          2,
+          2,
+          2
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "0.5",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_constant",
+        "values": [
+          2,
+          2,
+          2
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_constant",
+        "values": [
+          2,
+          2,
+          2
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_constant",
+        "values": [
+          2,
+          2,
+          2
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_constant",
+        "values": [
+          2,
+          2,
+          2
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_constant",
+        "values": [
+          2,
+          2,
+          2
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_constant",
+        "values": [
+          2,
+          2,
+          2
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_constant",
+        "values": [
+          2,
+          2,
+          2
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_constant",
+        "values": [
+          2,
+          2,
+          2
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_constant",
+        "values": [
+          2,
+          2,
+          2
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "two_positive",
+        "values": [
+          2,
+          4
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "2.0;2.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "two_positive",
+        "values": [
+          2,
+          4
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "0.3333333333333333",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "two_positive",
+        "values": [
+          2,
+          4
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "3.0;1.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "two_positive",
+        "values": [
+          2,
+          4
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "2.0;2.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "two_positive",
+        "values": [
+          2,
+          4
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "two_positive",
+        "values": [
+          2,
+          4
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "two_positive",
+        "values": [
+          2,
+          4
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "two_positive",
+        "values": [
+          2,
+          4
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "two_positive",
+        "values": [
+          2,
+          4
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "two_positive",
+        "values": [
+          2,
+          4
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "two_positive",
+        "values": [
+          2,
+          4
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "three_positive",
+        "values": [
+          1,
+          2,
+          3
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "1.0;2.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "three_positive",
+        "values": [
+          1,
+          2,
+          3
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "0.5",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "three_positive",
+        "values": [
+          1,
+          2,
+          3
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "2.0;0.816496580927726",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "three_positive",
+        "values": [
+          1,
+          2,
+          3
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "1.0;2.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "three_positive",
+        "values": [
+          1,
+          2,
+          3
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "three_positive",
+        "values": [
+          1,
+          2,
+          3
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "three_positive",
+        "values": [
+          1,
+          2,
+          3
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "three_positive",
+        "values": [
+          1,
+          2,
+          3
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "three_positive",
+        "values": [
+          1,
+          2,
+          3
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "three_positive",
+        "values": [
+          1,
+          2,
+          3
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "three_positive",
+        "values": [
+          1,
+          2,
+          3
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_negative",
+        "values": [
+          -4
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_negative",
+        "values": [
+          -4
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_negative",
+        "values": [
+          -4
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_negative",
+        "values": [
+          -4
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_negative",
+        "values": [
+          -4
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_negative",
+        "values": [
+          -4
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_negative",
+        "values": [
+          -4
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_negative",
+        "values": [
+          -4
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_negative",
+        "values": [
+          -4
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_negative",
+        "values": [
+          -4
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "one_negative",
+        "values": [
+          -4
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_constant",
+        "values": [
+          -2,
+          -2,
+          -2
+        ],
+        "force_distribution": null
+      },
+      "error": {
+        "type": "FitDataError",
+        "message": "Invalid values in `data`.  Maximum likelihood estimation with 'expon' requires that 0 < (x - loc)/scale  < inf for each x in `data`."
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_constant",
+        "values": [
+          -2,
+          -2,
+          -2
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_constant",
+        "values": [
+          -2,
+          -2,
+          -2
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_constant",
+        "values": [
+          -2,
+          -2,
+          -2
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_constant",
+        "values": [
+          -2,
+          -2,
+          -2
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_constant",
+        "values": [
+          -2,
+          -2,
+          -2
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_constant",
+        "values": [
+          -2,
+          -2,
+          -2
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_constant",
+        "values": [
+          -2,
+          -2,
+          -2
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_constant",
+        "values": [
+          -2,
+          -2,
+          -2
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_constant",
+        "values": [
+          -2,
+          -2,
+          -2
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_constant",
+        "values": [
+          -2,
+          -2,
+          -2
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_mean",
+        "values": [
+          -5,
+          1,
+          2
+        ],
+        "force_distribution": null
+      },
+      "error": {
+        "type": "FitDataError",
+        "message": "Invalid values in `data`.  Maximum likelihood estimation with 'expon' requires that 0 < (x - loc)/scale  < inf for each x in `data`."
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_mean",
+        "values": [
+          -5,
+          1,
+          2
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_mean",
+        "values": [
+          -5,
+          1,
+          2
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "-0.6666666666666666;3.0912061651652345",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_mean",
+        "values": [
+          -5,
+          1,
+          2
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "-5.0;7.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_mean",
+        "values": [
+          -5,
+          1,
+          2
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_mean",
+        "values": [
+          -5,
+          1,
+          2
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_mean",
+        "values": [
+          -5,
+          1,
+          2
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_mean",
+        "values": [
+          -5,
+          1,
+          2
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_mean",
+        "values": [
+          -5,
+          1,
+          2
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_mean",
+        "values": [
+          -5,
+          1,
+          2
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_mean",
+        "values": [
+          -5,
+          1,
+          2
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_mean",
+        "values": [
+          -1,
+          0,
+          1
+        ],
+        "force_distribution": null
+      },
+      "error": {
+        "type": "FitDataError",
+        "message": "Invalid values in `data`.  Maximum likelihood estimation with 'expon' requires that 0 < (x - loc)/scale  < inf for each x in `data`."
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_mean",
+        "values": [
+          -1,
+          0,
+          1
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_mean",
+        "values": [
+          -1,
+          0,
+          1
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "0.0;0.816496580927726",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_mean",
+        "values": [
+          -1,
+          0,
+          1
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "-1.0;2.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_mean",
+        "values": [
+          -1,
+          0,
+          1
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_mean",
+        "values": [
+          -1,
+          0,
+          1
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_mean",
+        "values": [
+          -1,
+          0,
+          1
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_mean",
+        "values": [
+          -1,
+          0,
+          1
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_mean",
+        "values": [
+          -1,
+          0,
+          1
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_mean",
+        "values": [
+          -1,
+          0,
+          1
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_mean",
+        "values": [
+          -1,
+          0,
+          1
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_mixed",
+        "values": [
+          -1,
+          2,
+          3
+        ],
+        "force_distribution": null
+      },
+      "error": {
+        "type": "FitDataError",
+        "message": "Invalid values in `data`.  Maximum likelihood estimation with 'expon' requires that 0 < (x - loc)/scale  < inf for each x in `data`."
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_mixed",
+        "values": [
+          -1,
+          2,
+          3
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "0.75",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_mixed",
+        "values": [
+          -1,
+          2,
+          3
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "1.3333333333333333;1.699673171197595",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_mixed",
+        "values": [
+          -1,
+          2,
+          3
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "-1.0;4.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_mixed",
+        "values": [
+          -1,
+          2,
+          3
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_mixed",
+        "values": [
+          -1,
+          2,
+          3
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_mixed",
+        "values": [
+          -1,
+          2,
+          3
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_mixed",
+        "values": [
+          -1,
+          2,
+          3
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_mixed",
+        "values": [
+          -1,
+          2,
+          3
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_mixed",
+        "values": [
+          -1,
+          2,
+          3
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "positive_mixed",
+        "values": [
+          -1,
+          2,
+          3
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_positive",
+        "values": [
+          0,
+          1,
+          2
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "0.0;2.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_positive",
+        "values": [
+          0,
+          1,
+          2
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "1.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_positive",
+        "values": [
+          0,
+          1,
+          2
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "1.0;0.816496580927726",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_positive",
+        "values": [
+          0,
+          1,
+          2
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "0.0;2.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_positive",
+        "values": [
+          0,
+          1,
+          2
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_positive",
+        "values": [
+          0,
+          1,
+          2
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_positive",
+        "values": [
+          0,
+          1,
+          2
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_positive",
+        "values": [
+          0,
+          1,
+          2
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_positive",
+        "values": [
+          0,
+          1,
+          2
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_positive",
+        "values": [
+          0,
+          1,
+          2
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "zero_positive",
+        "values": [
+          0,
+          1,
+          2
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "tiny_positive",
+        "values": [
+          1e-12,
+          2e-12
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "tiny_positive",
+        "values": [
+          1e-12,
+          2e-12
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "666666666666.6666",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "tiny_positive",
+        "values": [
+          1e-12,
+          2e-12
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "tiny_positive",
+        "values": [
+          1e-12,
+          2e-12
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "tiny_positive",
+        "values": [
+          1e-12,
+          2e-12
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "tiny_positive",
+        "values": [
+          1e-12,
+          2e-12
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "tiny_positive",
+        "values": [
+          1e-12,
+          2e-12
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "tiny_positive",
+        "values": [
+          1e-12,
+          2e-12
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "tiny_positive",
+        "values": [
+          1e-12,
+          2e-12
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "tiny_positive",
+        "values": [
+          1e-12,
+          2e-12
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "tiny_positive",
+        "values": [
+          1e-12,
+          2e-12
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero",
+        "values": [
+          -1e-06,
+          0,
+          1e-06
+        ],
+        "force_distribution": null
+      },
+      "error": {
+        "type": "FitDataError",
+        "message": "Invalid values in `data`.  Maximum likelihood estimation with 'expon' requires that 0 < (x - loc)/scale  < inf for each x in `data`."
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero",
+        "values": [
+          -1e-06,
+          0,
+          1e-06
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero",
+        "values": [
+          -1e-06,
+          0,
+          1e-06
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero",
+        "values": [
+          -1e-06,
+          0,
+          1e-06
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero",
+        "values": [
+          -1e-06,
+          0,
+          1e-06
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero",
+        "values": [
+          -1e-06,
+          0,
+          1e-06
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero",
+        "values": [
+          -1e-06,
+          0,
+          1e-06
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero",
+        "values": [
+          -1e-06,
+          0,
+          1e-06
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero",
+        "values": [
+          -1e-06,
+          0,
+          1e-06
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero",
+        "values": [
+          -1e-06,
+          0,
+          1e-06
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero",
+        "values": [
+          -1e-06,
+          0,
+          1e-06
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "uniform_grid",
+        "values": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "1.0;9.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "uniform_grid",
+        "values": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "0.18181818181818182",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "uniform_grid",
+        "values": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "5.5;2.8722813232690143",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "uniform_grid",
+        "values": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "1.0;9.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "uniform_grid",
+        "values": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "uniform_grid",
+        "values": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "uniform_grid",
+        "values": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "uniform_grid",
+        "values": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "uniform_grid",
+        "values": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "uniform_grid",
+        "values": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "uniform_grid",
+        "values": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_cluster",
+        "values": [
+          2,
+          3,
+          4,
+          4,
+          5,
+          5,
+          5,
+          6,
+          6,
+          7,
+          8
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "2.0;6.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_cluster",
+        "values": [
+          2,
+          3,
+          4,
+          4,
+          5,
+          5,
+          5,
+          6,
+          6,
+          7,
+          8
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "0.2",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_cluster",
+        "values": [
+          2,
+          3,
+          4,
+          4,
+          5,
+          5,
+          5,
+          6,
+          6,
+          7,
+          8
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "5.0;1.651445647689541",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_cluster",
+        "values": [
+          2,
+          3,
+          4,
+          4,
+          5,
+          5,
+          5,
+          6,
+          6,
+          7,
+          8
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "2.0;6.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_cluster",
+        "values": [
+          2,
+          3,
+          4,
+          4,
+          5,
+          5,
+          5,
+          6,
+          6,
+          7,
+          8
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_cluster",
+        "values": [
+          2,
+          3,
+          4,
+          4,
+          5,
+          5,
+          5,
+          6,
+          6,
+          7,
+          8
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_cluster",
+        "values": [
+          2,
+          3,
+          4,
+          4,
+          5,
+          5,
+          5,
+          6,
+          6,
+          7,
+          8
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_cluster",
+        "values": [
+          2,
+          3,
+          4,
+          4,
+          5,
+          5,
+          5,
+          6,
+          6,
+          7,
+          8
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_cluster",
+        "values": [
+          2,
+          3,
+          4,
+          4,
+          5,
+          5,
+          5,
+          6,
+          6,
+          7,
+          8
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_cluster",
+        "values": [
+          2,
+          3,
+          4,
+          4,
+          5,
+          5,
+          5,
+          6,
+          6,
+          7,
+          8
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_cluster",
+        "values": [
+          2,
+          3,
+          4,
+          4,
+          5,
+          5,
+          5,
+          6,
+          6,
+          7,
+          8
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "long_tail",
+        "values": [
+          0.1,
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1.3,
+          2.1,
+          3.4,
+          5.5,
+          8.9
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "0.4329004329004329",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "long_tail",
+        "values": [
+          0.1,
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1.3,
+          2.1,
+          3.4,
+          5.5,
+          8.9
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "0.4329004329004329",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "long_tail",
+        "values": [
+          0.1,
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1.3,
+          2.1,
+          3.4,
+          5.5,
+          8.9
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "2.31;2.7347577589249106",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "long_tail",
+        "values": [
+          0.1,
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1.3,
+          2.1,
+          3.4,
+          5.5,
+          8.9
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "0.1;8.8",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "long_tail",
+        "values": [
+          0.1,
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1.3,
+          2.1,
+          3.4,
+          5.5,
+          8.9
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "long_tail",
+        "values": [
+          0.1,
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1.3,
+          2.1,
+          3.4,
+          5.5,
+          8.9
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "long_tail",
+        "values": [
+          0.1,
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1.3,
+          2.1,
+          3.4,
+          5.5,
+          8.9
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "long_tail",
+        "values": [
+          0.1,
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1.3,
+          2.1,
+          3.4,
+          5.5,
+          8.9
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "long_tail",
+        "values": [
+          0.1,
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1.3,
+          2.1,
+          3.4,
+          5.5,
+          8.9
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "long_tail",
+        "values": [
+          0.1,
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1.3,
+          2.1,
+          3.4,
+          5.5,
+          8.9
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "long_tail",
+        "values": [
+          0.1,
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1.3,
+          2.1,
+          3.4,
+          5.5,
+          8.9
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_dominant",
+        "values": [
+          1,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          9
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "5.0;1.2060453783110545",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_dominant",
+        "values": [
+          1,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          9
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "0.2",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_dominant",
+        "values": [
+          1,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          9
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "5.0;1.2060453783110545",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_dominant",
+        "values": [
+          1,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          9
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "1.0;8.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_dominant",
+        "values": [
+          1,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          9
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_dominant",
+        "values": [
+          1,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          9
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_dominant",
+        "values": [
+          1,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          9
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_dominant",
+        "values": [
+          1,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          9
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_dominant",
+        "values": [
+          1,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          9
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_dominant",
+        "values": [
+          1,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          9
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "normal_dominant",
+        "values": [
+          1,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          9
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_varying",
+        "values": [
+          -4,
+          -2,
+          -1
+        ],
+        "force_distribution": null
+      },
+      "error": {
+        "type": "FitDataError",
+        "message": "Invalid values in `data`.  Maximum likelihood estimation with 'expon' requires that 0 < (x - loc)/scale  < inf for each x in `data`."
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_varying",
+        "values": [
+          -4,
+          -2,
+          -1
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_varying",
+        "values": [
+          -4,
+          -2,
+          -1
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "-2.3333333333333335;1.247219128924647",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_varying",
+        "values": [
+          -4,
+          -2,
+          -1
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "-4.0;3.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_varying",
+        "values": [
+          -4,
+          -2,
+          -1
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_varying",
+        "values": [
+          -4,
+          -2,
+          -1
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_varying",
+        "values": [
+          -4,
+          -2,
+          -1
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_varying",
+        "values": [
+          -4,
+          -2,
+          -1
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_varying",
+        "values": [
+          -4,
+          -2,
+          -1
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_varying",
+        "values": [
+          -4,
+          -2,
+          -1
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "negative_varying",
+        "values": [
+          -4,
+          -2,
+          -1
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside",
+        "values": [
+          0,
+          9.999e-05
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside",
+        "values": [
+          0,
+          9.999e-05
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "20002.000200020004",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside",
+        "values": [
+          0,
+          9.999e-05
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside",
+        "values": [
+          0,
+          9.999e-05
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside",
+        "values": [
+          0,
+          9.999e-05
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside",
+        "values": [
+          0,
+          9.999e-05
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside",
+        "values": [
+          0,
+          9.999e-05
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside",
+        "values": [
+          0,
+          9.999e-05
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside",
+        "values": [
+          0,
+          9.999e-05
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside",
+        "values": [
+          0,
+          9.999e-05
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_inside",
+        "values": [
+          0,
+          9.999e-05
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary",
+        "values": [
+          0,
+          0.0001
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "0.0;0.0001",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary",
+        "values": [
+          0,
+          0.0001
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "20000.0",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary",
+        "values": [
+          0,
+          0.0001
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "5e-05;5e-05",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary",
+        "values": [
+          0,
+          0.0001
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "0.0;0.0001",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary",
+        "values": [
+          0,
+          0.0001
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary",
+        "values": [
+          0,
+          0.0001
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary",
+        "values": [
+          0,
+          0.0001
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary",
+        "values": [
+          0,
+          0.0001
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary",
+        "values": [
+          0,
+          0.0001
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary",
+        "values": [
+          0,
+          0.0001
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_boundary",
+        "values": [
+          0,
+          0.0001
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_outside",
+        "values": [
+          0,
+          0.00010001
+        ],
+        "force_distribution": null
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "0.0;0.00010001",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_outside",
+        "values": [
+          0,
+          0.00010001
+        ],
+        "force_distribution": "EXPONENTIAL"
+      },
+      "result": {
+        "distribution": "EXPONENTIAL",
+        "parameters": "19998.00019998",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_outside",
+        "values": [
+          0,
+          0.00010001
+        ],
+        "force_distribution": "NORMAL"
+      },
+      "result": {
+        "distribution": "NORMAL",
+        "parameters": "5.0005e-05;5.0005e-05",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_outside",
+        "values": [
+          0,
+          0.00010001
+        ],
+        "force_distribution": "UNIFORM"
+      },
+      "result": {
+        "distribution": "UNIFORM",
+        "parameters": "0.0;0.00010001",
+        "weight": 0,
+        "priority": 0
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_outside",
+        "values": [
+          0,
+          0.00010001
+        ],
+        "force_distribution": "LOGNORMAL"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_outside",
+        "values": [
+          0,
+          0.00010001
+        ],
+        "force_distribution": "GAMMA"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_outside",
+        "values": [
+          0,
+          0.00010001
+        ],
+        "force_distribution": "DETERMINISTIC"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_outside",
+        "values": [
+          0,
+          0.00010001
+        ],
+        "force_distribution": "IMMEDIATE"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_outside",
+        "values": [
+          0,
+          0.00010001
+        ],
+        "force_distribution": "CONSTANT0"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_outside",
+        "values": [
+          0,
+          0.00010001
+        ],
+        "force_distribution": "normal"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    },
+    {
+      "spec": {
+        "name": "near_zero_outside",
+        "values": [
+          0,
+          0.00010001
+        ],
+        "force_distribution": "invalid"
+      },
+      "result": {
+        "distribution": "IMMEDIATE",
+        "parameters": "UNDEFINED",
+        "weight": 0,
+        "priority": 1
+      }
+    }
+  ]
+}

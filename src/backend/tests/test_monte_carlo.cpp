@@ -15,6 +15,23 @@
 
 namespace {
 
+const minera::StochasticMapTransition& fitted_record(
+    const minera::MonteCarloOptions& options, std::size_t transition) {
+  assert(options.stochastic_map.has_value());
+  for (const auto& record : options.stochastic_map->transitions)
+    if (record.transition == transition) return record;
+  throw std::logic_error("missing fitted transition");
+}
+
+std::vector<double> fitted_weights(const minera::MonteCarloOptions& options,
+                                   std::size_t count) {
+  assert(options.stochastic_map.has_value());
+  std::vector<double> weights(count, 0.0);
+  for (const auto& record : options.stochastic_map->transitions)
+    weights[record.transition] = record.activation_weight;
+  return weights;
+}
+
 minera::PetriNet linear_net() {
   minera::PetriNet net;
   const auto source = net.add_place();
@@ -204,14 +221,12 @@ void source_log_fits_missing_weights_and_durations() {
     input.traces.push_back(std::move(trace));
   }
   const auto fitted = minera::fit_monte_carlo_options(input, net);
-  assert(fitted.transition_weights.size() == 2);
-  assert(fitted.transition_weights[0] == 2.0 &&
-         fitted.transition_weights[1] == 2.0);
-  assert(fitted.transition_durations.size() == 2);
-  assert(fitted.transition_durations[0].distribution ==
-         minera::MonteCarloDurationDistribution::kDeterministic);
-  assert(fitted.transition_durations[0].value_seconds == 4.0);
-  assert(fitted.transition_durations[1].value_seconds == 1.0);
+  assert(fitted.transition_weights.empty());
+  assert(fitted.transition_durations.empty());
+  assert(fitted_record(fitted, 0).distribution == minera::StochasticMapDistribution::kImmediate);
+  assert(fitted_record(fitted, 1).distribution == minera::StochasticMapDistribution::kExponential);
+  assert(fitted_record(fitted, 1).parameter == 0.25);
+  assert((fitted_weights(fitted, 2) == std::vector<double>{1.0, 1.0}));
 
   minera::MonteCarloOptions options;
   options.simulations = 1;
@@ -219,7 +234,50 @@ void source_log_fits_missing_weights_and_durations() {
   const auto result = minera::monte_carlo(input, net, options);
   assert(result.diagnostics.completed_cases == 1);
   assert(result.diagnostics.case_execution_seconds.size() == 1);
-  assert(result.diagnostics.case_execution_seconds.front() == 5.0);
+  auto control = options;
+  control.stochastic_map = fitted.stochastic_map;
+  const auto expected = minera::monte_carlo(net, control);
+  assert_same_logs(result.log, expected.log);
+  assert(result.diagnostics.case_execution_seconds == expected.diagnostics.case_execution_seconds);
+}
+
+void source_log_fitting_preserves_sparse_causal_records_and_overrides() {
+  const auto net = sequential_net();
+  minera::EventLog input;
+  for (int seconds : {2, 4}) {
+    minera::Trace trace;
+    trace.case_id = std::to_string(seconds);
+    trace.events = {{trace.case_id, "A", "2026-01-01T00:00:00Z"},
+                    {trace.case_id, "B", "2026-01-01T00:00:0" + std::to_string(seconds) + "Z"}};
+    input.traces.push_back(trace);
+  }
+  minera::MonteCarloOptions options;
+  options.initial_marking = {1, 1, 0};
+  options.final_marking = {0, 1, 1};
+  options.force_distribution = minera::MonteCarloDurationDistribution::kExponential;
+  const auto fitted = minera::fit_monte_carlo_options(input, net, options);
+  assert(fitted_record(fitted, 1).activation_weight == 0.5);
+  assert(fitted_record(fitted, 1).parameter == 1.0 / 3.0);
+  options.transition_weights = {7.0, 9.0};
+  const auto weights_only = minera::fit_monte_carlo_options(input, net, options);
+  assert(weights_only.transition_weights == options.transition_weights);
+  assert(weights_only.transition_durations.empty());
+  assert(fitted_record(weights_only, 1).parameter == 1.0 / 3.0);
+  options.transition_weights.clear();
+  options.transition_durations = {{minera::MonteCarloDurationDistribution::kDeterministic, 7.0},
+                                  {minera::MonteCarloDurationDistribution::kDeterministic, 9.0}};
+  const auto durations_only = minera::fit_monte_carlo_options(input, net, options);
+  assert(durations_only.transition_durations[1].value_seconds == 9.0);
+  assert(fitted_record(durations_only, 1).activation_weight == 0.5);
+
+  options = {};
+  input.traces.resize(1);
+  input.traces[0].events.resize(1);
+  const auto partial = minera::fit_monte_carlo_options(input, net, options);
+  assert(partial.stochastic_map && partial.stochastic_map->transitions.size() == 1);
+  assert(partial.stochastic_map->transitions.front().transition == 0);
+  const auto empty = minera::fit_monte_carlo_options({}, net, options);
+  assert(empty.stochastic_map && empty.stochastic_map->transitions.empty());
 }
 
 void source_log_forces_duration_distributions() {
@@ -240,26 +298,22 @@ void source_log_forces_duration_distributions() {
   options.force_distribution =
       minera::MonteCarloDurationDistribution::kNormal;
   const auto normal = minera::fit_monte_carlo_options(input, net, options);
-  assert(normal.transition_durations[0].distribution ==
-         minera::MonteCarloDurationDistribution::kNormal);
-  assert(normal.transition_durations[0].value_seconds == 4.0);
-  assert(std::abs(normal.transition_durations[0].secondary_seconds -
-                  std::sqrt(8.0 / 3.0)) < 1e-9);
+  assert(fitted_record(normal, 1).distribution == minera::StochasticMapDistribution::kNormal);
+  assert(fitted_record(normal, 1).parameter == 4.0);
+  assert(std::abs(fitted_record(normal, 1).secondary_parameter - std::sqrt(8.0 / 3.0)) < 1e-9);
 
   options.force_distribution =
       minera::MonteCarloDurationDistribution::kUniform;
   const auto uniform = minera::fit_monte_carlo_options(input, net, options);
-  assert(uniform.transition_durations[0].distribution ==
-         minera::MonteCarloDurationDistribution::kUniform);
-  assert(uniform.transition_durations[0].value_seconds == 2.0);
-  assert(uniform.transition_durations[0].secondary_seconds == 4.0);
+  assert(fitted_record(uniform, 1).distribution == minera::StochasticMapDistribution::kUniform);
+  assert(fitted_record(uniform, 1).parameter == 2.0);
+  assert(fitted_record(uniform, 1).secondary_parameter == 6.0);
 
   options.force_distribution =
       minera::MonteCarloDurationDistribution::kExponential;
   const auto exponential = minera::fit_monte_carlo_options(input, net, options);
-  assert(exponential.transition_durations[0].distribution ==
-         minera::MonteCarloDurationDistribution::kExponential);
-  assert(exponential.transition_durations[0].value_seconds == 4.0);
+  assert(fitted_record(exponential, 1).distribution == minera::StochasticMapDistribution::kExponential);
+  assert(fitted_record(exponential, 1).parameter == 0.25);
 
   options.transition_durations = {
       {minera::MonteCarloDurationDistribution::kDeterministic, 9.0},
@@ -281,9 +335,8 @@ void source_log_forces_duration_distributions() {
   options.force_distribution =
       minera::MonteCarloDurationDistribution::kUniform;
   const auto fallback = minera::fit_monte_carlo_options(degenerate, net, options);
-  assert(fallback.transition_durations[0].distribution ==
-         minera::MonteCarloDurationDistribution::kDeterministic);
-  assert(fallback.transition_durations[0].value_seconds == 0.0);
+  assert(fitted_record(fallback, 0).distribution == minera::StochasticMapDistribution::kImmediate);
+  assert(fitted_record(fallback, 1).distribution == minera::StochasticMapDistribution::kImmediate);
 
   options.force_distribution =
       static_cast<minera::MonteCarloDurationDistribution>(99);
@@ -711,11 +764,10 @@ void arrival_inference_and_custom_selectors_round_trip() {
   assert(fitted.case_arrival_ratio.has_value());
   assert(*fitted.case_arrival_ratio == 20.0);
   assert(!fitted.case_arrival_seconds.has_value());
-  assert(fitted.transition_durations.size() == 2);
-  assert(fitted.transition_durations[0].value_seconds == 50.0);
-  assert(fitted.transition_weights.size() == 2);
-  assert(fitted.transition_weights[0] == 3.0);
-  assert(fitted.transition_weights[1] == 3.0);
+  assert(fitted.transition_durations.empty());
+  assert(fitted_record(fitted, 1).distribution == minera::StochasticMapDistribution::kExponential);
+  assert(fitted_record(fitted, 1).parameter == 1.0 / 50.0);
+  assert((fitted_weights(fitted, 2) == std::vector<double>{1.0, 1.0}));
 
   options.simulations = 1;
   options.transition_durations = {
@@ -773,13 +825,56 @@ void replay_selector_changes_fitted_activation_counts() {
   minera::MonteCarloOptions backwards = forward;
   backwards.token_replay_variant = minera::TokenReplayVariant::kBackwards;
   const auto b = minera::fit_monte_carlo_options(input, net, backwards);
-  assert(f.transition_weights.size() == 3);
+  assert(f.stochastic_map.has_value());
   // Public forward replay fixes the greatest disabled duplicate name before
   // routing, so t2 receives the activation rather than t1.
-  assert((f.transition_weights == std::vector<double>{1.0, 0.0, 1.0}));
+  assert((fitted_weights(f, 3) == std::vector<double>{1.0, 0.0, 1.0}));
   // The backwards variation interrupts on the ambiguous duplicate label,
   // leaving no activation-weight fit; forward replay selects one branch.
-  assert(b.transition_weights.empty());
+  assert(b.stochastic_map && b.stochastic_map->transitions.empty());
+}
+
+void signed_fitted_metadata_retains_simulation_domain_validation() {
+  const auto net = sequential_net();
+  minera::EventLog input;
+  for (int end : {6, 8}) {
+    minera::Trace trace;
+    trace.case_id = std::to_string(end);
+    trace.events = {{trace.case_id, "A", "2026-01-01T00:00:10Z"},
+                    {trace.case_id, "B", "2026-01-01T00:00:0" + std::to_string(end) + "Z"}};
+    input.traces.push_back(trace);
+  }
+  minera::MonteCarloOptions options;
+  options.simulations = 1;
+  options.force_distribution = minera::MonteCarloDurationDistribution::kNormal;
+  const auto normal = minera::fit_monte_carlo_options(input, net, options);
+  assert(fitted_record(normal, 1).distribution == minera::StochasticMapDistribution::kNormal);
+  assert(fitted_record(normal, 1).parameter == -3.0);
+  assert(fitted_record(normal, 1).secondary_parameter == 1.0);
+  assert(throws_invalid([&] { (void)minera::monte_carlo(net, normal); }));
+  options.force_distribution = minera::MonteCarloDurationDistribution::kUniform;
+  const auto uniform = minera::fit_monte_carlo_options(input, net, options);
+  assert(fitted_record(uniform, 1).parameter == -4.0);
+  assert(fitted_record(uniform, 1).secondary_parameter == -2.0);
+  assert(throws_invalid([&] { (void)minera::monte_carlo(net, uniform); }));
+  for (auto overridden : {normal, uniform}) {
+    overridden.transition_durations = {
+        {minera::MonteCarloDurationDistribution::kDeterministic, 2.0},
+        {minera::MonteCarloDurationDistribution::kDeterministic, 3.0}};
+    const auto result = minera::monte_carlo(net, overridden);
+    auto control = overridden;
+    control.stochastic_map.reset();
+    const auto expected = minera::monte_carlo(net, control);
+    assert(result.diagnostics.completed_cases == 1);
+    assert(result.diagnostics.case_execution_seconds.front() == 5.0);
+    assert_same_logs(result.log, expected.log);
+    // Metadata validation remains active even when its durations are unused.
+    overridden.stochastic_map->transitions.front().parameter =
+        std::numeric_limits<double>::quiet_NaN();
+    assert(throws_invalid([&] { (void)minera::monte_carlo(net, overridden); }));
+  }
+  // A supplied signed map is valid metadata even though simulation rejects it.
+  assert(minera::fit_monte_carlo_options({}, net, uniform).stochastic_map.has_value());
 }
 
 void compatibility_controls_validate_without_runtime_effects() {
@@ -817,20 +912,14 @@ void fitted_weights_preserve_supplied_replay_context() {
     replay.transition_names = options.transition_names;
     replay.initial_marking_keys = options.initial_marking_keys;
     replay.final_marking_keys = options.final_marking_keys;
-    const auto diagnostics = minera::replay_token_diagnostics(input, net, replay);
-    std::vector<double> expected(net.transitions().size(), 0.0);
-    bool observed = false;
-    for (std::size_t i = 0; i < expected.size(); ++i) {
-      if (!net.transitions()[i].activity) expected[i] = 1.0;
-      else {
-        expected[i] = static_cast<double>(diagnostics.transition_activations[i]);
-        observed = observed || expected[i] != 0.0;
-      }
-    }
-    if (!observed) expected.clear();
+    minera::StochasticMapFitOptions expected_options;
+    expected_options.replay = replay;
+    const auto expected = minera::fit_stochastic_map_with_report(input, net, expected_options).map;
     const auto fitted = minera::fit_monte_carlo_options(input, net, options);
-    assert(fitted.transition_weights == expected);
-    return fitted.transition_weights;
+    assert(fitted.stochastic_map.has_value());
+    assert(minera::serialize_stochastic_map_json(*fitted.stochastic_map) ==
+           minera::serialize_stochastic_map_json(expected));
+    return fitted_weights(fitted, net.transitions().size());
   };
   minera::MonteCarloOptions options;
   options.place_names = {"source-id", "gate-id", "sink-id"};
@@ -863,7 +952,7 @@ void fitted_weights_preserve_supplied_replay_context() {
   assert((check(options) == std::vector<double>{0.0, 1.0}));
 }
 
-void replay_context_validation_is_limited_to_weight_fitting() {
+void replay_context_validation_is_limited_to_map_fitting() {
   const auto net = linear_net();
   minera::EventLog input;
   minera::Trace trace;
@@ -876,6 +965,9 @@ void replay_context_validation_is_limited_to_weight_fitting() {
     options.transition_durations = {{minera::MonteCarloDurationDistribution::kDeterministic, 7.0}};
     assert(throws_invalid([&] { (void)minera::fit_monte_carlo_options(input, net, options); }));
     options.transition_weights = {3.0};
+    options.transition_durations.clear();
+    assert(throws_invalid([&] { (void)minera::fit_monte_carlo_options(input, net, options); }));
+    options.transition_durations = {{minera::MonteCarloDurationDistribution::kDeterministic, 7.0}};
     const auto fitted = minera::fit_monte_carlo_options(input, net, options);
     assert(fitted.transition_weights == options.transition_weights);
     assert(fitted.transition_durations.front().value_seconds == 7.0);
@@ -1030,6 +1122,7 @@ int main() {
   weighted_choices_and_exponential_replay();
   source_log_fits_missing_weights_and_durations();
   source_log_forces_duration_distributions();
+  source_log_fitting_preserves_sparse_causal_records_and_overrides();
   scalar_duration_distributions_are_seeded_and_nonnegative();
   resources_create_virtual_fifo_wait();
   reset_arcs_close_only_the_firing_cases_tokens();
@@ -1042,8 +1135,9 @@ int main() {
   arrival_inference_and_custom_selectors_round_trip();
   replay_selector_changes_fitted_activation_counts();
   fitted_weights_preserve_supplied_replay_context();
-  replay_context_validation_is_limited_to_weight_fitting();
+  replay_context_validation_is_limited_to_map_fitting();
   compatibility_controls_validate_without_runtime_effects();
+  signed_fitted_metadata_retains_simulation_domain_validation();
   invalid_options_are_rejected();
   diagnostics_can_be_disabled();
   json_contract_is_stable();
