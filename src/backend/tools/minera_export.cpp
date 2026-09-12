@@ -25,6 +25,7 @@
 #include "pnml_model_options.hpp"
 
 #include "minera/alpha_miner.hpp"
+#include "minera/alpha_result_json.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/attribute_kde.hpp"
 #include "minera/attribute_statistics.hpp"
@@ -609,6 +610,7 @@ int usage(const char* program) {
                "                            the directly-follows graph alone,\n"
                "                            scaling to huge logs)\n"
                "  --alpha-variant <id>      classic (default) or plus (short loops)\n"
+               "  --alpha-plus-result      Emit Alpha+ graph with live/detached markings\n"
                "  --alpha-activity-attribute <name> Event field used as activity\n"
                "  --alpha-remove-unconnected <bool> Drop unconnected Alpha transitions\n"
                "  --alpha-max-rows-to-materialize <n> Alpha input event cap\n"
@@ -1866,6 +1868,7 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> case_grouping_fields;
   minera::InductiveMinerOptions inductive_options;
   minera::AlphaMinerOptions alpha_options;
+  bool alpha_plus_result = false;
   minera::HeuristicMinerOptions heuristic_options;
   minera::PowlDiscoveryOptions powl_options;
   minera::TransitionSystemOptions transition_options;
@@ -4841,12 +4844,15 @@ int main(int argc, char** argv) {
       } else {
         inductive_options.case_id_key = selector;
       }
-    } else if (arg == "--alpha-variant") {
-      const auto* value = next();
-      if (!value) return usage(argv[0]);
-      const std::string_view variant = value;
-      if (variant != "classic" && variant != "plus") return usage(argv[0]);
-      alpha_options.short_loops = variant == "plus";
+    } else if (arg == "--alpha-variant" || arg == "--alpha-plus-result") {
+      if (arg == "--alpha-plus-result") alpha_plus_result = true;
+      else {
+        const auto* value = next();
+        if (!value) return usage(argv[0]);
+        const std::string_view variant = value;
+        if (variant != "classic" && variant != "plus") return usage(argv[0]);
+        alpha_options.short_loops = variant == "plus";
+      }
     } else if (arg == "--alpha-activity-attribute") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -5253,7 +5259,7 @@ int main(int argc, char** argv) {
        compare_petri_miner_used || compare_petri_replay_option_used ||
        compare_petri_initial_marking_used || compare_petri_final_marking_used ||
        !compare_petri_activity_attribute.empty() || !check_pnml.empty() ||
-       log_conversion_requested ||
+       log_conversion_requested || alpha_plus_result ||
        browser_history_requested || windows_events_requested || repository_history_requested ||
        workflow_history_requested || enterprise_history_requested || communication_history_requested ||
        random_tree_requested || merge_requested || timestamp_interleavings_requested ||
@@ -6006,6 +6012,18 @@ int main(int argc, char** argv) {
       replay_options.transition_names = document.transition_ids;
       const auto body = minera::token_replay_traces_json(
           minera::replay_token_traces(log, document.net, replay_options), replay_options.variant);
+      if (output.empty()) std::cout << body << '\n';
+      else {
+        std::ofstream file(output);
+        if (!file) throw std::runtime_error("Cannot open output file " + output.string());
+        file << body << '\n';
+        if (!file) throw std::runtime_error("Cannot write output file " + output.string());
+      }
+      return 0;
+    }
+    if (alpha_plus_result) {
+      const auto body = minera::alpha_plus_result_json(
+          minera::discover_alpha_plus_result(log, alpha_options));
       if (output.empty()) std::cout << body << '\n';
       else {
         std::ofstream file(output);

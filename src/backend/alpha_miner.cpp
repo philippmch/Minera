@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <iterator>
 #include <optional>
+#include <random>
 #include <set>
 #include <string>
 #include <stdexcept>
@@ -353,36 +354,36 @@ PetriNet discover_alpha_classic(const EventLog& log,
   return build_classic_net(ids.names, footprint, false);
 }
 
-PetriNet discover_alpha_plus(const EventLog& log,
+AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
                              const AlphaMinerOptions& options) {
   const EventLog normalized = normalize_alpha_event_log(log, options);
-  const IdLog ids = intern_log(normalized);
+  IdLog ids = intern_log(normalized);
+  const auto visible_names = ids.names;
+  if (ids.traces.empty())
+    throw std::invalid_argument("Alpha+: a trace-bearing log is required");
+  // Boundary labels participate in ordinary label identity and loop removal.
+  const auto boundary_id = [&](const std::string& name) {
+    const auto found = std::find(ids.names.begin(), ids.names.end(), name);
+    if (found != ids.names.end())
+      return static_cast<std::size_t>(found - ids.names.begin());
+    ids.names.push_back(name);
+    return ids.names.size() - 1;
+  };
+  const auto start_label = boundary_id("artificial_start");
+  const auto end_label = boundary_id("artificial_end");
+  IdLog boundary_log = ids;
+  for (auto& sequence : boundary_log.traces) {
+    sequence.insert(sequence.begin(), start_label);
+    sequence.push_back(end_label);
+  }
   const std::size_t n = ids.names.size();
-  const Footprint full = build_footprint(ids, nullptr, true);
-  if (ids.traces.empty() || n == 0)
-    throw std::invalid_argument("Alpha+: an event-bearing log is required");
+  const Footprint full = build_footprint(boundary_log, nullptr, true);
   std::vector<bool> loops(n, false);
   for (std::size_t a = 0; a < n; ++a) loops[a] = full.follows[a][a];
-
-  // Include artificial boundaries in the maximal-pair search even when no
-  // one-loops occur. Cleanup below tests whether their surrounding flow
-  // permits removing the corresponding hidden transitions.
-  const std::size_t artificial_start = n;
-  const std::size_t artificial_end = n + 1;
-  IdLog boundary_log;
-  boundary_log.names = ids.names;
-  boundary_log.names.resize(n + 2);
-  boundary_log.traces.reserve(ids.traces.size());
-  for (const auto& trace : ids.traces) {
-    std::vector<std::size_t> sequence;
-    sequence.reserve(trace.size() + 2);
-    sequence.push_back(artificial_start);
-    sequence.insert(sequence.end(), trace.begin(), trace.end());
-    sequence.push_back(artificial_end);
-    boundary_log.traces.push_back(std::move(sequence));
-  }
-  auto boundary_exclude = loops;
-  boundary_exclude.resize(n + 2, false);
+  const auto reduced = build_footprint(boundary_log, &loops, true);
+  if (reduced.starts.empty() || reduced.ends.empty())
+    throw std::invalid_argument("Alpha+: boundary reduction leaves no endpoints");
+  const auto& boundary_exclude = loops;
   const std::vector<Place> boundary_pairs = maximal_places(
       build_footprint(boundary_log, &boundary_exclude, true));
 
@@ -432,8 +433,8 @@ PetriNet discover_alpha_plus(const EventLog& log,
     }
   }
 
-  std::vector<std::vector<std::size_t>> transition_inputs(n + 2);
-  std::vector<std::vector<std::size_t>> transition_outputs(n + 2);
+  std::vector<std::vector<std::size_t>> transition_inputs(n);
+  std::vector<std::vector<std::size_t>> transition_outputs(n);
   for (std::size_t pair_index = 0; pair_index < boundary_pairs.size();
        ++pair_index) {
     for (const auto from : boundary_pairs[pair_index].first)
@@ -441,103 +442,127 @@ PetriNet discover_alpha_plus(const EventLog& log,
     for (const auto to : boundary_pairs[pair_index].second)
       transition_inputs[to].push_back(pair_index);
   }
-  // The initial hidden boundary is removable only when it has one target
-  // place and no other transition enters that place.
-  bool collapse_initial = transition_outputs[artificial_start].size() == 1;
-  std::size_t initial_pair = 0;
-  if (collapse_initial) {
-    initial_pair = transition_outputs[artificial_start].front();
-    collapse_initial = boundary_pairs[initial_pair].first.size() == 1;
-  }
-
-  // The final hidden boundary is removable only for one exclusive source
-  // place whose incoming transitions do not branch elsewhere. When removed,
-  // those transitions are wired directly to the workflow sink.
-  bool collapse_final = transition_inputs[artificial_end].size() == 1;
-  std::size_t final_pair = 0;
-  if (collapse_final) {
-    final_pair = transition_inputs[artificial_end].front();
-    collapse_final = boundary_pairs[final_pair].second.size() == 1;
-    if (collapse_final && collapse_initial && initial_pair == final_pair)
-      throw std::invalid_argument(
-          "Alpha+: boundary cleanup leaves no valid initial marking");
-    if (collapse_final) {
-      for (const auto from : boundary_pairs[final_pair].first) {
-        if (transition_outputs[from].size() > 1) {
-          collapse_final = false;
-          break;
-        }
+  // Assemble the complete graph before cleanup: reserved names can occur
+  // inside traces, and reduced traces can have several distinct endpoints.
+  std::vector<AlphaPlaceName> names{{"start", {}, {}}, {"end", {}, {}}};
+  const auto pair_name = [&](std::size_t index) {
+    AlphaPlaceName name;
+    for (const auto id : boundary_pairs[index].first)
+      name.before.push_back(boundary_log.names[id]);
+    for (const auto id : boundary_pairs[index].second)
+      name.after.push_back(boundary_log.names[id]);
+    std::sort(name.before.begin(), name.before.end());
+    std::sort(name.after.begin(), name.after.end());
+    return name;
+  };
+  for (std::size_t i = 0; i < boundary_pairs.size(); ++i)
+    names.push_back(pair_name(i));
+  auto inputs = transition_inputs;
+  auto outputs = transition_outputs;
+  for (std::size_t t = 0; t < n; ++t) {
+    for (auto& p : inputs[t]) p += 2;
+    for (auto& p : outputs[t]) p += 2;
+    if (reduced.starts.contains(t)) inputs[t].push_back(0);
+    if (reduced.ends.contains(t)) outputs[t].push_back(1);
+    if (loops[t]) {
+      for (const auto pair : loop_pairs[t]) {
+        inputs[t].push_back(names.size());
+        outputs[t].push_back(names.size());
+        names.push_back(pair_name(pair));
       }
     }
   }
-
-  PetriNet net;
-  net.set_activities(ids.names);
-  std::optional<std::size_t> outer_source;
-  if (!collapse_initial) outer_source = net.add_place();
-  std::vector<std::optional<std::size_t>> pair_places(boundary_pairs.size());
-  for (std::size_t pair_index = 0; pair_index < boundary_pairs.size();
-       ++pair_index) {
-    if (collapse_final && pair_index == final_pair) continue;
-    pair_places[pair_index] = net.add_place();
-  }
-  const std::size_t sink = net.add_place();
-  const std::size_t source =
-      collapse_initial ? *pair_places[initial_pair] : *outer_source;
-  net.set_source(source);
-  net.set_sink(sink);
-  // Each qualifying loop context receives a fresh place carrying only the
-  // loop's self-arcs. The original maximal-pair place retains its own wiring.
-  std::vector<std::vector<std::size_t>> loop_places(n);
-  for (std::size_t activity = 0; activity < n; ++activity) {
-    for (const auto pair_index : loop_pairs[activity]) {
-      (void)pair_index;
-      loop_places[activity].push_back(net.add_place());
-    }
-  }
-
-  const auto input_places = [&](std::size_t transition) {
-    std::vector<std::size_t> places;
-    for (const auto pair_index : transition_inputs[transition]) {
-      if (collapse_final && pair_index == final_pair) continue;
-      places.push_back(*pair_places[pair_index]);
-    }
-    return places;
+  std::vector<bool> live_places(names.size(), true), live_transitions(n, true);
+  const auto erase_place = [&](std::size_t p) {
+    live_places[p] = false;
+    for (auto& values : inputs) std::erase(values, p);
+    for (auto& values : outputs) std::erase(values, p);
   };
-  const auto output_places = [&](std::size_t transition) {
-    std::vector<std::size_t> places;
-    for (const auto pair_index : transition_outputs[transition]) {
-      if (collapse_final && pair_index == final_pair)
-        places.push_back(sink);
-      else
-        places.push_back(*pair_places[pair_index]);
-    }
-    return places;
+  const auto erase_transition = [&](std::size_t t) {
+    live_transitions[t] = false;
+    inputs[t].clear();
+    outputs[t].clear();
   };
-
-  if (!collapse_initial) {
-    net.add_transition(std::nullopt, {*outer_source},
-                       output_places(artificial_start));
-  }
-  if (!collapse_final) {
-    net.add_transition(std::nullopt, input_places(artificial_end), {sink});
-  }
-
-  for (std::size_t activity = 0; activity < n; ++activity) {
-    std::vector<std::size_t> inputs;
-    std::vector<std::size_t> outputs;
-    if (loops[activity]) {
-      inputs = loop_places[activity];
-      outputs = inputs;
-    } else {
-      inputs = input_places(activity);
-      outputs = output_places(activity);
+  const auto incident = [&](std::size_t p, const auto& arcs) {
+    std::vector<std::size_t> result;
+    for (std::size_t t = 0; t < n; ++t)
+      if (live_transitions[t] && std::find(arcs[t].begin(), arcs[t].end(), p) != arcs[t].end())
+        result.push_back(t);
+    return result;
+  };
+  // The public implementation selects an identity-ordered incident arc.
+  // Allocation identity is not portable; sample tied incident choices.
+  // Uniform independent draws model observed alternatives, not the unverified
+  // allocation-dependent probabilities or correlations of the reference.
+  const auto choose = [](const std::vector<std::size_t>& candidates) {
+    if (candidates.empty())
+      throw std::invalid_argument("Alpha+: boundary cleanup has no incident transition");
+    static thread_local std::mt19937_64 generator(std::random_device{}());
+    return candidates[std::uniform_int_distribution<std::size_t>(0, candidates.size() - 1)(generator)];
+  };
+  std::size_t initial = 0;
+  const auto first = choose(incident(0, inputs));
+  if (outputs[first].size() == 1) {
+    const auto next = outputs[first].front();
+    if (incident(next, outputs).size() == 1) {
+      initial = next;
+      erase_transition(first);
+      erase_place(0);
     }
-    if (options.remove_unconnected && inputs.empty() && outputs.empty())
-      continue;
-    net.add_transition(activity, std::move(inputs), std::move(outputs));
   }
-  return net;
+  const auto last = choose(incident(1, outputs));
+  if (inputs[last].size() == 1) {
+    const auto previous = inputs[last].front();
+    const auto producers = incident(previous, outputs);
+    const bool exclusive = std::all_of(producers.begin(), producers.end(),
+        [&](std::size_t t) { return outputs[t].size() == 1; });
+    if (exclusive && incident(previous, inputs).size() == 1) {
+      erase_transition(last);
+      erase_place(previous);
+      for (const auto t : producers)
+        if (live_transitions[t]) outputs[t].push_back(1);
+    }
+  }
+  AlphaPlusDiscoveryResult result;
+  auto& net = result.net;
+  net.set_activities(visible_names);
+  std::vector<std::size_t> place_ids(names.size());
+  for (std::size_t p = 0; p < names.size(); ++p) {
+    if (!live_places[p]) continue;
+    place_ids[p] = net.add_place();
+    result.place_names.push_back(names[p]);
+  }
+  for (std::size_t t = 0; t < n; ++t) {
+    if (!live_transitions[t]) continue;
+    if (options.remove_unconnected && inputs[t].empty() && outputs[t].empty()) continue;
+    for (auto& p : inputs[t]) p = place_ids[p];
+    for (auto& p : outputs[t]) p = place_ids[p];
+    const bool hidden = !loops[t] && (t == start_label || t == end_label);
+    net.add_transition(hidden ? std::nullopt : std::optional<std::size_t>(t),
+                       std::move(inputs[t]), std::move(outputs[t]));
+  }
+  result.initial_marking.resize(net.place_count());
+  result.final_marking.resize(net.place_count());
+  if (live_places[initial]) {
+    net.set_source(place_ids[initial]);
+    result.initial_marking[place_ids[initial]] = 1;
+  } else result.detached_initial_marking.push_back({names[initial], 1});
+  if (live_places[1]) {
+    net.set_sink(place_ids[1]);
+    result.final_marking[place_ids[1]] = 1;
+  } else result.detached_final_marking.push_back({names[1], 1});
+
+  return result;
+}
+
+PetriNet discover_alpha_plus(const EventLog& log,
+                             const AlphaMinerOptions& options) {
+  auto result = discover_alpha_plus_result(log, options);
+  if (!result.detached_initial_marking.empty() ||
+      !result.detached_final_marking.empty())
+    throw std::invalid_argument(
+        "Alpha+: boundary cleanup leaves no valid initial marking");
+  return std::move(result.net);
 }
 
 PetriNet discover_petri_net(const EventLog& log,

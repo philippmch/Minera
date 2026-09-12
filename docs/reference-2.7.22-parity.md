@@ -129,7 +129,7 @@ are reconciled.
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both `VERSION_DISCOUNTED_A_STAR` algorithms preserve the asymmetric discounted recurrence, complete model-transition runs, raw ordinary-distance borders, deterministic longer-run ties, exact marking-limit boundaries, objectives, precision/distance diagnostics, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters, with distinct registered proofs |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, strict direct-OCDFG activity/object-type selectors, and cross-family envelope rejection; broader OCEL schema coverage remains |
-| Discovery: Alpha | classic and Alpha+ | **Partial (classic, abstraction, and endpoint modules complete)** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ has independently checked boundary, short-loop, last-predecessor, fresh-place, and cleanup behavior, while reserved boundary-label collisions and the hardened invalid-marking domain remain explicitly outside its complete claim |
+| Discovery: Alpha | classic and Alpha+ | **Partial (classic, abstraction, and endpoint modules complete)** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ exposes raw live/detached markings and reserved-label collision cleanup through native/JSON/CLI/HTTP adapters, with repeated output-support checks; identity-dependent selection probabilities and correlations remain outside its complete claim |
 | Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Partial (implemented core; proof pending)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
@@ -430,19 +430,58 @@ and no-short-loop boundary fixtures are independently checked against an
 executable snapshot of the pinned commit. Place membership in markings is
 checked by identity, since distinct reference places may share displayed names.
 
-An empty Alpha+ log or a boundary reduction that leaves a stale initial marking
-raises `std::invalid_argument` in Minera. This includes all-loop/empty-only logs
-and combinations that collapse both boundaries onto the same removed place.
+The raw `discover_alpha_plus_result` API preserves explicit live and detached
+initial/final markings, including all-loop/empty-only logs and boundary
+reductions that leave a marking on a removed place. Detached entries retain
+their structural names without identifying a live place with the same name;
+the raw net has no fabricated source. The strict `discover_alpha_plus` workflow
+adapter still rejects detached markings. A log containing no traces fails in
+both the native and pinned public implementations.
 A reduced self-loop alone is different: `a,L,L,a` returns two disconnected
 boundary places with silent boundary transitions, matching the pinned runtime.
 Cleanup removes the disconnected visible transitions. Adding a trailing `b`
 retains the boundary-to-`b` connection and an isolated `L` loop place.
-Minera also isolates its internal boundary identities from visible activity
-labels; public probes confirm collisions for the reference labels
-`artificial_start` and `artificial_end`, including stale initial markings.
-These error and reserved-label behaviors remain documented
-differences; the enhanced variant and its dispatcher remain partial. Its
+Artificial boundary identities now share visible activity labels during loop
+removal, including `artificial_start` and `artificial_end`; boundary reduction
+can therefore hide an ordinary activity or leave a detached initial marking.
+All reduced trace endpoints connect to the source/sink, and hidden boundary
+transitions retain reverse arcs. Initial cleanup requires a single-output
+successor with an exclusive target producer; final cleanup requires an
+exclusive prior-place consumer whose producers have no other outputs.
+The enhanced variant and its dispatcher remain partial. Its
 optional cleanup removes only completely disconnected visible transitions.
+
+`--alpha-plus-result` and `POST /api/discover-alpha-plus` expose the raw graph
+and markings as JSON, with activity selection, optional cleanup, and row caps.
+The HTTP endpoint accepts uploaded logs or the cached session log; the typed
+frontend client validates place identities, arc references, and markings.
+The typed client is available independently; it is not yet connected to the
+production UI. The raw result API accepts EventLog inputs; stream and table
+adapters retain their ordinary Petri-net projections.
+`scripts/capture-alpha-plus-reference.py` records public graph and marking
+outputs from the pinned 2.7.22 runtime. The durable
+`docs/alpha-plus-reference-fixtures.json` merges five captures with Python hash
+seeds 0 through 4 and 20 calls per row. The 784-row corpus contains 774 distinct
+cases; 72 cases vary across these seeds. Repeating a fixed seed produced no
+additional observed alternatives in this capture.
+Boundary cleanup samples incident choices independently and uniformly as an
+approximation to reference ordering. Membership in sampled support does not
+prove full support, selection probabilities, or correlation equivalence;
+these remain open parity requirements.
+The integrated audit sampled 7,740 native results across all 774 distinct
+cases. Against seed 0 alone, 374 results were outside observed support; all
+7,740 were within the merged five-seed support, with no malformed results.
+`scripts/check-alpha-plus-sampled-support.py` rejects unsupported or malformed
+results and requires pinned reference provenance. The portable
+`scripts/check-alpha-plus-model-transports.py` passed all 21 CLI/HTTP checks,
+including output files, uploaded and cached logs, selectors, and rejection
+contracts. The Release build, all 150 native suites, 613 frontend tests,
+TypeScript checks, and production frontend build passed. Six focused offline
+tests also verify that the evidence gates fail on invalid output and provenance.
+The comparison normalizes structural place names and incident transition
+labels, distinguishes live from detached markings, and compares failure
+presence rather than Python/C++ exception classes or messages. It does not
+establish arbitrary graph identity or exhaust every possible log.
 
 The strict discovery projection is reused for conformance, footprints,
 alignment, decoration, comparison, evaluation, decision mining, stochastic

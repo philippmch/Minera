@@ -7280,7 +7280,15 @@
         "src/backend/alpha_event_data.cpp",
         "src/backend/tests/test_alpha_parity_contracts.cpp",
         "src/backend/tests/test_alpha_miner.cpp",
-        "src/backend/tests/test_alpha_event_data.cpp"
+        "src/backend/tests/test_alpha_event_data.cpp",
+        "include/minera/alpha_result_json.hpp",
+        "src/backend/alpha_result_json.cpp",
+        "src/backend/tests/test_alpha_result_json.cpp",
+        "src/frontend/src/alpha-result.ts",
+        "scripts/capture-alpha-plus-reference.py",
+        "scripts/check-alpha-plus-sampled-support.py",
+        "scripts/check-alpha-plus-model-transports.py",
+        "docs/alpha-plus-reference-fixtures.json"
       ],
       "proofs": {
         "module": "algo.discovery.alpha.variants.plus",

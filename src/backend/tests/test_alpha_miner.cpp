@@ -354,6 +354,124 @@ void alpha_default_projection_remains_compatible() {
 }  // namespace
 
 int main() {
+  // Multiple reduced endpoints expose identity-dependent cleanup choices.
+  // Every sampled result must retain the public graph/marking alternatives.
+  for (int sample = 0; sample < 32; ++sample) {
+    const auto result = discover_alpha_plus_result(
+        log({trace({"a"}), trace({"artificial_end"})}));
+    const auto* a = transition_for(result.net, "a");
+    assert(a && a->inputs.size() == 1 && a->outputs.size() == 1);
+    assert(result.place_names[a->outputs[0]].boundary == "end");
+    if (result.detached_initial_marking.empty()) {
+      assert(result.net.place_count() == 3);
+      assert(result.net.transitions().size() == 3);
+      assert(result.net.has_source());
+    } else {
+      assert(result.net.place_count() == 2);
+      assert(result.net.transitions().size() == 2);
+      assert(!result.net.has_source());
+      assert(result.detached_initial_marking.size() == 1);
+      assert(result.detached_initial_marking[0].name.boundary == "start");
+    }
+  }
+  const auto reverse_boundary = discover_alpha_plus_result(
+      log({trace({"a"}), trace({"artificial_end", "artificial_start"})}));
+  bool reverse_pair_found = false;
+  for (std::size_t p = 0; p < reverse_boundary.place_names.size(); ++p) {
+    if (reverse_boundary.place_names[p] !=
+        AlphaPlaceName{"", {"artificial_end"}, {"artificial_start"}}) continue;
+    reverse_pair_found = true;
+    std::size_t incoming = 0, outgoing = 0;
+    for (const auto& t : reverse_boundary.net.transitions()) {
+      if (contains(t.inputs, p)) { assert(t.silent()); ++outgoing; }
+      if (contains(t.outputs, p)) { assert(t.silent()); ++incoming; }
+    }
+    assert(incoming == 1 && outgoing == 1);
+  }
+  assert(reverse_pair_found);
+  for (const bool cleanup : {false, true}) {
+    AlphaMinerOptions options;
+    options.remove_unconnected = cleanup;
+    // A boundary collision participates in loop removal. The first/last
+    // remaining labels then become hidden boundary transitions.
+    for (const auto& word : {trace({"artificial_start"}),
+                            trace({"a", "a", "artificial_end"}),
+                            trace({"artificial_start", "a", "artificial_end"})}) {
+      bool rejected = false;
+      try { (void)discover_alpha_plus_result(log({word}), options); }
+      catch (const std::invalid_argument&) { rejected = true; }
+      assert(rejected);
+    }
+    const auto shifted = discover_alpha_plus_result(
+        log({trace({"a", "artificial_end"})}), options);
+    assert(shifted.net.place_count() == 1);
+    assert(!shifted.net.has_source());
+    assert(shifted.detached_initial_marking.size() == 1);
+    assert((shifted.detached_initial_marking[0].name ==
+            AlphaPlaceName{"", {"artificial_start"}, {"a"}}));
+    assert(transition_for(shifted.net, "a") == nullptr);
+    assert(shifted.net.transitions().size() == (cleanup ? 0 : 1));
+    if (!cleanup) {
+      const auto* remaining = transition_for(shifted.net, "artificial_end");
+      assert(remaining && remaining->inputs.empty() && remaining->outputs.empty());
+    }
+    const auto retained = discover_alpha_plus_result(
+        log({trace({"artificial_end", "a", "artificial_end"})}), options);
+    const auto* loop = transition_for(retained.net, "artificial_end");
+    assert(loop && loop->inputs.size() == 1 && loop->inputs == loop->outputs);
+    assert(retained.initial_marking[loop->inputs[0]] == 0);
+    assert(retained.detached_initial_marking.size() == 1);
+    assert(retained.detached_initial_marking[0].name == retained.place_names[loop->inputs[0]]);
+    const auto ordinary = discover_alpha_plus_result(log({trace({"a"})}), options);
+    assert(ordinary.net.activities() == std::vector<std::string>({"a"}));
+  }
+  // Raw results retain marking identity after boundary cleanup, including
+  // detached places whose names coincide with live loop places.
+  for (const bool cleanup : {false, true}) {
+    AlphaMinerOptions options;
+    options.remove_unconnected = cleanup;
+    const auto empty = discover_alpha_plus_result(log({trace({})}), options);
+    assert(empty.net.place_count() == 1);
+    assert(!empty.net.has_source());
+    assert(empty.net.transitions().empty());
+    assert(empty.place_names == std::vector<AlphaPlaceName>({{"end", {}, {}}}));
+    assert(empty.initial_marking == std::vector<std::uint64_t>({0}));
+    assert(empty.final_marking == std::vector<std::uint64_t>({1}));
+    assert(empty.detached_initial_marking.size() == 1);
+    const AlphaPlaceName boundary_pair{"", {"artificial_start"}, {"artificial_end"}};
+    assert(empty.detached_initial_marking[0].name == boundary_pair);
+    assert(empty.detached_initial_marking[0].tokens == 1);
+    assert(empty.detached_final_marking.empty());
+
+    const auto loops = discover_alpha_plus_result(log({trace({"a", "a"})}), options);
+    assert(loops.net.place_count() == 2);
+    assert(!loops.net.has_source());
+    assert(loops.initial_marking == std::vector<std::uint64_t>({0, 0}));
+    assert(loops.detached_initial_marking.size() == 1);
+    assert(loops.detached_initial_marking[0].name == boundary_pair);
+    const auto* a = transition_for(loops.net, "a");
+    assert(a && a->inputs.size() == 1 && a->inputs == a->outputs);
+    assert(loops.place_names[a->inputs[0]] == boundary_pair);
+    assert(loops.initial_marking[a->inputs[0]] == 0);
+    assert(loops.final_marking[a->inputs[0]] == 0);
+    assert(loops.final_marking[loops.net.sink()] == 1);
+
+    const auto ordinary = discover_alpha_plus_result(log({trace({"a"})}), options);
+    assert(ordinary.net.place_count() == 2);
+    assert(ordinary.detached_initial_marking.empty());
+    assert(ordinary.detached_final_marking.empty());
+    const auto* visible = transition_for(ordinary.net, "a");
+    assert(visible && visible->inputs.size() == 1 && visible->outputs.size() == 1);
+    assert((ordinary.place_names[visible->inputs[0]] ==
+            AlphaPlaceName{"", {"artificial_start"}, {"a"}}));
+    assert(ordinary.place_names[visible->outputs[0]].boundary == "end");
+    assert(ordinary.initial_marking[visible->inputs[0]] == 1);
+    assert(ordinary.final_marking[visible->outputs[0]] == 1);
+  }
+  bool no_traces_rejected = false;
+  try { (void)discover_alpha_plus_result(EventLog{}); }
+  catch (const std::invalid_argument&) { no_traces_rejected = true; }
+  assert(no_traces_rejected);
   alpha_plus_boundary_loops_use_unmarked_separate_places();
   alpha_plus_rejects_all_loop_logs_with_no_valid_initial_marking();
   alpha_plus_creates_a_separate_interior_loop_place();
