@@ -209,6 +209,102 @@ void weighted_choices_and_exponential_replay() {
   }
 }
 
+void signed_activation_weights_normalize_enabled_sets() {
+  const auto net = choice_net();
+  minera::MonteCarloOptions options;
+  options.simulations = 2000;
+  options.max_steps = 4;
+  options.seed = 731;
+  options.default_duration_seconds = 0.0;
+  const auto fraction_a = [](const minera::MonteCarloResult& result) {
+    std::size_t count = 0;
+    for (const auto& trace : result.log.traces) {
+      assert(trace.events.size() == 1);
+      count += trace.events.front().activity == "A";
+    }
+    return static_cast<double>(count) / result.log.traces.size();
+  };
+  for (const auto& weights : {std::vector<double>{-1.0, -3.0},
+                              std::vector<double>{-1e-320, -3e-320},
+                              std::vector<double>{1e-320, 3e-320}}) {
+    options.transition_weights = weights;
+    assert(std::abs(fraction_a(minera::monte_carlo(net, options)) - 0.25) < 0.05);
+  }
+  for (const auto& weights : {std::vector<double>{-1.0, 1.0},
+                              std::vector<double>{0.0, 0.0}}) {
+    options.transition_weights = weights;
+    assert(std::abs(fraction_a(minera::monte_carlo(net, options)) - 0.5) < 0.05);
+  }
+  options.transition_weights = {-1.0, 0.0};
+  assert(fraction_a(minera::monte_carlo(net, options)) == 1.0);
+  auto three_way = choice_net();
+  three_way.set_activities({"A", "B", "C"});
+  three_way.add_transition(2, {three_way.source()}, {three_way.sink()});
+  options.transition_weights = {-1.0, -1.0, 2.0};
+  const auto cancelled = minera::monte_carlo(three_way, options);
+  std::array<std::size_t, 3> counts{};
+  for (const auto& trace : cancelled.log.traces)
+    ++counts[trace.events.front().activity.front() - 'A'];
+  for (const auto count : counts)
+    assert(std::abs(static_cast<double>(count) / options.simulations - 1.0 / 3.0) < 0.05);
+
+  minera::StochasticMap map;
+  map.transitions.push_back({0, minera::StochasticMapTiming::kImmediate,
+      minera::StochasticMapDistribution::kConstant0, 0.0, 0.0, 0.0, -1.0, 0});
+  options.stochastic_map = map;
+  options.transition_weights.clear();
+  // The absent record defaults to +1, cancelling the supplied -1.
+  assert(std::abs(fraction_a(minera::monte_carlo(net, options)) - 0.5) < 0.05);
+  map.transitions.push_back({1, minera::StochasticMapTiming::kImmediate,
+      minera::StochasticMapDistribution::kConstant0, 0.0, 0.0, 0.0, -3.0, 0});
+  options.stochastic_map = map;
+  assert(std::abs(fraction_a(minera::monte_carlo(net, options)) - 0.25) < 0.05);
+  options.stochastic_map->transitions[1].activation_weight = 2.0;
+  options.transition_weights = {0.0, -1.0};
+  assert(fraction_a(minera::monte_carlo(net, options)) == 0.0);
+  // Unused map weights remain subject to finite metadata validation.
+  options.stochastic_map->transitions[0].activation_weight =
+      std::numeric_limits<double>::infinity();
+  assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
+  options.stochastic_map.reset();
+
+  for (const auto& weights : {std::vector<double>{-1.0, 2.0},
+                              std::vector<double>{-2.0, 1.0},
+                              std::vector<double>{1e308, 1e308},
+                              std::vector<double>{-1e308, -1e308}}) {
+    options.transition_weights = weights;
+    assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
+    // These values are individually valid when enabled in separate stages.
+    const auto sequential = minera::monte_carlo(sequential_net(), options);
+    assert(sequential.diagnostics.completed_cases == options.simulations);
+    for (const auto& trace : sequential.log.traces) {
+      assert(trace.events.size() == 2);
+      assert(trace.events[0].activity == "A" && trace.events[1].activity == "B");
+    }
+  }
+  for (const double invalid : {std::numeric_limits<double>::infinity(),
+                               std::numeric_limits<double>::quiet_NaN()}) {
+    options.transition_weights = {1.0, invalid};
+    options.max_steps = 1;  // The invalid second transition is never reached.
+    assert(throws_invalid([&] {
+      (void)minera::monte_carlo(sequential_net(), options);
+    }));
+  }
+  // Invalid normalization is deferred until the conflicting set is enabled.
+  auto staged = sequential_net();
+  staged.set_activities({"A", "B", "C"});
+  staged.add_transition(2, {1}, {staged.sink()});
+  for (const auto& weights : {std::vector<double>{1.0, -1.0, 2.0},
+                              std::vector<double>{1.0, 1e308, 1e308}}) {
+    options.transition_weights = weights;
+    options.max_steps = 1;
+    assert(minera::monte_carlo(staged, options).diagnostics.step_limited_cases ==
+           options.simulations);
+    options.max_steps = 2;
+    assert(throws_invalid([&] { (void)minera::monte_carlo(staged, options); }));
+  }
+}
+
 void source_log_fits_missing_weights_and_durations() {
   const auto net = sequential_net();
   minera::EventLog input;
@@ -1519,6 +1615,7 @@ void json_contract_is_stable() {
 int main() {
   deterministic_seed_and_diagnostics();
   weighted_choices_and_exponential_replay();
+  signed_activation_weights_normalize_enabled_sets();
   source_log_fits_missing_weights_and_durations();
   source_log_forces_duration_distributions();
   source_log_fitting_preserves_sparse_causal_records_and_overrides();

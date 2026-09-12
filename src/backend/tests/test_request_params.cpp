@@ -3979,6 +3979,16 @@ void parse_stochastic_playout_params_rejects_bad_values() {
 }
 
 void parse_monte_carlo_params_maps_controls() {
+  // Sign validity depends on the transitions enabled together at runtime.
+  for (const auto& weights : {"-1,-3", "-1,0", "-1,1", "-1,2"}) {
+    const auto signed_weights = minera::parse_monte_carlo_params(fields({
+        {"monte_carlo_transition_weights", weights}}));
+    assert(signed_weights.transition_weights.size() == 2);
+    assert(signed_weights.transition_weights[0] == -1.0);
+  }
+  const auto signed_map = minera::parse_monte_carlo_params(fields({
+      {"monte_carlo_provided_stochastic_map", "0:timed:normal:0:0:0:-1:0"}}));
+  assert(signed_map.stochastic_map->transitions[0].activation_weight == -1.0);
   const auto exponential_laws = minera::parse_monte_carlo_params(fields({
       {"monte_carlo_transition_durations", "exponential:2,exponential:2;-3,exponential:1;2,exponential:0;3,exponential:0;0"}}));
   assert(exponential_laws.transition_durations.size() == 5);
@@ -4064,6 +4074,9 @@ void parse_monte_carlo_params_rejects_bad_values() {
            std::pair{"monte_carlo_case_arrival_seconds", "-1"},
            std::pair{"monte_carlo_force_distribution", "deterministic"},
            std::pair{"monte_carlo_transition_weights", "1,"},
+           std::pair{"monte_carlo_transition_weights", "1,nan"},
+           std::pair{"monte_carlo_transition_weights", "1,inf"},
+           std::pair{"monte_carlo_provided_stochastic_map", "0:timed:normal:0:0:0:nan:0"},
            std::pair{"monte_carlo_transition_durations", "normal:1"},
            std::pair{"monte_carlo_transition_durations", "exponential:-1;0"},
            std::pair{"monte_carlo_transition_durations", "exponential:0;-1"},

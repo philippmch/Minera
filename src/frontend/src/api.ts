@@ -4585,7 +4585,7 @@ function validateMonteCarloMapTransition(
   const { parameter, secondary_parameter: secondary,
     tertiary_parameter: tertiary, activation_weight: weight, priority } = transition;
   if (![parameter, secondary, tertiary, weight].every(Number.isFinite) ||
-      (transition.distribution !== "uniform" && secondary < 0) || tertiary < 0 || weight < 0 ||
+      (transition.distribution !== "uniform" && secondary < 0) || tertiary < 0 ||
       !Number.isSafeInteger(priority) || priority < -2147483648 ||
       priority > 2147483647) {
     throw new Error("provided_stochastic_map contains invalid numeric fields");
@@ -4703,8 +4703,8 @@ export function monteCarloQuery(options: MonteCarloOptions = {}): string {
   }
   if (options.transition_weights !== undefined) {
     if (!Array.isArray(options.transition_weights) || options.transition_weights.length === 0 ||
-        options.transition_weights.some((value) => !Number.isFinite(value) || value < 0)) {
-      throw new Error("transition_weights must be a non-empty list of finite non-negative numbers");
+        options.transition_weights.some((value) => !Number.isFinite(value))) {
+      throw new Error("transition_weights must be a non-empty list of finite numbers");
     }
     params.set("monte_carlo_transition_weights", options.transition_weights.join(","));
   }

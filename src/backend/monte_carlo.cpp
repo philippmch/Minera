@@ -190,7 +190,6 @@ void validate_stochastic_map_record(const StochasticMapTransition& transition,
         "Monte Carlo stochastic_map transition index is out of range");
   }
   if (!std::isfinite(transition.activation_weight) ||
-      transition.activation_weight < 0.0 ||
       !std::isfinite(transition.parameter) ||
       !std::isfinite(transition.secondary_parameter) ||
       !std::isfinite(transition.tertiary_parameter) ||
@@ -198,7 +197,7 @@ void validate_stochastic_map_record(const StochasticMapTransition& transition,
        transition.distribution != StochasticMapDistribution::kUniform) ||
       transition.tertiary_parameter < 0.0) {
     throw std::invalid_argument(
-        "Monte Carlo stochastic_map record values must be finite with non-negative auxiliary parameters and weight");
+        "Monte Carlo stochastic_map record values must be finite with non-negative auxiliary parameters");
   }
   switch (transition.timing) {
     case StochasticMapTiming::kTimed:
@@ -468,9 +467,9 @@ PreparedOptions prepare_options(const PetriNet& net,
         "Monte Carlo transition_weights must be empty or match the transition count");
   }
   for (const double weight : options.transition_weights) {
-    if (!std::isfinite(weight) || weight < 0.0) {
+    if (!std::isfinite(weight)) {
       throw std::invalid_argument(
-          "Monte Carlo transition_weights must be finite and non-negative");
+          "Monte Carlo transition_weights must be finite");
     }
   }
   if (!options.transition_durations.empty() &&
@@ -593,15 +592,26 @@ PreparedOptions prepare_options(const PetriNet& net,
     const std::vector<double>& weights,
     std::mt19937_64& rng) {
   if (enabled.empty()) throw std::invalid_argument("no enabled transitions");
-  double maximum = 0.0;
-  for (const auto index : enabled) maximum = std::max(maximum, weights[index]);
-  if (!(maximum > 0.0)) {
+  double total = 0.0;
+  for (const auto index : enabled) total += weights[index];
+  if (!std::isfinite(total)) {
+    throw std::invalid_argument(
+        "Monte Carlo enabled transition weight sum must be finite");
+  }
+  if (total == 0.0) {
     return enabled[std::uniform_int_distribution<std::size_t>(
         0, enabled.size() - 1)(rng)];
   }
   std::vector<double> scaled;
   scaled.reserve(enabled.size());
-  for (const auto index : enabled) scaled.push_back(weights[index] / maximum);
+  for (const auto index : enabled) {
+    const double probability = weights[index] / total;
+    if (!std::isfinite(probability) || probability < 0.0) {
+      throw std::invalid_argument(
+          "Monte Carlo enabled transition probabilities must be finite and non-negative");
+    }
+    scaled.push_back(probability);
+  }
   const auto picked =
       std::discrete_distribution<std::size_t>(scaled.begin(), scaled.end())(rng);
   return enabled[picked];
