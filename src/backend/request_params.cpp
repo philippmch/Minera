@@ -3802,10 +3802,16 @@ StochasticMapParams parse_stochastic_map_params(
           "stochastic_map_source: expected log or performance_dfg");
   }
   if (supplied("stochastic_map_distribution")) {
-    const auto distribution =
-        parse_distribution(require("stochastic_map_distribution"));
-    params.fit.distribution = distribution;
-    params.performance.distribution = distribution;
+    const auto value = require("stochastic_map_distribution");
+    if (value == "automatic" || value == "auto") {
+      if (params.source != StochasticMapSource::kLog)
+        throw std::invalid_argument("automatic stochastic-map fitting requires source log");
+      params.fit.distribution.reset();
+    } else {
+      const auto distribution = parse_distribution(value);
+      params.fit.distribution = distribution;
+      params.performance.distribution = distribution;
+    }
   }
   if (supplied("stochastic_map_default_parameter")) {
     const auto value = parse_finite_double(

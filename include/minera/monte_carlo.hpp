@@ -108,7 +108,7 @@ struct MonteCarloOptions {
   // Optional sparse transition map. Missing records use weight 1 and an
   // immediate duration; explicit vectors take precedence over map records.
   std::optional<StochasticMap> stochastic_map;
-  // The replay implementation used to derive fitted activation weights.
+  // The replay implementation used to derive fitted weights and token timing.
   TokenReplayVariant token_replay_variant = TokenReplayVariant::kForward;
   // Compatibility controls retained for callers of the timed simulator.
   // They are validated but intentionally inert in this bounded implementation.
@@ -116,8 +116,8 @@ struct MonteCarloOptions {
   double small_scale_factor = 864000.0;
   double max_thread_execution_time = 60.0;
   // Model IDs and zero-token marking membership used only by automatic
-  // activation-weight replay. Empty values use the replay defaults. These
-  // fields do not affect simulation or explicit weight/map inputs.
+  // stochastic-map fitting. Empty values use the replay defaults. Explicit
+  // maps or both explicit vectors bypass fitting and ignore these fields.
   std::vector<std::string> place_names;
   std::vector<std::string> transition_names;
   std::vector<bool> initial_marking_keys;

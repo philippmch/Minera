@@ -5149,7 +5149,7 @@ export interface StochasticPetriDistributionResult {
 
 export interface StochasticMapOptions {
   source?: "log" | "performance_dfg";
-  distribution?: "deterministic" | "exponential" | "constant0" | "immediate" |
+  distribution?: "automatic" | "deterministic" | "exponential" | "constant0" | "immediate" |
     "normal" | "uniform" | "lognormal" | "gamma";
   default_parameter?: number;
   silent_transitions_immediate?: boolean;
@@ -5164,7 +5164,7 @@ export interface StochasticMapOptions {
 }
 
 export type StochasticMapDistribution =
-  NonNullable<StochasticMapOptions["distribution"]>;
+  Exclude<NonNullable<StochasticMapOptions["distribution"]>, "automatic">;
 
 export interface StochasticMapTransition {
   transition: number;
@@ -5213,7 +5213,7 @@ export function isStochasticMapResult(
       (transition.timing === "timed" || transition.timing === "immediate") &&
       Number.isFinite(transition.parameter) &&
       Number.isFinite(transition.secondary_parameter) &&
-      (transition.secondary_parameter as number) >= 0 &&
+      (distribution === "uniform" || (transition.secondary_parameter as number) >= 0) &&
       Number.isFinite(transition.tertiary_parameter) &&
       (transition.tertiary_parameter as number) >= 0 &&
       Number.isFinite(transition.activation_weight) &&
@@ -5221,7 +5221,7 @@ export function isStochasticMapResult(
       Number.isSafeInteger(transition.priority) &&
       (transition.priority as number) >= -2147483648 &&
       (transition.priority as number) <= 2147483647 &&
-      (distribution === "lognormal" ||
+      (distribution === "lognormal" || distribution === "normal" || distribution === "uniform" ||
        (transition.parameter as number) >= 0) &&
       (distribution !== "exponential" || transition.timing === "immediate" ||
        (transition.parameter as number) > 0) &&

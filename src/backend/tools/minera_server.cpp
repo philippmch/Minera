@@ -6202,10 +6202,8 @@ void handle_stochastic_map(const httplib::Request& request,
         !present("stochastic_map_initial_marking"))
       params.initial_marking = minera::tools::pnml_marking<std::uint32_t>(
           session->imported_document->initial_marking);
-    const auto stochastic_options = minera::stochastic_map_to_options(
+    const auto reachability = minera::tools::stochastic_map_reachability(
         *owned_net, map, params.fit, params.initial_marking, params.max_states);
-    const auto reachability = minera::stochastic_petri_reachability(
-        *owned_net, stochastic_options);
     std::ostringstream out;
     out << "{\"family\":\"STOCHASTIC_MAP\",\"source\":\""
         << (params.source == minera::StochasticMapSource::kLog ? "log"

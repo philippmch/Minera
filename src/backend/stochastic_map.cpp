@@ -254,7 +254,8 @@ StochasticMapTransition default_transition(
   result.transition = index;
   result.priority = options.default_priority;
   result.activation_weight = 1.0;
-  initialize_distribution(result, options.distribution,
+  initialize_distribution(result, options.distribution.value_or(
+                              StochasticMapDistribution::kExponential),
                           options.default_parameter,
                           options.zero_duration_immediate);
   if (index < net.transitions().size() &&
@@ -337,7 +338,8 @@ void validate_sparse_stochastic_map(const StochasticMap& map,
         !std::isfinite(transition.secondary_parameter) ||
         !std::isfinite(transition.tertiary_parameter))
       throw std::invalid_argument("stochastic map: parameters must be finite");
-    if (transition.secondary_parameter < 0.0 ||
+    if ((transition.secondary_parameter < 0.0 &&
+         transition.distribution != StochasticMapDistribution::kUniform) ||
         transition.tertiary_parameter < 0.0)
       throw std::invalid_argument(
         "stochastic map: parameters must be non-negative");
@@ -354,12 +356,12 @@ void validate_sparse_stochastic_map(const StochasticMap& map,
               "stochastic map: timed exponential rates must be positive");
         break;
       case StochasticMapDistribution::kUniform:
-        if (transition.parameter < 0.0 ||
-            transition.secondary_parameter < transition.parameter)
+        if (transition.secondary_parameter < transition.parameter)
           throw std::invalid_argument(
-              "stochastic map: uniform bounds must be ordered and non-negative");
+              "stochastic map: uniform bounds must be ordered");
         break;
       case StochasticMapDistribution::kNormal:
+        break;
       case StochasticMapDistribution::kDeterministic:
         if (transition.parameter < 0.0)
           throw std::invalid_argument(
@@ -394,6 +396,67 @@ void validate_stochastic_map(const StochasticMap& map,
         "stochastic map: transition record count does not match the net");
 }
 
+StochasticMapTransition fit_stochastic_distribution(
+    const std::vector<double>& samples,
+    std::optional<StochasticMapDistribution> forced) {
+  for (double value : samples)
+    if (!std::isfinite(value))
+      throw std::invalid_argument("stochastic map: fit samples must be finite");
+  StochasticMapTransition immediate;
+  set_zero_duration(immediate);
+  immediate.distribution = StochasticMapDistribution::kImmediate;
+  immediate.activation_weight = 0.0;
+  immediate.priority = 1;
+  const double count = static_cast<double>(samples.size());
+  const double mean = samples.empty() ? 0.0 :
+      std::accumulate(samples.begin(), samples.end(), 0.0) / count;
+  if (!std::isfinite(mean))
+    throw std::invalid_argument("stochastic map: fitted mean must be finite");
+  auto exponential = immediate;
+  exponential.timing = StochasticMapTiming::kTimed;
+  exponential.distribution = StochasticMapDistribution::kExponential;
+  exponential.priority = 0;
+  if (mean > 0.0) exponential.parameter = 1.0 / mean;
+  if (forced == StochasticMapDistribution::kExponential)
+    return mean > 0.0 ? exponential : immediate;
+  if (samples.size() < 2) return immediate;
+  if (forced && forced != StochasticMapDistribution::kNormal &&
+      forced != StochasticMapDistribution::kUniform) return immediate;
+  if (!forced && std::any_of(samples.begin(), samples.end(),
+                            [](double value) { return value < 0.0; }))
+    throw std::invalid_argument(
+        "stochastic map: automatic exponential fit requires non-negative samples");
+  double variance = 0.0;
+  for (double value : samples) variance += (value - mean) * (value - mean);
+  variance /= count;
+  const double deviation = std::sqrt(variance);
+  const auto [minimum, maximum] = std::minmax_element(samples.begin(), samples.end());
+  const double width = *maximum - *minimum;
+  auto normal = exponential;
+  normal.distribution = StochasticMapDistribution::kNormal;
+  normal.parameter = mean;
+  normal.secondary_parameter = deviation;
+  auto uniform = exponential;
+  uniform.distribution = StochasticMapDistribution::kUniform;
+  uniform.parameter = *minimum;
+  uniform.secondary_parameter = *maximum;
+  auto best = immediate;
+  double likelihood = std::all_of(samples.begin(), samples.end(),
+      [](double value) { return std::abs(value) < 0.0001; })
+      ? std::numeric_limits<double>::max() : -std::numeric_limits<double>::max();
+  auto consider = [&](const StochasticMapTransition& candidate, double score) {
+    if (score > likelihood) { best = candidate; likelihood = score; }
+  };
+  if ((!forced || forced == StochasticMapDistribution::kNormal) && deviation > 0.0)
+    consider(normal, -count * (std::log(deviation) +
+                              0.5 * std::log(2.0 * std::acos(-1.0)) + 0.5));
+  if ((!forced || forced == StochasticMapDistribution::kUniform) && width > 0.0)
+    consider(uniform, -count * std::log(width));
+  if (!forced && mean > 0.0)
+    consider(exponential, -count * (std::log(mean) + 1.0));
+  return best;
+}
+
 StochasticMapFitResult fit_stochastic_map_with_report(
     const EventLog& log, const PetriNet& net,
     const StochasticMapFitOptions& options) {
@@ -417,19 +480,19 @@ StochasticMapFitResult fit_stochastic_map_with_report(
     }
     return selected;
   };
-  auto selected_time = [&](const Event& event) -> std::optional<double> {
+  auto selected_time = [&](const Event& event) -> std::optional<std::int64_t> {
     const auto key = options.replay.timestamp_attribute.empty()
         ? std::string_view("time:timestamp")
         : std::string_view(options.replay.timestamp_attribute);
     if (const auto* value = selected_attribute(event, key)) {
       if (value->is_null || value->first_class_state == FirstClassAttributeState::kNull)
         return std::nullopt;
-      return parse_timestamp(value->value);
+      return parse_timestamp_microseconds(value->value);
     }
     if (key == "time:timestamp" || key == "timestamp" ||
         key == event.timestamp_source_key) {
       if (event.timestamp_state == FirstClassAttributeState::kNull) return std::nullopt;
-      return parse_timestamp(event.timestamp);
+      return parse_timestamp_microseconds(event.timestamp);
     }
     return std::nullopt;
   };
@@ -457,7 +520,7 @@ StochasticMapFitResult fit_stochastic_map_with_report(
       std::copy(options.replay.initial_marking.begin(),
                 options.replay.initial_marking.end(), marking.begin());
     }
-    std::vector<std::deque<std::optional<double>>> arrivals(net.place_count());
+    std::vector<std::deque<std::optional<std::int64_t>>> arrivals(net.place_count());
     auto initial_arrivals = marking;
     const auto first_time = trace.events.empty() ? std::nullopt
                                                  : selected_time(trace.events.front());
@@ -470,11 +533,11 @@ StochasticMapFitResult fit_stochastic_map_with_report(
       auto& stats = statistics[transition_index];
       ++stats.activations;
       const auto& transition = net.transitions()[transition_index];
-      std::optional<double> arrival;
+      std::optional<std::int64_t> arrival;
       std::vector<bool> consumed(net.place_count(), false);
       for (const auto place : transition.inputs) {
         if (!consumed[place]) {
-          std::optional<double> consumed_time;
+          std::optional<std::int64_t> consumed_time;
           if (initial_arrivals[place] > 0) {
             --initial_arrivals[place];
             consumed_time = first_time;
@@ -493,12 +556,12 @@ StochasticMapFitResult fit_stochastic_map_with_report(
         arrivals[place].clear();
         initial_arrivals[place] = 0;
       }
-      std::optional<double> time;
+      std::optional<std::int64_t> time;
       if (transition.activity && event_index < trace.events.size()) {
         const auto& event = trace.events[event_index];
         time = selected_time(event);
         if (time && arrival) {
-          stats.performance.push_back(*time - *arrival);
+          stats.performance.push_back(static_cast<double>(*time - *arrival) / 1000000.0);
           stats.log_indices.push_back(trace_index);
         }
         const auto activity = selected_activity(event);
@@ -524,17 +587,14 @@ StochasticMapFitResult fit_stochastic_map_with_report(
     if (options.fit_timing &&
         (net.transitions()[stats.transition].activity ||
          options.silent_transitions_immediate)) {
-      const double mean = stats.performance.empty() ? 0.0 :
-          std::accumulate(stats.performance.begin(), stats.performance.end(), 0.0) /
-              static_cast<double>(stats.performance.size());
-      if (options.distribution == StochasticMapDistribution::kExponential &&
-          options.zero_duration_immediate && mean <= 0.0) {
-        set_zero_duration(record);
-        record.distribution = StochasticMapDistribution::kImmediate;
-        record.priority = options.default_priority == 0 ? 1 : options.default_priority;
+      if (!options.zero_duration_immediate) {
+        set_fitted_parameter(record, stats.performance, false);
       } else {
-        set_fitted_parameter(record, stats.performance,
-                             options.zero_duration_immediate);
+        auto fitted = fit_stochastic_distribution(stats.performance, options.distribution);
+        fitted.transition = record.transition;
+        fitted.activation_weight = record.activation_weight;
+        if (options.default_priority != 0) fitted.priority = options.default_priority;
+        record = fitted;
       }
     }
     result.map.transitions.push_back(record);
@@ -597,8 +657,8 @@ StochasticPetriOptions stochastic_map_to_options(
     }
     const double mean = mean_equivalent(transition);
     if (!std::isfinite(mean) || mean < 0.0)
-      throw std::invalid_argument(
-          "stochastic map: distribution mean is not finite");
+      throw std::domain_error(
+          "stochastic map: CTMC distribution mean must be finite and non-negative");
     const double rate =
         transition.distribution == StochasticMapDistribution::kExponential
             ? transition.parameter

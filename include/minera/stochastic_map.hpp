@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -72,8 +73,8 @@ struct StochasticMap {
 };
 
 struct StochasticMapFitOptions {
-  StochasticMapDistribution distribution =
-      StochasticMapDistribution::kExponential;
+  // An absent forced family selects the public maximum-likelihood fit.
+  std::optional<StochasticMapDistribution> distribution;
   double default_parameter = 1.0;
   bool silent_transitions_immediate = true;
   bool zero_duration_immediate = true;
@@ -128,6 +129,11 @@ void validate_stochastic_map(const StochasticMap& map,
 // Fitted maps may omit transitions that were never enabled or activated.
 void validate_sparse_stochastic_map(const StochasticMap& map,
                                     std::size_t expected_transition_count);
+
+// Fits timing metadata; the returned transition ID and activation weight are zero.
+[[nodiscard]] StochasticMapTransition fit_stochastic_distribution(
+    const std::vector<double>& samples,
+    std::optional<StochasticMapDistribution> forced = {});
 
 [[nodiscard]] StochasticMapFitResult fit_stochastic_map_with_report(
     const EventLog& log, const PetriNet& net,

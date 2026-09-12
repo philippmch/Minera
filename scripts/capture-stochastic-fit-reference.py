@@ -65,11 +65,12 @@ def make_case(spec):
     return net, initial, final, log
 
 
-def capture(spec, with_statistics=False):
+def capture(spec, with_statistics=False, force_distribution='EXPONENTIAL'):
     net, initial, final, log = make_case(spec)
     try:
         result = replay.get_map_from_log_and_net(log, net, initial, final,
-            force_distribution='EXPONENTIAL', parameters={'show_progress_bar': False})
+            force_distribution=spec.get('force_distribution', force_distribution),
+            parameters={'show_progress_bar': False})
         records = {}
         for transition, value in result.items():
             records[transition.name] = {

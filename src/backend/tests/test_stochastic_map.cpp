@@ -1,8 +1,10 @@
 #include "minera/stochastic_map.hpp"
+#include "minera/timestamp.hpp"
 
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -59,6 +61,77 @@ EventLog events(std::initializer_list<std::pair<const char*, int>> values) {
   }
   log.traces.push_back(std::move(trace));
   return log;
+}
+
+void exact_timestamp_regressions() {
+  assert(parse_timestamp_microseconds("1970-01-01T00:00:00.000001Z") == 1);
+  assert(parse_timestamp_microseconds("1969-12-31T23:59:59.999999Z") == -1);
+  assert(parse_timestamp_microseconds("1970-01-01T01:00:00.1234567+01:00") == 123456);
+  assert(parse_timestamp_microseconds("1969-12-31T23:00:00.1-0100") == 100000);
+  assert(parse_timestamp_microseconds("1970-01-01") == 0);
+  assert(!parse_timestamp_microseconds("1970-01-01T00:00:00.Z"));
+  assert(!parse_timestamp_microseconds("1970-01-01T00:00.1Z"));
+  auto log = timed_log();
+  log.traces[0].events[1].timestamp = "2026-01-01T00:00:00.000000Z";
+  log.traces[1].events[1].timestamp = "2026-01-01T00:00:10.000100Z";
+  const auto fitted = fit_stochastic_map_with_report(log, linear_net());
+  assert(fitted.statistics[1].performance == std::vector<double>({0, 0.0001}));
+  assert(fitted.map.transitions[1].distribution == StochasticMapDistribution::kUniform);
+  assert(fitted.map.transitions[1].secondary_parameter == 0.0001);
+}
+
+void public_distribution_regressions() {
+  using D = StochasticMapDistribution;
+  const auto automatic = fit_stochastic_distribution({2, 4});
+  assert(automatic.distribution == D::kUniform);
+  assert(automatic.parameter == 2 && automatic.secondary_parameter == 4);
+  assert(automatic.transition == 0 && automatic.activation_weight == 0);
+  assert(automatic.priority == 0 && automatic.timing == StochasticMapTiming::kTimed);
+  std::vector<double> central(22, 5);
+  central.front() = 1; central.back() = 9;
+  const auto normal = fit_stochastic_distribution(central);
+  assert(normal.distribution == D::kNormal && normal.parameter == 5);
+  assert(std::abs(normal.secondary_parameter - std::sqrt(32.0 / 22)) < 1e-12);
+  assert(fit_stochastic_distribution({4}).distribution == D::kImmediate);
+  assert(fit_stochastic_distribution({4, 4}).distribution == D::kExponential);
+  assert(fit_stochastic_distribution({0, 0}).priority == 1);
+  assert(fit_stochastic_distribution({0.00001, 0.00009}, D::kUniform).priority == 1);
+  assert(fit_stochastic_distribution({0, 0.0001}, D::kUniform).distribution == D::kUniform);
+  const auto exponential = fit_stochastic_distribution({-1, 3}, D::kExponential);
+  assert(exponential.distribution == D::kExponential && exponential.parameter == 1);
+  assert(fit_stochastic_distribution({3}, D::kExponential).parameter == 1.0 / 3.0);
+  assert(fit_stochastic_distribution({}, D::kExponential).priority == 1);
+  assert(fit_stochastic_distribution({-3, 1}, D::kExponential).priority == 1);
+  for (const auto family : {D::kNormal, D::kUniform}) {
+    assert(fit_stochastic_distribution({3, 3}, family).priority == 1);
+    const auto signed_fit = fit_stochastic_distribution({-4, -2}, family);
+    assert(signed_fit.distribution == family);
+    if (family == D::kNormal) {
+      assert(signed_fit.parameter == -3 && signed_fit.secondary_parameter == 1);
+    } else {
+      assert(signed_fit.parameter == -4 && signed_fit.secondary_parameter == -2);
+    }
+    StochasticMap signed_map{{signed_fit}};
+    validate_stochastic_map(signed_map, 1);
+    assert(!serialize_stochastic_map_json(signed_map).empty());
+    bool rejected = false;
+    try { (void)stochastic_map_to_options(signed_map); }
+    catch (const std::domain_error&) { rejected = true; }
+    assert(rejected);
+  }
+  for (const auto family : {D::kLogNormal, D::kGamma, D::kDeterministic,
+                            D::kImmediate, D::kConstant0})
+    assert(fit_stochastic_distribution({2, 4}, family).distribution == D::kImmediate);
+  for (const auto& sample : {std::vector<double>{-1, 3},
+                             std::vector<double>{-0.00001, 0.00001},
+                             std::vector<double>{std::numeric_limits<double>::infinity()}}) {
+    bool rejected = false;
+    try { (void)fit_stochastic_distribution(sample); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
+  const auto integrated = fit_stochastic_map(timed_log(), linear_net());
+  assert(integrated.transitions[1].distribution == D::kUniform);
 }
 
 void public_statistics_regressions() {
@@ -179,11 +252,15 @@ void public_statistics_regressions() {
 }  // namespace
 
 int main() {
+  exact_timestamp_regressions();
+  public_distribution_regressions();
   public_statistics_regressions();
   const auto net = linear_net();
   const auto log = timed_log();
 
-  const auto fitted = fit_stochastic_map_with_report(log, net);
+  StochasticMapFitOptions forced_exponential;
+  forced_exponential.distribution = StochasticMapDistribution::kExponential;
+  const auto fitted = fit_stochastic_map_with_report(log, net, forced_exponential);
   assert(fitted.replayed_traces == 2);
   assert(fitted.skipped_traces == 0);
   assert(fitted.map.transitions.size() == 2);
@@ -279,10 +356,10 @@ int main() {
   lognormal_options.distribution = StochasticMapDistribution::kLogNormal;
   const auto subsecond = fit_stochastic_map_with_report(
       subsecond_log(), net, lognormal_options);
-  assert(subsecond.map.transitions[1].parameter < 0.0);
+  assert(subsecond.map.transitions[1].distribution == StochasticMapDistribution::kImmediate);
   validate_stochastic_map(subsecond.map, net.transitions().size());
   const auto subsecond_ctmc = stochastic_map_to_options(subsecond.map);
-  assert(subsecond_ctmc.transition_rates[1] > 0.0);
+  assert(subsecond_ctmc.transition_rates[1] == 0.0);
 
   bool threw = false;
   try {

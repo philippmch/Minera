@@ -57,11 +57,38 @@ def records(result, ids):
         name = ids[record['transition']]
         assert name not in normalized, name
         distribution = record['distribution'].upper()
-        assert record['secondary_parameter'] == record['tertiary_parameter'] == 0
+        assert record['tertiary_parameter'] == 0
         assert record['timing'] == ('immediate' if distribution == 'IMMEDIATE' else 'timed')
-        normalized[name] = dict(distribution=distribution, parameter=record['parameter'],
+        parameters = [record['parameter']]
+        if distribution == 'IMMEDIATE':
+            assert record['parameter'] == record['secondary_parameter'] == 0
+            parameters = []
+        elif distribution == 'NORMAL':
+            parameters.append(record['secondary_parameter'])
+        elif distribution == 'UNIFORM':
+            parameters.append(record['secondary_parameter'] - record['parameter'])
+        else:
+            assert record['secondary_parameter'] == 0
+        normalized[name] = dict(distribution=distribution, parameters=parameters,
             weight=record['activation_weight'], priority=record['priority'])
     return normalized
+
+
+def expected_record(value):
+    return dict(distribution=value['distribution'],
+        parameters=[] if value['parameters'] == 'UNDEFINED' else
+            [float(part) for part in value['parameters'].split(';')],
+        weight=value['weight'], priority=value['priority'])
+
+
+def check_analysis(result, expected):
+    negative_mean = any(value['distribution'] == 'NORMAL' and value['parameters'][0] < 0 or
+        value['distribution'] == 'UNIFORM' and
+        value['parameters'][0] + value['parameters'][1] / 2 < 0 for value in expected.values())
+    if negative_mean:
+        assert result['reachability']['exhausted'] is True
+        assert result['reachability']['states'] == []
+        assert result['reachability']['diagnostic'].startswith('CTMC unavailable:')
 
 
 def main():
@@ -81,9 +108,12 @@ def main():
         model, log, output = [directory / name for name in ('model.pnml', 'log.xes', 'fitted.json')]
         server_log = (directory / 'server.log').open('w', encoding='utf-8')
 
-        def run(*arguments):
+        def run(*arguments, expect_error=False):
             result = subprocess.run(list(map(str, arguments)), capture_output=True,
                 text=True, encoding='utf-8', timeout=120)
+            if expect_error:
+                assert result.returncode != 0 and 'negative' in result.stderr, (arguments, result)
+                return
             assert result.returncode == 0, (arguments, result.stderr, result.stdout[:2000])
             return json.loads(result.stdout)
 
@@ -97,13 +127,18 @@ def main():
                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
                 base = f'http://127.0.0.1:{port}'
 
-                def get(path, data=None, content_type='application/xml'):
+                def get(path, data=None, content_type='application/xml', expect_error=False):
                     request = urllib.request.Request(base + path, data=data,
                         headers={'Content-Type': content_type})
                     try:
                         with urllib.request.urlopen(request, timeout=120) as response:
+                            assert not expect_error, path
                             return json.loads(response.read())
                     except urllib.error.HTTPError as error:
+                        if expect_error:
+                            body = error.read().decode()
+                            assert error.code == 400 and 'negative' in body, (path, error.code, body)
+                            return
                         raise AssertionError((path, error.code, error.read().decode())) from error
 
                 for _ in range(200):
@@ -122,16 +157,34 @@ def main():
                 model.write_text(support.pnml(spec['places'], spec['transitions'],
                     spec['arcs'], spec['initial'], spec['final']), encoding='utf-8')
                 log.write_text(xes(spec), encoding='utf-8')
-                native = run(args.probe.resolve(), model, log)
+                force = spec.get('force_distribution', 'EXPONENTIAL')
+                cli_distribution = [] if force is None else ['--stochastic-map-distribution', force.lower()]
+                query = '/api/stochastic-map?miner=imported'
+                if force is not None:
+                    query += '&stochastic_map_distribution=' + force.lower()
+                cli_arguments = [log, '--check-pnml', model, '--stochastic-map-miner', 'imported',
+                    '--stochastic-map', output, '--no-alignments', *cli_distribution]
+                if 'error' in row:
+                    run(args.probe.resolve(), model, log, force or 'automatic', expect_error=True)
+                    checks.append(dict(name=name, route='native_expected_error', passed=True))
+                    if args.exporter:
+                        run(args.exporter.resolve(), *cli_arguments, expect_error=True)
+                        checks.append(dict(name=name, route='cli_expected_error', passed=True))
+                    if args.server:
+                        body, headers = support.multipart('log', log.name, log.read_text(encoding='utf-8'))
+                        get('/api/mine', body, headers['Content-Type'])
+                        get('/api/check-model', model.read_bytes())
+                        get(query, expect_error=True)
+                        checks.append(dict(name=name, route='http_expected_error', passed=True))
+                    continue
+                native = run(args.probe.resolve(), model, log, force or 'automatic')
                 ids = native['transition_ids']
                 # Public Petri transitions form a set. The named duplicate
                 # fixture records both observed insertion-order outcomes for
                 # identical labels/arcs; require one whole observed outcome.
                 failures = []
                 for outcome in [row, *row.get('alternatives', [])]:
-                    expected = {key: dict(distribution=value['distribution'],
-                        parameter=0 if value['parameters'] == 'UNDEFINED' else float(value['parameters']),
-                        weight=value['weight'], priority=value['priority'])
+                    expected = {key: expected_record(value)
                         for key, value in outcome['records'].items()}
                     try:
                         compare(records(native, ids), expected, name + '.native.map')
@@ -142,23 +195,26 @@ def main():
                 else:
                     raise AssertionError(failures)
                 checks.append(dict(name=name, route='native', passed=True))
+                if 'monte_carlo_map' in native:
+                    compare(records({'map': native['monte_carlo_map']}, ids), expected, name + '.monte_carlo')
+                    checks.append(dict(name=name, route='monte_carlo_fit', passed=True))
                 # Empty event logs are valid fitting inputs. Whole-log discovery
                 # adapters have a separate input contract, exercised elsewhere.
                 if not any(spec['traces']):
                     continue
                 if args.exporter:
-                    run(args.exporter.resolve(), log, '--check-pnml', model,
-                        '--stochastic-map-miner', 'imported', '--stochastic-map', output,
-                        '--no-alignments')
+                    run(args.exporter.resolve(), *cli_arguments)
                     cli = json.loads(output.read_text(encoding='utf-8'))
                     compare(records(cli, ids), expected, name + '.cli.map')
+                    check_analysis(cli, expected)
                     checks.append(dict(name=name, route='cli', passed=True))
                 if args.server:
                     body, headers = support.multipart('log', log.name, log.read_text(encoding='utf-8'))
                     get('/api/mine', body, headers['Content-Type'])
                     get('/api/check-model', model.read_bytes())
-                    http = get('/api/stochastic-map?miner=imported')
+                    http = get(query)
                     compare(records(http, ids), expected, name + '.http.map')
+                    check_analysis(http, expected)
                     if args.exporter:
                         compare(http, cli, name + '.transport')
                     checks.append(dict(name=name, route='http', passed=True))
@@ -170,14 +226,12 @@ def main():
                     overridden_expected = dict(expected)
                     overridden_expected['b'] = dict(expected['b'], weight=0.5)
                     if args.exporter:
-                        run(args.exporter.resolve(), log, '--check-pnml', model,
-                            '--stochastic-map-miner', 'imported', '--stochastic-map', output,
-                            '--stochastic-map-initial-marking', marking, '--no-alignments')
+                        run(args.exporter.resolve(), *cli_arguments, '--stochastic-map-initial-marking', marking)
                         overridden = json.loads(output.read_text(encoding='utf-8'))
                         compare(records(overridden, ids), overridden_expected, name + '.cli.override')
                         checks.append(dict(name=name, route='cli_initial_override', passed=True))
                     if args.server:
-                        overridden = get('/api/stochastic-map?miner=imported&stochastic_map_initial_marking=' + marking)
+                        overridden = get(query + '&stochastic_map_initial_marking=' + marking)
                         compare(records(overridden, ids), overridden_expected, name + '.http.override')
                         checks.append(dict(name=name, route='http_initial_override', passed=True))
                 print(name + ': passed', flush=True)
