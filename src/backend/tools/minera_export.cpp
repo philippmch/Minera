@@ -1293,7 +1293,7 @@ int usage(const char* program) {
                "  --stochastic-petri-initial-probabilities <p,...> Transient vector\n"
                "  --stochastic-map <path> Emit a fitted stochastic-map JSON document\n"
                "  --stochastic-map-source <name> log or performance_dfg\n"
-               "  --stochastic-map-miner <id> Petri miner used for log fitting\n"
+               "  --stochastic-map-miner <id> Petri miner or imported model for log fitting\n"
                "  --stochastic-map-distribution <name> Distribution family\n"
                "  --stochastic-map-default-parameter <f> Default duration/rate\n"
                "  --stochastic-map-conversion-variant <name> DFG Petri conversion\n"
@@ -6923,78 +6923,6 @@ int main(int argc, char** argv) {
         minera::to_petri_net(tree, process_tree_variant);
     const auto heuristic_net = minera::to_petri_net(heuristics);
     const auto powl_net = minera::to_petri_net(powl);
-    if (stochastic_map_requested) {
-      std::optional<minera::PetriNet> stochastic_map_net;
-      minera::StochasticMap stochastic_map;
-      std::size_t replayed = 0;
-      std::size_t skipped = 0;
-      std::string converted_net_json;
-      if (stochastic_map_params.source ==
-          minera::StochasticMapSource::kPerformanceDfg) {
-        const auto performance_dfg = minera::discover_performance_dfg(log);
-        const auto model = minera::stochastic_map_from_performance_dfg(
-            graph, performance_dfg, stochastic_map_params.performance);
-        stochastic_map_net = model.net;
-        stochastic_map = model.map;
-        converted_net_json = minera::serialize_dfg_petri_net_json(
-            model.net, stochastic_map_params.performance.conversion.variant);
-      } else {
-        const minera::PetriNet* selected = nullptr;
-        if (stochastic_map_miner == "inductive") selected = &inductive_net;
-        else if (stochastic_map_miner == "alpha") selected = &net;
-        else if (stochastic_map_miner == "heuristic") selected = &heuristic_net;
-        else if (stochastic_map_miner == "powl") selected = &powl_net;
-        else {
-          std::cerr << "error: unknown --stochastic-map-miner '"
-                    << stochastic_map_miner
-                    << "' (expected inductive, alpha, heuristic, or powl)\n";
-          return 2;
-        }
-        const auto& fit_log =
-            stochastic_map_miner == "powl"
-                ? powl_log
-                : stochastic_map_miner == "inductive"
-                      ? inductive_log
-                      : stochastic_map_miner == "alpha" ? alpha_log : log;
-        const auto report = minera::fit_stochastic_map_with_report(
-            fit_log, *selected, stochastic_map_params.fit);
-        stochastic_map_net = *selected;
-        stochastic_map = report.map;
-        replayed = report.replayed_traces;
-        skipped = report.skipped_traces;
-      }
-      const auto stochastic_options = minera::stochastic_map_to_options(
-          stochastic_map, stochastic_map_params.initial_marking,
-          stochastic_map_params.max_states);
-      const auto reachability = minera::stochastic_petri_reachability(
-          *stochastic_map_net, stochastic_options);
-      std::ostringstream stochastic_map_json;
-      stochastic_map_json
-          << "{\"family\":\"STOCHASTIC_MAP\",\"source\":\""
-          << (stochastic_map_params.source ==
-                      minera::StochasticMapSource::kLog
-                  ? "log"
-                  : "performance_dfg")
-          << "\",\"map\":"
-          << minera::serialize_stochastic_map_json(stochastic_map);
-      if (!converted_net_json.empty())
-        stochastic_map_json << ",\"net\":" << converted_net_json;
-      if (stochastic_map_params.source == minera::StochasticMapSource::kLog)
-        stochastic_map_json << ",\"diagnostics\":{\"replayed_traces\":"
-                            << replayed << ",\"skipped_traces\":" << skipped
-                            << '}';
-      stochastic_map_json << ",\"reachability\":"
-                          << minera::serialize_stochastic_petri_json(
-                                 reachability)
-                          << '}';
-      std::ofstream file(stochastic_map_output);
-      if (!file) {
-        std::cerr << "error: cannot open stochastic-map output file "
-                  << stochastic_map_output << '\n';
-        return 1;
-      }
-      file << stochastic_map_json.str() << '\n';
-    }
     register_activity_selector_values(
         graph, log, footprints_options.activity_attribute);
     const auto footprints =
@@ -7124,6 +7052,90 @@ int main(int argc, char** argv) {
       conformance.push_back(model("imported", *imported_net,
           imported_document ? &*imported_document : nullptr));
       available_models.emplace_back("imported", &*imported_net);
+    }
+    if (stochastic_map_requested) {
+      std::optional<minera::PetriNet> stochastic_map_net;
+      minera::StochasticMap stochastic_map;
+      std::size_t replayed = 0;
+      std::size_t skipped = 0;
+      std::string converted_net_json;
+      if (stochastic_map_params.source ==
+          minera::StochasticMapSource::kPerformanceDfg) {
+        const auto performance_dfg = minera::discover_performance_dfg(log);
+        const auto model = minera::stochastic_map_from_performance_dfg(
+            graph, performance_dfg, stochastic_map_params.performance);
+        stochastic_map_net = model.net;
+        stochastic_map = model.map;
+        converted_net_json = minera::serialize_dfg_petri_net_json(
+            model.net, stochastic_map_params.performance.conversion.variant);
+      } else {
+        const minera::PetriNet* selected = nullptr;
+        if (stochastic_map_miner == "inductive") selected = &inductive_net;
+        else if (stochastic_map_miner == "alpha") selected = &net;
+        else if (stochastic_map_miner == "heuristic") selected = &heuristic_net;
+        else if (stochastic_map_miner == "powl") selected = &powl_net;
+        else if (stochastic_map_miner == "imported" && imported_net)
+          selected = &*imported_net;
+        else {
+          std::cerr << "error: unknown --stochastic-map-miner '"
+                    << stochastic_map_miner
+                    << "' (expected inductive, alpha, heuristic, powl, or a supplied imported model)\n";
+          return 2;
+        }
+        const auto& fit_log =
+            stochastic_map_miner == "powl"
+                ? powl_log
+                : stochastic_map_miner == "inductive"
+                      ? inductive_log
+                      : stochastic_map_miner == "alpha" ? alpha_log : log;
+        stochastic_map_params.fit.replay = minera::tools::stochastic_map_replay_options(
+            stochastic_map_params.fit.replay, stochastic_map_params.initial_marking,
+            stochastic_map_miner == "imported" && imported_document
+                ? &*imported_document : nullptr);
+        const auto report = minera::fit_stochastic_map_with_report(
+            fit_log, *selected, stochastic_map_params.fit);
+        stochastic_map_net = *selected;
+        stochastic_map = report.map;
+        replayed = report.replayed_traces;
+        skipped = report.skipped_traces;
+      }
+      if (stochastic_map_params.source == minera::StochasticMapSource::kLog &&
+          stochastic_map_miner == "imported" && imported_document &&
+          stochastic_map_params.initial_marking.empty())
+        stochastic_map_params.initial_marking = minera::tools::pnml_marking<std::uint32_t>(
+            imported_document->initial_marking);
+      const auto stochastic_options = minera::stochastic_map_to_options(
+          *stochastic_map_net, stochastic_map, stochastic_map_params.fit,
+          stochastic_map_params.initial_marking,
+          stochastic_map_params.max_states);
+      const auto reachability = minera::stochastic_petri_reachability(
+          *stochastic_map_net, stochastic_options);
+      std::ostringstream stochastic_map_json;
+      stochastic_map_json
+          << "{\"family\":\"STOCHASTIC_MAP\",\"source\":\""
+          << (stochastic_map_params.source ==
+                      minera::StochasticMapSource::kLog
+                  ? "log"
+                  : "performance_dfg")
+          << "\",\"map\":"
+          << minera::serialize_stochastic_map_json(stochastic_map);
+      if (!converted_net_json.empty())
+        stochastic_map_json << ",\"net\":" << converted_net_json;
+      if (stochastic_map_params.source == minera::StochasticMapSource::kLog)
+        stochastic_map_json << ",\"diagnostics\":{\"replayed_traces\":"
+                            << replayed << ",\"skipped_traces\":" << skipped
+                            << '}';
+      stochastic_map_json << ",\"reachability\":"
+                          << minera::serialize_stochastic_petri_json(
+                                 reachability)
+                          << '}';
+      std::ofstream file(stochastic_map_output);
+      if (!file) {
+        std::cerr << "error: cannot open stochastic-map output file "
+                  << stochastic_map_output << '\n';
+        return 1;
+      }
+      file << stochastic_map_json.str() << '\n';
     }
     if (!compare_petri_reference.empty()) {
       if (!ends_with_ci(compare_petri_reference.string(), ".csv") &&

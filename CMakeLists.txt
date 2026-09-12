@@ -841,6 +841,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_stochastic_map_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_stochastic_map_tests COMMAND minera_stochastic_map_tests)
 
+  add_executable(minera_stochastic_fit_probe
+    src/backend/tests/stochastic_fit_probe.cpp
+  )
+  target_link_libraries(minera_stochastic_fit_probe PRIVATE minera::core)
+  target_compile_features(minera_stochastic_fit_probe PRIVATE cxx_std_20)
+
   add_executable(minera_monte_carlo_tests
     src/backend/tests/test_monte_carlo.cpp
   )

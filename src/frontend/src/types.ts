@@ -5242,8 +5242,9 @@ export function isStochasticMapResult(
         result.diagnostics.replayed_traces < 0 ||
         result.diagnostics.skipped_traces < 0) return false;
   }
-  return transitions.every((item, index) =>
-    (item as StochasticMapTransition).transition === index);
+  return transitions.every((item, index) => index === 0 ||
+    (transitions[index - 1] as StochasticMapTransition).transition <
+      (item as StochasticMapTransition).transition);
 }
 
 export function isStochasticPetriResult(

@@ -53,9 +53,8 @@ enum class StochasticMapDistribution {
   GAMMA = kGamma,
 };
 
-// One record per PetriNet::transitions() entry.  `transition` is deliberately
-// repeated in the record so JSON consumers can validate alignment rather than
-// relying on array position alone.
+// Records retain original PetriNet transition IDs. Fitted maps can be sparse;
+// array positions are not transition IDs.
 struct StochasticMapTransition {
   std::size_t transition = 0;
   StochasticMapTiming timing = StochasticMapTiming::kTimed;
@@ -81,14 +80,24 @@ struct StochasticMapFitOptions {
   bool fit_activation_weights = true;
   bool fit_timing = true;
   int default_priority = 0;
+  TokenReplayOptions replay;
 };
 
-// A successful report still contains skipped traces: callers can surface a
-// partial-fit diagnostic without losing the usable map.
+struct StochasticMapTransitionStatistics {
+  std::size_t transition = 0;
+  std::size_t activations = 0;
+  std::size_t enablings = 0;
+  std::vector<double> performance;
+  std::vector<std::size_t> log_indices;
+};
+
+// All traces contribute their replay paths, including paths from unfit traces.
+// skipped_traces is retained for compatibility and remains zero.
 struct StochasticMapFitResult {
   StochasticMap map;
   std::size_t replayed_traces = 0;
   std::size_t skipped_traces = 0;
+  std::vector<StochasticMapTransitionStatistics> statistics;
 };
 
 struct StochasticMapPerformanceOptions {
@@ -112,10 +121,13 @@ struct StochasticMapPetriModel {
 [[nodiscard]] const char* stochastic_map_distribution_name(
     StochasticMapDistribution distribution);
 
-// Validates that records are a complete, deterministic transition-indexed
-// view. The expected count is normally net.transitions().size().
+// Validates a complete transition-indexed map for consumers requiring all IDs.
 void validate_stochastic_map(const StochasticMap& map,
                              std::size_t expected_transition_count);
+
+// Fitted maps may omit transitions that were never enabled or activated.
+void validate_sparse_stochastic_map(const StochasticMap& map,
+                                    std::size_t expected_transition_count);
 
 [[nodiscard]] StochasticMapFitResult fit_stochastic_map_with_report(
     const EventLog& log, const PetriNet& net,
@@ -143,6 +155,13 @@ void validate_stochastic_map(const StochasticMap& map,
 // use the reciprocal of their positive mean-equivalent parameter.
 [[nodiscard]] StochasticPetriOptions stochastic_map_to_options(
     const StochasticMap& map,
+    std::vector<std::uint32_t> initial_marking = {},
+    std::size_t max_states = kStochasticPetriMaxGeneratorStates);
+
+// Materializes defaults internally for missing IDs, preserving the sparse map.
+[[nodiscard]] StochasticPetriOptions stochastic_map_to_options(
+    const PetriNet& net, const StochasticMap& map,
+    const StochasticMapFitOptions& fit_options = {},
     std::vector<std::uint32_t> initial_marking = {},
     std::size_t max_states = kStochasticPetriMaxGeneratorStates);
 

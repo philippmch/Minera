@@ -42,13 +42,14 @@ def cases():
         initial={'source': 1}, final={'sink': 1}, traces=traces)
 
 
-def capture(spec):
+def make_case(spec):
     net = PetriNet(spec['name'])
     places = {name: PetriNet.Place(name) for name in spec['places']}
     transitions = {name: PetriNet.Transition(name, label)
                    for name, label in spec['transitions']}
     net.places.update(places.values())
-    net.transitions.update(transitions.values())
+    order = spec.get('transition_insertion_order', list(transitions))
+    net.transitions.update(transitions[name] for name in order)
     nodes = dict(places, **transitions)
     for source, target, weight in spec['arcs']:
         add_arc_from_to(nodes[source], nodes[target], net, weight=weight)
@@ -61,6 +62,11 @@ def capture(spec):
             trace.append(Event({'concept:name': label,
                 'time:timestamp': datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=second)}))
         log.append(trace)
+    return net, initial, final, log
+
+
+def capture(spec, with_statistics=False):
+    net, initial, final, log = make_case(spec)
     try:
         result = replay.get_map_from_log_and_net(log, net, initial, final,
             force_distribution='EXPONENTIAL', parameters={'show_progress_bar': False})
@@ -72,7 +78,22 @@ def capture(spec):
                 'weight': value.get_weight(),
                 'priority': value.get_priority(),
             }
-        return dict(spec=spec, records=records)
+        row = dict(spec=spec, records=records)
+        if with_statistics:
+            from pm4py.algo.conformance.tokenreplay import algorithm as token_replay
+            from pm4py.objects.petri_net.utils import performance_map
+            from pm4py.statistics.variants.log import get as variants
+            aligned = token_replay.apply(log, net, initial, final,
+                parameters={'show_progress_bar': False})
+            variants_idx = variants.get_variants_from_log_trace_idx(log)
+            statistics = performance_map.single_element_statistics(
+                log, net, initial, aligned, variants_idx)
+            row['statistics'] = {transition.name: value for transition, value in statistics.items()
+                                 if isinstance(transition, PetriNet.Transition)}
+            row['aligned_traces'] = [dict(activated=[t.name for t in item['activated_transitions']],
+                fit=item['trace_is_fit'], reached={p.name: v for p, v in item['reached_marking'].items()})
+                for item in aligned]
+        return row
     except Exception as error:
         return dict(spec=spec, error={'type': type(error).__name__, 'message': str(error)})
 
@@ -80,8 +101,21 @@ def capture(spec):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--statistics', action='store_true')
+    parser.add_argument('--specs', type=Path,
+        help='Replay the input specs from a saved observation document')
     args = parser.parse_args()
-    observations = [capture(spec) for spec in cases()]
+    selected = [dict(spec=spec) for spec in cases()]
+    if args.specs:
+        document = json.loads(args.specs.read_text(encoding='utf-8'))
+        selected = document['observations']
+    observations = []
+    for source in selected:
+        row = capture(source['spec'], args.statistics)
+        if source.get('alternatives'):
+            row['alternatives'] = [capture(alternative['spec'], args.statistics)
+                                   for alternative in source['alternatives']]
+        observations.append(row)
     result = dict(reference='2.7.22', reference_commit='0715c31f3f1d85924107d6aa5329806db69df899',
         public_api='pm4py.algo.simulation.montecarlo.utils.replay.get_map_from_log_and_net',
         forced_distribution='EXPONENTIAL', observations=observations)
