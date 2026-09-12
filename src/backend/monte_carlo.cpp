@@ -4,7 +4,6 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
-#include <deque>
 #include <limits>
 #include <map>
 #include <numeric>
@@ -28,10 +27,6 @@ struct CaseState {
   double arrival = 0.0;
   double now = 0.0;
   Marking marking;
-  // Token assignment timestamps are owned by the case that created them.
-  // Keeping these queues with the marking prevents one case's ordinary or
-  // reset arc from consuming another case's interval history.
-  std::vector<std::deque<double>> place_assignments;
   Trace trace;
   std::size_t steps = 0;
   bool finished = false;
@@ -79,7 +74,6 @@ constexpr std::size_t kMaxMonteCarloSteps = 10'000;
 constexpr std::size_t kMaxMonteCarloResourceCapacity = 1'000;
 constexpr std::size_t kMaxMonteCarloResourceSlots = 1'000'000;
 constexpr std::size_t kMaxMonteCarloInitialTokens = 1'000'000;
-constexpr std::size_t kMaxMonteCarloInitialAssignments = 1'000'000;
 constexpr std::size_t kMaxMonteCarloSimulationSteps = 1'000'000;
 constexpr std::size_t kMaxMonteCarloRuntimeAssignments = 1'000'000;
 constexpr std::size_t kMaxMonteCarloRuntimeIntervals = 1'000'000;
@@ -358,10 +352,18 @@ void validate_scheduler_budgets(const PetriNet& net,
   if (capacities.size() != net.place_count()) {
     throw std::invalid_argument("Monte Carlo resource capacity vector is invalid");
   }
+  // Case markings remain dense even when capacities are zero or initial
+  // token counts are sparse. Bound those allocations independently.
+  if (net.place_count() > kMaxMonteCarloRuntimeAssignments ||
+      (options.simulations != 0 && net.place_count() >
+          kMaxMonteCarloRuntimeAssignments / options.simulations)) {
+    throw std::invalid_argument(
+        "Monte Carlo case marking allocation exceeds the native safety limit");
+  }
 
   std::size_t total_resources = 0;
   for (const auto capacity : capacities) {
-    if (capacity == 0 || capacity > kMaxMonteCarloResourceCapacity) {
+    if (capacity > kMaxMonteCarloResourceCapacity) {
       throw std::invalid_argument(
           "Monte Carlo resource capacity exceeds the native safety limit");
     }
@@ -380,12 +382,6 @@ void validate_scheduler_budgets(const PetriNet& net,
           "Monte Carlo initial marking exceeds the native safety limit");
     }
     initial_tokens += static_cast<std::size_t>(tokens);
-  }
-  if (initial_tokens != 0 &&
-      options.simulations >
-          kMaxMonteCarloInitialAssignments / initial_tokens) {
-    throw std::invalid_argument(
-        "Monte Carlo initial assignment budget exceeds the native safety limit");
   }
   if (options.max_steps != 0 && options.simulations != 0 &&
       options.simulations >
@@ -412,10 +408,6 @@ PreparedOptions prepare_options(const PetriNet& net,
       options.diagnostic_interval == 0) {
     throw std::invalid_argument(
         "Monte Carlo compatibility controls must be finite and positive");
-  }
-  if (options.default_resources_per_place == 0) {
-    throw std::invalid_argument(
-        "Monte Carlo default resource count must be positive");
   }
   if (options.default_resources_per_place > kMaxMonteCarloResourceCapacity) {
     throw std::invalid_argument(
@@ -549,10 +541,6 @@ PreparedOptions prepare_options(const PetriNet& net,
       throw std::invalid_argument(
           "Monte Carlo resource place index is invalid");
     }
-    if (capacity == 0) {
-      throw std::invalid_argument(
-          "Monte Carlo resource count must be positive");
-    }
     if (capacity > kMaxMonteCarloResourceCapacity) {
       throw std::invalid_argument(
           "Monte Carlo resource capacity exceeds the native safety limit");
@@ -636,9 +624,11 @@ PreparedOptions prepare_options(const PetriNet& net,
 
 void append_interval(std::vector<MonteCarloInterval>& intervals,
                      double start, double end, RuntimeBudget& budget) {
-  if (!std::isfinite(start) || !std::isfinite(end) || end < start) {
+  if (!std::isfinite(start) || !std::isfinite(end)) {
     throw std::runtime_error("Monte Carlo interval has invalid finite bounds");
   }
+  // Shared reservation timestamps may exceed this case's nominal finish.
+  // Such intervals are absent from the public result, as are zero spans.
   if (end <= start) return;
   if (budget.interval_records >= kMaxMonteCarloRuntimeIntervals) {
     throw std::runtime_error(
@@ -648,124 +638,48 @@ void append_interval(std::vector<MonteCarloInterval>& intervals,
   ++budget.interval_records;
 }
 
-// Reserve output-place resources for one firing. A transition requiring
-// several slots on one place waits for the corresponding number of earliest
-// slots. Place occupancy is recorded when an input token is consumed below;
-// output reservation itself is not a place-occupancy interval.
-double reserve_output_resources(
-    std::size_t transition_index,
-    const PetriTransition& transition,
-    const std::vector<std::size_t>& capacities,
-    std::vector<std::vector<double>>& available,
-    std::vector<MonteCarloTransitionIntervalTree>& transition_intervals,
-    double ready_time, double duration, RuntimeBudget& budget,
-    std::size_t interval_limit_before_place_intervals) {
-  std::map<std::size_t, std::size_t> output_counts;
-  for (const auto place : transition.outputs) ++output_counts[place];
-  double start = ready_time;
-  for (const auto& [place, count] : output_counts) {
-    if (count > capacities[place]) {
-      throw std::invalid_argument(
-          "Monte Carlo transition output demand exceeds place capacity");
-    }
-    auto order = std::vector<std::size_t>(available[place].size());
-    std::iota(order.begin(), order.end(), 0);
-    std::sort(order.begin(), order.end(), [&](const std::size_t lhs,
-                                              const std::size_t rhs) {
-      return std::tie(available[place][lhs], lhs) <
-             std::tie(available[place][rhs], rhs);
-    });
-    start = std::max(start, available[place][order[count - 1]]);
-  }
-  const double finish = start + duration;
-  if (!std::isfinite(finish) || finish < start) {
-    throw std::runtime_error("Monte Carlo virtual time overflow");
-  }
-  if (start > ready_time) {
-    // Place intervals are appended by the caller after this wait interval.
-    // Reserve enough aggregate headroom for both so a budget failure cannot
-    // occur after resource availability has been mutated.
-    if (interval_limit_before_place_intervals == 0 ||
-        budget.interval_records >= interval_limit_before_place_intervals) {
-      throw std::runtime_error(
-          "Monte Carlo interval record budget exceeded");
-    }
-    append_interval(transition_intervals[transition_index].intervals,
-                    ready_time, start, budget);
-  }
-  for (const auto& [place, count] : output_counts) {
-    auto order = std::vector<std::size_t>(available[place].size());
-    std::iota(order.begin(), order.end(), 0);
-    std::sort(order.begin(), order.end(), [&](const std::size_t lhs,
-                                              const std::size_t rhs) {
-      return std::tie(available[place][lhs], lhs) <
-             std::tie(available[place][rhs], rhs);
-    });
-    for (std::size_t i = 0; i < count; ++i) {
-      available[place][order[i]] = finish;
-    }
-  }
-  return start;
-}
-
-void assign_place_timestamp(std::vector<std::deque<double>>& assignments,
-                            std::size_t place, double timestamp,
-                            RuntimeBudget& budget) {
-  if (!std::isfinite(timestamp)) {
-    throw std::runtime_error("Monte Carlo place assignment is not finite");
-  }
-  if (budget.live_assignments >= kMaxMonteCarloRuntimeAssignments) {
-    throw std::runtime_error(
-        "Monte Carlo live assignment budget exceeded");
-  }
-  auto& queue = assignments[place];
-  const auto position = std::upper_bound(queue.begin(), queue.end(), timestamp);
-  queue.insert(position, timestamp);
+// Initial arrivals append directly, while subsequent operations use the
+// observed binary min-heap operations. The initial append can temporarily
+// violate heap order, so std::pop_heap's heap precondition is inappropriate.
+void push_timestamp(std::vector<double>& values, double value,
+                    RuntimeBudget& budget, bool initial = false) {
+  if (budget.live_assignments >= kMaxMonteCarloRuntimeAssignments)
+    throw std::runtime_error("Monte Carlo live assignment budget exceeded");
+  values.push_back(value);
   ++budget.live_assignments;
+  if (initial) return;
+  std::size_t position = values.size() - 1;
+  while (position > 0) {
+    const auto parent = (position - 1) / 2;
+    if (!(value < values[parent])) break;
+    values[position] = values[parent];
+    position = parent;
+  }
+  values[position] = value;
 }
 
-void consume_place_assignment(
-    std::vector<std::deque<double>>& assignments, std::size_t place,
-    double completion_time, std::vector<MonteCarloInterval>& intervals,
-    RuntimeBudget& budget) {
-  auto& queue = assignments[place];
-  if (queue.empty()) {
-    throw std::runtime_error("Monte Carlo place assignment queue underflow");
+double pop_timestamp(std::vector<double>& values, RuntimeBudget& budget) {
+  const double result = values.front();
+  const double last = values.back();
+  values.pop_back();
+  --budget.live_assignments;
+  if (values.empty()) return result;
+  std::size_t position = 0;
+  while (2 * position + 1 < values.size()) {
+    auto child = 2 * position + 1;
+    if (child + 1 < values.size() && !(values[child] < values[child + 1]))
+      ++child;
+    values[position] = values[child];
+    position = child;
   }
-  const double assigned_time = queue.front();
-  append_interval(intervals, assigned_time, completion_time, budget);
-  queue.pop_front();
-}
-
-void consume_reset_assignments(
-    std::vector<std::deque<double>>& assignments, std::size_t place,
-    double completion_time, std::vector<MonteCarloInterval>& intervals,
-    RuntimeBudget& budget) {
-  auto& queue = assignments[place];
-  while (!queue.empty()) {
-    const double assigned_time = queue.front();
-    append_interval(intervals, assigned_time, completion_time, budget);
-    queue.pop_front();
+  while (position > 0) {
+    const auto parent = (position - 1) / 2;
+    if (!(last < values[parent])) break;
+    values[position] = values[parent];
+    position = parent;
   }
-}
-
-void validate_assignment_timestamps(const std::deque<double>& assignments,
-                                    std::size_t count, double ready_time) {
-  if (count > assignments.size()) {
-    throw std::runtime_error("Monte Carlo place assignment queue underflow");
-  }
-  auto timestamp = assignments.begin();
-  for (std::size_t index = 0; index < count; ++index, ++timestamp) {
-    if (!std::isfinite(*timestamp) || *timestamp > ready_time) {
-      throw std::runtime_error(
-          "Monte Carlo place assignment is not available at firing time");
-    }
-  }
-}
-
-void validate_all_assignment_timestamps(const std::deque<double>& assignments,
-                                        double ready_time) {
-  validate_assignment_timestamps(assignments, assignments.size(), ready_time);
+  values[position] = last;
+  return result;
 }
 
 void fire_transition(const PetriTransition& transition,
@@ -884,7 +798,8 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
   if (options.enable_diagnostics) {
     result.diagnostics.case_execution_seconds.assign(options.simulations, 0.0);
   }
-  if (options.simulations == 0) return result;
+  if (options.simulations == 0)
+    throw std::invalid_argument("Monte Carlo requires at least one simulated case");
 
   std::vector<CaseState> cases;
   cases.reserve(options.simulations);
@@ -902,43 +817,28 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
     state.arrival = arrival;
     state.now = arrival;
     state.marking = prepared.initial_marking;
-    state.place_assignments.resize(net.place_count());
-    for (std::size_t place = 0; place < state.marking.size(); ++place) {
-      for (std::uint64_t token = 0; token < state.marking[place]; ++token) {
-        assign_place_timestamp(state.place_assignments, place, state.arrival,
-                               runtime_budget);
-      }
-    }
     state.trace.case_id = "case_" + std::to_string(index + 1);
     cases.push_back(std::move(state));
-    queue.push({arrival, index, serial++});
   }
 
-  std::vector<std::vector<double>> resource_available(net.place_count());
-  for (std::size_t place = 0; place < net.place_count(); ++place) {
-    resource_available[place].assign(prepared.capacities[place], 0.0);
-  }
+  std::vector<std::vector<double>> timestamps(net.place_count());
+  std::vector<std::int64_t> occupied(net.place_count(), 0);
   std::mt19937_64 rng(options.seed);
-
-  while (!queue.empty()) {
-    const auto entry = queue.top();
-    queue.pop();
-    auto& state = cases[entry.case_index];
-    if (state.finished) continue;
-    state.now = std::max(state.now, entry.time);
-
+  auto advance = [&](CaseState& state) {
     if (options.stop_at_final &&
         is_final_marking(state.marking, prepared.final_marking)) {
       state.completed = true;
+      for (std::size_t place = 0; place < state.marking.size(); ++place)
+        if (state.marking[place] != 0) --occupied[place];
       finalize_case(state, result.diagnostics, options,
                     &result.diagnostics.case_execution_seconds);
-      continue;
+      return;
     }
     if (state.steps >= options.max_steps) {
       state.step_limited = true;
       finalize_case(state, result.diagnostics, options,
                     &result.diagnostics.case_execution_seconds);
-      continue;
+      return;
     }
 
     const auto enabled = enabled_transitions(net, state.marking);
@@ -946,7 +846,7 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
       state.deadlocked = true;
       finalize_case(state, result.diagnostics, options,
                     &result.diagnostics.case_execution_seconds);
-      continue;
+      return;
     }
 
     const auto transition_index =
@@ -958,107 +858,50 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
       throw std::runtime_error("Monte Carlo sampled an invalid duration");
     }
 
-    // Preflight all assignment and interval effects before reserving shared
-    // resources or mutating this case. Reset arcs consume every assignment in
-    // their place, so their queues must be included in both aggregate caps.
-    std::map<std::size_t, std::size_t> input_counts;
-    for (const auto place : transition.inputs) {
-      auto& count = input_counts[place];
-      if (count == std::numeric_limits<std::size_t>::max()) {
-        throw std::runtime_error("Monte Carlo input multiplicity overflow");
-      }
-      ++count;
-    }
-    std::map<std::size_t, bool> reset_places;
-    for (const auto place : transition.reset_inputs) reset_places[place] = true;
-
-    // A reset consumes the complete queue after ordinary inputs have been
-    // removed. If malformed callers overlap an ordinary and reset arc on one
-    // place, count that queue once rather than charging it twice; duplicate
-    // reset arcs likewise have one effective drain.
-    std::size_t consumed_assignments = 0;
-    for (const auto& [place, count] : input_counts) {
-      const auto& assignments = state.place_assignments[place];
-      if (reset_places.contains(place)) {
-        validate_all_assignment_timestamps(assignments, state.now);
-      } else {
-        validate_assignment_timestamps(assignments, count, state.now);
-      }
-      const auto amount = reset_places.contains(place) ? assignments.size()
-                                                       : count;
-      if (amount >
-          kMaxMonteCarloRuntimeAssignments - consumed_assignments) {
-        throw std::runtime_error(
-            "Monte Carlo live assignment budget exceeded");
-      }
-      consumed_assignments += amount;
-    }
-    for (const auto& [place, unused] : reset_places) {
-      (void)unused;
-      if (input_counts.contains(place)) continue;
-      const auto& assignments = state.place_assignments[place];
-      if (assignments.size() >
-          kMaxMonteCarloRuntimeAssignments - consumed_assignments) {
-        throw std::runtime_error(
-            "Monte Carlo live assignment budget exceeded");
-      }
-      consumed_assignments += assignments.size();
-      validate_all_assignment_timestamps(assignments, state.now);
-    }
-    if (consumed_assignments > runtime_budget.live_assignments) {
-      throw std::runtime_error(
-          "Monte Carlo place assignment accounting is inconsistent");
-    }
-    const auto remaining_assignments =
-        runtime_budget.live_assignments - consumed_assignments;
-    if (transition.outputs.size() >
-        kMaxMonteCarloRuntimeAssignments - remaining_assignments) {
-      throw std::runtime_error(
-          "Monte Carlo live assignment budget exceeded");
-    }
-    if (runtime_budget.interval_records >
-        kMaxMonteCarloRuntimeIntervals - consumed_assignments) {
-      throw std::runtime_error(
-          "Monte Carlo interval record budget exceeded");
-    }
-    const double start = reserve_output_resources(
-        transition_index, transition, prepared.capacities, resource_available,
-        result.output_transitions_interval_trees, state.now, duration,
-        runtime_budget,
-        kMaxMonteCarloRuntimeIntervals - consumed_assignments);
-    const double finish = start + duration;
-    if (!std::isfinite(finish) || finish < start) {
+    const double finish = state.now + duration;
+    if (!std::isfinite(finish) || finish < state.now)
       throw std::runtime_error("Monte Carlo virtual time overflow");
+    // Markings retain arc multiplicity. Shared timing and resource accounting
+    // operate once per distinct place, including weighted ordinary arcs.
+    std::map<std::size_t, bool> consumed;
+    for (const auto place : transition.inputs) consumed[place] = true;
+    // Reset arcs retain case-local marking semantics; they must not drain
+    // timestamps belonging to the shared scheduler's other cases.
+    for (const auto place : transition.reset_inputs)
+      if (state.marking[place] != 0) consumed[place] = true;
+    for (const auto& [place, unused] : consumed) {
+      (void)unused;
+      --occupied[place];
+      if (!timestamps[place].empty()) {
+        const double assigned = pop_timestamp(timestamps[place], runtime_budget);
+        append_interval(result.output_places_interval_trees[place].intervals,
+                        assigned, finish, runtime_budget);
+      }
+      push_timestamp(timestamps[place], finish, runtime_budget);
+    }
+    std::map<std::size_t, bool> produced;
+    for (const auto place : transition.outputs) produced[place] = true;
+    for (const auto& [place, unused] : produced) {
+      (void)unused;
+      if (!timestamps[place].empty() &&
+          occupied[place] >= static_cast<std::int64_t>(prepared.capacities[place])) {
+        const double available = pop_timestamp(timestamps[place], runtime_budget);
+        --occupied[place];
+        append_interval(result.output_transitions_interval_trees[transition_index].intervals,
+                        state.now, available, runtime_budget);
+      }
+      push_timestamp(timestamps[place], finish, runtime_budget);
+      ++occupied[place];
     }
     fire_transition(transition, state.marking);
     state.now = finish;
     ++state.steps;
-    runtime_budget.live_assignments -= consumed_assignments;
-
-    // A place interval spans the time from token assignment to the firing
-    // that consumes that token. Output tokens become available at completion.
-    for (const auto place : transition.inputs) {
-      consume_place_assignment(
-          state.place_assignments, place, finish,
-          result.output_places_interval_trees[place].intervals,
-          runtime_budget);
-    }
-    for (const auto place : transition.reset_inputs) {
-      consume_reset_assignments(
-          state.place_assignments, place, finish,
-          result.output_places_interval_trees[place].intervals,
-          runtime_budget);
-    }
-    for (const auto place : transition.outputs) {
-      assign_place_timestamp(state.place_assignments, place, finish,
-                             runtime_budget);
-    }
 
     if (!transition.silent()) {
       Event event;
       event.case_id = state.trace.case_id;
       event.activity = net.activities()[*transition.activity];
-      event.timestamp = format_timestamp(finish);
+      event.timestamp = format_timestamp_microseconds(finish);
       event.input_order = state.trace.events.size();
       if (!is_activity_alias(options.activity_key)) {
         event.attributes.push_back(
@@ -1071,6 +914,26 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
       state.trace.events.push_back(std::move(event));
     }
     queue.push({state.now, state.index, serial++});
+  };
+  // First firings are primed in generation order, before any continuation.
+  const auto first_initial = std::find_if(prepared.initial_marking.begin(),
+      prepared.initial_marking.end(), [](auto tokens) { return tokens != 0; });
+  for (auto& state : cases) {
+    if (first_initial != prepared.initial_marking.end()) {
+      const auto place = static_cast<std::size_t>(
+          first_initial - prepared.initial_marking.begin());
+      push_timestamp(timestamps[place], state.arrival, runtime_budget, true);
+      ++occupied[place];
+    }
+    advance(state);
+  }
+  while (!queue.empty()) {
+    const auto entry = queue.top();
+    queue.pop();
+    auto& state = cases[entry.case_index];
+    if (state.finished) continue;
+    state.now = entry.time;
+    advance(state);
   }
 
   // The scheduler finalizes cases in virtual-time order; preserve generation
@@ -1090,6 +953,8 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
     result.diagnostics.median_case_execution_seconds =
         median(result.diagnostics.case_execution_seconds);
 
+  }
+  {
     // The contract's case execution time uses the first and last visible
     // event timestamps. Keep the legacy scheduler elapsed time above because
     // it also accounts for silent work and is part of the existing API.
@@ -1098,8 +963,7 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
     double last_visible = -std::numeric_limits<double>::infinity();
     for (const auto& trace : result.log.traces) {
       if (trace.events.empty()) {
-        result.diagnostics.cases_ex_time.push_back(0.0);
-        continue;
+        throw std::runtime_error("Monte Carlo simulated case has no visible events");
       }
       const auto first = parse_timestamp(trace.events.front().timestamp);
       const auto last = parse_timestamp(trace.events.back().timestamp);
@@ -1118,8 +982,6 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
         std::isfinite(first_visible) && std::isfinite(last_visible)
             ? std::max(0.0, last_visible - first_visible)
             : result.diagnostics.total_cases_seconds;
-  } else {
-    result.diagnostics.total_cases_time = result.diagnostics.total_cases_seconds;
   }
   for (auto& tree : result.output_places_interval_trees) {
     std::sort(tree.intervals.begin(), tree.intervals.end(),

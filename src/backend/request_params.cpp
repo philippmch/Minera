@@ -3967,7 +3967,7 @@ MonteCarloParams parse_monte_carlo_params(
     params.default_duration_seconds =
         nonnegative("monte_carlo_default_duration_seconds");
   if (supplied("monte_carlo_default_resources_per_place"))
-    params.default_resources_per_place = parse_positive_size(
+    params.default_resources_per_place = parse_nonnegative_size(
         require("monte_carlo_default_resources_per_place"),
         "monte_carlo_default_resources_per_place");
   if (supplied("monte_carlo_enable_diagnostics"))
@@ -4190,7 +4190,7 @@ MonteCarloParams parse_monte_carlo_params(
       const auto place = parse_nonnegative_size(
           trim(token.substr(0, separator)),
           "monte_carlo_resources_per_place");
-      const auto capacity = parse_positive_size(
+      const auto capacity = parse_nonnegative_size(
           trim(token.substr(separator + 1)),
           "monte_carlo_resources_per_place");
       if (!params.resources_per_place.emplace(place, capacity).second)

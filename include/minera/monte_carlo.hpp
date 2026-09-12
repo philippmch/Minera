@@ -61,8 +61,8 @@ struct MonteCarloDuration {
 };
 
 struct MonteCarloOptions {
-  // Number of independent cases to schedule.  A zero count returns an empty
-  // log and diagnostics without performing any simulation.
+  // Number of independent cases to schedule. Zero is rejected because the
+  // public result requires at least one nonempty visible trace.
   std::size_t simulations = 100;
   // Every case is inserted into the virtual scheduler at this interval. The
   // two names are wire-compatible aliases; at most one may be supplied.
@@ -83,7 +83,7 @@ struct MonteCarloOptions {
   std::size_t max_steps = 1000;
   std::uint64_t seed = 1;
   // Timestamp of the first case arrival, in Unix epoch seconds.
-  double start = 1767225600.0;
+  double start = 1000000.0;
   // A missing duration vector uses this deterministic service time.
   double default_duration_seconds = 1.0;
   // Transition weights are indexed by PetriNet::transitions().  An empty
@@ -93,11 +93,11 @@ struct MonteCarloOptions {
   // this vector must contain one entry per transition.
   std::vector<MonteCarloDuration> transition_durations;
   // Output places reserve one virtual resource for the duration of a firing.
-  // A missing entry uses default_resources_per_place.
+  // A missing entry uses default_resources_per_place. Zero is accepted.
   std::map<std::size_t, std::size_t> resources_per_place;
   std::size_t default_resources_per_place = 1;
-  // Diagnostics are inexpensive aggregate values, but callers may disable
-  // the per-case vector for very large simulations.
+  // Controls the legacy elapsed-time vector. Public visible-event duration
+  // diagnostics and interval records are returned regardless of this flag.
   bool enable_diagnostics = true;
   // Stop a case when its marking covers every token required by final_marking.
   // When false, the case continues until max_steps or a deadlock.
@@ -175,9 +175,9 @@ struct MonteCarloResult {
 };
 
 // Fits optional transition weights and service durations from a source log.
-// Visible transitions use activity frequencies; when timestamps are available,
-// the elapsed time to the next event estimates the current activity's service
-// interval. Explicit options always take precedence.
+// Shared token replay derives activation/enabling weights and causal token
+// timing samples, then fits the selected or automatic distribution. Explicit
+// maps and vectors retain their precedence.
 [[nodiscard]] MonteCarloOptions fit_monte_carlo_options(
     const EventLog& input_log, const PetriNet& net,
     const MonteCarloOptions& options = {});

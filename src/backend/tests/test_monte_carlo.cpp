@@ -177,7 +177,7 @@ void deterministic_seed_and_diagnostics() {
          1e-9);
   assert(first.diagnostics.total_cases_seconds >= 9.0);
   assert(first.log.traces[0].events[0].timestamp ==
-         "2026-01-01T00:00:05.000Z");
+         "2026-01-01T00:00:05.000000Z");
 }
 
 void weighted_choices_and_exponential_replay() {
@@ -399,67 +399,36 @@ void scalar_duration_distributions_are_seeded_and_nonnegative() {
       {minera::MonteCarloDurationDistribution::kGamma, 1.0, 0.0, 1.0}));
 }
 
-void resources_create_virtual_fifo_wait() {
+void resources_record_waits_without_delaying_events() {
   const auto net = linear_net();
   minera::MonteCarloOptions options;
   options.simulations = 2;
   options.case_arrival_seconds = 0.0;
-  options.transition_durations = {{
-      minera::MonteCarloDurationDistribution::kDeterministic, 5.0}};
-  options.resources_per_place[net.sink()] = 1;
+  options.default_duration_seconds = 5.0;
   const auto result = minera::monte_carlo(net, options);
-  assert(result.log.traces[0].events.size() == 1);
-  assert(result.log.traces[1].events.size() == 1);
-  assert(result.log.traces[0].events[0].timestamp ==
-         "2026-01-01T00:00:05.000Z");
-  assert(result.log.traces[1].events[0].timestamp ==
-         "2026-01-01T00:00:10.000Z");
-  assert(result.diagnostics.case_execution_seconds.size() == 2);
-  assert(result.diagnostics.case_execution_seconds[0] == 5.0);
-  assert(result.diagnostics.case_execution_seconds[1] == 10.0);
-  assert(result.diagnostics.cases_ex_time.size() == 2);
-  assert(result.diagnostics.cases_ex_time[0] == 0.0);
-  assert(result.diagnostics.cases_ex_time[1] == 0.0);
-  assert(result.diagnostics.median_cases_ex_time == 0.0);
-  assert(result.diagnostics.total_cases_time == 5.0);
-
-  assert(result.output_places_interval_trees.size() == net.place_count());
-  const auto& source_intervals = result.output_places_interval_trees[0].intervals;
-  assert(source_intervals.size() == 2);
-  constexpr double start = 1767225600.0;
-  assert(source_intervals[0] ==
-         (minera::MonteCarloInterval{start, start + 5.0}));
-  assert(source_intervals[1] ==
-         (minera::MonteCarloInterval{start, start + 10.0}));
-  assert(result.output_places_interval_trees[1].intervals.empty());
-
-  assert(result.output_transitions_interval_trees.size() ==
-         net.transitions().size());
-  const auto& waiting = result.output_transitions_interval_trees[0].intervals;
-  assert(waiting.size() == 1);
-  assert(waiting.front() ==
-         (minera::MonteCarloInterval{start, start + 5.0}));
+  for (const auto& trace : result.log.traces)
+    assert(trace.events.front().timestamp == "1970-01-12T13:46:45.000000Z");
+  assert(result.diagnostics.case_execution_seconds == (std::vector<double>{5, 5}));
+  assert(result.diagnostics.cases_ex_time == (std::vector<double>{0, 0}));
+  assert(result.diagnostics.total_cases_time == 0);
+  assert(result.output_places_interval_trees[0].intervals ==
+         (std::vector<minera::MonteCarloInterval>{{1000000, 1000005}}));
+  assert(result.output_transitions_interval_trees[0].intervals ==
+         (std::vector<minera::MonteCarloInterval>{{1000000, 1000005}}));
 }
 
-void reset_arcs_close_only_the_firing_cases_tokens() {
+void reset_arcs_preserve_case_markings_with_shared_timing() {
   const auto net = reset_net();
   minera::MonteCarloOptions options;
   options.simulations = 2;
   options.case_arrival_ratio = 2.0;
   options.initial_marking = {1, 2, 0};
-  options.transition_durations = {{
-      minera::MonteCarloDurationDistribution::kDeterministic, 5.0}};
+  options.default_duration_seconds = 5.0;
   options.resources_per_place[net.sink()] = 2;
-
   const auto result = minera::monte_carlo(net, options);
   assert(result.diagnostics.completed_cases == 2);
-  const auto& intervals = result.output_places_interval_trees[1].intervals;
-  assert(intervals.size() == 4);
-  assert(intervals[0] == (minera::MonteCarloInterval{1767225600.0, 1767225605.0}));
-  assert(intervals[1] == (minera::MonteCarloInterval{1767225600.0, 1767225605.0}));
-  assert(intervals[2] == (minera::MonteCarloInterval{1767225602.0, 1767225607.0}));
-  assert(intervals[3] == (minera::MonteCarloInterval{1767225602.0, 1767225607.0}));
-
+  assert(result.output_places_interval_trees[1].intervals ==
+         (std::vector<minera::MonteCarloInterval>{{1000005, 1000007}}));
 }
 
 void scheduler_budget_limits_reject_unbounded_allocations() {
@@ -480,7 +449,8 @@ void scheduler_budget_limits_reject_unbounded_allocations() {
   options = {};
   options.initial_marking = {600'000, 0};
   options.simulations = 2;
-  assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
+  // Token multiplicity no longer multiplies timestamp allocations.
+  assert(minera::monte_carlo(net, options).diagnostics.completed_cases == 2);
 
   options = {};
   options.simulations = std::numeric_limits<std::size_t>::max();
@@ -500,62 +470,38 @@ void scheduler_budget_limits_reject_unbounded_allocations() {
   options.default_resources_per_place = 1000;
   assert(throws_invalid(
       [&] { (void)minera::monte_carlo(many_places, options); }));
+  options.default_resources_per_place = 0;
+  options.simulations = 1000;
+  options.max_steps = 1;
+  assert(throws_invalid(
+      [&] { (void)minera::monte_carlo(many_places, options); }));
 }
 
 void runtime_growth_budgets_reject_amplifying_loops() {
-  // A bounded step count is not enough when one firing creates many output
-  // tokens. The live-assignment cap must stop this loop before its queues grow
-  // beyond the aggregate safety budget.
-  minera::PetriNet token_amplifier;
-  const auto source = token_amplifier.add_place();
-  const auto sink = token_amplifier.add_place();
-  token_amplifier.set_source(source);
-  token_amplifier.set_sink(sink);
-  token_amplifier.set_activities({"A"});
-  token_amplifier.add_transition(
-      0, {source}, std::vector<std::size_t>(1000, source));
-
-  minera::MonteCarloOptions options;
-  options.simulations = 1;
-  options.max_steps = 10'000;
-  options.transition_durations = {{
-      minera::MonteCarloDurationDistribution::kDeterministic, 0.0}};
-  options.resources_per_place[source] = 1000;
-  bool rejected = false;
-  try {
-    (void)minera::monte_carlo(token_amplifier, options);
-  } catch (const std::runtime_error&) {
-    rejected = true;
+  // Distinct places grow shared queues; weighted copies of one arc do not.
+  for (bool interval_growth : {false, true}) {
+    minera::PetriNet net;
+    std::vector<std::size_t> places;
+    for (std::size_t i = 0; i < 999; ++i) places.push_back(net.add_place());
+    const auto sink = net.add_place();
+    net.set_source(places.front());
+    net.set_sink(sink);
+    net.set_activities({"A"});
+    net.add_transition(0, interval_growth ? places : std::vector<std::size_t>{0}, places);
+    minera::MonteCarloOptions options;
+    options.simulations = 1;
+    options.max_steps = 10000;
+    options.default_duration_seconds = interval_growth ? 1.0 : 0.0;
+    options.default_resources_per_place = interval_growth ? 1 : 1000;
+    if (interval_growth) {
+      options.initial_marking.assign(net.place_count(), 1);
+      options.initial_marking[sink] = 0;
+    }
+    bool rejected = false;
+    try { (void)minera::monte_carlo(net, options); }
+    catch (const std::runtime_error&) { rejected = true; }
+    assert(rejected);
   }
-  assert(rejected);
-
-  // A transition can keep its live token count constant while appending a
-  // large number of occupancy intervals on every firing. That aggregate
-  // output budget is checked before the next firing mutates resources.
-  minera::PetriNet interval_amplifier;
-  const auto interval_source = interval_amplifier.add_place();
-  const auto interval_sink = interval_amplifier.add_place();
-  interval_amplifier.set_source(interval_source);
-  interval_amplifier.set_sink(interval_sink);
-  interval_amplifier.set_activities({"A"});
-  interval_amplifier.add_transition(
-      0, std::vector<std::size_t>(1000, interval_source),
-      std::vector<std::size_t>(1000, interval_source));
-
-  options = {};
-  options.simulations = 1;
-  options.max_steps = 10'000;
-  options.initial_marking = {1000, 0};
-  options.transition_durations = {{
-      minera::MonteCarloDurationDistribution::kDeterministic, 1.0}};
-  options.resources_per_place[interval_source] = 1000;
-  rejected = false;
-  try {
-    (void)minera::monte_carlo(interval_amplifier, options);
-  } catch (const std::runtime_error&) {
-    rejected = true;
-  }
-  assert(rejected);
 }
 
 void deadlocks_and_step_limits_are_reported() {
@@ -619,6 +565,7 @@ void sparse_stochastic_map_controls_branch_and_duration() {
       minera::StochasticMapDistribution::kDeterministic, 2.0, 0.0, 0.0,
       1.0, 0});
   minera::MonteCarloOptions options;
+  options.start = 1767225600.0;
   options.simulations = 1;
   options.case_arrival_seconds = 0.0;
   options.stochastic_map = sparse;
@@ -626,10 +573,10 @@ void sparse_stochastic_map_controls_branch_and_duration() {
   assert(result.diagnostics.completed_cases == 1);
   assert(result.log.traces.front().events.size() == 2);
   assert(result.log.traces.front().events[0].timestamp ==
-         "2026-01-01T00:00:02.000Z");
+         "2026-01-01T00:00:02.000000Z");
   // The missing second map record has an immediate duration.
   assert(result.log.traces.front().events[1].timestamp ==
-         "2026-01-01T00:00:02.000Z");
+         "2026-01-01T00:00:02.000000Z");
 
   const auto branch_net = choice_net();
   minera::StochasticMap branch_map;
@@ -650,7 +597,7 @@ void sparse_stochastic_map_controls_branch_and_duration() {
   assert(branch.log.traces.front().events.size() == 1);
   assert(branch.log.traces.front().events.front().activity == "B");
   assert(branch.log.traces.front().events.front().timestamp ==
-         "2026-01-01T00:00:04.000Z");
+         "2026-01-01T00:00:04.000000Z");
 
   // Explicit vectors override corresponding map values.
   options.transition_weights = {0.0, 1.0};
@@ -660,7 +607,7 @@ void sparse_stochastic_map_controls_branch_and_duration() {
   const auto explicit_values = minera::monte_carlo(branch_net, options);
   assert(explicit_values.log.traces.front().events.front().activity == "B");
   assert(explicit_values.log.traces.front().events.front().timestamp ==
-         "2026-01-01T00:00:07.000Z");
+         "2026-01-01T00:00:07.000000Z");
 
   auto malformed = branch_map;
   malformed.transitions.push_back(malformed.transitions.front());
@@ -691,6 +638,7 @@ void sparse_stochastic_map_controls_branch_and_duration() {
 void stochastic_map_distribution_parameters_are_converted() {
   const auto net = linear_net();
   minera::MonteCarloOptions options;
+  options.start = 1767225600.0;
   options.simulations = 1;
   options.case_arrival_ratio = 0.0;
   options.stochastic_map = minera::StochasticMap{};
@@ -713,7 +661,7 @@ void stochastic_map_distribution_parameters_are_converted() {
   options.stochastic_map = map;
   const auto lognormal = minera::monte_carlo(net, options);
   assert(lognormal.log.traces.front().events.front().timestamp ==
-         "2026-01-01T00:00:02.000Z");
+         "2026-01-01T00:00:02.000000Z");
 
   // A negative log-scale location is valid and produces a sub-unit service
   // time when the supplied map uses a finite negative mu.
@@ -721,7 +669,7 @@ void stochastic_map_distribution_parameters_are_converted() {
   options.stochastic_map = map;
   const auto subunit_lognormal = minera::monte_carlo(net, options);
   assert(subunit_lognormal.log.traces.front().events.front().timestamp ==
-         "2026-01-01T00:00:00.500Z");
+         "2026-01-01T00:00:00.500000Z");
 
   map.transitions.front().distribution =
       minera::StochasticMapDistribution::kGamma;
@@ -991,7 +939,7 @@ void replay_context_validation_is_limited_to_map_fitting() {
   // The simulator retains its wider unsigned final-marking range when replay
   // is unnecessary (initial-token allocation has its own independent budget).
   options.simulations = 0;
-  (void)minera::monte_carlo(net, options);
+  assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
 }
 
 void invalid_options_are_rejected() {
@@ -1017,15 +965,11 @@ void invalid_options_are_rejected() {
   }
   assert(rejected);
 
-  rejected = false;
-  try {
+  {
     minera::MonteCarloOptions options;
     options.default_resources_per_place = 0;
-    (void)minera::monte_carlo(net, options);
-  } catch (const std::invalid_argument&) {
-    rejected = true;
+    assert(minera::monte_carlo(net, options).diagnostics.completed_cases == options.simulations);
   }
-  assert(rejected);
 
   rejected = false;
   try {
@@ -1092,6 +1036,105 @@ void diagnostics_can_be_disabled() {
   assert(result.diagnostics.simulated_cases == 2);
   assert(result.diagnostics.case_execution_seconds.empty());
   assert(result.diagnostics.median_case_execution_seconds == 0.0);
+  assert(result.diagnostics.cases_ex_time == (std::vector<double>{0, 0}));
+  assert(result.diagnostics.total_cases_time == 60.0);
+}
+
+void public_scheduler_sequences_and_weighted_arcs() {
+  auto net = sequential_net();
+  minera::MonteCarloOptions options;
+  options.simulations = 3;
+  options.case_arrival_ratio = 1;
+  options.transition_durations = {
+      {minera::MonteCarloDurationDistribution::kDeterministic, 2},
+      {minera::MonteCarloDurationDistribution::kDeterministic, 3}};
+  const auto result = minera::monte_carlo(net, options);
+  assert(result.diagnostics.cases_ex_time == (std::vector<double>{3, 3, 3}));
+  assert(result.diagnostics.total_cases_time == 5);
+  assert(result.output_places_interval_trees[0].intervals ==
+      (std::vector<minera::MonteCarloInterval>{{1000000,1000002}, {1000001,1000004}, {1000002,1000003}}));
+  assert(result.output_places_interval_trees[1].intervals ==
+      (std::vector<minera::MonteCarloInterval>{{1000004,1000005}, {1000005,1000006}, {1000006,1000007}}));
+  assert(result.output_transitions_interval_trees[1].intervals ==
+      (std::vector<minera::MonteCarloInterval>{{1000003,1000005}, {1000004,1000006}}));
+
+  options.case_arrival_ratio = 10;
+  const auto spaced = minera::monte_carlo(net, options);
+  // Priming leaves timestamp 1000022 at the middle place before case zero
+  // finishes at 1000005. Its reversed interval must be omitted, not rejected.
+  assert(spaced.output_places_interval_trees[1].intervals ==
+      (std::vector<minera::MonteCarloInterval>{{1000005,1000015}, {1000015,1000025}}));
+  assert(spaced.diagnostics.total_cases_time == 23);
+
+  minera::PetriNet weighted;
+  for (int i = 0; i < 3; ++i) weighted.add_place();
+  weighted.set_source(0); weighted.set_sink(2); weighted.set_activities({"A", "B"});
+  weighted.add_transition(0, {0,0}, {1,1});
+  weighted.add_transition(1, {1,1}, {2});
+  options.initial_marking = {2,0,0};
+  options.case_arrival_ratio = 1;
+  const auto multiple = minera::monte_carlo(weighted, options);
+  assert(multiple.output_places_interval_trees == result.output_places_interval_trees);
+  assert(multiple.output_transitions_interval_trees == result.output_transitions_interval_trees);
+}
+
+void public_scheduler_parallel_and_hidden_timing() {
+  minera::PetriNet net;
+  for (int i = 0; i < 5; ++i) net.add_place();
+  net.set_source(0); net.set_sink(4); net.set_activities({"A", "B", "C"});
+  net.add_transition(0, {0}, {2}); net.add_transition(1, {1}, {3});
+  net.add_transition(2, {2,3}, {4});
+  minera::MonteCarloOptions options;
+  options.simulations = 3; options.case_arrival_ratio = 1;
+  options.initial_marking = {1,1,0,0,0}; options.transition_weights = {1,0,1};
+  options.transition_durations = {
+      {minera::MonteCarloDurationDistribution::kDeterministic, 2},
+      {minera::MonteCarloDurationDistribution::kDeterministic, 3},
+      {minera::MonteCarloDurationDistribution::kDeterministic, 5}};
+  const auto result = minera::monte_carlo(net, options);
+  assert(result.output_places_interval_trees[1].intervals ==
+      (std::vector<minera::MonteCarloInterval>{{1000005,1000006}, {1000006,1000007}}));
+  assert(result.diagnostics.cases_ex_time == (std::vector<double>{8,8,8}));
+
+  minera::PetriNet hidden;
+  for (int i = 0; i < 4; ++i) hidden.add_place();
+  hidden.set_source(0); hidden.set_sink(3); hidden.set_activities({"A", "B"});
+  hidden.add_transition(std::nullopt, {0}, {1});
+  hidden.add_transition(0, {1}, {2}); hidden.add_transition(1, {2}, {3});
+  options.initial_marking.clear(); options.transition_weights.clear();
+  const auto hidden_result = minera::monte_carlo(hidden, options);
+  assert(hidden_result.diagnostics.cases_ex_time == (std::vector<double>{5,5,5}));
+  assert(hidden_result.diagnostics.total_cases_time == 7);
+}
+
+void microsecond_events_and_empty_trace_errors() {
+  minera::MonteCarloOptions options;
+  options.simulations = 1;
+  options.transition_durations = {
+      {minera::MonteCarloDurationDistribution::kDeterministic, 0.0001},
+      {minera::MonteCarloDurationDistribution::kDeterministic, 0.0002}};
+  const auto result = minera::monte_carlo(sequential_net(), options);
+  assert(result.log.traces[0].events[0].timestamp == "1970-01-12T13:46:40.000100Z");
+  assert(result.log.traces[0].events[1].timestamp == "1970-01-12T13:46:40.000300Z");
+  assert(std::abs(result.diagnostics.cases_ex_time[0] - 0.00020000000949949026) < 1e-12);
+  assert(minera::format_timestamp_microseconds(-0.000001) == "1969-12-31T23:59:59.999999Z");
+  assert(minera::format_timestamp_microseconds(0.0000005) == "1970-01-01T00:00:00.000000Z");
+  assert(minera::format_timestamp_microseconds(0.0000015) == "1970-01-01T00:00:00.000002Z");
+  assert(minera::format_timestamp_microseconds(0.9999996) == "1970-01-01T00:00:01.000000Z");
+  for (double invalid : {std::numeric_limits<double>::infinity(), 253402300800.0}) {
+    bool rejected = false;
+    try { (void)minera::format_timestamp_microseconds(invalid); }
+    catch (const std::exception&) { rejected = true; }
+    assert(rejected);
+  }
+  minera::PetriNet hidden;
+  hidden.add_place(); hidden.add_place(); hidden.set_source(0); hidden.set_sink(1);
+  hidden.add_transition(std::nullopt, {0}, {1});
+  options.transition_durations.clear();
+  bool rejected = false;
+  try { (void)minera::monte_carlo(hidden, options); }
+  catch (const std::runtime_error&) { rejected = true; }
+  assert(rejected);
 }
 
 void json_contract_is_stable() {
@@ -1124,8 +1167,8 @@ int main() {
   source_log_forces_duration_distributions();
   source_log_fitting_preserves_sparse_causal_records_and_overrides();
   scalar_duration_distributions_are_seeded_and_nonnegative();
-  resources_create_virtual_fifo_wait();
-  reset_arcs_close_only_the_firing_cases_tokens();
+  resources_record_waits_without_delaying_events();
+  reset_arcs_preserve_case_markings_with_shared_timing();
   scheduler_budget_limits_reject_unbounded_allocations();
   runtime_growth_budgets_reject_amplifying_loops();
   deadlocks_and_step_limits_are_reported();
@@ -1140,5 +1183,8 @@ int main() {
   signed_fitted_metadata_retains_simulation_domain_validation();
   invalid_options_are_rejected();
   diagnostics_can_be_disabled();
+  public_scheduler_sequences_and_weighted_arcs();
+  public_scheduler_parallel_and_hidden_timing();
+  microsecond_events_and_empty_trace_errors();
   json_contract_is_stable();
 }

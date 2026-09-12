@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <stdexcept>
 
 namespace minera {
 namespace {
@@ -222,6 +223,33 @@ std::string format_timestamp(double epoch_seconds) {
                 "%04lld-%02u-%02uT%02lld:%02lld:%02lld.%03lldZ", year, month,
                 day, of_day / 3600, (of_day / 60) % 60, of_day % 60, milli);
   return buffer;
+}
+
+std::string format_timestamp_microseconds(double epoch_seconds) {
+  constexpr double first_second = -62135596800.0;  // 0001-01-01
+  constexpr double past_last_second = 253402300800.0;  // 10000-01-01
+  if (!std::isfinite(epoch_seconds) || epoch_seconds < first_second ||
+      epoch_seconds >= past_last_second) {
+    throw std::invalid_argument("timestamp is outside calendar years 1 through 9999");
+  }
+  double whole = std::floor(epoch_seconds);
+  const double fraction = (epoch_seconds - whole) * 1000000.0;
+  auto micros = static_cast<long long>(std::floor(fraction));
+  const double remainder = fraction - static_cast<double>(micros);
+  // datetime timestamps use round-to-nearest with ties to the even microsecond.
+  if (remainder > 0.5 || (remainder == 0.5 && micros % 2 != 0)) ++micros;
+  if (micros == 1000000) {
+    micros = 0;
+    whole += 1.0;
+  }
+  if (whole >= past_last_second) {
+    throw std::invalid_argument("rounded timestamp is outside calendar years 1 through 9999");
+  }
+  auto result = format_timestamp(whole);
+  char fraction_text[9];
+  std::snprintf(fraction_text, sizeof(fraction_text), ".%06lldZ", micros);
+  result.replace(result.size() - 5, 5, fraction_text);
+  return result;
 }
 
 }  // namespace minera

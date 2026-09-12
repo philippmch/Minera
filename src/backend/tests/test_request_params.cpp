@@ -3979,6 +3979,12 @@ void parse_stochastic_playout_params_rejects_bad_values() {
 }
 
 void parse_monte_carlo_params_maps_controls() {
+  const auto zero_capacity = minera::parse_monte_carlo_params(fields({
+      {"monte_carlo_default_resources_per_place", "0"},
+      {"monte_carlo_resources_per_place", "0=0,1=2"}}));
+  assert(zero_capacity.default_resources_per_place == 0);
+  assert(zero_capacity.resources_per_place.at(0) == 0);
+  assert(zero_capacity.resources_per_place.at(1) == 2);
   const auto parsed = minera::parse_monte_carlo_params(fields({
       {"monte_carlo_simulations", "12"},
       {"monte_carlo_case_arrival_seconds", "2.5"},
@@ -4037,7 +4043,7 @@ void parse_monte_carlo_params_rejects_bad_values() {
            std::pair{"monte_carlo_transition_durations", "normal:1"},
            std::pair{"monte_carlo_transition_durations", "lognormal:1;0;0"},
            std::pair{"monte_carlo_transition_durations", "unknown:1"},
-           std::pair{"monte_carlo_resources_per_place", "1=0"},
+           std::pair{"monte_carlo_resources_per_place", "1=-1"},
            std::pair{"monte_carlo_enable_diagnostics", "maybe"}}) {
     bool threw = false;
     try {
