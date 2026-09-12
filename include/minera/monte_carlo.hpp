@@ -92,8 +92,9 @@ struct MonteCarloOptions {
   // A missing duration entry uses default_duration_seconds.  When supplied,
   // this vector must contain one entry per transition.
   std::vector<MonteCarloDuration> transition_durations;
-  // Output places reserve one virtual resource for the duration of a firing.
-  // A missing entry uses default_resources_per_place. Zero is accepted.
+  // Output places reserve resources before input timing is updated. A firing
+  // completes at max(nominal service finish, reserved resource availability).
+  // A missing entry uses default_resources_per_place. Zero resolves to one.
   std::map<std::size_t, std::size_t> resources_per_place;
   std::size_t default_resources_per_place = 1;
   // Controls the legacy elapsed-time vector. Public visible-event duration
