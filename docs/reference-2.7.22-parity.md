@@ -472,9 +472,11 @@ selection, deterministic, exponential, constant-zero, immediate, normal, uniform
 lognormal, and gamma service times, bounded case/step and live-allocation
 budgets, shared place timestamp heaps and signed occupancy counts,
 completion/deadlock diagnostics, and deterministic EventLog output. Cases are
-primed through their first firing before continuations are ordered by nominal
-finish time and generation index. Capacity waits enter transition diagnostics
-without delaying event timestamps. Arbitrary multi-token initial/final markings
+primed through their first firing before continuations are ordered by
+completion time and generation index. Output resources are reserved before input
+timing is updated. A firing completes at the later of its nominal service finish
+and the latest reserved resource availability, with one combined wait interval.
+Arbitrary multi-token initial/final markings
 require final-key membership and componentwise token coverage.
 Sparse supplied stochastic maps support every distribution and
 define missing transitions as uniform, immediate choices; explicit weight and
@@ -496,7 +498,9 @@ URLs while the legacy GET routes remain available. The default simulation epoch
 is 1,000,000 UTC seconds and generated timestamps retain microseconds. Public
 visible-event duration fields remain populated when diagnostics are disabled;
 that flag controls only the legacy elapsed-time vector. Zero capacities are
-accepted, while zero cases and traces without visible events return errors.
+accepted and resolve to one resource. Ordinary transitions without inputs are
+enabled; a simulation still requires an initial marking key, which may carry
+zero tokens. Zero cases and traces without visible events return errors.
 
 Object-centric Petri-net simulation evidence: the bounded native adapter
 enumerates per-object-type workflow-net traces, combines object choices into
@@ -2332,15 +2336,18 @@ controls, and empty-output errors. Captures require `TZ=UTC` and record that
 runtime setting so local timestamp conversion is reproducible.
 
 The independently observed scheduler primes every case through its first firing
-in generation order, then schedules continuations by nominal finish and case
+in generation order, then schedules continuations by completion time and case
 index. Shared timestamp heaps and signed occupancy counters are separate from
 each case's numeric marking. Initial arrival timestamps append before heap
 operations; the captured positive initial markings initialize one timestamp on
 the first initial place, irrespective of token multiplicity. Input consumption
 and output capacity reservation update timing once per distinct place. Completion
 releases occupancy for remaining marked places without removing timestamps.
-Resource waits record blocked intervals and leave nominal event times unchanged.
-Finite intervals with nonpositive length are omitted. These rules also explain
+Resources are reserved before input timing updates. One wait interval spans
+the latest required resource availability, and completion is the later of that
+availability and nominal service finish. The topology matrix below distinguishes
+this rule from the earlier chain examples, where waits did not exceed service
+finish. Finite intervals with nonpositive length are omitted. These rules also explain
 the otherwise surprising intervals seen when cases arrive far apart.
 
 Native simulation, CLI, and HTTP now follow those observations. Numeric weighted
@@ -2365,8 +2372,9 @@ field and generated activity/timestamp sequence. Four public error cases are
 checked for failure on each transport; their exception classes/messages are not
 claimed equivalent across languages.
 
-Randomized branch selection, general cyclic nets, platform-dependent local
-timestamp behavior, and wider parameter/error contracts still require proof.
+Randomized branch selection, wider cyclic nets beyond the finite cases below,
+platform-dependent local timestamp behavior, and wider parameter/error contracts
+still require proof.
 The native envelope also retains its explicit case identifiers and bounded
 diagnostics. Monte Carlo remains partial, and the catalogue still has 234
 incomplete coverage units.
@@ -2406,6 +2414,46 @@ actionable findings. Successful comparisons include every public result field
 and each generated activity/timestamp sequence. Error cases establish failure
 behavior only. These observations close the captured marking-key gaps without
 promoting the broader Monte Carlo module.
+
+## Monte Carlo source transitions and resource-constrained cycles
+
+`scripts/capture-monte-carlo-topology-reference.py` and
+`docs/monte-carlo-topology-reference-fixtures.json` retain 260 public simulation
+outcomes. The matrix covers finite fuel-consuming cycles, inputless generators,
+transitions without outputs, initial/final overlap, and repeated firings with
+overlapping input/output places. One or three cases vary arrival spacing,
+zero/one/two capacities, and zero or positive service times. Seventy-two cases
+vary capacities across two output places and reverse output-arc declaration order
+to check reservation aggregation. The capture uses the same pinned runtime and
+UTC environment as the preceding scheduler evidence.
+
+Ordinary transitions without inputs now participate in enabled selection. A
+nonempty initial key set is required even when inputless transitions could fire;
+a zero-valued initial key satisfies that requirement. Empty initial markings use
+an explicit all-zero adapter override to avoid absent-PNML-boundary inference.
+As before, reaching a final marking before producing a visible event fails when
+the public result attempts to compute visible-event duration diagnostics.
+
+Both default and per-place zero capacities resolve to one resource. A firing
+reserves all output places before updating input timing. It produces one combined
+wait interval ending at the latest reserved availability, even when multiple
+outputs require waits. Completion is `max(nominal service finish, latest resource
+availability)`; waiting does not add another service duration. All produced
+timestamps use that completion before input-place timing is consumed and updated.
+Numeric firing and marking-key changes remain case-local, and the existing
+allocation and step bounds remain enforced.
+
+The previous native checkpoint matched 97 of these 260 cases. The corrected
+independent model matches all 398 saved scheduler, marking, and topology outcomes.
+The isolated native checkpoint passes four focused suites, all 520 topology
+CLI/HTTP comparisons, the existing 140 scheduler and 136 marking comparisons,
+29 supplied-PNML checks, and the catalogue audit. Independent review reports no
+actionable findings. Successful transport comparisons check every public result
+field and generated activity/timestamp sequence; eight public error outcomes
+establish failure behavior on both routes without claiming equivalent exception
+classes or messages. The 825 transport checks close these observed topology and
+resource-timing gaps; Monte Carlo and the 234 incomplete catalogue units remain
+open for their broader contracts.
 
 ## Token-replay parity evidence
 

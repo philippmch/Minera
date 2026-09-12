@@ -1188,6 +1188,63 @@ void microsecond_events_and_empty_trace_errors() {
   assert(rejected);
 }
 
+void inputless_transitions_require_an_initial_key() {
+  minera::PetriNet net;
+  net.add_place(); net.add_place(); net.set_source(0); net.set_sink(1);
+  net.set_activities({"A"}); net.add_transition(0, {}, {1});
+  minera::MonteCarloOptions options;
+  options.simulations = 1; options.default_duration_seconds = 2;
+  const auto positive = minera::monte_carlo(net, options);
+  assert(positive.log.traces.front().events.front().activity == "A");
+  assert(positive.diagnostics.completed_cases == 1);
+  options.initial_marking = {0,0}; options.initial_marking_keys = {true,false};
+  const auto zero = minera::monte_carlo(net, options);
+  assert_same_logs(positive.log, zero.log);
+  options.initial_marking_keys = {false,false};
+  assert(throws_invalid([&] { (void)minera::monte_carlo(net, options); }));
+}
+
+void cycle_zero_capacity_and_overlapping_places() {
+  minera::PetriNet net;
+  for (int i = 0; i < 4; ++i) net.add_place();
+  net.set_source(0); net.set_sink(3); net.set_activities({"A", "B"});
+  net.add_transition(0, {0,1}, {2}); net.add_transition(1, {2}, {0,3});
+  minera::MonteCarloOptions options;
+  options.simulations = 1; options.initial_marking = {1,2,0,0};
+  options.final_marking = {0,0,0,2};
+  options.transition_durations = {
+      {minera::MonteCarloDurationDistribution::kDeterministic,2},
+      {minera::MonteCarloDurationDistribution::kDeterministic,3}};
+  const auto one = minera::monte_carlo(net, options);
+  options.default_resources_per_place = 0;
+  const auto zero = minera::monte_carlo(net, options);
+  assert(one.output_places_interval_trees == zero.output_places_interval_trees);
+  assert(zero.output_places_interval_trees[0].intervals ==
+      (std::vector<minera::MonteCarloInterval>{{1000000,1000002},{1000002,1000007}}));
+
+  minera::PetriNet overlap;
+  overlap.add_place(); overlap.add_place(); overlap.set_source(0); overlap.set_sink(1);
+  overlap.set_activities({"A"}); overlap.add_transition(0, {0}, {0,1});
+  options = {}; options.simulations = 3; options.case_arrival_ratio = 1;
+  options.final_marking = {0,3}; options.default_duration_seconds = 0;
+  const auto immediate = minera::monte_carlo(overlap, options);
+  assert(immediate.diagnostics.cases_ex_time == (std::vector<double>{2,1,0}));
+  for (const auto& trace : immediate.log.traces) {
+    assert(trace.events.size() == 3);
+    assert(trace.events.back().timestamp == "1970-01-12T13:46:42.000000Z");
+  }
+  assert(immediate.output_transitions_interval_trees[0].intervals ==
+      (std::vector<minera::MonteCarloInterval>{{1000000,1000002},{1000001,1000002}}));
+  options.default_duration_seconds = 2;
+  const auto timed = minera::monte_carlo(overlap, options);
+  // Two delayed output places produce one reservation interval per firing.
+  assert(timed.output_transitions_interval_trees[0].intervals ==
+      (std::vector<minera::MonteCarloInterval>{{1000001,1000002},{1000002,1000003},
+          {1000002,1000004},{1000003,1000004},{1000004,1000005},
+          {1000004,1000006},{1000005,1000006}}));
+  assert(timed.diagnostics.cases_ex_time == (std::vector<double>{4,4,4}));
+}
+
 void json_contract_is_stable() {
   const auto result = minera::monte_carlo(linear_net(), minera::MonteCarloOptions{});
   const auto json = minera::monte_carlo_json(result);
@@ -1238,5 +1295,7 @@ int main() {
   public_scheduler_sequences_and_weighted_arcs();
   public_scheduler_parallel_and_hidden_timing();
   microsecond_events_and_empty_trace_errors();
+  inputless_transitions_require_an_initial_key();
+  cycle_zero_capacity_and_overlapping_places();
   json_contract_is_stable();
 }

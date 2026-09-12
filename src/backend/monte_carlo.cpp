@@ -560,7 +560,7 @@ PreparedOptions prepare_options(const PetriNet& net,
     prepared.durations = options.transition_durations;
 
   prepared.capacities.assign(net.place_count(),
-                             options.default_resources_per_place);
+                             std::max<std::size_t>(1, options.default_resources_per_place));
   for (const auto& [place, capacity] : options.resources_per_place) {
     if (place >= net.place_count()) {
       throw std::invalid_argument(
@@ -570,7 +570,7 @@ PreparedOptions prepare_options(const PetriNet& net,
       throw std::invalid_argument(
           "Monte Carlo resource capacity exceeds the native safety limit");
     }
-    prepared.capacities[place] = capacity;
+    prepared.capacities[place] = std::max<std::size_t>(1, capacity);
   }
   validate_scheduler_budgets(net, options, prepared.initial_marking,
                              prepared.capacities);
@@ -583,7 +583,6 @@ PreparedOptions prepare_options(const PetriNet& net,
   enabled.reserve(net.transitions().size());
   for (std::size_t index = 0; index < net.transitions().size(); ++index) {
     const auto& transition = net.transitions()[index];
-    if (transition.inputs.empty() && !transition.has_extended_arcs()) continue;
     if (petri_transition_enabled(transition, marking)) enabled.push_back(index);
   }
   return enabled;
@@ -888,7 +887,7 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
       throw std::runtime_error("Monte Carlo sampled an invalid duration");
     }
 
-    const double finish = state.now + duration;
+    double finish = state.now + duration;
     if (!std::isfinite(finish) || finish < state.now)
       throw std::runtime_error("Monte Carlo virtual time overflow");
     // Markings retain arc multiplicity. Shared timing and resource accounting
@@ -899,6 +898,30 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
     // timestamps belonging to the shared scheduler's other cases.
     for (const auto place : transition.reset_inputs)
       if (state.marking[place] != 0) consumed[place] = true;
+    std::map<std::size_t, bool> produced;
+    for (const auto place : transition.outputs) produced[place] = true;
+    double available_time = state.now;
+    // Acquire all output resources before consuming inputs. One firing emits
+    // one wait interval, even if several output places delay its reservation.
+    for (const auto& [place, unused] : produced) {
+      (void)unused;
+      if (!timestamps[place].empty() &&
+          occupied[place] >= static_cast<std::int64_t>(prepared.capacities[place])) {
+        available_time = std::max(available_time,
+            pop_timestamp(timestamps[place], runtime_budget));
+        --occupied[place];
+      }
+      ++occupied[place];
+    }
+    append_interval(result.output_transitions_interval_trees[transition_index].intervals,
+                    state.now, available_time, runtime_budget);
+    // Resource availability bounds the completion timestamp; it does not add
+    // another service duration after waiting.
+    finish = std::max(finish, available_time);
+    for (const auto& [place, unused] : produced) {
+      (void)unused;
+      push_timestamp(timestamps[place], finish, runtime_budget);
+    }
     for (const auto& [place, unused] : consumed) {
       (void)unused;
       --occupied[place];
@@ -908,20 +931,6 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
                         assigned, finish, runtime_budget);
       }
       push_timestamp(timestamps[place], finish, runtime_budget);
-    }
-    std::map<std::size_t, bool> produced;
-    for (const auto place : transition.outputs) produced[place] = true;
-    for (const auto& [place, unused] : produced) {
-      (void)unused;
-      if (!timestamps[place].empty() &&
-          occupied[place] >= static_cast<std::int64_t>(prepared.capacities[place])) {
-        const double available = pop_timestamp(timestamps[place], runtime_budget);
-        --occupied[place];
-        append_interval(result.output_transitions_interval_trees[transition_index].intervals,
-                        state.now, available, runtime_budget);
-      }
-      push_timestamp(timestamps[place], finish, runtime_budget);
-      ++occupied[place];
     }
     fire_transition(transition, state.marking, state.marking_keys);
     state.now = finish;
@@ -948,6 +957,8 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
   // First firings are primed in generation order, before any continuation.
   const auto first_initial = std::find(prepared.initial_keys.begin(),
       prepared.initial_keys.end(), true);
+  if (first_initial == prepared.initial_keys.end())
+    throw std::invalid_argument("Monte Carlo requires an initial marking key");
   for (auto& state : cases) {
     if (first_initial != prepared.initial_keys.end()) {
       const auto place = static_cast<std::size_t>(
