@@ -1,6 +1,7 @@
 #include "minera/dfg_dataframe.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
@@ -262,6 +263,9 @@ std::optional<std::string> cell_text(const TableRow& row,
   if (!cell->value.empty()) return cell->value;
   if (const auto* date = std::get_if<NativeDate>(&cell->typed_value))
     return date->value;
+  if (const auto* unsigned_integer =
+          std::get_if<std::uint64_t>(&cell->typed_value))
+    return std::to_string(*unsigned_integer);
   return cell->value;
 }
 
@@ -556,23 +560,98 @@ bool numeric_index_kind(const EventAttribute& attribute) {
   return attribute.kind == AttributeKind::kInt ||
          attribute.kind == AttributeKind::kFloat ||
          std::holds_alternative<std::int64_t>(attribute.typed_value) ||
+         std::holds_alternative<std::uint64_t>(attribute.typed_value) ||
          std::holds_alternative<double>(attribute.typed_value);
 }
 
-std::optional<long double> comparable_number(const EventAttribute& attribute) {
+using ComparableNumber = std::variant<std::int64_t, std::uint64_t, double>;
+
+std::optional<ComparableNumber> comparable_number(
+    const EventAttribute& attribute) {
   if (const auto* value = std::get_if<std::int64_t>(&attribute.typed_value))
-    return static_cast<long double>(*value);
+    return *value;
+  if (const auto* value = std::get_if<std::uint64_t>(&attribute.typed_value))
+    return *value;
   if (const auto* value = std::get_if<double>(&attribute.typed_value)) {
-    if (std::isfinite(*value)) return static_cast<long double>(*value);
+    if (std::isfinite(*value)) return *value;
+    return std::nullopt;
+  }
+  if (attribute.kind == AttributeKind::kInt) {
+    std::string_view text = attribute.value;
+    if (text.starts_with('+')) text.remove_prefix(1);
+    std::int64_t signed_value = 0;
+    const auto signed_result = std::from_chars(
+        text.data(), text.data() + text.size(), signed_value, 10);
+    if (signed_result.ec == std::errc{} &&
+        signed_result.ptr == text.data() + text.size())
+      return signed_value;
+    std::uint64_t unsigned_value = 0;
+    const auto unsigned_result = std::from_chars(
+        text.data(), text.data() + text.size(), unsigned_value, 10);
+    if (unsigned_result.ec == std::errc{} &&
+        unsigned_result.ptr == text.data() + text.size())
+      return unsigned_value;
     return std::nullopt;
   }
   try {
     std::size_t consumed = 0;
-    const auto value = std::stold(attribute.value, &consumed);
+    const auto value = std::stod(attribute.value, &consumed);
     if (consumed == attribute.value.size() && std::isfinite(value)) return value;
   } catch (const std::exception&) {
   }
   return std::nullopt;
+}
+
+int compare_signed_real(std::int64_t integer, double real) {
+  if (std::isnan(real)) return -1;
+  if (real >= 0x1p63) return -1;
+  if (real < -0x1p63) return 1;
+  const auto truncated = static_cast<std::int64_t>(real);
+  if (integer < truncated) return -1;
+  if (integer > truncated) return 1;
+  const auto whole = std::trunc(real);
+  return real > whole ? -1 : real < whole ? 1 : 0;
+}
+
+int compare_unsigned_real(std::uint64_t integer, double real) {
+  if (std::isnan(real)) return -1;
+  if (real < 0) return 1;
+  if (real >= 0x1p64) return -1;
+  const auto truncated = static_cast<std::uint64_t>(real);
+  if (integer < truncated) return -1;
+  if (integer > truncated) return 1;
+  const auto whole = std::trunc(real);
+  return real > whole ? -1 : real < whole ? 1 : 0;
+}
+
+int compare_numbers(const ComparableNumber& left,
+                     const ComparableNumber& right) {
+  if (const auto* left_signed = std::get_if<std::int64_t>(&left)) {
+    if (const auto* right_signed = std::get_if<std::int64_t>(&right))
+      return *left_signed < *right_signed ? -1 : *left_signed > *right_signed;
+    if (const auto* right_unsigned = std::get_if<std::uint64_t>(&right)) {
+      if (*left_signed < 0) return -1;
+      const auto converted = static_cast<std::uint64_t>(*left_signed);
+      return converted < *right_unsigned ? -1 : converted > *right_unsigned;
+    }
+    return compare_signed_real(*left_signed, std::get<double>(right));
+  }
+  if (const auto* left_unsigned = std::get_if<std::uint64_t>(&left)) {
+    if (const auto* right_unsigned = std::get_if<std::uint64_t>(&right))
+      return *left_unsigned < *right_unsigned ? -1 : *left_unsigned > *right_unsigned;
+    if (const auto* right_signed = std::get_if<std::int64_t>(&right)) {
+      if (*right_signed < 0) return 1;
+      const auto converted = static_cast<std::uint64_t>(*right_signed);
+      return *left_unsigned < converted ? -1 : *left_unsigned > converted;
+    }
+    return compare_unsigned_real(*left_unsigned, std::get<double>(right));
+  }
+  const double left_real = std::get<double>(left);
+  if (const auto* right_real = std::get_if<double>(&right))
+    return left_real < *right_real ? -1 : left_real > *right_real;
+  if (const auto* right_signed = std::get_if<std::int64_t>(&right))
+    return -compare_signed_real(*right_signed, left_real);
+  return -compare_unsigned_real(std::get<std::uint64_t>(right), left_real);
 }
 
 bool index_less(const TableRow& lhs, const TableRow& rhs) {
@@ -590,12 +669,15 @@ bool index_less(const TableRow& lhs, const TableRow& rhs) {
   if (lhs_numeric) {
     const auto left = comparable_number(*lhs.index_attribute);
     const auto right = comparable_number(*rhs.index_attribute);
-    return left && right && *left < *right;
+    return left && right && compare_numbers(*left, *right) < 0;
   }
   return *lhs.index_text < *rhs.index_text;
 }
 
 double output_index(const TableRow& row) {
+  // DFG pair results expose both this legacy double projection and the
+  // source index text. Keep the latter exact for uint64 identifiers; this
+  // floating projection is only the established numeric API.
   return numeric_index(row).value_or(static_cast<double>(row.generated_index));
 }
 

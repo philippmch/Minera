@@ -69,6 +69,17 @@ bool parse_int_value(std::string_view value, std::int64_t& result) {
   const char* first = value.data();
   const char* last = value.data() + value.size();
   if (*first == '+') ++first;
+  if (first == last) return false;
+  const auto parsed = std::from_chars(first, last, result, 10);
+  return parsed.ec == std::errc{} && parsed.ptr == last;
+}
+
+bool parse_uint_value(std::string_view value, std::uint64_t& result) {
+  if (value.empty()) return false;
+  const char* first = value.data();
+  const char* last = value.data() + value.size();
+  if (*first == '+') ++first;
+  if (first == last) return false;
   const auto parsed = std::from_chars(first, last, result, 10);
   return parsed.ec == std::errc{} && parsed.ptr == last;
 }
@@ -152,6 +163,11 @@ std::string scalar_lexical_value(const EventAttribute& attribute) {
         throw std::invalid_argument("XES attribute has an incompatible integer native value");
       return std::to_string(*value);
     }
+    if (const auto* value = std::get_if<std::uint64_t>(&attribute.typed_value)) {
+      if (attribute.kind != AttributeKind::kInt)
+        throw std::invalid_argument("XES attribute has an incompatible unsigned integer native value");
+      return std::to_string(*value);
+    }
     if (const auto* value = std::get_if<double>(&attribute.typed_value)) {
       if (attribute.kind != AttributeKind::kFloat)
         throw std::invalid_argument("XES attribute has an incompatible float native value");
@@ -180,10 +196,12 @@ std::string scalar_lexical_value(const EventAttribute& attribute) {
   switch (attribute.kind) {
     case AttributeKind::kInt: {
       std::int64_t parsed = 0;
-      if (!parse_int_value(attribute.value, parsed))
-        throw std::invalid_argument("XES int attribute has an invalid value: " +
-                                    attribute.value);
-      return std::to_string(parsed);
+      if (parse_int_value(attribute.value, parsed)) return std::to_string(parsed);
+      std::uint64_t unsigned_parsed = 0;
+      if (parse_uint_value(attribute.value, unsigned_parsed))
+        return std::to_string(unsigned_parsed);
+      throw std::invalid_argument("XES int attribute has an invalid value: " +
+                                  attribute.value);
     }
     case AttributeKind::kFloat: {
       double parsed = 0.0;

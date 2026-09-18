@@ -1634,8 +1634,14 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     if (promote) {
       const auto number = std::holds_alternative<std::int64_t>(value.typed_value)
           ? static_cast<double>(std::get<std::int64_t>(value.typed_value))
-          : std::holds_alternative<double>(value.typed_value)
-              ? std::get<double>(value.typed_value) : native_attribute_number(value);
+          : std::holds_alternative<std::uint64_t>(value.typed_value)
+              // Temporal frequency's promoted numeric output is float64 by
+              // contract; make this narrowing explicit after exact scalar
+              // classification and key comparison.
+              ? static_cast<double>(std::get<std::uint64_t>(value.typed_value))
+              : std::holds_alternative<double>(value.typed_value)
+                  ? std::get<double>(value.typed_value)
+                  : native_attribute_number(value);
       value.kind = AttributeKind::kFloat;
       value.typed_value = number;
     }

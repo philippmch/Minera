@@ -1738,9 +1738,30 @@ output cells.
 The validation record in `docs/table-metadata-validation.json` reports 150 passing
 native suites, 58 script tests, 11 optimized evidence tests and 13 CLI/HTTP checks.
 
-The family remains partial. Column dtype declarations now survive supported
-adapters, but case-merge dtype promotion and full categorical/extension metadata
-are not implemented. Generated rejection checks require native validation
+The dtype checkpoint adds column-aligned categorical descriptors (category dtype,
+values and ordering) and exact unsigned 64-bit native scalars. The public capture
+in `docs/case-relations-dtype-reference.json.gz` contains 390 observations under
+PM4Py 2.7.22 and pandas 3.0.5: a complete ordered 18-by-18 sampled scalar dtype
+matrix, typed empty/missing branches, categorical compatibility and category-code
+sorting, datetime units, and signed/unsigned boundaries. The generator checks
+pinned module hashes, selectors, input immutability and every captured cell tag.
+Generated comparisons require exact scalar kind/value, dtype, category metadata,
+row order and consistent numeric text. Validation recorded in
+`docs/dtype-uint64-validation.json` passed all 150 native suites, 67 script tests,
+18 optimized evidence tests and 13 CLI/HTTP checks. They intentionally equate native signed
+and unsigned storage for the same nonnegative public integer, and absent/native
+null cells for the public capture's normalized missing value. The separate index
+fixture retains exact index checks.
+
+`docs/xes-unsigned-reference.json.gz` records 24 public importer boundary calls.
+Legacy importers preserve unsigned 64-bit values; Rust returns zero above the
+signed 64-bit range. Python's legacy integers beyond UINT64_MAX remain unsupported
+by the native scalar model. The public evidence includes that boundary as an
+explicit limitation, not a native parity claim.
+
+The family remains partial. These finite dtype observations do not cover every
+pandas extension dtype, arbitrary precision integer, category object, timezone or
+missing-value identity. Generated rejection checks require native validation
 errors rather than exact Python exception class/message equality. CSV adapters
 do not yet infer pandas column dtypes or expose the full typed/null identifier
 surface, and XES/mixed adapters have not moved to the table surface. These finite

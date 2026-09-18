@@ -1445,6 +1445,10 @@ if(MINERA_BUILD_TESTS)
   target_link_libraries(minera_case_relations_tests PRIVATE minera::core)
   target_compile_features(minera_case_relations_tests PRIVATE cxx_std_20)
   target_compile_options(minera_case_relations_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  if(MSVC)
+    # The generated public dtype matrix contains hundreds of independent cases.
+    target_compile_options(minera_case_relations_tests PRIVATE /bigobj)
+  endif()
   add_test(NAME minera_case_relations_tests COMMAND minera_case_relations_tests)
 
   add_executable(minera_random_tree_tests

@@ -192,6 +192,9 @@ std::string attribute_text(const EventAttribute& cell) {
     return date->value;
   if (const auto* integer = std::get_if<std::int64_t>(&cell.typed_value))
     return std::to_string(*integer);
+  if (const auto* unsigned_integer =
+          std::get_if<std::uint64_t>(&cell.typed_value))
+    return std::to_string(*unsigned_integer);
   if (const auto* floating = std::get_if<double>(&cell.typed_value))
     return std::to_string(*floating);
   if (const auto* boolean = std::get_if<bool>(&cell.typed_value))

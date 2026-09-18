@@ -525,7 +525,22 @@ void table_metadata_survives_conversion_and_serialization() {
   table.columns = {"activity", "amount"};
   table.rows = {{minera::EventAttribute{"activity", "A"},
                  minera::EventAttribute{"amount", "1"}}};
-  table.dtypes = {"str", "int64"};
+  table.dtypes = {"str", "category"};
+  minera::EventTableCategoricalDtype category;
+  category.categories_dtype = "object";
+  category.ordered = true;
+  category.categories = {
+      minera::EventAttribute{"first-key", "1"},
+      [] {
+        minera::EventAttribute tuple{"tuple", ""};
+        tuple.container = minera::AttributeContainerKind::kTuple;
+        tuple.children = {minera::EventAttribute{"left", "x"},
+                          minera::EventAttribute{"right", "2",
+                                                   minera::AttributeKind::kInt}};
+        return tuple;
+      }(),
+  };
+  table.categorical_dtypes = {std::nullopt, category};
   minera::EventTableIndex explicit_index;
   explicit_index.kind = "Index";
   explicit_index.dtype = "object";
@@ -538,16 +553,29 @@ void table_metadata_survives_conversion_and_serialization() {
       minera::event_data_to_table(minera::EventDataView(table));
   assert(identity.dtypes == table.dtypes);
   assert(identity.index == table.index);
+  assert(identity.categorical_dtypes == table.categorical_dtypes);
   const auto lazy = minera::LazyEventTable::from_table(table);
   assert(lazy.dtypes() == table.dtypes);
   assert(lazy.index() == table.index);
+  assert(lazy.categorical_dtypes() == table.categorical_dtypes);
   assert(lazy.materialize().index == table.index);
+  assert(lazy.materialize().categorical_dtypes == table.categorical_dtypes);
 
   minera::LogConversionResult table_result;
   table_result.variant = minera::LogConversionVariant::kToDataFrame;
   table_result.table = table;
   const auto table_json = minera::log_conversion_json(table_result);
-  assert(table_json.find("\"dtypes\":[\"str\",\"int64\"]") !=
+  table_result.table.categorical_dtypes.pop_back();
+  bool malformed_rejected = false;
+  try { (void)minera::log_conversion_json(table_result); }
+  catch (const std::invalid_argument&) { malformed_rejected = true; }
+  assert(malformed_rejected);
+  table_result.table = table;
+  assert(table_json.find("\"dtypes\":[\"str\",\"category\"]") !=
+         std::string::npos);
+  assert(table_json.find("\"categorical_dtypes\":[null,{\"categories_dtype\":\"object\",\"ordered\":true") !=
+         std::string::npos);
+  assert(table_json.find("\"container\":\"tuple\"") !=
          std::string::npos);
   assert(table_json.find("\"index\":{\"class\":\"Index\"") !=
          std::string::npos);
@@ -569,6 +597,27 @@ void table_metadata_survives_conversion_and_serialization() {
   assert(multi_json.find("\"kind\":\"tuple\"") !=
          std::string::npos);
   assert(multi_json.find("\"items\":[") != std::string::npos);
+}
+
+void exact_uint64_values_are_serialized_without_rounding() {
+  minera::EventTable table;
+  table.columns = {"amount"};
+  minera::EventAttribute amount{"amount", "18446744073709551615",
+                                minera::AttributeKind::kInt};
+  amount.typed_value = std::uint64_t{18446744073709551615ULL};
+  table.rows = {{amount}};
+  table.validate();
+
+  minera::LogConversionResult result;
+  result.variant = minera::LogConversionVariant::kToDataFrame;
+  result.table = table;
+  const auto conversion_json = minera::log_conversion_json(result);
+  assert(conversion_json.find("\"typed_value\":18446744073709551615") !=
+         std::string::npos);
+
+  const auto relation_json = minera::case_relations_json(table);
+  assert(relation_json.find("\"typed_value\":18446744073709551615") !=
+         std::string::npos);
 }
 
 void csv_projection_preserves_schema_and_source_index_labels() {
@@ -1003,6 +1052,7 @@ int main() {
   table_projection_is_rectangular_and_typed();
   lazy_output_and_metadata_json_are_explicit();
   table_metadata_survives_conversion_and_serialization();
+  exact_uint64_values_are_serialized_without_rounding();
   csv_projection_preserves_schema_and_source_index_labels();
   dataframe_row_cap_counts_events_and_is_deterministic();
   graph_null_selectors_are_absent();

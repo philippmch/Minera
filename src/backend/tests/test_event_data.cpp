@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include "minera/event_data.hpp"
@@ -63,6 +65,77 @@ minera::EventAttribute index_nan() {
   return result;
 }
 
+minera::EventAttribute category_scalar(std::string key, std::string value,
+                                       minera::AttributeKind kind =
+                                           minera::AttributeKind::kString) {
+  return {std::move(key), std::move(value), kind};
+}
+
+minera::EventAttribute category_tuple(
+    std::vector<minera::EventAttribute> children) {
+  minera::EventAttribute result{"tuple", "", minera::AttributeKind::kString};
+  result.container = minera::AttributeContainerKind::kTuple;
+  result.children = std::move(children);
+  return result;
+}
+
+minera::EventTableCategoricalDtype category_descriptor() {
+  minera::EventTableCategoricalDtype descriptor;
+  descriptor.categories_dtype = "object";
+  descriptor.ordered = true;
+  auto first = category_scalar("source-a", "A");
+  first.first_class_role = minera::FirstClassAttributeRole::kActivity;
+  first.first_class_state = minera::FirstClassAttributeState::kPresent;
+  descriptor.categories.push_back(std::move(first));
+  descriptor.categories.push_back(category_tuple(
+      {category_scalar("left", "x"),
+       category_scalar("right", "1", minera::AttributeKind::kInt)}));
+  return descriptor;
+}
+
+void native_scalar_integral_construction_is_stable() {
+  using Value = minera::NativeAttributeValue;
+  static_assert(std::is_constructible_v<Value, std::uint32_t>);
+  static_assert(std::is_constructible_v<Value, std::int32_t>);
+  static_assert(std::is_constructible_v<Value, bool>);
+  static_assert(std::is_constructible_v<Value, std::int64_t&>);
+  static_assert(std::is_constructible_v<Value, std::int64_t&&>);
+  static_assert(std::is_constructible_v<Value, std::uint64_t&>);
+  static_assert(std::is_constructible_v<Value, std::uint64_t&&>);
+
+  minera::NativeAttributeValue narrow_unsigned = std::uint32_t{17};
+  assert(std::holds_alternative<std::int64_t>(narrow_unsigned));
+  assert(std::get<std::int64_t>(narrow_unsigned) == 17);
+  narrow_unsigned = std::uint32_t{23};
+  assert(std::holds_alternative<std::int64_t>(narrow_unsigned));
+  assert(std::get<std::int64_t>(narrow_unsigned) == 23);
+
+  minera::NativeAttributeValue signed_value = std::int32_t{-7};
+  assert(std::holds_alternative<std::int64_t>(signed_value));
+  assert(std::get<std::int64_t>(signed_value) == -7);
+
+  std::int64_t signed_source = -11;
+  Value exact_signed_lvalue = signed_source;
+  assert(std::holds_alternative<std::int64_t>(exact_signed_lvalue));
+  assert(std::get<std::int64_t>(exact_signed_lvalue) == -11);
+  Value exact_signed_rvalue = std::int64_t{-13};
+  assert(std::holds_alternative<std::int64_t>(exact_signed_rvalue));
+  assert(std::get<std::int64_t>(exact_signed_rvalue) == -13);
+
+  std::uint64_t unsigned_source = std::numeric_limits<std::uint64_t>::max();
+  Value exact_unsigned_lvalue = unsigned_source;
+  assert(std::holds_alternative<std::uint64_t>(exact_unsigned_lvalue));
+  assert(std::get<std::uint64_t>(exact_unsigned_lvalue) == unsigned_source);
+  Value exact_unsigned = std::uint64_t{std::numeric_limits<std::uint64_t>::max()};
+  assert(std::holds_alternative<std::uint64_t>(exact_unsigned));
+  assert(std::get<std::uint64_t>(exact_unsigned) ==
+         std::numeric_limits<std::uint64_t>::max());
+
+  minera::NativeAttributeValue boolean = true;
+  assert(std::holds_alternative<bool>(boolean));
+  assert(std::get<bool>(boolean));
+}
+
 void table_metadata_is_validated_and_lazy_round_trips() {
   auto table = sample_table();
   table.dtypes = {"string", "string", "string", "boolean"};
@@ -78,6 +151,9 @@ void table_metadata_is_validated_and_lazy_round_trips() {
                    index_scalar(index_date("2024-01-02"))}),
   };
   table.index = multi;
+  table.dtypes[2] = "category";
+  table.categorical_dtypes.resize(table.columns.size());
+  table.categorical_dtypes[2] = category_descriptor();
   table.validate();
 
   const auto lazy = minera::LazyEventTable::from_table(table);
@@ -88,6 +164,8 @@ void table_metadata_is_validated_and_lazy_round_trips() {
   assert(materialized.rows == table.rows);
   assert(materialized.dtypes == table.dtypes);
   assert(materialized.index == table.index);
+  assert(lazy.categorical_dtypes() == table.categorical_dtypes);
+  assert(materialized.categorical_dtypes == table.categorical_dtypes);
 
   // A plain Index still permits tuple-valued labels; only its name arity is
   // constrained to one.
@@ -105,6 +183,179 @@ void table_metadata_is_validated_and_lazy_round_trips() {
   plain.validate();
 }
 
+void categorical_metadata_is_validated_semantically() {
+  auto table = sample_table();
+  table.dtypes = {"string", "string", "category", "boolean"};
+  table.categorical_dtypes.resize(table.columns.size());
+  table.categorical_dtypes[2] = category_descriptor();
+  table.validate();
+
+  // A category descriptor is optional detail for a known category dtype.
+  auto unknown = table;
+  unknown.categorical_dtypes[2].reset();
+  unknown.validate();
+
+  const auto expect_invalid = [](minera::EventTable candidate) {
+    bool threw = false;
+    try {
+      candidate.validate();
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  };
+
+  auto misaligned = table;
+  misaligned.categorical_dtypes.pop_back();
+  expect_invalid(misaligned);
+
+  auto wrong_dtype = table;
+  wrong_dtype.dtypes[2] = "object";
+  expect_invalid(wrong_dtype);
+
+  auto missing_categories_dtype = table;
+  missing_categories_dtype.categorical_dtypes[2]->categories_dtype.clear();
+  expect_invalid(missing_categories_dtype);
+
+  auto duplicate = table;
+  auto duplicate_category = category_scalar("different-key", "A");
+  duplicate_category.first_class_role = minera::FirstClassAttributeRole::kResource;
+  duplicate.categorical_dtypes[2]->categories.push_back(
+      std::move(duplicate_category));
+  expect_invalid(duplicate);
+
+  auto null_category = table;
+  null_category.categorical_dtypes[2]->categories[0].is_null = true;
+  expect_invalid(null_category);
+
+  auto nan_category = table;
+  auto nan = category_scalar("nan", "nan", minera::AttributeKind::kFloat);
+  nan.typed_value = std::numeric_limits<double>::quiet_NaN();
+  nan_category.categorical_dtypes[2]->categories.push_back(std::move(nan));
+  expect_invalid(nan_category);
+
+  auto bool_integer_duplicate = table;
+  auto truth = category_scalar("truth", "true", minera::AttributeKind::kBoolean);
+  truth.typed_value = true;
+  auto one = category_scalar("one", "1", minera::AttributeKind::kInt);
+  one.typed_value = std::int64_t{1};
+  bool_integer_duplicate.categorical_dtypes[2]->categories = {
+      std::move(truth), std::move(one)};
+  expect_invalid(bool_integer_duplicate);
+
+  auto integer_float_duplicate = table;
+  auto integer = category_scalar("integer", "1", minera::AttributeKind::kInt);
+  integer.typed_value = std::int64_t{1};
+  auto real = category_scalar("real", "1.0", minera::AttributeKind::kFloat);
+  real.typed_value = 1.0;
+  integer_float_duplicate.categorical_dtypes[2]->categories = {
+      std::move(integer), std::move(real)};
+  expect_invalid(integer_float_duplicate);
+
+  auto typed_date_duplicate = table;
+  auto normalized_date = category_scalar(
+      "date-a", "stale-a", minera::AttributeKind::kDate);
+  normalized_date.typed_value = minera::NativeDate{
+      "2026-01-01T00:00:00.000000000Z",
+      minera::NativeDateResolution::kMicrosecond};
+  auto stale_date = category_scalar(
+      "date-b", "stale-b", minera::AttributeKind::kDate);
+  stale_date.typed_value = minera::NativeDate{
+      "2026-01-01T00:00:00.000000000Z",
+      minera::NativeDateResolution::kNanosecond};
+  typed_date_duplicate.categorical_dtypes[2]->categories = {
+      std::move(normalized_date), std::move(stale_date)};
+  // NativeDate equality ignores source precision and the lexical projection
+  // may be stale after normalization, so these categories are duplicates.
+  expect_invalid(typed_date_duplicate);
+
+  auto uint64_boundary = table;
+  auto maximum = category_scalar("maximum", "", minera::AttributeKind::kInt);
+  maximum.typed_value = std::numeric_limits<std::uint64_t>::max();
+  auto rounded = category_scalar("rounded", "", minera::AttributeKind::kFloat);
+  rounded.typed_value = static_cast<double>(
+      std::numeric_limits<std::uint64_t>::max());
+  uint64_boundary.categorical_dtypes[2]->categories = {
+      std::move(maximum), std::move(rounded)};
+  // The float is 2^64 after conversion and must remain distinct from
+  // UINT64_MAX; comparing through double-to-integer wrapping would be wrong.
+  uint64_boundary.validate();
+
+  auto tuple_null = category_scalar("none", "", minera::AttributeKind::kString);
+  tuple_null.is_null = true;
+  auto tuple_null_category = category_tuple({
+      std::move(tuple_null), category_scalar("number", "1", minera::AttributeKind::kInt)});
+  auto tuple_other_category = category_tuple({
+      category_scalar("text", "x"), category_scalar("number", "2", minera::AttributeKind::kInt)});
+  auto nested_null = table;
+  nested_null.categorical_dtypes[2]->categories = {
+      std::move(tuple_null_category), std::move(tuple_other_category)};
+  nested_null.validate();
+
+  auto tuple_nan_child = category_scalar("nan", "nan", minera::AttributeKind::kFloat);
+  tuple_nan_child.typed_value = std::numeric_limits<double>::quiet_NaN();
+  auto tuple_nan_category = category_tuple({
+      std::move(tuple_nan_child), category_scalar("number", "1", minera::AttributeKind::kInt)});
+  auto tuple_nan_other_category = category_tuple({
+      category_scalar("text", "x"), category_scalar("number", "2", minera::AttributeKind::kInt)});
+  auto nested_nan = table;
+  nested_nan.categorical_dtypes[2]->categories = {
+      std::move(tuple_nan_category), std::move(tuple_nan_other_category)};
+  nested_nan.validate();
+
+  auto null_nan_distinct = table;
+  auto null_child = category_scalar("none", "", minera::AttributeKind::kString);
+  null_child.is_null = true;
+  auto nan_child = category_scalar("nan", "nan", minera::AttributeKind::kFloat);
+  nan_child.typed_value = std::numeric_limits<double>::quiet_NaN();
+  null_nan_distinct.categorical_dtypes[2]->categories = {
+      category_tuple({std::move(null_child), category_scalar("n", "1", minera::AttributeKind::kInt)}),
+      category_tuple({std::move(nan_child), category_scalar("n", "1", minera::AttributeKind::kInt)})};
+  null_nan_distinct.validate();
+
+  auto tuple_numeric_duplicate = table;
+  auto tuple_truth_child = category_scalar("truth", "true", minera::AttributeKind::kBoolean);
+  tuple_truth_child.typed_value = true;
+  auto tuple_one_child = category_scalar("one", "1", minera::AttributeKind::kInt);
+  tuple_one_child.typed_value = std::int64_t{1};
+  tuple_numeric_duplicate.categorical_dtypes[2]->categories = {
+      category_tuple({std::move(tuple_truth_child), category_scalar("n", "1", minera::AttributeKind::kInt)}),
+      category_tuple({std::move(tuple_one_child), category_scalar("n", "1", minera::AttributeKind::kInt)})};
+  expect_invalid(tuple_numeric_duplicate);
+
+  auto tuple_null_duplicate = table;
+  auto null_string = category_scalar("none-string", "", minera::AttributeKind::kString);
+  null_string.is_null = true;
+  auto null_integer = category_scalar("none-integer", "", minera::AttributeKind::kInt);
+  null_integer.is_null = true;
+  tuple_null_duplicate.categorical_dtypes[2]->categories = {
+      category_tuple({std::move(null_string), category_scalar("n", "1", minera::AttributeKind::kInt)}),
+      category_tuple({std::move(null_integer), category_scalar("n", "1", minera::AttributeKind::kInt)})};
+  expect_invalid(tuple_null_duplicate);
+
+  auto list_category = table;
+  auto list = category_scalar("list", "[x]");
+  list.container = minera::AttributeContainerKind::kList;
+  list.children.push_back(category_scalar("0", "x"));
+  list_category.categorical_dtypes[2]->categories.push_back(std::move(list));
+  expect_invalid(list_category);
+
+  auto nested_tuple = table;
+  nested_tuple.categorical_dtypes[2]->categories.push_back(category_tuple(
+      {category_tuple({category_scalar("nested", "z")})}));
+  nested_tuple.validate();
+
+  auto many_distinct = table;
+  many_distinct.categorical_dtypes[2]->categories.clear();
+  for (std::int64_t value = 0; value < 256; ++value) {
+    auto category = category_scalar("value", std::to_string(value),
+                                   minera::AttributeKind::kInt);
+    category.typed_value = value;
+    many_distinct.categorical_dtypes[2]->categories.push_back(std::move(category));
+  }
+  many_distinct.validate();
+}
+
 void table_metadata_rejects_malformed_shapes() {
   const auto expect_invalid = [](minera::EventTable table) {
     bool threw = false;
@@ -118,6 +369,11 @@ void table_metadata_rejects_malformed_shapes() {
 
   auto table = sample_table();
   table.dtypes = {"only-one"};
+  expect_invalid(table);
+
+  table = sample_table();
+  table.categorical_dtypes.resize(table.columns.size());
+  table.categorical_dtypes[0] = std::nullopt;
   expect_invalid(table);
 
   table = sample_table();
@@ -430,8 +686,10 @@ void tagged_views_and_compatibility_aliases() {
 }  // namespace
 
 int main() {
+  native_scalar_integral_construction_is_stable();
   table_validation_and_null_contract();
   table_metadata_is_validated_and_lazy_round_trips();
+  categorical_metadata_is_validated_semantically();
   table_metadata_rejects_malformed_shapes();
   table_prefixes_infer_only_known_extensions();
   lazy_scan_is_restartable_and_bounded();

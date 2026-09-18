@@ -201,14 +201,33 @@ void append_alias_column(EventTable& table, std::string_view key,
   if (cells.size() != table.rows.size())
     throw std::logic_error("footprints projection row count mismatch");
   std::optional<std::string> dtype;
+  std::optional<EventTableCategoricalDtype> categorical_dtype;
+  const bool had_categorical_metadata = !table.categorical_dtypes.empty();
   if (!table.dtypes.empty()) dtype = copy_alias_dtype(table, source_key);
+  if (had_categorical_metadata) {
+    const auto source = std::find(table.columns.begin(), table.columns.end(),
+                                  source_key);
+    if (source != table.columns.end()) {
+      const auto index =
+          static_cast<std::size_t>(source - table.columns.begin());
+      categorical_dtype = table.categorical_dtypes[index];
+    }
+  }
   table.columns.emplace_back(key);
-  if (dtype)
+  if (dtype) {
     table.dtypes.push_back(std::move(*dtype));
-  else if (!table.dtypes.empty())
+    if (had_categorical_metadata)
+      table.categorical_dtypes.push_back(std::move(categorical_dtype));
+    else if (table.dtypes.back() == "category") {
+      table.categorical_dtypes.assign(table.columns.size() - 1, std::nullopt);
+      table.categorical_dtypes.push_back(std::nullopt);
+    }
+  } else if (!table.dtypes.empty()) {
     // The selected field has no exact source column in this projection.  Drop
     // the partial declaration rather than guessing a dtype for the alias.
     table.dtypes.clear();
+    table.categorical_dtypes.clear();
+  }
   for (std::size_t i = 0; i < table.rows.size(); ++i)
     table.rows[i].push_back(cells[i]);
 }
