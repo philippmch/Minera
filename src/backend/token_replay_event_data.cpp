@@ -1,6 +1,7 @@
 #include "minera/conformance.hpp"
 
 #include <algorithm>
+#include <map>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
@@ -293,6 +294,38 @@ EventLog project_table(const EventTable& table, const TokenReplayOptions& option
     if (left_numeric) return number_less(number(left), number(right));
     return left.value < right.value;
   });
+  // Public dataframe replay infers the grouped index from the first scalar
+  // representative of each exact case. An all-numeric index containing a
+  // float (but no bool) promotes its keys to double. Dictionary construction
+  // then replaces earlier groups whose inferred keys compare equal.
+  bool has_float = false;
+  bool floating_index = !log.traces.empty();
+  for (const auto& trace : log.traces) {
+    const auto& key = *trace.case_id_attribute;
+    if (!numeric(key.kind) || key.kind == AttributeKind::kBoolean ||
+        std::holds_alternative<bool>(key.typed_value)) {
+      floating_index = false;
+      break;
+    }
+    const auto value = number(key);
+    if (const auto* real = std::get_if<double>(&value)) {
+      has_float = true;
+      if (std::isnan(*real)) { floating_index = false; break; }
+    }
+  }
+  if (floating_index && has_float) {
+    std::map<double, std::size_t> positions;
+    std::vector<Trace> inferred;
+    inferred.reserve(log.traces.size());
+    for (auto& trace : log.traces) {
+      const auto key = std::visit([](auto value) { return static_cast<double>(value); },
+                                 number(*trace.case_id_attribute));
+      const auto [entry, inserted] = positions.emplace(key, inferred.size());
+      if (inserted) inferred.push_back(std::move(trace));
+      else inferred[entry->second] = std::move(trace);
+    }
+    log.traces = std::move(inferred);
+  }
   return log;
 }
 
