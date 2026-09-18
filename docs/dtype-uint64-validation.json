@@ -1,0 +1,104 @@
+{
+  "scope": "Finite case-merge dtype/categorical and uint64 scalar checkpoint; full parity remains incomplete.",
+  "reference_version": "2.7.22",
+  "pandas_version": "3.0.5",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "native_source_parent_commit": "e026b50e182692457e8f2217ca3c54ac354bb0de",
+  "reference_artifacts": {
+    "docs/case-relations-dtype-reference.json.gz": {
+      "uncompressed_sha256": "a1a754c365e993cc9ac0ee0b056291138c08807af2cf104b28a9aa2f68665cc5"
+    },
+    "docs/xes-unsigned-reference.json.gz": {
+      "uncompressed_sha256": "05352c9a01f04c0c4a169ac45ff13215f0a029a460030772470cd6d65c984f37"
+    }
+  },
+  "public_cases": {
+    "dtype_cases": 390,
+    "existing_index_cases": 26,
+    "existing_table_cases": 43,
+    "xes_unsigned_boundary_observations": 24
+  },
+  "catalog_audit": {
+    "dispatchers": 86,
+    "complete_dispatchers": 44,
+    "partial_dispatchers": 42,
+    "modules": 387,
+    "complete_modules": 195,
+    "partial_modules": 192
+  },
+  "comparison_limits": [
+    "Normalized missing cells equate absent cells and native nulls; None/NaN/pd.NA identity is not claimed.",
+    "Equal nonnegative public integers permit signed or unsigned native storage, while scalar kind/value and numeric lexical projections must match.",
+    "Legacy public XES supports integers beyond UINT64_MAX; native arbitrary precision remains unsupported.",
+    "Finite dtype/categorical cases do not establish every extension dtype, timezone, category object, index metadata or exception identity."
+  ],
+  "native_verified_staged_tree": "642775bf0dccef450ae41ce86a35dd04cd5526a6",
+  "native_changed_source_sha256_lf_normalized": {
+    "CMakeLists.txt": "9312e3eec75dbd84c226e3dd558516673fe156b20e7d762592bf779af56b0782",
+    "include/minera/event_data.hpp": "f4aa526329d424c609c284501af792998386ae764207f1d4d61c7727fdea6f2f",
+    "include/minera/event_log.hpp": "4c67cda585a0ef703055d91e07f7be9dfc907e200aa3bba277df3b5ad961e913",
+    "src/backend/batches.cpp": "7c39a2dd5c3c204fb1082f7ed8584ba9aa412031f0642b32047c2574bbc1f16a",
+    "src/backend/case_relations.cpp": "548c3973dc4c2b9879c6961b3b7e685ae3454be1f09406009f2e53af69930b09",
+    "src/backend/declare.cpp": "e4208ffffe245746c1305e35033e39f3be183bd30a27153762e72456981fbe80",
+    "src/backend/dfg_dataframe.cpp": "c76e19304a4161df8f2c6ca7e50defc463aa89ab3ba5d07fb556103510755611",
+    "src/backend/dfg_dataframe_json.cpp": "58299dc4f7e21ee03a386e7b59fcda7787ff05a7660e7415dc509c7c6b86111f",
+    "src/backend/event_data.cpp": "c9fda5af296b3d85af8ca4010a84aa709869164cb115a19d51b444e74de66e7e",
+    "src/backend/footprints.cpp": "05fc8b878ff2a1ee30914c32ced202b011f89733173d0fe4064ae739a1c68730",
+    "src/backend/json_export.cpp": "f8de5717ed1e04bbb80effa3240b5b8f564fccb0f15a2da46a06f2653e7c71dd",
+    "src/backend/log_conversion.cpp": "6b148969917ade75942434e435686d0187478869b67b7166fc244cd33fada457",
+    "src/backend/log_skeleton.cpp": "2e031e94757c048cb3817440925a210901a3483b4043edfb184cad109bd1d415",
+    "src/backend/log_to_features.cpp": "74f466adff46a404aa95a6af57cf54ad8ec635ec2845a6ef8f11f73887f07db7",
+    "src/backend/log_util_json.cpp": "3d1da08c9df94016b3ed240dc32b8d3e0938cd05b4c95820367ee77160c68137",
+    "src/backend/root_cause.cpp": "a4d474caa144e05dacc9d7f0a7958bfc80d8f7e74eabc313701785ccccf69ffd",
+    "src/backend/root_cause_trace_key.cpp": "466549d0741f314fce7f39e5adb26d8adae984201049645bb77c657f159bdf94",
+    "src/backend/tests/case_relations_dtype_reference_cases.hpp": "e47dfba37844ac648ae35c081b04fc185306bc9ee1199ea7261adf3fbefa8bd9",
+    "src/backend/tests/test_case_relations.cpp": "c54a93b8917674095aa41fe9231f7fca0d7925a81fe107915dbbfc176dc8a62a",
+    "src/backend/tests/test_dfg_dataframe.cpp": "4c41f68a2b9dbebc300f63ad534019c81068ed9476d5f6fd6313297d831ecf6e",
+    "src/backend/tests/test_event_data.cpp": "eadff528d339e932663804f796096a6fdc9d5a6f0e6ce6d59203515758367b9f",
+    "src/backend/tests/test_log_conversion.cpp": "ebf01ca01874388a05209eeaf11ccbaf5731530a4b82282d34051b11167cfee2",
+    "src/backend/tests/test_root_cause.cpp": "4747720378197228871f1db260c26f2132158fb5aa6f443cf96dcdae2188876d",
+    "src/backend/tests/test_xes_io.cpp": "d36728d38ce18f76a5d58701bcf7496a8968c55fc7123592d0beaadb69604916",
+    "src/backend/token_replay_event_data.cpp": "e02426eae0ecfa14bb3ce3fd74eb135f1b8b761d7b6041f40fd2c15dfa5d4134",
+    "src/backend/xes_event_log_importer.cpp": "b8575d4c01a0f4cd4f2e4e3c6ca239ca3820a8fed1583309b03a35b933407670",
+    "src/backend/xes_export.cpp": "15834371507f248c0c9fbef3853e7f63d27ba89c86dbd2398e8ecf1231285604"
+  },
+  "native_suites": {
+    "passed": 150,
+    "failed": 0
+  },
+  "script_tests": {
+    "passed": 67,
+    "failed": 0,
+    "optimized_evidence_tests_passed": 18
+  },
+  "transport": {
+    "checks": [
+      "CLI lexical timestamps, missing configured timestamps, duplicate relations and case order",
+      "CLI preserves base row labels and expanded incoming row labels through sorting",
+      "CLI output file matches stdout",
+      "CLI invalid output destination rejected",
+      "HTTP merge matches CLI including compatibility log",
+      "HTTP missing timestamp column rejected",
+      "CLI and HTTP preserve explicit missing canonical selector",
+      "CLI and HTTP support one-sided timestamp columns",
+      "CLI and HTTP honor explicit canonical column when both aliases exist",
+      "CLI and HTTP project selected case/timestamp columns into compatibility log",
+      "CLI and HTTP preserve quoted relation metadata, collision suffixes and explicit relation selectors",
+      "CLI custom import columns retain default relation selectors and log roles",
+      "Mixed XES/CSV CLI and HTTP honor explicit relation selectors over unused suffixes"
+    ],
+    "native_sha256_before_and_after": {
+      "export": "5b5951428e40f92f3e7bdf2a649e0bb32bd336ff193642a1df05088222786a82",
+      "server": "1bd42747a5e846be0f3c8dab39ca5bad09283a511aa444c1818ce90510c6f077"
+    }
+  },
+  "independent_review": "No actionable findings remain. Repaired integral constructor compatibility, semantic categorical validation/hash consistency, exact DFG uint64 ordering, serializer validation, strict dtype parsing, category promotion and lookup complexity, null-state handling, and timezone/unit promotion. All final native checks passed.",
+  "validation_logs": [
+    "build/dtype-final-build.log",
+    "build/dtype-final-tests.log",
+    "build/dtype-final-script-tests.log",
+    "build/dtype-final-optimized-evidence-tests.log",
+    "build/dtype-transport-validation.log",
+    "build/dtype-catalog-audit.log"
+  ]
+}

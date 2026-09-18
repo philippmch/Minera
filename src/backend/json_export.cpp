@@ -4194,6 +4194,8 @@ void write_typed_attribute_value(std::ostream& out,
                                  const NativeAttributeValue& value) {
   if (const auto* integer = std::get_if<std::int64_t>(&value)) {
     out << *integer;
+  } else if (const auto* unsigned_integer = std::get_if<std::uint64_t>(&value)) {
+    out << *unsigned_integer;
   } else if (const auto* number = std::get_if<double>(&value)) {
     if (std::isfinite(*number))
       out << std::setprecision(17) << *number;
@@ -4521,6 +4523,31 @@ void write_case_relations_table_metadata(std::ostream& out,
     }
     out << "]}";
   }
+  if (!table.categorical_dtypes.empty()) {
+    out << ",\"categorical_dtypes\":[";
+    for (std::size_t column = 0; column < table.categorical_dtypes.size();
+         ++column) {
+      if (column != 0) out << ',';
+      const auto& descriptor = table.categorical_dtypes[column];
+      if (!descriptor) {
+        out << "null";
+        continue;
+      }
+      out << "{\"categories_dtype\":";
+      write_json_string(out, descriptor->categories_dtype);
+      out << ",\"ordered\":"
+          << (descriptor->ordered ? "true" : "false")
+          << ",\"categories\":[";
+      for (std::size_t category = 0;
+           category < descriptor->categories.size(); ++category) {
+        if (category != 0) out << ',';
+        write_case_relations_table_attribute(out,
+                                             descriptor->categories[category]);
+      }
+      out << "]}";
+    }
+    out << ']';
+  }
 }
 
 void write_case_relations_table(std::ostream& out, const EventTable& table) {
@@ -4597,9 +4624,11 @@ EventTable case_relations_log_projection_table(
     // for a selector that is absent from every source row. Keep this
     // synthetic column local to the projection; the public merge table
     // remains unchanged. A declared dtype vector must stay aligned with the
-    // temporary schema.
+    // temporary schema, including nullable categorical descriptors.
     projected.columns.push_back(options.timestamp_key);
     if (!projected.dtypes.empty()) projected.dtypes.push_back("object");
+    if (!projected.categorical_dtypes.empty())
+      projected.categorical_dtypes.push_back(std::nullopt);
     for (auto& row : projected.rows) row.push_back(std::nullopt);
     timestamp_index = projected.columns.size() - 1;
   }
@@ -5321,6 +5350,7 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
     if (!attribute.is_null && attribute.container == AttributeContainerKind::kScalar &&
         attribute.kind != AttributeKind::kBytes &&
         (std::holds_alternative<std::int64_t>(attribute.typed_value) ||
+         std::holds_alternative<std::uint64_t>(attribute.typed_value) ||
          (attribute.kind == AttributeKind::kInt &&
           std::holds_alternative<std::monostate>(attribute.typed_value)))) {
       const auto canonical = root_cause_attribute_category(attribute);
@@ -5355,6 +5385,19 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
     };
     if (std::holds_alternative<std::int64_t>(attribute.typed_value)) {
       write_integer();
+      return;
+    }
+    if (const auto* value = std::get_if<std::uint64_t>(&attribute.typed_value)) {
+      const auto canonical = std::to_string(*value);
+      if (safe_integer_text(canonical)) {
+        out << canonical;
+      } else {
+        auto exact = attribute;
+        exact.kind = AttributeKind::kInt;
+        exact.value = canonical;
+        exact.typed_value = std::monostate{};
+        write_attribute_detail(out, exact);
+      }
       return;
     }
     if (const auto* value = std::get_if<double>(&attribute.typed_value)) {

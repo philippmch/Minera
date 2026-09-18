@@ -70,7 +70,9 @@ Scalar scalar_kind(const EventAttribute& value) {
   if (value.kind == AttributeKind::kBytes) return Scalar::kBytes;
   if (std::holds_alternative<NativeDate>(value.typed_value)) return Scalar::kDate;
   if (std::holds_alternative<double>(value.typed_value)) return Scalar::kReal;
-  if (std::holds_alternative<std::int64_t>(value.typed_value) || std::holds_alternative<bool>(value.typed_value)) return Scalar::kInteger;
+  if (std::holds_alternative<std::int64_t>(value.typed_value) ||
+      std::holds_alternative<std::uint64_t>(value.typed_value) ||
+      std::holds_alternative<bool>(value.typed_value)) return Scalar::kInteger;
   if (value.kind == AttributeKind::kInt || value.kind == AttributeKind::kBoolean) return Scalar::kInteger;
   if (value.kind == AttributeKind::kFloat) return Scalar::kReal;
   if (value.kind == AttributeKind::kDate) return Scalar::kDate;

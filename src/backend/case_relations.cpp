@@ -4,12 +4,14 @@
 #include <bit>
 #include <cmath>
 #include <cstdint>
+#include <iomanip>
 #include <limits>
 #include <map>
 #include <optional>
 #include <set>
 #include <stdexcept>
 #include <string_view>
+#include <sstream>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -260,24 +262,31 @@ EventTableIndexLabel source_index_label(const EventTable& table,
 }
 
 struct NumericValue {
-  bool integer = false;
-  std::int64_t integer_value = 0;
+  enum class Kind { kSigned, kUnsigned, kFloat } kind = Kind::kSigned;
+  std::int64_t signed_value = 0;
+  std::uint64_t unsigned_value = 0;
   double floating_value = 0.0;
+
+  [[nodiscard]] bool integer() const noexcept {
+    return kind != Kind::kFloat;
+  }
 };
 
 std::optional<NumericValue> numeric_value(const EventAttribute& cell) {
   if (cell.is_null) return std::nullopt;
   if (cell.kind == AttributeKind::kInt) {
     if (const auto* value = std::get_if<std::int64_t>(&cell.typed_value))
-      return NumericValue{true, *value, 0.0};
+      return NumericValue{NumericValue::Kind::kSigned, *value, 0, 0.0};
+    if (const auto* value = std::get_if<std::uint64_t>(&cell.typed_value))
+      return NumericValue{NumericValue::Kind::kUnsigned, 0, *value, 0.0};
   }
   if (cell.kind == AttributeKind::kFloat) {
     if (const auto* value = std::get_if<double>(&cell.typed_value))
-      return NumericValue{false, 0, *value};
+      return NumericValue{NumericValue::Kind::kFloat, 0, 0, *value};
   }
   if (cell.kind == AttributeKind::kBoolean) {
     if (const auto* value = std::get_if<bool>(&cell.typed_value))
-      return NumericValue{true, *value ? 1 : 0, 0.0};
+      return NumericValue{NumericValue::Kind::kSigned, *value ? 1 : 0, 0, 0.0};
   }
   return std::nullopt;
 }
@@ -293,7 +302,8 @@ std::optional<EventTime> native_date_value(const EventAttribute& cell) {
 }
 
 bool null_cell(const std::optional<EventAttribute>& cell) {
-  return !cell || cell->is_null;
+  return !cell || cell->is_null ||
+         cell->first_class_state == FirstClassAttributeState::kNull;
 }
 
 // Compare an exact signed integer against a finite IEEE-754 double without
@@ -350,16 +360,76 @@ int compare_int_double(std::int64_t integer, double floating) {
   return integer_negative ? -magnitude_comparison : magnitude_comparison;
 }
 
-int compare_numeric(const NumericValue& left, const NumericValue& right) {
-  if (left.integer && right.integer) {
-    return left.integer_value < right.integer_value
-               ? -1
-               : left.integer_value > right.integer_value ? 1 : 0;
+// Compare an exact non-negative integer against a finite IEEE-754 double
+// without converting the integer to double.  This is the unsigned companion
+// to compare_int_double and keeps uint64 case ids/keys exact above 2^53.
+int compare_uint_double(std::uint64_t integer, double floating) {
+  if (std::isnan(floating)) return -1;
+  if (std::isinf(floating)) return floating > 0 ? -1 : 1;
+  if (floating < 0) return 1;
+  const std::uint64_t bits = std::bit_cast<std::uint64_t>(floating);
+  const std::uint64_t magnitude_bits = bits & ((std::uint64_t{1} << 63) - 1);
+  const std::uint64_t exponent_bits = (magnitude_bits >> 52) & 0x7ff;
+  const std::uint64_t fraction = magnitude_bits & ((std::uint64_t{1} << 52) - 1);
+  if (exponent_bits == 0 && fraction == 0)
+    return integer == 0 ? 0 : 1;
+
+  const std::uint64_t significand =
+      exponent_bits == 0 ? fraction : (std::uint64_t{1} << 52) | fraction;
+  const int exponent = exponent_bits == 0 ? -1074
+                                          : static_cast<int>(exponent_bits) - 1023 - 52;
+  if (exponent >= 0) {
+    if (exponent >= 64 ||
+        significand > (std::numeric_limits<std::uint64_t>::max() >> exponent))
+      return -1;
+    const auto floating_integer = significand << exponent;
+    return integer < floating_integer ? -1 : integer > floating_integer ? 1 : 0;
   }
-  if (left.integer && !right.integer)
-    return compare_int_double(left.integer_value, right.floating_value);
-  if (!left.integer && right.integer)
-    return -compare_int_double(right.integer_value, left.floating_value);
+  const int shift = -exponent;
+  if (shift >= 64) return integer == 0 ? -1 : 1;
+  const std::uint64_t whole = significand >> shift;
+  const std::uint64_t remainder_mask = (std::uint64_t{1} << shift) - 1;
+  const std::uint64_t remainder = significand & remainder_mask;
+  if (integer < whole) return -1;
+  if (integer > whole) return 1;
+  return remainder == 0 ? 0 : -1;
+}
+
+int compare_integer(const NumericValue& left, const NumericValue& right) {
+  if (left.kind == NumericValue::Kind::kSigned &&
+      right.kind == NumericValue::Kind::kSigned)
+    return left.signed_value < right.signed_value
+               ? -1
+               : left.signed_value > right.signed_value ? 1 : 0;
+  if (left.kind == NumericValue::Kind::kUnsigned &&
+      right.kind == NumericValue::Kind::kUnsigned)
+    return left.unsigned_value < right.unsigned_value
+               ? -1
+               : left.unsigned_value > right.unsigned_value ? 1 : 0;
+  if (left.kind == NumericValue::Kind::kSigned) {
+    if (left.signed_value < 0) return -1;
+    const auto right_value = right.unsigned_value;
+    const auto left_value = static_cast<std::uint64_t>(left.signed_value);
+    return left_value < right_value ? -1 : left_value > right_value ? 1 : 0;
+  }
+  if (right.signed_value < 0) return 1;
+  const auto left_value = left.unsigned_value;
+  const auto right_value = static_cast<std::uint64_t>(right.signed_value);
+  return left_value < right_value ? -1 : left_value > right_value ? 1 : 0;
+}
+
+int compare_numeric(const NumericValue& left, const NumericValue& right) {
+  if (left.integer() && right.integer()) return compare_integer(left, right);
+  if (left.integer()) {
+    if (left.kind == NumericValue::Kind::kSigned)
+      return compare_int_double(left.signed_value, right.floating_value);
+    return compare_uint_double(left.unsigned_value, right.floating_value);
+  }
+  if (right.integer()) {
+    if (right.kind == NumericValue::Kind::kSigned)
+      return -compare_int_double(right.signed_value, left.floating_value);
+    return -compare_uint_double(right.unsigned_value, left.floating_value);
+  }
   if (std::isnan(left.floating_value) || std::isnan(right.floating_value)) {
     if (std::isnan(left.floating_value) && std::isnan(right.floating_value)) return 0;
     return std::isnan(left.floating_value) ? 1 : -1;
@@ -371,20 +441,41 @@ int compare_numeric(const NumericValue& left, const NumericValue& right) {
 
 enum class SortKind { kNumeric, kDate, kString, kMissing };
 
+class CategoryLookup {
+ public:
+  explicit CategoryLookup(const EventTableCategoricalDtype* descriptor);
+
+  [[nodiscard]] std::optional<std::size_t> code(
+      const std::optional<EventAttribute>& cell) const;
+
+ private:
+  const EventTableCategoricalDtype* descriptor_ = nullptr;
+  std::unordered_map<std::string, std::vector<std::size_t>> buckets_;
+};
+
+std::optional<std::size_t> category_code(
+    const std::optional<EventAttribute>& cell,
+    const CategoryLookup* lookup);
+
 struct SortValue {
   SortKind kind = SortKind::kMissing;
   std::optional<NumericValue> numeric;
   std::optional<EventTime> date;
   std::string text;
+  std::optional<std::size_t> category;
 };
 
-SortValue sort_value(const std::optional<EventAttribute>& cell) {
+SortValue sort_value(const std::optional<EventAttribute>& cell,
+                     const CategoryLookup* lookup = nullptr) {
   if (null_cell(cell)) return {};
+  if (const auto code = category_code(cell, lookup))
+    return {SortKind::kNumeric, std::nullopt, std::nullopt, {}, code};
   if (const auto numeric = numeric_value(*cell))
-    return {SortKind::kNumeric, numeric, std::nullopt, {}};
+    return {SortKind::kNumeric, numeric, std::nullopt, {}, std::nullopt};
   if (const auto date = native_date_value(*cell))
-    return {SortKind::kDate, std::nullopt, date, {}};
-  return {SortKind::kString, std::nullopt, std::nullopt, cell->value};
+    return {SortKind::kDate, std::nullopt, date, {}, std::nullopt};
+  return {SortKind::kString, std::nullopt, std::nullopt, cell->value,
+          std::nullopt};
 }
 
 int compare_sort_values(const SortValue& left, const SortValue& right) {
@@ -397,12 +488,23 @@ int compare_sort_values(const SortValue& left, const SortValue& right) {
     // strings.  Numeric/datetime mixtures are rejected by the caller.
     return static_cast<int>(left.kind) < static_cast<int>(right.kind) ? -1 : 1;
   }
-  if (left.kind == SortKind::kNumeric)
+  if (left.kind == SortKind::kNumeric) {
+    if (left.category || right.category) {
+      if (left.category && right.category)
+        return *left.category < *right.category
+                   ? -1
+                   : *left.category > *right.category ? 1 : 0;
+      return left.category ? 1 : -1;
+    }
     return compare_numeric(*left.numeric, *right.numeric);
+  }
   if (left.kind == SortKind::kDate)
     return *left.date < *right.date ? -1 : *left.date > *right.date ? 1 : 0;
   return left.text < right.text ? -1 : left.text > right.text ? 1 : 0;
 }
+
+bool category_value_equal(const EventAttribute& left,
+                          const EventAttribute& right);
 
 bool cell_equal(const std::optional<EventAttribute>& left,
                 const std::optional<EventAttribute>& right) {
@@ -416,28 +518,31 @@ bool cell_equal(const std::optional<EventAttribute>& left,
   const auto right_date = native_date_value(*right);
   if (left_date || right_date)
     return left_date && right_date && *left_date == *right_date;
-  return left->kind == right->kind && left->value == right->value;
+  return category_value_equal(*left, *right);
 }
 
 bool has_integer_float_conversion_collision(const EventTable& table,
                                             std::size_t index) {
-  std::vector<std::int64_t> integers;
+  std::vector<NumericValue> integers;
   std::vector<double> floats;
   for (const auto& row : table.rows) {
     if (null_cell(row[index])) continue;
     if (const auto numeric = numeric_value(*row[index])) {
-      if (numeric->integer && row[index]->kind == AttributeKind::kInt)
-        integers.push_back(numeric->integer_value);
-      else if (!numeric->integer && row[index]->kind == AttributeKind::kFloat)
+      if (numeric->integer() && row[index]->kind == AttributeKind::kInt)
+        integers.push_back(*numeric);
+      else if (!numeric->integer() && row[index]->kind == AttributeKind::kFloat)
         floats.push_back(numeric->floating_value);
     }
   }
   for (const auto integer : integers) {
-    const auto converted = static_cast<double>(integer);
+    const auto converted = integer.kind == NumericValue::Kind::kSigned
+                               ? static_cast<double>(integer.signed_value)
+                               : static_cast<double>(integer.unsigned_value);
     for (const auto floating : floats) {
       if (std::bit_cast<std::uint64_t>(converted) ==
               std::bit_cast<std::uint64_t>(floating) &&
-          compare_int_double(integer, floating) != 0)
+          compare_numeric(integer, NumericValue{NumericValue::Kind::kFloat, 0,
+                                               0, floating}) != 0)
         return true;
     }
   }
@@ -447,15 +552,15 @@ bool has_integer_float_conversion_collision(const EventTable& table,
 bool has_integer_float_conversion_collision(
     const EventTable& first, std::size_t first_index,
     const EventTable& second, std::size_t second_index) {
-  std::vector<std::int64_t> integers;
+  std::vector<NumericValue> integers;
   std::vector<double> floats;
   const auto collect = [&](const EventTable& table, std::size_t index) {
     for (const auto& row : table.rows) {
       if (null_cell(row[index])) continue;
       if (const auto numeric = numeric_value(*row[index])) {
-        if (numeric->integer && row[index]->kind == AttributeKind::kInt)
-          integers.push_back(numeric->integer_value);
-        else if (!numeric->integer && row[index]->kind == AttributeKind::kFloat)
+        if (numeric->integer() && row[index]->kind == AttributeKind::kInt)
+          integers.push_back(*numeric);
+        else if (!numeric->integer() && row[index]->kind == AttributeKind::kFloat)
           floats.push_back(numeric->floating_value);
       }
     }
@@ -463,11 +568,14 @@ bool has_integer_float_conversion_collision(
   collect(first, first_index);
   collect(second, second_index);
   for (const auto integer : integers) {
-    const auto converted = static_cast<double>(integer);
+    const auto converted = integer.kind == NumericValue::Kind::kSigned
+                               ? static_cast<double>(integer.signed_value)
+                               : static_cast<double>(integer.unsigned_value);
     for (const auto floating : floats) {
       if (std::bit_cast<std::uint64_t>(converted) ==
               std::bit_cast<std::uint64_t>(floating) &&
-          compare_int_double(integer, floating) != 0)
+          compare_numeric(integer, NumericValue{NumericValue::Kind::kFloat, 0,
+                                               0, floating}) != 0)
         return true;
     }
   }
@@ -592,6 +700,580 @@ std::vector<TableColumnPlan> plan_columns(
   return plans;
 }
 
+// The table adapter carries pandas' dtype spelling as metadata.  Merge
+// coercion uses the spelling for empty columns as well as populated cells;
+// values are still checked below before a narrowing conversion is made.
+enum class DtypeFamily {
+  kUnknown,
+  kObject,
+  kString,
+  kSigned,
+  kUnsigned,
+  kFloat,
+  kBoolean,
+  kCategory,
+  kDatetime,
+};
+
+struct DtypeInfo {
+  std::string name;
+  DtypeFamily family = DtypeFamily::kUnknown;
+  int width = 0;
+  bool extension = false;
+  std::string datetime_timezone;
+};
+
+DtypeInfo parse_dtype(const std::string& name) {
+  DtypeInfo result;
+  result.name = name;
+  if (name == "object") result.family = DtypeFamily::kObject;
+  else if (name == "str") result.family = DtypeFamily::kString;
+  else if (name == "string") {
+    result.family = DtypeFamily::kString;
+    result.extension = true;
+  } else if (name == "bool") result.family = DtypeFamily::kBoolean;
+  else if (name == "boolean") {
+    result.family = DtypeFamily::kBoolean;
+    result.extension = true;
+  } else if (name == "Int64") {
+    result.family = DtypeFamily::kSigned;
+    result.width = 64;
+    result.extension = true;
+  } else if (name == "UInt64") {
+    result.family = DtypeFamily::kUnsigned;
+    result.width = 64;
+    result.extension = true;
+  } else if (name == "Float64") {
+    result.family = DtypeFamily::kFloat;
+    result.width = 64;
+    result.extension = true;
+  } else if (name == "category") result.family = DtypeFamily::kCategory;
+  else if (name.rfind("datetime64[", 0) == 0) {
+    const auto open = name.find('[');
+    const auto close = name.rfind(']');
+    if (open != std::string::npos && close == name.size() - 1 && close > open) {
+      const auto specification = trim(name.substr(open + 1, close - open - 1));
+      const auto comma = specification.find(',');
+      const auto unit = trim(comma == std::string::npos
+                                 ? specification
+                                 : specification.substr(0, comma));
+      const auto timezone =
+          comma == std::string::npos
+              ? std::string{}
+              : trim(specification.substr(comma + 1));
+      const bool valid_unit = unit == "us" || unit == "ns";
+      const bool valid_timezone =
+          comma == std::string::npos ||
+          (!timezone.empty() && specification.find(',', comma + 1) ==
+                                     std::string::npos);
+      if (valid_unit && valid_timezone) {
+        result.family = DtypeFamily::kDatetime;
+        result.width = unit == "ns" ? 64 : 32;
+        result.datetime_timezone = timezone;
+      }
+    }
+  } else if (name == "int8") {
+    result.family = DtypeFamily::kSigned;
+    result.width = 8;
+  } else if (name == "int16") {
+    result.family = DtypeFamily::kSigned;
+    result.width = 16;
+  } else if (name == "int32") {
+    result.family = DtypeFamily::kSigned;
+    result.width = 32;
+  } else if (name == "int64") {
+    result.family = DtypeFamily::kSigned;
+    result.width = 64;
+  } else if (name == "uint8") {
+    result.family = DtypeFamily::kUnsigned;
+    result.width = 8;
+  } else if (name == "uint16") {
+    result.family = DtypeFamily::kUnsigned;
+    result.width = 16;
+  } else if (name == "uint32") {
+    result.family = DtypeFamily::kUnsigned;
+    result.width = 32;
+  } else if (name == "uint64") {
+    result.family = DtypeFamily::kUnsigned;
+    result.width = 64;
+  } else if (name == "float32") {
+    result.family = DtypeFamily::kFloat;
+    result.width = 32;
+  } else if (name == "float64") {
+    result.family = DtypeFamily::kFloat;
+    result.width = 64;
+  }
+  return result;
+}
+
+std::string signed_dtype(int width) {
+  if (width <= 8) return "int8";
+  if (width <= 16) return "int16";
+  if (width <= 32) return "int32";
+  return "int64";
+}
+
+std::string unsigned_dtype(int width) {
+  if (width <= 8) return "uint8";
+  if (width <= 16) return "uint16";
+  if (width <= 32) return "uint32";
+  return "uint64";
+}
+
+bool category_value_equal(const EventAttribute& left,
+                          const EventAttribute& right) {
+  const bool left_null =
+      left.is_null || left.first_class_state == FirstClassAttributeState::kNull;
+  const bool right_null =
+      right.is_null || right.first_class_state == FirstClassAttributeState::kNull;
+  if (left_null != right_null || left.container != right.container ||
+      left.children.size() != right.children.size())
+    return false;
+  if (left_null) return true;
+  if (const auto left_numeric = numeric_value(left)) {
+    const auto right_numeric = numeric_value(right);
+    if (!right_numeric || compare_numeric(*left_numeric, *right_numeric) != 0)
+      return false;
+  } else if (const auto left_date = native_date_value(left)) {
+    const auto right_date = native_date_value(right);
+    if (!right_date || *left_date != *right_date) return false;
+  } else if (left.container == AttributeContainerKind::kScalar &&
+             (left.kind != right.kind || left.value != right.value)) {
+    return false;
+  } else if (left.container == AttributeContainerKind::kTuple &&
+             left.kind != right.kind) {
+    return false;
+  }
+  for (std::size_t index = 0; index < left.children.size(); ++index)
+    if (!category_value_equal(left.children[index], right.children[index]))
+      return false;
+  return true;
+}
+
+void append_category_key_part(std::string& key, std::string_view value) {
+  key += std::to_string(value.size());
+  key.push_back(':');
+  key.append(value);
+  key.push_back(';');
+}
+
+std::string numeric_category_key(const NumericValue& value) {
+  if (value.kind == NumericValue::Kind::kSigned)
+    return "integer:" + std::to_string(value.signed_value);
+  if (value.kind == NumericValue::Kind::kUnsigned)
+    return "integer:" + std::to_string(value.unsigned_value);
+  const double real = value.floating_value;
+  if (std::isnan(real)) return "real:nan";
+  if (std::isinf(real)) return real < 0 ? "real:-inf" : "real:inf";
+  if (std::trunc(real) == real) {
+    if (real >= -0x1p63 && real < 0x1p63)
+      return "integer:" + std::to_string(static_cast<std::int64_t>(real));
+    if (real >= 0 && real < 0x1p64)
+      return "integer:" + std::to_string(static_cast<std::uint64_t>(real));
+  }
+  std::ostringstream text;
+  text << std::setprecision(std::numeric_limits<double>::max_digits10) << real;
+  return "real:" + text.str();
+}
+
+std::string category_semantic_key(const EventAttribute& attribute) {
+  std::string key = "container:" +
+                    std::to_string(static_cast<int>(attribute.container)) +
+                    ";";
+  if (attribute.is_null ||
+      attribute.first_class_state == FirstClassAttributeState::kNull) {
+    key += "null:" + std::to_string(attribute.children.size()) + ";";
+    return key;
+  }
+  if (const auto numeric = numeric_value(attribute)) {
+    key += "numeric:" + numeric_category_key(*numeric) + ";";
+  } else if (const auto date = native_date_value(attribute)) {
+    key += "date:" + std::to_string(date->first) + ":" +
+           std::to_string(date->second) + ";";
+  } else if (attribute.container == AttributeContainerKind::kScalar) {
+    key += "scalar:" + std::to_string(static_cast<int>(attribute.kind)) + ":";
+    append_category_key_part(key, attribute.value);
+  } else if (attribute.container == AttributeContainerKind::kTuple) {
+    key += "tuple:" + std::to_string(static_cast<int>(attribute.kind)) + ";";
+  }
+  for (const auto& child : attribute.children)
+    append_category_key_part(key, category_semantic_key(child));
+  return key;
+}
+
+CategoryLookup::CategoryLookup(
+    const EventTableCategoricalDtype* descriptor)
+    : descriptor_(descriptor) {
+  if (!descriptor_) return;
+  buckets_.reserve(descriptor_->categories.size());
+  for (std::size_t index = 0; index < descriptor_->categories.size(); ++index)
+    buckets_[category_semantic_key(descriptor_->categories[index])].push_back(index);
+}
+
+std::optional<std::size_t> CategoryLookup::code(
+    const std::optional<EventAttribute>& cell) const {
+  if (null_cell(cell) ||
+      cell->first_class_state == FirstClassAttributeState::kNull ||
+      !descriptor_)
+    return std::nullopt;
+  const auto found = buckets_.find(category_semantic_key(*cell));
+  if (found == buckets_.end()) return std::nullopt;
+  for (const auto index : found->second)
+    if (category_value_equal(*cell, descriptor_->categories[index])) return index;
+  return std::nullopt;
+}
+
+std::optional<std::size_t> category_code(
+    const std::optional<EventAttribute>& cell,
+    const CategoryLookup* lookup) {
+  return lookup ? lookup->code(cell) : std::nullopt;
+}
+
+bool category_descriptor_compatible(
+    const EventTableCategoricalDtype& left,
+    const EventTableCategoricalDtype& right) {
+  if (left.categories_dtype != right.categories_dtype ||
+      left.ordered != right.ordered ||
+      left.categories.size() != right.categories.size())
+    return false;
+  if (left.ordered) {
+    for (std::size_t index = 0; index < left.categories.size(); ++index)
+      if (!category_value_equal(left.categories[index], right.categories[index]))
+        return false;
+    return true;
+  }
+  const CategoryLookup right_lookup(&right);
+  for (const auto& category : left.categories) {
+    if (!right_lookup.code(category)) return false;
+  }
+  return true;
+}
+
+enum class CategoryValueFamily { kUnknown, kString, kNumeric, kOther };
+
+CategoryValueFamily category_family(
+    const std::optional<EventTableCategoricalDtype>& descriptor) {
+  if (!descriptor) return CategoryValueFamily::kUnknown;
+  if (descriptor->categories.empty()) return CategoryValueFamily::kUnknown;
+  CategoryValueFamily family = CategoryValueFamily::kUnknown;
+  for (const auto& category : descriptor->categories) {
+    const auto current = numeric_value(category)
+                             ? CategoryValueFamily::kNumeric
+                             : (category.container == AttributeContainerKind::kScalar &&
+                                (category.kind == AttributeKind::kString ||
+                                 category.kind == AttributeKind::kId))
+                                   ? CategoryValueFamily::kString
+                                   : CategoryValueFamily::kOther;
+    if (family == CategoryValueFamily::kUnknown) family = current;
+    else if (family != current) return CategoryValueFamily::kOther;
+  }
+  return family;
+}
+
+std::string category_underlying_dtype(
+    const std::optional<EventTableCategoricalDtype>& descriptor) {
+  if (!descriptor || descriptor->categories_dtype.empty()) return {};
+  if (parse_dtype(descriptor->categories_dtype).family == DtypeFamily::kUnknown)
+    return {};
+  return descriptor->categories_dtype;
+}
+
+std::string promote_dtype_pair(
+    const std::string& left_name, const std::string& right_name,
+    const std::optional<EventTableCategoricalDtype>& left_category,
+    const std::optional<EventTableCategoricalDtype>& right_category);
+
+std::string category_fallback_dtype(
+    const std::optional<EventTableCategoricalDtype>& left,
+    const std::optional<EventTableCategoricalDtype>& right) {
+  const auto left_underlying = category_underlying_dtype(left);
+  const auto right_underlying = category_underlying_dtype(right);
+  if (left_underlying.empty() || right_underlying.empty()) return "object";
+  return promote_dtype_pair(left_underlying, right_underlying, {}, {});
+}
+
+std::string promote_dtype_pair(
+    const std::string& left_name, const std::string& right_name,
+    const std::optional<EventTableCategoricalDtype>& left_category = {},
+    const std::optional<EventTableCategoricalDtype>& right_category = {}) {
+  const auto left = parse_dtype(left_name);
+  const auto right = parse_dtype(right_name);
+  if (left.family == DtypeFamily::kUnknown ||
+      right.family == DtypeFamily::kUnknown)
+    return "object";
+  if (left_name == right_name &&
+      !(left.family == DtypeFamily::kCategory &&
+        right.family == DtypeFamily::kCategory))
+    return left_name;
+
+  if (left.family == DtypeFamily::kCategory &&
+      right.family == DtypeFamily::kCategory) {
+    if (left_category && right_category &&
+        category_descriptor_compatible(*left_category, *right_category))
+      return "category";
+    if (!left_category || !right_category) return "category";
+    return category_fallback_dtype(left_category, right_category);
+  }
+  if (left.family == DtypeFamily::kCategory ||
+      right.family == DtypeFamily::kCategory) {
+    const bool category_is_left = left.family == DtypeFamily::kCategory;
+    const auto& category = category_is_left ? left_category : right_category;
+    const auto& other_name = category_is_left ? right_name : left_name;
+    const auto other = category_is_left ? right : left;
+    const auto family = category_family(category);
+    if (other.family == DtypeFamily::kObject) return "object";
+    if (other.family == DtypeFamily::kString) {
+      return family == CategoryValueFamily::kString
+                 ? (other.extension ? "string" : "str")
+                 : "object";
+    }
+    if (other.family == DtypeFamily::kCategory) return "category";
+    if (family != CategoryValueFamily::kNumeric) return "object";
+    const auto underlying = category_underlying_dtype(category);
+    if (underlying.empty()) return "object";
+    if (category_is_left)
+      return promote_dtype_pair(underlying, other_name);
+    return promote_dtype_pair(other_name, underlying);
+  }
+
+  if (left.family == DtypeFamily::kObject ||
+      right.family == DtypeFamily::kObject)
+    return "object";
+  if (left.family == DtypeFamily::kString ||
+      right.family == DtypeFamily::kString) {
+    if (left.family == DtypeFamily::kString &&
+        right.family == DtypeFamily::kString)
+      return left.extension || right.extension ? "string" : "str";
+    return "object";
+  }
+  if (left.family == DtypeFamily::kDatetime ||
+      right.family == DtypeFamily::kDatetime) {
+    if (left.family == DtypeFamily::kDatetime &&
+        right.family == DtypeFamily::kDatetime) {
+      if (left.datetime_timezone != right.datetime_timezone) return "object";
+      const auto resolution = left.width == 64 || right.width == 64 ? "ns" : "us";
+      if (left.datetime_timezone.empty())
+        return std::string("datetime64[") + resolution + "]";
+      return std::string("datetime64[") + resolution + ", " +
+             left.datetime_timezone + "]";
+    }
+    return "object";
+  }
+
+  // Nullable boolean only combines with its plain counterpart.  A nullable
+  // numeric and boolean pair is object in pandas, while plain bool is an
+  // integer-like dtype for integer promotion.
+  if (left.name == "boolean" || right.name == "boolean") {
+    if (left.name == "boolean" && right.name == "bool") return "boolean";
+    if (right.name == "boolean" && left.name == "bool") return "boolean";
+    return "object";
+  }
+  if (left.name == "Int64" || right.name == "Int64" ||
+      left.name == "UInt64" || right.name == "UInt64" ||
+      left.name == "Float64" || right.name == "Float64") {
+    if (left.name == "Int64" && right.name == "Int64") return "Int64";
+    if (left.name == "UInt64" && right.name == "UInt64") return "UInt64";
+    if (left.name == "Float64" && right.name == "Float64") return "Float64";
+    if (left.family == DtypeFamily::kBoolean ||
+        right.family == DtypeFamily::kBoolean)
+      return "object";
+    if (left.name == "UInt64" || right.name == "UInt64") {
+      if (left.name == "UInt64" && right.name == "UInt64") return "UInt64";
+      if (left.family == DtypeFamily::kUnsigned &&
+          right.family == DtypeFamily::kUnsigned)
+        return "UInt64";
+      return "Float64";
+    }
+    if (left.name == "Float64" || right.name == "Float64") return "Float64";
+    if (left.name == "Int64" || right.name == "Int64") {
+      if (left.family == DtypeFamily::kFloat ||
+          right.family == DtypeFamily::kFloat)
+        return "Float64";
+      if ((left.family == DtypeFamily::kUnsigned && left.width == 64) ||
+          (right.family == DtypeFamily::kUnsigned && right.width == 64))
+        return "Float64";
+      return "Int64";
+    }
+  }
+
+  if (left.family == DtypeFamily::kBoolean &&
+      right.family == DtypeFamily::kBoolean)
+    return "bool";
+  if (left.family == DtypeFamily::kBoolean) {
+    if (right.family == DtypeFamily::kFloat)
+      return "object";  // bool base + float incoming retains object kinds.
+    if (right.family == DtypeFamily::kSigned ||
+        right.family == DtypeFamily::kUnsigned)
+      return right.name;
+  }
+  if (right.family == DtypeFamily::kBoolean) {
+    if (left.family == DtypeFamily::kFloat)
+      return left.name;  // float base + bool incoming recasts to float.
+    if (left.family == DtypeFamily::kSigned ||
+        left.family == DtypeFamily::kUnsigned)
+      return left.name;
+  }
+  if (left.family == DtypeFamily::kFloat ||
+      right.family == DtypeFamily::kFloat) {
+    const auto width = std::max(left.family == DtypeFamily::kFloat ? left.width : 0,
+                                right.family == DtypeFamily::kFloat ? right.width : 0);
+    if (width >= 64) return "float64";
+    const auto integer_width = std::max(
+        left.family == DtypeFamily::kSigned || left.family == DtypeFamily::kUnsigned
+            ? left.width
+            : 1,
+        right.family == DtypeFamily::kSigned || right.family == DtypeFamily::kUnsigned
+            ? right.width
+            : 1);
+    return integer_width <= 16 ? "float32" : "float64";
+  }
+
+  if ((left.family == DtypeFamily::kSigned ||
+       left.family == DtypeFamily::kUnsigned) &&
+      (right.family == DtypeFamily::kSigned ||
+       right.family == DtypeFamily::kUnsigned)) {
+    if (left.family == right.family)
+      return left.family == DtypeFamily::kSigned
+                 ? signed_dtype(std::max(left.width, right.width))
+                 : unsigned_dtype(std::max(left.width, right.width));
+    const auto signed_width = left.family == DtypeFamily::kSigned ? left.width : right.width;
+    const auto unsigned_width = left.family == DtypeFamily::kUnsigned ? left.width : right.width;
+    if (signed_width > unsigned_width) return signed_dtype(signed_width);
+    if (signed_width < 64 && signed_width + 1 > unsigned_width)
+      return signed_dtype(std::min(64, signed_width * 2));
+    if (unsigned_width < 64) return signed_dtype(std::min(64, unsigned_width * 2));
+    return "float64";
+  }
+  return "object";
+}
+
+std::string promote_dtype_sources(
+    const std::vector<std::pair<std::string,
+                                std::optional<EventTableCategoricalDtype>>>& sources,
+    bool missing) {
+  if (sources.empty()) return "object";
+  std::string result = sources.front().first;
+  std::optional<EventTableCategoricalDtype> descriptor = sources.front().second;
+  for (std::size_t index = 1; index < sources.size(); ++index) {
+    result = promote_dtype_pair(result, sources[index].first, descriptor,
+                                sources[index].second);
+    if (result != "category") descriptor.reset();
+    else if (!descriptor || !sources[index].second)
+      descriptor.reset();
+  }
+  const auto parsed = parse_dtype(result);
+  if (missing && !parsed.extension) {
+    if (parsed.family == DtypeFamily::kSigned ||
+        parsed.family == DtypeFamily::kUnsigned)
+      return "float64";
+    if (parsed.family == DtypeFamily::kBoolean ||
+        parsed.family == DtypeFamily::kString)
+      return "object";
+  }
+  return result;
+}
+
+const EventTableCategoricalDtype* category_descriptor_at(
+    const EventTable& table, std::size_t index) {
+  if (table.categorical_dtypes.empty() || index >= table.categorical_dtypes.size() ||
+      !table.categorical_dtypes[index])
+    return nullptr;
+  return &*table.categorical_dtypes[index];
+}
+
+std::optional<EventAttribute> coerce_cell_to_dtype(
+    const std::optional<EventAttribute>& source, const std::string& column,
+    const std::string& dtype) {
+  if (!source) return std::nullopt;
+  EventAttribute result = *source;
+  result.key = column;
+  if (result.is_null ||
+      result.first_class_state == FirstClassAttributeState::kNull)
+    return result;
+  const auto parsed = parse_dtype(dtype);
+  if (parsed.family == DtypeFamily::kObject ||
+      parsed.family == DtypeFamily::kCategory ||
+      parsed.family == DtypeFamily::kUnknown)
+    return result;
+  const auto numeric = numeric_value(result);
+  if (parsed.family == DtypeFamily::kFloat) {
+    if (!numeric) return result;
+    double value = 0.0;
+    if (numeric->kind == NumericValue::Kind::kFloat) value = numeric->floating_value;
+    else if (numeric->kind == NumericValue::Kind::kSigned)
+      value = static_cast<double>(numeric->signed_value);
+    else value = static_cast<double>(numeric->unsigned_value);
+    if (parsed.width == 32)
+      value = static_cast<double>(static_cast<float>(value));
+    result.kind = AttributeKind::kFloat;
+    std::ostringstream text;
+    text << std::setprecision(std::numeric_limits<double>::max_digits10) << value;
+    result.value = text.str();
+    result.typed_value = value;
+    return result;
+  }
+  if (parsed.family == DtypeFamily::kSigned ||
+      parsed.family == DtypeFamily::kUnsigned) {
+    if (!numeric) return result;
+    std::int64_t signed_value = 0;
+    std::uint64_t unsigned_value = 0;
+    bool exact = true;
+    if (numeric->kind == NumericValue::Kind::kSigned) {
+      signed_value = numeric->signed_value;
+      if (parsed.family == DtypeFamily::kUnsigned && signed_value < 0)
+        exact = false;
+      unsigned_value = static_cast<std::uint64_t>(signed_value);
+    } else if (numeric->kind == NumericValue::Kind::kUnsigned) {
+      unsigned_value = numeric->unsigned_value;
+      if (parsed.family == DtypeFamily::kSigned &&
+          unsigned_value > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
+        exact = false;
+      if (exact) signed_value = static_cast<std::int64_t>(unsigned_value);
+    } else {
+      const auto floating = numeric->floating_value;
+      if (!std::isfinite(floating) || std::trunc(floating) != floating)
+        exact = false;
+      if (parsed.family == DtypeFamily::kSigned) {
+        // 2^63 is exactly representable but is outside int64's half-open
+        // range; using the half-open bound avoids an out-of-range cast.
+        if (floating < -9223372036854775808.0 ||
+            floating >= 9223372036854775808.0)
+          exact = false;
+        if (exact) signed_value = static_cast<std::int64_t>(floating);
+      } else {
+        // 2^64 is exactly representable as a double and is the exclusive
+        // upper bound for uint64 conversion.
+        if (floating < 0.0 || floating >= 18446744073709551616.0)
+          exact = false;
+        if (exact) unsigned_value = static_cast<std::uint64_t>(floating);
+      }
+    }
+    if (!exact) return result;
+    result.kind = AttributeKind::kInt;
+    if (parsed.family == DtypeFamily::kSigned) {
+      result.value = std::to_string(signed_value);
+      result.typed_value = signed_value;
+    } else {
+      result.value = std::to_string(unsigned_value);
+      result.typed_value = unsigned_value;
+    }
+    return result;
+  }
+  if (parsed.family == DtypeFamily::kBoolean) {
+    if (const auto* value = std::get_if<bool>(&result.typed_value)) {
+      result.kind = AttributeKind::kBoolean;
+      result.value = *value ? "True" : "False";
+    }
+    return result;
+  }
+  if (parsed.family == DtypeFamily::kString) {
+    if (result.kind == AttributeKind::kString || result.kind == AttributeKind::kId)
+      result.kind = AttributeKind::kString;
+    return result;
+  }
+  return result;
+}
+
 }  // namespace
 
 std::vector<CaseRelation> parse_case_relations_csv(std::istream& input,
@@ -660,6 +1342,9 @@ EventTable parse_case_relations_table_csv(std::istream& input) {
 
   EventTable table;
   table.columns = header;
+  // The table adapter parses every field as text, so preserve that declared
+  // dtype even when the relation file has no data rows.
+  table.dtypes.assign(header.size(), "str");
   while (std::getline(input, line)) {
     if (trim(line).empty()) continue;
     const auto fields = parse_csv_row(line);
@@ -862,6 +1547,12 @@ EventTable merge_case_relations(const EventTable& base,
       base_time_index ? base.columns[*base_time_index]
                       : incoming.columns[*incoming_time_index];
   const auto output_timestamp_index = output_index(output_timestamp_name);
+  std::vector<std::optional<std::size_t>> incoming_sources(result.columns.size());
+  std::vector<std::optional<std::size_t>> relation_sources(result.columns.size());
+  for (const auto& plan : incoming_plans)
+    incoming_sources[output_index(plan.output_name)] = plan.source_index;
+  for (const auto& plan : relation_plans)
+    relation_sources[output_index(plan.output_name)] = plan.source_index;
   const bool coerce_boolean_timestamp =
       (base_time_index && column_has_kind(base, *base_time_index,
                                           AttributeKind::kBoolean) &&
@@ -878,7 +1569,7 @@ EventTable merge_case_relations(const EventTable& base,
 
   const auto coerce_timestamp_cell = [&](EventTable::Row& row) {
     if (!coerce_boolean_timestamp || !row[output_timestamp_index] ||
-        row[output_timestamp_index]->is_null ||
+        null_cell(row[output_timestamp_index]) ||
         row[output_timestamp_index]->kind != AttributeKind::kBoolean)
       return;
     const auto* value = std::get_if<bool>(&row[output_timestamp_index]->typed_value);
@@ -896,9 +1587,12 @@ EventTable merge_case_relations(const EventTable& base,
     EventTableIndexLabel index_label;
     bool index_label_from_expansion = false;
     std::size_t sequence = 0;
+    std::optional<SortValue> case_sort;
+    std::optional<SortValue> timestamp_sort;
   };
   std::vector<OutputRow> output_rows;
   output_rows.reserve(base.rows.size());
+  std::size_t joined_row_count = 0;
 
   const auto write_cell = [&](EventTable::Row& row, const std::string& name,
                               const std::optional<EventAttribute>& cell) {
@@ -948,7 +1642,131 @@ EventTable merge_case_relations(const EventTable& base,
           true,
           sequence++};
       output_rows.push_back(std::move(output));
+      ++joined_row_count;
     }
+  }
+
+  // Dtype metadata is complete only when every source declares one dtype per
+  // column.  In that case derive each output column from the branch that
+  // actually supplies its cells: base rows use base columns, joined rows use
+  // relation columns when their planned name wins and incoming columns
+  // otherwise.  The output case id is explicitly overwritten by relation
+  // LEFT, so the incoming join key does not participate in its dtype.
+  const bool complete_dtypes =
+      base.dtypes.size() == base.columns.size() &&
+      incoming.dtypes.size() == incoming.columns.size() &&
+      relations.dtypes.size() == relations.columns.size();
+  if (complete_dtypes) {
+    result.dtypes.reserve(result.columns.size());
+    result.categorical_dtypes.assign(result.columns.size(), std::nullopt);
+    const auto source_dtype = [](const EventTable& table,
+                                 std::optional<std::size_t> index) {
+      return index ? table.dtypes[*index] : std::string{};
+    };
+    const auto source_category = [](const EventTable& table,
+                                    std::optional<std::size_t> index)
+        -> std::optional<EventTableCategoricalDtype> {
+      if (!index || table.categorical_dtypes.empty() ||
+          !table.categorical_dtypes[*index])
+        return std::nullopt;
+      return table.categorical_dtypes[*index];
+    };
+    for (std::size_t column = 0; column < result.columns.size(); ++column) {
+      const auto base_source = find_column(base, result.columns[column]);
+      std::optional<std::size_t> joined_source;
+      const EventTable* joined_table = nullptr;
+      if (column == output_case_index) {
+        joined_source = relation_left_index;
+        joined_table = &relations;
+      } else if (relation_sources[column]) {
+        joined_source = relation_sources[column];
+        joined_table = &relations;
+      } else if (incoming_sources[column]) {
+        joined_source = incoming_sources[column];
+        joined_table = &incoming;
+      }
+
+      std::vector<std::pair<std::string,
+                            std::optional<EventTableCategoricalDtype>>> sources;
+      if (base_source)
+        sources.push_back({source_dtype(base, base_source),
+                           source_category(base, base_source)});
+      if (joined_source)
+        sources.push_back({source_dtype(*joined_table, joined_source),
+                           source_category(*joined_table, joined_source)});
+
+      bool missing = false;
+      if (!base.rows.empty()) {
+        if (!base_source) {
+          missing = true;
+        } else {
+          for (const auto& row : base.rows)
+            if (null_cell(row[*base_source])) {
+              missing = true;
+              break;
+            }
+        }
+      }
+      if (joined_row_count != 0) {
+        if (!joined_source) {
+          missing = true;
+        } else {
+          for (const auto& output : output_rows) {
+            if (!output.index_label_from_expansion) continue;
+            if (null_cell(output.row[column])) {
+              missing = true;
+              break;
+            }
+          }
+        }
+      }
+      result.dtypes.push_back(promote_dtype_sources(sources, missing));
+      if (result.dtypes.back() == "category") {
+        bool complete_categories = true;
+        std::optional<EventTableCategoricalDtype> selected;
+        for (const auto& source : sources) {
+          if (source.first != "category") continue;
+          if (!source.second) {
+            complete_categories = false;
+            continue;
+          }
+          if (!selected) selected = source.second;
+        }
+        if (complete_categories && selected)
+          result.categorical_dtypes[column] = std::move(selected);
+      }
+    }
+  }
+
+  // Coerce cells before sorting.  Pandas computes case/timestamp ordering on
+  // the merged column dtype, including categorical code order and exact
+  // integer comparisons, rather than on the source cell representation.
+  if (!result.dtypes.empty()) {
+    for (auto& output : output_rows)
+      for (std::size_t column = 0; column < result.columns.size(); ++column)
+        output.row[column] = coerce_cell_to_dtype(
+            output.row[column], result.columns[column], result.dtypes[column]);
+  }
+
+  // Build categorical lookups once for the two sort columns and cache the
+  // resulting sort values on each row.  Sorting repeatedly scanning a
+  // descriptor's categories makes a large merge needlessly quadratic in the
+  // category count.
+  const auto* case_descriptor =
+      category_descriptor_at(result, output_case_index);
+  const auto* timestamp_descriptor =
+      category_descriptor_at(result, output_timestamp_index);
+  std::optional<CategoryLookup> case_lookup;
+  std::optional<CategoryLookup> timestamp_lookup;
+  if (case_descriptor) case_lookup.emplace(case_descriptor);
+  if (timestamp_descriptor) timestamp_lookup.emplace(timestamp_descriptor);
+  for (auto& output : output_rows) {
+    output.case_sort = sort_value(
+        output.row[output_case_index],
+        case_lookup ? &*case_lookup : nullptr);
+    output.timestamp_sort = sort_value(
+        output.row[output_timestamp_index],
+        timestamp_lookup ? &*timestamp_lookup : nullptr);
   }
 
   std::vector<EventTableIndexLabel> preconcat_index_labels;
@@ -956,12 +1774,12 @@ EventTable merge_case_relations(const EventTable& base,
   for (const auto& output : output_rows)
     preconcat_index_labels.push_back(output.index_label);
   std::stable_sort(output_rows.begin(), output_rows.end(),
-                   [](const OutputRow& left, const OutputRow& right) {
-    const auto case_order = compare_sort_values(sort_value(left.case_cell),
-                                                sort_value(right.case_cell));
+                   [&](const OutputRow& left, const OutputRow& right) {
+    const auto case_order = compare_sort_values(
+        *left.case_sort, *right.case_sort);
     if (case_order != 0) return case_order < 0;
-    const auto time_order = compare_sort_values(sort_value(left.timestamp_cell),
-                                                sort_value(right.timestamp_cell));
+    const auto time_order = compare_sort_values(
+        *left.timestamp_sort, *right.timestamp_sort);
     if (time_order != 0) return time_order < 0;
     return left.sequence < right.sequence;
   });
@@ -1070,6 +1888,7 @@ EventTable merge_case_relations(const EventTable& base,
   if (left_column == right_column)
     throw std::invalid_argument("case relations: relation columns must differ");
   relation_table.columns = {left_column, right_column};
+  relation_table.dtypes = {"str", "str"};
   relation_table.rows.reserve(relations.size());
   for (const auto& relation : relations) {
     if (relation.left_case_id.empty() || relation.right_case_id.empty())

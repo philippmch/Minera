@@ -59,19 +59,49 @@ struct NativeDate {
 // Mutating a held value through get/get_if/visit or a Base reference cannot
 // renew identity and therefore does not preserve replacement alias semantics.
 class NativeAttributeValue
-    : public std::variant<std::monostate, std::int64_t, double, bool, NativeDate> {
+    : public std::variant<std::monostate, std::int64_t, double, bool, NativeDate,
+                          std::uint64_t> {
  public:
-  using Base = std::variant<std::monostate, std::int64_t, double, bool, NativeDate>;
+  // Keep the existing alternative indexes stable.  A uint64 value is appended
+  // so code that uses the public variant-compatible interface for int64,
+  // double, bool, or NativeDate keeps its alternative indexes and source
+  // meaning.
+  using Base = std::variant<std::monostate, std::int64_t, double, bool, NativeDate,
+                            std::uint64_t>;
   using Base::Base;
 
   NativeAttributeValue() = default;
+  // Adding uint64 as a distinct alternative makes a direct construction from
+  // narrower integral types ambiguous in std::variant. Preserve the old
+  // int64 representation for narrower unsigned values. Signed values and
+  // exact int64/uint64 values remain on the inherited variant constructor;
+  // adding an overload for those exact types would make MSVC report an
+  // ambiguity with that constructor.
+  template <class T>
+    requires (std::is_integral_v<std::remove_cvref_t<T>> &&
+              std::is_unsigned_v<std::remove_cvref_t<T>> &&
+              !std::is_same_v<std::remove_cvref_t<T>, bool> &&
+              (sizeof(std::remove_cvref_t<T>) < sizeof(std::uint64_t)))
+  NativeAttributeValue(T value)
+      : Base(integral_base(value)), scalar_identity_(next_identity()) {}
   NativeAttributeValue(const NativeAttributeValue&) = default;
   NativeAttributeValue(NativeAttributeValue&&) noexcept = default;
   NativeAttributeValue& operator=(const NativeAttributeValue&) = default;
   NativeAttributeValue& operator=(NativeAttributeValue&&) noexcept = default;
 
   template <class T>
+    requires (std::is_integral_v<std::remove_cvref_t<T>> &&
+              !std::is_same_v<std::remove_cvref_t<T>, bool>)
+  NativeAttributeValue& operator=(T value) {
+    scalar_identity_ = next_identity();
+    Base::operator=(integral_base(value));
+    return *this;
+  }
+
+  template <class T>
     requires (!std::is_same_v<std::remove_cvref_t<T>, NativeAttributeValue> &&
+              (!std::is_integral_v<std::remove_cvref_t<T>> ||
+               std::is_same_v<std::remove_cvref_t<T>, bool>) &&
               std::is_assignable_v<Base&, T&&>)
   NativeAttributeValue& operator=(T&& value) {
     scalar_identity_ = next_identity();
@@ -114,6 +144,21 @@ class NativeAttributeValue
   }
 
  private:
+  template <class T>
+  static Base integral_base(T value) {
+    using Integral = std::remove_cvref_t<T>;
+    if constexpr (std::is_signed_v<Integral>) {
+      return Base(std::in_place_type<std::int64_t>,
+                  static_cast<std::int64_t>(value));
+    } else if constexpr (sizeof(Integral) < sizeof(std::uint64_t)) {
+      return Base(std::in_place_type<std::int64_t>,
+                  static_cast<std::int64_t>(value));
+    } else {
+      return Base(std::in_place_type<std::uint64_t>,
+                  static_cast<std::uint64_t>(value));
+    }
+  }
+
   static std::uint64_t next_identity() noexcept {
     static std::atomic<std::uint64_t> sequence{1};
     return sequence.fetch_add(1, std::memory_order_relaxed);

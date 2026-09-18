@@ -71,13 +71,26 @@ NativeAttributeValue parse_native_value(AttributeKind kind,
       const char* first = value.data();
       const char* last = value.data() + value.size();
       if (*first == '+') ++first;
-      std::int64_t parsed = 0;
-      const auto result = std::from_chars(first, last, parsed, 10);
-      if (result.ec != std::errc{} || result.ptr != last) {
+      if (first == last)
         throw std::invalid_argument("XES int attribute has an invalid value: " +
                                     std::string(value));
+      std::int64_t parsed = 0;
+      const auto signed_result = std::from_chars(first, last, parsed, 10);
+      if (signed_result.ec == std::errc{} && signed_result.ptr == last)
+        return parsed;
+      // The pinned Rust XES adapter keeps its int parser signed. A uint64
+      // cell may still reach normalization through a future/native adapter,
+      // so that path below handles it without assuming every XES int is
+      // unsigned.
+      if (variant != XesImportVariant::kRustXes) {
+        std::uint64_t unsigned_parsed = 0;
+        const auto unsigned_result =
+            std::from_chars(first, last, unsigned_parsed, 10);
+        if (unsigned_result.ec == std::errc{} && unsigned_result.ptr == last)
+          return unsigned_parsed;
       }
-      return parsed;
+      throw std::invalid_argument("XES int attribute has an invalid value: " +
+                                  std::string(value));
     }
     case AttributeKind::kFloat: {
       if (value == "INF" || value == "+INF")
@@ -151,6 +164,14 @@ NativeAttributeValue parse_native_value(AttributeKind kind,
       return std::monostate{};
   }
   return std::monostate{};
+}
+
+std::string native_integer_text(const NativeAttributeValue& value) {
+  if (const auto* signed_value = std::get_if<std::int64_t>(&value))
+    return std::to_string(*signed_value);
+  if (const auto* unsigned_value = std::get_if<std::uint64_t>(&value))
+    return std::to_string(*unsigned_value);
+  throw std::invalid_argument("XES int attribute has no integer native value");
 }
 
 void skip_element(detail::XmlPullParser& parser,
@@ -403,10 +424,11 @@ std::string rust_debug_node(const RustXesNode& node) {
     try { value = "Date(" + rust_debug_date(node.value) + ")"; }
     catch (const std::invalid_argument&) { value = "None"; }
   } else if (node.tag == "int") {
-    std::int64_t number = 0;
-    try { number = std::get<std::int64_t>(parse_native_value(AttributeKind::kInt, node.value, XesImportVariant::kRustXes)); }
+    std::string number = "0";
+    try { number = native_integer_text(parse_native_value(
+        AttributeKind::kInt, node.value, XesImportVariant::kRustXes)); }
     catch (const std::invalid_argument&) {}
-    value = "Int(" + std::to_string(number) + ")";
+    value = "Int(" + number + ")";
   } else if (node.tag == "float") {
     const double number = rust_float_value(node.value);
     value = "Float(" + rust_debug_float(number) + ")";
@@ -463,11 +485,16 @@ std::optional<EventAttribute> parse_attribute_node(
     if (!raw) return EventAttribute{*key, "", *kind, true};
     EventAttribute result{*key, *raw, *kind};
     if (*kind == AttributeKind::kInt) {
-      std::int64_t value = 0;
-      try { value = std::get<std::int64_t>(parse_native_value(*kind, *raw, variant)); }
-      catch (const std::invalid_argument&) {}
-      result.typed_value = value;
-      result.value = std::to_string(value);
+      NativeAttributeValue value = std::int64_t{0};
+      try {
+        value = parse_native_value(*kind, *raw, variant);
+        result.value = native_integer_text(value);
+      } catch (const std::invalid_argument&) {
+        // Preserve the existing Rust adapter's invalid-integer fallback while
+        // allowing valid uint64 cells to retain their exact lexical value.
+        result.value = "0";
+      }
+      result.typed_value = std::move(value);
     } else if (*kind == AttributeKind::kFloat) {
       const double value = rust_float_value(*raw);
 
@@ -1227,7 +1254,19 @@ static EventLog import_xes_impl(
           if (cell->is_null) continue;
           if (numeric && cell->kind == AttributeKind::kInt &&
               (kinds.contains(AttributeKind::kFloat) || (promote_missing && present < rows.size()))) {
-            const auto value = static_cast<double>(std::get<std::int64_t>(cell->typed_value));
+            double value = 0.0;
+            if (const auto* signed_value =
+                    std::get_if<std::int64_t>(&cell->typed_value))
+              value = static_cast<double>(*signed_value);
+            else if (const auto* unsigned_value =
+                         std::get_if<std::uint64_t>(&cell->typed_value))
+              // This is the Rust adapter's documented numeric promotion
+              // contract (mixed int/float columns become float). The native
+              // uint64 cell remains exact until this deliberate promotion.
+              value = static_cast<double>(*unsigned_value);
+            else
+              throw std::invalid_argument(
+                  "RUSTXES: integer cell has no native integer value");
             cell->kind = AttributeKind::kFloat;
             cell->typed_value = value;
             cell->value = rust_debug_float(value);

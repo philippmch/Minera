@@ -1354,7 +1354,43 @@ void date_export_preserves_source_precision() {
 
 }  // namespace
 
+void unsigned_integer_boundaries_match_public_variants() {
+  using namespace minera;
+  for (const auto value : {std::uint64_t{9223372036854775808ULL},
+                           (std::numeric_limits<std::uint64_t>::max)()}) {
+    const auto xml = separate_xes_tags(
+        "<log><trace><string key=\"concept:name\" value=\"c\"/>"
+        "<event><string key=\"concept:name\" value=\"A\"/>"
+        "<int key=\"amount\" value=\"" + std::to_string(value) +
+        "\"/></event></trace></log>");
+    for (const auto variant : {XesImportVariant::ITERPARSE, XesImportVariant::LINE_BY_LINE,
+         XesImportVariant::ITERPARSE_MEM_COMPRESSED, XesImportVariant::ITERPARSE_20,
+         XesImportVariant::CHUNK_REGEX, XesImportVariant::RUSTXES}) {
+      std::istringstream input(xml);
+      XesImportOptions options;
+      options.variant = variant;
+      const auto log = import_xes_event_log(input, options);
+      const auto* amount = find_attribute(log.traces.at(0).events.at(0).attributes, "amount");
+      assert(amount && amount->kind == AttributeKind::kInt);
+      if (variant == XesImportVariant::RUSTXES) {
+        assert(std::get<std::int64_t>(amount->typed_value) == 0);
+      } else {
+        assert(std::get<std::uint64_t>(amount->typed_value) == value);
+        for (const auto export_variant : {XesExportVariant::ETREE, XesExportVariant::LINE_BY_LINE}) {
+          const auto exported = serialize_xes(log, {.variant = export_variant});
+          assert(exported.find(std::to_string(value)) != std::string::npos);
+          std::istringstream reinput(exported);
+          const auto round = import_xes_event_log(reinput);
+          const auto* restored = find_attribute(round.traces.at(0).events.at(0).attributes, "amount");
+          assert(restored && std::get<std::uint64_t>(restored->typed_value) == value);
+        }
+      }
+    }
+  }
+}
+
 int main() {
+  unsigned_integer_boundaries_match_public_variants();
   {
     using namespace minera;
     const std::string xml = "<log><trace><string key=\"concept:name\" value=\"c\"/>"

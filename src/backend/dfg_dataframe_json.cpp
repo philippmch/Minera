@@ -115,6 +115,10 @@ void write_typed_value(std::ostream& out, const NativeAttributeValue& value) {
           out << "null";
         } else if constexpr (std::is_same_v<T, std::int64_t>) {
           out << item;
+        } else if constexpr (std::is_same_v<T, std::uint64_t>) {
+          // Keep uint64 values as JSON integers. Converting through double
+          // would silently change identifiers above 2^53.
+          out << item;
         } else if constexpr (std::is_same_v<T, double>) {
           write_number(out, item, "typed attribute value");
         } else if constexpr (std::is_same_v<T, bool>) {

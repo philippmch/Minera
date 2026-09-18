@@ -92,6 +92,9 @@ void write_attributes(std::ostream& out,
       if (const auto* integer_value =
               std::get_if<std::int64_t>(&attribute.typed_value))
         out << *integer_value;
+      else if (const auto* unsigned_integer_value =
+                   std::get_if<std::uint64_t>(&attribute.typed_value))
+        out << *unsigned_integer_value;
       else if (const auto* float_value =
                    std::get_if<double>(&attribute.typed_value)) {
         if (std::isfinite(*float_value))
@@ -138,6 +141,9 @@ void write_attribute_detail(std::ostream& out,
     if (const auto* integer_value =
             std::get_if<std::int64_t>(&attribute.typed_value))
       out << *integer_value;
+    else if (const auto* unsigned_integer_value =
+                 std::get_if<std::uint64_t>(&attribute.typed_value))
+      out << *unsigned_integer_value;
     else if (const auto* float_value =
                  std::get_if<double>(&attribute.typed_value)) {
       if (std::isfinite(*float_value))

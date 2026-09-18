@@ -52,6 +52,14 @@ const std::optional<EventAttribute> integer_value(std::string key,
   return result;
 }
 
+const std::optional<EventAttribute> uint64_value(std::string key,
+                                                  std::uint64_t number) {
+  auto result = cell(std::move(key), std::to_string(number));
+  result.kind = AttributeKind::kInt;
+  result.typed_value = number;
+  return result;
+}
+
 const std::optional<EventAttribute> float_value(std::string key, double number) {
   auto result = cell(std::move(key), std::to_string(number));
   result.kind = AttributeKind::kFloat;
@@ -397,6 +405,32 @@ void partial_order_contract() {
   assert(numeric.pairs.front().target_index == 1.5);
   assert(numeric.pairs.front().source_index_value == "-2");
   assert(numeric.pairs.front().target_index_value == "1.500000");
+
+  const auto high = std::numeric_limits<std::uint64_t>::max();
+  const auto adjacent_high_indices = make_table(
+      {"case:concept:name", "concept:name", "start_timestamp",
+       "time:timestamp", "@@index"},
+      {row({value("case:concept:name", "c"), value("concept:name", "A"),
+            value("start_timestamp", "2026-01-05T09:00:02Z"),
+            value("time:timestamp", "2026-01-05T09:00:03Z"),
+            uint64_value("@@index", high)}),
+       row({value("case:concept:name", "c"), value("concept:name", "B"),
+            value("start_timestamp", "2026-01-05T09:00:00Z"),
+            value("time:timestamp", "2026-01-05T09:00:01Z"),
+            uint64_value("@@index", high - 1)})});
+  options.event_index_attribute = "@@index";
+  options.keep_first_following = false;
+  options.sort_caseid_required = false;
+  options.sort_timestamp_along_case_id = false;
+  const auto adjacent_high = discover_polars_partial_order(
+      LazyEventTable::from_table(adjacent_high_indices), options);
+  assert(adjacent_high.pairs.size() == 1);
+  assert(adjacent_high.pairs.front().source.activity == "B");
+  assert(adjacent_high.pairs.front().target.activity == "A");
+  assert(adjacent_high.pairs.front().source_index_value ==
+         std::to_string(high - 1));
+  assert(adjacent_high.pairs.front().target_index_value ==
+         std::to_string(high));
 
   const auto unrelated_null = make_table(
       {"case:concept:name", "concept:name", "start_timestamp",

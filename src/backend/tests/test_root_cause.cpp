@@ -8,11 +8,12 @@
 #include <limits>
 #include <stdexcept>
 
-static_assert(std::variant_size_v<minera::NativeAttributeValue> == 5);
-static_assert(std::variant_size_v<const minera::NativeAttributeValue> == 5);
+static_assert(std::variant_size_v<minera::NativeAttributeValue> == 6);
+static_assert(std::variant_size_v<const minera::NativeAttributeValue> == 6);
 static_assert(std::is_same_v<std::variant_alternative_t<0, minera::NativeAttributeValue>, std::monostate>);
 static_assert(std::is_same_v<std::variant_alternative_t<2, minera::NativeAttributeValue>, double>);
 static_assert(std::is_same_v<std::variant_alternative_t<4, minera::NativeAttributeValue>, minera::NativeDate>);
+static_assert(std::is_same_v<std::variant_alternative_t<5, minera::NativeAttributeValue>, std::uint64_t>);
 static_assert(std::is_same_v<std::variant_alternative_t<2, const minera::NativeAttributeValue>, const double>);
 
 namespace {
@@ -612,12 +613,25 @@ void test_native_scalar_identity() {
   NativeAttributeValue integer = std::int64_t{7};
   NativeAttributeValue other_integer = std::int64_t{7};
   assert(integer.scalar_identity() != other_integer.scalar_identity() && integer == other_integer);
+  NativeAttributeValue unsigned_integer = std::numeric_limits<std::uint64_t>::max();
+  assert(std::holds_alternative<std::uint64_t>(unsigned_integer));
+  assert(std::get<5>(unsigned_integer) == std::numeric_limits<std::uint64_t>::max());
+  assert(unsigned_integer.scalar_identity() != integer.scalar_identity());
   NativeAttributeValue boolean(std::in_place_type<bool>, true);
   assert(std::get<bool>(boolean));
   boolean = minera::NativeDate{"2026-01-01T00:00:00Z"};
   assert(std::get<minera::NativeDate>(boolean).value == "2026-01-01T00:00:00Z");
   boolean = std::monostate{};
   assert(std::holds_alternative<std::monostate>(boolean));
+
+  minera::EventAttribute exact{"value", "", minera::AttributeKind::kInt};
+  exact.typed_value = std::numeric_limits<std::uint64_t>::max();
+  assert(minera::root_cause_attribute_category(exact) ==
+         "18446744073709551615");
+  assert(minera::native_scalar_key_compare(
+             exact, minera::EventAttribute{
+                        "value", "18446744073709551614",
+                        minera::AttributeKind::kInt}) > 0);
 }
 
 void test_trace_equivalence() {

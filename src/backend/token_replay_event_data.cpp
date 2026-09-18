@@ -1,7 +1,9 @@
 #include "minera/conformance.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
@@ -210,14 +212,29 @@ EventLog project_table(const EventTable& table, const TokenReplayOptions& option
     return kind == AttributeKind::kInt || kind == AttributeKind::kFloat ||
            kind == AttributeKind::kBoolean;
   };
-  using Number = std::variant<std::int64_t, double>;
+  using Number = std::variant<std::int64_t, std::uint64_t, double>;
   const auto number = [](const EventAttribute& field) -> Number {
     if (const auto* value = std::get_if<std::int64_t>(&field.typed_value)) return *value;
+    if (const auto* value = std::get_if<std::uint64_t>(&field.typed_value)) return *value;
     if (const auto* value = std::get_if<double>(&field.typed_value)) return *value;
     if (const auto* value = std::get_if<bool>(&field.typed_value)) return std::int64_t{*value ? 1 : 0};
     if (field.kind == AttributeKind::kBoolean)
       return std::int64_t{field.value == "true" || field.value == "1" ? 1 : 0};
-    if (field.kind == AttributeKind::kInt) return static_cast<std::int64_t>(std::stoll(field.value));
+    if (field.kind == AttributeKind::kInt) {
+      auto text = std::string_view(field.value);
+      if (text.starts_with('+')) text.remove_prefix(1);
+      std::int64_t signed_value = 0;
+      const auto signed_result = std::from_chars(
+          text.data(), text.data() + text.size(), signed_value, 10);
+      if (signed_result.ec == std::errc{} && signed_result.ptr == text.data() + text.size())
+        return signed_value;
+      std::uint64_t unsigned_value = 0;
+      const auto unsigned_result = std::from_chars(
+          text.data(), text.data() + text.size(), unsigned_value, 10);
+      if (unsigned_result.ec == std::errc{} && unsigned_result.ptr == text.data() + text.size())
+        return unsigned_value;
+      throw std::invalid_argument("token replay: invalid integer case-id value");
+    }
     return std::stod(field.value);
   };
   const auto compare_integer_real = [](std::int64_t integer, double real) {
@@ -231,12 +248,38 @@ EventLog project_table(const EventTable& table, const TokenReplayOptions& option
     const auto whole = std::trunc(real);
     return real > whole ? -1 : real < whole ? 1 : 0;
   };
+  const auto compare_unsigned_real = [](std::uint64_t integer, double real) {
+    // Do not convert a uint64 identifier to double before comparison. A
+    // double at or above 2^64 is greater than every uint64 value.
+    if (std::isnan(real)) return -1;
+    if (real < 0) return 1;
+    if (real >= 0x1p64) return -1;
+    const auto truncated = static_cast<std::uint64_t>(real);
+    if (integer < truncated) return -1;
+    if (integer > truncated) return 1;
+    const auto whole = std::trunc(real);
+    return real > whole ? -1 : real < whole ? 1 : 0;
+  };
   const auto number_less = [&](const Number& left, const Number& right) {
     const auto* left_integer = std::get_if<std::int64_t>(&left);
+    const auto* left_unsigned = std::get_if<std::uint64_t>(&left);
     const auto* right_integer = std::get_if<std::int64_t>(&right);
+    const auto* right_unsigned = std::get_if<std::uint64_t>(&right);
     if (left_integer && right_integer) return *left_integer < *right_integer;
-    if (left_integer) return compare_integer_real(*left_integer, std::get<double>(right)) < 0;
-    if (right_integer) return compare_integer_real(*right_integer, std::get<double>(left)) > 0;
+    if (left_unsigned && right_unsigned) return *left_unsigned < *right_unsigned;
+    if (left_integer && right_unsigned)
+      return *left_integer < 0 || static_cast<std::uint64_t>(*left_integer) < *right_unsigned;
+    if (left_unsigned && right_integer)
+      return *right_integer >= 0 &&
+             *left_unsigned < static_cast<std::uint64_t>(*right_integer);
+    if (left_integer)
+      return compare_integer_real(*left_integer, std::get<double>(right)) < 0;
+    if (left_unsigned)
+      return compare_unsigned_real(*left_unsigned, std::get<double>(right)) < 0;
+    if (right_integer)
+      return compare_integer_real(*right_integer, std::get<double>(left)) > 0;
+    if (right_unsigned)
+      return compare_unsigned_real(*right_unsigned, std::get<double>(left)) > 0;
     const double a = std::get<double>(left), b = std::get<double>(right);
     if (std::isnan(a)) return false;
     if (std::isnan(b)) return true;

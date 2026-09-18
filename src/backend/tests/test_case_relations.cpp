@@ -2,6 +2,7 @@
 
 #include "minera/case_relations.hpp"
 #include "minera/json_export.hpp"
+#include "case_relations_dtype_reference_cases.hpp"
 #include "case_relations_index_reference_cases.hpp"
 #include "case_relations_reference_cases.hpp"
 
@@ -522,6 +523,7 @@ void parses_relation_table_with_extra_columns() {
   std::istringstream crlf("lhs,rhs,note\r\nL1,R1,\"quoted, note\"\r\n");
   const auto uploaded = parse_case_relations_table_csv(crlf);
   assert(uploaded.rows[0][2]->value == "quoted, note");
+  assert((uploaded.dtypes == std::vector<std::string>{"str", "str", "str"}));
   std::istringstream legacy_crlf("case_id_LEFT,case_id_RIGHT\r\n\"L1\",\"R1\"\r\n");
   assert((parse_case_relations_csv(legacy_crlf) ==
           std::vector<CaseRelation>{{"L1", "R1"}}));
@@ -586,6 +588,259 @@ void parses_relation_table_with_extra_columns() {
   expect_bad("lhs,rhs\n\"L1,R1\n");
 }
 
+EventAttribute uint64_cell(const std::string& key, std::uint64_t value) {
+  EventAttribute cell{key, std::to_string(value), AttributeKind::kInt};
+  cell.typed_value = value;
+  return cell;
+}
+
+EventAttribute float_cell(const std::string& key, double value) {
+  EventAttribute cell{key, "", AttributeKind::kFloat};
+  cell.typed_value = value;
+  cell.value = std::to_string(value);
+  return cell;
+}
+
+void exact_uint64_join_and_sorting() {
+  const auto high = std::numeric_limits<std::uint64_t>::max();
+  EventTable base{
+      {"case", "when", "label"},
+      {{uint64_cell("case", high), EventAttribute{"when", "z", AttributeKind::kString},
+        EventAttribute{"label", "base", AttributeKind::kString}}}};
+  EventTable incoming{
+      {"case", "when", "label"},
+      {{uint64_cell("case", high - 1), EventAttribute{"when", "a", AttributeKind::kString},
+        EventAttribute{"label", "near", AttributeKind::kString}},
+       {uint64_cell("case", high), EventAttribute{"when", "b", AttributeKind::kString},
+        EventAttribute{"label", "match", AttributeKind::kString}}}};
+  EventTable relations{
+      {"lhs", "rhs"},
+      {{uint64_cell("lhs", 7), uint64_cell("rhs", high - 1)},
+       {uint64_cell("lhs", 8), uint64_cell("rhs", high)}}};
+  CaseRelationsOptions options;
+  options.case_id_key = "case";
+  options.timestamp_key = "when";
+  options.relation_left_column = "lhs";
+  options.relation_right_column = "rhs";
+  const auto merged = merge_case_relations(base, incoming, relations, options);
+  assert(merged.rows.size() == 3);
+  assert(merged.rows[0][0] &&
+         std::get<std::uint64_t>(merged.rows[0][0]->typed_value) == 7);
+  assert(merged.rows[0][2] && merged.rows[0][2]->value == "near");
+  assert(merged.rows[1][0] &&
+         std::get<std::uint64_t>(merged.rows[1][0]->typed_value) == 8);
+  assert(merged.rows[1][2] && merged.rows[1][2]->value == "match");
+  assert(merged.rows[2][0] &&
+         std::get<std::uint64_t>(merged.rows[2][0]->typed_value) == high);
+  assert(merged.rows[2][2] && merged.rows[2][2]->value == "base");
+
+  auto sortable = base;
+  sortable.rows.push_back(
+      {uint64_cell("case", high - 1), EventAttribute{"when", "a", AttributeKind::kString},
+       EventAttribute{"label", "lower", AttributeKind::kString}});
+  const auto sorted = merge_case_relations(
+      sortable, EventTable{{"case", "when", "label"}, {}},
+      EventTable{{"lhs", "rhs"}, {}}, options);
+  assert(sorted.rows.size() == 2);
+  assert(std::get<std::uint64_t>(sorted.rows[0][0]->typed_value) == high - 1);
+  assert(std::get<std::uint64_t>(sorted.rows[1][0]->typed_value) == high);
+}
+
+void unknown_dtype_metadata_falls_back_without_mutating_inputs() {
+  EventTable base{
+      {"case", "when", "payload"},
+      {{EventAttribute{"case", "L1", AttributeKind::kString},
+        EventAttribute{"when", "a", AttributeKind::kString},
+        EventAttribute{"payload", "base", AttributeKind::kString}}}};
+  EventTable incoming{
+      {"case", "when", "payload"},
+      {{EventAttribute{"case", "R1", AttributeKind::kString},
+        EventAttribute{"when", "b", AttributeKind::kString},
+        EventAttribute{"payload", "incoming", AttributeKind::kString}}}};
+  EventTable relations{
+      {"lhs", "rhs"},
+      {{EventAttribute{"lhs", "L1", AttributeKind::kString},
+        EventAttribute{"rhs", "R1", AttributeKind::kString}}}};
+  const auto base_before = base;
+  const auto incoming_before = incoming;
+  const auto relations_before = relations;
+  CaseRelationsOptions options;
+  options.case_id_key = "case";
+  options.timestamp_key = "when";
+  options.relation_left_column = "lhs";
+  options.relation_right_column = "rhs";
+  const auto merged = merge_case_relations(base, incoming, relations, options);
+  assert(merged.dtypes.empty());
+  assert(merged.categorical_dtypes.empty());
+  assert(base.columns == base_before.columns && base.rows == base_before.rows &&
+         base.dtypes == base_before.dtypes &&
+         base.categorical_dtypes == base_before.categorical_dtypes);
+  assert(incoming.columns == incoming_before.columns &&
+         incoming.rows == incoming_before.rows);
+  assert(relations.columns == relations_before.columns &&
+         relations.rows == relations_before.rows);
+}
+
+void unknown_dtype_prefixes_fall_back_to_object() {
+  EventTable base{
+      {"case", "when", "payload"},
+      {{EventAttribute{"case", "L1", AttributeKind::kString},
+        EventAttribute{"when", "a", AttributeKind::kString},
+        EventAttribute{"payload", "base", AttributeKind::kString}}}};
+  EventTable incoming{
+      {"case", "when", "payload"},
+      {{EventAttribute{"case", "R1", AttributeKind::kString},
+        EventAttribute{"when", "b", AttributeKind::kString},
+        EventAttribute{"payload", "incoming", AttributeKind::kString}}}};
+  EventTable relations{
+      {"lhs", "rhs"},
+      {{EventAttribute{"lhs", "L1", AttributeKind::kString},
+        EventAttribute{"rhs", "R1", AttributeKind::kString}}}};
+  base.dtypes = {"integer", "interval[int64, right]", "str"};
+  incoming.dtypes = {"integer", "interval[int64, right]", "str"};
+  relations.dtypes = {"str", "str"};
+  CaseRelationsOptions options;
+  options.case_id_key = "case";
+  options.timestamp_key = "when";
+  options.relation_left_column = "lhs";
+  options.relation_right_column = "rhs";
+  const auto merged = merge_case_relations(base, incoming, relations, options);
+  assert(merged.dtypes.size() == merged.columns.size());
+  assert(merged.dtypes[0] == "object");
+  assert(merged.dtypes[1] == "object");
+}
+
+void incompatible_category_numeric_metadata_promotes_without_narrowing() {
+  const auto high = std::numeric_limits<std::uint64_t>::max();
+  EventTable base{
+      {"case", "when", "score"},
+      {{EventAttribute{"case", "L1", AttributeKind::kString},
+        EventAttribute{"when", "a", AttributeKind::kString},
+        float_cell("score", 1.25)}}};
+  EventTable incoming{
+      {"case", "when", "score"},
+      {{EventAttribute{"case", "R1", AttributeKind::kString},
+        EventAttribute{"when", "b", AttributeKind::kString},
+        uint64_cell("score", high)}}};
+  EventTable relations{
+      {"lhs", "rhs"},
+      {{EventAttribute{"lhs", "L1", AttributeKind::kString},
+        EventAttribute{"rhs", "R1", AttributeKind::kString}}}};
+  base.dtypes = {"str", "str", "category"};
+  incoming.dtypes = {"str", "str", "category"};
+  relations.dtypes = {"str", "str"};
+  base.categorical_dtypes.assign(3, std::nullopt);
+  incoming.categorical_dtypes.assign(3, std::nullopt);
+  base.categorical_dtypes[2] = EventTableCategoricalDtype{
+      "float64", {float_cell("category", 1.25), float_cell("category", 4.5)},
+      false};
+  incoming.categorical_dtypes[2] = EventTableCategoricalDtype{
+      "uint64", {uint64_cell("category", high - 1),
+                  uint64_cell("category", high)},
+      false};
+  CaseRelationsOptions options;
+  options.case_id_key = "case";
+  options.timestamp_key = "when";
+  options.relation_left_column = "lhs";
+  options.relation_right_column = "rhs";
+  const auto merged = merge_case_relations(base, incoming, relations, options);
+  assert(merged.dtypes[2] == "float64");
+  assert(merged.rows.size() == 2);
+  assert(merged.rows[1][2] &&
+         std::get<double>(merged.rows[1][2]->typed_value) ==
+             static_cast<double>(high));
+}
+
+void categorical_nested_null_state_is_semantic() {
+  auto tuple_category = [](bool first_class_null) {
+    EventAttribute tuple{"score", "", AttributeKind::kString};
+    tuple.container = AttributeContainerKind::kTuple;
+    EventAttribute value{"value", "x", AttributeKind::kString};
+    EventAttribute missing{"missing", "", AttributeKind::kString};
+    missing.is_null = !first_class_null;
+    if (first_class_null)
+      missing.first_class_state = FirstClassAttributeState::kNull;
+    tuple.children = {value, missing};
+    return tuple;
+  };
+  EventTable base{
+      {"case", "when", "score"},
+      {{EventAttribute{"case", "L1", AttributeKind::kString},
+        EventAttribute{"when", "a", AttributeKind::kString},
+        tuple_category(true)}}};
+  EventTable incoming{
+      {"case", "when", "score"},
+      {{EventAttribute{"case", "R1", AttributeKind::kString},
+        EventAttribute{"when", "b", AttributeKind::kString},
+        tuple_category(false)}}};
+  EventTable relations{
+      {"lhs", "rhs"},
+      {{EventAttribute{"lhs", "L1", AttributeKind::kString},
+        EventAttribute{"rhs", "R1", AttributeKind::kString}}}};
+  base.dtypes = {"str", "str", "category"};
+  incoming.dtypes = {"str", "str", "category"};
+  relations.dtypes = {"str", "str"};
+  base.categorical_dtypes.assign(3, std::nullopt);
+  incoming.categorical_dtypes.assign(3, std::nullopt);
+  base.categorical_dtypes[2] = EventTableCategoricalDtype{
+      "object", {tuple_category(true)}, false};
+  incoming.categorical_dtypes[2] = EventTableCategoricalDtype{
+      "object", {tuple_category(false)}, false};
+  CaseRelationsOptions options;
+  options.case_id_key = "case";
+  options.timestamp_key = "when";
+  options.relation_left_column = "lhs";
+  options.relation_right_column = "rhs";
+  const auto merged = merge_case_relations(base, incoming, relations, options);
+  assert(merged.dtypes[2] == "category");
+}
+
+void categorical_state_null_cells_sort_last() {
+  const auto category_cell = [](const std::string& key,
+                                const std::string& value) {
+    return EventAttribute{key, value, AttributeKind::kString};
+  };
+  auto state_null_cell = [](const std::string& key,
+                            const std::string& stale_value) {
+    EventAttribute cell{key, stale_value, AttributeKind::kString};
+    cell.first_class_state = FirstClassAttributeState::kNull;
+    return cell;
+  };
+  const EventTableCategoricalDtype case_dtype{
+      "str", {category_cell("category", "B"),
+              category_cell("category", "A")}, false};
+  const EventTableCategoricalDtype timestamp_dtype{
+      "str", {category_cell("category", "high"),
+              category_cell("category", "low")}, false};
+  EventTable base{
+      {"case", "when", "payload"},
+      {{category_cell("case", "B"), category_cell("when", "high"),
+        category_cell("payload", "regular")},
+       {category_cell("case", "B"), state_null_cell("when", "low"),
+        category_cell("payload", "timestamp-missing")},
+       {state_null_cell("case", "A"), category_cell("when", "low"),
+        category_cell("payload", "case-missing")}}};
+  EventTable incoming{{"case", "when", "payload"}, {}};
+  EventTable relations{{"lhs", "rhs"}, {}};
+  base.dtypes = {"category", "category", "str"};
+  incoming.dtypes = {"category", "category", "str"};
+  relations.dtypes = {"category", "category"};
+  base.categorical_dtypes = {case_dtype, timestamp_dtype, std::nullopt};
+  incoming.categorical_dtypes = {case_dtype, timestamp_dtype, std::nullopt};
+  relations.categorical_dtypes = {case_dtype, case_dtype};
+  CaseRelationsOptions options;
+  options.case_id_key = "case";
+  options.timestamp_key = "when";
+  options.relation_left_column = "lhs";
+  options.relation_right_column = "rhs";
+  const auto merged = merge_case_relations(base, incoming, relations, options);
+  assert(merged.rows.size() == 3);
+  assert(merged.rows[0][2] && merged.rows[0][2]->value == "regular");
+  assert(merged.rows[1][2] &&
+         merged.rows[1][2]->value == "timestamp-missing");
+  assert(merged.rows[2][2] && merged.rows[2][2]->value == "case-missing");
+}
+
 }  // namespace
 
 int main() try {
@@ -593,6 +848,7 @@ int main() try {
   _set_error_mode(_OUT_TO_STDERR);
 #endif
   check_public_case_relations_reference_cases();
+  check_public_case_relations_dtype_reference_cases();
   check_public_case_relations_index_reference_cases();
   missing_timestamps_sort_last_with_stable_duplicates();
   nanosecond_ordering_and_exact_ties_match_public_merge();
@@ -607,6 +863,12 @@ int main() try {
   range_index_extrema_do_not_overflow_classification();
   table_selectors_are_exact();
   parses_relation_table_with_extra_columns();
+  exact_uint64_join_and_sorting();
+  unknown_dtype_metadata_falls_back_without_mutating_inputs();
+  unknown_dtype_prefixes_fall_back_to_object();
+  incompatible_category_numeric_metadata_promotes_without_narrowing();
+  categorical_nested_null_state_is_semantic();
+  categorical_state_null_cells_sort_last();
 } catch (const std::exception& error) {
   std::cerr << error.what() << '\n';
   return 1;

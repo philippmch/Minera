@@ -699,6 +699,30 @@ void write_event_table_metadata(std::ostream& output,
     }
     output << "]}";
   }
+  if (!table.categorical_dtypes.empty()) {
+    output << ",\"categorical_dtypes\":[";
+    for (std::size_t column = 0; column < table.categorical_dtypes.size();
+         ++column) {
+      if (column != 0) output << ',';
+      const auto& descriptor = table.categorical_dtypes[column];
+      if (!descriptor) {
+        output << "null";
+        continue;
+      }
+      output << "{\"categories_dtype\":\""
+             << json_escape(descriptor->categories_dtype)
+             << "\",\"ordered\":"
+             << (descriptor->ordered ? "true" : "false")
+             << ",\"categories\":[";
+      for (std::size_t category = 0;
+           category < descriptor->categories.size(); ++category) {
+        if (category != 0) output << ',';
+        write_attribute(output, descriptor->categories[category]);
+      }
+      output << "]}";
+    }
+    output << ']';
+  }
 }
 
 void write_attribute(std::ostream& output, const EventAttribute& attribute) {
@@ -713,6 +737,9 @@ void write_attribute(std::ostream& output, const EventAttribute& attribute) {
     if (const auto* integer_value =
             std::get_if<std::int64_t>(&attribute.typed_value))
       output << *integer_value;
+    else if (const auto* unsigned_value =
+                 std::get_if<std::uint64_t>(&attribute.typed_value))
+      output << *unsigned_value;
     else if (const auto* float_value =
                  std::get_if<double>(&attribute.typed_value)) {
       if (std::isfinite(*float_value))
@@ -771,6 +798,9 @@ void write_attribute_detail(std::ostream& output,
     if (const auto* integer_value =
             std::get_if<std::int64_t>(&attribute.typed_value))
       output << *integer_value;
+    else if (const auto* unsigned_value =
+                 std::get_if<std::uint64_t>(&attribute.typed_value))
+      output << *unsigned_value;
     else if (const auto* float_value =
                  std::get_if<double>(&attribute.typed_value)) {
       if (std::isfinite(*float_value))
@@ -1373,7 +1403,7 @@ LazyEventTable event_data_to_lazy_table(const EventDataView& data,
               }, max_rows);
             },
             source.attributes(), source.metadata(), source.row_count(),
-            source.dtypes(), source.index());
+            source.dtypes(), source.index(), source.categorical_dtypes());
       }
   }
   throw std::invalid_argument("event data: invalid input kind");
@@ -1568,6 +1598,7 @@ std::string log_conversion_json(const LogConversionResult& result) {
     }
     output << "]}";
   } else if (result.variant == LogConversionVariant::kToDataFrame) {
+    result.table.validate();
     output << ",\"table\":{\"columns\":[";
     for (std::size_t i = 0; i < result.table.columns.size(); ++i) {
       if (i != 0) output << ',';

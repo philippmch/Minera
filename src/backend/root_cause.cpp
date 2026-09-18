@@ -288,6 +288,9 @@ std::string scalar_category(const EventAttribute& value, bool nested) {
     return *boolean ? "True" : "False";
   if (const auto* integer = std::get_if<std::int64_t>(&value.typed_value))
     return std::to_string(*integer);
+  if (const auto* unsigned_integer =
+          std::get_if<std::uint64_t>(&value.typed_value))
+    return std::to_string(*unsigned_integer);
   if (const auto* real = std::get_if<double>(&value.typed_value))
     return real_category(*real);
   if (const auto* date = std::get_if<NativeDate>(&value.typed_value))
@@ -432,6 +435,12 @@ double attribute_number(const EventAttribute* value, const std::string& key) {
   }
   else if (const auto* real = std::get_if<double>(&value->typed_value)) result = *real;
   else if (const auto* integer = std::get_if<std::int64_t>(&value->typed_value)) result = static_cast<double>(*integer);
+  else if (const auto* unsigned_integer =
+               std::get_if<std::uint64_t>(&value->typed_value))
+    // Root-cause model features are part of the existing float64 API. Keep
+    // the conversion explicit; scalar keys and categories retain uint64
+    // values exactly elsewhere.
+    result = static_cast<double>(*unsigned_integer);
   else if (const auto* boolean = std::get_if<bool>(&value->typed_value)) result = *boolean ? 1.0 : 0.0;
   else if (value->kind == AttributeKind::kBoolean && (value->value == "true" || value->value == "false"))
     result = value->value == "true" ? 1.0 : 0.0;

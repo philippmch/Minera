@@ -50,6 +50,17 @@ struct EventTableIndex {
   bool operator==(const EventTableIndex&) const = default;
 };
 
+// Public pandas categorical metadata for one event-table column.  A null
+// descriptor means that the column is known to be categorical from dtypes but
+// its category details were not supplied by the source.
+struct EventTableCategoricalDtype {
+  std::string categories_dtype;
+  std::vector<EventAttribute> categories;
+  bool ordered = false;
+
+  bool operator==(const EventTableCategoricalDtype&) const = default;
+};
+
 // A rectangular event table.  An empty optional is a missing cell.  A cell
 // containing an EventAttribute with is_null=true is a present null.  An
 // ordinary value with value=="" is a present empty string.
@@ -65,6 +76,10 @@ struct EventTable {
   std::vector<std::string> dtypes;
   // An absent index means the table has the implicit 0..n-1 RangeIndex.
   std::optional<EventTableIndex> index;
+  // An empty vector means that categorical details were not declared;
+  // otherwise entries are aligned one-to-one with columns. A null entry
+  // preserves a known categorical dtype whose categories are unavailable.
+  std::vector<std::optional<EventTableCategoricalDtype>> categorical_dtypes;
 
   [[nodiscard]] std::size_t size() const noexcept { return rows.size(); }
   [[nodiscard]] bool empty() const noexcept { return rows.empty(); }
@@ -90,7 +105,9 @@ class LazyEventTable {
                  EventDataMetadata metadata = {},
                  std::optional<std::size_t> row_count = std::nullopt,
                  std::vector<std::string> dtypes = {},
-                 std::optional<EventTableIndex> index = std::nullopt);
+                 std::optional<EventTableIndex> index = std::nullopt,
+                 std::vector<std::optional<EventTableCategoricalDtype>>
+                     categorical_dtypes = {});
 
   [[nodiscard]] const std::vector<std::string>& columns() const noexcept {
     return columns_;
@@ -106,6 +123,10 @@ class LazyEventTable {
   }
   [[nodiscard]] const std::optional<EventTableIndex>& index() const noexcept {
     return index_;
+  }
+  [[nodiscard]] const std::vector<std::optional<EventTableCategoricalDtype>>&
+  categorical_dtypes() const noexcept {
+    return categorical_dtypes_;
   }
   [[nodiscard]] std::optional<std::size_t> row_count() const noexcept {
     return row_count_;
@@ -132,6 +153,7 @@ class LazyEventTable {
   std::optional<std::size_t> row_count_;
   std::vector<std::string> dtypes_;
   std::optional<EventTableIndex> index_;
+  std::vector<std::optional<EventTableCategoricalDtype>> categorical_dtypes_;
 };
 
 enum class EventDataKind { kEventLog, kEventStream, kEventTable, kLazyEventTable };
