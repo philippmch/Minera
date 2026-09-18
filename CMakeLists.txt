@@ -49,6 +49,7 @@ add_library(minera_core
   src/backend/correlation_miner.cpp
   src/backend/clustering.cpp
   src/backend/csv_event_log_importer.cpp
+  src/backend/dataframe_validation.cpp
   src/backend/dataframe_format.cpp
   src/backend/dataframe_format_json.cpp
   src/backend/data_petri_net.cpp
@@ -448,6 +449,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_event_data_tests PRIVATE cxx_std_20)
   target_compile_options(minera_event_data_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_event_data_tests COMMAND minera_event_data_tests)
+
+  add_executable(minera_dataframe_validation_tests
+    src/backend/tests/test_dataframe_validation.cpp
+  )
+  target_link_libraries(minera_dataframe_validation_tests PRIVATE minera::core)
+  target_compile_features(minera_dataframe_validation_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_dataframe_validation_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_dataframe_validation_tests COMMAND minera_dataframe_validation_tests)
 
   add_executable(minera_dataframe_format_tests
     src/backend/tests/test_dataframe_format.cpp

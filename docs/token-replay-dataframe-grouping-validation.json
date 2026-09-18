@@ -31,6 +31,16 @@
       "nan_keys": "High-level public empty-case validation is not implemented by the native lower-level normalization API.",
       "none_keys": "High-level public empty-case validation is not implemented by the native lower-level normalization API.",
       "nan_only": "High-level public empty-case validation is not implemented by the native lower-level normalization API."
+    },
+    "high_level_validation_resolution": {
+      "entry_point": "replay_dataframe_traces",
+      "evidence": "docs/dataframe-column-validation-evidence.json",
+      "cases": [
+        "nan_keys",
+        "none_keys",
+        "nan_only"
+      ],
+      "scope": "The new validated dataframe entry point reproduces all three rejections; lower-level APIs remain unchanged."
     }
   },
   "native_test_executable_sha256": "1f6595f5d99041b2cd400dce9c03fc512504385daa53bd15cf1b193efaec71ff",
