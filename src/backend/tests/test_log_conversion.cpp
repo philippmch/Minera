@@ -12,6 +12,7 @@
 #include "minera/log_util_json.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "dataframe_conversion_metadata_reference_cases.hpp"
+#include "conversion_case_grouping_reference_cases.hpp"
 
 namespace {
 
@@ -519,6 +520,22 @@ void lazy_output_and_metadata_json_are_explicit() {
   assert(json.find("\"extensions\":[{\"name\":\"demo\"") !=
          std::string::npos);
   assert(json.find("\"lazy\":true") != std::string::npos);
+}
+
+void lexical_numeric_case_values_group_without_losing_strings() {
+  minera::EventStream stream;
+  for (const auto& key : std::vector<minera::EventAttribute>{
+           {"case:concept:name", "0001", minera::AttributeKind::kInt},
+           {"case:concept:name", "+1", minera::AttributeKind::kInt},
+           {"case:concept:name", "1.0", minera::AttributeKind::kFloat},
+           {"case:concept:name", "true", minera::AttributeKind::kBoolean},
+           {"case:concept:name", "1", minera::AttributeKind::kString}})
+    stream.events.push_back({{key, {"concept:name", "A"}}});
+  const auto log = minera::event_stream_to_event_log(stream);
+  assert(log.traces.size() == 2);
+  assert(log.traces[0].events.size() == 4);
+  assert(log.traces[0].case_id == "0001");
+  assert(log.traces[1].events.size() == 1);
 }
 
 void explicit_native_table_origin_survives_conversion() {
@@ -1057,6 +1074,8 @@ void xes_result_serialization_preserves_missing_cells_and_schema() {
 
 int main() {
   check_public_dataframe_conversion_metadata();
+  check_public_conversion_case_grouping();
+  lexical_numeric_case_values_group_without_losing_strings();
   explicit_native_table_origin_survives_conversion();
   xes_result_serialization_preserves_missing_cells_and_schema();
   empty_scalar_wrappers_survive_conversion();
