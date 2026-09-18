@@ -1878,6 +1878,34 @@ to metadata and container lengths; it does not establish exhaustive conversion
 cell, dtype, identity, or error behavior. Structural coverage counts are unchanged.
 
 
+## Typed case grouping evidence
+
+Seventeen pinned public event-stream conversions establish numeric case-key
+equality across booleans, integers, and floating-point values. Native conversion
+now groups equal values together, keeps the first typed case representative,
+and retains input event order. Exact signed/unsigned keys avoid rounding large
+integers through double precision. Positive and negative zero share a case;
+strings remain distinct from numbers. Reused NaN scalar identities share a case,
+while separately created NaNs remain separate. Native lexical numeric fields
+also normalize for grouping without changing their stored labels.
+
+`docs/conversion-case-grouping-reference.json.gz` records typed input keys,
+scalar identities, typed output labels and complete event partitions. Generated
+checks and native lexical fallback checks pass with all 152 native suites,
+88 script tests, four optimized evidence tests and the existing formatter
+transport matrix. Validation hashes are recorded in
+`docs/conversion-case-grouping-validation.json`.
+
+A separate seven-case capture in `docs/token-replay-case-key-reference.json.gz`
+records an open boundary: the public direct-dataframe replay path can produce
+fewer diagnostics than conversion followed by replay for large mixed numeric
+keys. In particular, int64 max and floating-point 2^63 produce one dataframe
+diagnostic but two converted-log diagnostics. This checkpoint corrects exact
+stream grouping and its generic native normalization integration; it does not
+claim parity for that optimized dataframe replay path. Date/container keys,
+all hashability errors, and broader scalar identity behavior remain unproven.
+
+
 ## Basic random-tree generation evidence
 
 The BASIC random-tree generator uses the seeded recursive-depth process-tree

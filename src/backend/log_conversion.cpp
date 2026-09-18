@@ -4,6 +4,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
+#include <limits>
+#include <locale>
 #include <cstdint>
 #include <cmath>
 #include <iomanip>
@@ -355,6 +358,61 @@ void infer_standard_extensions(const LogConversionTable& table,
         {std::string(found->name), std::string(found->prefix),
          std::string(found->uri)});
   }
+}
+
+// Numeric Python dictionary keys compare by value across bool/int/float.
+// Canonical integer strings retain exact uint64/int64 boundaries without
+// rounding through double; nonintegral/out-of-range floats have separate keys.
+std::pair<AttributeKind, std::string> case_grouping_scalar(
+    const EventAttribute& value) {
+  const auto original = std::pair{value.kind, std::string("lexical:") + value.value};
+  if (value.is_null) return original;
+  const auto integer = [](auto number) {
+    return std::pair{AttributeKind::kInt, std::string("integer:") + std::to_string(number)};
+  };
+  const auto floating = [&](double number) {
+    if (std::isnan(number))
+      return std::pair{AttributeKind::kFloat, std::string("nan:") +
+          std::to_string(value.typed_value.scalar_identity())};
+    if (std::isfinite(number) && std::trunc(number) == number) {
+      if (number >= 0 && number < 18446744073709551616.0)
+        return integer(static_cast<std::uint64_t>(number));
+      if (number < 0 && number >= -9223372036854775808.0)
+        return integer(static_cast<std::int64_t>(number));
+    }
+    std::ostringstream text;
+    text.imbue(std::locale::classic());
+    text << std::hexfloat << number;
+    return std::pair{AttributeKind::kFloat, std::string("float:") + text.str()};
+  };
+  if (const auto* number = std::get_if<std::int64_t>(&value.typed_value)) return integer(*number);
+  if (const auto* number = std::get_if<std::uint64_t>(&value.typed_value)) return integer(*number);
+  if (const auto* number = std::get_if<bool>(&value.typed_value)) return integer(*number ? 1 : 0);
+  if (const auto* number = std::get_if<double>(&value.typed_value)) return floating(*number);
+  if (!std::holds_alternative<std::monostate>(value.typed_value)) return original;
+  if (value.kind == AttributeKind::kBoolean) {
+    if (value.value == "true" || value.value == "True" || value.value == "1") return integer(1);
+    if (value.value == "false" || value.value == "False" || value.value == "0") return integer(0);
+  }
+  std::string_view text = value.value;
+  if (text.starts_with('+')) text.remove_prefix(1);
+  const auto parse = [&](auto& number) {
+    const auto result = std::from_chars(text.data(), text.data() + text.size(), number);
+    return result.ec == std::errc{} && result.ptr == text.data() + text.size();
+  };
+  if (value.kind == AttributeKind::kInt) {
+    if (text.starts_with('-')) {
+      std::int64_t number = 0;
+      if (parse(number)) return integer(number);
+    } else {
+      std::uint64_t number = 0;
+      if (parse(number)) return integer(number);
+    }
+  } else if (value.kind == AttributeKind::kFloat) {
+    double number = 0;
+    if (parse(number)) return floating(number);
+  }
+  return original;
 }
 
 bool is_case_attribute_field(const EventAttribute& field,
@@ -1137,8 +1195,9 @@ EventLog event_stream_to_event_log(const ConvertedEventStream& stream,
                    ? std::string(kActivityKey)
                    : glue->key)
             : glue->first_class_source_key;
+    const auto scalar_key = case_grouping_scalar(*glue);
     auto [found, inserted] = trace_indexes.emplace(
-        std::tuple{glue->kind, glue->value, glue->is_null,
+        std::tuple{scalar_key.first, scalar_key.second, glue->is_null,
                    static_cast<int>(case_state),
                    row_case_source_key},
         log.traces.size());

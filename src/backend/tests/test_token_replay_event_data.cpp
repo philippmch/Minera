@@ -388,16 +388,18 @@ void numeric_case_ordering_preserves_full_integers() {
   stream.events[6].fields[0].kind = AttributeKind::kFloat;
   const auto table = event_stream_to_table(stream);
   const auto lazy = LazyEventTable::from_table(table);
+  // Generic native tables use stream conversion's exact numeric equality.
+  // The equal int/float case shares one trace and retains its first label.
   const std::vector<std::string> expected = {"-1.5", "-1", "9007199254740992",
-      "9007199254740992", "9007199254740993", "9223372036854775807", "9223372036854775808"};
+      "9007199254740993", "9223372036854775807", "9223372036854775808"};
   for (const auto view : {EventDataView(table), EventDataView(lazy)}) {
     const auto log = normalize_token_replay_event_log(view);
     std::vector<std::string> actual;
     for (const auto& trace : log.traces) actual.push_back(trace.case_id);
     require(actual == expected, "numeric case sorting preserves integers beyond double precision");
     require(log.traces[2].case_id_attribute->kind == AttributeKind::kInt &&
-            log.traces[3].case_id_attribute->kind == AttributeKind::kFloat,
-            "equal numeric values of distinct types retain stable source order");
+            log.traces[2].events.size() == 2,
+            "equal numeric types group with the first representative");
   }
 }
 }  // namespace
