@@ -1,3 +1,4 @@
+#include "minera/event_table_json.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/xes_event_log_importer.hpp"
 
@@ -1574,6 +1575,41 @@ std::string xes_import_result_json(const XesImportResult& result) {
   return output.str();
 }
 
+
+std::string serialize_event_table_json(const EventTable& table) {
+  std::ostringstream output;
+  output << "{\"columns\":[";
+  for (std::size_t i = 0; i < table.columns.size(); ++i) {
+    if (i != 0) output << ',';
+    output << '\"' << json_escape(table.columns[i]) << '\"';
+  }
+  output << ']';
+  write_event_table_metadata(output, table);
+  output << ",\"attributes\":";
+  write_attributes(output, table.attributes);
+  output << ",\"metadata\":";
+  write_metadata(output, table.metadata);
+  output << ",\"rows\":[";
+  for (std::size_t row = 0; row < table.rows.size(); ++row) {
+    if (row != 0) output << ',';
+    output << '[';
+    for (std::size_t column = 0; column < table.rows[row].size();
+         ++column) {
+      if (column != 0) output << ',';
+      if (!table.rows[row][column]) {
+        output << "null";
+        continue;
+      }
+      const auto& cell = *table.rows[row][column];
+      write_attribute(output, cell);
+    }
+    output << ']';
+  }
+  output << ']';
+  output << "}";
+  return output.str();
+}
+
 std::string log_conversion_json(const LogConversionResult& result) {
   const auto variant = log_conversion_variant_name(result.variant);
   std::ostringstream output;
@@ -1599,36 +1635,9 @@ std::string log_conversion_json(const LogConversionResult& result) {
     output << "]}";
   } else if (result.variant == LogConversionVariant::kToDataFrame) {
     result.table.validate();
-    output << ",\"table\":{\"columns\":[";
-    for (std::size_t i = 0; i < result.table.columns.size(); ++i) {
-      if (i != 0) output << ',';
-      output << '\"' << json_escape(result.table.columns[i]) << '\"';
-    }
-    output << ']';
-    write_event_table_metadata(output, result.table);
-    output << ",\"attributes\":";
-    write_attributes(output, result.table.attributes);
-    output << ",\"metadata\":";
-    write_metadata(output, result.table.metadata);
-    output << ",\"rows\":[";
-    for (std::size_t row = 0; row < result.table.rows.size(); ++row) {
-      if (row != 0) output << ',';
-      output << '[';
-      for (std::size_t column = 0; column < result.table.rows[row].size();
-           ++column) {
-        if (column != 0) output << ',';
-        if (!result.table.rows[row][column]) {
-          output << "null";
-          continue;
-        }
-        const auto& cell = *result.table.rows[row][column];
-        write_attribute(output, cell);
-      }
-      output << ']';
-    }
-    output << ']';
-    if (result.lazy_table) output << ",\"lazy\":true";
-    output << "}";
+    auto table_json = serialize_event_table_json(result.table);
+    if (result.lazy_table) table_json.insert(table_json.size() - 1, ",\"lazy\":true");
+    output << ",\"table\":" << table_json;
   } else {
     output << ",\"graph\":{\"nodes\":[";
     for (std::size_t i = 0; i < result.graph.nodes.size(); ++i) {

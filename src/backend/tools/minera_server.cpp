@@ -92,6 +92,7 @@
 #include "minera/trie_conversion.hpp"
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
+#include "minera/dataframe_format_json.hpp"
 #include "minera/random_tree.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/monte_carlo.hpp"
@@ -4986,6 +4987,20 @@ void handle_case_relations(const httplib::Request& request,
   }
 }
 
+void handle_format_dataframe(const httplib::Request& request,
+                             httplib::Response& response) {
+  try {
+    if (!request.params.empty())
+      throw std::invalid_argument("formatter options belong in the JSON request body");
+    const auto result = minera::format_dataframe_json(request.body);
+    response.status = result.success ? 200 : 400;
+    response.set_content(result.body, "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_timestamp_interleavings(const httplib::Request& request,
                                     httplib::Response& response) {
   try {
@@ -7701,6 +7716,7 @@ int main(int argc, char** argv) {
   server.Options("/api/trie-to-petri", preflight);
   server.Options("/api/interval-tree", preflight);
   server.Options("/api/merge-case-relations", preflight);
+  server.Options("/api/format-dataframe", preflight);
   server.Options("/api/timestamp-interleavings", preflight);
   server.Options("/api/random-tree", preflight);
   server.Options("/api/compare-petri", preflight);
@@ -7803,6 +7819,7 @@ int main(int argc, char** argv) {
   server.Get("/api/trie-to-petri", handle_trie_to_petri);
   server.Get("/api/interval-tree", handle_interval_tree);
   server.Post("/api/merge-case-relations", handle_case_relations);
+  server.Post("/api/format-dataframe", handle_format_dataframe);
   server.Post("/api/timestamp-interleavings", handle_timestamp_interleavings);
   server.Get("/api/random-tree", handle_random_tree);
   server.Post("/api/compare-petri", handle_compare_petri);

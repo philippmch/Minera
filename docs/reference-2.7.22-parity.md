@@ -1808,12 +1808,28 @@ The minimum signed nanosecond value converts to NaT and its event is dropped;
 conversion failure leaves that integer intact. Infinity values retain their
 sign and float type in the public evidence rather than becoming missing cells.
 
-The isolated Release build and all 151 native suites pass, including the 119
-mapped public formatter cases. All 76 script tests and nine optimized evidence
+The isolated Release build and all 152 native suites pass, including the 119
+mapped public formatter cases. All 80 script tests and 13 optimized formatter
 tests pass; independent review has no outstanding findings in this checkpoint.
 `docs/format-dataframe-validation.json` records source/artifact hashes, the resolved
 mixed numeric exception observation, and validation limits. Structural catalogue
 coverage remains 44/86 dispatchers and 195/387 modules complete.
+
+The typed JSON interfaces are `minera_format_dataframe` and
+`POST /api/format-dataframe`. They accept declared cells, dtypes, categories,
+indexes and recursive metadata, and return both the result and post-call input.
+Formatting rejections preserve the changed input; malformed JSON is rejected
+before formatting. The existing native log-conversion table serialization is
+shared, including ordered globals and exact 64-bit scalar values. The decoder
+checks numeric grammar/ranges, lexical/typed agreement, UTF-8, duplicate keys,
+unknown fields, table dimensions, and size/depth limits.
+
+All 119 representable observations pass independently through the CLI and HTTP
+endpoint, with 12 additional file/error/metadata boundaries. Executables are
+hashed before and after checks. `docs/format-dataframe-transport-validation.json`
+records the complete case manifest, source/binary hashes and validation;
+`docs/dataframe-format-interface.md` describes the request and response schema.
+
 
 ## Basic random-tree generation evidence
 

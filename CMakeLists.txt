@@ -50,6 +50,7 @@ add_library(minera_core
   src/backend/clustering.cpp
   src/backend/csv_event_log_importer.cpp
   src/backend/dataframe_format.cpp
+  src/backend/dataframe_format_json.cpp
   src/backend/data_petri_net.cpp
   src/backend/declare.cpp
   src/backend/declare_playout.cpp
@@ -231,6 +232,10 @@ target_compile_features(minera_process_cube PRIVATE cxx_std_20)
 add_executable(minera_log_util src/backend/tools/minera_log_util.cpp)
 target_link_libraries(minera_log_util PRIVATE minera::core)
 target_compile_features(minera_log_util PRIVATE cxx_std_20)
+
+add_executable(minera_format_dataframe src/backend/tools/minera_format_dataframe.cpp)
+target_link_libraries(minera_format_dataframe PRIVATE minera::core)
+target_compile_features(minera_format_dataframe PRIVATE cxx_std_20)
 
 add_executable(minera_knowledge src/backend/tools/minera_knowledge.cpp)
 target_link_libraries(minera_knowledge PRIVATE minera::core)
@@ -451,6 +456,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_dataframe_format_tests PRIVATE cxx_std_20)
   target_compile_options(minera_dataframe_format_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_dataframe_format_tests COMMAND minera_dataframe_format_tests)
+
+  add_executable(minera_dataframe_format_json_tests src/backend/tests/test_dataframe_format_json.cpp)
+  target_link_libraries(minera_dataframe_format_json_tests PRIVATE minera::core)
+  target_compile_features(minera_dataframe_format_json_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_dataframe_format_json_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_dataframe_format_json_tests COMMAND minera_dataframe_format_json_tests)
 
   add_executable(minera_ocel_tests
     src/backend/tests/test_ocel.cpp
