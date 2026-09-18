@@ -1850,6 +1850,34 @@ records the complete case manifest, source/binary hashes and validation;
 `docs/dataframe-format-interface.md` describes the request and response schema.
 
 
+## Dataframe conversion metadata evidence
+
+Public `convert_to_event_log` and `convert_to_event_stream` observations now
+cover dataframe metadata mapping in 22 cases: 20 dataframe routes and two
+existing-stream controls. The durable capture pins the public conversion and
+formatter modules by opaque normalized bytes, records full dataframe inputs
+and input-after state, and checks metadata plus output container lengths.
+Generated native checks run each dataframe case through eager and lazy routes
+for 42 total comparisons, preserving nested properties, custom case keys, and
+empty typed schemas.
+
+Dataframe attrs map to native metadata properties. Conversion removes exactly
+`pm4py:param:case_id_key`, retaining ordinary `case_id_key` and all other captured
+properties. Tables without native log-level attributes receive `origin=csv`.
+Native tables can additionally carry log-level attributes, which dataframes do
+not represent; those vectors remain intact when nonempty. Existing stream
+conversion retains both its origin and reserved case-id property. Input data
+and metadata remain unchanged.
+
+The isolated Release build, all 152 native suites, 84 script tests, four
+optimized evidence gates, and 258 formatter cases through each CLI/HTTP route
+pass. Independent review is clear. The capture and validation are recorded in
+`docs/dataframe-conversion-metadata-reference.json.gz` and
+`docs/dataframe-conversion-metadata-validation.json`. This evidence is limited
+to metadata and container lengths; it does not establish exhaustive conversion
+cell, dtype, identity, or error behavior. Structural coverage counts are unchanged.
+
+
 ## Basic random-tree generation evidence
 
 The BASIC random-tree generator uses the seeded recursive-depth process-tree
