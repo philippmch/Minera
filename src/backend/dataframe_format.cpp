@@ -188,6 +188,13 @@ std::optional<ExactTimestamp> parse_strptime_timestamp(std::string text,
   if (year < 1 || month < 1 || month > 12 || day < 1 || day > 31 ||
       hour > 23 || minute > 59 || second > 59)
     return std::nullopt;
+  constexpr unsigned month_lengths[] = {31, 28, 31, 30, 31, 30,
+                                         31, 31, 30, 31, 30, 31};
+  const bool leap_year = year % 4 == 0 &&
+                         (year % 100 != 0 || year % 400 == 0);
+  const auto maximum_day = month_lengths[month - 1] +
+                           (month == 2 && leap_year ? 1u : 0u);
+  if (day > maximum_day) return std::nullopt;
   return ExactTimestamp{days_from_civil(year, month, day) * 86400 +
                              static_cast<std::int64_t>(hour * 3600 +
                                                        minute * 60 + second),

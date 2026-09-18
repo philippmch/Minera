@@ -1,5 +1,5 @@
 {
-  "reference_sha256": "28efbc752979ad4385cd8a6f6e53762d756fbcb994b5e450c90c8b55b848ca6e",
+  "reference_sha256": "1296781252880533e1ceab02cea94c6a05b75b871c7e5dbc29d69b6b0002f03c",
   "reference_provenance": {
     "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
     "method": "opaque defining-module bytes, CRLF normalized to LF, no source decoding",
@@ -9,7 +9,7 @@
     "installed_sha256": "cf480411c34ff169468b726424a6563aedb6c94274b283973ca194ec51235a88",
     "pinned_sha256": "cf480411c34ff169468b726424a6563aedb6c94274b283973ca194ec51235a88"
   },
-  "public_cases": 120,
+  "public_cases": 127,
   "case_names": [
     "normal_defaults_unsorted",
     "normal_explicit_default_selectors",
@@ -129,33 +129,40 @@
     "numeric_boundary_object_unsigned_wrap_split",
     "numeric_boundary_object_overflow_float_same",
     "numeric_boundary_object_overflow_float_split",
-    "numeric_boundary_custom_error_mutation"
+    "numeric_boundary_custom_error_mutation",
+    "calendar_invalid_february",
+    "calendar_nonleap_february",
+    "calendar_leap_february",
+    "calendar_invalid_april",
+    "calendar_valid_april",
+    "calendar_century_nonleap",
+    "calendar_century_leap"
   ],
   "excluded_cases": {
     "non_string_column_labels_with_selectors": "EventTable column labels are strings."
   },
-  "cli_comparisons": 119,
-  "http_comparisons": 119,
+  "cli_comparisons": 126,
+  "http_comparisons": 126,
   "transport_boundary_checks": 12,
   "native_sha256_before_and_after": {
-    "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-comparison-checkpoint-build\\Release\\minera_format_dataframe.exe": "6e7bf477626ea8aee72d7a4f5f40404bde0239aedaa6d3d17f176bb29600c66d",
-    "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-comparison-checkpoint-build\\Release\\minera_server.exe": "4d921eb68064de74d2a865fce0d5d2d5a634ab88a574de2692606a7e50845682"
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-comparison-checkpoint-build\\Release\\minera_format_dataframe.exe": "1db2e3bd27fc420189e85d04ca1a835911e11310c251aba7eb155e1c510b23f2",
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-comparison-checkpoint-build\\Release\\minera_server.exe": "7f5e740d33662b89991acd9095db6a78ebf709859fb5f9336979f0b4dd81ccab"
   },
   "scope": "Typed JSON CLI and HTTP formatter transport; CSV/pandas reader inference and mixed XES/CSV adapters remain incomplete.",
-  "native_source_parent_commit": "a0084ab3aeb7c88ce1f2526aa2edb1153af68f76",
-  "native_verified_staged_tree": "a3549b78f813299e791692d697218964c53a04d4",
+  "native_source_parent_commit": "bef72f3318b69034e72f844ba889e51cd17ee186",
+  "native_verified_staged_tree": "dfc579027cf90aeb516e57caed35623b9f308bc3",
   "source_sha256_lf_normalized": {
     "CMakeLists.txt": "220e056be153fe64baabc9e6f9c3945ef67ea837b9a865f66ef82c8789db7ba1",
     "include/minera/dataframe_format_json.hpp": "d71be6525f6db2235c9fbebdde8dd4a0bc705343bf2520e0147c1b3db932aff9",
     "include/minera/event_table_json.hpp": "589fa0b630a4ce5496506450ce35e3bbef2cb768193098a570b57567316d7abf",
-    "src/backend/dataframe_format.cpp": "ddaac0b84437f6edfd7bcc684c6e27bf4a45867c8deefedacb3e6eac68eca6f8",
+    "src/backend/dataframe_format.cpp": "6c2362ceac7d7336be22eca6aca01e9fe923e00a37da93712449dadfb7a897a9",
     "src/backend/dataframe_format_json.cpp": "23b0ade82b0076428cad24e00769e702b3d91a48d22b73cf7d9f5f97433ac714",
     "src/backend/log_conversion.cpp": "9344fd4224e868812d15f1ad5546a79e6b2a41c6c594e2583c56b344d87473ba",
     "src/backend/tools/minera_format_dataframe.cpp": "6eb907e1ef78a8eef48a8e2bb7f63b87ca9b1c7a4119407da3a6cf357209a2ba",
     "src/backend/tools/minera_server.cpp": "42d41d92b0ca842b69de25586a2f7a2032e0749df548ea3fddb122db0bb26376",
     "src/backend/tests/test_dataframe_format_json.cpp": "446e826dff14791b8747b5f15f0f9e22560391d671f94f5cc3966af1673d358c",
-    "scripts/check-format-dataframe-transports.py": "cd179ab7878566527ee76204c197c41f8f112151c8be2f41c63537cb4329da98",
-    "scripts/tests/test_format_dataframe_transports.py": "d2ee9ca15a9bf52ed866cc4efe6722cc28cfbe401d07abd00c6249fa0be858fb"
+    "scripts/check-format-dataframe-transports.py": "0b8aa520757ad99030a58493c0cda5f64b963552f3ca88f893dc3dacf0ad237c",
+    "scripts/tests/test_format_dataframe_transports.py": "a4d7e6726875b6410043d3b79013883b6cc223ac4737735cd606e4e66012432b"
   },
   "validation": {
     "release_build": "passed",
@@ -163,7 +170,7 @@
     "native_suites_failed": 0,
     "script_tests_passed": 80,
     "optimized_formatter_tests_passed": 13,
-    "independent_review": "No actionable findings in the typed formatter transport checkpoint."
+    "independent_review": "No actionable findings in the calendar formatter checkpoint."
   },
   "transport_boundaries": [
     "CLI file input/output",

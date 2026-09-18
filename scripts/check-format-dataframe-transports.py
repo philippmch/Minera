@@ -234,8 +234,8 @@ def check(executable, server, reference, output):
     report = json.loads(raw)
     excluded = generator["EXCLUDED_CASES"]
     cases = [row for row in report["rows"] if row["name"] not in excluded]
-    if len(cases) != 119:
-        raise ValueError("expected all 119 representable cases")
+    if len(cases) != 126:
+        raise ValueError("expected all 126 representable cases")
     hashes = {
         str(path): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in (executable, server)
