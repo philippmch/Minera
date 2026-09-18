@@ -58,11 +58,9 @@ std::string attribute_text(const EventAttribute& cell) {
   if (const auto* value = std::get_if<bool>(&cell.typed_value))
     return *value ? "True" : "False";
   if (const auto* value = std::get_if<std::int64_t>(&cell.typed_value)) {
-    if (!cell.value.empty()) return cell.value;
     return std::to_string(*value);
   }
   if (const auto* value = std::get_if<std::uint64_t>(&cell.typed_value)) {
-    if (!cell.value.empty()) return cell.value;
     return std::to_string(*value);
   }
   if (const auto* value = std::get_if<double>(&cell.typed_value)) {
