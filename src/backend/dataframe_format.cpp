@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <limits>
 #include <locale>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
@@ -317,15 +318,18 @@ bool all_date_eligible(const EventTable& table, std::size_t column,
       // nanoseconds. Numeric dataframe dtypes bypass this conversion above.
       const auto& cell = *row[column];
       std::int64_t nanos = 0;
-      if (const auto* number = std::get_if<std::int64_t>(&cell.typed_value)) nanos = *number;
-      else if (const auto* number = std::get_if<std::uint64_t>(&cell.typed_value)) {
-        if (*number > static_cast<std::uint64_t>(INT64_MAX)) return false;
-        nanos = static_cast<std::int64_t>(*number);
-      } else if (const auto* number = std::get_if<double>(&cell.typed_value)) {
-        if (!std::isfinite(*number) || *number <= -9223372036854775808.0 || *number >= 9223372036854775808.0) return false;
-        nanos = static_cast<std::int64_t>(*number);
+      if (const auto* signed_number = std::get_if<std::int64_t>(&cell.typed_value)) nanos = *signed_number;
+      else if (const auto* unsigned_number = std::get_if<std::uint64_t>(&cell.typed_value)) {
+        if (*unsigned_number > static_cast<std::uint64_t>(INT64_MAX)) return false;
+        nanos = static_cast<std::int64_t>(*unsigned_number);
+      } else if (const auto* floating_number = std::get_if<double>(&cell.typed_value)) {
+        if (!std::isfinite(*floating_number) || *floating_number < -9223372036854775808.0 || *floating_number >= 9223372036854775808.0) return false;
+        nanos = static_cast<std::int64_t>(*floating_number);
       } else return false;
-      if (nanos == INT64_MIN) return false;
+      if (nanos == INT64_MIN) {
+        parsed.push_back(std::nullopt);
+        continue;
+      }
       auto seconds = nanos / 1000000000;
       auto fraction = nanos % 1000000000;
       if (fraction < 0) { --seconds; fraction += 1000000000; }
@@ -343,7 +347,7 @@ EventAttribute date_cell(std::string key, const std::optional<EventAttribute>& s
                          const std::optional<ExactTimestamp>& parsed,
                          std::string_view precision) {
   if (cell_missing(source)) return null_cell(std::move(key), AttributeKind::kDate);
-  if (!parsed) return copy_cell(source, std::move(key));
+  if (!parsed) return null_cell(std::move(key), AttributeKind::kDate);
   const auto value = format_exact_timestamp(*parsed, precision);
   EventAttribute result{std::move(key), value, AttributeKind::kDate};
   result.typed_value = NativeDate{value, precision == "ns"
@@ -435,8 +439,7 @@ void convert_column_to_strings(EventTable& table, std::size_t column) {
   if (!table.categorical_dtypes.empty()) table.categorical_dtypes[column] = std::nullopt;
 }
 
-std::optional<ExactTimestamp> sort_timestamp(const std::optional<EventAttribute>& cell,
-                                             const std::optional<std::string>& format) {
+std::optional<ExactTimestamp> sort_timestamp(const std::optional<EventAttribute>& cell) {
   if (cell_missing(cell)) return std::nullopt;
   if (cell->kind != AttributeKind::kDate) return std::nullopt;
   return parse_timestamp_cell(*cell, std::nullopt);
@@ -481,6 +484,43 @@ bool numeric_less(const EventAttribute& left, const EventAttribute& right) {
   return compare_format_numbers(format_number(left), format_number(right)) < 0;
 }
 
+void validate_numeric_sort_categories(const EventTable& table, std::size_t column) {
+  struct Category {
+    FormatNumber number;
+    bool boolean;
+  };
+  std::vector<Category> categories;
+  categories.reserve(table.rows.size());
+  for (const auto& row : table.rows) {
+    const auto& cell = row[column];
+    if (cell_missing(cell) || !numeric_kind(*cell)) return;
+    categories.push_back({format_number(*cell),
+                          cell->kind == AttributeKind::kBoolean ||
+                              std::holds_alternative<bool>(cell->typed_value)});
+  }
+  // Public sorting first forms exact unique values. The first representative
+  // decides the type when equal boolean/integer/float values occur together.
+  std::stable_sort(categories.begin(), categories.end(), [](const auto& a, const auto& b) {
+    return compare_format_numbers(a.number, b.number) < 0;
+  });
+  categories.erase(std::unique(categories.begin(), categories.end(), [](const auto& a, const auto& b) {
+    return compare_format_numbers(a.number, b.number) == 0;
+  }), categories.end());
+  if (std::any_of(categories.begin(), categories.end(), [](const auto& value) { return value.boolean; }) ||
+      std::none_of(categories.begin(), categories.end(), [](const auto& value) { return value.number.floating.has_value(); }))
+    return;
+  // Float category inference can collapse distinct exact integers. Reproduce
+  // the observed rejection globally, even when the rows have different cases.
+  std::set<double> projected;
+  for (const auto& category : categories) {
+    const auto& number = category.number;
+    const auto value = number.floating ? *number.floating :
+        (number.negative ? -static_cast<double>(number.magnitude) : static_cast<double>(number.magnitude));
+    if (!projected.insert(value).second)
+      throw std::invalid_argument("Categorical categories must be unique");
+  }
+}
+
 EventAttribute index_cell(std::string key, std::int64_t value) {
   EventAttribute result{std::move(key), std::to_string(value), AttributeKind::kInt};
   result.typed_value = value;
@@ -516,7 +556,6 @@ EventTable format_dataframe(EventTable& input,
   // mutation while the returned table receives normalized cells.
   const bool custom_case = options.case_id != kCaseColumn;
   const bool custom_activity = options.activity_key != kActivityColumn;
-  const bool custom_timestamp = options.timestamp_key != kTimestampColumn;
   // Aliases are replaced in public selector order. Later selectors can
   // observe a canonical alias written by an earlier selector.
   auto alias = [&](const std::string& source, std::string_view target, std::string_view role) {
@@ -610,6 +649,13 @@ EventTable format_dataframe(EventTable& input,
                               options.timestamp_format);
   }
 
+  // A successful object-to-date conversion can introduce NaT (the reserved
+  // minimum signed nanosecond value). Required timestamp NaTs drop their rows.
+  std::erase_if(result.rows, [&](const auto& row) {
+    return cell_missing(row[canonical_timestamp]);
+  });
+  validate_numeric_sort_categories(result, canonical_timestamp);
+
   // Sort normalized dates exactly, numeric values numerically, and columns
   // that failed date conversion lexically; preserve input order for ties.
   const auto result_case = require_column(result, std::string(kCaseColumn), "case ID");
@@ -620,12 +666,13 @@ EventTable format_dataframe(EventTable& input,
     const auto left_case = attribute_text(*left[result_case]);
     const auto right_case = attribute_text(*right[result_case]);
     if (left_case != right_case) return left_case < right_case;
-    if (numeric_kind(*left[result_timestamp]) && numeric_kind(*right[result_timestamp]))
+    const bool left_numeric = numeric_kind(*left[result_timestamp]);
+    const bool right_numeric = numeric_kind(*right[result_timestamp]);
+    if (left_numeric != right_numeric) return left_numeric;
+    if (left_numeric)
       return numeric_less(*left[result_timestamp], *right[result_timestamp]);
-    const auto left_time = sort_timestamp(left[result_timestamp],
-                                          options.timestamp_format);
-    const auto right_time = sort_timestamp(right[result_timestamp],
-                                           options.timestamp_format);
+    const auto left_time = sort_timestamp(left[result_timestamp]);
+    const auto right_time = sort_timestamp(right[result_timestamp]);
     if (left_time && right_time) return timestamp_less(*left_time, *right_time);
     if (left_time.has_value() != right_time.has_value()) return left_time.has_value();
     if (!cell_missing(left[result_timestamp]) &&

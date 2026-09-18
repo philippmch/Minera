@@ -1773,14 +1773,14 @@ from empty/singleton labels remain outside the current table metadata model.
 
 The native `format_dataframe(EventTable&, DataFrameFormatOptions)` operation is
 based on public calls to `pm4py.format_dataframe`, rather than CSV-reader
-inference. `docs/format-dataframe-reference.json.gz` retains 53 observations
-under PM4Py 2.7.22 and pandas 3.0.5, including seven public rejections. The
+inference. `docs/format-dataframe-reference.json.gz` retains 120 observations
+under PM4Py 2.7.22 and pandas 3.0.5, including 26 public rejections. The
 capture records the full input and post-call state, returned cells and dtypes,
 categorical descriptors, index class/names/labels, attrs, and return identity.
 The defining public module is checked against the pinned Git blob using opaque
 bytes with CRLF normalization; implementation text is not decoded.
 
-Generated native checks cover 52 representable cases, including post-call input
+Generated native checks cover 119 representable cases, including post-call input
 checks for failures. The non-string-column case remains a named exclusion:
 EventTable models column labels and selectors as strings. Dataframe attrs map
 to `EventTable::metadata.properties`, as confirmed by a separate public
@@ -1798,13 +1798,20 @@ categorical source aliases, numeric sorting, and mixed microsecond/nanosecond
 string columns. Object-typed numeric timestamps within the observed signed
 nanosecond range become exact UTC dates; boolean/integer objects and unsigned
 values outside that range retain their scalar kinds in the captured cases.
-The public mixed float/int/UINT64 boundary can reject with pandas categorical
-uniqueness errors; that combined boundary remains an explicit follow-on gap.
+Mixed float/int/UINT64 sorting reproduces the observed categorical-uniqueness
+rejection when distinct numeric categories collide after floating conversion.
+Exact duplicates retain their first representative, which matters when boolean,
+integer, and float values compare equal. Boolean/string mixtures prevent that
+numeric category coercion, and numeric cells sort before strings. The check
+applies across cases and preserves custom selector mutations before rejection.
+The minimum signed nanosecond value converts to NaT and its event is dropped;
+conversion failure leaves that integer intact. Infinity values retain their
+sign and float type in the public evidence rather than becoming missing cells.
 
-The isolated Release build and all 151 native suites pass, including the 52
-mapped public formatter cases. All 75 script tests and eight optimized evidence
+The isolated Release build and all 151 native suites pass, including the 119
+mapped public formatter cases. All 76 script tests and nine optimized evidence
 tests pass; independent review has no outstanding findings in this checkpoint.
-`docs/format-dataframe-validation.json` records source/artifact hashes, the known
+`docs/format-dataframe-validation.json` records source/artifact hashes, the resolved
 mixed numeric exception observation, and validation limits. Structural catalogue
 coverage remains 44/86 dispatchers and 195/387 modules complete.
 

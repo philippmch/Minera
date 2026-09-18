@@ -71,6 +71,77 @@ EXPECTED_CASES += (
     "object_unsigned_timestamps",
 )
 
+NUMERIC_BOUNDARY_CASES = (
+    "numeric_boundary_duplicate_float_late_same",
+    "numeric_boundary_duplicate_float_late_split",
+    "numeric_boundary_duplicate_float_first_same",
+    "numeric_boundary_duplicate_float_first_split",
+    "numeric_boundary_duplicate_bool_late_same",
+    "numeric_boundary_duplicate_bool_late_split",
+    "numeric_boundary_duplicate_bool_first_same",
+    "numeric_boundary_duplicate_bool_first_split",
+    "numeric_boundary_float_negative_zero_same",
+    "numeric_boundary_float_negative_zero_split",
+    "numeric_boundary_bool_float_wide_same",
+    "numeric_boundary_bool_float_wide_split",
+    "numeric_boundary_string_float_wide_same",
+    "numeric_boundary_string_float_wide_split",
+    "numeric_boundary_float_exact_equal_same",
+    "numeric_boundary_float_exact_equal_split",
+    "numeric_boundary_float_rounding_pair_same",
+    "numeric_boundary_float_rounding_pair_split",
+    "numeric_boundary_float_bool_rounding_same",
+    "numeric_boundary_float_bool_rounding_split",
+    "numeric_boundary_timestamp_text_before_number_same",
+    "numeric_boundary_timestamp_text_before_number_split",
+    "numeric_boundary_timestamp_boolean_text_same",
+    "numeric_boundary_timestamp_boolean_text_split",
+    "numeric_boundary_nanosecond_nat_with_bad_same",
+    "numeric_boundary_nanosecond_nat_with_bad_split",
+    "numeric_boundary_numeric_datetime_string_same",
+    "numeric_boundary_numeric_datetime_string_split",
+    "numeric_boundary_numeric_signed_nat_and_bool_same",
+    "numeric_boundary_numeric_signed_nat_and_bool_split",
+    "numeric_boundary_wide_float_collision_same",
+    "numeric_boundary_wide_float_collision_split",
+    "numeric_boundary_wide_float_safe_same",
+    "numeric_boundary_wide_float_safe_split",
+    "numeric_boundary_wide_integer_collision_same",
+    "numeric_boundary_wide_integer_collision_split",
+    "numeric_boundary_wide_only_float_same",
+    "numeric_boundary_wide_only_float_split",
+    "numeric_boundary_wide_one_float_same",
+    "numeric_boundary_wide_one_float_split",
+    "numeric_boundary_wide_bool_collision_same",
+    "numeric_boundary_wide_bool_collision_split",
+    "numeric_boundary_bool_exact_collision_same",
+    "numeric_boundary_bool_exact_collision_split",
+    "numeric_boundary_negative_wide_same",
+    "numeric_boundary_negative_wide_split",
+    "numeric_boundary_negative_wide_float_same",
+    "numeric_boundary_negative_wide_float_split",
+    "numeric_boundary_infinite_collision_same",
+    "numeric_boundary_infinite_collision_split",
+    "numeric_boundary_negative_infinite_same",
+    "numeric_boundary_negative_infinite_split",
+    "numeric_boundary_numeric_string_same",
+    "numeric_boundary_numeric_string_split",
+    "numeric_boundary_mixed_object_int_float_same",
+    "numeric_boundary_mixed_object_int_float_split",
+    "numeric_boundary_object_large_signed_same",
+    "numeric_boundary_object_large_signed_split",
+    "numeric_boundary_object_signed_nat_same",
+    "numeric_boundary_object_signed_nat_split",
+    "numeric_boundary_object_unsigned_epoch_same",
+    "numeric_boundary_object_unsigned_epoch_split",
+    "numeric_boundary_object_unsigned_wrap_same",
+    "numeric_boundary_object_unsigned_wrap_split",
+    "numeric_boundary_object_overflow_float_same",
+    "numeric_boundary_object_overflow_float_split",
+    "numeric_boundary_custom_error_mutation",
+)
+EXPECTED_CASES += NUMERIC_BOUNDARY_CASES
+
 EXCLUDED_CASES = {
     "non_string_column_labels_with_selectors": "EventTable column labels are strings."
 }
@@ -105,6 +176,34 @@ EXPECTED_ERRORS = {
         "message": "missing column (timestamp) is not in the dataframe!",
     },
 }
+NUMERIC_BOUNDARY_ERRORS = (
+    "numeric_boundary_duplicate_float_first_same",
+    "numeric_boundary_duplicate_float_first_split",
+    "numeric_boundary_duplicate_bool_late_same",
+    "numeric_boundary_duplicate_bool_late_split",
+    "numeric_boundary_float_rounding_pair_same",
+    "numeric_boundary_float_rounding_pair_split",
+    "numeric_boundary_wide_float_collision_same",
+    "numeric_boundary_wide_float_collision_split",
+    "numeric_boundary_wide_only_float_same",
+    "numeric_boundary_wide_only_float_split",
+    "numeric_boundary_negative_wide_float_same",
+    "numeric_boundary_negative_wide_float_split",
+    "numeric_boundary_infinite_collision_same",
+    "numeric_boundary_infinite_collision_split",
+    "numeric_boundary_negative_infinite_same",
+    "numeric_boundary_negative_infinite_split",
+    "numeric_boundary_object_overflow_float_same",
+    "numeric_boundary_object_overflow_float_split",
+    "numeric_boundary_custom_error_mutation",
+)
+EXPECTED_ERRORS.update(
+    {
+        name: {"type": "ValueError", "message": "Categorical categories must be unique"}
+        for name in NUMERIC_BOUNDARY_ERRORS
+    }
+)
+
 EXPECTED_SIGNATURE = "(df, case_id: str = 'case:concept:name', activity_key: str = 'concept:name', timestamp_key: str = 'time:timestamp', start_timestamp_key: str = 'start_timestamp', timest_format: Optional[str] = None) -> Any"
 
 
@@ -118,6 +217,15 @@ def tag(value):
 
 
 def scalar(value, key="", dtype=None):
+    if value["kind"] == "float" and value["value"] in ("Infinity", "-Infinity"):
+        sign = "-" if value["value"] == "-Infinity" else ""
+        return (
+            "dtype_number("
+            + QUOTE(key)
+            + ", "
+            + sign
+            + "std::numeric_limits<double>::infinity())"
+        )
     if value["kind"] == "tuple":
         parts = value["value"]
         value = {

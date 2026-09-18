@@ -1,4 +1,4 @@
-// Public formatter report SHA256: ee7b977a734a925bea440d08ed74f86138114b4c98d145ae3eab925a4008d2b4
+// Public formatter report SHA256: 28efbc752979ad4385cd8a6f6e53762d756fbcb994b5e450c90c8b55b848ca6e
 #pragma once
 #include "case_relations_reference_cases.hpp"
 #include <limits>
@@ -1552,6 +1552,1945 @@ inline void check_case_52() {
   check_format_table("object_unsigned_timestamps: result", actual, expected);
   check_format_table("object_unsigned_timestamps: input after call", input, expected_input);
 }
+inline void check_case_53() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_duplicate_float_late_same: result", actual, expected);
+  check_format_table("numeric_boundary_duplicate_float_late_same: input after call", input, expected_input);
+}
+inline void check_case_54() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{3})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_duplicate_float_late_split: result", actual, expected);
+  check_format_table("numeric_boundary_duplicate_float_late_split: input after call", input, expected_input);
+}
+inline void check_case_55() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_duplicate_float_first_same: expected public rejection");
+  check_format_table("numeric_boundary_duplicate_float_first_same: input after call", input, expected_input);
+}
+inline void check_case_56() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_duplicate_float_first_split: expected public rejection");
+  check_format_table("numeric_boundary_duplicate_float_first_split: input after call", input, expected_input);
+}
+inline void check_case_57() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "4", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "4", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_duplicate_bool_late_same: expected public rejection");
+  check_format_table("numeric_boundary_duplicate_bool_late_same: input after call", input, expected_input);
+}
+inline void check_case_58() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "4", AttributeKind::kString}, EventAttribute{"concept:name", "4", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "4", AttributeKind::kString}, EventAttribute{"concept:name", "4", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_duplicate_bool_late_split: expected public rejection");
+  check_format_table("numeric_boundary_duplicate_bool_late_split: input after call", input, expected_input);
+}
+inline void check_case_59() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "4", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "4", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "4", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{4}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_duplicate_bool_first_same: result", actual, expected);
+  check_format_table("numeric_boundary_duplicate_bool_first_same: input after call", input, expected_input);
+}
+inline void check_case_60() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "4", AttributeKind::kString}, EventAttribute{"concept:name", "4", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "4", AttributeKind::kString}, EventAttribute{"concept:name", "4", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{3})},
+{EventAttribute{"case:concept:name", "4", AttributeKind::kString}, EventAttribute{"concept:name", "4", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{4}), dtype_number("@@case_index", std::int64_t{4})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_duplicate_bool_first_split: result", actual, expected);
+  check_format_table("numeric_boundary_duplicate_bool_first_split: input after call", input, expected_input);
+}
+inline void check_case_61() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{-0.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{-0.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{-0.0}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_float_negative_zero_same: result", actual, expected);
+  check_format_table("numeric_boundary_float_negative_zero_same: input after call", input, expected_input);
+}
+inline void check_case_62() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{-0.0})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{-0.0})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{-0.0}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{3})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_float_negative_zero_split: result", actual, expected);
+  check_format_table("numeric_boundary_float_negative_zero_split: input after call", input, expected_input);
+}
+inline void check_case_63() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_bool_float_wide_same: result", actual, expected);
+  check_format_table("numeric_boundary_bool_float_wide_same: input after call", input, expected_input);
+}
+inline void check_case_64() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{3})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_bool_float_wide_split: result", actual, expected);
+  check_format_table("numeric_boundary_bool_float_wide_split: input after call", input, expected_input);
+}
+inline void check_case_65() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "z", AttributeKind::kString}},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "z", AttributeKind::kString}},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "z", AttributeKind::kString}, dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_string_float_wide_same: result", actual, expected);
+  check_format_table("numeric_boundary_string_float_wide_same: input after call", input, expected_input);
+}
+inline void check_case_66() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "z", AttributeKind::kString}},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "z", AttributeKind::kString}},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "z", AttributeKind::kString}, dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.5}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{3})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_string_float_wide_split: result", actual, expected);
+  check_format_table("numeric_boundary_string_float_wide_split: input after call", input, expected_input);
+}
+inline void check_case_67() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_float_exact_equal_same: result", actual, expected);
+  check_format_table("numeric_boundary_float_exact_equal_same: input after call", input, expected_input);
+}
+inline void check_case_68() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_float_exact_equal_split: result", actual, expected);
+  check_format_table("numeric_boundary_float_exact_equal_split: input after call", input, expected_input);
+}
+inline void check_case_69() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_float_rounding_pair_same: expected public rejection");
+  check_format_table("numeric_boundary_float_rounding_pair_same: input after call", input, expected_input);
+}
+inline void check_case_70() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_float_rounding_pair_split: expected public rejection");
+  check_format_table("numeric_boundary_float_rounding_pair_split: input after call", input, expected_input);
+}
+inline void check_case_71() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_float_bool_rounding_same: result", actual, expected);
+  check_format_table("numeric_boundary_float_bool_rounding_same: input after call", input, expected_input);
+}
+inline void check_case_72() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{3})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_float_bool_rounding_split: result", actual, expected);
+  check_format_table("numeric_boundary_float_bool_rounding_split: input after call", input, expected_input);
+}
+inline void check_case_73() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "!bad", AttributeKind::kString}},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{2})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "!bad", AttributeKind::kString}},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{2})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{2}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "!bad", AttributeKind::kString}, dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_timestamp_text_before_number_same: result", actual, expected);
+  check_format_table("numeric_boundary_timestamp_text_before_number_same: input after call", input, expected_input);
+}
+inline void check_case_74() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "!bad", AttributeKind::kString}},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{2})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "!bad", AttributeKind::kString}},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{2})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "!bad", AttributeKind::kString}, dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{2}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_timestamp_text_before_number_split: result", actual, expected);
+  check_format_table("numeric_boundary_timestamp_text_before_number_split: input after call", input, expected_input);
+}
+inline void check_case_75() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "!bad", AttributeKind::kString}},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "!bad", AttributeKind::kString}},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "!bad", AttributeKind::kString}, dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_timestamp_boolean_text_same: result", actual, expected);
+  check_format_table("numeric_boundary_timestamp_boolean_text_same: input after call", input, expected_input);
+}
+inline void check_case_76() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "!bad", AttributeKind::kString}},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "!bad", AttributeKind::kString}},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, EventAttribute{"time:timestamp", "!bad", AttributeKind::kString}, dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_timestamp_boolean_text_split: result", actual, expected);
+  check_format_table("numeric_boundary_timestamp_boolean_text_split: input after call", input, expected_input);
+}
+inline void check_case_77() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "bad", AttributeKind::kString}}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "bad", AttributeKind::kString}}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)()), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "bad", AttributeKind::kString}, dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_nanosecond_nat_with_bad_same: result", actual, expected);
+  check_format_table("numeric_boundary_nanosecond_nat_with_bad_same: input after call", input, expected_input);
+}
+inline void check_case_78() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "bad", AttributeKind::kString}}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "bad", AttributeKind::kString}}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)()), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "bad", AttributeKind::kString}, dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_nanosecond_nat_with_bad_split: result", actual, expected);
+  check_format_table("numeric_boundary_nanosecond_nat_with_bad_split: input after call", input, expected_input);
+}
+inline void check_case_79() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "2024-01-01", AttributeKind::kString}}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "2024-01-01", AttributeKind::kString}}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_date("time:timestamp", "1970-01-01T00:00:00+00:00"), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00"), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "datetime64[ns, UTC]", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_numeric_datetime_string_same: result", actual, expected);
+  check_format_table("numeric_boundary_numeric_datetime_string_same: input after call", input, expected_input);
+}
+inline void check_case_80() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "2024-01-01", AttributeKind::kString}}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "2024-01-01", AttributeKind::kString}}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_date("time:timestamp", "1970-01-01T00:00:00+00:00"), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00"), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})}}};
+  expected.dtypes = {"string", "string", "datetime64[ns, UTC]", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_numeric_datetime_string_split: result", actual, expected);
+  check_format_table("numeric_boundary_numeric_datetime_string_split: input after call", input, expected_input);
+}
+inline void check_case_81() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true)}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true)}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)()), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_numeric_signed_nat_and_bool_same: result", actual, expected);
+  check_format_table("numeric_boundary_numeric_signed_nat_and_bool_same: input after call", input, expected_input);
+}
+inline void check_case_82() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true)}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true)}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)()), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_numeric_signed_nat_and_bool_split: result", actual, expected);
+  check_format_table("numeric_boundary_numeric_signed_nat_and_bool_split: input after call", input, expected_input);
+}
+inline void check_case_83() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_wide_float_collision_same: expected public rejection");
+  check_format_table("numeric_boundary_wide_float_collision_same: input after call", input, expected_input);
+}
+inline void check_case_84() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_wide_float_collision_split: expected public rejection");
+  check_format_table("numeric_boundary_wide_float_collision_split: input after call", input, expected_input);
+}
+inline void check_case_85() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740994})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740994})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740994}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_wide_float_safe_same: result", actual, expected);
+  check_format_table("numeric_boundary_wide_float_safe_same: input after call", input, expected_input);
+}
+inline void check_case_86() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740994})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740994})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740994}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_wide_float_safe_split: result", actual, expected);
+  check_format_table("numeric_boundary_wide_float_safe_split: input after call", input, expected_input);
+}
+inline void check_case_87() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_wide_integer_collision_same: result", actual, expected);
+  check_format_table("numeric_boundary_wide_integer_collision_same: input after call", input, expected_input);
+}
+inline void check_case_88() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})},
+{EventAttribute{"case:concept:name", "3", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{3}), dtype_number("@@case_index", std::int64_t{3})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_wide_integer_collision_split: result", actual, expected);
+  check_format_table("numeric_boundary_wide_integer_collision_split: input after call", input, expected_input);
+}
+inline void check_case_89() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_wide_only_float_same: expected public rejection");
+  check_format_table("numeric_boundary_wide_only_float_same: input after call", input, expected_input);
+}
+inline void check_case_90() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_wide_only_float_split: expected public rejection");
+  check_format_table("numeric_boundary_wide_only_float_split: input after call", input, expected_input);
+}
+inline void check_case_91() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_wide_one_float_same: result", actual, expected);
+  check_format_table("numeric_boundary_wide_one_float_same: input after call", input, expected_input);
+}
+inline void check_case_92() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{1.0}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_wide_one_float_split: result", actual, expected);
+  check_format_table("numeric_boundary_wide_one_float_split: input after call", input, expected_input);
+}
+inline void check_case_93() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_wide_bool_collision_same: result", actual, expected);
+  check_format_table("numeric_boundary_wide_bool_collision_same: input after call", input, expected_input);
+}
+inline void check_case_94() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_wide_bool_collision_split: result", actual, expected);
+  check_format_table("numeric_boundary_wide_bool_collision_split: input after call", input, expected_input);
+}
+inline void check_case_95() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_bool_exact_collision_same: result", actual, expected);
+  check_format_table("numeric_boundary_bool_exact_collision_same: input after call", input, expected_input);
+}
+inline void check_case_96() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true)},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", true), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_bool_exact_collision_split: result", actual, expected);
+  check_format_table("numeric_boundary_bool_exact_collision_split: input after call", input, expected_input);
+}
+inline void check_case_97() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{-1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{-1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{-1}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_negative_wide_same: result", actual, expected);
+  check_format_table("numeric_boundary_negative_wide_same: input after call", input, expected_input);
+}
+inline void check_case_98() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{-1})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{-1})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{-1}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL}), dtype_number("@@index", std::int64_t{2}), dtype_number("@@case_index", std::int64_t{2})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_negative_wide_split: result", actual, expected);
+  check_format_table("numeric_boundary_negative_wide_split: input after call", input, expected_input);
+}
+inline void check_case_99() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{-1.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{-1.0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_negative_wide_float_same: expected public rejection");
+  check_format_table("numeric_boundary_negative_wide_float_same: input after call", input, expected_input);
+}
+inline void check_case_100() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{-1.0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{-1.0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_negative_wide_float_split: expected public rejection");
+  check_format_table("numeric_boundary_negative_wide_float_split: input after call", input, expected_input);
+}
+inline void check_case_101() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::numeric_limits<double>::infinity())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::numeric_limits<double>::infinity())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_infinite_collision_same: expected public rejection");
+  check_format_table("numeric_boundary_infinite_collision_same: input after call", input, expected_input);
+}
+inline void check_case_102() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::numeric_limits<double>::infinity())},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::numeric_limits<double>::infinity())},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740992})},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_infinite_collision_split: expected public rejection");
+  check_format_table("numeric_boundary_infinite_collision_split: input after call", input, expected_input);
+}
+inline void check_case_103() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", -std::numeric_limits<double>::infinity())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{-9223372036854775807})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", -std::numeric_limits<double>::infinity())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{-9223372036854775807})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_negative_infinite_same: expected public rejection");
+  check_format_table("numeric_boundary_negative_infinite_same: input after call", input, expected_input);
+}
+inline void check_case_104() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", -std::numeric_limits<double>::infinity())},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{-9223372036854775807})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", -std::numeric_limits<double>::infinity())},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "2", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{-9223372036854775807})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_negative_infinite_split: expected public rejection");
+  check_format_table("numeric_boundary_negative_infinite_split: input after call", input, expected_input);
+}
+inline void check_case_105() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "2", AttributeKind::kString}}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "2", AttributeKind::kString}}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "2", AttributeKind::kString}, dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_numeric_string_same: result", actual, expected);
+  check_format_table("numeric_boundary_numeric_string_same: input after call", input, expected_input);
+}
+inline void check_case_106() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "2", AttributeKind::kString}}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "2", AttributeKind::kString}}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{1}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, EventAttribute{"time:timestamp", "2", AttributeKind::kString}, dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_numeric_string_split: result", actual, expected);
+  check_format_table("numeric_boundary_numeric_string_split: input after call", input, expected_input);
+}
+inline void check_case_107() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_date("time:timestamp", "1970-04-15T05:59:59.254740992+00:00"), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_date("time:timestamp", "1970-04-15T05:59:59.254740993+00:00"), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "datetime64[ns, UTC]", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_mixed_object_int_float_same: result", actual, expected);
+  check_format_table("numeric_boundary_mixed_object_int_float_same: input after call", input, expected_input);
+}
+inline void check_case_108() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_date("time:timestamp", "1970-04-15T05:59:59.254740993+00:00"), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_date("time:timestamp", "1970-04-15T05:59:59.254740992+00:00"), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})}}};
+  expected.dtypes = {"string", "string", "datetime64[ns, UTC]", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_mixed_object_int_float_split: result", actual, expected);
+  check_format_table("numeric_boundary_mixed_object_int_float_split: input after call", input, expected_input);
+}
+inline void check_case_109() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9223372036854775807})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9223372036854775807})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_date("time:timestamp", "2262-04-11T23:47:16.854775807+00:00"), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "datetime64[ns, UTC]", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_object_large_signed_same: result", actual, expected);
+  check_format_table("numeric_boundary_object_large_signed_same: input after call", input, expected_input);
+}
+inline void check_case_110() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9223372036854775807})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9223372036854775807})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_date("time:timestamp", "2262-04-11T23:47:16.854775807+00:00"), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "datetime64[ns, UTC]", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_object_large_signed_split: result", actual, expected);
+  check_format_table("numeric_boundary_object_large_signed_split: input after call", input, expected_input);
+}
+inline void check_case_111() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_date("time:timestamp", "1970-01-01T00:00:00+00:00"), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "datetime64[ns, UTC]", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_object_signed_nat_same: result", actual, expected);
+  check_format_table("numeric_boundary_object_signed_nat_same: input after call", input, expected_input);
+}
+inline void check_case_112() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", (std::numeric_limits<std::int64_t>::min)())},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_date("time:timestamp", "1970-01-01T00:00:00+00:00"), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "datetime64[ns, UTC]", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_object_signed_nat_split: result", actual, expected);
+  check_format_table("numeric_boundary_object_signed_nat_split: input after call", input, expected_input);
+}
+inline void check_case_113() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{9223372036854775808ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{9223372036854775809ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{9223372036854775808ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{9223372036854775809ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{9223372036854775808ULL}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{9223372036854775809ULL}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_object_unsigned_epoch_same: result", actual, expected);
+  check_format_table("numeric_boundary_object_unsigned_epoch_same: input after call", input, expected_input);
+}
+inline void check_case_114() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{9223372036854775808ULL})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{9223372036854775809ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{9223372036854775808ULL})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{9223372036854775809ULL})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{9223372036854775808ULL}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{9223372036854775809ULL}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_object_unsigned_epoch_split: result", actual, expected);
+  check_format_table("numeric_boundary_object_unsigned_epoch_split: input after call", input, expected_input);
+}
+inline void check_case_115() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{0})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_object_unsigned_wrap_same: result", actual, expected);
+  check_format_table("numeric_boundary_object_unsigned_wrap_same: input after call", input, expected_input);
+}
+inline void check_case_116() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  EventTable expected{{"case:concept:name", "concept:name", "time:timestamp", "@@index", "@@case_index"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL}), dtype_number("@@index", std::int64_t{0}), dtype_number("@@case_index", std::int64_t{0})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{0}), dtype_number("@@index", std::int64_t{1}), dtype_number("@@case_index", std::int64_t{1})}}};
+  expected.dtypes = {"string", "string", "object", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {EventAttribute{"pm4py:param:activity_key", "concept:name", AttributeKind::kString}, EventAttribute{"pm4py:param:timestamp_key", "time:timestamp", AttributeKind::kString}, EventAttribute{"pm4py:param:group_key", "org:group", AttributeKind::kString}, EventAttribute{"pm4py:param:transition_key", "lifecycle:transition", AttributeKind::kString}, EventAttribute{"pm4py:param:resource_key", "org:resource", AttributeKind::kString}, EventAttribute{"pm4py:param:case_id_key", "case:concept:name", AttributeKind::kString}};
+  const auto actual = format_dataframe(input, options);
+  actual.validate();
+  check_format_table("numeric_boundary_object_unsigned_wrap_split: result", actual, expected);
+  check_format_table("numeric_boundary_object_unsigned_wrap_split: input after call", input, expected_input);
+}
+inline void check_case_117() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{9.223372036854776e+18})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9223372036854775807})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{9.223372036854776e+18})},
+{EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9223372036854775807})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_object_overflow_float_same: expected public rejection");
+  check_format_table("numeric_boundary_object_overflow_float_same: input after call", input, expected_input);
+}
+inline void check_case_118() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{9.223372036854776e+18})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9223372036854775807})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"case:concept:name", "0", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", double{9.223372036854776e+18})},
+{EventAttribute{"case:concept:name", "1", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9223372036854775807})}}};
+  expected_input.dtypes = {"str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_object_overflow_float_split: expected public rejection");
+  check_format_table("numeric_boundary_object_overflow_float_split: input after call", input, expected_input);
+}
+inline void check_case_119() {
+  EventTable input{{"cid", "act", "when"}, {
+{EventAttribute{"cid", "C", AttributeKind::kString}, EventAttribute{"act", "0", AttributeKind::kString}, dtype_number("when", std::int64_t{9007199254740993})},
+{EventAttribute{"cid", "C", AttributeKind::kString}, EventAttribute{"act", "1", AttributeKind::kString}, dtype_number("when", double{9007199254740992.0})},
+{EventAttribute{"cid", "C", AttributeKind::kString}, EventAttribute{"act", "2", AttributeKind::kString}, reference_number("when", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"cid", "C", AttributeKind::kString}, EventAttribute{"act", "3", AttributeKind::kString}, reference_number("when", std::uint64_t{18446744073709551614ULL})}}};
+  input.dtypes = {"str", "str", "object"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  input.metadata.properties = {};
+  EventTable expected_input{{"cid", "act", "when", "case:concept:name", "concept:name", "time:timestamp"}, {
+{EventAttribute{"cid", "C", AttributeKind::kString}, EventAttribute{"act", "0", AttributeKind::kString}, dtype_number("when", std::int64_t{9007199254740993}), EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "0", AttributeKind::kString}, dtype_number("time:timestamp", std::int64_t{9007199254740993})},
+{EventAttribute{"cid", "C", AttributeKind::kString}, EventAttribute{"act", "1", AttributeKind::kString}, dtype_number("when", double{9007199254740992.0}), EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "1", AttributeKind::kString}, dtype_number("time:timestamp", double{9007199254740992.0})},
+{EventAttribute{"cid", "C", AttributeKind::kString}, EventAttribute{"act", "2", AttributeKind::kString}, reference_number("when", std::uint64_t{18446744073709551615ULL}), EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "2", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551615ULL})},
+{EventAttribute{"cid", "C", AttributeKind::kString}, EventAttribute{"act", "3", AttributeKind::kString}, reference_number("when", std::uint64_t{18446744073709551614ULL}), EventAttribute{"case:concept:name", "C", AttributeKind::kString}, EventAttribute{"concept:name", "3", AttributeKind::kString}, reference_number("time:timestamp", std::uint64_t{18446744073709551614ULL})}}};
+  expected_input.dtypes = {"str", "str", "object", "str", "str", "object"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
+  expected_input.metadata.properties = {};
+  DataFrameFormatOptions options;
+  options.case_id = "cid";
+  options.activity_key = "act";
+  options.timestamp_key = "when";
+  bool rejected = false;
+  try { (void)format_dataframe(input, options); }
+  catch (const std::exception&) { rejected = true; }
+  if (!rejected) throw std::runtime_error("numeric_boundary_custom_error_mutation: expected public rejection");
+  check_format_table("numeric_boundary_custom_error_mutation: input after call", input, expected_input);
+}
 } // namespace format_dataframe_reference
 inline void check_public_format_dataframe_reference_cases() {
   std::string failures;
@@ -1658,6 +3597,140 @@ inline void check_public_format_dataframe_reference_cases() {
   try { format_dataframe_reference::check_case_51(); }
   catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
   try { format_dataframe_reference::check_case_52(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_53(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_54(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_55(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_56(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_57(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_58(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_59(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_60(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_61(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_62(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_63(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_64(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_65(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_66(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_67(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_68(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_69(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_70(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_71(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_72(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_73(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_74(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_75(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_76(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_77(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_78(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_79(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_80(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_81(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_82(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_83(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_84(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_85(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_86(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_87(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_88(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_89(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_90(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_91(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_92(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_93(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_94(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_95(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_96(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_97(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_98(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_99(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_100(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_101(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_102(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_103(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_104(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_105(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_106(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_107(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_108(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_109(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_110(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_111(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_112(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_113(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_114(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_115(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_116(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_117(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_118(); }
+  catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
+  try { format_dataframe_reference::check_case_119(); }
   catch (const std::exception& error) { failures += std::string(error.what()) + "\n"; }
   if (!failures.empty()) throw std::runtime_error(failures);
 }
