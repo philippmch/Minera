@@ -33,7 +33,7 @@ class FormatterTransportTests(unittest.TestCase):
                 continue
             CHECKER["compare"](row, self.response(row))
             included += 1
-        self.assertEqual(included, 119)
+        self.assertEqual(included, 126)
 
     def test_scalar_precision_kind_and_projection_differences_reject(self):
         row = next(

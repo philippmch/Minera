@@ -141,6 +141,15 @@ NUMERIC_BOUNDARY_CASES = (
     "numeric_boundary_custom_error_mutation",
 )
 EXPECTED_CASES += NUMERIC_BOUNDARY_CASES
+EXPECTED_CASES += (
+    "calendar_invalid_february",
+    "calendar_nonleap_february",
+    "calendar_leap_february",
+    "calendar_invalid_april",
+    "calendar_valid_april",
+    "calendar_century_nonleap",
+    "calendar_century_leap",
+)
 
 EXCLUDED_CASES = {
     "non_string_column_labels_with_selectors": "EventTable column labels are strings."

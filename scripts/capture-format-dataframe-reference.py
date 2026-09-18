@@ -991,6 +991,28 @@ def _cases():
             ),
         )
     cases.extend(_numeric_boundary_cases())
+    for name, values in (
+        ("invalid_february", ["2024/02/31", "2024/03/01"]),
+        ("nonleap_february", ["2023/02/29"]),
+        ("leap_february", ["2024/02/29"]),
+        ("invalid_april", ["2024/04/31"]),
+        ("valid_april", ["2024/04/30"]),
+        ("century_nonleap", ["1900/02/29"]),
+        ("century_leap", ["2000/02/29"]),
+    ):
+        cases.append(
+            (
+                "calendar_" + name,
+                _frame(
+                    {
+                        "case:concept:name": ["C"] * len(values),
+                        "concept:name": ["A"] * len(values),
+                        "time:timestamp": values,
+                    }
+                ),
+                {"timest_format": "%Y/%m/%d"},
+            )
+        )
     return cases
 
 

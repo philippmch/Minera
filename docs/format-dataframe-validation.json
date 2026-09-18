@@ -1,5 +1,5 @@
 {
-  "scope": "Native format_dataframe and typed CLI/HTTP checkpoint; full parity remains incomplete.",
+  "scope": "Native formatter calendar validation and typed CLI/HTTP checkpoint; full parity remains incomplete.",
   "reference_version": "2.7.22",
   "pandas_version": "3.0.5",
   "reference_provenance": {
@@ -11,22 +11,22 @@
     "installed_sha256": "cf480411c34ff169468b726424a6563aedb6c94274b283973ca194ec51235a88",
     "pinned_sha256": "cf480411c34ff169468b726424a6563aedb6c94274b283973ca194ec51235a88"
   },
-  "native_source_parent_commit": "a0084ab3aeb7c88ce1f2526aa2edb1153af68f76",
-  "native_verified_staged_tree": "a3549b78f813299e791692d697218964c53a04d4",
+  "native_source_parent_commit": "bef72f3318b69034e72f844ba889e51cd17ee186",
+  "native_verified_staged_tree": "dfc579027cf90aeb516e57caed35623b9f308bc3",
   "native_changed_source_sha256_lf_normalized": {
     "CMakeLists.txt": "220e056be153fe64baabc9e6f9c3945ef67ea837b9a865f66ef82c8789db7ba1",
     "include/minera/dataframe_format.hpp": "e7209a1836d6531cf80b5a0992b4c9a5ec8e64caefb6189efdf3a60923f75878",
-    "src/backend/dataframe_format.cpp": "ddaac0b84437f6edfd7bcc684c6e27bf4a45867c8deefedacb3e6eac68eca6f8",
+    "src/backend/dataframe_format.cpp": "6c2362ceac7d7336be22eca6aca01e9fe923e00a37da93712449dadfb7a897a9",
     "src/backend/tests/test_dataframe_format.cpp": "67066b22e5d786427866254b1f287c5b8be2ec7d69b7ed0b88c0cefba9d40a0d",
-    "src/backend/tests/dataframe_format_reference_cases.hpp": "cc96524e7fa95cb5b833f42c34134460ddbabb754ea33d5c4f2fc3918f6b810b"
+    "src/backend/tests/dataframe_format_reference_cases.hpp": "5c9a6f6166ce1f318fccf43c15b74cf6733a5ac0fafefae7a95b08a5aa975924"
   },
   "reference_artifact": {
     "path": "docs/format-dataframe-reference.json.gz",
-    "uncompressed_sha256": "28efbc752979ad4385cd8a6f6e53762d756fbcb994b5e450c90c8b55b848ca6e",
-    "public_cases": 120,
-    "successes": 94,
+    "uncompressed_sha256": "1296781252880533e1ceab02cea94c6a05b75b871c7e5dbc29d69b6b0002f03c",
+    "public_cases": 127,
+    "successes": 101,
     "rejections": 26,
-    "native_cases": 119,
+    "native_cases": 126,
     "excluded_case": "non_string_column_labels_with_selectors"
   },
   "validation": {
@@ -35,9 +35,9 @@
     "native_suites_failed": 0,
     "script_tests_passed": 80,
     "optimized_evidence_tests_passed": 13,
-    "independent_review": "No actionable findings in the typed formatter transport checkpoint."
+    "independent_review": "No actionable findings in the calendar formatter checkpoint."
   },
-  "native_test_executable_sha256": "cd803b9a742b4ac95bc4be938e51b0a4230b21bc3233787a50d554e25dae09dc",
+  "native_test_executable_sha256": "e55d0937f2a1c942b607152b3d43c43bcfb4103dcfead9c0d712196968bb1032",
   "catalog_audit": {
     "dispatchers": 86,
     "complete_dispatchers": 44,
@@ -67,5 +67,22 @@
     },
     "resolved_checkpoint": "a0084ab"
   },
-  "transport_validation": "docs/format-dataframe-transport-validation.json"
+  "transport_validation": "docs/format-dataframe-transport-validation.json",
+  "calendar_validation": {
+    "behavior": "Explicit date formats reject impossible Gregorian calendar dates for conversion, preserving the complete column as text. Valid leap days and month-end dates convert normally.",
+    "public_cases": [
+      "calendar_invalid_february",
+      "calendar_nonleap_february",
+      "calendar_leap_february",
+      "calendar_invalid_april",
+      "calendar_valid_april",
+      "calendar_century_nonleap",
+      "calendar_century_leap"
+    ],
+    "before_fix": "The transport comparison failed at calendar_invalid_february.",
+    "remaining_observed_gaps": [
+      "Explicit %f fractional seconds",
+      "Explicit %z timezone offsets"
+    ]
+  }
 }
