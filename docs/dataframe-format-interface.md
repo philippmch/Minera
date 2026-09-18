@@ -100,5 +100,5 @@ provide mixed XES/CSV formatting. Parser and extension-dtype parity remain
 bounded by the public evidence documented in `reference-2.7.22-parity.md`.
 
 `scripts/check-format-dataframe-transports.py` validates the pinned evidence
-manifest, compares all 126 representable public cases through both interfaces,
+manifest, compares all 190 representable public cases through both interfaces,
 checks transport failures, and hashes both executables before and after replay.

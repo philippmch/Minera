@@ -171,14 +171,97 @@ std::optional<ExactTimestamp> parse_iso_timestamp(std::string text) {
 
 std::optional<ExactTimestamp> parse_strptime_timestamp(std::string text,
                                                         std::string_view format) {
-  std::istringstream stream(trim_ascii(std::move(text)));
-  stream.imbue(std::locale::classic());
+  text = trim_ascii(std::move(text));
+  // The public parser accepts empty fractions and hour-only offsets for
+  // ISO-shaped formats, but requires digits/minutes for other formats.
+  bool iso_shape = false;
+  for (const auto separator : {"-", "/", ".", " "}) {
+    for (const auto clock_separator : {" ", "T"}) {
+      const auto prefix = std::string("%Y") + separator + "%m" + separator +
+                          "%d" + clock_separator + "%H:%M:%S";
+      if (format == prefix || format == prefix + ".%f" ||
+          format == prefix + "%z" || format == prefix + ".%f%z")
+        iso_shape = true;
+    }
+  }
   std::tm calendar{};
-  stream >> std::get_time(&calendar, std::string(format).c_str());
-  if (stream.fail()) return std::nullopt;
-  std::string trailing;
-  std::getline(stream, trailing);
-  if (!trim_ascii(std::move(trailing)).empty()) return std::nullopt;
+  std::size_t position = 0;
+  std::uint32_t nanoseconds = 0;
+  int offset_minutes = 0;
+  auto digit = [&]() {
+    return position < text.size() && text[position] >= '0' &&
+           text[position] <= '9';
+  };
+  auto two_digits = [&]() -> std::optional<int> {
+    if (position + 2 > text.size() || !digit() ||
+        text[position + 1] < '0' || text[position + 1] > '9')
+      return std::nullopt;
+    const int value = (text[position] - '0') * 10 + text[position + 1] - '0';
+    position += 2;
+    return value;
+  };
+  auto standard = [&](std::string_view fragment) {
+    if (fragment.empty()) return true;
+    std::istringstream stream(text.substr(position));
+    stream.imbue(std::locale::classic());
+    stream >> std::get_time(&calendar, std::string(fragment).c_str());
+    if (stream.fail()) return false;
+    if (stream.eof()) position = text.size();
+    else position += static_cast<std::size_t>(stream.tellg());
+    return true;
+  };
+  std::size_t segment = 0;
+  for (std::size_t i = 0; i < format.size(); ++i) {
+    if (format[i] != '%' || i + 1 == format.size()) continue;
+    const char directive = format[++i];
+    if (directive != 'f' && directive != 'z') continue;
+    if (!standard(format.substr(segment, i - 1 - segment)))
+      return std::nullopt;
+    if (directive == 'f') {
+      std::size_t digits = 0;
+      nanoseconds = 0;
+      while (digit()) {
+        if (digits < 9) nanoseconds = nanoseconds * 10 + text[position] - '0';
+        ++position;
+        ++digits;
+      }
+      if (!digits && !iso_shape) return std::nullopt;
+      while (digits++ < 9) nanoseconds *= 10;
+    } else {
+      if (position == text.size()) return std::nullopt;
+      if (text[position] == 'Z') {
+        ++position;
+        offset_minutes = 0;
+      } else {
+        const char sign = text[position++];
+        if (sign != '+' && sign != '-') return std::nullopt;
+        const auto hours = two_digits();
+        if (!hours || *hours > 23) return std::nullopt;
+        const bool colon = position < text.size() && text[position] == ':';
+        if (colon) ++position;
+        std::optional<int> minutes;
+        if (digit()) minutes = two_digits();
+        else if (iso_shape && !colon) minutes = 0;
+        if (!minutes || *minutes > 59) return std::nullopt;
+        if ((position < text.size() && text[position] == ':') || digit()) {
+          if (colon) {
+            if (text[position++] != ':') return std::nullopt;
+          } else if (!digit()) return std::nullopt;
+          const auto seconds = two_digits();
+          if (!seconds) return std::nullopt;
+          // Reference UTC normalization discards offset seconds/fractions.
+          if (position < text.size() && text[position] == '.') {
+            ++position;
+            while (digit()) ++position;
+          }
+        }
+        offset_minutes = (*hours * 60 + *minutes) * (sign == '-' ? -1 : 1);
+      }
+    }
+    segment = i + 1;
+  }
+  if (!standard(format.substr(segment)) ||
+      !trim_ascii(text.substr(position)).empty()) return std::nullopt;
   const auto year = static_cast<std::int64_t>(calendar.tm_year) + 1900;
   const auto month = static_cast<unsigned>(calendar.tm_mon + 1);
   const auto day = static_cast<unsigned>(calendar.tm_mday);
@@ -197,8 +280,9 @@ std::optional<ExactTimestamp> parse_strptime_timestamp(std::string text,
   if (day > maximum_day) return std::nullopt;
   return ExactTimestamp{days_from_civil(year, month, day) * 86400 +
                              static_cast<std::int64_t>(hour * 3600 +
-                                                       minute * 60 + second),
-                         0};
+                                                       minute * 60 + second) -
+                             static_cast<std::int64_t>(offset_minutes) * 60,
+                         nanoseconds};
 }
 
 std::string format_exact_timestamp(const ExactTimestamp& timestamp,

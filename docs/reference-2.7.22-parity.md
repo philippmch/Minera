@@ -1773,14 +1773,14 @@ from empty/singleton labels remain outside the current table metadata model.
 
 The native `format_dataframe(EventTable&, DataFrameFormatOptions)` operation is
 based on public calls to `pm4py.format_dataframe`, rather than CSV-reader
-inference. `docs/format-dataframe-reference.json.gz` retains 127 observations
+inference. `docs/format-dataframe-reference.json.gz` retains 191 observations
 under PM4Py 2.7.22 and pandas 3.0.5, including 26 public rejections. The
 capture records the full input and post-call state, returned cells and dtypes,
 categorical descriptors, index class/names/labels, attrs, and return identity.
 The defining public module is checked against the pinned Git blob using opaque
 bytes with CRLF normalization; implementation text is not decoded.
 
-Generated native checks cover 126 representable cases, including post-call input
+Generated native checks cover 190 representable cases, including post-call input
 checks for failures. The non-string-column case remains a named exclusion:
 EventTable models column labels and selectors as strings. Dataframe attrs map
 to `EventTable::metadata.properties`, as confirmed by a separate public
@@ -1811,9 +1811,16 @@ sign and float type in the public evidence rather than becoming missing cells.
 Explicit date formats validate Gregorian month lengths and leap years. Seven
 calendar observations cover invalid dates, valid month ends, and the 1900/2000
 century boundary; a single invalid value keeps the entire column as text.
-Explicit fractional-second and timezone-offset formats remain observed gaps.
+A further 64 observations cover explicit `%f` fractional seconds and `%z`
+timezone offsets, including nanosecond retention, truncation beyond nine digits,
+negative/positive offsets, UTC day rollover, escaped percent directives, and
+malformed input. Reference normalization discards offset seconds and fractions;
+native formatting preserves that behavior. The observed ISO-shaped formats
+accept empty fractions and hour-only offsets, while literal date formats reject
+those spellings. This finite matrix does not establish every parsing directive,
+locale, timezone name, or directive combination.
 
-The isolated Release build and all 152 native suites pass, including the 126
+The isolated Release build and all 152 native suites pass, including the 190
 mapped public formatter cases. All 80 script tests and 13 optimized formatter
 tests pass; independent review has no outstanding findings in this checkpoint.
 `docs/format-dataframe-validation.json` records source/artifact hashes, the resolved
@@ -1829,7 +1836,7 @@ shared, including ordered globals and exact 64-bit scalar values. The decoder
 checks numeric grammar/ranges, lexical/typed agreement, UTF-8, duplicate keys,
 unknown fields, table dimensions, and size/depth limits.
 
-All 126 representable observations pass independently through the CLI and HTTP
+All 190 representable observations pass independently through the CLI and HTTP
 endpoint, with 12 additional file/error/metadata boundaries. Executables are
 hashed before and after checks. `docs/format-dataframe-transport-validation.json`
 records the complete case manifest, source/binary hashes and validation;
