@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 #include "minera/event_log.hpp"
@@ -30,6 +31,25 @@ struct EventStream {
   [[nodiscard]] bool empty() const noexcept { return events.empty(); }
 };
 
+// A table index label is either one scalar attribute (including a present
+// null, NaN, or native date) or a recursive tuple used by a MultiIndex.  The
+// attribute key is retained because index labels can carry a named scalar
+// payload through the same value model as table cells.
+struct EventTableIndexLabel {
+  std::variant<EventAttribute, std::vector<EventTableIndexLabel>> value;
+
+  bool operator==(const EventTableIndexLabel&) const = default;
+};
+
+struct EventTableIndex {
+  std::string kind = "Index";
+  std::string dtype = "int64";
+  std::vector<std::optional<std::string>> names{std::nullopt};
+  std::vector<EventTableIndexLabel> labels;
+
+  bool operator==(const EventTableIndex&) const = default;
+};
+
 // A rectangular event table.  An empty optional is a missing cell.  A cell
 // containing an EventAttribute with is_null=true is a present null.  An
 // ordinary value with value=="" is a present empty string.
@@ -40,6 +60,11 @@ struct EventTable {
   std::vector<Row> rows;
   std::vector<EventAttribute> attributes;
   EventDataMetadata metadata;
+  // An empty dtype vector means that the source did not declare column dtypes;
+  // otherwise it is aligned one-to-one with columns.
+  std::vector<std::string> dtypes;
+  // An absent index means the table has the implicit 0..n-1 RangeIndex.
+  std::optional<EventTableIndex> index;
 
   [[nodiscard]] std::size_t size() const noexcept { return rows.size(); }
   [[nodiscard]] bool empty() const noexcept { return rows.empty(); }
@@ -63,7 +88,9 @@ class LazyEventTable {
   LazyEventTable(std::vector<std::string> columns, Scanner scanner,
                  std::vector<EventAttribute> attributes = {},
                  EventDataMetadata metadata = {},
-                 std::optional<std::size_t> row_count = std::nullopt);
+                 std::optional<std::size_t> row_count = std::nullopt,
+                 std::vector<std::string> dtypes = {},
+                 std::optional<EventTableIndex> index = std::nullopt);
 
   [[nodiscard]] const std::vector<std::string>& columns() const noexcept {
     return columns_;
@@ -73,6 +100,12 @@ class LazyEventTable {
   }
   [[nodiscard]] const EventDataMetadata& metadata() const noexcept {
     return metadata_;
+  }
+  [[nodiscard]] const std::vector<std::string>& dtypes() const noexcept {
+    return dtypes_;
+  }
+  [[nodiscard]] const std::optional<EventTableIndex>& index() const noexcept {
+    return index_;
   }
   [[nodiscard]] std::optional<std::size_t> row_count() const noexcept {
     return row_count_;
@@ -97,6 +130,8 @@ class LazyEventTable {
   std::vector<EventAttribute> attributes_;
   EventDataMetadata metadata_;
   std::optional<std::size_t> row_count_;
+  std::vector<std::string> dtypes_;
+  std::optional<EventTableIndex> index_;
 };
 
 enum class EventDataKind { kEventLog, kEventStream, kEventTable, kLazyEventTable };

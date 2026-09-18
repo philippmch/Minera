@@ -286,6 +286,35 @@ void conformance_diagnostics_validate_case_id_selectors() {
   assert(log_model_null && trace_extensive_null);
 }
 
+void table_projection_keeps_aliases_aligned_after_reordering() {
+  EventLog log;
+  Trace second{"c2", {Event{"c2", "B", "2024-01-02T00:00:00Z"}}};
+  second.events.front().input_order = 1;
+  Trace first{"c1", {Event{"c1", "A", "2024-01-01T00:00:00Z"}}};
+  first.events.front().input_order = 0;
+  log.traces = {std::move(second), std::move(first)};
+
+  FootprintsDiscoveryOptions options;
+  options.activity_attribute = "activity";
+  const auto table = prepare_footprints_event_table(log, options);
+  const auto activity = table.column_index("activity");
+  const auto case_id = table.column_index("case:concept:name");
+  assert(table.rows.size() == 2);
+  assert(table.rows[0][activity] && table.rows[0][activity]->value == "A");
+  assert(table.rows[0][case_id] && table.rows[0][case_id]->value == "c1");
+  assert(table.rows[1][activity] && table.rows[1][activity]->value == "B");
+  assert(table.rows[1][case_id] && table.rows[1][case_id]->value == "c2");
+  assert(table.dtypes.empty());
+  assert(!table.index);
+
+  const auto lazy = prepare_footprints_lazy_table(log, options);
+  assert(lazy.row_count() == 2);
+  assert(lazy.dtypes().empty());
+  assert(!lazy.index());
+  const auto materialized = lazy.materialize();
+  assert(materialized.rows == table.rows);
+}
+
 int main() {
   discovery_variants_are_deterministic();
   dfg_boundaries_are_inferred();
@@ -294,4 +323,5 @@ int main() {
   conformance_atomic_relation_extension_is_strict();
   conformance_summary_validates_cardinality();
   conformance_diagnostics_validate_case_id_selectors();
+  table_projection_keeps_aliases_aligned_after_reordering();
 }

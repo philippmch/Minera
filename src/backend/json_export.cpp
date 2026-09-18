@@ -19,6 +19,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "minera/version.hpp"
@@ -4469,6 +4470,59 @@ void write_case_relations_table_attribute(
   out << '}';
 }
 
+void write_case_relations_table_index_label(
+    std::ostream& out, const EventTableIndexLabel& label) {
+  out << "{\"kind\":";
+  if (const auto* scalar = std::get_if<EventAttribute>(&label.value)) {
+    out << "\"scalar\",\"value\":";
+    write_case_relations_table_attribute(out, *scalar);
+  } else if (const auto* tuple =
+                 std::get_if<std::vector<EventTableIndexLabel>>(&label.value)) {
+    out << "\"tuple\",\"items\":[";
+    for (std::size_t index = 0; index < tuple->size(); ++index) {
+      if (index != 0) out << ',';
+      write_case_relations_table_index_label(out, (*tuple)[index]);
+    }
+    out << ']';
+  } else {
+    throw std::invalid_argument(
+        "case relations table contains an invalid index label");
+  }
+  out << '}';
+}
+
+void write_case_relations_table_metadata(std::ostream& out,
+                                         const EventTable& table) {
+  if (!table.dtypes.empty()) {
+    out << ",\"dtypes\":[";
+    for (std::size_t index = 0; index < table.dtypes.size(); ++index) {
+      if (index != 0) out << ',';
+      write_json_string(out, table.dtypes[index]);
+    }
+    out << ']';
+  }
+  if (table.index) {
+    out << ",\"index\":{\"class\":";
+    write_json_string(out, table.index->kind);
+    out << ",\"dtype\":";
+    write_json_string(out, table.index->dtype);
+    out << ",\"names\":[";
+    for (std::size_t index = 0; index < table.index->names.size(); ++index) {
+      if (index != 0) out << ',';
+      if (table.index->names[index])
+        write_json_string(out, *table.index->names[index]);
+      else
+        out << "null";
+    }
+    out << "],\"labels\":[";
+    for (std::size_t index = 0; index < table.index->labels.size(); ++index) {
+      if (index != 0) out << ',';
+      write_case_relations_table_index_label(out, table.index->labels[index]);
+    }
+    out << "]}";
+  }
+}
+
 void write_case_relations_table(std::ostream& out, const EventTable& table) {
   table.validate();
   out << "{\"columns\":[";
@@ -4476,7 +4530,9 @@ void write_case_relations_table(std::ostream& out, const EventTable& table) {
     if (i) out << ',';
     write_json_string(out, table.columns[i]);
   }
-  out << "],\"attributes\":";
+  out << ']';
+  write_case_relations_table_metadata(out, table);
+  out << ",\"attributes\":";
   write_case_relations_table_attributes(out, table.attributes);
   out << ",\"metadata\":";
   write_projected_metadata(out, table.metadata);
@@ -4536,6 +4592,17 @@ EventTable case_relations_log_projection_table(
   if (timestamp_column != projected.columns.end())
     timestamp_index = static_cast<std::size_t>(
         std::distance(projected.columns.begin(), timestamp_column));
+  if (!timestamp_index) {
+    // Compatibility EventLog reconstruction needs an explicit role marker
+    // for a selector that is absent from every source row. Keep this
+    // synthetic column local to the projection; the public merge table
+    // remains unchanged. A declared dtype vector must stay aligned with the
+    // temporary schema.
+    projected.columns.push_back(options.timestamp_key);
+    if (!projected.dtypes.empty()) projected.dtypes.push_back("object");
+    for (auto& row : projected.rows) row.push_back(std::nullopt);
+    timestamp_index = projected.columns.size() - 1;
+  }
 
   for (auto& row : projected.rows) {
     for (std::size_t index = 0; index < row.size(); ++index) {

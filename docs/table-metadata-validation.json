@@ -1,0 +1,77 @@
+{
+  "scope": "Finite EventTable metadata preservation and case-merge index checkpoint; column dtype promotion and complete dataframe/family parity remain unproven.",
+  "reference_version": "2.7.22",
+  "pandas_version": "3.0.5",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "reference_artifact": "docs/case-relations-index-reference.json.gz",
+  "reference_uncompressed_sha256": "83f3e11179f3a76cf0b6a61a874f4dc8f125d88232c2db18ed3038a60ecff461",
+  "native_source_parent_commit": "c09da75e670dac00eeca51d97d0cb8f5f803c287",
+  "native_verified_staged_tree": "31c63f4a2fd550b3762f441698f550d6265a781f",
+  "native_changed_source_sha256_lf_normalized": {
+    "include/minera/event_data.hpp": "b37ad46d97934f87af1402853ea079ea2c558b8451824f22d9e6b91af44b6f6f",
+    "src/backend/case_relations.cpp": "53c2f1942654a3d8439739c43a485219c4088eff947657dbb31fafcb3fd1a8db",
+    "src/backend/csv_event_log_importer.cpp": "da7c9b0310e49fe280c75505e729d83760965088df510a53260023dbcab614c6",
+    "src/backend/declare.cpp": "c001c48737eeb7023084bbdc2ca0625cbdaf9bc7b369752c4272d250c3505edd",
+    "src/backend/event_data.cpp": "493daefe72f277d29ff34d5b69bc4ecb501d2e654c661778b72ba0eabdee5426",
+    "src/backend/footprints.cpp": "cc582ad316bdc8454411f0d319f4fa7f8c63557aa5cd3e91b9bf409caf08eaa1",
+    "src/backend/json_export.cpp": "6ca9f133ba983eccf28075e9d26091bcf6e624d96abefc11c0c0692697fa84db",
+    "src/backend/log_conversion.cpp": "6b059f578f2d527194ad761a100a9b0d0bd7ba7ffdb4b54307d26df1ecdd2562",
+    "src/backend/log_skeleton.cpp": "314882313d49c86b57caf058edce5d140cb511933ee8c884c8501b21d98feb9c",
+    "src/backend/tests/case_relations_index_reference_cases.hpp": "26bd9a66da05416cd58db9f878a57584a7dd5bd8a80fd1a1d9a053e65608a456",
+    "src/backend/tests/test_case_relations.cpp": "707d4ba43bb9e54099e368ea27aed382ca735d413a0b15fc55883750c5ccda19",
+    "src/backend/tests/test_event_data.cpp": "b3cde280eb38cbb9c3e8441ad3509efb05b039cd77773a9d2da23b13639ce5f2",
+    "src/backend/tests/test_footprints.cpp": "dfe08b06a103a31829c028006f85b5ed1bd9f5a55428f725ebd8f33e0a5a4f80",
+    "src/backend/tests/test_log_conversion.cpp": "ca87ec8d93f38915149bc7a67e358f4ffc87f14071cb4897f69c9dc2af8e4756",
+    "src/backend/tests/test_xes_io.cpp": "27079c5d43f984fab01fddc12ec9415e1a0072f40da755544a690a4bcb1d944f",
+    "src/backend/xes_event_log_importer.cpp": "ed3881f5976915d0c4eaeb095a8b8340d78ade48327bbf7d5ec19166a86b6248"
+  },
+  "native_suites": {
+    "passed": 150,
+    "failed": 0
+  },
+  "public_cases": {
+    "new_exact_index_cases": 26,
+    "existing_table_cases": 43
+  },
+  "script_tests": {
+    "passed": 58,
+    "failed": 0,
+    "optimized_evidence_tests_passed": 11
+  },
+  "transport": {
+    "checks": [
+      "CLI lexical timestamps, missing configured timestamps, duplicate relations and case order",
+      "CLI preserves base row labels and expanded incoming row labels through sorting",
+      "CLI output file matches stdout",
+      "CLI invalid output destination rejected",
+      "HTTP merge matches CLI including compatibility log",
+      "HTTP missing timestamp column rejected",
+      "CLI and HTTP preserve explicit missing canonical selector",
+      "CLI and HTTP support one-sided timestamp columns",
+      "CLI and HTTP honor explicit canonical column when both aliases exist",
+      "CLI and HTTP project selected case/timestamp columns into compatibility log",
+      "CLI and HTTP preserve quoted relation metadata, collision suffixes and explicit relation selectors",
+      "CLI custom import columns retain default relation selectors and log roles",
+      "Mixed XES/CSV CLI and HTTP honor explicit relation selectors over unused suffixes"
+    ],
+    "native_sha256_before_and_after": {
+      "export": "78ff18d506e1f15188ccc5b2fc9b30c4ad15c31b15b5f885eec6cdaac9791010",
+      "server": "bb7dce3f65b407ac621c0b32f41e71c9ed00424077880a173cb1dc9a5f74ed10"
+    }
+  },
+  "catalog_audit": {
+    "dispatchers": 86,
+    "complete_dispatchers": 44,
+    "partial_dispatchers": 42,
+    "modules": 387,
+    "complete_modules": 195,
+    "partial_modules": 192
+  },
+  "independent_review": "No actionable findings remain. Range classification, pre-sort concatenation and full-width step arithmetic findings corrected. Final native test selector/order fixtures corrected and all 150 suites passed.",
+  "limitations": [
+    "Case-merge column dtype promotion is not implemented.",
+    "Categorical/extension descriptors, non-string index names and specialized index-level metadata are not fully modeled.",
+    "Empty/singleton RangeIndex parameters cannot all be recovered from stored labels.",
+    "Exact Python error identity and complete family parity are not established."
+  ]
+}

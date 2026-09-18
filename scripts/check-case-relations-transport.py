@@ -1,7 +1,7 @@
 """Exercise case-relation table output through the CLI and local HTTP route.
 
 Run only after all native compilation/linking has finished. This checks adapter
-behavior, not dataframe index/dtype or complete PM4Py equivalence.
+behavior and one exact merged index, not complete PM4Py equivalence.
 """
 
 import argparse
@@ -65,6 +65,14 @@ def run(export, server):
         require(result.returncode == 0, "CLI merge failed: " + result.stderr)
         cli = check_output(json.loads(result.stdout), expected)
         checks.append("CLI lexical timestamps, missing configured timestamps, duplicate relations and case order")
+        merged_index = cli["table"]["index"]
+        require((merged_index["class"], merged_index["dtype"], merged_index["names"]) ==
+                ("Index", "int64", [None]), "merged index metadata differs")
+        require(all(label["kind"] == "scalar" for label in merged_index["labels"]),
+                "merged integer index contains nonscalar labels")
+        require([label["value"]["typed_value"] for label in merged_index["labels"]] ==
+                [1, 0, 1, 2, 2, 0], "merged index row provenance differs")
+        checks.append("CLI preserves base row labels and expanded incoming row labels through sorting")
         output = root / "result.json"
         result = subprocess.run(command + ["-o", str(output)], capture_output=True, text=True, timeout=30)
         require(result.returncode == 0 and not result.stdout.strip(), "CLI output file routing failed")

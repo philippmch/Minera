@@ -1311,6 +1311,10 @@ static EventLog import_xes_impl(
             dtype = lazy ? "Datetime(time_unit='us', time_zone='UTC')" : "datetime64[us, UTC]"; break;
           default: dtype = lazy ? "String" : "str"; break;
         }
+        // Keep the compatibility field on XesImportResult and the selected
+        // table metadata synchronized. The latter must be populated before a
+        // LazyEventTable is constructed or the table is moved into the result.
+        table.dtypes.push_back(dtype);
         table_result->dtypes.push_back(std::move(dtype));
         for (auto& row : table.rows) {
           auto& cell = row[column];

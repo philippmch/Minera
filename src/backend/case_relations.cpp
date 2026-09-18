@@ -181,6 +181,84 @@ std::optional<EventAttribute> copy_cell(const std::optional<EventAttribute>& cel
   return result;
 }
 
+EventTableIndexLabel implicit_index_label(std::size_t position) {
+  EventAttribute value;
+  value.kind = AttributeKind::kInt;
+  value.value = std::to_string(position);
+  value.typed_value = static_cast<std::int64_t>(position);
+  return EventTableIndexLabel{std::move(value)};
+}
+
+EventTableIndexLabel floating_index_label(std::size_t position) {
+  EventAttribute value;
+  value.kind = AttributeKind::kFloat;
+  value.value = std::to_string(static_cast<double>(position));
+  value.typed_value = static_cast<double>(position);
+  return EventTableIndexLabel{std::move(value)};
+}
+
+std::optional<std::int64_t> integer_index_label(
+    const EventTableIndexLabel& label) {
+  const auto* scalar = std::get_if<EventAttribute>(&label.value);
+  if (!scalar || scalar->is_null || scalar->kind != AttributeKind::kInt)
+    return std::nullopt;
+  if (const auto* value = std::get_if<std::int64_t>(&scalar->typed_value))
+    return *value;
+  return std::nullopt;
+}
+
+std::uint64_t index_magnitude(std::int64_t value) {
+  if (value >= 0) return static_cast<std::uint64_t>(value);
+  return static_cast<std::uint64_t>(-(value + 1)) + 1;
+}
+
+struct IndexStep {
+  bool negative = false;
+  std::uint64_t magnitude = 0;
+
+  bool operator==(const IndexStep&) const = default;
+};
+
+IndexStep index_difference(std::int64_t right, std::int64_t left) {
+  if ((right < 0) == (left < 0)) {
+    if (right >= left)
+      return {false, static_cast<std::uint64_t>(right - left)};
+    return {true, static_cast<std::uint64_t>(left - right)};
+  }
+  const auto gap = index_magnitude(right) + index_magnitude(left);
+  return {right < left, gap};
+}
+
+bool arithmetic_index_labels(const std::vector<EventTableIndexLabel>& labels) {
+  if (labels.size() < 2) return true;
+  const auto first = integer_index_label(labels[0]);
+  const auto second = integer_index_label(labels[1]);
+  if (!first || !second) return false;
+  const auto step = index_difference(*second, *first);
+  if (step.magnitude == 0) return false;
+  for (std::size_t position = 2; position < labels.size(); ++position) {
+    const auto previous = integer_index_label(labels[position - 1]);
+    const auto current = integer_index_label(labels[position]);
+    if (!previous || !current ||
+        index_difference(*current, *previous) != step)
+      return false;
+  }
+  return true;
+}
+
+bool valid_range_index(const EventTable& table) {
+  if (!table.index) return true;
+  return table.index->kind == "RangeIndex" &&
+         table.index->dtype == "int64" &&
+         arithmetic_index_labels(table.index->labels);
+}
+
+EventTableIndexLabel source_index_label(const EventTable& table,
+                                        std::size_t position) {
+  if (table.index) return table.index->labels[position];
+  return implicit_index_label(position);
+}
+
 struct NumericValue {
   bool integer = false;
   std::int64_t integer_value = 0;
@@ -815,6 +893,8 @@ EventTable merge_case_relations(const EventTable& base,
     EventTable::Row row;
     std::optional<EventAttribute> case_cell;
     std::optional<EventAttribute> timestamp_cell;
+    EventTableIndexLabel index_label;
+    bool index_label_from_expansion = false;
     std::size_t sequence = 0;
   };
   std::vector<OutputRow> output_rows;
@@ -825,6 +905,7 @@ EventTable merge_case_relations(const EventTable& base,
     row[output_index(name)] = copy_cell(cell, name);
   };
   const auto make_base_row = [&](const EventTable::Row& source,
+                                 std::size_t source_position,
                                  std::size_t sequence) {
     EventTable::Row row(result.columns.size());
     for (std::size_t index = 0; index < base.columns.size(); ++index)
@@ -835,12 +916,16 @@ EventTable merge_case_relations(const EventTable& base,
                      base_time_index ? copy_cell(source[*base_time_index],
                                                  options.timestamp_key)
                                      : std::nullopt,
+                     source_index_label(base, source_position),
+                     false,
                      sequence};
     output_rows.push_back(std::move(output));
   };
   std::size_t sequence = 0;
-  for (const auto& row : base.rows) make_base_row(row, sequence++);
+  for (std::size_t position = 0; position < base.rows.size(); ++position)
+    make_base_row(base.rows[position], position, sequence++);
 
+  std::size_t incoming_index_sequence = 0;
   for (const auto& source : incoming.rows) {
     for (const auto& relation : relations.rows) {
       if (!cell_equal(source[incoming_case_index],
@@ -859,11 +944,17 @@ EventTable merge_case_relations(const EventTable& base,
           incoming_time_index
               ? copy_cell(source[*incoming_time_index], options.timestamp_key)
               : std::nullopt,
+          implicit_index_label(incoming_index_sequence++),
+          true,
           sequence++};
       output_rows.push_back(std::move(output));
     }
   }
 
+  std::vector<EventTableIndexLabel> preconcat_index_labels;
+  preconcat_index_labels.reserve(output_rows.size());
+  for (const auto& output : output_rows)
+    preconcat_index_labels.push_back(output.index_label);
   std::stable_sort(output_rows.begin(), output_rows.end(),
                    [](const OutputRow& left, const OutputRow& right) {
     const auto case_order = compare_sort_values(sort_value(left.case_cell),
@@ -876,6 +967,82 @@ EventTable merge_case_relations(const EventTable& base,
   });
   result.rows.reserve(output_rows.size());
   for (auto& output : output_rows) result.rows.push_back(std::move(output.row));
+
+  // Pandas carries the base table index through the stable sort.  Rows
+  // introduced by the relation expansion receive a fresh integer label in
+  // expansion order; incoming and relation source indexes do not participate
+  // in that numbering.  A plain implicit RangeIndex remains implicit only
+  // when sorting leaves its labels in positional order.  Combining expanded
+  // rows with a non-integer base index promotes an ordinary result index to
+  // object, while nullable integer and floating indexes retain their
+  // extension/numeric dtype.
+  std::vector<EventTableIndexLabel> sorted_index_labels;
+  sorted_index_labels.reserve(output_rows.size());
+  for (const auto& output : output_rows)
+    sorted_index_labels.push_back(output.index_label);
+  const bool has_incoming_rows = incoming_index_sequence != 0;
+  bool implicit_index_is_identity = output_rows.size() == base.rows.size();
+  for (std::size_t position = 0;
+       implicit_index_is_identity && position < output_rows.size(); ++position) {
+    const auto* label = std::get_if<EventAttribute>(&output_rows[position].index_label.value);
+    const auto* value = label ? std::get_if<std::int64_t>(&label->typed_value) : nullptr;
+    if (!value || *value != static_cast<std::int64_t>(position))
+      implicit_index_is_identity = false;
+  }
+  const bool need_explicit_implicit_index =
+      !base.index && !has_incoming_rows && !implicit_index_is_identity &&
+      !output_rows.empty();
+  // The relation merge creates fresh positional labels for incoming rows;
+  // their source index does not participate in the concat index class.  The
+  // base side still determines whether the concat starts from a RangeIndex.
+  const bool range_inputs_valid = valid_range_index(base);
+  const bool output_range_index =
+      (!base.index || base.index->kind == "RangeIndex") &&
+      range_inputs_valid &&
+      arithmetic_index_labels(preconcat_index_labels) &&
+      arithmetic_index_labels(sorted_index_labels);
+  if (base.index || has_incoming_rows || need_explicit_implicit_index) {
+    EventTableIndex output_index;
+    if (output_range_index) {
+      output_index.kind = "RangeIndex";
+      output_index.dtype = "int64";
+    } else if (has_incoming_rows) {
+      output_index.kind = "Index";
+      if (!base.index || base.index->kind == "RangeIndex" ||
+          base.index->dtype == "int64" || base.index->dtype == "Int64" ||
+          base.index->dtype == "float64") {
+        output_index.dtype = base.index ? base.index->dtype : "int64";
+      } else {
+        output_index.dtype = "object";
+      }
+    } else if (base.index) {
+      output_index.kind = base.index->kind == "RangeIndex"
+                              ? "Index"
+                              : base.index->kind;
+      output_index.dtype = base.index->dtype;
+    } else {
+      output_index.kind = "Index";
+      output_index.dtype = "int64";
+    }
+    const auto level_count = output_index.kind == "MultiIndex"
+                                 ? base.index->names.size()
+                                 : std::size_t{1};
+    output_index.names.assign(level_count, std::nullopt);
+    output_index.labels.reserve(output_rows.size());
+    for (const auto& output : output_rows) {
+      if (output_range_index) {
+        output_index.labels.push_back(output.index_label);
+      } else if (output.index_label_from_expansion &&
+          output_index.dtype == "float64") {
+        const auto& label = std::get<EventAttribute>(output.index_label.value);
+        output_index.labels.push_back(floating_index_label(static_cast<std::size_t>(
+            std::get<std::int64_t>(label.typed_value))));
+      } else {
+        output_index.labels.push_back(output.index_label);
+      }
+    }
+    result.index = std::move(output_index);
+  }
   result.validate();
   return result;
 }

@@ -7,6 +7,7 @@
 #include <string>
 
 #include "minera/json_export.hpp"
+#include "minera/csv_event_log_importer.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/log_util_json.hpp"
 #include "minera/xes_event_log_importer.hpp"
@@ -519,6 +520,87 @@ void lazy_output_and_metadata_json_are_explicit() {
   assert(json.find("\"lazy\":true") != std::string::npos);
 }
 
+void table_metadata_survives_conversion_and_serialization() {
+  minera::EventTable table;
+  table.columns = {"activity", "amount"};
+  table.rows = {{minera::EventAttribute{"activity", "A"},
+                 minera::EventAttribute{"amount", "1"}}};
+  table.dtypes = {"str", "int64"};
+  minera::EventTableIndex explicit_index;
+  explicit_index.kind = "Index";
+  explicit_index.dtype = "object";
+  explicit_index.names = {std::nullopt};
+  explicit_index.labels = {{minera::EventAttribute{"run", "r1"}}};
+  table.index = explicit_index;
+  table.validate();
+
+  const auto identity =
+      minera::event_data_to_table(minera::EventDataView(table));
+  assert(identity.dtypes == table.dtypes);
+  assert(identity.index == table.index);
+  const auto lazy = minera::LazyEventTable::from_table(table);
+  assert(lazy.dtypes() == table.dtypes);
+  assert(lazy.index() == table.index);
+  assert(lazy.materialize().index == table.index);
+
+  minera::LogConversionResult table_result;
+  table_result.variant = minera::LogConversionVariant::kToDataFrame;
+  table_result.table = table;
+  const auto table_json = minera::log_conversion_json(table_result);
+  assert(table_json.find("\"dtypes\":[\"str\",\"int64\"]") !=
+         std::string::npos);
+  assert(table_json.find("\"index\":{\"class\":\"Index\"") !=
+         std::string::npos);
+  assert(table_json.find("\"kind\":\"scalar\"") !=
+         std::string::npos);
+
+  explicit_index.kind = "MultiIndex";
+  explicit_index.names = {std::string{"run"}, std::string{"step"}};
+  minera::EventTableIndexLabel tuple;
+  tuple.value = std::vector<minera::EventTableIndexLabel>{
+      {minera::EventAttribute{"run", "r1"}},
+      {minera::EventAttribute{"step", "1"}},
+  };
+  explicit_index.labels = {std::move(tuple)};
+  table.index = explicit_index;
+  table.validate();
+  table_result.table = table;
+  const auto multi_json = minera::log_conversion_json(table_result);
+  assert(multi_json.find("\"kind\":\"tuple\"") !=
+         std::string::npos);
+  assert(multi_json.find("\"items\":[") != std::string::npos);
+}
+
+void csv_projection_preserves_schema_and_source_index_labels() {
+  std::istringstream input(
+      "case_id,activity,timestamp\n"
+      "c0,A,2026-01-01T00:00:00Z\n"
+      "c1,B,2026-01-01T00:01:00Z\n"
+      "c2,C,2026-01-01T00:02:00Z\n");
+  const auto imported = minera::import_csv_event_data(input);
+  assert(imported.table.dtypes ==
+         std::vector<std::string>({"str", "str", "str"}));
+  assert(!imported.table.index);
+
+  minera::EventLog filtered;
+  filtered.traces.push_back(imported.log.traces[2]);
+  filtered.traces.push_back(imported.log.traces[0]);
+  const auto projected =
+      minera::project_csv_event_table(imported.table, filtered);
+  assert(projected.dtypes == imported.table.dtypes);
+  assert(projected.index);
+  assert(projected.index->labels.size() == 2);
+  const auto& first = projected.index->labels[0].value;
+  const auto& second = projected.index->labels[1].value;
+  assert(std::get<minera::EventAttribute>(first).value == "0");
+  assert(std::get<minera::EventAttribute>(second).value == "2");
+
+  const auto identity =
+      minera::project_csv_event_table(imported.table, imported.log);
+  assert(!identity.index);
+  assert(identity.dtypes == imported.table.dtypes);
+}
+
 void dataframe_row_cap_counts_events_and_is_deterministic() {
   // A flattened EventLog has exactly one table row per event, regardless of
   // how many traces contain those events.
@@ -875,6 +957,7 @@ void xes_result_serialization_preserves_missing_cells_and_schema() {
   result.kind = minera::EventDataKind::kEventTable;
   result.table.columns = {"case:concept:name", "flag"};
   result.table.rows = {{minera::EventAttribute{"case:concept:name", "c"}, std::nullopt}};
+  result.table.dtypes = {"str", "object"};
   result.dtypes = {"str", "object"};
   auto json = minera::xes_import_result_json(result);
   assert(json.find("\"type\":\"DataFrame\"") != std::string::npos);
@@ -883,12 +966,12 @@ void xes_result_serialization_preserves_missing_cells_and_schema() {
   result.kind = minera::EventDataKind::kLazyEventTable;
   result.lazy_table = minera::LazyEventTable::from_table(result.table);
   result.table = {};
-  result.dtypes = {"String", "Boolean"};
+  result.dtypes.clear();
   json = minera::xes_import_result_json(result);
   assert(json.find("\"type\":\"LazyFrame\"") != std::string::npos);
   assert(json.find("\"lazy\":true") != std::string::npos);
   assert(json.find("case:concept:name") != std::string::npos);
-  result.dtypes.clear();
+  result.dtypes = {"String", "Boolean"};
   bool rejected = false;
   try { (void)minera::xes_import_result_json(result); }
   catch (const std::invalid_argument&) { rejected = true; }
@@ -919,6 +1002,8 @@ int main() {
   selected_typed_attributes_survive_all_event_log_json_paths();
   table_projection_is_rectangular_and_typed();
   lazy_output_and_metadata_json_are_explicit();
+  table_metadata_survives_conversion_and_serialization();
+  csv_projection_preserves_schema_and_source_index_labels();
   dataframe_row_cap_counts_events_and_is_deterministic();
   graph_null_selectors_are_absent();
   graph_projection_builds_cases_events_attributes_and_df();
