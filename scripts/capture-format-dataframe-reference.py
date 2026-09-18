@@ -1211,6 +1211,104 @@ def _cases():
             ),
             {"timest_format": timestamp_format},
         )
+    for name, values, timestamp_format, kind in (
+        ("default_empty", ["2024-01-01", ""], None, "text"),
+        ("default_nat", ["2024-01-01", "NaT"], None, "text"),
+        ("default_lower_nat", ["2024-01-01", "nat"], None, "text"),
+        ("default_upper_nat", ["2024-01-01", "NAT"], None, "text"),
+        ("default_none", ["2024-01-01", "None"], None, "text"),
+        ("default_nan", ["2024-01-01", "nan"], None, "text"),
+        ("default_space", ["2024-01-01", " "], None, "text"),
+        ("default_all_nat", ["NaT", "NaT"], None, "text"),
+        ("default_invalid_nat", ["invalid", "NaT"], None, "text"),
+        ("default_typed", ["2024-01-01", "2024-01-02"], None, "typed"),
+        ("mixed_empty", ["2024-01-01", ""], "mixed", "text"),
+        ("mixed_nat", ["2024-01-01", "NaT"], "mixed", "text"),
+        ("mixed_lower_nat", ["2024-01-01", "nat"], "mixed", "text"),
+        ("mixed_upper_nat", ["2024-01-01", "NAT"], "mixed", "text"),
+        ("mixed_none", ["2024-01-01", "None"], "mixed", "text"),
+        ("mixed_nan", ["2024-01-01", "nan"], "mixed", "text"),
+        ("mixed_space", ["2024-01-01", " "], "mixed", "text"),
+        ("mixed_all_nat", ["NaT", "NaT"], "mixed", "text"),
+        ("mixed_invalid_nat", ["invalid", "NaT"], "mixed", "text"),
+        ("mixed_typed", ["2024-01-01", "2024-01-02"], "mixed", "typed"),
+        ("iso_empty", ["2024-01-01", ""], "ISO8601", "text"),
+        ("iso_nat", ["2024-01-01", "NaT"], "ISO8601", "text"),
+        ("iso_lower_nat", ["2024-01-01", "nat"], "ISO8601", "text"),
+        ("iso_upper_nat", ["2024-01-01", "NAT"], "ISO8601", "text"),
+        ("iso_none", ["2024-01-01", "None"], "ISO8601", "text"),
+        ("iso_nan", ["2024-01-01", "nan"], "ISO8601", "text"),
+        ("iso_space", ["2024-01-01", " "], "ISO8601", "text"),
+        ("iso_all_nat", ["NaT", "NaT"], "ISO8601", "text"),
+        ("iso_invalid_nat", ["invalid", "NaT"], "ISO8601", "text"),
+        ("iso_typed", ["2024-01-01", "2024-01-02"], "ISO8601", "typed"),
+        ("explicit_empty", ["2024-01-01", ""], "%Y-%m-%d", "text"),
+        ("explicit_nat", ["2024-01-01", "NaT"], "%Y-%m-%d", "text"),
+        ("explicit_lower_nat", ["2024-01-01", "nat"], "%Y-%m-%d", "text"),
+        ("explicit_upper_nat", ["2024-01-01", "NAT"], "%Y-%m-%d", "text"),
+        ("explicit_none", ["2024-01-01", "None"], "%Y-%m-%d", "text"),
+        ("explicit_nan", ["2024-01-01", "nan"], "%Y-%m-%d", "text"),
+        ("explicit_space", ["2024-01-01", " "], "%Y-%m-%d", "text"),
+        ("explicit_all_nat", ["NaT", "NaT"], "%Y-%m-%d", "text"),
+        ("explicit_invalid_nat", ["invalid", "NaT"], "%Y-%m-%d", "text"),
+        ("explicit_typed", ["2024-01-01", "2024-01-02"], "%Y-%m-%d", "typed"),
+        ("token_mixed_nan", ["2024-01-01", "NaN"], None, "text"),
+        ("token_upper_nan", ["2024-01-01", "NAN"], None, "text"),
+        ("token_null", ["2024-01-01", "null"], None, "text"),
+        ("token_upper_null", ["2024-01-01", "NULL"], None, "text"),
+        ("token_na", ["2024-01-01", "<NA>"], None, "text"),
+        ("token_nat_space", ["2024-01-01", "NaT "], None, "text"),
+        ("token_nan_space", ["2024-01-01", " nan"], None, "text"),
+        ("token_slash_na", ["2024-01-01", "N/a"], None, "text"),
+        ("typed_wrong_format", ["2024-01-01", "2024-01-02"], "%d|%m|%Y", "typed"),
+        (
+            "object_typed_wrong_format",
+            ["2024-01-01", "2024-01-02"],
+            "%d|%m|%Y",
+            "object_typed",
+        ),
+        ("missing_only", ["", "NaT", "nan"], None, "text"),
+        (
+            "iso_timezone",
+            ["2024-01-01T00:00:00.123456789+0230", "2024-01-01T00:00:00Z"],
+            "ISO8601",
+            "text",
+        ),
+        ("case_token_nat", ["2024-01-01", "nat"], None, "text"),
+        ("case_token_naT", ["2024-01-01", "naT"], None, "text"),
+        ("case_token_nAt", ["2024-01-01", "nAt"], None, "text"),
+        ("case_token_nAT", ["2024-01-01", "nAT"], None, "text"),
+        ("case_token_Nat", ["2024-01-01", "Nat"], None, "text"),
+        ("case_token_NaT", ["2024-01-01", "NaT"], None, "text"),
+        ("case_token_NAt", ["2024-01-01", "NAt"], None, "text"),
+        ("case_token_NAT", ["2024-01-01", "NAT"], None, "text"),
+        ("case_token_nan", ["2024-01-01", "nan"], None, "text"),
+        ("case_token_naN", ["2024-01-01", "naN"], None, "text"),
+        ("case_token_nAn", ["2024-01-01", "nAn"], None, "text"),
+        ("case_token_nAN", ["2024-01-01", "nAN"], None, "text"),
+        ("case_token_Nan", ["2024-01-01", "Nan"], None, "text"),
+        ("case_token_NaN", ["2024-01-01", "NaN"], None, "text"),
+        ("case_token_NAn", ["2024-01-01", "NAn"], None, "text"),
+        ("case_token_NAN", ["2024-01-01", "NAN"], None, "text"),
+    ):
+        times = (
+            pd.to_datetime(values, utc=True)
+            if kind in ("typed", "object_typed")
+            else values
+        )
+        if kind == "object_typed":
+            times = pd.Series(times, dtype="object")
+        add(
+            "format_mode_" + name,
+            _frame(
+                {
+                    "case:concept:name": ["C"] * len(values),
+                    "concept:name": ["A" + str(i) for i in range(len(values))],
+                    "time:timestamp": times,
+                }
+            ),
+            {} if timestamp_format is None else {"timest_format": timestamp_format},
+        )
     return cases
 
 
