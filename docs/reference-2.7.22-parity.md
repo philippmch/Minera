@@ -1906,6 +1906,36 @@ claim parity for that optimized dataframe replay path. Date/container keys,
 all hashability errors, and broader scalar identity behavior remain unproven.
 
 
+## Direct dataframe replay group-key inference evidence
+
+The numeric-key discrepancy recorded after the exact stream grouping checkpoint
+is resolved for the captured cases. Public direct-dataframe replay first groups
+exact case values, then infers the group index from each case's first scalar
+representative. In the observed all-numeric sets, a float representative promotes
+the index to floating point unless a boolean representative is present. When
+inferred keys collide, the later group replaces the earlier group at its output
+position; events are not merged. String representatives also prevent promotion.
+Exact stream-to-log conversion retains its separate grouping behavior.
+
+A flower net with distinct activity labels makes the surviving event sequences
+observable without inferring case labels from replay results. The new capture
+contains 28 public cases, with 25 successful cases checked through both eager
+and lazy native tables. All 50 comparisons verify activated transition paths,
+fit/fitness values, consumed/produced/missing/remaining tokens, and unchanged
+inputs. Reversed source orders, first-representative type changes, signed and
+unsigned large integers, infinities, and boolean/string suppression are covered.
+
+Three public high-level empty-case rejections remain named exclusions: the
+native lower-level normalization API does not implement that validation layer.
+Case-label representation is not established by the public list diagnostics,
+and broader dtype/index and replay parity remain unproven. The durable capture
+and validation are `docs/token-replay-dataframe-grouping-reference.json.gz` and
+`docs/token-replay-dataframe-grouping-validation.json`. The isolated Release
+build, all 152 native suites, 92 script tests, four optimized evidence gates,
+and the existing formatter CLI/HTTP matrix pass. Structural coverage counts
+are unchanged.
+
+
 ## Basic random-tree generation evidence
 
 The BASIC random-tree generator uses the seeded recursive-depth process-tree

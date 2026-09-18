@@ -337,6 +337,8 @@
     "uncompressed_sha256": "52d5de1e2f861dff25b81b3f63290ce35bbdb0fab6f3173c0d2aab86378ab489",
     "public_cases": 7,
     "status": "Not resolved by this conversion checkpoint.",
-    "observation": "Direct public dataframe replay of int64max and float(2^63) gives one diagnostic; conversion followed by replay gives two. Native generic normalization retains exact conversion grouping."
+    "observation": "Direct public dataframe replay of int64max and float(2^63) gives one diagnostic; conversion followed by replay gives two. Native generic normalization retains exact conversion grouping.",
+    "resolved_by": "docs/token-replay-dataframe-grouping-validation.json",
+    "resolution_scope": "Captured numeric group-key collisions are resolved by the subsequent checkpoint; high-level empty-case validation remains outside the native normalization contract."
   }
 }

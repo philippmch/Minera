@@ -1,5 +1,6 @@
 #include "minera/conformance.hpp"
 #include "minera/log_conversion.hpp"
+#include "token_replay_dataframe_grouping_reference_cases.hpp"
 
 #include <algorithm>
 #include <iostream>
@@ -375,7 +376,7 @@ void null_cases_and_activities_keep_distinct_semantics() {
           "table numeric keys sort numerically before distinct string keys");
 }
 
-void numeric_case_ordering_preserves_full_integers() {
+void numeric_case_ordering_matches_inferred_index() {
   EventStream stream;
   stream.events = {row("9007199254740993", "A"), row("9007199254740992", "A"),
                    row("9223372036854775808", "A"), row("9223372036854775807", "A"),
@@ -388,30 +389,31 @@ void numeric_case_ordering_preserves_full_integers() {
   stream.events[6].fields[0].kind = AttributeKind::kFloat;
   const auto table = event_stream_to_table(stream);
   const auto lazy = LazyEventTable::from_table(table);
-  // Generic native tables use stream conversion's exact numeric equality.
-  // The equal int/float case shares one trace and retains its first label.
-  const std::vector<std::string> expected = {"-1.5", "-1", "9007199254740992",
-      "9007199254740993", "9223372036854775807", "9223372036854775808"};
+  // Float index inference overwrites earlier groups when numeric keys round
+  // together. Exact stream conversion is intentionally a different boundary.
+  const std::vector<std::string> expected = {"-1.5", "-1",
+      "9007199254740993", "9223372036854775808"};
   for (const auto view : {EventDataView(table), EventDataView(lazy)}) {
     const auto log = normalize_token_replay_event_log(view);
     std::vector<std::string> actual;
     for (const auto& trace : log.traces) actual.push_back(trace.case_id);
-    require(actual == expected, "numeric case sorting preserves integers beyond double precision");
+    require(actual == expected, "numeric case sorting matches inferred index collisions");
     require(log.traces[2].case_id_attribute->kind == AttributeKind::kInt &&
-            log.traces[2].events.size() == 2,
-            "equal numeric types group with the first representative");
+            log.traces[2].events.size() == 1,
+            "inferred key collisions keep the later exact group");
   }
 }
 }  // namespace
 
 int main() {
   try {
+    check_public_replay_dataframe_grouping();
     replay_flat_inputs_preserve_source_order();
     custom_selectors_and_typed_identity();
     strict_selection_and_caps();
     transported_nulls_and_ambiguity();
     null_cases_and_activities_keep_distinct_semantics();
-    numeric_case_ordering_preserves_full_integers();
+    numeric_case_ordering_matches_inferred_index();
     std::cout << "Token replay event-data tests passed\n";
     return 0;
   } catch (const std::exception& error) {
