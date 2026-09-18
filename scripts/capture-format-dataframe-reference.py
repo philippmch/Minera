@@ -68,7 +68,11 @@ def normalize(value):
         return int(value)
     if isinstance(value, numbers.Real):
         scalar = float(value)
-        return scalar if math.isfinite(scalar) else None
+        return (
+            scalar
+            if math.isfinite(scalar)
+            else ("Infinity" if scalar > 0 else "-Infinity")
+        )
     if isinstance(value, bytes):
         return {"encoding": "hex", "value": value.hex()}
     if isinstance(value, str):
@@ -343,6 +347,78 @@ def _typed_empty(columns, dtypes):
         {column: pd.Series([], dtype=dtype) for column, dtype in zip(columns, dtypes)}
     )
     return result
+
+
+def _numeric_boundary_cases():
+    """Public numeric sorting/conversion boundaries with same and split cases."""
+    inputs = {
+        "duplicate_float_late": [1, 1.0, 2**64 - 1, 2**64 - 2],
+        "duplicate_float_first": [1.0, 1, 2**64 - 1, 2**64 - 2],
+        "duplicate_bool_late": [1, True, 1.5, 2**64 - 1, 2**64 - 2],
+        "duplicate_bool_first": [True, 1, 1.5, 2**64 - 1, 2**64 - 2],
+        "float_negative_zero": [0, -0.0, 2**64 - 1, 2**64 - 2],
+        "bool_float_wide": [True, 1.5, 2**64 - 1, 2**64 - 2],
+        "string_float_wide": ["z", 1.5, 2**64 - 1, 2**64 - 2],
+        "float_exact_equal": [1, 1.0, 2**64 - 1],
+        "float_rounding_pair": [float(2**53), 2**53 + 1, 2**64 - 1],
+        "float_bool_rounding": [True, float(2**53), 2**53 + 1, 2**64 - 1],
+        "timestamp_text_before_number": ["!bad", 2],
+        "timestamp_boolean_text": ["!bad", True, 0],
+        "nanosecond_nat_with_bad": [-(2**63), "bad"],
+        "numeric_datetime_string": [0, "2024-01-01"],
+        "numeric_signed_nat_and_bool": [-(2**63), True],
+        "wide_float_collision": [2**53 + 1, float(2**53), 2**64 - 1, 2**64 - 2],
+        "wide_float_safe": [2**53 + 2, float(2**53), 2**64 - 1],
+        "wide_integer_collision": [2**53 + 1, 2**53, 2**64 - 1, 2**64 - 2],
+        "wide_only_float": [float(1), 2**64 - 1, 2**64 - 2],
+        "wide_one_float": [float(1), 2**64 - 1],
+        "wide_bool_collision": [True, 2**64 - 1, 2**64 - 2],
+        "bool_exact_collision": [True, 2**53, 2**53 + 1],
+        "negative_wide": [-1, 2**64 - 1, 2**64 - 2],
+        "negative_wide_float": [-1.0, 2**64 - 1, 2**64 - 2],
+        "infinite_collision": [float("inf"), 2**53, 2**53 + 1],
+        "negative_infinite": [float("-inf"), -(2**63), -(2**63) + 1],
+        "numeric_string": [1, "2"],
+        "mixed_object_int_float": [2**53 + 1, float(2**53)],
+        "object_large_signed": [-(2**63), 2**63 - 1],
+        "object_signed_nat": [-(2**63), 0],
+        "object_unsigned_epoch": [2**63, 2**63 + 1],
+        "object_unsigned_wrap": [2**64 - 1, 0],
+        "object_overflow_float": [float(2**63), 2**63 - 1],
+    }
+    cases = []
+    for name, values in inputs.items():
+        for mode in ("same", "split"):
+            cases.append(
+                (
+                    "numeric_boundary_" + name + "_" + mode,
+                    _frame(
+                        {
+                            "case:concept:name": ["C"] * len(values)
+                            if mode == "same"
+                            else [str(i) for i in range(len(values))],
+                            "concept:name": [str(i) for i in range(len(values))],
+                            "time:timestamp": pd.Series(values, dtype="object"),
+                        }
+                    ),
+                    {},
+                )
+            )
+    values = inputs["wide_float_collision"]
+    cases.append(
+        (
+            "numeric_boundary_custom_error_mutation",
+            _frame(
+                {
+                    "cid": ["C"] * len(values),
+                    "act": [str(i) for i in range(len(values))],
+                    "when": pd.Series(values, dtype="object"),
+                }
+            ),
+            {"case_id": "cid", "activity_key": "act", "timestamp_key": "when"},
+        )
+    )
+    return cases
 
 
 def _cases():
@@ -914,6 +990,7 @@ def _cases():
                 }
             ),
         )
+    cases.extend(_numeric_boundary_cases())
     return cases
 
 

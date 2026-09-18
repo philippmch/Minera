@@ -26,7 +26,7 @@ class FormatDataFrameEvidenceTests(unittest.TestCase):
                 encoding="utf-8"
             ),
         )
-        self.assertEqual(generated.count("inline void check_case_"), 52)
+        self.assertEqual(generated.count("inline void check_case_"), 119)
         self.assertEqual(
             set(GENERATOR["EXCLUDED_CASES"]),
             {"non_string_column_labels_with_selectors"},
@@ -109,6 +109,37 @@ class FormatDataFrameEvidenceTests(unittest.TestCase):
         )
         row["input"]["categorical_dtypes"] = {}
         self.reject(report)
+
+    def test_infinities_and_mutating_rejections_are_retained(self):
+        row = next(
+            row
+            for row in REPORT["rows"]
+            if row["name"] == "numeric_boundary_negative_infinite_same"
+        )
+        cell = row["input"]["records"][0]["cell_tags"]["time:timestamp"]
+        self.assertEqual(
+            cell,
+            {
+                "dtype": "object",
+                "kind": "float",
+                "missing": False,
+                "value": "-Infinity",
+            },
+        )
+        self.assertIn(
+            "-std::numeric_limits<double>::infinity()",
+            GENERATOR["scalar"](cell, "time:timestamp"),
+        )
+        failed = next(
+            row
+            for row in REPORT["rows"]
+            if row["name"] == "numeric_boundary_custom_error_mutation"
+        )
+        self.assertTrue(failed["input_mutated"])
+        self.assertIn("time:timestamp", failed["input_after"]["columns"])
+        self.assertEqual(
+            failed["error"]["message"], "Categorical categories must be unique"
+        )
 
 
 if __name__ == "__main__":
