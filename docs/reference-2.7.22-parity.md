@@ -1936,6 +1936,30 @@ and the existing formatter CLI/HTTP matrix pass. Structural coverage counts
 are unchanged.
 
 
+## Dataframe column validation evidence
+
+`check_dataframe_columns` now validates the dataframe schema and optional case,
+activity, timestamp, and start-timestamp selectors. Declared dtypes determine
+column eligibility; global schema checks precede selected-column type and
+missing-value checks. Empty strings remain valid values. Checks preserve the
+input, including metadata, and reproduce the captured public error messages.
+
+`replay_dataframe_traces` applies that validation before dataframe replay.
+All 28 captured replay cases now have a validated native comparison, including
+the three empty-case rejections excluded from the lower-level API checkpoint.
+Existing lower-level conversion and replay APIs retain their separate behavior.
+The validator corpus adds 64 cases: 18 successes and 46 expected rejections.
+All 153 native suites, 96 script tests, four optimized evidence gates, and
+258 CLI plus 258 HTTP formatter comparisons pass. Independent review found
+no actionable issues. The durable evidence is `docs/dataframe-column-validation-reference.json.gz`
+and `docs/dataframe-column-validation-evidence.json`.
+
+These finite checks do not establish Python exception-class identity, arbitrary
+extension dtypes, duplicate/non-string column labels, or exhaustive pandas
+inference. Native tables without declared dtypes use basic scalar-kind inference.
+Full parity and structural coverage counts remain unchanged.
+
+
 ## Basic random-tree generation evidence
 
 The BASIC random-tree generator uses the seeded recursive-depth process-tree

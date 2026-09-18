@@ -317,6 +317,11 @@ struct TokenReplayDiagnostics {
     const EventLog& event_log, const PetriNet& net,
     TokenReplayOptions options = {});
 
+// Validated dataframe entry point: checks declared schema and required
+// case/activity/timestamp columns before applying dataframe replay semantics.
+[[nodiscard]] std::vector<TokenReplayTraceDiagnostics> replay_dataframe_traces(
+    const EventTable& table, const PetriNet& net, TokenReplayOptions options = {});
+
 // Flat replay projection does not require timestamps or reorder case events.
 [[nodiscard]] EventLog normalize_token_replay_event_log(
     const EventDataView& data, const TokenReplayOptions& options = {});

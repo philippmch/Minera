@@ -11,6 +11,7 @@
 #include <utility>
 
 #include "minera/log_conversion.hpp"
+#include "minera/dataframe_validation.hpp"
 
 namespace minera {
 namespace {
@@ -330,6 +331,16 @@ EventLog project_table(const EventTable& table, const TokenReplayOptions& option
 }
 
 }  // namespace
+
+std::vector<TokenReplayTraceDiagnostics> replay_dataframe_traces(
+    const EventTable& table, const PetriNet& net, TokenReplayOptions options) {
+  DataFrameColumnOptions columns;
+  columns.activity_key = options.activity_attribute;
+  columns.case_id_key = options.case_id_attribute;
+  columns.timestamp_key = options.timestamp_attribute;
+  check_dataframe_columns(table, columns);
+  return replay_token_traces(EventDataView(table), net, options);
+}
 
 EventLog normalize_token_replay_event_log(const EventDataView& data,
                                           const TokenReplayOptions& options) {
