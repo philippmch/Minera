@@ -4717,10 +4717,40 @@ CaseRelationsParams parse_case_relations_params(const FieldLookup& field,
     params.timestamp_key = require("merge_timestamp_key");
   if (supplied("merge_case_id_key"))
     params.case_id_key = require("merge_case_id_key");
-  if (supplied("merge_left_suffix"))
-    params.left_suffix = require("merge_left_suffix");
-  if (supplied("merge_right_suffix"))
-    params.right_suffix = require("merge_right_suffix");
+  if (supplied("merge_left_column"))
+    params.relation_left_column = require("merge_left_column");
+  if (supplied("merge_right_column"))
+    params.relation_right_column = require("merge_right_column");
+  const auto assign_suffix = [&](std::string_view field_name,
+                                 std::string& target,
+                                 std::string_view selector_name) {
+    if (!supplied(field_name)) return;
+    const auto value = field(field_name);
+    if (value.empty() && !supplied(selector_name))
+      throw std::invalid_argument(std::string(field_name) +
+                                  ": expected a value unless " +
+                                  std::string(selector_name) +
+                                  " is supplied");
+    target = value;
+  };
+  assign_suffix("merge_left_suffix", params.left_suffix,
+                "merge_left_column");
+  assign_suffix("merge_right_suffix", params.right_suffix,
+                "merge_right_column");
+  if ((params.relation_left_column.empty() && params.left_suffix.empty()) ||
+      (params.relation_right_column.empty() && params.right_suffix.empty()))
+    throw std::invalid_argument(
+        "relation selectors require non-empty default suffixes");
+  const auto relation_left_name =
+      params.relation_left_column.empty()
+          ? params.case_id_key + params.left_suffix
+          : params.relation_left_column;
+  const auto relation_right_name =
+      params.relation_right_column.empty()
+          ? params.case_id_key + params.right_suffix
+          : params.relation_right_column;
+  if (relation_left_name == relation_right_name)
+    throw std::invalid_argument("merge relation columns must differ");
   return params;
 }
 

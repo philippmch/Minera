@@ -157,6 +157,48 @@ namespace {
 using minera::error_json;
 using minera::looks_like_xes;
 
+bool has_table_column(const minera::EventTable& table, std::string_view column) {
+  return std::find(table.columns.begin(), table.columns.end(), column) !=
+         table.columns.end();
+}
+
+void adapt_case_relations_table_timestamp(
+    minera::CaseRelationsOptions& options,
+    const minera::EventTable& base,
+    const minera::EventTable& incoming) {
+  // Callers invoke this only when merge_timestamp_key was omitted.  Keep the
+  // canonical time:timestamp header first, then bridge the CSV timestamp
+  // alias when it exists on either side; the table merge handles absence on
+  // the other side.  Explicit selectors remain exact at the call site.
+  if (options.timestamp_key != "time:timestamp") return;
+  for (const std::string_view candidate : {"time:timestamp", "timestamp"}) {
+    if (has_table_column(base, candidate) ||
+        has_table_column(incoming, candidate)) {
+      options.timestamp_key = std::string(candidate);
+      return;
+    }
+  }
+}
+
+void normalize_csv_timestamp_missingness(minera::EventTable& table) {
+  for (auto& row : table.rows) {
+    for (auto& cell : row) {
+      if (!cell || cell->first_class_role !=
+                       minera::FirstClassAttributeRole::kTimestamp)
+        continue;
+      if (cell->first_class_state ==
+          minera::FirstClassAttributeState::kMissing) {
+        cell.reset();
+      } else if (cell->first_class_state ==
+                 minera::FirstClassAttributeState::kNull) {
+        cell->is_null = true;
+        cell->value.clear();
+        cell->typed_value = minera::NativeAttributeValue{};
+      }
+    }
+  }
+}
+
 std::string trim_text(std::string_view value) {
   const auto first = value.find_first_not_of(" \t\r\n");
   if (first == std::string_view::npos) return {};
@@ -4885,13 +4927,6 @@ void handle_case_relations(const httplib::Request& request,
     std::istringstream base_input(base_file.content);
     std::istringstream incoming_input(incoming_file.content);
     std::istringstream relation_input(relation_file.content);
-    const auto base = looks_like_xes(base_file.filename, base_file.content)
-                          ? minera::import_xes_event_log(base_input)
-                          : minera::import_csv_event_log(base_input);
-    const auto incoming =
-        looks_like_xes(incoming_file.filename, incoming_file.content)
-            ? minera::import_xes_event_log(incoming_input)
-            : minera::import_csv_event_log(incoming_input);
     const auto value = [&](std::string_view key,
                            std::string fallback) {
       return request.has_param(std::string(key))
@@ -4906,18 +4941,45 @@ void handle_case_relations(const httplib::Request& request,
     const auto present = [&](std::string_view key) {
       return request.has_param(std::string(key));
     };
-    const auto options =
+    auto options =
         minera::parse_case_relations_params(lookup, present);
     const auto left_column = value(
         "merge_left_column", options.case_id_key + options.left_suffix);
     const auto right_column = value(
         "merge_right_column", options.case_id_key + options.right_suffix);
-    const auto relations = minera::parse_case_relations_csv(
-        relation_input, left_column, right_column);
-    response.set_content(
-        minera::case_relations_json(minera::merge_case_relations(
-            base, incoming, relations, options), options.variant),
-        "application/json");
+    const bool base_is_xes = looks_like_xes(base_file.filename, base_file.content);
+    const bool incoming_is_xes =
+        looks_like_xes(incoming_file.filename, incoming_file.content);
+    if (!base_is_xes && !incoming_is_xes) {
+      const auto relation_table =
+          minera::parse_case_relations_table_csv(relation_input);
+      options.relation_left_column = left_column;
+      options.relation_right_column = right_column;
+      auto base_data = minera::import_csv_event_data(base_input);
+      auto incoming_data = minera::import_csv_event_data(incoming_input);
+      normalize_csv_timestamp_missingness(base_data.table);
+      normalize_csv_timestamp_missingness(incoming_data.table);
+      if (!request.has_param("merge_timestamp_key")) {
+        adapt_case_relations_table_timestamp(options, base_data.table,
+                                              incoming_data.table);
+      }
+      response.set_content(
+          minera::case_relations_json(minera::merge_case_relations(
+              base_data.table, incoming_data.table, relation_table, options), options),
+          "application/json");
+    } else {
+      const auto relations = minera::parse_case_relations_csv(
+          relation_input, left_column, right_column);
+      const auto base = base_is_xes ? minera::import_xes_event_log(base_input)
+                                    : minera::import_csv_event_log(base_input);
+      const auto incoming =
+          incoming_is_xes ? minera::import_xes_event_log(incoming_input)
+                          : minera::import_csv_event_log(incoming_input);
+      response.set_content(
+          minera::case_relations_json(minera::merge_case_relations(
+              base, incoming, relations, options), options.variant),
+          "application/json");
+    }
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");

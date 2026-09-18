@@ -2,6 +2,7 @@
 
 #include "minera/case_relations.hpp"
 #include "minera/json_export.hpp"
+#include "case_relations_reference_cases.hpp"
 
 #include <cassert>
 #include <sstream>
@@ -99,6 +100,62 @@ void rejects_invalid_timestamps() {
     threw = true;
   }
   assert(threw);
+  base.traces[0].events[0].timestamp.clear();
+  base.traces[0].events[0].timestamp_state = FirstClassAttributeState::kPresent;
+  threw = false;
+  try { (void)merge_case_relations(base, {}, {}); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);  // Explicit empty text is not a missing datetime cell.
+}
+
+void missing_timestamps_sort_last_with_stable_duplicates() {
+  for (const int selector : {0, 1, 2}) {
+    for (const bool all_null : {false, true}) {
+      auto base = base_log();
+      base.traces[0].events = {
+          event("L1", "base-null", "stale-null-projection"),
+          event("L1", "base2", "2024-01-01T00:00:00.000000002Z"),
+          event("L1", "base-missing", "")};
+      base.traces[0].events[0].timestamp_state = FirstClassAttributeState::kNull;
+      auto incoming = incoming_log();
+      incoming.traces[0].events = {
+          event("R1", "incoming-null", ""),
+          event("R1", "incoming1", "2024-01-01T00:00:00.000000001Z")};
+      incoming.traces[0].events[0].timestamp_state = FirstClassAttributeState::kNull;
+      CaseRelationsOptions options;
+      if (selector) options.timestamp_key = "started";
+      for (auto* log : {&base, &incoming}) {
+        for (auto& value : log->traces[0].events) {
+          if (all_null) value.timestamp_state = FirstClassAttributeState::kNull;
+          if (!selector) continue;
+          if (selector == 2) value.timestamp_source_key = "started";
+          if (!value.has_timestamp()) {
+            if (selector == 1) value.timestamp = "unused";
+            continue;
+          }
+          EventAttribute attribute{"started", "stale-date-projection", AttributeKind::kDate};
+          attribute.is_null = value.timestamp_state == FirstClassAttributeState::kNull;
+          if (!attribute.is_null)
+            attribute.typed_value = NativeDate{value.timestamp, NativeDateResolution::kNanosecond};
+          if (selector == 1) value.attributes.push_back(attribute);
+          else value.timestamp_attribute = attribute;
+          value.timestamp = "unused";
+        }
+      }
+      const auto base_before = case_relations_json(base);
+      const auto incoming_before = case_relations_json(incoming);
+      const auto merged = merge_case_relations(base, incoming,
+          {{"L1", "R1"}, {"L1", "R1"}}, options);
+      const std::vector<std::string> expected = all_null
+          ? std::vector<std::string>{"base-null", "base2", "base-missing", "incoming-null", "incoming-null", "incoming1", "incoming1"}
+          : std::vector<std::string>{"incoming1", "incoming1", "base2", "base-null", "base-missing", "incoming-null", "incoming-null"};
+      assert(merged.traces[0].events.size() == expected.size());
+      for (std::size_t i = 0; i < expected.size(); ++i)
+        assert(merged.traces[0].events[i].activity == expected[i]);
+      assert(case_relations_json(base) == base_before);
+      assert(case_relations_json(incoming) == incoming_before);
+    }
+  }
 }
 
 void supports_custom_case_key_and_suffixes() {
@@ -144,6 +201,47 @@ void supports_custom_case_key_and_suffixes() {
   assert(threw);
 }
 
+void event_log_selectors_ignore_unused_suffixes() {
+  CaseRelationsOptions options;
+  options.relation_left_column = "lhs";
+  options.relation_right_column = "rhs";
+  options.left_suffix.clear();
+  options.right_suffix.clear();
+  const auto explicit_empty = merge_case_relations(
+      base_log(), incoming_log(), { {"L1", "R1"} }, options);
+  assert(explicit_empty.traces.size() == 1 &&
+         explicit_empty.traces[0].events.size() == 3);
+
+  options.left_suffix = "same-unused-suffix";
+  options.right_suffix = options.left_suffix;
+  const auto explicit_equal = merge_case_relations(
+      base_log(), incoming_log(), { {"L1", "R1"} }, options);
+  assert(explicit_equal.traces.size() == 1 &&
+         explicit_equal.traces[0].events.size() == 3);
+
+  options.relation_right_column = options.relation_left_column;
+  bool threw = false;
+  try {
+    (void)merge_case_relations(base_log(), incoming_log(),
+                               { {"L1", "R1"} }, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  options.relation_left_column.clear();
+  options.relation_right_column = "rhs";
+  options.left_suffix.clear();
+  threw = false;
+  try {
+    (void)merge_case_relations(base_log(), incoming_log(),
+                               { {"L1", "R1"} }, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void json_shape_is_stable() {
   const auto merged = merge_case_relations(base_log(), incoming_log(),
                                            {{"L1", "R1"}});
@@ -154,12 +252,251 @@ void json_shape_is_stable() {
   assert(json.find(R"("activity":"B")") != std::string::npos);
 }
 
+void nanosecond_ordering_and_exact_ties_match_public_merge() {
+  for (const std::string prefix : {"2024-01-01T00:00:00", "1969-12-31T23:59:59"}) {
+    for (const bool custom_key : {false, true}) {
+      auto base = base_log();
+      base.traces[0].events = {
+          event("L1", "base1", prefix + ".000000001Z"),
+          event("L1", "base0", prefix + ".000000000Z"),
+          event("L1", "base-last", prefix + ".999999999Z")};
+      auto incoming = incoming_log();
+      incoming.traces[0].events = {
+          event("R1", "incoming2", prefix + ".000000002Z"),
+          event("R1", "incoming1", prefix + ".000000001+00:00")};
+      CaseRelationsOptions options;
+      if (custom_key) {
+        options.timestamp_key = "started";
+        for (auto* log : {&base, &incoming}) {
+          for (auto& value : log->traces[0].events) {
+            value.attributes.push_back({"started", value.timestamp, AttributeKind::kDate});
+            value.timestamp = "unused";
+          }
+        }
+      }
+      const auto merged = merge_case_relations(base, incoming,
+          {{"L1", "R1"}, {"L1", "R1"}}, options);
+      const std::vector<std::string> expected{
+          "base0", "base1", "incoming1", "incoming1", "incoming2", "incoming2", "base-last"};
+      assert(merged.traces.size() == 1);
+      assert(merged.traces[0].events.size() == expected.size());
+      for (std::size_t i = 0; i < expected.size(); ++i)
+        assert(merged.traces[0].events[i].activity == expected[i]);
+      assert(base.traces[0].events[0].activity == "base1");
+    }
+  }
+  auto base = base_log();
+  base.traces[0].events = {event("L1", "late", "2024-01-01T00:00:00.000000002Z")};
+  auto incoming = incoming_log();
+  incoming.traces[0].events = {
+      event("R1", "early", "2024-01-01T05:30:00.000000001+05:30"),
+      event("R1", "tie", "2023-12-31T20:00:00.000000002-04:00")};
+  const auto merged = merge_case_relations(base, incoming, {{"L1", "R1"}});
+  assert(merged.traces[0].events[0].activity == "early");
+  assert(merged.traces[0].events[1].activity == "late");
+  assert(merged.traces[0].events[2].activity == "tie");
+}
+
+void table_vector_adapter_preserves_inputs() {
+  EventTable base{
+      {"case_id", "when", "base_value"},
+      {{EventAttribute{"case_id", "L1", AttributeKind::kString},
+        EventAttribute{"when", "a", AttributeKind::kString},
+        EventAttribute{"base_value", "base", AttributeKind::kString}}}};
+  EventTable incoming{
+      {"case_id", "when", "incoming_value"},
+      {{EventAttribute{"case_id", "R1", AttributeKind::kString},
+        EventAttribute{"when", "b", AttributeKind::kString},
+        EventAttribute{"incoming_value", "incoming", AttributeKind::kString}}}};
+  const auto base_before = base;
+  const auto incoming_before = incoming;
+  CaseRelationsOptions options;
+  options.timestamp_key = "when";
+  const auto merged = merge_case_relations(
+      base, incoming, std::vector<CaseRelation>{{"L1", "R1"}}, options);
+  assert((merged.columns == std::vector<std::string>{
+      "case_id", "when", "base_value", "incoming_value", "case_id_LEFT",
+      "case_id_RIGHT"}));
+  assert(merged.rows.size() == 2);
+  assert(merged.rows[0][0] && merged.rows[0][0]->value == "L1");
+  assert(merged.rows[1][0] && merged.rows[1][0]->value == "L1");
+  assert(!merged.rows[0][4] && !merged.rows[0][5]);
+  assert(merged.rows[1][4] && merged.rows[1][4]->value == "L1");
+  assert(merged.rows[1][5] && merged.rows[1][5]->value == "R1");
+  assert(base.columns == base_before.columns && base.rows == base_before.rows);
+  assert(incoming.columns == incoming_before.columns &&
+         incoming.rows == incoming_before.rows);
+
+  options.relation_left_column = "lhs";
+  options.relation_right_column = "rhs";
+  const auto renamed = merge_case_relations(
+      base, incoming, std::vector<CaseRelation>{{"L1", "R1"}}, options);
+  assert(renamed.columns.size() == 6 && renamed.columns[4] == "lhs" &&
+         renamed.columns[5] == "rhs");
+}
+
+void table_selectors_are_exact() {
+  const auto event_table = [](const std::string& case_column,
+                              const std::string& case_value,
+                              const std::string& timestamp_column,
+                              const std::string& timestamp_value) {
+    EventTable table;
+    table.columns = {case_column, timestamp_column};
+    table.rows.push_back({
+        EventAttribute{case_column, case_value, AttributeKind::kString},
+        EventAttribute{timestamp_column, timestamp_value,
+                       AttributeKind::kString}});
+    return table;
+  };
+  const auto relation_table = [](const std::string& left_column,
+                                 const std::string& right_column) {
+    EventTable table;
+    table.columns = {left_column, right_column};
+    table.rows.push_back({
+        EventAttribute{left_column, "L1", AttributeKind::kString},
+        EventAttribute{right_column, "R1", AttributeKind::kString}});
+    return table;
+  };
+  const auto expect_rejected = [](const EventTable& base,
+                                  const EventTable& incoming,
+                                  const EventTable& relations,
+                                  const CaseRelationsOptions& options) {
+    bool threw = false;
+    try {
+      (void)merge_case_relations(base, incoming, relations, options);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  };
+
+  // A selected time:timestamp column does not fall back to timestamp.
+  const auto timestamp_alias_base =
+      event_table("case_id", "L1", "timestamp", "a");
+  const auto timestamp_alias_incoming =
+      event_table("case_id", "R1", "timestamp", "b");
+  const auto exact_relations = relation_table("case_id_LEFT", "case_id_RIGHT");
+  expect_rejected(timestamp_alias_base, timestamp_alias_incoming,
+                  exact_relations, {});
+
+  // A selected case_id column does not fall back to case:concept:name.
+  const auto case_alias_base =
+      event_table("case:concept:name", "L1", "time:timestamp", "a");
+  const auto case_alias_incoming =
+      event_table("case:concept:name", "R1", "time:timestamp", "b");
+  expect_rejected(case_alias_base, case_alias_incoming, exact_relations, {});
+
+  // Relation columns use the configured case key verbatim as well.
+  const auto exact_base =
+      event_table("case_id", "L1", "time:timestamp", "a");
+  const auto exact_incoming =
+      event_table("case_id", "R1", "time:timestamp", "b");
+  const auto relation_alias =
+      relation_table("case:concept:name_LEFT", "case:concept:name_RIGHT");
+  expect_rejected(exact_base, exact_incoming, relation_alias, {});
+
+  // The default case_id/time:timestamp names remain valid when present
+  // exactly, with no alias translation on the table path.
+  const auto merged = merge_case_relations(
+      exact_base, exact_incoming, exact_relations, {});
+  assert(merged.rows.size() == 2);
+  assert((merged.columns == std::vector<std::string>{
+      "case_id", "time:timestamp", "case_id_LEFT", "case_id_RIGHT"}));
+}
+
+void parses_relation_table_with_extra_columns() {
+  std::istringstream input(
+      "lhs,rhs,relation note,empty\n"
+      "L1,R1,\"quoted, \"\"note\"\"\",\n");
+  const auto relations = parse_case_relations_table_csv(input);
+  assert((relations.columns ==
+          std::vector<std::string>{"lhs", "rhs", "relation note", "empty"}));
+  assert(relations.rows.size() == 1 && relations.rows[0].size() == 4);
+  assert(relations.rows[0][2] &&
+         relations.rows[0][2]->value == "quoted, \"note\"");
+  assert(relations.rows[0][3] && relations.rows[0][3]->value.empty() &&
+         !relations.rows[0][3]->is_null &&
+         relations.rows[0][3]->kind == AttributeKind::kString);
+  std::istringstream crlf("lhs,rhs,note\r\nL1,R1,\"quoted, note\"\r\n");
+  const auto uploaded = parse_case_relations_table_csv(crlf);
+  assert(uploaded.rows[0][2]->value == "quoted, note");
+  std::istringstream legacy_crlf("case_id_LEFT,case_id_RIGHT\r\n\"L1\",\"R1\"\r\n");
+  assert((parse_case_relations_csv(legacy_crlf) ==
+          std::vector<CaseRelation>{{"L1", "R1"}}));
+
+  EventTable base{
+      {"case_id", "time:timestamp", "base_value"},
+      {{EventAttribute{"case_id", "L1", AttributeKind::kString},
+        EventAttribute{"time:timestamp", "a", AttributeKind::kString},
+        EventAttribute{"base_value", "base", AttributeKind::kString}}}};
+  EventTable incoming{
+      {"case_id", "time:timestamp", "incoming_value"},
+      {{EventAttribute{"case_id", "R1", AttributeKind::kString},
+        EventAttribute{"time:timestamp", "b", AttributeKind::kString},
+        EventAttribute{"incoming_value", "incoming", AttributeKind::kString}}}};
+  CaseRelationsOptions options;
+  options.relation_left_column = "lhs";
+  options.relation_right_column = "rhs";
+  const auto merged = merge_case_relations(base, incoming, relations, options);
+  assert((merged.columns == std::vector<std::string>{
+      "case_id", "time:timestamp", "base_value", "incoming_value", "lhs",
+      "rhs", "relation note", "empty"}));
+  assert(merged.rows.size() == 2);
+  assert(merged.rows[1][4] && merged.rows[1][4]->value == "L1");
+  assert(merged.rows[1][5] && merged.rows[1][5]->value == "R1");
+  assert(merged.rows[1][6] &&
+         merged.rows[1][6]->value == "quoted, \"note\"");
+  assert(merged.rows[1][7] && merged.rows[1][7]->value.empty() &&
+         !merged.rows[1][7]->is_null);
+  for (const auto& suffix : {std::string{}, std::string("_SAME")}) {
+    options.left_suffix = options.right_suffix = suffix;
+    assert(merge_case_relations(base, incoming, relations, options).rows == merged.rows);
+    const auto adapted = merge_case_relations(
+        base, incoming, std::vector<CaseRelation>{{"L1", "R1"}}, options);
+    assert(adapted.rows.size() == 2 && adapted.columns.back() == "rhs");
+  }
+  options.relation_right_column = "lhs";
+  for (bool vector_adapter : {false, true}) {
+    bool rejected = false;
+    try {
+      if (vector_adapter)
+        (void)merge_case_relations(base, incoming,
+            std::vector<CaseRelation>{{"L1", "R1"}}, options);
+      else
+        (void)merge_case_relations(base, incoming, relations, options);
+    } catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
+
+  const auto expect_bad = [](const std::string& csv) {
+    bool threw = false;
+    try {
+      std::istringstream malformed(csv);
+      (void)parse_case_relations_table_csv(malformed);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  };
+  expect_bad("lhs,rhs,lhs\nL1,R1,duplicate\n");
+  expect_bad(",rhs\nL1,R1\n");
+  expect_bad("lhs,rhs,extra\nL1,R1\n");
+  expect_bad("lhs,rhs\n\"L1,R1\n");
+}
+
 }  // namespace
 
 int main() {
+  check_public_case_relations_reference_cases();
+  missing_timestamps_sort_last_with_stable_duplicates();
+  nanosecond_ordering_and_exact_ties_match_public_merge();
   merges_and_drops();
   parses_relations_and_custom_timestamps();
   rejects_invalid_timestamps();
   supports_custom_case_key_and_suffixes();
+  event_log_selectors_ignore_unused_suffixes();
   json_shape_is_stable();
+  table_vector_adapter_preserves_inputs();
+  table_selectors_are_exact();
+  parses_relation_table_with_extra_columns();
 }
