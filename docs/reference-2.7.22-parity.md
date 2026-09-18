@@ -4119,10 +4119,13 @@ XES import preserves up to six fractional digits, truncating finer fractions;
 both XES exporters preserve those microseconds in first-class timestamps and
 log, trace, event, and nested date attributes, including compressed output.
 Explicit nanosecond native dates retain up to nine digits on export; re-import
-still follows the microsecond source contract. Native export normalizes whole
-seconds to UTC independently of the fraction, avoiding rounding into the next
-second or losing precision at distant dates. Import offset handling follows the
-selected variation as described below.
+still follows the microsecond source contract. Native export preserves source
+clock fields and timezone offsets without converting fractions through floating
+point; UTC emits `+00:00` and naive dates remain without an offset. Zero fractions
+are omitted, microsecond values use six digits, and genuine nanosecond values
+use nine. Import offset handling follows the selected variation as described
+below, so ordinary iterparse re-import retains clock fields while Rust import
+preserves absolute instants.
 Fractional tick coefficients now follow the observed double conversion and
 truncation behavior. Each compound component normalizes independently through
 direct conversions to finer units (days begin at hours), accepting an integer
@@ -4234,9 +4237,10 @@ keys. `CHUNK_REGEX` drops scalar children and retains list children as a mapping
 wrapped list entries as ordered pairs, and direct list children as mappings.
 `ITERPARSE_20` retains direct list entries as ordered pairs but ignores entries
 inside a `values` wrapper. Native Rust scalar imports discard child metadata
-and retain the first duplicate attribute. Rust list stringification, unknown
-container tags, log-level shape differences, and empty/malformed shape edges
-remain open. Public exporter probes cover 288 combinations of nested shapes,
+and retain the first duplicate attribute. Rust lists and containers now import
+as debug-formatted strings, retaining ordered duplicate entries, nested type
+names, and scalar child attributes. Broader unknown-tag, table-shape, and
+empty/malformed shape edges remain open. Public exporter probes cover 288 combinations of nested shapes,
 event/trace/log/global scopes, both export variations, and plain/gzip transport.
 Native dictionary-shaped list exports now emit `list`/`values`: `ETREE` writes
 typed mapping entries, while `LINE_BY_LINE` uses the first two Unicode code
@@ -4378,3 +4382,72 @@ five focused tests repeated under Python optimization). CLI/HTTP checks cover
 null defaults, opt-in preservation, gzip, and invalid options. Independent
 review findings were corrected and reviewed again. The structural catalogue
 remains 44/86 dispatchers and 195/387 non-dispatcher modules complete.
+
+
+## Rust XES table and conversion checkpoint
+
+The additive `import_xes_result` API supports legacy EventLog, eager DataFrame,
+and LazyFrame results. Legacy mode takes precedence; the EventLog convenience
+API always returns a log. Raw modes preserve rows before case grouping and
+include column-aligned dtype names. The native lazy scanner owns an eagerly
+parsed in-memory table, and JSON output materializes rows.
+
+Rust scalar conversion retains missing/NaN placeholders through first-duplicate
+selection and schema inference. Nullable numeric columns, mixed-column display,
+UTC date instants, invalid scalar fallback, and generated empty column names
+follow the observed backend. Lists/containers become debug strings that retain
+nested types, ordered duplicates, and Unicode escaping. Empty traces contribute
+to schema before being omitted from legacy output.
+
+Legacy reconstruction groups rows by the selected case column, preserving
+first-seen group and event order. It normalizes trace prefixes, projects selected
+first-class fields, and infers standard extensions. Explicit extension lists
+replace inference and use last-value replacement for duplicate names. CLI
+return/conversion flags expose these results; raw modes ignore conversion flags.
+
+These behaviors target PM4Py 2.7.22 with r4pm 0.6.2, pandas 3.0.5, and Polars
+1.44.1. Column ordering and collision outcomes can vary; finite sampled support
+is not evidence of exact distribution equivalence. Python-only parameter object
+kinds, arbitrary malformed XML, runtime object identity, true deferred I/O, and
+complete adapter equivalence remain unproven. Rust importer coverage stays partial.
+
+
+The Rust implementation checkpoint is `822afe2`. Its isolated Release build and
+all 150 native suites passed. The reproducible corpus covers 77 raw-return,
+41 conversion, seven conversion-schema, 26 extension, and 42 empty-boundary
+observations. Native checks exercise each mapped observation four times in
+plain and gzip form: 616, 312, 56, 160, and 336 comparisons respectively.
+Two conversion and six extension observations use Python-only parameter objects
+that the native CLI cannot represent; they are retained as explicit exclusions.
+
+Additional comparisons cover 140 metadata cases (including two expected
+rejections), 384 container strings, 513 scalar cases, 62 UTC-date cases, and
+1,111,934 valid non-ASCII XML code points. Grouping uses 64 samples per side for
+108 cases and reaches all 106 observed variable outcomes. These are finite
+behavioral checks; rejection comparisons do not establish exception-class or
+message identity, and sampled support does not prove equal probabilities.
+
+Public gzip replay retains exact generated column names. Strict differences
+caused by variable names remain in the reports; optional paired 64-sample
+plain/gzip support comparisons require both the historical expected result and
+the triggering gzip result to occur in the matching observed supports. No
+name normalization or probability-equivalence claim is used for that check.
+
+
+`docs/xes-rust-reference-fixtures.json.gz` stores 44 reports as exact UTF-8
+`json_text` strings with SHA-256 digests, preserving the bytes needed to verify
+cross-report input hashes. The `xes-rust-reviewed-*` reports exercise the final
+manifest and provenance gates; earlier `xes-rust-final-*` reports retain the
+broader scalar/grouping/Unicode runs and their original inputs. The bundle also
+records 33 opaque reference-module comparisons, dependency versions/backend
+binary hash, and the native executable hash tied to implementation `822afe2`.
+To restore a report for a checker, UTF-8 encode its `json_text` value unchanged.
+
+All 1,480 mapped native comparisons passed the repaired gates. Public gzip
+replay checked 193 observations: 189 strict matches and four retained strict
+differences resolved by equal observed support over 64 samples per input form.
+No gzip observations were skipped. The gates reject incomplete/duplicate
+manifests, reported capture errors, invalid provenance, and zero comparisons;
+native comparisons hash their executable before and after running. The complete
+script suite passes 47 tests, with the 24 focused Rust gate tests also passing
+under Python optimization. Structural coverage remains partial and unchanged.
