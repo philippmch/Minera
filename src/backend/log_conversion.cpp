@@ -1239,7 +1239,14 @@ ConvertedEventStream event_table_to_event_stream(
   table.validate();
   ConvertedEventStream stream;
   stream.attributes = table.attributes;
+  // Dataframes have attrs mapped to metadata.properties, not log attributes.
+  // Preserve native log attributes when present; otherwise declare the same
+  // tabular origin as the public dataframe conversion.
+  if (stream.attributes.empty()) stream.attributes.push_back({"origin", "csv"});
   stream.metadata = table.metadata;
+  std::erase_if(stream.metadata.properties, [](const auto& property) {
+    return property.key == "pm4py:param:case_id_key";
+  });
   infer_standard_extensions(table, stream.metadata);
   stream.events.reserve(table.rows.size());
   for (const auto& row : table.rows) {

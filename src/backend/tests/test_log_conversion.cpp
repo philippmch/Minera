@@ -11,6 +11,7 @@
 #include "minera/log_conversion.hpp"
 #include "minera/log_util_json.hpp"
 #include "minera/xes_event_log_importer.hpp"
+#include "dataframe_conversion_metadata_reference_cases.hpp"
 
 namespace {
 
@@ -518,6 +519,25 @@ void lazy_output_and_metadata_json_are_explicit() {
   assert(json.find("\"extensions\":[{\"name\":\"demo\"") !=
          std::string::npos);
   assert(json.find("\"lazy\":true") != std::string::npos);
+}
+
+void explicit_native_table_origin_survives_conversion() {
+  minera::EventTable table;
+  table.attributes = {{"origin", "native"}, {"source", "preserved"}};
+  table.metadata.extensions = {{"Custom", "custom", "urn:custom"}};
+  table.metadata.properties = {{"pm4py:param:case_id_key", "custom-case"},
+                               {"case_id_key", "ordinary"}};
+  const auto before = table;
+  const auto stream = minera::event_table_to_event_stream(table);
+  assert(stream.attributes == before.attributes);
+  assert(stream.metadata.extensions == before.metadata.extensions);
+  assert(stream.metadata.properties.size() == 1);
+  assert(stream.metadata.properties.front().key == "case_id_key");
+  assert(stream.metadata.properties.front().value == "ordinary");
+  assert(table.metadata == before.metadata);
+  assert(table.attributes == before.attributes);
+  table.attributes = {{"source", "native-without-origin"}};
+  assert(minera::event_table_to_event_stream(table).attributes == table.attributes);
 }
 
 void table_metadata_survives_conversion_and_serialization() {
@@ -1036,6 +1056,8 @@ void xes_result_serialization_preserves_missing_cells_and_schema() {
 }
 
 int main() {
+  check_public_dataframe_conversion_metadata();
+  explicit_native_table_origin_survives_conversion();
   xes_result_serialization_preserves_missing_cells_and_schema();
   empty_scalar_wrappers_survive_conversion();
   stream_round_trip_preserves_typed_attributes();
