@@ -1769,6 +1769,45 @@ observations do not establish complete dataframe or family parity. Non-string
 index names, specialized index-level metadata and range parameters not recoverable
 from empty/singleton labels remain outside the current table metadata model.
 
+## Dataframe formatting evidence
+
+The native `format_dataframe(EventTable&, DataFrameFormatOptions)` operation is
+based on public calls to `pm4py.format_dataframe`, rather than CSV-reader
+inference. `docs/format-dataframe-reference.json.gz` retains 53 observations
+under PM4Py 2.7.22 and pandas 3.0.5, including seven public rejections. The
+capture records the full input and post-call state, returned cells and dtypes,
+categorical descriptors, index class/names/labels, attrs, and return identity.
+The defining public module is checked against the pinned Git blob using opaque
+bytes with CRLF normalization; implementation text is not decoded.
+
+Generated native checks cover 52 representable cases, including post-call input
+checks for failures. The non-string-column case remains a named exclusion:
+EventTable models column labels and selectors as strings. Dataframe attrs map
+to `EventTable::metadata.properties`, as confirmed by a separate public
+format-and-convert call. Custom selectors validate required columns before
+replacing/appending canonical copies in the input; the formatted return value
+has its own sorted rows and reset index. Existing generated index columns are
+overwritten, and mixed valid/invalid date text remains text when the reference
+cannot convert the column. These observations do not establish every pandas
+extension dtype, timestamp parser format, non-string label, or Python exception
+identity. The generated rejection checks require native rejection, not Python
+runtime exception classes. CSV and mixed XES adapters remain separate work.
+
+The checkpoint additionally covers sequential cross-canonical selector aliases,
+categorical source aliases, numeric sorting, and mixed microsecond/nanosecond
+string columns. Object-typed numeric timestamps within the observed signed
+nanosecond range become exact UTC dates; boolean/integer objects and unsigned
+values outside that range retain their scalar kinds in the captured cases.
+The public mixed float/int/UINT64 boundary can reject with pandas categorical
+uniqueness errors; that combined boundary remains an explicit follow-on gap.
+
+The isolated Release build and all 151 native suites pass, including the 52
+mapped public formatter cases. All 75 script tests and eight optimized evidence
+tests pass; independent review has no outstanding findings in this checkpoint.
+`docs/format-dataframe-validation.json` records source/artifact hashes, the known
+mixed numeric exception observation, and validation limits. Structural catalogue
+coverage remains 44/86 dispatchers and 195/387 modules complete.
+
 ## Basic random-tree generation evidence
 
 The BASIC random-tree generator uses the seeded recursive-depth process-tree

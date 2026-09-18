@@ -1,0 +1,720 @@
+#include "minera/dataframe_format.hpp"
+
+#include <algorithm>
+#include <charconv>
+#include <cctype>
+#include <chrono>
+#include <cmath>
+#include <cstdint>
+#include <ctime>
+#include <iomanip>
+#include <limits>
+#include <locale>
+#include <sstream>
+#include <stdexcept>
+#include <string_view>
+#include <utility>
+
+#include "minera/timestamp.hpp"
+
+namespace minera {
+namespace {
+
+constexpr std::string_view kCaseColumn = "case:concept:name";
+constexpr std::string_view kActivityColumn = "concept:name";
+constexpr std::string_view kTimestampColumn = "time:timestamp";
+constexpr std::string_view kStartTimestampColumn = "start_timestamp";
+
+struct ExactTimestamp {
+  std::int64_t seconds = 0;
+  std::uint32_t nanoseconds = 0;
+};
+
+bool timestamp_less(const ExactTimestamp& left, const ExactTimestamp& right) {
+  if (left.seconds != right.seconds) return left.seconds < right.seconds;
+  return left.nanoseconds < right.nanoseconds;
+}
+
+bool cell_missing(const std::optional<EventAttribute>& cell) {
+  if (!cell || cell->is_null ||
+      cell->first_class_state == FirstClassAttributeState::kNull)
+    return true;
+  if (const auto* number = std::get_if<double>(&cell->typed_value))
+    return std::isnan(*number);
+  if (cell->kind == AttributeKind::kFloat &&
+      (cell->value == "nan" || cell->value == "NaN" ||
+       cell->value == "NAN"))
+    return true;
+  return false;
+}
+
+std::string attribute_text(const EventAttribute& cell) {
+  if (cell.is_null ||
+      cell.first_class_state == FirstClassAttributeState::kNull)
+    return {};
+  if (const auto* value = std::get_if<NativeDate>(&cell.typed_value))
+    return value->value;
+  if (const auto* value = std::get_if<bool>(&cell.typed_value))
+    return *value ? "True" : "False";
+  if (const auto* value = std::get_if<std::int64_t>(&cell.typed_value)) {
+    if (!cell.value.empty()) return cell.value;
+    return std::to_string(*value);
+  }
+  if (const auto* value = std::get_if<std::uint64_t>(&cell.typed_value)) {
+    if (!cell.value.empty()) return cell.value;
+    return std::to_string(*value);
+  }
+  if (const auto* value = std::get_if<double>(&cell.typed_value)) {
+    char buffer[64];
+    const auto converted = std::to_chars(
+        buffer, buffer + sizeof(buffer), *value, std::chars_format::general);
+    auto text = converted.ec == std::errc{}
+                    ? std::string(buffer, converted.ptr) : std::to_string(*value);
+    if (std::isfinite(*value) && text.find_first_of(".eE") == std::string::npos)
+      text += ".0";
+    return text;
+  }
+  return cell.value;
+}
+
+EventAttribute null_cell(std::string key,
+                         AttributeKind kind = AttributeKind::kString) {
+  EventAttribute result{std::move(key), "", kind, true};
+  result.first_class_state = FirstClassAttributeState::kNull;
+  result.typed_value = std::monostate{};
+  return result;
+}
+
+EventAttribute copy_cell(const std::optional<EventAttribute>& source,
+                         std::string key) {
+  if (!source) return null_cell(std::move(key));
+  auto result = *source;
+  result.key = std::move(key);
+  return result;
+}
+
+EventAttribute string_cell(std::string key,
+                           const std::optional<EventAttribute>& source) {
+  if (cell_missing(source)) return null_cell(std::move(key));
+  EventAttribute result{std::move(key), attribute_text(*source),
+                        AttributeKind::kString};
+  result.first_class_state = FirstClassAttributeState::kPresent;
+  result.typed_value = std::monostate{};
+  result.container = AttributeContainerKind::kScalar;
+  result.children.clear();
+  result.scalar_wrapper = false;
+  result.scalar_children_list = false;
+  return result;
+}
+
+std::string trim_ascii(std::string value) {
+  const auto first = value.find_first_not_of(" \t\r\n");
+  if (first == std::string::npos) return {};
+  const auto last = value.find_last_not_of(" \t\r\n");
+  return value.substr(first, last - first + 1);
+}
+
+std::int64_t days_from_civil(std::int64_t year, unsigned month,
+                             unsigned day) {
+  year -= month <= 2;
+  const std::int64_t era = (year >= 0 ? year : year - 399) / 400;
+  const auto year_of_era = static_cast<unsigned>(year - era * 400);
+  const unsigned day_of_year =
+      (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+  const unsigned day_of_era = year_of_era * 365 + year_of_era / 4 -
+                              year_of_era / 100 + day_of_year;
+  return era * 146097 + static_cast<std::int64_t>(day_of_era) - 719468;
+}
+
+void civil_from_days(std::int64_t days, std::int64_t& year, unsigned& month,
+                     unsigned& day) {
+  days += 719468;
+  const std::int64_t era =
+      (days >= 0 ? days : days - 146096) / 146097;
+  const unsigned day_of_era = static_cast<unsigned>(days - era * 146097);
+  const unsigned year_of_era =
+      (day_of_era - day_of_era / 1460 + day_of_era / 36524 -
+       day_of_era / 146096) /
+      365;
+  year = static_cast<std::int64_t>(year_of_era) + era * 400;
+  const unsigned day_of_year =
+      day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+  const unsigned month_prime = (5 * day_of_year + 2) / 153;
+  day = day_of_year - (153 * month_prime + 2) / 5 + 1;
+  month = month_prime < 10 ? month_prime + 3 : month_prime - 9;
+  year += month <= 2;
+}
+
+std::optional<ExactTimestamp> parse_iso_timestamp(std::string text) {
+  text = trim_ascii(std::move(text));
+  if (text.empty() || !parse_timestamp(text)) return std::nullopt;
+
+  std::int64_t nanoseconds = 0;
+  std::size_t digits = 0;
+  if (const auto dot = text.find('.'); dot != std::string::npos) {
+    std::size_t end = dot + 1;
+    while (end < text.size() && text[end] >= '0' && text[end] <= '9') {
+      if (digits < 9) nanoseconds = nanoseconds * 10 + text[end] - '0';
+      ++digits;
+      ++end;
+    }
+    while (digits < 9) {
+      nanoseconds *= 10;
+      ++digits;
+    }
+    text.erase(dot, end - dot);
+  }
+  const auto whole_seconds = parse_timestamp(text);
+  if (!whole_seconds || !std::isfinite(*whole_seconds)) return std::nullopt;
+  return ExactTimestamp{static_cast<std::int64_t>(*whole_seconds),
+                        static_cast<std::uint32_t>(nanoseconds)};
+}
+
+std::optional<ExactTimestamp> parse_strptime_timestamp(std::string text,
+                                                        std::string_view format) {
+  std::istringstream stream(trim_ascii(std::move(text)));
+  stream.imbue(std::locale::classic());
+  std::tm calendar{};
+  stream >> std::get_time(&calendar, std::string(format).c_str());
+  if (stream.fail()) return std::nullopt;
+  std::string trailing;
+  std::getline(stream, trailing);
+  if (!trim_ascii(std::move(trailing)).empty()) return std::nullopt;
+  const auto year = static_cast<std::int64_t>(calendar.tm_year) + 1900;
+  const auto month = static_cast<unsigned>(calendar.tm_mon + 1);
+  const auto day = static_cast<unsigned>(calendar.tm_mday);
+  const auto hour = static_cast<unsigned>(calendar.tm_hour);
+  const auto minute = static_cast<unsigned>(calendar.tm_min);
+  const auto second = static_cast<unsigned>(calendar.tm_sec);
+  if (year < 1 || month < 1 || month > 12 || day < 1 || day > 31 ||
+      hour > 23 || minute > 59 || second > 59)
+    return std::nullopt;
+  return ExactTimestamp{days_from_civil(year, month, day) * 86400 +
+                             static_cast<std::int64_t>(hour * 3600 +
+                                                       minute * 60 + second),
+                         0};
+}
+
+std::string format_exact_timestamp(const ExactTimestamp& timestamp,
+                                   std::string_view precision) {
+  std::int64_t days = timestamp.seconds / 86400;
+  std::int64_t second_of_day = timestamp.seconds % 86400;
+  if (second_of_day < 0) {
+    second_of_day += 86400;
+    --days;
+  }
+  std::int64_t year = 0;
+  unsigned month = 0;
+  unsigned day = 0;
+  civil_from_days(days, year, month, day);
+  std::ostringstream output;
+  output << std::setfill('0') << std::setw(4) << year << '-' << std::setw(2)
+         << month << '-' << std::setw(2) << day << 'T' << std::setw(2)
+         << second_of_day / 3600 << ':' << std::setw(2)
+         << (second_of_day / 60) % 60 << ':' << std::setw(2)
+         << second_of_day % 60;
+  const std::uint32_t nanos = timestamp.nanoseconds;
+  if (precision == "ns") {
+    if (nanos % 1000 != 0) output << '.' << std::setw(9) << nanos;
+    else if (nanos != 0) output << '.' << std::setw(6) << nanos / 1000;
+  } else if (precision == "us") {
+    const auto micros = nanos / 1000;
+    if (micros != 0) output << '.' << std::setw(6) << micros;
+  }
+  output << "+00:00";
+  return output.str();
+}
+
+std::optional<ExactTimestamp> parse_timestamp_cell(
+    const EventAttribute& cell, const std::optional<std::string>& format) {
+  if (cell.is_null ||
+      cell.first_class_state == FirstClassAttributeState::kNull)
+    return std::nullopt;
+  if (const auto* date = std::get_if<NativeDate>(&cell.typed_value)) {
+    if (!format || *format == "mixed") return parse_iso_timestamp(date->value);
+  }
+  const auto text = attribute_text(cell);
+  if (!format || *format == "mixed") return parse_iso_timestamp(text);
+  return parse_strptime_timestamp(text, *format);
+}
+
+bool is_numeric_dtype(std::string_view dtype) {
+  if (dtype == "bool" || dtype == "boolean") return true;
+  if (dtype.find("int") != std::string_view::npos ||
+      dtype.find("float") != std::string_view::npos ||
+      dtype.find("UInt") != std::string_view::npos ||
+      dtype.find("Int") != std::string_view::npos ||
+      dtype.find("Float") != std::string_view::npos)
+    return true;
+  return false;
+}
+
+bool numeric_kind(const EventAttribute& cell) {
+  return cell.kind == AttributeKind::kInt ||
+         cell.kind == AttributeKind::kFloat ||
+         cell.kind == AttributeKind::kBoolean ||
+         std::holds_alternative<std::int64_t>(cell.typed_value) ||
+         std::holds_alternative<std::uint64_t>(cell.typed_value) ||
+         std::holds_alternative<double>(cell.typed_value) ||
+         std::holds_alternative<bool>(cell.typed_value);
+}
+
+std::string source_dtype(const EventTable& table, std::size_t column) {
+  if (!table.dtypes.empty()) return table.dtypes[column];
+  bool has_value = false;
+  bool all_bool = true;
+  bool all_int = true;
+  bool all_float = true;
+  bool all_date = true;
+  for (const auto& row : table.rows) {
+    if (column >= row.size() || cell_missing(row[column])) continue;
+    has_value = true;
+    const auto& cell = *row[column];
+    all_bool = all_bool && cell.kind == AttributeKind::kBoolean;
+    all_int = all_int && cell.kind == AttributeKind::kInt;
+    all_float = all_float && cell.kind == AttributeKind::kFloat;
+    all_date = all_date && cell.kind == AttributeKind::kDate;
+  }
+  if (all_bool && has_value) return "bool";
+  if (all_int && has_value) return "int64";
+  if (all_float && has_value) return "float64";
+  if (all_date && has_value) return "datetime64[us]";
+  return "str";
+}
+
+std::string date_precision(const EventTable& table, std::size_t column,
+                           const std::vector<std::optional<ExactTimestamp>>& parsed) {
+  std::string dtype = source_dtype(table, column);
+  if (dtype.find("[ns") != std::string::npos) return "ns";
+  if (dtype.find("[us") != std::string::npos) return "us";
+  if (dtype.find("[ms") != std::string::npos) return "us";
+  if (dtype.find("[s") != std::string::npos) return "s";
+  if (table.rows.empty()) return "s";
+  for (const auto& row : table.rows)
+    if (!cell_missing(row[column]) && numeric_kind(*row[column])) return "ns";
+  for (const auto& value : parsed) {
+    if (!value || value->nanoseconds == 0) continue;
+    if (value->nanoseconds % 1000 != 0) return "ns";
+  }
+  return "us";
+}
+
+bool all_date_eligible(const EventTable& table, std::size_t column,
+                       const std::optional<std::string>& format,
+                       std::vector<std::optional<ExactTimestamp>>& parsed) {
+  parsed.clear();
+  parsed.reserve(table.rows.size());
+  const auto dtype = source_dtype(table, column);
+  if (is_numeric_dtype(dtype)) return false;
+  for (const auto& row : table.rows) {
+    if (column >= row.size()) return false;
+    if (cell_missing(row[column])) {
+      parsed.push_back(std::nullopt);
+      continue;
+    }
+    if (numeric_kind(*row[column])) {
+      // Public object columns interpret non-boolean numeric cells as epoch
+      // nanoseconds. Numeric dataframe dtypes bypass this conversion above.
+      const auto& cell = *row[column];
+      std::int64_t nanos = 0;
+      if (const auto* number = std::get_if<std::int64_t>(&cell.typed_value)) nanos = *number;
+      else if (const auto* number = std::get_if<std::uint64_t>(&cell.typed_value)) {
+        if (*number > static_cast<std::uint64_t>(INT64_MAX)) return false;
+        nanos = static_cast<std::int64_t>(*number);
+      } else if (const auto* number = std::get_if<double>(&cell.typed_value)) {
+        if (!std::isfinite(*number) || *number <= -9223372036854775808.0 || *number >= 9223372036854775808.0) return false;
+        nanos = static_cast<std::int64_t>(*number);
+      } else return false;
+      if (nanos == INT64_MIN) return false;
+      auto seconds = nanos / 1000000000;
+      auto fraction = nanos % 1000000000;
+      if (fraction < 0) { --seconds; fraction += 1000000000; }
+      parsed.push_back(ExactTimestamp{seconds, static_cast<std::uint32_t>(fraction)});
+      continue;
+    }
+    const auto value = parse_timestamp_cell(*row[column], format);
+    if (!value) return false;
+    parsed.push_back(value);
+  }
+  return true;
+}
+
+EventAttribute date_cell(std::string key, const std::optional<EventAttribute>& source,
+                         const std::optional<ExactTimestamp>& parsed,
+                         std::string_view precision) {
+  if (cell_missing(source)) return null_cell(std::move(key), AttributeKind::kDate);
+  if (!parsed) return copy_cell(source, std::move(key));
+  const auto value = format_exact_timestamp(*parsed, precision);
+  EventAttribute result{std::move(key), value, AttributeKind::kDate};
+  result.typed_value = NativeDate{value, precision == "ns"
+                                           ? NativeDateResolution::kNanosecond
+                                           : NativeDateResolution::kMicrosecond};
+  result.first_class_state = FirstClassAttributeState::kPresent;
+  result.container = AttributeContainerKind::kScalar;
+  result.children.clear();
+  result.scalar_wrapper = false;
+  result.scalar_children_list = false;
+  return result;
+}
+
+std::optional<std::size_t> find_column(const EventTable& table,
+                                       std::string_view name);
+
+void append_column(EventTable& table, std::string name, std::size_t source_column,
+                   std::string dtype) {
+  if (table.dtypes.empty()) {
+    std::vector<std::string> inferred;
+    inferred.reserve(table.columns.size());
+    for (std::size_t column = 0; column < table.columns.size(); ++column)
+      inferred.push_back(source_dtype(table, column));
+    table.dtypes = std::move(inferred);
+  }
+  table.columns.push_back(name);
+  table.dtypes.push_back(std::move(dtype));
+  if (!table.categorical_dtypes.empty()) {
+    const auto category = table.categorical_dtypes[source_column];
+    table.categorical_dtypes.push_back(category);
+  }
+  for (auto& row : table.rows) {
+    row.push_back(copy_cell(row[source_column], table.columns.back()));
+  }
+}
+
+void remove_column(EventTable& table, std::string_view name) {
+  const auto found = find_column(table, name);
+  if (!found) return;
+  const auto column = *found;
+  table.columns.erase(table.columns.begin() + static_cast<std::ptrdiff_t>(column));
+  if (!table.dtypes.empty())
+    table.dtypes.erase(table.dtypes.begin() + static_cast<std::ptrdiff_t>(column));
+  if (!table.categorical_dtypes.empty())
+    table.categorical_dtypes.erase(
+        table.categorical_dtypes.begin() + static_cast<std::ptrdiff_t>(column));
+  for (auto& row : table.rows)
+    row.erase(row.begin() + static_cast<std::ptrdiff_t>(column));
+}
+
+void ensure_aligned_categories(EventTable& table) {
+  if (table.categorical_dtypes.empty()) return;
+  table.categorical_dtypes.resize(table.columns.size());
+}
+
+std::optional<std::size_t> find_column(const EventTable& table,
+                                       std::string_view name) {
+  const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+  if (found == table.columns.end()) return std::nullopt;
+  return static_cast<std::size_t>(found - table.columns.begin());
+}
+
+std::size_t require_column(const EventTable& table, const std::string& name,
+                           std::string_view role) {
+  if (const auto column = find_column(table, name)) return *column;
+  throw std::invalid_argument(name + " column (" + std::string(role) +
+                              ") is not in the dataframe!");
+}
+
+void convert_column_to_dates(EventTable& table, std::size_t column,
+                             const std::optional<std::string>& format) {
+  std::vector<std::optional<ExactTimestamp>> parsed;
+  if (!all_date_eligible(table, column, format, parsed)) return;
+  const auto precision = date_precision(table, column, parsed);
+  for (std::size_t row = 0; row < table.rows.size(); ++row)
+    table.rows[row][column] =
+        date_cell(table.columns[column], table.rows[row][column], parsed[row],
+                  precision);
+  if (table.dtypes.empty()) table.dtypes.resize(table.columns.size());
+  table.dtypes[column] = "datetime64[" + precision + ", UTC]";
+  if (!table.categorical_dtypes.empty()) table.categorical_dtypes[column] = std::nullopt;
+}
+
+void convert_column_to_strings(EventTable& table, std::size_t column) {
+  for (auto& row : table.rows)
+    row[column] = string_cell(table.columns[column], row[column]);
+  if (table.dtypes.empty()) table.dtypes.resize(table.columns.size());
+  table.dtypes[column] = "string";
+  if (!table.categorical_dtypes.empty()) table.categorical_dtypes[column] = std::nullopt;
+}
+
+std::optional<ExactTimestamp> sort_timestamp(const std::optional<EventAttribute>& cell,
+                                             const std::optional<std::string>& format) {
+  if (cell_missing(cell)) return std::nullopt;
+  if (cell->kind != AttributeKind::kDate) return std::nullopt;
+  return parse_timestamp_cell(*cell, std::nullopt);
+}
+
+// Compare integer/floating values without rounding an integer through double.
+int compare_unsigned_float(std::uint64_t integer, double value) {
+  if (value < 0) return 1;
+  if (value >= 18446744073709551616.0) return -1;
+  const auto whole = static_cast<std::uint64_t>(value);
+  if (integer != whole) return integer < whole ? -1 : 1;
+  return value > std::floor(value) ? -1 : 0;
+}
+struct FormatNumber {
+  bool negative = false;
+  std::uint64_t magnitude = 0;
+  std::optional<double> floating;
+};
+FormatNumber format_number(const EventAttribute& cell) {
+  if (const auto* value = std::get_if<double>(&cell.typed_value)) return {false, 0, *value};
+  if (const auto* value = std::get_if<bool>(&cell.typed_value)) return {false, *value ? 1U : 0U, {}};
+  if (const auto* value = std::get_if<std::uint64_t>(&cell.typed_value)) return {false, *value, {}};
+  if (const auto* value = std::get_if<std::int64_t>(&cell.typed_value))
+    return {*value < 0, *value < 0 ? static_cast<std::uint64_t>(-(*value + 1)) + 1 : static_cast<std::uint64_t>(*value), {}};
+  if (cell.kind == AttributeKind::kFloat) return {false, 0, std::stod(cell.value)};
+  if (cell.kind == AttributeKind::kBoolean) return {false, cell.value == "true" || cell.value == "True" || cell.value == "1" ? 1U : 0U, {}};
+  const bool negative = cell.value.starts_with('-');
+  return {negative, std::stoull(negative ? cell.value.substr(1) : cell.value), {}};
+}
+int compare_format_numbers(const FormatNumber& a, const FormatNumber& b) {
+  if (a.floating && b.floating) return *a.floating < *b.floating ? -1 : *a.floating > *b.floating ? 1 : 0;
+  if (a.floating) return -compare_format_numbers(b, a);
+  if (b.floating) {
+    if (a.negative) return -compare_unsigned_float(a.magnitude, -*b.floating);
+    return compare_unsigned_float(a.magnitude, *b.floating);
+  }
+  if (a.negative != b.negative) return a.negative ? -1 : 1;
+  const int comparison = a.magnitude < b.magnitude ? -1 : a.magnitude > b.magnitude ? 1 : 0;
+  return a.negative ? -comparison : comparison;
+}
+bool numeric_less(const EventAttribute& left, const EventAttribute& right) {
+  return compare_format_numbers(format_number(left), format_number(right)) < 0;
+}
+
+EventAttribute index_cell(std::string key, std::int64_t value) {
+  EventAttribute result{std::move(key), std::to_string(value), AttributeKind::kInt};
+  result.typed_value = value;
+  return result;
+}
+
+void append_property(EventDataMetadata& metadata, std::string key,
+                     std::string value) {
+  for (auto& property : metadata.properties) {
+    if (property.key == key) {
+      property = EventAttribute{std::move(key), std::move(value), AttributeKind::kString};
+      return;
+    }
+  }
+  metadata.properties.emplace_back(std::move(key), std::move(value),
+                                   AttributeKind::kString);
+}
+
+}  // namespace
+
+EventTable format_dataframe(EventTable& input,
+                            const DataFrameFormatOptions& options) {
+  input.validate();
+
+  // Resolve all selectors before touching the caller-owned frame. This also
+  // keeps missing custom selectors from causing a partial alias mutation.
+  require_column(input, options.case_id, "case ID");
+  require_column(input, options.activity_key, "activity");
+  require_column(input, options.timestamp_key, "timestamp");
+
+  // PM4Py makes canonical aliases on the input frame before taking the
+  // formatting copy. Keep those aliases raw so callers can observe the same
+  // mutation while the returned table receives normalized cells.
+  const bool custom_case = options.case_id != kCaseColumn;
+  const bool custom_activity = options.activity_key != kActivityColumn;
+  const bool custom_timestamp = options.timestamp_key != kTimestampColumn;
+  // Aliases are replaced in public selector order. Later selectors can
+  // observe a canonical alias written by an earlier selector.
+  auto alias = [&](const std::string& source, std::string_view target, std::string_view role) {
+    if (source == target) return;
+    remove_column(input, target);
+    const auto column = require_column(input, source, role);
+    append_column(input, std::string(target), column, source_dtype(input, column));
+  };
+  alias(options.case_id, kCaseColumn, "case ID");
+  alias(options.activity_key, kActivityColumn, "activity");
+  alias(options.timestamp_key, kTimestampColumn, "timestamp");
+  ensure_aligned_categories(input);
+
+  const auto start_source =
+      options.start_timestamp_key
+          ? find_column(input, *options.start_timestamp_key)
+          : std::nullopt;
+
+  EventTable working = input;
+  working.validate();
+
+  // Resolve indexes again after the alias columns have been appended. The
+  // original source indexes remain valid because aliases are appended.
+  const auto case_column = require_column(working, options.case_id, "case ID");
+  const auto activity_column =
+      require_column(working, options.activity_key, "activity");
+  const auto timestamp_column =
+      require_column(working, options.timestamp_key, "timestamp");
+  const auto canonical_case = require_column(working, std::string(kCaseColumn),
+                                             "case ID");
+  const auto canonical_activity =
+      require_column(working, std::string(kActivityColumn), "activity");
+  const auto canonical_timestamp =
+      require_column(working, std::string(kTimestampColumn), "timestamp");
+
+  if (working.dtypes.empty()) {
+    std::vector<std::string> inferred;
+    inferred.reserve(working.columns.size());
+    for (std::size_t column = 0; column < working.columns.size(); ++column)
+      inferred.push_back(source_dtype(working, column));
+    working.dtypes = std::move(inferred);
+  }
+
+  // Rows missing any required value are omitted before date conversion.
+  std::vector<std::size_t> kept;
+  kept.reserve(working.rows.size());
+  for (std::size_t row = 0; row < working.rows.size(); ++row) {
+    if (!cell_missing(working.rows[row][case_column]) &&
+        !cell_missing(working.rows[row][activity_column]) &&
+        !cell_missing(working.rows[row][timestamp_column]))
+      kept.push_back(row);
+  }
+  EventTable result = working;
+  result.rows.clear();
+  for (const auto row : kept) result.rows.push_back(working.rows[row]);
+
+  // Canonical identifiers are always pandas string dtype. Convert source
+  // timestamp/start columns and the canonical timestamp projection only when
+  // every non-null value is parseable; invalid text remains text.
+  convert_column_to_strings(result, canonical_case);
+  convert_column_to_strings(result, canonical_activity);
+
+  // Source selector columns are eligible date columns. Empty custom source
+  // schemas are intentionally included: pandas converts an empty object/string
+  // series to datetime64[s, UTC]. Other object/string columns are also
+  // attempted, matching pandas' observed conversion of extra date-like
+  // columns while leaving non-date text untouched.
+  std::vector<std::size_t> date_candidates;
+  auto add_candidate = [&](std::size_t column) {
+    if (std::find(date_candidates.begin(), date_candidates.end(), column) ==
+        date_candidates.end())
+      date_candidates.push_back(column);
+  };
+  if (custom_case) add_candidate(case_column);
+  if (custom_activity) add_candidate(activity_column);
+  add_candidate(timestamp_column);
+  if (start_source) add_candidate(*start_source);
+  for (std::size_t column = 0; column < result.columns.size(); ++column) {
+    if (column == canonical_case || column == canonical_activity) continue;
+    add_candidate(column);
+  }
+  for (const auto column : date_candidates) {
+    if (column < result.columns.size())
+      convert_column_to_dates(result, column, options.timestamp_format);
+  }
+  // A custom timestamp selector may have been copied to the canonical column;
+  // both columns carry the same normalized date values and dtype.
+  if (canonical_timestamp < result.columns.size()) {
+    if (canonical_timestamp != timestamp_column)
+      convert_column_to_dates(result, canonical_timestamp,
+                              options.timestamp_format);
+  }
+
+  // Sort normalized dates exactly, numeric values numerically, and columns
+  // that failed date conversion lexically; preserve input order for ties.
+  const auto result_case = require_column(result, std::string(kCaseColumn), "case ID");
+  const auto result_timestamp =
+      require_column(result, std::string(kTimestampColumn), "timestamp");
+  std::stable_sort(result.rows.begin(), result.rows.end(), [&](const auto& left,
+                                                              const auto& right) {
+    const auto left_case = attribute_text(*left[result_case]);
+    const auto right_case = attribute_text(*right[result_case]);
+    if (left_case != right_case) return left_case < right_case;
+    if (numeric_kind(*left[result_timestamp]) && numeric_kind(*right[result_timestamp]))
+      return numeric_less(*left[result_timestamp], *right[result_timestamp]);
+    const auto left_time = sort_timestamp(left[result_timestamp],
+                                          options.timestamp_format);
+    const auto right_time = sort_timestamp(right[result_timestamp],
+                                           options.timestamp_format);
+    if (left_time && right_time) return timestamp_less(*left_time, *right_time);
+    if (left_time.has_value() != right_time.has_value()) return left_time.has_value();
+    if (!cell_missing(left[result_timestamp]) &&
+        !cell_missing(right[result_timestamp])) {
+      const auto left_text = attribute_text(*left[result_timestamp]);
+      const auto right_text = attribute_text(*right[result_timestamp]);
+      if (left_text != right_text) return left_text < right_text;
+    }
+    return false;
+  });
+
+  // Existing generated columns retain their positions when overwritten.
+  auto generated_column = [&](const std::string& name) {
+    if (const auto found = find_column(result, name)) {
+      result.dtypes[*found] = "int64";
+      if (!result.categorical_dtypes.empty()) result.categorical_dtypes[*found] = std::nullopt;
+      return *found;
+    }
+    const auto column = result.columns.size();
+    result.columns.push_back(name);
+    result.dtypes.emplace_back("int64");
+    if (!result.categorical_dtypes.empty()) result.categorical_dtypes.push_back(std::nullopt);
+    for (auto& row : result.rows) row.push_back(std::nullopt);
+    return column;
+  };
+  const auto row_index_column = generated_column("@@index");
+  const auto case_index_column = generated_column("@@case_index");
+  std::string previous_case;
+  bool first_case = true;
+  std::int64_t case_index = -1;
+  const auto result_case_for_index =
+      require_column(result, std::string(kCaseColumn), "case ID");
+  for (std::size_t row = 0; row < result.rows.size(); ++row) {
+    const auto current_case =
+        attribute_text(*result.rows[row][result_case_for_index]);
+    if (first_case || current_case != previous_case) {
+      ++case_index;
+      previous_case = current_case;
+      first_case = false;
+    }
+    result.rows[row][row_index_column] = index_cell("@@index", static_cast<std::int64_t>(row));
+    result.rows[row][case_index_column] = index_cell("@@case_index", case_index);
+  }
+
+  // A configured start selector is projected under PM4Py's canonical name at
+  // the end of the output schema. It is not added to the mutable input frame.
+  const bool has_start_projection =
+      options.start_timestamp_key && start_source.has_value();
+  if (has_start_projection) {
+    if (const auto existing_start = find_column(result, kStartTimestampColumn)) {
+      for (std::size_t row = 0; row < result.rows.size(); ++row)
+        result.rows[row][*existing_start] = copy_cell(
+            result.rows[row][*start_source], std::string(kStartTimestampColumn));
+      result.dtypes[*existing_start] = source_dtype(result, *start_source);
+      convert_column_to_dates(result, *existing_start, options.timestamp_format);
+    } else {
+      result.columns.emplace_back(kStartTimestampColumn);
+      result.dtypes.emplace_back(source_dtype(result, *start_source));
+      if (!result.categorical_dtypes.empty())
+        result.categorical_dtypes.push_back(std::nullopt);
+      for (std::size_t row = 0; row < result.rows.size(); ++row)
+        result.rows[row].push_back(copy_cell(
+            result.rows[row][*start_source], std::string(kStartTimestampColumn)));
+      const auto start_column = result.columns.size() - 1;
+      convert_column_to_dates(result, start_column, options.timestamp_format);
+    }
+  }
+
+  result.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {}};
+  result.index->labels.reserve(result.rows.size());
+  for (std::size_t row = 0; row < result.rows.size(); ++row)
+    result.index->labels.push_back(
+        {index_cell("", static_cast<std::int64_t>(row))});
+
+  if (has_start_projection)
+    append_property(result.metadata, "pm4py:param:start_timestamp_key",
+                    std::string(kStartTimestampColumn));
+  append_property(result.metadata, "pm4py:param:activity_key",
+                  std::string(kActivityColumn));
+  append_property(result.metadata, "pm4py:param:timestamp_key",
+                  std::string(kTimestampColumn));
+  append_property(result.metadata, "pm4py:param:group_key", "org:group");
+  append_property(result.metadata, "pm4py:param:transition_key",
+                  "lifecycle:transition");
+  append_property(result.metadata, "pm4py:param:resource_key", "org:resource");
+  append_property(result.metadata, "pm4py:param:case_id_key",
+                  std::string(kCaseColumn));
+  result.validate();
+  return result;
+}
+
+}  // namespace minera

@@ -1,0 +1,764 @@
+{
+  "scope": "Finite native format_dataframe checkpoint; full parity remains incomplete.",
+  "reference_version": "2.7.22",
+  "pandas_version": "3.0.5",
+  "reference_provenance": {
+    "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+    "method": "opaque defining-module bytes, CRLF normalized to LF, no source decoding",
+    "function_module": "pm4py.utils",
+    "function_qualname": "format_dataframe",
+    "module_relative_path": "pm4py/utils.py",
+    "installed_sha256": "cf480411c34ff169468b726424a6563aedb6c94274b283973ca194ec51235a88",
+    "pinned_sha256": "cf480411c34ff169468b726424a6563aedb6c94274b283973ca194ec51235a88"
+  },
+  "native_source_parent_commit": "597a8f26253b5ef1dece4003559cad94d9e04900",
+  "native_verified_staged_tree": "17da4fda02e16d9bbf1a4103b8d1c3f97d433e8e",
+  "native_changed_source_sha256_lf_normalized": {
+    "CMakeLists.txt": "a44b32b77336f92eea701186278fa4954e0dc2e1eac20304216d0206d4e44a79",
+    "include/minera/dataframe_format.hpp": "e7209a1836d6531cf80b5a0992b4c9a5ec8e64caefb6189efdf3a60923f75878",
+    "src/backend/dataframe_format.cpp": "9b388e89130d4fc66d175b0521dfcb549deec171c520c21c4ac80bee1ae1da4e",
+    "src/backend/tests/test_dataframe_format.cpp": "67066b22e5d786427866254b1f287c5b8be2ec7d69b7ed0b88c0cefba9d40a0d",
+    "src/backend/tests/dataframe_format_reference_cases.hpp": "c13ec0cef4e7a186dff51978ec82fd02b74bcd5a9f19377954835fbb4666fe98"
+  },
+  "reference_artifact": {
+    "path": "docs/format-dataframe-reference.json.gz",
+    "uncompressed_sha256": "ee7b977a734a925bea440d08ed74f86138114b4c98d145ae3eab925a4008d2b4",
+    "public_cases": 53,
+    "successes": 46,
+    "rejections": 7,
+    "native_cases": 52,
+    "excluded_case": "non_string_column_labels_with_selectors"
+  },
+  "validation": {
+    "release_build": "passed",
+    "native_suites_passed": 151,
+    "native_suites_failed": 0,
+    "script_tests_passed": 75,
+    "optimized_evidence_tests_passed": 8,
+    "independent_review": "No actionable findings remain in the finite checkpoint."
+  },
+  "native_test_executable_sha256": "00ff87f39cd1d6927f775d1c143a6bca9ff489b022db932ac864a9b6d5fe94e5",
+  "catalog_audit": {
+    "dispatchers": 86,
+    "complete_dispatchers": 44,
+    "partial_dispatchers": 42,
+    "modules": 387,
+    "complete_modules": 195,
+    "partial_modules": 192
+  },
+  "comparison_limits": [
+    "Public missing values are normalized; Python missing-sentinel identity is not claimed.",
+    "Native error checks verify rejection and input state, not Python exception class/message identity.",
+    "Column labels and selector names are native strings; non-string labels remain excluded.",
+    "Finite parser, categorical and numeric observations do not establish all pandas extension dtypes, formatting, overflow, timezone or mixed-scalar coercion behavior.",
+    "CSV, HTTP, CLI and mixed XES formatter adapters remain follow-on work.",
+    "The mixed float/int/UINT64 boundary below is a known public rejection not yet matched by native formatting."
+  ],
+  "known_gap_public_observation": {
+    "name": "mixed_exact",
+    "parameters": {},
+    "input": {
+      "type": "DataFrame",
+      "columns": [
+        "case:concept:name",
+        "concept:name",
+        "time:timestamp"
+      ],
+      "column_metadata": [
+        {
+          "position": 0,
+          "label": "case:concept:name",
+          "key": "case:concept:name",
+          "dtype": "str"
+        },
+        {
+          "position": 1,
+          "label": "concept:name",
+          "key": "concept:name",
+          "dtype": "str"
+        },
+        {
+          "position": 2,
+          "label": "time:timestamp",
+          "key": "time:timestamp",
+          "dtype": "object"
+        }
+      ],
+      "dtypes": {
+        "case:concept:name": "str",
+        "concept:name": "str",
+        "time:timestamp": "object"
+      },
+      "categorical_dtypes": {},
+      "shape": [
+        4,
+        3
+      ],
+      "records": [
+        {
+          "position": 0,
+          "index": 0,
+          "values": {
+            "case:concept:name": "C",
+            "concept:name": "A0",
+            "time:timestamp": 9007199254740993
+          },
+          "kinds": {
+            "case:concept:name": "string",
+            "concept:name": "string",
+            "time:timestamp": "int"
+          },
+          "cell_tags": {
+            "case:concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "C"
+            },
+            "concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "A0"
+            },
+            "time:timestamp": {
+              "dtype": "object",
+              "kind": "int",
+              "missing": false,
+              "value": 9007199254740993
+            }
+          }
+        },
+        {
+          "position": 1,
+          "index": 1,
+          "values": {
+            "case:concept:name": "C",
+            "concept:name": "A1",
+            "time:timestamp": 9007199254740992.0
+          },
+          "kinds": {
+            "case:concept:name": "string",
+            "concept:name": "string",
+            "time:timestamp": "float"
+          },
+          "cell_tags": {
+            "case:concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "C"
+            },
+            "concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "A1"
+            },
+            "time:timestamp": {
+              "dtype": "object",
+              "kind": "float",
+              "missing": false,
+              "value": 9007199254740992.0
+            }
+          }
+        },
+        {
+          "position": 2,
+          "index": 2,
+          "values": {
+            "case:concept:name": "C",
+            "concept:name": "A2",
+            "time:timestamp": 18446744073709551615
+          },
+          "kinds": {
+            "case:concept:name": "string",
+            "concept:name": "string",
+            "time:timestamp": "int"
+          },
+          "cell_tags": {
+            "case:concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "C"
+            },
+            "concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "A2"
+            },
+            "time:timestamp": {
+              "dtype": "object",
+              "kind": "int",
+              "missing": false,
+              "value": 18446744073709551615
+            }
+          }
+        },
+        {
+          "position": 3,
+          "index": 3,
+          "values": {
+            "case:concept:name": "C",
+            "concept:name": "A3",
+            "time:timestamp": 18446744073709551614
+          },
+          "kinds": {
+            "case:concept:name": "string",
+            "concept:name": "string",
+            "time:timestamp": "int"
+          },
+          "cell_tags": {
+            "case:concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "C"
+            },
+            "concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "A3"
+            },
+            "time:timestamp": {
+              "dtype": "object",
+              "kind": "int",
+              "missing": false,
+              "value": 18446744073709551614
+            }
+          }
+        }
+      ],
+      "index_metadata": {
+        "class": "RangeIndex",
+        "dtype": "int64",
+        "name": null,
+        "names": [
+          null
+        ],
+        "values": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "labels": [
+          {
+            "kind": "int",
+            "value": 0
+          },
+          {
+            "kind": "int",
+            "value": 1
+          },
+          {
+            "kind": "int",
+            "value": 2
+          },
+          {
+            "kind": "int",
+            "value": 3
+          }
+        ]
+      },
+      "attrs": {}
+    },
+    "returned_same_object": null,
+    "error": {
+      "type": "ValueError",
+      "message": "Categorical categories must be unique"
+    },
+    "input_after": {
+      "type": "DataFrame",
+      "columns": [
+        "case:concept:name",
+        "concept:name",
+        "time:timestamp"
+      ],
+      "column_metadata": [
+        {
+          "position": 0,
+          "label": "case:concept:name",
+          "key": "case:concept:name",
+          "dtype": "str"
+        },
+        {
+          "position": 1,
+          "label": "concept:name",
+          "key": "concept:name",
+          "dtype": "str"
+        },
+        {
+          "position": 2,
+          "label": "time:timestamp",
+          "key": "time:timestamp",
+          "dtype": "object"
+        }
+      ],
+      "dtypes": {
+        "case:concept:name": "str",
+        "concept:name": "str",
+        "time:timestamp": "object"
+      },
+      "categorical_dtypes": {},
+      "shape": [
+        4,
+        3
+      ],
+      "records": [
+        {
+          "position": 0,
+          "index": 0,
+          "values": {
+            "case:concept:name": "C",
+            "concept:name": "A0",
+            "time:timestamp": 9007199254740993
+          },
+          "kinds": {
+            "case:concept:name": "string",
+            "concept:name": "string",
+            "time:timestamp": "int"
+          },
+          "cell_tags": {
+            "case:concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "C"
+            },
+            "concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "A0"
+            },
+            "time:timestamp": {
+              "dtype": "object",
+              "kind": "int",
+              "missing": false,
+              "value": 9007199254740993
+            }
+          }
+        },
+        {
+          "position": 1,
+          "index": 1,
+          "values": {
+            "case:concept:name": "C",
+            "concept:name": "A1",
+            "time:timestamp": 9007199254740992.0
+          },
+          "kinds": {
+            "case:concept:name": "string",
+            "concept:name": "string",
+            "time:timestamp": "float"
+          },
+          "cell_tags": {
+            "case:concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "C"
+            },
+            "concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "A1"
+            },
+            "time:timestamp": {
+              "dtype": "object",
+              "kind": "float",
+              "missing": false,
+              "value": 9007199254740992.0
+            }
+          }
+        },
+        {
+          "position": 2,
+          "index": 2,
+          "values": {
+            "case:concept:name": "C",
+            "concept:name": "A2",
+            "time:timestamp": 18446744073709551615
+          },
+          "kinds": {
+            "case:concept:name": "string",
+            "concept:name": "string",
+            "time:timestamp": "int"
+          },
+          "cell_tags": {
+            "case:concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "C"
+            },
+            "concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "A2"
+            },
+            "time:timestamp": {
+              "dtype": "object",
+              "kind": "int",
+              "missing": false,
+              "value": 18446744073709551615
+            }
+          }
+        },
+        {
+          "position": 3,
+          "index": 3,
+          "values": {
+            "case:concept:name": "C",
+            "concept:name": "A3",
+            "time:timestamp": 18446744073709551614
+          },
+          "kinds": {
+            "case:concept:name": "string",
+            "concept:name": "string",
+            "time:timestamp": "int"
+          },
+          "cell_tags": {
+            "case:concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "C"
+            },
+            "concept:name": {
+              "dtype": "str",
+              "kind": "string",
+              "missing": false,
+              "value": "A3"
+            },
+            "time:timestamp": {
+              "dtype": "object",
+              "kind": "int",
+              "missing": false,
+              "value": 18446744073709551614
+            }
+          }
+        }
+      ],
+      "index_metadata": {
+        "class": "RangeIndex",
+        "dtype": "int64",
+        "name": null,
+        "names": [
+          null
+        ],
+        "values": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "labels": [
+          {
+            "kind": "int",
+            "value": 0
+          },
+          {
+            "kind": "int",
+            "value": 1
+          },
+          {
+            "kind": "int",
+            "value": 2
+          },
+          {
+            "kind": "int",
+            "value": 3
+          }
+        ]
+      },
+      "attrs": {}
+    },
+    "inputs_unchanged": true,
+    "input_metadata_unchanged": true,
+    "input_mutated": false,
+    "input_metadata_mutated": false,
+    "input_scalar_snapshot_before": [
+      {
+        "position": 0,
+        "index": 0,
+        "values": {
+          "case:concept:name": "C",
+          "concept:name": "A0",
+          "time:timestamp": 9007199254740993
+        },
+        "kinds": {
+          "case:concept:name": "string",
+          "concept:name": "string",
+          "time:timestamp": "int"
+        },
+        "cell_tags": {
+          "case:concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "C"
+          },
+          "concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "A0"
+          },
+          "time:timestamp": {
+            "dtype": "object",
+            "kind": "int",
+            "missing": false,
+            "value": 9007199254740993
+          }
+        }
+      },
+      {
+        "position": 1,
+        "index": 1,
+        "values": {
+          "case:concept:name": "C",
+          "concept:name": "A1",
+          "time:timestamp": 9007199254740992.0
+        },
+        "kinds": {
+          "case:concept:name": "string",
+          "concept:name": "string",
+          "time:timestamp": "float"
+        },
+        "cell_tags": {
+          "case:concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "C"
+          },
+          "concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "A1"
+          },
+          "time:timestamp": {
+            "dtype": "object",
+            "kind": "float",
+            "missing": false,
+            "value": 9007199254740992.0
+          }
+        }
+      },
+      {
+        "position": 2,
+        "index": 2,
+        "values": {
+          "case:concept:name": "C",
+          "concept:name": "A2",
+          "time:timestamp": 18446744073709551615
+        },
+        "kinds": {
+          "case:concept:name": "string",
+          "concept:name": "string",
+          "time:timestamp": "int"
+        },
+        "cell_tags": {
+          "case:concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "C"
+          },
+          "concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "A2"
+          },
+          "time:timestamp": {
+            "dtype": "object",
+            "kind": "int",
+            "missing": false,
+            "value": 18446744073709551615
+          }
+        }
+      },
+      {
+        "position": 3,
+        "index": 3,
+        "values": {
+          "case:concept:name": "C",
+          "concept:name": "A3",
+          "time:timestamp": 18446744073709551614
+        },
+        "kinds": {
+          "case:concept:name": "string",
+          "concept:name": "string",
+          "time:timestamp": "int"
+        },
+        "cell_tags": {
+          "case:concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "C"
+          },
+          "concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "A3"
+          },
+          "time:timestamp": {
+            "dtype": "object",
+            "kind": "int",
+            "missing": false,
+            "value": 18446744073709551614
+          }
+        }
+      }
+    ],
+    "input_scalar_snapshot_after": [
+      {
+        "position": 0,
+        "index": 0,
+        "values": {
+          "case:concept:name": "C",
+          "concept:name": "A0",
+          "time:timestamp": 9007199254740993
+        },
+        "kinds": {
+          "case:concept:name": "string",
+          "concept:name": "string",
+          "time:timestamp": "int"
+        },
+        "cell_tags": {
+          "case:concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "C"
+          },
+          "concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "A0"
+          },
+          "time:timestamp": {
+            "dtype": "object",
+            "kind": "int",
+            "missing": false,
+            "value": 9007199254740993
+          }
+        }
+      },
+      {
+        "position": 1,
+        "index": 1,
+        "values": {
+          "case:concept:name": "C",
+          "concept:name": "A1",
+          "time:timestamp": 9007199254740992.0
+        },
+        "kinds": {
+          "case:concept:name": "string",
+          "concept:name": "string",
+          "time:timestamp": "float"
+        },
+        "cell_tags": {
+          "case:concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "C"
+          },
+          "concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "A1"
+          },
+          "time:timestamp": {
+            "dtype": "object",
+            "kind": "float",
+            "missing": false,
+            "value": 9007199254740992.0
+          }
+        }
+      },
+      {
+        "position": 2,
+        "index": 2,
+        "values": {
+          "case:concept:name": "C",
+          "concept:name": "A2",
+          "time:timestamp": 18446744073709551615
+        },
+        "kinds": {
+          "case:concept:name": "string",
+          "concept:name": "string",
+          "time:timestamp": "int"
+        },
+        "cell_tags": {
+          "case:concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "C"
+          },
+          "concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "A2"
+          },
+          "time:timestamp": {
+            "dtype": "object",
+            "kind": "int",
+            "missing": false,
+            "value": 18446744073709551615
+          }
+        }
+      },
+      {
+        "position": 3,
+        "index": 3,
+        "values": {
+          "case:concept:name": "C",
+          "concept:name": "A3",
+          "time:timestamp": 18446744073709551614
+        },
+        "kinds": {
+          "case:concept:name": "string",
+          "concept:name": "string",
+          "time:timestamp": "int"
+        },
+        "cell_tags": {
+          "case:concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "C"
+          },
+          "concept:name": {
+            "dtype": "str",
+            "kind": "string",
+            "missing": false,
+            "value": "A3"
+          },
+          "time:timestamp": {
+            "dtype": "object",
+            "kind": "int",
+            "missing": false,
+            "value": 18446744073709551614
+          }
+        }
+      }
+    ]
+  }
+}
