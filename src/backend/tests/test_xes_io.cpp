@@ -1443,6 +1443,7 @@ int main() {
       assert(result.kind == (lazy ? EventDataKind::kLazyEventTable : EventDataKind::kEventTable));
       const auto table = lazy ? result.lazy_table.materialize() : result.table;
       assert(table.rows.size() == 2 && table.columns.size() == 4);
+      assert(table.dtypes == result.dtypes);
       const auto n = table.column_index("n");
       assert(result.dtypes[n] == (lazy ? "Int64" : "float64"));
       assert(table.rows[0][table.column_index("concept:name")]->value == "A");

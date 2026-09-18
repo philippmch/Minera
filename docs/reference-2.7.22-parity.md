@@ -1724,12 +1724,29 @@ It records the changed native source hashes and unchanged CLI/server binary
 hashes used for validation. The native fixture covers 36 successful tables and
 seven validation rejections; quoted CRLF relation uploads have dedicated checks.
 
-The family remains partial. EventTable does not retain pandas index labels or
-full dtype metadata/coercion. Generated rejection checks require native validation
+The table metadata checkpoint adds optional column dtype declarations and typed,
+recursive index labels to EventTable and LazyEventTable. Identity/lazy conversion,
+CSV projection and Rust XES import retain applicable metadata; JSON exposes
+explicit index class, dtype, names and labels. Case merging carries base labels
+and numbers expanded incoming rows before sorting. The 26 pinned public cases in
+`docs/case-relations-index-reference.json.gz` cover integer, string, nullable,
+float, datetime and tuple labels, empty inputs, cleared names and specialized
+index classes, reversed/offset ranges, contiguous range concatenation and
+range steps spanning the full signed 64-bit label domain.
+Generated native checks compare exact index metadata as well as
+output cells.
+The validation record in `docs/table-metadata-validation.json` reports 150 passing
+native suites, 58 script tests, 11 optimized evidence tests and 13 CLI/HTTP checks.
+
+The family remains partial. Column dtype declarations now survive supported
+adapters, but case-merge dtype promotion and full categorical/extension metadata
+are not implemented. Generated rejection checks require native validation
 errors rather than exact Python exception class/message equality. CSV adapters
 do not yet infer pandas column dtypes or expose the full typed/null identifier
 surface, and XES/mixed adapters have not moved to the table surface. These finite
-observations do not establish complete dataframe or family parity.
+observations do not establish complete dataframe or family parity. Non-string
+index names, specialized index-level metadata and range parameters not recoverable
+from empty/singleton labels remain outside the current table metadata model.
 
 ## Basic random-tree generation evidence
 

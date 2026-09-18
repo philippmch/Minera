@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <tuple>
 #include <utility>
+#include <variant>
 
 namespace minera {
 namespace {
@@ -645,6 +646,60 @@ void write_attributes(std::ostream& output,
                       const std::vector<EventAttribute>& attributes);
 void write_attribute_details(std::ostream& output,
                              const std::vector<EventAttribute>& attributes);
+void write_attribute(std::ostream& output, const EventAttribute& attribute);
+
+// Table-only metadata is deliberately additive to the long-standing table
+// JSON shape. A missing dtype vector means that the source did not declare
+// dtypes; an explicit index is emitted only when the source supplied one.
+void write_event_table_index_label(std::ostream& output,
+                                   const EventTableIndexLabel& label) {
+  output << "{\"kind\":";
+  if (const auto* scalar = std::get_if<EventAttribute>(&label.value)) {
+    output << "\"scalar\",\"value\":";
+    write_attribute(output, *scalar);
+  } else if (const auto* tuple =
+                 std::get_if<std::vector<EventTableIndexLabel>>(&label.value)) {
+    output << "\"tuple\",\"items\":[";
+    for (std::size_t index = 0; index < tuple->size(); ++index) {
+      if (index != 0) output << ',';
+      write_event_table_index_label(output, (*tuple)[index]);
+    }
+    output << ']';
+  } else {
+    throw std::invalid_argument("log conversion: invalid table index label");
+  }
+  output << '}';
+}
+
+void write_event_table_metadata(std::ostream& output,
+                                const EventTable& table) {
+  if (!table.dtypes.empty()) {
+    output << ",\"dtypes\":[";
+    for (std::size_t index = 0; index < table.dtypes.size(); ++index) {
+      if (index != 0) output << ',';
+      output << '"' << json_escape(table.dtypes[index]) << '"';
+    }
+    output << ']';
+  }
+  if (table.index) {
+    output << ",\"index\":{\"class\":\""
+           << json_escape(table.index->kind) << "\",\"dtype\":\""
+           << json_escape(table.index->dtype) << "\",\"names\":[";
+    for (std::size_t index = 0; index < table.index->names.size(); ++index) {
+      if (index != 0) output << ',';
+      if (table.index->names[index])
+        output << '"' << json_escape(*table.index->names[index]) << '"';
+      else
+        output << "null";
+    }
+    output << "],\"labels\":[";
+    for (std::size_t index = 0; index < table.index->labels.size(); ++index) {
+      if (index != 0) output << ',';
+      write_event_table_index_label(output, table.index->labels[index]);
+    }
+    output << "]}";
+  }
+}
 
 void write_attribute(std::ostream& output, const EventAttribute& attribute) {
   output << "{\"key\":\"" << json_escape(attribute.key)
@@ -1317,7 +1372,8 @@ LazyEventTable event_data_to_lazy_table(const EventDataView& data,
                 if (consumer) consumer(row);
               }, max_rows);
             },
-            source.attributes(), source.metadata(), source.row_count());
+            source.attributes(), source.metadata(), source.row_count(),
+            source.dtypes(), source.index());
       }
   }
   throw std::invalid_argument("event data: invalid input kind");
@@ -1454,15 +1510,35 @@ std::string xes_import_result_json(const XesImportResult& result) {
     converted.table = result.lazy_table.materialize();
   } else converted.table = result.table;
   if (!legacy) converted.table.validate();
-  if (!legacy && result.dtypes.size() != converted.table.columns.size())
-    throw std::invalid_argument("XES import dtype count does not match columns");
+
+  // Older callers populated only XesImportResult::dtypes, while newer table
+  // adapters retain the declaration on EventTable/LazyEventTable as well.
+  // Accept either representation, but reject disagreement so a serialized
+  // result cannot silently advertise two different schemas.
+  std::vector<std::string> dtypes = result.dtypes;
+  const auto reconcile_dtypes = [&](const std::vector<std::string>& candidate,
+                                    std::string_view source) {
+    if (candidate.empty()) return;
+    if (!dtypes.empty() && dtypes != candidate)
+      throw std::invalid_argument("XES import dtype metadata conflicts with " +
+                                  std::string(source));
+    dtypes = candidate;
+  };
+  if (!legacy) {
+    reconcile_dtypes(converted.table.dtypes, "table");
+    if (lazy) reconcile_dtypes(result.lazy_table.dtypes(), "lazy table");
+    if (!dtypes.empty() && dtypes.size() != converted.table.columns.size())
+      throw std::invalid_argument("XES import dtype count does not match columns");
+    if (converted.table.dtypes.empty() && !dtypes.empty())
+      converted.table.dtypes = dtypes;
+  }
   std::ostringstream output;
   output << "{\"family\":\"XES_IMPORT\",\"type\":\""
          << (legacy ? "EventLog" : lazy ? "LazyFrame" : "DataFrame")
          << "\",\"dtypes\":[";
-  for (std::size_t i = 0; i < result.dtypes.size(); ++i) {
+  for (std::size_t i = 0; i < dtypes.size(); ++i) {
     if (i) output << ',';
-    output << '"' << json_escape(result.dtypes[i]) << '"';
+    output << '"' << json_escape(dtypes[i]) << '"';
   }
   output << "],\"result\":" << log_conversion_json(converted) << '}';
   return output.str();
@@ -1497,7 +1573,9 @@ std::string log_conversion_json(const LogConversionResult& result) {
       if (i != 0) output << ',';
       output << '\"' << json_escape(result.table.columns[i]) << '\"';
     }
-    output << "],\"attributes\":";
+    output << ']';
+    write_event_table_metadata(output, result.table);
+    output << ",\"attributes\":";
     write_attributes(output, result.table.attributes);
     output << ",\"metadata\":";
     write_metadata(output, result.table.metadata);

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -33,6 +34,165 @@ minera::EventTable sample_table() {
        cell("concept:name", "C"), cell("note", "present"), std::nullopt},
   };
   return table;
+}
+
+minera::EventTableIndexLabel index_scalar(minera::EventAttribute value) {
+  minera::EventTableIndexLabel label;
+  label.value = std::move(value);
+  return label;
+}
+
+minera::EventTableIndexLabel index_tuple(
+    std::vector<minera::EventTableIndexLabel> values) {
+  minera::EventTableIndexLabel label;
+  label.value = std::move(values);
+  return label;
+}
+
+minera::EventAttribute index_date(std::string value) {
+  minera::EventAttribute result{"date", std::move(value),
+                                minera::AttributeKind::kDate};
+  result.typed_value = minera::NativeDate{result.value,
+                                           minera::NativeDateResolution::kNanosecond};
+  return result;
+}
+
+minera::EventAttribute index_nan() {
+  minera::EventAttribute result{"number", "nan", minera::AttributeKind::kFloat};
+  result.typed_value = std::numeric_limits<double>::quiet_NaN();
+  return result;
+}
+
+void table_metadata_is_validated_and_lazy_round_trips() {
+  auto table = sample_table();
+  table.dtypes = {"string", "string", "string", "boolean"};
+  minera::EventTableIndex multi;
+  multi.kind = "MultiIndex";
+  multi.dtype = "object";
+  multi.names = {std::string{"case"}, std::string{"phase"}};
+  multi.labels = {
+      index_tuple({index_scalar(cell("case", "c2")),
+                   index_scalar(minera::EventAttribute{"phase", "", {}, true})}),
+      index_tuple({index_scalar(index_nan()), index_scalar(index_date("2024-01-01"))}),
+      index_tuple({index_scalar(cell("case", "c2")),
+                   index_scalar(index_date("2024-01-02"))}),
+  };
+  table.index = multi;
+  table.validate();
+
+  const auto lazy = minera::LazyEventTable::from_table(table);
+  assert(lazy.dtypes() == table.dtypes);
+  assert(lazy.index() == table.index);
+  const auto materialized = lazy.materialize();
+  assert(materialized.columns == table.columns);
+  assert(materialized.rows == table.rows);
+  assert(materialized.dtypes == table.dtypes);
+  assert(materialized.index == table.index);
+
+  // A plain Index still permits tuple-valued labels; only its name arity is
+  // constrained to one.
+  auto plain = table;
+  plain.index->kind = "Index";
+  plain.index->names = {std::nullopt};
+  plain.index->labels = {
+      index_tuple({index_scalar(cell("left", "L")),
+                   index_scalar(cell("right", "R"))}),
+      index_tuple({index_scalar(cell("left", "M")),
+                   index_scalar(cell("right", "N"))}),
+      index_tuple({index_scalar(cell("left", "O")),
+                   index_scalar(cell("right", "P"))}),
+  };
+  plain.validate();
+}
+
+void table_metadata_rejects_malformed_shapes() {
+  const auto expect_invalid = [](minera::EventTable table) {
+    bool threw = false;
+    try {
+      table.validate();
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  };
+
+  auto table = sample_table();
+  table.dtypes = {"only-one"};
+  expect_invalid(table);
+
+  table = sample_table();
+  table.dtypes = {"string", "", "string", "boolean"};
+  expect_invalid(table);
+
+  table = sample_table();
+  minera::EventTableIndex index;
+  index.labels.resize(2);
+  table.index = index;
+  expect_invalid(table);
+
+  table = sample_table();
+  index = {};
+  index.kind.clear();
+  index.labels.resize(table.rows.size());
+  table.index = index;
+  expect_invalid(table);
+
+  table = sample_table();
+  index = {};
+  index.dtype.clear();
+  index.labels.resize(table.rows.size());
+  table.index = index;
+  expect_invalid(table);
+
+  table = sample_table();
+  index = {};
+  index.names.clear();
+  index.labels.resize(table.rows.size());
+  table.index = index;
+  expect_invalid(table);
+
+  table = sample_table();
+  index = {};
+  index.names = {std::string{"a"}, std::string{"b"}};
+  index.labels.resize(table.rows.size());
+  table.index = index;
+  expect_invalid(table);
+
+  table = sample_table();
+  index = {};
+  index.kind = "MultiIndex";
+  index.names.clear();
+  table.index = index;
+  expect_invalid(table);
+
+  table = sample_table();
+  index = {};
+  index.kind = "MultiIndex";
+  index.names = {std::string{"a"}, std::string{"b"}};
+  index.labels = {
+      index_scalar(cell("a", "scalar")),
+      index_tuple({index_scalar(cell("a", "one"))}),
+      index_tuple({index_scalar(cell("a", "one")),
+                   index_scalar(cell("b", "two"))}),
+  };
+  table.index = index;
+  expect_invalid(table);
+
+  bool scan_threw = false;
+  try {
+    minera::EventTableIndex mismatched;
+    mismatched.labels.resize(2);
+    const minera::LazyEventTable lazy(
+        table.columns,
+        [](const auto& consume) {
+          consume(minera::EventTable::Row(4));
+        },
+        {}, {}, std::nullopt, {}, mismatched);
+    (void)lazy.materialize();
+  } catch (const std::invalid_argument&) {
+    scan_threw = true;
+  }
+  assert(scan_threw);
 }
 
 void table_validation_and_null_contract() {
@@ -271,6 +431,8 @@ void tagged_views_and_compatibility_aliases() {
 
 int main() {
   table_validation_and_null_contract();
+  table_metadata_is_validated_and_lazy_round_trips();
+  table_metadata_rejects_malformed_shapes();
   table_prefixes_infer_only_known_extensions();
   lazy_scan_is_restartable_and_bounded();
   invalid_default_lazy_table_is_rejected();

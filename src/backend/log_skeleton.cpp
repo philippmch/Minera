@@ -341,7 +341,8 @@ LazyEventTable promoted_selector_table(const LazyEventTable& source,
           if (consumer) consumer(row);
         });
       },
-      source.attributes(), source.metadata(), source.row_count());
+      source.attributes(), source.metadata(), source.row_count(),
+      source.dtypes(), source.index());
 }
 
 EventLog event_data_log(const EventDataView& data,

@@ -2,9 +2,13 @@
 
 #include "minera/case_relations.hpp"
 #include "minera/json_export.hpp"
+#include "case_relations_index_reference_cases.hpp"
 #include "case_relations_reference_cases.hpp"
 
 #include <cassert>
+#include <cstdlib>
+#include <iostream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 
@@ -335,6 +339,104 @@ void table_vector_adapter_preserves_inputs() {
          renamed.columns[5] == "rhs");
 }
 
+EventTable table_for_index_metadata() {
+  EventTable table{
+      {"case:concept:name", "concept:name", "when"},
+      {{EventAttribute{"case:concept:name", "L2", AttributeKind::kString},
+        EventAttribute{"concept:name", "b2", AttributeKind::kString},
+        EventAttribute{"when", "2024-01-01T00:00:00Z", AttributeKind::kString}},
+       {EventAttribute{"case:concept:name", "L1", AttributeKind::kString},
+        EventAttribute{"concept:name", "b1-late", AttributeKind::kString},
+        EventAttribute{"when", "2024-01-01T00:00:00.000000002Z",
+                       AttributeKind::kString}},
+       {EventAttribute{"case:concept:name", "L1", AttributeKind::kString},
+        EventAttribute{"concept:name", "b1-early", AttributeKind::kString},
+        EventAttribute{"when", "2024-01-01T00:00:00.000000001Z",
+                       AttributeKind::kString}}}};
+  return table;
+}
+
+EventTable incoming_for_index_metadata() {
+  EventTable table{
+      {"case:concept:name", "concept:name", "when"},
+      {{EventAttribute{"case:concept:name", "R1", AttributeKind::kString},
+        EventAttribute{"concept:name", "i1", AttributeKind::kString},
+        EventAttribute{"when", "2024-01-01T00:00:00Z", AttributeKind::kString}},
+       {EventAttribute{"case:concept:name", "R2", AttributeKind::kString},
+        EventAttribute{"concept:name", "i2", AttributeKind::kString},
+        EventAttribute{"when", "2024-01-01T00:00:00.000000003Z",
+                       AttributeKind::kString}}}};
+  return table;
+}
+
+void implicit_index_metadata_is_reset_or_carried_as_expected() {
+  auto base = table_for_index_metadata();
+  auto incoming = incoming_for_index_metadata();
+  EventTable relations{
+      {"case:concept:name_LEFT", "case:concept:name_RIGHT"},
+      {{EventAttribute{"case:concept:name_LEFT", "L1", AttributeKind::kString},
+        EventAttribute{"case:concept:name_RIGHT", "R1", AttributeKind::kString}}}};
+
+  CaseRelationsOptions options;
+  options.case_id_key = "case:concept:name";
+  options.timestamp_key = "when";
+  const auto sorted_without_matches = merge_case_relations(
+      base, incoming, EventTable{{"case:concept:name_LEFT",
+                                  "case:concept:name_RIGHT"}, {}}, options);
+  assert(sorted_without_matches.index);
+  assert(sorted_without_matches.index->kind == "RangeIndex");
+  assert(sorted_without_matches.index->dtype == "int64");
+  assert(sorted_without_matches.rows.size() == 3);
+  assert(std::get<EventAttribute>(sorted_without_matches.index->labels[0].value)
+             .typed_value == NativeAttributeValue{static_cast<std::int64_t>(2)});
+  assert(std::get<EventAttribute>(sorted_without_matches.index->labels[1].value)
+             .typed_value == NativeAttributeValue{static_cast<std::int64_t>(1)});
+  assert(std::get<EventAttribute>(sorted_without_matches.index->labels[2].value)
+             .typed_value == NativeAttributeValue{static_cast<std::int64_t>(0)});
+
+  const auto expanded = merge_case_relations(base, incoming, relations, options);
+  assert(expanded.index);
+  assert(expanded.index->kind == "Index");
+  assert(expanded.index->dtype == "int64");
+  assert(expanded.index->names == std::vector<std::optional<std::string>>{std::nullopt});
+  assert(expanded.index->labels.size() == expanded.rows.size());
+  assert(std::get<EventAttribute>(expanded.index->labels[0].value).typed_value ==
+         NativeAttributeValue{static_cast<std::int64_t>(2)});
+  assert(std::get<EventAttribute>(expanded.index->labels[1].value).typed_value ==
+         NativeAttributeValue{static_cast<std::int64_t>(1)});
+  // These timestamps are strings: fractional text sorts before the final Z.
+  assert(std::get<EventAttribute>(expanded.index->labels[2].value).typed_value ==
+         NativeAttributeValue{static_cast<std::int64_t>(0)});
+}
+
+void range_index_extrema_do_not_overflow_classification() {
+  EventTable base{
+      {"case:concept:name", "concept:name", "when"},
+      {{EventAttribute{"case:concept:name", "L1", AttributeKind::kString},
+        EventAttribute{"concept:name", "first", AttributeKind::kString},
+        EventAttribute{"when", "a", AttributeKind::kString}},
+       {EventAttribute{"case:concept:name", "L1", AttributeKind::kString},
+        EventAttribute{"concept:name", "last", AttributeKind::kString},
+        EventAttribute{"when", "b", AttributeKind::kString}}}};
+  EventAttribute minimum{"", std::to_string(std::numeric_limits<std::int64_t>::min()),
+                          AttributeKind::kInt};
+  minimum.typed_value = std::numeric_limits<std::int64_t>::min();
+  EventAttribute maximum{"", std::to_string(std::numeric_limits<std::int64_t>::max()),
+                          AttributeKind::kInt};
+  maximum.typed_value = std::numeric_limits<std::int64_t>::max();
+  base.index = EventTableIndex{
+      "RangeIndex", "int64", {std::nullopt},
+      {EventTableIndexLabel{minimum}, EventTableIndexLabel{maximum}}};
+  EventTable incoming{{"case:concept:name", "concept:name", "when"}, {}};
+  EventTable relations{{"case:concept:name_LEFT", "case:concept:name_RIGHT"}, {}};
+  CaseRelationsOptions options;
+  options.case_id_key = "case:concept:name";
+  options.timestamp_key = "when";
+  const auto merged = merge_case_relations(base, incoming, relations, options);
+  assert(merged.index && merged.index->kind == "RangeIndex");
+  assert(merged.index->labels == base.index->labels);
+}
+
 void table_selectors_are_exact() {
   const auto event_table = [](const std::string& case_column,
                               const std::string& case_value,
@@ -486,8 +588,12 @@ void parses_relation_table_with_extra_columns() {
 
 }  // namespace
 
-int main() {
+int main() try {
+#ifdef _WIN32
+  _set_error_mode(_OUT_TO_STDERR);
+#endif
   check_public_case_relations_reference_cases();
+  check_public_case_relations_index_reference_cases();
   missing_timestamps_sort_last_with_stable_duplicates();
   nanosecond_ordering_and_exact_ties_match_public_merge();
   merges_and_drops();
@@ -497,6 +603,11 @@ int main() {
   event_log_selectors_ignore_unused_suffixes();
   json_shape_is_stable();
   table_vector_adapter_preserves_inputs();
+  implicit_index_metadata_is_reset_or_carried_as_expected();
+  range_index_extrema_do_not_overflow_classification();
   table_selectors_are_exact();
   parses_relation_table_with_extra_columns();
+} catch (const std::exception& error) {
+  std::cerr << error.what() << '\n';
+  return 1;
 }

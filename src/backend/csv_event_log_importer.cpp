@@ -202,7 +202,13 @@ CsvEventData import_csv_event_data_impl(
   CsvEventData result;
   EventLog& log = result.log;
   EventTable& table = result.table;
-  if (preserve_table) table.columns = header;
+  if (preserve_table) {
+    table.columns = header;
+    // CSV keeps every source column as a string. Timestamp-role cells use a
+    // date kind marker for first-class selection, but no datetime value is
+    // inferred from the textual CSV payload.
+    table.dtypes.assign(header.size(), "str");
+  }
 
   std::size_t line_number = 1;
   std::size_t input_order = 0;
@@ -390,6 +396,28 @@ EventTable project_csv_event_table(const EventTable& source,
   EventTable result = source;
   result.rows.clear();
   result.rows.reserve(candidates.size());
+  bool identity_rows = candidates.size() == source.rows.size();
+  for (std::size_t index = 0; identity_rows && index < candidates.size();
+       ++index)
+    identity_rows = candidates[index].source_row == index;
+  if (!result.index && !identity_rows) {
+    // A filtered or reordered projection of an implicit RangeIndex must keep
+    // the original source labels. Materialize those labels instead of
+    // silently renumbering the result from zero.
+    EventTableIndex index;
+    index.kind = "Index";
+    index.dtype = "int64";
+    index.names = {std::nullopt};
+    result.index = std::move(index);
+  } else if (result.index) {
+    // A projection changes row order and cardinality. Keep the explicit
+    // index declaration, but select labels by the same source-row mapping as
+    // the copied cells so validation and downstream joins see aligned rows.
+    if (!identity_rows && result.index->kind == "RangeIndex")
+      result.index->kind = "Index";
+    result.index->labels.clear();
+    result.index->labels.reserve(candidates.size());
+  }
 
   const auto first_class_value = [](const Event& event, const Trace& trace,
                                     FirstClassAttributeRole role)
@@ -477,6 +505,14 @@ EventTable project_csv_event_table(const EventTable& source,
       }
     }
     result.rows.push_back(std::move(row));
+    if (result.index && source.index)
+      result.index->labels.push_back(source.index->labels[candidate.source_row]);
+    else if (result.index) {
+      EventAttribute label{"", std::to_string(candidate.source_row),
+                           AttributeKind::kInt};
+      label.typed_value = static_cast<std::int64_t>(candidate.source_row);
+      result.index->labels.push_back({std::move(label)});
+    }
   }
   result.validate();
   return result;

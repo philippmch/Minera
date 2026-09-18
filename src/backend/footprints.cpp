@@ -183,12 +183,32 @@ bool has_column(const EventTable& table, std::string_view key) {
          table.columns.end();
 }
 
+std::optional<std::string> copy_alias_dtype(const EventTable& table,
+                                            std::string_view source_key) {
+  const auto source = std::find(table.columns.begin(), table.columns.end(),
+                                source_key);
+  if (source != table.columns.end()) {
+    const auto index = static_cast<std::size_t>(source - table.columns.begin());
+    return table.dtypes[index];
+  }
+  return std::nullopt;
+}
+
 void append_alias_column(EventTable& table, std::string_view key,
+                         std::string_view source_key,
                          const std::vector<std::optional<EventAttribute>>& cells) {
   if (has_column(table, key)) return;
   if (cells.size() != table.rows.size())
     throw std::logic_error("footprints projection row count mismatch");
+  std::optional<std::string> dtype;
+  if (!table.dtypes.empty()) dtype = copy_alias_dtype(table, source_key);
   table.columns.emplace_back(key);
+  if (dtype)
+    table.dtypes.push_back(std::move(*dtype));
+  else if (!table.dtypes.empty())
+    // The selected field has no exact source column in this projection.  Drop
+    // the partial declaration rather than guessing a dtype for the alias.
+    table.dtypes.clear();
   for (std::size_t i = 0; i < table.rows.size(); ++i)
     table.rows[i].push_back(cells[i]);
 }
@@ -344,6 +364,7 @@ EventTable prepare_footprints_event_table(
   LogConversionOptions conversion;
   conversion.case_id_key = unique_case_glue_key(log, options);
   auto table = event_log_to_table(log, conversion);
+  table.validate();
   const auto events = source_events(log);
   const auto traces = source_traces_for_events(log);
   if (table.rows.size() != events.size() || events.size() != traces.size())
@@ -364,13 +385,24 @@ EventTable prepare_footprints_event_table(
                                               options.case_id_attribute));
     return cells;
   };
-  append_alias_column(table, options.activity_attribute,
+  const auto activity_source = options.activity_attribute == "activity"
+                                   ? std::string_view{"concept:name"}
+                                   : std::string_view{options.activity_attribute};
+  const auto timestamp_source = options.timestamp_attribute == "timestamp"
+                                    ? std::string_view{"time:timestamp"}
+                                    : std::string_view{options.timestamp_attribute};
+  append_alias_column(table, options.activity_attribute, activity_source,
                       event_cells(options.activity_attribute));
-  append_alias_column(table, options.timestamp_attribute,
+  append_alias_column(table, options.timestamp_attribute, timestamp_source,
                       event_cells(options.timestamp_attribute));
-  append_alias_column(table, options.case_id_attribute, case_cells());
+  append_alias_column(table, options.case_id_attribute, conversion.case_id_key,
+                      case_cells());
   if (options.start_timestamp_attribute)
-    append_alias_column(table, *options.start_timestamp_attribute,
+    append_alias_column(
+        table, *options.start_timestamp_attribute,
+        *options.start_timestamp_attribute == "timestamp"
+            ? std::string_view{"time:timestamp"}
+            : std::string_view{*options.start_timestamp_attribute},
                         event_cells(*options.start_timestamp_attribute));
 
   std::vector<std::size_t> order(table.rows.size());
@@ -384,6 +416,16 @@ EventTable prepare_footprints_event_table(
   for (const auto index : order)
     ordered_rows.push_back(std::move(table.rows[index]));
   table.rows = std::move(ordered_rows);
+  if (table.index) {
+    if (table.index->labels.size() != order.size())
+      throw std::invalid_argument(
+          "footprints projection index label count does not match rows");
+    std::vector<EventTableIndexLabel> ordered_labels;
+    ordered_labels.reserve(order.size());
+    for (const auto index : order)
+      ordered_labels.push_back(std::move(table.index->labels[index]));
+    table.index->labels = std::move(ordered_labels);
+  }
   table.validate();
   return table;
 }
