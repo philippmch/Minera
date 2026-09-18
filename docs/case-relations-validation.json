@@ -1,0 +1,64 @@
+{
+  "scope": "Finite case-relations checkpoint; not full dataframe/family parity or exact Python exception/dtype/index equivalence.",
+  "reference_version": "2.7.22",
+  "pandas_version": "3.0.5",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "reference_artifact": "docs/case-relations-reference.json.gz",
+  "reference_uncompressed_sha256": "05b5e94b2c083870f99f284df25bedd00f2bdd6773309f4af4fcf6f577b74fac",
+  "native_source_parent_commit": "e1ff5c3a53e55a4b9fe7a3c30d51cbcab4d610b8",
+  "native_changed_source_sha256_lf_normalized": {
+    "include/minera/case_relations.hpp": "5f1437c6ffbab88eec5c59995fa80f2c3d0bc01bc36321f61b2313e7ea622865",
+    "include/minera/json_export.hpp": "20c735b45a8b8ec159093def97b930b072b6f8ad19fc95ff0a09cc33d9dd271a",
+    "src/backend/case_relations.cpp": "0ec3e294637cbd2e4b52b1b78cfb45a28f7fc3bde47a11260464d2a585a864f2",
+    "src/backend/json_export.cpp": "39129ef27c55bdefea99396fdedb18d681a0fdac0ec991ecbd8780ec18741d7c",
+    "src/backend/request_params.cpp": "141cb18747b25dc11fb9b2207c1c0b69075bdbbf26ea173e8d6b4a8cd09e27d8",
+    "src/backend/tests/case_relations_reference_cases.hpp": "781c0cac7c8abe4f41016951c3cf74c5dbd98fcd31075a7aca28c30ad34e8599",
+    "src/backend/tests/test_case_relations.cpp": "7564e4a548ea4af518bdd9d44152d0606a2f4847b9d31e6643b1bc56de7d0a9d",
+    "src/backend/tests/test_request_params.cpp": "a7789c46e08dc853134a779daf1c342218f5c97b1a7741af8e39f72cd055af16",
+    "src/backend/tools/minera_export.cpp": "d88ca209255026a11d366dee1ec7be5ef4f439211d674de21c3386fbfb9e2525",
+    "src/backend/tools/minera_server.cpp": "c817bb25f0f0059a8fb8dd214f52a18c738f66aba546d221934795275fb71528"
+  },
+  "native_suites": {
+    "passed": 150,
+    "failed": 0
+  },
+  "public_cases": {
+    "total": 43,
+    "table_results": 36,
+    "validation_rejections": 7
+  },
+  "script_tests": {
+    "passed": 53,
+    "failed": 0,
+    "optimized_evidence_tests_passed": 6
+  },
+  "transport": {
+    "checks": [
+      "CLI lexical timestamps, missing configured timestamps, duplicate relations and case order",
+      "CLI output file matches stdout",
+      "CLI invalid output destination rejected",
+      "HTTP merge matches CLI including compatibility log",
+      "HTTP missing timestamp column rejected",
+      "CLI and HTTP preserve explicit missing canonical selector",
+      "CLI and HTTP support one-sided timestamp columns",
+      "CLI and HTTP honor explicit canonical column when both aliases exist",
+      "CLI and HTTP project selected case/timestamp columns into compatibility log",
+      "CLI and HTTP preserve quoted relation metadata, collision suffixes and explicit relation selectors",
+      "CLI custom import columns retain default relation selectors and log roles",
+      "Mixed XES/CSV CLI and HTTP honor explicit relation selectors over unused suffixes"
+    ],
+    "native_sha256_before_and_after": {
+      "export": "9d2a9966fc610069fa2d5fb8b9f40868a5db5ab083d6c03ec0018290bb9f5a51",
+      "server": "f6fd0ba59b04d3ce385fadaa497c3e4f29c322ca84441eb44ab420245e43013f"
+    }
+  },
+  "catalog_audit": {
+    "dispatchers": 86,
+    "complete_dispatchers": 44,
+    "partial_dispatchers": 42,
+    "modules": 387,
+    "complete_modules": 195,
+    "partial_modules": 192
+  },
+  "independent_review": "All actionable findings closed; final CRLF quoted-field repair and fixture correction verified by native and HTTP checks."
+}

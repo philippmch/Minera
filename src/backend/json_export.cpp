@@ -1,4 +1,5 @@
 #include "minera/json_export.hpp"
+#include "minera/log_conversion.hpp"
 #include "minera/pnml.hpp"
 #include "root_cause_trace_key.hpp"
 
@@ -4168,6 +4169,19 @@ const char* first_class_state_name(FirstClassAttributeState state) {
       "projected log contains an invalid first-class attribute state");
 }
 
+const char* first_class_role_name(FirstClassAttributeRole role) {
+  switch (role) {
+    case FirstClassAttributeRole::kNone: return "none";
+    case FirstClassAttributeRole::kCaseId: return "case_id";
+    case FirstClassAttributeRole::kActivity: return "activity";
+    case FirstClassAttributeRole::kTimestamp: return "timestamp";
+    case FirstClassAttributeRole::kResource: return "resource";
+    case FirstClassAttributeRole::kLifecycle: return "lifecycle";
+  }
+  throw std::invalid_argument(
+      "projected table contains an invalid first-class attribute role");
+}
+
 FirstClassAttributeState effective_first_class_state(
     FirstClassAttributeState state, std::string_view value) {
   return state == FirstClassAttributeState::kMissing && !value.empty()
@@ -4407,6 +4421,182 @@ void write_projected_log(std::ostream& out, const EventLog& log) {
     out << "]}";
   }
   out << "]}";
+}
+
+void write_case_relations_table_attribute(
+    std::ostream& out, const EventAttribute& attribute);
+
+void write_case_relations_table_attributes(
+    std::ostream& out, const std::vector<EventAttribute>& attributes) {
+  out << '[';
+  for (std::size_t i = 0; i < attributes.size(); ++i) {
+    if (i) out << ',';
+    write_case_relations_table_attribute(out, attributes[i]);
+  }
+  out << ']';
+}
+
+void write_case_relations_table_attribute(
+    std::ostream& out, const EventAttribute& attribute) {
+  out << "{\"key\":";
+  write_json_string(out, attribute.key);
+  out << ",\"value\":";
+  write_json_string(out, attribute.value);
+  out << ",\"kind\":";
+  write_json_string(out, attribute_kind_name(attribute.kind));
+  out << ",\"container\":";
+  write_json_string(out, attribute_container_name(attribute.container));
+  out << ",\"null\":" << (attribute.is_null ? "true" : "false");
+  if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+    out << ",\"typed_value\":";
+    write_typed_attribute_value(out, attribute.typed_value);
+  }
+  if (attribute.scalar_wrapper) out << ",\"scalar_wrapper\":true";
+  if (attribute.scalar_children_list)
+    out << ",\"scalar_children_list\":true";
+  if (!attribute.children.empty()) {
+    out << ",\"children\":";
+    write_case_relations_table_attributes(out, attribute.children);
+  }
+  if (attribute.first_class_role != FirstClassAttributeRole::kNone) {
+    out << ",\"first_class_role\":";
+    write_json_string(out, first_class_role_name(attribute.first_class_role));
+    out << ",\"first_class_state\":";
+    write_json_string(out, first_class_state_name(attribute.first_class_state));
+    out << ",\"first_class_source_key\":";
+    write_json_string(out, attribute.first_class_source_key);
+  }
+  out << '}';
+}
+
+void write_case_relations_table(std::ostream& out, const EventTable& table) {
+  table.validate();
+  out << "{\"columns\":[";
+  for (std::size_t i = 0; i < table.columns.size(); ++i) {
+    if (i) out << ',';
+    write_json_string(out, table.columns[i]);
+  }
+  out << "],\"attributes\":";
+  write_case_relations_table_attributes(out, table.attributes);
+  out << ",\"metadata\":";
+  write_projected_metadata(out, table.metadata);
+  out << ",\"rows\":[";
+  for (std::size_t row = 0; row < table.rows.size(); ++row) {
+    if (row) out << ',';
+    out << '[';
+    for (std::size_t column = 0; column < table.rows[row].size(); ++column) {
+      if (column) out << ',';
+      if (!table.rows[row][column]) {
+        out << "null";
+      } else {
+        write_case_relations_table_attribute(out, *table.rows[row][column]);
+      }
+    }
+    out << ']';
+  }
+  out << "]}";
+}
+
+void clear_first_class_role(EventAttribute& attribute) {
+  attribute.first_class_role = FirstClassAttributeRole::kNone;
+  attribute.first_class_state = FirstClassAttributeState::kMissing;
+  attribute.first_class_source_key.clear();
+}
+
+void retag_projection_cell(EventAttribute& attribute,
+                           FirstClassAttributeRole role,
+                           std::string_view source_key) {
+  attribute.first_class_role = role;
+  attribute.first_class_state =
+      attribute.is_null ? FirstClassAttributeState::kNull
+                        : FirstClassAttributeState::kPresent;
+  attribute.first_class_source_key = std::string(source_key);
+}
+
+EventTable case_relations_log_projection_table(
+    const EventTable& source, const CaseRelationsOptions& options) {
+  source.validate();
+  EventTable projected = source;
+
+  // The merge table retains source adapter roles, including the original
+  // CSV case/timestamp roles.  Those roles describe import configuration,
+  // while the compatibility log must describe the selectors used by this
+  // merge.  Normalize this private copy only; the public table remains a
+  // faithful source/result table.
+  const auto case_column = std::find(
+      projected.columns.begin(), projected.columns.end(), options.case_id_key);
+  const auto timestamp_column = std::find(projected.columns.begin(),
+                                           projected.columns.end(),
+                                           options.timestamp_key);
+  std::optional<std::size_t> case_index;
+  if (case_column != projected.columns.end())
+    case_index = static_cast<std::size_t>(
+        std::distance(projected.columns.begin(), case_column));
+  std::optional<std::size_t> timestamp_index;
+  if (timestamp_column != projected.columns.end())
+    timestamp_index = static_cast<std::size_t>(
+        std::distance(projected.columns.begin(), timestamp_column));
+
+  for (auto& row : projected.rows) {
+    for (std::size_t index = 0; index < row.size(); ++index) {
+      auto& cell = row[index];
+      if (!cell) continue;
+      if (cell->first_class_role == FirstClassAttributeRole::kCaseId) {
+        if (case_index && index == *case_index) {
+          retag_projection_cell(*cell, FirstClassAttributeRole::kCaseId,
+                                projected.columns[index]);
+        } else {
+          clear_first_class_role(*cell);
+        }
+        continue;
+      }
+      if (cell->first_class_role == FirstClassAttributeRole::kTimestamp) {
+        if (timestamp_index && index == *timestamp_index) {
+          retag_projection_cell(*cell, FirstClassAttributeRole::kTimestamp,
+                                projected.columns[index]);
+        } else {
+          clear_first_class_role(*cell);
+        }
+        continue;
+      }
+      if (case_index && index == *case_index) {
+        retag_projection_cell(*cell, FirstClassAttributeRole::kCaseId,
+                              projected.columns[index]);
+      } else if (timestamp_index && index == *timestamp_index) {
+        retag_projection_cell(*cell, FirstClassAttributeRole::kTimestamp,
+                              projected.columns[index]);
+      }
+    }
+  }
+  return projected;
+}
+
+EventLog case_relations_compatibility_log(
+    const EventTable& source, const CaseRelationsOptions& options) {
+  LogConversionOptions conversion_options;
+  conversion_options.case_id_key = options.case_id_key;
+  const auto projection_table =
+      case_relations_log_projection_table(source, options);
+  auto stream = event_table_to_event_stream(projection_table,
+                                            conversion_options);
+
+  // event_table_to_event_log has a canonical timestamp fallback for legacy
+  // tables.  A custom selector with a missing cell must suppress that
+  // fallback for the individual record; a private missing role marker does
+  // so without adding a cell to the returned table.
+  for (auto& record : stream.events) {
+    const auto has_timestamp_role = std::any_of(
+        record.fields.begin(), record.fields.end(), [](const auto& field) {
+          return field.first_class_role == FirstClassAttributeRole::kTimestamp;
+        });
+    if (has_timestamp_role) continue;
+    EventAttribute missing{options.timestamp_key, "", AttributeKind::kDate};
+    missing.first_class_role = FirstClassAttributeRole::kTimestamp;
+    missing.first_class_state = FirstClassAttributeState::kMissing;
+    missing.first_class_source_key = options.timestamp_key;
+    record.fields.push_back(std::move(missing));
+  }
+  return event_stream_to_event_log(stream, conversion_options);
 }
 }
 
@@ -5303,6 +5493,34 @@ std::string case_relations_json(const EventLog& result,
   std::ostringstream out;
   out << "{\"family\":\"MERGE_CASE_RELATIONS\",\"variant\":\"pandas\",\"log\":";
   write_projected_log(out, result);
+  out << '}';
+  return out.str();
+}
+
+std::string case_relations_json(const EventTable& result,
+                                const CaseRelationsOptions& options) {
+  if (options.variant != CaseRelationsVariant::kPandas)
+    throw std::invalid_argument("case relations result has an unknown variant");
+
+  std::optional<EventLog> projected_log;
+  std::string projection_error;
+  try {
+    projected_log = case_relations_compatibility_log(result, options);
+  } catch (const std::exception& error) {
+    projection_error = error.what();
+  }
+
+  std::ostringstream out;
+  out << "{\"family\":\"MERGE_CASE_RELATIONS\",\"variant\":\"pandas\"";
+  if (projected_log) {
+    out << ",\"log\":";
+    write_projected_log(out, *projected_log);
+  } else {
+    out << ",\"log\":null,\"log_projection_error\":";
+    write_json_string(out, projection_error);
+  }
+  out << ",\"table\":";
+  write_case_relations_table(out, result);
   out << '}';
   return out.str();
 }

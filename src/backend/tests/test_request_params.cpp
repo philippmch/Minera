@@ -852,15 +852,57 @@ void case_relations_params_contract() {
               {"merge_timestamp_key", "completed_at"},
               {"merge_case_id_key", "case:order_id"},
               {"merge_left_suffix", "__left"},
-              {"merge_right_suffix", "__right"}}));
+              {"merge_right_suffix", "__right"},
+              {"merge_left_column", "lhs"},
+              {"merge_right_column", "rhs"}}));
   assert(p.variant == minera::CaseRelationsVariant::kPandas);
   assert(p.timestamp_key == "completed_at");
   assert(p.case_id_key == "case:order_id");
   assert(p.left_suffix == "__left" && p.right_suffix == "__right");
+  assert(p.relation_left_column == "lhs" && p.relation_right_column == "rhs");
+
+  const auto explicit_empty_lookup = fields({
+      {"merge_left_column", "lhs"},
+      {"merge_right_column", "rhs"},
+      {"merge_left_suffix", ""},
+      {"merge_right_suffix", ""}});
+  const minera::FieldPresence explicit_empty_present = [](std::string_view name) {
+    return name == "merge_left_column" || name == "merge_right_column" ||
+           name == "merge_left_suffix" || name == "merge_right_suffix";
+  };
+  const auto explicit_empty = minera::parse_case_relations_params(
+      explicit_empty_lookup, explicit_empty_present);
+  assert(explicit_empty.relation_left_column == "lhs" &&
+         explicit_empty.relation_right_column == "rhs" &&
+         explicit_empty.left_suffix.empty() &&
+         explicit_empty.right_suffix.empty());
+
   bool threw = false;
   try {
     (void)minera::parse_case_relations_params(
         fields({{"merge_variant", "other"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  threw = false;
+  try {
+    const auto lookup = fields({{"merge_left_suffix", ""}});
+    const minera::FieldPresence present = [](std::string_view name) {
+      return name == "merge_left_suffix";
+    };
+    (void)minera::parse_case_relations_params(lookup, present);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  threw = false;
+  try {
+    (void)minera::parse_case_relations_params(
+        fields({{"merge_left_column", "same"},
+                {"merge_right_column", "same"}}));
   } catch (const std::invalid_argument&) {
     threw = true;
   }

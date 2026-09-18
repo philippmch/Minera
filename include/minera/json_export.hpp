@@ -14,6 +14,7 @@
 #include "minera/dfg_playout.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
 #include "minera/eventually_follows.hpp"
 #include "minera/footprints.hpp"
@@ -325,6 +326,13 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string case_relations_json(
     const EventLog& result,
     CaseRelationsVariant variant = CaseRelationsVariant::kPandas);
+// CSV case-relation merges retain their rectangular source table alongside a
+// faithful EventLog projection where the table carries the standard case
+// glue.  The explicit options overload keeps the merge selectors and output
+// variant together without changing the legacy EventLog overload above.
+[[nodiscard]] std::string case_relations_json(
+    const EventTable& result,
+    const CaseRelationsOptions& options = {});
 // The one-argument overload is the legacy BASIC serializer. Pass the
 // variant explicitly for PT-and-log results.
 [[nodiscard]] std::string random_tree_json(const ProcessTree& result);

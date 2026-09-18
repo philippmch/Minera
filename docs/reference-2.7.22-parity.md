@@ -1668,13 +1668,68 @@ The case-relations variation preserves the base log, inserts only incoming
 events with a declared right-case relation, rewrites those events to the left
 case, preserves duplicate relation rows, supports new left cases, and sorts
 each resulting case deterministically by a configured timestamp attribute.
+Sorting caches whole-second and nanosecond keys independently, preserving
+adjacent nanoseconds, pre-epoch dates, and equivalent offset instants. Exact
+ties retain base-before-incoming order and duplicate relation multiplicity.
+`scripts/capture-case-relations-time-reference.py` reproduces the pinned public
+ordering for modern/pre-epoch dates and default/custom timestamp selectors;
+registered native regressions additionally cover offset normalization.
 The case identifier can target the canonical trace id or a trace-level
 attribute, and relation-column defaults are derived from configurable left and
 right suffixes; explicit relation-column selectors still take precedence.
 Malformed relation headers/rows, empty identifiers/suffixes, missing selected
-case ids, missing timestamps, and invalid timestamps are rejected. The result
+case ids, and invalid timestamp text (including explicitly present empty strings)
+are rejected. Missing and null
+timestamp cells sort after timed events, retaining base-before-incoming order.
+Duplicate relations expand each incoming event before advancing to the next
+event, including all-missing timestamp ties. Selected custom timestamp fields
+and native date payloads share the same exact ordering. The result
 is exposed as recursive JSON, strict CLI/server/frontend controls, and a
 multipart local-server endpoint with runtime response validation.
+The EventTable overload preserves source columns and typed cells, including
+relation fields and their collision suffixes. It sorts globally by case identifier,
+then by the selected timestamp's actual scalar type, retaining nulls and duplicate
+relations. Strings, including empty strings, sort lexically. A timestamp column
+absent from one input produces missing cells; absence from both is rejected.
+Typed relation tables support null joins and numeric/string identifiers. The
+EventLog overload above retains its datetime-oriented compatibility contract.
+
+Both-CSV CLI/server merges use preserved source tables and return an additive
+`table` alongside the compatibility `log` projection. An omitted timestamp selector
+can use a CSV timestamp alias present in either input; explicit selectors are
+exact. CSV relation files retain all columns as string cells, including quoted
+extra fields and explicitly selected relation headers. Configured blank CSV
+timestamps remain missing; empty custom text fields remain present strings.
+The compatibility log uses the selected case and timestamp columns even when
+the source CSV contains other first-class columns. XES and mixed-format inputs
+retain the EventLog route. CLI merge output
+supports `-o` with checked flushing.
+
+`scripts/capture-case-relations-table-reference.py` captures 43 public cases using
+PM4Py 2.7.22 and pandas 3.0.5. Algorithm and PANDAS variant module bytes match
+commit `0715c31f3f1d85924107d6aa5329806db69df899` after CRLF normalization, without
+decoding reference implementation text. Per-cell scalar tags preserve booleans
+and dates in mixed object columns. The capture includes and cross-checks the
+16 observations from `scripts/capture-case-relations-time-reference.py`.
+`docs/case-relations-reference.json.gz` stores complete inputs, outputs, column
+dtypes, index labels, public errors and provenance. The generated native fixture
+header checks all 43 cases for columns, row order, scalar kinds/values and native
+validation rejection. Integral floats and integers compare by exact numeric value.
+Offline tests reject truncated observations and inconsistent provenance or nested
+timestamp evidence. `scripts/check-case-relations-transport.py` checks CLI and
+HTTP behavior after native compilation finishes.
+The checkpoint in `docs/case-relations-validation.json` passed all 150 native
+suites, 53 script tests, six optimized evidence tests and 12 CLI/HTTP checks.
+It records the changed native source hashes and unchanged CLI/server binary
+hashes used for validation. The native fixture covers 36 successful tables and
+seven validation rejections; quoted CRLF relation uploads have dedicated checks.
+
+The family remains partial. EventTable does not retain pandas index labels or
+full dtype metadata/coercion. Generated rejection checks require native validation
+errors rather than exact Python exception class/message equality. CSV adapters
+do not yet infer pandas column dtypes or expose the full typed/null identifier
+surface, and XES/mixed adapters have not moved to the table surface. These finite
+observations do not establish complete dataframe or family parity.
 
 ## Basic random-tree generation evidence
 

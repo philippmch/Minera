@@ -2,6 +2,7 @@
 // plus discovered directly-follows graph) as JSON for the frontend.
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cerrno>
 #include <cmath>
@@ -153,6 +154,69 @@ std::vector<std::string> split_csv(std::string_view value) {
 bool is_xes_path(const std::filesystem::path& path) {
   const auto value = path.string();
   return ends_with_ci(value, ".xes") || ends_with_ci(value, ".xes.gz");
+}
+
+bool has_table_column(const minera::EventTable& table, std::string_view column) {
+  return std::find(table.columns.begin(), table.columns.end(), column) !=
+         table.columns.end();
+}
+
+std::string csv_case_column(const minera::EventTable& table,
+                            const minera::CsvImportOptions& options) {
+  if (has_table_column(table, options.case_id_column))
+    return options.case_id_column;
+  for (std::size_t index = 0; index < table.columns.size(); ++index) {
+    const auto marked = std::any_of(
+        table.rows.begin(), table.rows.end(), [&](const auto& row) {
+          return row[index] &&
+                 row[index]->first_class_role ==
+                     minera::FirstClassAttributeRole::kCaseId;
+        });
+    if (marked) return table.columns[index];
+  }
+  return options.case_id_column;
+}
+
+void adapt_case_relations_table_timestamp(
+    minera::CaseRelationsOptions& options,
+    const minera::EventTable& base,
+    const minera::EventTable& incoming,
+    const minera::CsvImportOptions& csv_options) {
+  // Callers invoke this only when merge_timestamp_key was omitted.  The
+  // public default is the XES spelling; CSV import resolves the established
+  // timestamp/time:timestamp aliases, so use the first known source header
+  // even when it is present on only one side and let the table merge handle
+  // the missing side.  An explicitly supplied selector remains exact.
+  if (options.timestamp_key != "time:timestamp") return;
+  const std::array<std::string_view, 3> candidates = {
+      "time:timestamp", csv_options.timestamp_column, "timestamp"};
+  for (const auto candidate : candidates) {
+    if (!candidate.empty() &&
+        (has_table_column(base, candidate) ||
+         has_table_column(incoming, candidate))) {
+      options.timestamp_key = std::string(candidate);
+      return;
+    }
+  }
+}
+
+void normalize_csv_timestamp_missingness(minera::EventTable& table) {
+  for (auto& row : table.rows) {
+    for (auto& cell : row) {
+      if (!cell || cell->first_class_role !=
+                       minera::FirstClassAttributeRole::kTimestamp)
+        continue;
+      if (cell->first_class_state ==
+          minera::FirstClassAttributeState::kMissing) {
+        cell.reset();
+      } else if (cell->first_class_state ==
+                 minera::FirstClassAttributeState::kNull) {
+        cell->is_null = true;
+        cell->value.clear();
+        cell->typed_value = minera::NativeAttributeValue{};
+      }
+    }
+  }
 }
 
 std::string trim_text(std::string_view value) {
@@ -5939,7 +6003,7 @@ int main(int argc, char** argv) {
     }
     if (input_is_xes) {
       log = minera::import_xes_event_log(input, xes_options);
-    } else if (!correlation_variants.empty()) {
+    } else if (!correlation_variants.empty() || merge_requested) {
       csv_data = minera::import_csv_event_data(input, options);
       log = std::move(csv_data->log);
     } else {
@@ -6011,10 +6075,6 @@ int main(int argc, char** argv) {
       return 0;
     }
     if (merge_requested) {
-      const auto incoming = is_xes_path(merge_incoming_path)
-                                ? minera::import_xes_event_log(merge_incoming_path)
-                                : minera::import_csv_event_log(merge_incoming_path,
-                                                               options);
       std::ifstream relation_input(merge_relations_path);
       if (!relation_input)
         throw std::invalid_argument("cannot open case relations file");
@@ -6025,19 +6085,67 @@ int main(int argc, char** argv) {
       const auto present = [&](std::string_view name) {
         return merge_fields.contains(std::string(name));
       };
-      const auto params = minera::parse_case_relations_params(lookup, present);
+      auto params = minera::parse_case_relations_params(lookup, present);
+      const bool merge_case_key_supplied =
+          merge_fields.contains("merge_case_id_key");
+      const auto relation_case_key = params.case_id_key;
       const auto left = merge_fields.contains("merge_left_column")
                             ? merge_fields.at("merge_left_column")
-                            : params.case_id_key + params.left_suffix;
+                            : relation_case_key + params.left_suffix;
       const auto right = merge_fields.contains("merge_right_column")
                              ? merge_fields.at("merge_right_column")
-                             : params.case_id_key + params.right_suffix;
-      const auto relations = minera::parse_case_relations_csv(
-          relation_input, left, right);
-      std::cout << minera::case_relations_json(
-          minera::merge_case_relations(log, incoming, relations, params),
-          params.variant)
-                << '\n';
+                             : relation_case_key + params.right_suffix;
+      const bool incoming_is_xes = is_xes_path(merge_incoming_path);
+      std::string body;
+      if (!input_is_xes && !incoming_is_xes) {
+        if (!csv_data)
+          throw std::logic_error("CSV merge did not retain its source table");
+        auto incoming_csv =
+            minera::import_csv_event_data(merge_incoming_path, options);
+        const auto relation_table =
+            minera::parse_case_relations_table_csv(relation_input);
+        params.relation_left_column = left;
+        params.relation_right_column = right;
+        auto base_table = csv_data->table;
+        auto incoming_table = std::move(incoming_csv.table);
+        normalize_csv_timestamp_missingness(base_table);
+        normalize_csv_timestamp_missingness(incoming_table);
+        if (!merge_case_key_supplied)
+          params.case_id_key = csv_case_column(base_table, options);
+        if (!merge_fields.contains("merge_timestamp_key")) {
+          adapt_case_relations_table_timestamp(params, base_table,
+                                                incoming_table, options);
+        }
+        const auto merged = minera::merge_case_relations(
+            base_table, incoming_table, relation_table, params);
+        body = minera::case_relations_json(merged, params);
+      } else {
+        const auto relations = minera::parse_case_relations_csv(
+            relation_input, left, right);
+        const auto incoming = incoming_is_xes
+                                  ? minera::import_xes_event_log(
+                                        merge_incoming_path)
+                                  : minera::import_csv_event_log(
+                                        merge_incoming_path, options);
+        body = minera::case_relations_json(
+            minera::merge_case_relations(log, incoming, relations, params),
+            params.variant);
+      }
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+        file.flush();
+        if (!file) {
+          std::cerr << "error: cannot write output file " << output << '\n';
+          return 1;
+        }
+      }
       return 0;
     }
     if (filter.any()) {
