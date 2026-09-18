@@ -26,7 +26,7 @@ class FormatDataFrameEvidenceTests(unittest.TestCase):
                 encoding="utf-8"
             ),
         )
-        self.assertEqual(generated.count("inline void check_case_"), 190)
+        self.assertEqual(generated.count("inline void check_case_"), 258)
         self.assertEqual(
             set(GENERATOR["EXCLUDED_CASES"]),
             {"non_string_column_labels_with_selectors"},

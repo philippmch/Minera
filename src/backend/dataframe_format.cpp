@@ -321,10 +321,11 @@ std::optional<ExactTimestamp> parse_timestamp_cell(
       cell.first_class_state == FirstClassAttributeState::kNull)
     return std::nullopt;
   if (const auto* date = std::get_if<NativeDate>(&cell.typed_value)) {
-    if (!format || *format == "mixed") return parse_iso_timestamp(date->value);
+    return parse_iso_timestamp(date->value);
   }
   const auto text = attribute_text(cell);
-  if (!format || *format == "mixed") return parse_iso_timestamp(text);
+  if (!format || *format == "mixed" || *format == "ISO8601")
+    return parse_iso_timestamp(text);
   return parse_strptime_timestamp(text, *format);
 }
 
@@ -382,6 +383,8 @@ std::string date_precision(const EventTable& table, std::size_t column,
   if (table.rows.empty()) return "s";
   for (const auto& row : table.rows)
     if (!cell_missing(row[column]) && numeric_kind(*row[column])) return "ns";
+  if (std::none_of(parsed.begin(), parsed.end(),
+                   [](const auto& value) { return value.has_value(); })) return "s";
   for (const auto& value : parsed) {
     if (!value || value->nanoseconds == 0) continue;
     if (value->nanoseconds % 1000 != 0) return "ns";
@@ -423,6 +426,14 @@ bool all_date_eligible(const EventTable& table, std::size_t column,
       auto fraction = nanos % 1000000000;
       if (fraction < 0) { --seconds; fraction += 1000000000; }
       parsed.push_back(ExactTimestamp{seconds, static_cast<std::uint32_t>(fraction)});
+      continue;
+    }
+    const auto text = attribute_text(*row[column]);
+    // Public date parsing recognizes only these exact textual missing tokens;
+    // whitespace and other capitalization still invalidate column conversion.
+    if (text.empty() || text == "NaT" || text == "nat" || text == "NAT" ||
+        text == "NaN" || text == "nan" || text == "NAN") {
+      parsed.push_back(std::nullopt);
       continue;
     }
     const auto value = parse_timestamp_cell(*row[column], format);
