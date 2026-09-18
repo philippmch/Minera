@@ -1013,6 +1013,204 @@ def _cases():
                 {"timest_format": "%Y/%m/%d"},
             )
         )
+    for name, values, timestamp_format in (
+        ("fraction_one", ["2024/01/01 01:02:03.1"], "%Y/%m/%d %H:%M:%S.%f"),
+        ("fraction_six", ["2024/01/01 01:02:03.123456"], "%Y/%m/%d %H:%M:%S.%f"),
+        ("fraction_nine", ["2024/01/01 01:02:03.123456789"], "%Y/%m/%d %H:%M:%S.%f"),
+        ("fraction_ten", ["2024/01/01 01:02:03.1234567899"], "%Y/%m/%d %H:%M:%S.%f"),
+        ("fraction_zero", ["2024/01/01 01:02:03.000000"], "%Y/%m/%d %H:%M:%S.%f"),
+        ("fraction_empty", ["2024/01/01 01:02:03."], "%Y/%m/%d %H:%M:%S.%f"),
+        ("fraction_bad", ["2024/01/01 01:02:03.abc"], "%Y/%m/%d %H:%M:%S.%f"),
+        ("offset_positive", ["2024/01/01 01:02:03+0230"], "%Y/%m/%d %H:%M:%S%z"),
+        ("offset_colon", ["2024/01/01 01:02:03+02:30"], "%Y/%m/%d %H:%M:%S%z"),
+        ("offset_negative", ["2024/01/01 01:02:03-0530"], "%Y/%m/%d %H:%M:%S%z"),
+        ("offset_utc", ["2024/01/01 01:02:03Z"], "%Y/%m/%d %H:%M:%S%z"),
+        ("offset_lower", ["2024/01/01 01:02:03z"], "%Y/%m/%d %H:%M:%S%z"),
+        ("offset_hour", ["2024/01/01 01:02:03+02"], "%Y/%m/%d %H:%M:%S%z"),
+        ("offset_seconds", ["2024/01/01 01:02:03+02:30:15"], "%Y/%m/%d %H:%M:%S%z"),
+        (
+            "offset_compact_seconds",
+            ["2024/01/01 01:02:03+023015"],
+            "%Y/%m/%d %H:%M:%S%z",
+        ),
+        ("offset_large", ["2024/01/01 01:02:03+2300"], "%Y/%m/%d %H:%M:%S%z"),
+        ("offset_day", ["2024/01/01 01:02:03+2400"], "%Y/%m/%d %H:%M:%S%z"),
+        ("offset_minutes", ["2024/01/01 01:02:03+0260"], "%Y/%m/%d %H:%M:%S%z"),
+        ("offset_mixed_colon", ["2024/01/01 01:02:03+02:3015"], "%Y/%m/%d %H:%M:%S%z"),
+        ("offset_fraction", ["2024/01/01 01:02:03+02:30:15.5"], "%Y/%m/%d %H:%M:%S%z"),
+        (
+            "fraction_offset",
+            ["2024/01/01 01:02:03.123456789+0230"],
+            "%Y/%m/%d %H:%M:%S.%f%z",
+        ),
+        (
+            "fraction_mixed",
+            ["2024/01/01 01:02:03.1", "2024/01/02 01:02:03.123456789"],
+            "%Y/%m/%d %H:%M:%S.%f",
+        ),
+        (
+            "offset_mixed",
+            ["2024/01/01 01:02:03+0230", "2024/01/01 01:02:03-0530"],
+            "%Y/%m/%d %H:%M:%S%z",
+        ),
+        ("literal_fraction", ["01|01|2024 01:02:03."], "%d|%m|%Y %H:%M:%S.%f"),
+        (
+            "literal_offset_seconds",
+            ["01|01|2024 01:02:03+02:30:15"],
+            "%d|%m|%Y %H:%M:%S%z",
+        ),
+        (
+            "fraction_before_literal",
+            ["2024/01/01 01:02:03.123END"],
+            "%Y/%m/%d %H:%M:%S.%fEND",
+        ),
+        (
+            "fraction_empty_offset",
+            ["2024/01/01 01:02:03.+0230"],
+            "%Y/%m/%d %H:%M:%S.%f%z",
+        ),
+        (
+            "offset_invalid_seconds",
+            ["2024/01/01 01:02:03+02:30:99"],
+            "%Y/%m/%d %H:%M:%S%z",
+        ),
+        (
+            "offset_fraction_seven",
+            ["2024/01/01 01:02:03+02:30:15.1234567"],
+            "%Y/%m/%d %H:%M:%S%z",
+        ),
+        (
+            "offset_before_literal",
+            ["2024/01/01 01:02:03+0230END"],
+            "%Y/%m/%d %H:%M:%S%zEND",
+        ),
+        ("literal_fraction_one", ["01|01|2024 01:02:03.1"], "%d|%m|%Y %H:%M:%S.%f"),
+        (
+            "literal_fraction_six",
+            ["01|01|2024 01:02:03.123456"],
+            "%d|%m|%Y %H:%M:%S.%f",
+        ),
+        (
+            "literal_fraction_nine",
+            ["01|01|2024 01:02:03.123456789"],
+            "%d|%m|%Y %H:%M:%S.%f",
+        ),
+        (
+            "literal_fraction_ten",
+            ["01|01|2024 01:02:03.1234567899"],
+            "%d|%m|%Y %H:%M:%S.%f",
+        ),
+        (
+            "literal_fraction_zero",
+            ["01|01|2024 01:02:03.000000"],
+            "%d|%m|%Y %H:%M:%S.%f",
+        ),
+        ("literal_fraction_empty", ["01|01|2024 01:02:03."], "%d|%m|%Y %H:%M:%S.%f"),
+        ("literal_fraction_bad", ["01|01|2024 01:02:03.abc"], "%d|%m|%Y %H:%M:%S.%f"),
+        (
+            "literal_offset_positive",
+            ["01|01|2024 01:02:03+0230"],
+            "%d|%m|%Y %H:%M:%S%z",
+        ),
+        ("literal_offset_colon", ["01|01|2024 01:02:03+02:30"], "%d|%m|%Y %H:%M:%S%z"),
+        (
+            "literal_offset_negative",
+            ["01|01|2024 01:02:03-0530"],
+            "%d|%m|%Y %H:%M:%S%z",
+        ),
+        ("literal_offset_utc", ["01|01|2024 01:02:03Z"], "%d|%m|%Y %H:%M:%S%z"),
+        ("literal_offset_lower", ["01|01|2024 01:02:03z"], "%d|%m|%Y %H:%M:%S%z"),
+        ("literal_offset_hour", ["01|01|2024 01:02:03+02"], "%d|%m|%Y %H:%M:%S%z"),
+        (
+            "literal_offset_compact_seconds",
+            ["01|01|2024 01:02:03+023015"],
+            "%d|%m|%Y %H:%M:%S%z",
+        ),
+        ("literal_offset_large", ["01|01|2024 01:02:03+2300"], "%d|%m|%Y %H:%M:%S%z"),
+        ("literal_offset_day", ["01|01|2024 01:02:03+2400"], "%d|%m|%Y %H:%M:%S%z"),
+        ("literal_offset_minutes", ["01|01|2024 01:02:03+0260"], "%d|%m|%Y %H:%M:%S%z"),
+        (
+            "literal_offset_mixed_colon",
+            ["01|01|2024 01:02:03+02:3015"],
+            "%d|%m|%Y %H:%M:%S%z",
+        ),
+        (
+            "literal_offset_fraction",
+            ["01|01|2024 01:02:03+02:30:15.5"],
+            "%d|%m|%Y %H:%M:%S%z",
+        ),
+        (
+            "literal_fraction_offset",
+            ["01|01|2024 01:02:03.123456789+0230"],
+            "%d|%m|%Y %H:%M:%S.%f%z",
+        ),
+        (
+            "literal_fraction_mixed",
+            ["01|01|2024 01:02:03.1", "02|01|2024 01:02:03.123456789"],
+            "%d|%m|%Y %H:%M:%S.%f",
+        ),
+        (
+            "literal_offset_mixed",
+            ["01|01|2024 01:02:03+0230", "01|01|2024 01:02:03-0530"],
+            "%d|%m|%Y %H:%M:%S%z",
+        ),
+    ):
+        add(
+            "explicit_date_" + name,
+            _frame(
+                {
+                    "case:concept:name": ["C"] * len(values),
+                    "concept:name": ["A"] * len(values),
+                    "time:timestamp": values,
+                }
+            ),
+            {"timest_format": timestamp_format},
+        )
+    for name, values, timestamp_format in (
+        ("dash_fraction_empty", ["2024-01-01T01:02:03."], "%Y-%m-%dT%H:%M:%S.%f"),
+        ("dash_offset_hour", ["2024-01-01T01:02:03+02"], "%Y-%m-%dT%H:%M:%S%z"),
+        ("dot_fraction_empty", ["2024.01.01T01:02:03."], "%Y.%m.%dT%H:%M:%S.%f"),
+        ("dot_offset_hour", ["2024.01.01T01:02:03+02"], "%Y.%m.%dT%H:%M:%S%z"),
+        ("space_fraction_empty", ["2024 01 01T01:02:03."], "%Y %m %dT%H:%M:%S.%f"),
+        ("space_offset_hour", ["2024 01 01T01:02:03+02"], "%Y %m %dT%H:%M:%S%z"),
+        (
+            "literal_offset_invalid_seconds",
+            ["01|01|2024 01:02:03+02:30:99"],
+            "%d|%m|%Y %H:%M:%S%z",
+        ),
+        (
+            "literal_offset_fraction_seven",
+            ["01|01|2024 01:02:03+02:30:15.1234567"],
+            "%d|%m|%Y %H:%M:%S%z",
+        ),
+        (
+            "literal_offset_fraction_empty",
+            ["01|01|2024 01:02:03+02:30:15."],
+            "%d|%m|%Y %H:%M:%S%z",
+        ),
+        (
+            "literal_offset_negative_seconds",
+            ["01|01|2024 01:02:03-00:00:45"],
+            "%d|%m|%Y %H:%M:%S%z",
+        ),
+        (
+            "escaped_fraction",
+            ["01|01|2024 %f 01:02:03.123"],
+            "%d|%m|%Y %%f %H:%M:%S.%f",
+        ),
+        ("escaped_offset", ["01|01|2024 %z 01:02:03+0230"], "%d|%m|%Y %%z %H:%M:%S%z"),
+    ):
+        add(
+            "explicit_date_" + name,
+            _frame(
+                {
+                    "case:concept:name": ["C"] * len(values),
+                    "concept:name": ["A"] * len(values),
+                    "time:timestamp": values,
+                }
+            ),
+            {"timest_format": timestamp_format},
+        )
     return cases
 
 
