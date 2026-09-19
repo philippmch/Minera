@@ -94,6 +94,67 @@ def capture(checkout):
             row["error"] = {"type": type(error).__name__, "message": str(error)}
         row["input_after"] = META["FORMAT"]["describe_frame"](frame)
         rows.append(row)
+    linear = PetriNet("linear")
+    places = [PetriNet.Place("p" + str(i)) for i in range(3)]
+    linear.places.update(places)
+    for i, label in enumerate("AB"):
+        transition = PetriNet.Transition(label, label)
+        linear.transitions.add(transition)
+        petri_utils.add_arc_from_to(places[i], transition, linear)
+        petri_utils.add_arc_from_to(transition, places[i + 1], linear)
+    boundaries = [
+        ("linear_fit", ["c", "c"], ["A", "B"], False),
+        ("linear_missing", ["c"], ["B"], False),
+        ("linear_remaining", ["c"], ["A"], False),
+        ("linear_reverse", ["c", "c"], ["B", "A"], False),
+        ("linear_unknown", ["c"], ["X"], False),
+        ("linear_unknown_between", ["c"] * 3, ["A", "X", "B"], False),
+        ("linear_source_order", ["z", "a", "z"], ["A", "B", "B"], False),
+        ("custom_selectors", ["z", "a", "z"], ["A", "B", "B"], True),
+    ]
+    for name, cases, activities, custom in boundaries:
+        frame = pd.DataFrame(
+            {
+                "case:concept:name": cases,
+                "concept:name": activities,
+                "time:timestamp": pd.to_datetime(["2024-01-01"] * len(cases), utc=True),
+            }
+        )
+        parameters = {}
+        if custom:
+            frame = frame.rename(
+                columns={
+                    "case:concept:name": "ticket",
+                    "concept:name": "action",
+                    "time:timestamp": "completed",
+                }
+            )
+            parameters = {
+                "case_id_key": "ticket",
+                "activity_key": "action",
+                "timestamp_key": "completed",
+            }
+        row = {
+            "name": name,
+            "net_kind": "linear",
+            "parameters": parameters,
+            "input": META["FORMAT"]["describe_frame"](frame),
+        }
+        try:
+            result = pm.conformance_diagnostics_token_based_replay(
+                frame,
+                linear,
+                Marking({places[0]: 1}),
+                Marking({places[-1]: 1}),
+                return_diagnostics_dataframe=True,
+                opt_parameters={"show_progress_bar": False},
+                **parameters,
+            )
+            row["result"] = META["FORMAT"]["describe_frame"](result)
+        except Exception as error:
+            row["error"] = {"type": type(error).__name__, "message": str(error)}
+        row["input_after"] = META["FORMAT"]["describe_frame"](frame)
+        rows.append(row)
     return {
         "capture_id": "token_replay_diagnostics_dataframe",
         "reference_version": pm.__version__,

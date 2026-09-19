@@ -1960,22 +1960,31 @@ inference. Native tables without declared dtypes use basic scalar-kind inference
 Full parity and structural coverage counts remain unchanged.
 
 
-## Replay diagnostics dataframe output: open implementation
+## Replay diagnostics dataframe output
 
-A separate public capture records 33 calls with
-`return_diagnostics_dataframe=True`: 29 successes and four expected errors.
-This mode retains exact case groups in first-occurrence order. Output dtype
-inference can round case identifiers without collapsing their rows, so converting
-the existing list diagnostics would lose cases. First scalar representatives
-determine the observed case dtype. A valid typed empty input returns no columns;
-nonempty output has seven diagnostic columns, a fresh RangeIndex, and empty attrs.
-All inputs remain unchanged.
+`replay_dataframe_diagnostics` validates the required columns and replays exact
+case groups in first-occurrence order. This reproduces the observed dataframe
+return path, which differs from the list path's inferred group index. Output
+case dtype inference can round distinct identifiers without merging their rows.
+The returned table contains `case_id`, `is_fit`, `trace_fitness`, `missing`,
+`remaining`, `produced`, and `consumed`, with a fresh RangeIndex and empty attrs.
+Valid typed empty input returns a zero-column table.
 
-The native output path remains open. The capture and requirements are recorded
-in `docs/token-replay-diagnostics-dataframe-reference.json.gz` and
-`docs/token-replay-diagnostics-dataframe-evidence.json`. All 101 script tests and
-five optimized evidence checks pass. No native equivalence is claimed by this
-capture; non-fitting nets and custom selectors still need additional observations.
+The public corpus contains 41 cases: 37 successes and four expected rejections.
+It covers numeric boundaries, first-representative dtype inference, source order,
+empty inputs, missing case IDs, non-fitting linear traces, unknown activities,
+and custom case/activity/timestamp selectors. Generated native comparisons check
+the full typed result, index, attrs, and unchanged input. The capture and
+validation are `docs/token-replay-diagnostics-dataframe-reference.json.gz` and
+`docs/token-replay-diagnostics-dataframe-evidence.json`.
+
+The isolated Release build, all 154 native suites, 102 script tests, six
+optimized evidence checks, and 516 formatter interface comparisons pass.
+Independent review found no code issues.
+
+This finite matrix does not establish arbitrary extension or date/container
+case dtypes, Python exception-class identity, all replay parameters, or full
+parity. Structural coverage counts remain unchanged.
 
 
 ## Basic random-tree generation evidence

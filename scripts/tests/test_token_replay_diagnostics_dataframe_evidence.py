@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import unittest
+import runpy
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW = gzip.decompress(
@@ -17,7 +18,7 @@ LIST_REPORT = json.loads(
         (ROOT / "docs/token-replay-dataframe-grouping-reference.json.gz").read_bytes()
     )
 )
-DIGEST = "187ff758e36739839dad681ccf95946398d764f0187ad89e961274d465e9a6f7"
+DIGEST = "0b09ae6e916aeef34fce5cc616b1862d6f504ab5f821138ca472dffe75fb8840"
 NAMES = (
     "empty",
     "typed_empty",
@@ -52,10 +53,36 @@ NAMES = (
     "prior_upper",
     "prior_small_fraction",
     "prior_string_mixed",
+    "linear_fit",
+    "linear_missing",
+    "linear_remaining",
+    "linear_reverse",
+    "linear_unknown",
+    "linear_unknown_between",
+    "linear_source_order",
+    "custom_selectors",
 )
 
 
 class DiagnosticsDataframeEvidenceTests(unittest.TestCase):
+    def test_native_fixture_and_tamper_gate(self):
+        generator = runpy.run_path(
+            str(ROOT / "scripts/generate-token-replay-diagnostics-dataframe-tests.py")
+        )["generate"]
+        generated = generator(RAW)
+        self.assertEqual(
+            generated,
+            (
+                ROOT
+                / "src/backend/tests/token_replay_diagnostics_dataframe_reference_cases.hpp"
+            ).read_text(encoding="utf-8"),
+        )
+        self.assertEqual(generated.count("inline void check_replay_dataframe_"), 41)
+        changed = json.loads(RAW)
+        changed["rows"][-1]["result"]["records"][0]["values"]["produced"] = 99
+        with self.assertRaises(ValueError):
+            generator(json.dumps(changed).encode())
+
     def test_pin_and_manifest(self):
         self.assertEqual(hashlib.sha256(RAW).hexdigest(), DIGEST)
         self.assertEqual(
@@ -67,7 +94,7 @@ class DiagnosticsDataframeEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(REPORT["reference_version"], "2.7.22")
         self.assertEqual(REPORT["pandas_version"], "3.0.5")
-        self.assertEqual(REPORT["case_count"], 33)
+        self.assertEqual(REPORT["case_count"], 41)
         self.assertEqual(tuple(ROWS), NAMES)
         self.assertEqual(
             REPORT["parameters"],
