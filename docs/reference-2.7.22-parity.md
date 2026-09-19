@@ -1970,7 +1970,7 @@ The returned table contains `case_id`, `is_fit`, `trace_fitness`, `missing`,
 `remaining`, `produced`, and `consumed`, with a fresh RangeIndex and empty attrs.
 Valid typed empty input returns a zero-column table.
 
-The public corpus contains 55 cases: 50 successes and five expected rejections.
+The public corpus contains 61 cases: 56 successes and five expected rejections.
 It covers numeric boundaries, first-representative dtype inference, source order,
 empty inputs, missing case IDs, non-fitting linear traces, unknown activities,
 and custom case/activity/timestamp selectors. Generated native comparisons check
@@ -1978,7 +1978,7 @@ the full typed result, index, attrs, and unchanged input. The capture and
 validation are `docs/token-replay-diagnostics-dataframe-reference.json.gz` and
 `docs/token-replay-diagnostics-dataframe-evidence.json`.
 
-The isolated Release build, all 154 native suites, 103 script tests, seven
+The isolated Release build, all 154 native suites, 104 script tests, eight
 optimized evidence checks, and 516 formatter interface comparisons pass.
 Independent review found no code issues.
 
@@ -2010,8 +2010,29 @@ the 55 replay and 13 conversion comparisons, as do 103 script tests, seven
 optimized evidence checks, and 516 formatter interface comparisons. Independent
 review is clear.
 
-Named timezone identity and arbitrary date/container or extension types remain
-outside this finite matrix. Full parity remains incomplete.
+Named timezone identity is covered by the subsequent checkpoint below. Arbitrary
+date/container or extension types remain unproven. Full parity remains incomplete.
+
+
+## Named timezone replay metadata
+
+The public diagnostics capture now includes named timezone identity alongside
+resolved ISO offsets and date precision. Berlin dates on either side of the
+summer clock change retain `Europe/Berlin` as their datetime dtype. Different
+zone names with the same offset retain object dtype. Equal instants still form
+one case and use its first timezone representative; the repeated autumn hour
+contains two distinct instants.
+
+The expanded corpus contains 61 replay cases and 19 direct conversion checks.
+All 154 native suites, 104 script tests, eight optimized evidence checks, and
+258 CLI plus 258 HTTP comparisons pass. Fourteen transport boundary checks
+include nanosecond and timezone metadata preservation in rejected requests.
+Independent review is clear.
+Native fixture comparisons include date timezone metadata, precision, complete
+tables, and unchanged inputs. The implementation retains resolved offsets and
+zone identity; it does not infer named zones from offsets or perform timezone
+database lookups. Arbitrary timezone-object classes and complete parity remain
+unproven.
 
 
 ## Basic random-tree generation evidence

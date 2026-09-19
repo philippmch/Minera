@@ -1,4 +1,4 @@
-// Public artifact SHA256: 9911beb8f4a011f7290b095bff6275ebf4355541c88dc27ce314f2631ff38d68
+// Public artifact SHA256: 7d00363d7fe3f03c09eb0075e87f33b0b928d25aa617f5c755aa8cfe98fd971f
 #include "minera/conformance.hpp"
 #include "minera/log_conversion.hpp"
 #pragma once
@@ -161,10 +161,254 @@ inline void check_replay_table(const std::string& name, const EventTable& actual
     const auto* date=std::get_if<NativeDate>(&expected.rows[i][j]->typed_value);
     if (!date) continue;
     const auto* observed=actual.rows[i][j] ? std::get_if<NativeDate>(&actual.rows[i][j]->typed_value) : nullptr;
-    if (!observed || observed->resolution != date->resolution) throw std::runtime_error(name + ": date precision differs");
+    if (!observed || observed->resolution != date->resolution || observed->timezone != date->timezone) throw std::runtime_error(name + ": date metadata differs");
   }
 }
 inline void check_replay_dataframe_0() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{reference_date("case:concept:name", "2024-01-01T00:00:00+01:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
+{reference_date("case:concept:name", "2024-07-01T00:00:00+02:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
+  input.dtypes = {"object", "str", "datetime64[us, UTC]"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{reference_date("case:concept:name", "2024-01-01T00:00:00+01:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
+{reference_date("case:concept:name", "2024-07-01T00:00:00+02:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
+  expected_input.dtypes = {"object", "str", "datetime64[us, UTC]"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
+  TokenReplayOptions options;
+  EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
+{reference_date("case_id", "2024-01-01T00:00:00+01:00"), dtype_number("is_fit", true), dtype_number("trace_fitness", double{1.0}), dtype_number("missing", std::int64_t{0}), dtype_number("remaining", std::int64_t{0}), dtype_number("produced", std::int64_t{2}), dtype_number("consumed", std::int64_t{2})},
+{reference_date("case_id", "2024-07-01T00:00:00+02:00"), dtype_number("is_fit", true), dtype_number("trace_fitness", double{1.0}), dtype_number("missing", std::int64_t{0}), dtype_number("remaining", std::int64_t{0}), dtype_number("produced", std::int64_t{2}), dtype_number("consumed", std::int64_t{2})}}};
+  expected.dtypes = {"datetime64[us, Europe/Berlin]", "bool", "float64", "int64", "int64", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {};
+  std::get<NativeDate>(expected.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected.rows[1][0]->typed_value).timezone = "Europe/Berlin";
+  check_replay_table("date_berlin_dst", replay_dataframe_diagnostics(input,net,options), expected);
+  const auto converted = event_table_to_event_log(input);
+  if (converted.traces.size() != 2) throw std::runtime_error("date_berlin_dst: conversion group count differs");
+  { std::vector<std::string> activities; for (const auto& event : converted.traces[0].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"A"}) throw std::runtime_error("date_berlin_dst: converted membership differs"); }
+  { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_berlin_dst: converted membership differs"); }
+  check_replay_table("date_berlin_dst: input after", input, expected_input);
+}
+inline void check_replay_dataframe_1() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{reference_date("case:concept:name", "2024-01-01T00:00:00+01:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
+{reference_date("case:concept:name", "2024-01-02T00:00:00+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
+  input.dtypes = {"object", "str", "datetime64[us, UTC]"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][0]->typed_value).timezone = "Europe/Paris";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{reference_date("case:concept:name", "2024-01-01T00:00:00+01:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
+{reference_date("case:concept:name", "2024-01-02T00:00:00+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
+  expected_input.dtypes = {"object", "str", "datetime64[us, UTC]"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).timezone = "Europe/Paris";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
+  TokenReplayOptions options;
+  EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
+{reference_date("case_id", "2024-01-01T00:00:00+01:00"), dtype_number("is_fit", true), dtype_number("trace_fitness", double{1.0}), dtype_number("missing", std::int64_t{0}), dtype_number("remaining", std::int64_t{0}), dtype_number("produced", std::int64_t{2}), dtype_number("consumed", std::int64_t{2})},
+{reference_date("case_id", "2024-01-02T00:00:00+01:00"), dtype_number("is_fit", true), dtype_number("trace_fitness", double{1.0}), dtype_number("missing", std::int64_t{0}), dtype_number("remaining", std::int64_t{0}), dtype_number("produced", std::int64_t{2}), dtype_number("consumed", std::int64_t{2})}}};
+  expected.dtypes = {"object", "bool", "float64", "int64", "int64", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {};
+  std::get<NativeDate>(expected.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected.rows[1][0]->typed_value).timezone = "Europe/Paris";
+  check_replay_table("date_named_same_offset", replay_dataframe_diagnostics(input,net,options), expected);
+  const auto converted = event_table_to_event_log(input);
+  if (converted.traces.size() != 2) throw std::runtime_error("date_named_same_offset: conversion group count differs");
+  { std::vector<std::string> activities; for (const auto& event : converted.traces[0].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"A"}) throw std::runtime_error("date_named_same_offset: converted membership differs"); }
+  { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_named_same_offset: converted membership differs"); }
+  check_replay_table("date_named_same_offset: input after", input, expected_input);
+}
+inline void check_replay_dataframe_2() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{reference_date("case:concept:name", "2024-01-01T00:00:00+01:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
+{reference_date("case:concept:name", "2023-12-31T23:00:00+00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
+  input.dtypes = {"object", "str", "datetime64[us, UTC]"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{reference_date("case:concept:name", "2024-01-01T00:00:00+01:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
+{reference_date("case:concept:name", "2023-12-31T23:00:00+00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
+  expected_input.dtypes = {"object", "str", "datetime64[us, UTC]"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
+  TokenReplayOptions options;
+  EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
+{reference_date("case_id", "2024-01-01T00:00:00+01:00"), dtype_number("is_fit", true), dtype_number("trace_fitness", double{1.0}), dtype_number("missing", std::int64_t{0}), dtype_number("remaining", std::int64_t{0}), dtype_number("produced", std::int64_t{3}), dtype_number("consumed", std::int64_t{3})}}};
+  expected.dtypes = {"datetime64[us, Europe/Berlin]", "bool", "float64", "int64", "int64", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
+  expected.metadata.properties = {};
+  std::get<NativeDate>(expected.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  check_replay_table("date_named_equal_instant", replay_dataframe_diagnostics(input,net,options), expected);
+  const auto converted = event_table_to_event_log(input);
+  if (converted.traces.size() != 1) throw std::runtime_error("date_named_equal_instant: conversion group count differs");
+  { std::vector<std::string> activities; for (const auto& event : converted.traces[0].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"A","B"}) throw std::runtime_error("date_named_equal_instant: converted membership differs"); }
+  check_replay_table("date_named_equal_instant: input after", input, expected_input);
+}
+inline void check_replay_dataframe_3() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{reference_date("case:concept:name", "2023-12-31T23:00:00+00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
+{reference_date("case:concept:name", "2024-01-01T00:00:00+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
+  input.dtypes = {"object", "str", "datetime64[us, UTC]"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{reference_date("case:concept:name", "2023-12-31T23:00:00+00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
+{reference_date("case:concept:name", "2024-01-01T00:00:00+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
+  expected_input.dtypes = {"object", "str", "datetime64[us, UTC]"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
+  TokenReplayOptions options;
+  EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
+{reference_date("case_id", "2023-12-31T23:00:00+00:00"), dtype_number("is_fit", true), dtype_number("trace_fitness", double{1.0}), dtype_number("missing", std::int64_t{0}), dtype_number("remaining", std::int64_t{0}), dtype_number("produced", std::int64_t{3}), dtype_number("consumed", std::int64_t{3})}}};
+  expected.dtypes = {"datetime64[us, UTC]", "bool", "float64", "int64", "int64", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
+  expected.metadata.properties = {};
+  std::get<NativeDate>(expected.rows[0][0]->typed_value).timezone = "UTC";
+  check_replay_table("date_named_equal_utc_first", replay_dataframe_diagnostics(input,net,options), expected);
+  const auto converted = event_table_to_event_log(input);
+  if (converted.traces.size() != 1) throw std::runtime_error("date_named_equal_utc_first: conversion group count differs");
+  { std::vector<std::string> activities; for (const auto& event : converted.traces[0].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"A","B"}) throw std::runtime_error("date_named_equal_utc_first: converted membership differs"); }
+  check_replay_table("date_named_equal_utc_first: input after", input, expected_input);
+}
+inline void check_replay_dataframe_4() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{reference_date("case:concept:name", "2024-01-01T00:00:00+01:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
+{reference_date("case:concept:name", "2024-07-01T00:00:00+02:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
+  input.dtypes = {"object", "str", "datetime64[us, UTC]"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(input.rows[1][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{reference_date("case:concept:name", "2024-01-01T00:00:00+01:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
+{reference_date("case:concept:name", "2024-07-01T00:00:00+02:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
+  expected_input.dtypes = {"object", "str", "datetime64[us, UTC]"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
+  TokenReplayOptions options;
+  EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
+{reference_date("case_id", "2024-01-01T00:00:00+01:00"), dtype_number("is_fit", true), dtype_number("trace_fitness", double{1.0}), dtype_number("missing", std::int64_t{0}), dtype_number("remaining", std::int64_t{0}), dtype_number("produced", std::int64_t{2}), dtype_number("consumed", std::int64_t{2})},
+{reference_date("case_id", "2024-07-01T00:00:00+02:00"), dtype_number("is_fit", true), dtype_number("trace_fitness", double{1.0}), dtype_number("missing", std::int64_t{0}), dtype_number("remaining", std::int64_t{0}), dtype_number("produced", std::int64_t{2}), dtype_number("consumed", std::int64_t{2})}}};
+  expected.dtypes = {"datetime64[ns, Europe/Berlin]", "bool", "float64", "int64", "int64", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {};
+  std::get<NativeDate>(expected.rows[0][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected.rows[1][0]->typed_value).timezone = "Europe/Berlin";
+  check_replay_table("date_named_mixed_precision", replay_dataframe_diagnostics(input,net,options), expected);
+  const auto converted = event_table_to_event_log(input);
+  if (converted.traces.size() != 2) throw std::runtime_error("date_named_mixed_precision: conversion group count differs");
+  { std::vector<std::string> activities; for (const auto& event : converted.traces[0].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"A"}) throw std::runtime_error("date_named_mixed_precision: converted membership differs"); }
+  { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_named_mixed_precision: converted membership differs"); }
+  check_replay_table("date_named_mixed_precision: input after", input, expected_input);
+}
+inline void check_replay_dataframe_5() {
+  EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{reference_date("case:concept:name", "2024-10-27T02:30:00+02:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
+{reference_date("case:concept:name", "2024-10-27T02:30:00+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
+  input.dtypes = {"object", "str", "datetime64[us, UTC]"};
+  input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
+{reference_date("case:concept:name", "2024-10-27T02:30:00+02:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
+{reference_date("case:concept:name", "2024-10-27T02:30:00+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
+  expected_input.dtypes = {"object", "str", "datetime64[us, UTC]"};
+  expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
+  expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
+  TokenReplayOptions options;
+  EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
+{reference_date("case_id", "2024-10-27T02:30:00+02:00"), dtype_number("is_fit", true), dtype_number("trace_fitness", double{1.0}), dtype_number("missing", std::int64_t{0}), dtype_number("remaining", std::int64_t{0}), dtype_number("produced", std::int64_t{2}), dtype_number("consumed", std::int64_t{2})},
+{reference_date("case_id", "2024-10-27T02:30:00+01:00"), dtype_number("is_fit", true), dtype_number("trace_fitness", double{1.0}), dtype_number("missing", std::int64_t{0}), dtype_number("remaining", std::int64_t{0}), dtype_number("produced", std::int64_t{2}), dtype_number("consumed", std::int64_t{2})}}};
+  expected.dtypes = {"datetime64[us, Europe/Berlin]", "bool", "float64", "int64", "int64", "int64", "int64"};
+  expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+  expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
+  expected.metadata.properties = {};
+  std::get<NativeDate>(expected.rows[0][0]->typed_value).timezone = "Europe/Berlin";
+  std::get<NativeDate>(expected.rows[1][0]->typed_value).timezone = "Europe/Berlin";
+  check_replay_table("date_named_fold", replay_dataframe_diagnostics(input,net,options), expected);
+  const auto converted = event_table_to_event_log(input);
+  if (converted.traces.size() != 2) throw std::runtime_error("date_named_fold: conversion group count differs");
+  { std::vector<std::string> activities; for (const auto& event : converted.traces[0].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"A"}) throw std::runtime_error("date_named_fold: converted membership differs"); }
+  { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_named_fold: converted membership differs"); }
+  check_replay_table("date_named_fold: input after", input, expected_input);
+}
+inline void check_replay_dataframe_6() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-02T00:00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -173,6 +417,9 @@ inline void check_replay_dataframe_0() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-02T00:00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -181,6 +428,9 @@ inline void check_replay_dataframe_0() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -197,7 +447,7 @@ inline void check_replay_dataframe_0() {
   { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_naive: converted membership differs"); }
   check_replay_table("date_naive: input after", input, expected_input);
 }
-inline void check_replay_dataframe_1() {
+inline void check_replay_dataframe_7() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-02T00:00:00+00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T00:00:00+00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -205,6 +455,10 @@ inline void check_replay_dataframe_1() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-02T00:00:00+00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T00:00:00+00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -212,6 +466,10 @@ inline void check_replay_dataframe_1() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -221,6 +479,8 @@ inline void check_replay_dataframe_1() {
   expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
   expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected.metadata.properties = {};
+  std::get<NativeDate>(expected.rows[0][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected.rows[1][0]->typed_value).timezone = "UTC";
   check_replay_table("date_utc", replay_dataframe_diagnostics(input,net,options), expected);
   const auto converted = event_table_to_event_log(input);
   if (converted.traces.size() != 2) throw std::runtime_error("date_utc: conversion group count differs");
@@ -228,7 +488,7 @@ inline void check_replay_dataframe_1() {
   { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_utc: converted membership differs"); }
   check_replay_table("date_utc: input after", input, expected_input);
 }
-inline void check_replay_dataframe_2() {
+inline void check_replay_dataframe_8() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00+00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T01:00:00+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -236,6 +496,10 @@ inline void check_replay_dataframe_2() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][0]->typed_value).timezone = "UTC+01:00";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00+00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T01:00:00+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -243,6 +507,10 @@ inline void check_replay_dataframe_2() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).timezone = "UTC+01:00";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -251,13 +519,14 @@ inline void check_replay_dataframe_2() {
   expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
   expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
   expected.metadata.properties = {};
+  std::get<NativeDate>(expected.rows[0][0]->typed_value).timezone = "UTC";
   check_replay_table("date_same_instant_offsets", replay_dataframe_diagnostics(input,net,options), expected);
   const auto converted = event_table_to_event_log(input);
   if (converted.traces.size() != 1) throw std::runtime_error("date_same_instant_offsets: conversion group count differs");
   { std::vector<std::string> activities; for (const auto& event : converted.traces[0].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"A","B"}) throw std::runtime_error("date_same_instant_offsets: converted membership differs"); }
   check_replay_table("date_same_instant_offsets: input after", input, expected_input);
 }
-inline void check_replay_dataframe_3() {
+inline void check_replay_dataframe_9() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00+00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-02T01:00:00+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -265,6 +534,10 @@ inline void check_replay_dataframe_3() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][0]->typed_value).timezone = "UTC+01:00";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00+00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-02T01:00:00+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -272,6 +545,10 @@ inline void check_replay_dataframe_3() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).timezone = "UTC+01:00";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -281,6 +558,8 @@ inline void check_replay_dataframe_3() {
   expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
   expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected.metadata.properties = {};
+  std::get<NativeDate>(expected.rows[0][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected.rows[1][0]->typed_value).timezone = "UTC+01:00";
   check_replay_table("date_mixed_offsets", replay_dataframe_diagnostics(input,net,options), expected);
   const auto converted = event_table_to_event_log(input);
   if (converted.traces.size() != 2) throw std::runtime_error("date_mixed_offsets: conversion group count differs");
@@ -288,7 +567,7 @@ inline void check_replay_dataframe_3() {
   { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_mixed_offsets: converted membership differs"); }
   check_replay_table("date_mixed_offsets: input after", input, expected_input);
 }
-inline void check_replay_dataframe_4() {
+inline void check_replay_dataframe_10() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T00:00:00+00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -296,6 +575,9 @@ inline void check_replay_dataframe_4() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T00:00:00+00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -303,6 +585,9 @@ inline void check_replay_dataframe_4() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -312,6 +597,7 @@ inline void check_replay_dataframe_4() {
   expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
   expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected.metadata.properties = {};
+  std::get<NativeDate>(expected.rows[1][0]->typed_value).timezone = "UTC";
   check_replay_table("date_mixed_naive_aware", replay_dataframe_diagnostics(input,net,options), expected);
   const auto converted = event_table_to_event_log(input);
   if (converted.traces.size() != 2) throw std::runtime_error("date_mixed_naive_aware: conversion group count differs");
@@ -319,7 +605,7 @@ inline void check_replay_dataframe_4() {
   { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_mixed_naive_aware: converted membership differs"); }
   check_replay_table("date_mixed_naive_aware: input after", input, expected_input);
 }
-inline void check_replay_dataframe_5() {
+inline void check_replay_dataframe_11() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "2024-01-01", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -327,6 +613,8 @@ inline void check_replay_dataframe_5() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "2024-01-01", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -334,6 +622,8 @@ inline void check_replay_dataframe_5() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -350,7 +640,7 @@ inline void check_replay_dataframe_5() {
   { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_mixed_string: converted membership differs"); }
   check_replay_table("date_mixed_string: input after", input, expected_input);
 }
-inline void check_replay_dataframe_6() {
+inline void check_replay_dataframe_12() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00.000000001"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T00:00:00.000000002"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -359,7 +649,9 @@ inline void check_replay_dataframe_6() {
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
   std::get<NativeDate>(input.rows[0][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
   std::get<NativeDate>(input.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00.000000001"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T00:00:00.000000002"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -368,7 +660,9 @@ inline void check_replay_dataframe_6() {
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
   std::get<NativeDate>(expected_input.rows[0][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
   std::get<NativeDate>(expected_input.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -387,7 +681,7 @@ inline void check_replay_dataframe_6() {
   { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_nanoseconds: converted membership differs"); }
   check_replay_table("date_nanoseconds: input after", input, expected_input);
 }
-inline void check_replay_dataframe_7() {
+inline void check_replay_dataframe_13() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-02T00:00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -395,7 +689,9 @@ inline void check_replay_dataframe_7() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
   std::get<NativeDate>(input.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-02T00:00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -403,7 +699,9 @@ inline void check_replay_dataframe_7() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
   std::get<NativeDate>(expected_input.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -422,7 +720,7 @@ inline void check_replay_dataframe_7() {
   { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_mixed_precision: converted membership differs"); }
   check_replay_table("date_mixed_precision: input after", input, expected_input);
 }
-inline void check_replay_dataframe_8() {
+inline void check_replay_dataframe_14() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "1969-12-31T23:59:59.999999999"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "1970-01-01T00:00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -431,6 +729,8 @@ inline void check_replay_dataframe_8() {
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
   std::get<NativeDate>(input.rows[0][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "1969-12-31T23:59:59.999999999"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "1970-01-01T00:00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -439,6 +739,8 @@ inline void check_replay_dataframe_8() {
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
   std::get<NativeDate>(expected_input.rows[0][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -457,7 +759,7 @@ inline void check_replay_dataframe_8() {
   { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_pre_epoch: converted membership differs"); }
   check_replay_table("date_pre_epoch: input after", input, expected_input);
 }
-inline void check_replay_dataframe_9() {
+inline void check_replay_dataframe_15() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00.000000001+00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T01:00:00.000000001+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -466,7 +768,11 @@ inline void check_replay_dataframe_9() {
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
   std::get<NativeDate>(input.rows[0][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(input.rows[0][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
   std::get<NativeDate>(input.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(input.rows[1][0]->typed_value).timezone = "UTC+01:00";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00.000000001+00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T01:00:00.000000001+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -475,7 +781,11 @@ inline void check_replay_dataframe_9() {
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
   std::get<NativeDate>(expected_input.rows[0][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected_input.rows[0][0]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
   std::get<NativeDate>(expected_input.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).timezone = "UTC+01:00";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -485,13 +795,14 @@ inline void check_replay_dataframe_9() {
   expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
   expected.metadata.properties = {};
   std::get<NativeDate>(expected.rows[0][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected.rows[0][0]->typed_value).timezone = "UTC";
   check_replay_table("date_offset_nanoseconds_equal", replay_dataframe_diagnostics(input,net,options), expected);
   const auto converted = event_table_to_event_log(input);
   if (converted.traces.size() != 1) throw std::runtime_error("date_offset_nanoseconds_equal: conversion group count differs");
   { std::vector<std::string> activities; for (const auto& event : converted.traces[0].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"A","B"}) throw std::runtime_error("date_offset_nanoseconds_equal: converted membership differs"); }
   check_replay_table("date_offset_nanoseconds_equal: input after", input, expected_input);
 }
-inline void check_replay_dataframe_10() {
+inline void check_replay_dataframe_16() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -499,7 +810,9 @@ inline void check_replay_dataframe_10() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
   std::get<NativeDate>(input.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -507,7 +820,9 @@ inline void check_replay_dataframe_10() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
   std::get<NativeDate>(expected_input.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -522,7 +837,7 @@ inline void check_replay_dataframe_10() {
   { std::vector<std::string> activities; for (const auto& event : converted.traces[0].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"A","B"}) throw std::runtime_error("date_equal_mixed_precision: converted membership differs"); }
   check_replay_table("date_equal_mixed_precision: input after", input, expected_input);
 }
-inline void check_replay_dataframe_11() {
+inline void check_replay_dataframe_17() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-02T00:00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -531,7 +846,9 @@ inline void check_replay_dataframe_11() {
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
   std::get<NativeDate>(input.rows[0][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
   std::get<NativeDate>(input.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-02T00:00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -540,7 +857,9 @@ inline void check_replay_dataframe_11() {
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
   std::get<NativeDate>(expected_input.rows[0][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
   std::get<NativeDate>(expected_input.rows[1][0]->typed_value).resolution = NativeDateResolution::kNanosecond;
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -559,7 +878,7 @@ inline void check_replay_dataframe_11() {
   { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_ns_whole: converted membership differs"); }
   check_replay_table("date_ns_whole: input after", input, expected_input);
 }
-inline void check_replay_dataframe_12() {
+inline void check_replay_dataframe_18() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T01:00:00+01:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-02T01:00:00+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -567,6 +886,10 @@ inline void check_replay_dataframe_12() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][0]->typed_value).timezone = "UTC+01:00";
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][0]->typed_value).timezone = "UTC+01:00";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_date("case:concept:name", "2024-01-01T01:00:00+01:00"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-02T01:00:00+01:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -574,6 +897,10 @@ inline void check_replay_dataframe_12() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][0]->typed_value).timezone = "UTC+01:00";
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][0]->typed_value).timezone = "UTC+01:00";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -583,6 +910,8 @@ inline void check_replay_dataframe_12() {
   expected.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
   expected.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected.metadata.properties = {};
+  std::get<NativeDate>(expected.rows[0][0]->typed_value).timezone = "UTC+01:00";
+  std::get<NativeDate>(expected.rows[1][0]->typed_value).timezone = "UTC+01:00";
   check_replay_table("date_fixed_offset", replay_dataframe_diagnostics(input,net,options), expected);
   const auto converted = event_table_to_event_log(input);
   if (converted.traces.size() != 2) throw std::runtime_error("date_fixed_offset: conversion group count differs");
@@ -590,7 +919,7 @@ inline void check_replay_dataframe_12() {
   { std::vector<std::string> activities; for (const auto& event : converted.traces[1].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"B"}) throw std::runtime_error("date_fixed_offset: converted membership differs"); }
   check_replay_table("date_fixed_offset: input after", input, expected_input);
 }
-inline void check_replay_dataframe_13() {
+inline void check_replay_dataframe_19() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_null("case:concept:name"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -598,6 +927,8 @@ inline void check_replay_dataframe_13() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_null("case:concept:name"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_date("case:concept:name", "2024-01-01T00:00:00"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -605,13 +936,15 @@ inline void check_replay_dataframe_13() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   std::string error; try { (void)replay_dataframe_diagnostics(input,net,options); } catch (const std::exception& caught) { error=caught.what(); }
   if (error != "the case ID column should not contain any empty value.") throw std::runtime_error("date_nat: rejection differs");
   check_replay_table("date_nat: input after", input, expected_input);
 }
-inline void check_replay_dataframe_14() {
+inline void check_replay_dataframe_20() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 }};
   input.dtypes = {"object", "float64", "datetime64[s, UTC]"};
@@ -630,7 +963,7 @@ inline void check_replay_dataframe_14() {
   if (error != "the dataframe should (at least) contain a column of type string for the case identifier and a column of type string for the activity.") throw std::runtime_error("empty: rejection differs");
   check_replay_table("empty: input after", input, expected_input);
 }
-inline void check_replay_dataframe_15() {
+inline void check_replay_dataframe_21() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 }};
   input.dtypes = {"object", "str", "datetime64[s, UTC]"};
@@ -654,7 +987,7 @@ inline void check_replay_dataframe_15() {
   check_replay_table("typed_empty", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("typed_empty: input after", input, expected_input);
 }
-inline void check_replay_dataframe_16() {
+inline void check_replay_dataframe_22() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "z", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "a", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -664,6 +997,10 @@ inline void check_replay_dataframe_16() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   input.metadata.properties = {EventAttribute{"example", "not propagated", AttributeKind::kString}};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[3][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "z", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "a", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -673,6 +1010,10 @@ inline void check_replay_dataframe_16() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   expected_input.metadata.properties = {EventAttribute{"example", "not propagated", AttributeKind::kString}};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[3][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -686,7 +1027,7 @@ inline void check_replay_dataframe_16() {
   check_replay_table("strings_source_order", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("strings_source_order: input after", input, expected_input);
 }
-inline void check_replay_dataframe_17() {
+inline void check_replay_dataframe_23() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", true), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", false), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -695,6 +1036,9 @@ inline void check_replay_dataframe_17() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", true), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", false), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -703,6 +1047,9 @@ inline void check_replay_dataframe_17() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -715,7 +1062,7 @@ inline void check_replay_dataframe_17() {
   check_replay_table("booleans", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("booleans: input after", input, expected_input);
 }
-inline void check_replay_dataframe_18() {
+inline void check_replay_dataframe_24() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "x", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -724,6 +1071,9 @@ inline void check_replay_dataframe_18() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "x", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -732,6 +1082,9 @@ inline void check_replay_dataframe_18() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -744,7 +1097,7 @@ inline void check_replay_dataframe_18() {
   check_replay_table("empty_strings", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("empty_strings: input after", input, expected_input);
 }
-inline void check_replay_dataframe_19() {
+inline void check_replay_dataframe_25() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", double{9.223372036854776e+18}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9223372036854775807}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -752,6 +1105,8 @@ inline void check_replay_dataframe_19() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", double{9.223372036854776e+18}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9223372036854775807}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -759,6 +1114,8 @@ inline void check_replay_dataframe_19() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -771,7 +1128,7 @@ inline void check_replay_dataframe_19() {
   check_replay_table("upper", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("upper: input after", input, expected_input);
 }
-inline void check_replay_dataframe_20() {
+inline void check_replay_dataframe_26() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9223372036854775807}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{9.223372036854776e+18}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -779,6 +1136,8 @@ inline void check_replay_dataframe_20() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9223372036854775807}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{9.223372036854776e+18}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -786,6 +1145,8 @@ inline void check_replay_dataframe_20() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -798,7 +1159,7 @@ inline void check_replay_dataframe_20() {
   check_replay_table("upper_reverse", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("upper_reverse: input after", input, expected_input);
 }
-inline void check_replay_dataframe_21() {
+inline void check_replay_dataframe_27() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -807,6 +1168,9 @@ inline void check_replay_dataframe_21() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -815,6 +1179,9 @@ inline void check_replay_dataframe_21() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -827,7 +1194,7 @@ inline void check_replay_dataframe_21() {
   check_replay_table("wide", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("wide: input after", input, expected_input);
 }
-inline void check_replay_dataframe_22() {
+inline void check_replay_dataframe_28() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", double{9007199254740992.0}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -836,6 +1203,9 @@ inline void check_replay_dataframe_22() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", double{9007199254740992.0}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -844,6 +1214,9 @@ inline void check_replay_dataframe_22() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -856,7 +1229,7 @@ inline void check_replay_dataframe_22() {
   check_replay_table("wide_float_first", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("wide_float_first: input after", input, expected_input);
 }
-inline void check_replay_dataframe_23() {
+inline void check_replay_dataframe_29() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -864,6 +1237,8 @@ inline void check_replay_dataframe_23() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -871,6 +1246,8 @@ inline void check_replay_dataframe_23() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -883,7 +1260,7 @@ inline void check_replay_dataframe_23() {
   check_replay_table("wide_only_int", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("wide_only_int: input after", input, expected_input);
 }
-inline void check_replay_dataframe_24() {
+inline void check_replay_dataframe_30() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -892,6 +1269,9 @@ inline void check_replay_dataframe_24() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -900,6 +1280,9 @@ inline void check_replay_dataframe_24() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -913,7 +1296,7 @@ inline void check_replay_dataframe_24() {
   check_replay_table("wide_float_unrelated", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("wide_float_unrelated: input after", input, expected_input);
 }
-inline void check_replay_dataframe_25() {
+inline void check_replay_dataframe_31() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{-9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{-9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -922,6 +1305,9 @@ inline void check_replay_dataframe_25() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{-9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{-9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -930,6 +1316,9 @@ inline void check_replay_dataframe_25() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -943,7 +1332,7 @@ inline void check_replay_dataframe_25() {
   check_replay_table("negative", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("negative: input after", input, expected_input);
 }
-inline void check_replay_dataframe_26() {
+inline void check_replay_dataframe_32() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_number("case:concept:name", std::uint64_t{18446744073709551615ULL}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_number("case:concept:name", std::uint64_t{18446744073709551614ULL}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -951,6 +1340,8 @@ inline void check_replay_dataframe_26() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_number("case:concept:name", std::uint64_t{18446744073709551615ULL}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_number("case:concept:name", std::uint64_t{18446744073709551614ULL}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -958,6 +1349,8 @@ inline void check_replay_dataframe_26() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -970,7 +1363,7 @@ inline void check_replay_dataframe_26() {
   check_replay_table("uint_only", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("uint_only: input after", input, expected_input);
 }
-inline void check_replay_dataframe_27() {
+inline void check_replay_dataframe_33() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_number("case:concept:name", std::uint64_t{18446744073709551615ULL}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_number("case:concept:name", std::uint64_t{18446744073709551614ULL}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -979,6 +1372,9 @@ inline void check_replay_dataframe_27() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_number("case:concept:name", std::uint64_t{18446744073709551615ULL}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_number("case:concept:name", std::uint64_t{18446744073709551614ULL}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -987,6 +1383,9 @@ inline void check_replay_dataframe_27() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1000,7 +1399,7 @@ inline void check_replay_dataframe_27() {
   check_replay_table("uint_float", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("uint_float: input after", input, expected_input);
 }
-inline void check_replay_dataframe_28() {
+inline void check_replay_dataframe_34() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1010,6 +1409,10 @@ inline void check_replay_dataframe_28() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[3][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1019,6 +1422,10 @@ inline void check_replay_dataframe_28() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[3][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1033,7 +1440,7 @@ inline void check_replay_dataframe_28() {
   check_replay_table("bool_suppresses", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("bool_suppresses: input after", input, expected_input);
 }
-inline void check_replay_dataframe_29() {
+inline void check_replay_dataframe_35() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1043,6 +1450,10 @@ inline void check_replay_dataframe_29() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[3][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1052,6 +1463,10 @@ inline void check_replay_dataframe_29() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[3][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1066,7 +1481,7 @@ inline void check_replay_dataframe_29() {
   check_replay_table("string_suppresses", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("string_suppresses: input after", input, expected_input);
 }
-inline void check_replay_dataframe_30() {
+inline void check_replay_dataframe_36() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", double{9.223372036854776e+18}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9223372036854775807}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1076,6 +1491,10 @@ inline void check_replay_dataframe_30() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[3][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", double{9.223372036854776e+18}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9223372036854775807}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1085,6 +1504,10 @@ inline void check_replay_dataframe_30() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[3][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1097,7 +1520,7 @@ inline void check_replay_dataframe_30() {
   check_replay_table("upper_repeat", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("upper_repeat: input after", input, expected_input);
 }
-inline void check_replay_dataframe_31() {
+inline void check_replay_dataframe_37() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{-1}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_number("case:concept:name", std::uint64_t{18446744073709551615ULL}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1106,6 +1529,9 @@ inline void check_replay_dataframe_31() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{-1}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_number("case:concept:name", std::uint64_t{18446744073709551615ULL}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1114,6 +1540,9 @@ inline void check_replay_dataframe_31() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1127,7 +1556,7 @@ inline void check_replay_dataframe_31() {
   check_replay_table("signed_unsigned", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("signed_unsigned: input after", input, expected_input);
 }
-inline void check_replay_dataframe_32() {
+inline void check_replay_dataframe_38() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", true), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{1.0}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1138,6 +1567,11 @@ inline void check_replay_dataframe_32() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[3][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[4][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", true), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{1.0}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1148,6 +1582,11 @@ inline void check_replay_dataframe_32() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[3][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[4][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1162,7 +1601,7 @@ inline void check_replay_dataframe_32() {
   check_replay_table("bool_first", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("bool_first: input after", input, expected_input);
 }
-inline void check_replay_dataframe_33() {
+inline void check_replay_dataframe_39() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", double{1.0}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", true), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1173,6 +1612,11 @@ inline void check_replay_dataframe_33() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[3][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[4][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", double{1.0}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", true), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1183,6 +1627,11 @@ inline void check_replay_dataframe_33() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}, EventTableIndexLabel{reference_number("", std::int64_t{4})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[3][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[4][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1197,7 +1646,7 @@ inline void check_replay_dataframe_33() {
   check_replay_table("float_before_bool", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("float_before_bool: input after", input, expected_input);
 }
-inline void check_replay_dataframe_34() {
+inline void check_replay_dataframe_40() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{1}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{1.0}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1207,6 +1656,10 @@ inline void check_replay_dataframe_34() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[3][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{1}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{1.0}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1216,6 +1669,10 @@ inline void check_replay_dataframe_34() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[3][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1229,7 +1686,7 @@ inline void check_replay_dataframe_34() {
   check_replay_table("int_before_float", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("int_before_float: input after", input, expected_input);
 }
-inline void check_replay_dataframe_35() {
+inline void check_replay_dataframe_41() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_null("case:concept:name"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{1}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1239,6 +1696,10 @@ inline void check_replay_dataframe_35() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[3][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_null("case:concept:name"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{1}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1248,13 +1709,17 @@ inline void check_replay_dataframe_35() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[3][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   std::string error; try { (void)replay_dataframe_diagnostics(input,net,options); } catch (const std::exception& caught) { error=caught.what(); }
   if (error != "the case ID column should not contain any empty value.") throw std::runtime_error("nan_keys: rejection differs");
   check_replay_table("nan_keys: input after", input, expected_input);
 }
-inline void check_replay_dataframe_36() {
+inline void check_replay_dataframe_42() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_null("case:concept:name"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_null("case:concept:name"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1263,6 +1728,9 @@ inline void check_replay_dataframe_36() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_null("case:concept:name"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_null("case:concept:name"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1271,13 +1739,16 @@ inline void check_replay_dataframe_36() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   std::string error; try { (void)replay_dataframe_diagnostics(input,net,options); } catch (const std::exception& caught) { error=caught.what(); }
   if (error != "the case ID column should not contain any empty value.") throw std::runtime_error("none_keys: rejection differs");
   check_replay_table("none_keys: input after", input, expected_input);
 }
-inline void check_replay_dataframe_37() {
+inline void check_replay_dataframe_43() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::numeric_limits<double>::infinity()), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", -std::numeric_limits<double>::infinity()), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1287,6 +1758,10 @@ inline void check_replay_dataframe_37() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[3][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::numeric_limits<double>::infinity()), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", -std::numeric_limits<double>::infinity()), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1296,6 +1771,10 @@ inline void check_replay_dataframe_37() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[3][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1310,7 +1789,7 @@ inline void check_replay_dataframe_37() {
   check_replay_table("infinity", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("infinity: input after", input, expected_input);
 }
-inline void check_replay_dataframe_38() {
+inline void check_replay_dataframe_44() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", double{9007199254740992.0}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1320,6 +1799,10 @@ inline void check_replay_dataframe_38() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[3][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", double{9007199254740992.0}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1329,6 +1812,10 @@ inline void check_replay_dataframe_38() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}, EventTableIndexLabel{reference_number("", std::int64_t{3})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[3][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1341,7 +1828,7 @@ inline void check_replay_dataframe_38() {
   check_replay_table("float_first_wide_twice", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("float_first_wide_twice: input after", input, expected_input);
 }
-inline void check_replay_dataframe_39() {
+inline void check_replay_dataframe_45() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_null("case:concept:name"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_null("case:concept:name"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1349,6 +1836,8 @@ inline void check_replay_dataframe_39() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {reference_null("case:concept:name"), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {reference_null("case:concept:name"), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1356,13 +1845,15 @@ inline void check_replay_dataframe_39() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   std::string error; try { (void)replay_dataframe_diagnostics(input,net,options); } catch (const std::exception& caught) { error=caught.what(); }
   if (error != "the case ID column should not contain any empty value.") throw std::runtime_error("nan_only: rejection differs");
   check_replay_table("nan_only: input after", input, expected_input);
 }
-inline void check_replay_dataframe_40() {
+inline void check_replay_dataframe_46() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{1}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{1.0}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1370,6 +1861,8 @@ inline void check_replay_dataframe_40() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{1}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{1.0}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1377,6 +1870,8 @@ inline void check_replay_dataframe_40() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1388,7 +1883,7 @@ inline void check_replay_dataframe_40() {
   check_replay_table("prior_equal", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("prior_equal: input after", input, expected_input);
 }
-inline void check_replay_dataframe_41() {
+inline void check_replay_dataframe_47() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{9007199254740992.0}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1396,6 +1891,8 @@ inline void check_replay_dataframe_41() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{9007199254740992.0}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1403,6 +1900,8 @@ inline void check_replay_dataframe_41() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1414,7 +1913,7 @@ inline void check_replay_dataframe_41() {
   check_replay_table("prior_wide_equal", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("prior_wide_equal: input after", input, expected_input);
 }
-inline void check_replay_dataframe_42() {
+inline void check_replay_dataframe_48() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1422,6 +1921,8 @@ inline void check_replay_dataframe_42() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1429,6 +1930,8 @@ inline void check_replay_dataframe_42() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1441,7 +1944,7 @@ inline void check_replay_dataframe_42() {
   check_replay_table("prior_wide_distinct", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("prior_wide_distinct: input after", input, expected_input);
 }
-inline void check_replay_dataframe_43() {
+inline void check_replay_dataframe_49() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1450,6 +1953,9 @@ inline void check_replay_dataframe_43() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{9007199254740993}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9007199254740992}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1458,6 +1964,9 @@ inline void check_replay_dataframe_43() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1470,7 +1979,7 @@ inline void check_replay_dataframe_43() {
   check_replay_table("prior_wide_mixed", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("prior_wide_mixed: input after", input, expected_input);
 }
-inline void check_replay_dataframe_44() {
+inline void check_replay_dataframe_50() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", double{9.223372036854776e+18}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9223372036854775807}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1478,6 +1987,8 @@ inline void check_replay_dataframe_44() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", double{9.223372036854776e+18}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", std::int64_t{9223372036854775807}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1485,6 +1996,8 @@ inline void check_replay_dataframe_44() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1497,7 +2010,7 @@ inline void check_replay_dataframe_44() {
   check_replay_table("prior_upper", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("prior_upper: input after", input, expected_input);
 }
-inline void check_replay_dataframe_45() {
+inline void check_replay_dataframe_51() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{-1}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{-1.5}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1505,6 +2018,8 @@ inline void check_replay_dataframe_45() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{-1}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{-1.5}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1512,6 +2027,8 @@ inline void check_replay_dataframe_45() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1524,7 +2041,7 @@ inline void check_replay_dataframe_45() {
   check_replay_table("prior_small_fraction", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("prior_small_fraction: input after", input, expected_input);
 }
-inline void check_replay_dataframe_46() {
+inline void check_replay_dataframe_52() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{1}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{1.0}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1533,6 +2050,9 @@ inline void check_replay_dataframe_46() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {dtype_number("case:concept:name", std::int64_t{1}), EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {dtype_number("case:concept:name", double{1.0}), EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1541,6 +2061,9 @@ inline void check_replay_dataframe_46() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(); net.set_source(p); net.set_sink(p); net.set_activities({"A","B","C","D","E","F","G","H"}); for (std::size_t i=0;i<8;++i) net.add_transition(i,{p},{p});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1553,7 +2076,7 @@ inline void check_replay_dataframe_46() {
   check_replay_table("prior_string_mixed", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("prior_string_mixed: input after", input, expected_input);
 }
-inline void check_replay_dataframe_47() {
+inline void check_replay_dataframe_53() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1561,6 +2084,8 @@ inline void check_replay_dataframe_47() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1568,6 +2093,8 @@ inline void check_replay_dataframe_47() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(), q=net.add_place(), r=net.add_place(); net.set_source(p); net.set_sink(r); net.set_activities({"A","B"}); net.add_transition(0,{p},{q}); net.add_transition(1,{q},{r});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1579,19 +2106,21 @@ inline void check_replay_dataframe_47() {
   check_replay_table("linear_fit", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("linear_fit: input after", input, expected_input);
 }
-inline void check_replay_dataframe_48() {
+inline void check_replay_dataframe_54() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
   input.dtypes = {"str", "str", "datetime64[us, UTC]"};
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
   expected_input.dtypes = {"str", "str", "datetime64[us, UTC]"};
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(), q=net.add_place(), r=net.add_place(); net.set_source(p); net.set_sink(r); net.set_activities({"A","B"}); net.add_transition(0,{p},{q}); net.add_transition(1,{q},{r});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1603,19 +2132,21 @@ inline void check_replay_dataframe_48() {
   check_replay_table("linear_missing", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("linear_missing: input after", input, expected_input);
 }
-inline void check_replay_dataframe_49() {
+inline void check_replay_dataframe_55() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
   input.dtypes = {"str", "str", "datetime64[us, UTC]"};
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
   expected_input.dtypes = {"str", "str", "datetime64[us, UTC]"};
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(), q=net.add_place(), r=net.add_place(); net.set_source(p); net.set_sink(r); net.set_activities({"A","B"}); net.add_transition(0,{p},{q}); net.add_transition(1,{q},{r});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1627,7 +2158,7 @@ inline void check_replay_dataframe_49() {
   check_replay_table("linear_remaining", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("linear_remaining: input after", input, expected_input);
 }
-inline void check_replay_dataframe_50() {
+inline void check_replay_dataframe_56() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1635,6 +2166,8 @@ inline void check_replay_dataframe_50() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
@@ -1642,6 +2175,8 @@ inline void check_replay_dataframe_50() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(), q=net.add_place(), r=net.add_place(); net.set_source(p); net.set_sink(r); net.set_activities({"A","B"}); net.add_transition(0,{p},{q}); net.add_transition(1,{q},{r});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1653,19 +2188,21 @@ inline void check_replay_dataframe_50() {
   check_replay_table("linear_reverse", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("linear_reverse: input after", input, expected_input);
 }
-inline void check_replay_dataframe_51() {
+inline void check_replay_dataframe_57() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "X", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
   input.dtypes = {"str", "str", "datetime64[us, UTC]"};
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "X", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")}}};
   expected_input.dtypes = {"str", "str", "datetime64[us, UTC]"};
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(), q=net.add_place(), r=net.add_place(); net.set_source(p); net.set_sink(r); net.set_activities({"A","B"}); net.add_transition(0,{p},{q}); net.add_transition(1,{q},{r});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1677,7 +2214,7 @@ inline void check_replay_dataframe_51() {
   check_replay_table("linear_unknown", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("linear_unknown: input after", input, expected_input);
 }
-inline void check_replay_dataframe_52() {
+inline void check_replay_dataframe_58() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "X", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1686,6 +2223,9 @@ inline void check_replay_dataframe_52() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "c", AttributeKind::kString}, EventAttribute{"concept:name", "X", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1694,6 +2234,9 @@ inline void check_replay_dataframe_52() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(), q=net.add_place(), r=net.add_place(); net.set_source(p); net.set_sink(r); net.set_activities({"A","B"}); net.add_transition(0,{p},{q}); net.add_transition(1,{q},{r});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1705,7 +2248,7 @@ inline void check_replay_dataframe_52() {
   check_replay_table("linear_unknown_between", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("linear_unknown_between: input after", input, expected_input);
 }
-inline void check_replay_dataframe_53() {
+inline void check_replay_dataframe_59() {
   EventTable input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "z", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "a", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1714,6 +2257,9 @@ inline void check_replay_dataframe_53() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"case:concept:name", "concept:name", "time:timestamp"}, {
 {EventAttribute{"case:concept:name", "z", AttributeKind::kString}, EventAttribute{"concept:name", "A", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"case:concept:name", "a", AttributeKind::kString}, EventAttribute{"concept:name", "B", AttributeKind::kString}, reference_date("time:timestamp", "2024-01-01T00:00:00+00:00")},
@@ -1722,6 +2268,9 @@ inline void check_replay_dataframe_53() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(), q=net.add_place(), r=net.add_place(); net.set_source(p); net.set_sink(r); net.set_activities({"A","B"}); net.add_transition(0,{p},{q}); net.add_transition(1,{q},{r});
   TokenReplayOptions options;
   EventTable expected{{"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"}, {
@@ -1734,7 +2283,7 @@ inline void check_replay_dataframe_53() {
   check_replay_table("linear_source_order", replay_dataframe_diagnostics(input,net,options), expected);
   check_replay_table("linear_source_order: input after", input, expected_input);
 }
-inline void check_replay_dataframe_54() {
+inline void check_replay_dataframe_60() {
   EventTable input{{"ticket", "action", "completed"}, {
 {EventAttribute{"ticket", "z", AttributeKind::kString}, EventAttribute{"action", "A", AttributeKind::kString}, reference_date("completed", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"ticket", "a", AttributeKind::kString}, EventAttribute{"action", "B", AttributeKind::kString}, reference_date("completed", "2024-01-01T00:00:00+00:00")},
@@ -1743,6 +2292,9 @@ inline void check_replay_dataframe_54() {
   input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   input.metadata.properties = {};
+  std::get<NativeDate>(input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(input.rows[2][2]->typed_value).timezone = "UTC";
   EventTable expected_input{{"ticket", "action", "completed"}, {
 {EventAttribute{"ticket", "z", AttributeKind::kString}, EventAttribute{"action", "A", AttributeKind::kString}, reference_date("completed", "2024-01-01T00:00:00+00:00")},
 {EventAttribute{"ticket", "a", AttributeKind::kString}, EventAttribute{"action", "B", AttributeKind::kString}, reference_date("completed", "2024-01-01T00:00:00+00:00")},
@@ -1751,6 +2303,9 @@ inline void check_replay_dataframe_54() {
   expected_input.categorical_dtypes = {std::nullopt, std::nullopt, std::nullopt};
   expected_input.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {EventTableIndexLabel{reference_number("", std::int64_t{0})}, EventTableIndexLabel{reference_number("", std::int64_t{1})}, EventTableIndexLabel{reference_number("", std::int64_t{2})}}};
   expected_input.metadata.properties = {};
+  std::get<NativeDate>(expected_input.rows[0][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[1][2]->typed_value).timezone = "UTC";
+  std::get<NativeDate>(expected_input.rows[2][2]->typed_value).timezone = "UTC";
   PetriNet net; const auto p=net.add_place(), q=net.add_place(), r=net.add_place(); net.set_source(p); net.set_sink(r); net.set_activities({"A","B"}); net.add_transition(0,{p},{q}); net.add_transition(1,{q},{r});
   TokenReplayOptions options;
   options.case_id_attribute = "ticket";
@@ -1823,4 +2378,10 @@ inline void check_public_replay_dataframe_diagnostics() {
   replay_dataframe_reference::check_replay_dataframe_52();
   replay_dataframe_reference::check_replay_dataframe_53();
   replay_dataframe_reference::check_replay_dataframe_54();
+  replay_dataframe_reference::check_replay_dataframe_55();
+  replay_dataframe_reference::check_replay_dataframe_56();
+  replay_dataframe_reference::check_replay_dataframe_57();
+  replay_dataframe_reference::check_replay_dataframe_58();
+  replay_dataframe_reference::check_replay_dataframe_59();
+  replay_dataframe_reference::check_replay_dataframe_60();
 }

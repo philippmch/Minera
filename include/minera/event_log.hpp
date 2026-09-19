@@ -49,6 +49,10 @@ struct NativeDate {
   std::string value;
   // Source precision is transport metadata; value equality ignores it.
   NativeDateResolution resolution = NativeDateResolution::kMicrosecond;
+  // Optional named timezone identity carried by dataframe datetime columns.
+  // The lexical value remains authoritative for the resolved instant; this
+  // metadata is used only when projecting a homogeneous datetime dtype.
+  std::optional<std::string> timezone = std::nullopt;
 
   bool operator==(const NativeDate& other) const { return value == other.value; }
 };

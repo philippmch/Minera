@@ -11,8 +11,14 @@ import runpy
 FMT = runpy.run_path(
     str(Path(__file__).with_name("generate-format-dataframe-tests.py"))
 )
-DIGEST = "9911beb8f4a011f7290b095bff6275ebf4355541c88dc27ce314f2631ff38d68"
+DIGEST = "7d00363d7fe3f03c09eb0075e87f33b0b928d25aa617f5c755aa8cfe98fd971f"
 NAMES = (
+    "date_berlin_dst",
+    "date_named_same_offset",
+    "date_named_equal_instant",
+    "date_named_equal_utc_first",
+    "date_named_mixed_precision",
+    "date_named_fold",
     "date_naive",
     "date_utc",
     "date_same_instant_offsets",
@@ -83,6 +89,15 @@ def frame_code(name, frame):
                 ):
                     raise ValueError("Invalid date resolution metadata")
                 tag.pop("native_resolution")
+            if "native_timezone" in tag:
+                if (
+                    tag["kind"] != "date"
+                    or tag["missing"]
+                    or not isinstance(tag["native_timezone"], str)
+                    or not tag["native_timezone"]
+                ):
+                    raise ValueError("Invalid date timezone metadata")
+                tag.pop("native_timezone")
     out = FMT["frame_code"](name, transport)
     for row in frame["records"]:
         for column, label in enumerate(frame["columns"]):
@@ -96,6 +111,18 @@ def frame_code(name, frame):
                     + "]["
                     + str(column)
                     + "]->typed_value).resolution = NativeDateResolution::kNanosecond;\n"
+                )
+            if "native_timezone" in tag:
+                out += (
+                    "  std::get<NativeDate>("
+                    + name
+                    + ".rows["
+                    + str(row["position"])
+                    + "]["
+                    + str(column)
+                    + "]->typed_value).timezone = "
+                    + json.dumps(tag["native_timezone"])
+                    + ";\n"
                 )
     return out
 
@@ -120,7 +147,7 @@ def generate(raw):
             "namespace replay_dataframe_reference",
         )
     )
-    out += 'inline void check_replay_table(const std::string& name, const EventTable& actual, const EventTable& expected) {\n  check_format_table(name, actual, expected);\n  for (std::size_t i=0; i<expected.rows.size(); ++i) for (std::size_t j=0; j<expected.columns.size(); ++j) {\n    if (!expected.rows[i][j]) continue;\n    const auto* date=std::get_if<NativeDate>(&expected.rows[i][j]->typed_value);\n    if (!date) continue;\n    const auto* observed=actual.rows[i][j] ? std::get_if<NativeDate>(&actual.rows[i][j]->typed_value) : nullptr;\n    if (!observed || observed->resolution != date->resolution) throw std::runtime_error(name + ": date precision differs");\n  }\n}\n'
+    out += 'inline void check_replay_table(const std::string& name, const EventTable& actual, const EventTable& expected) {\n  check_format_table(name, actual, expected);\n  for (std::size_t i=0; i<expected.rows.size(); ++i) for (std::size_t j=0; j<expected.columns.size(); ++j) {\n    if (!expected.rows[i][j]) continue;\n    const auto* date=std::get_if<NativeDate>(&expected.rows[i][j]->typed_value);\n    if (!date) continue;\n    const auto* observed=actual.rows[i][j] ? std::get_if<NativeDate>(&actual.rows[i][j]->typed_value) : nullptr;\n    if (!observed || observed->resolution != date->resolution || observed->timezone != date->timezone) throw std::runtime_error(name + ": date metadata differs");\n  }\n}\n'
     Q = json.dumps
     for i, row in enumerate(report["rows"]):
         if row["input"] != row["input_after"]:

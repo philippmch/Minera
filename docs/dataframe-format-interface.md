@@ -64,6 +64,19 @@ clients whose JSON number implementation uses floating point. Float
 null attribute objects use `"null": true` and cannot carry a non-null typed
 value.
 
+Typed date cells may also carry `date_resolution` (`"us"` or `"ns"`) and
+`date_timezone` (a nonempty timezone identity such as `"Europe/Berlin"`).
+Omitted resolution means microseconds; omitted timezone leaves the identity
+unspecified. These fields require a non-null date `typed_value`. The timezone
+name accompanies the resolved offset in the date string; it does not request
+localization or timezone database lookup. Serialization emits nanosecond
+resolution and present timezone identities while leaving ordinary date JSON
+unchanged.
+
+```json
+{"kind":"date","typed_value":"2024-01-01T00:00:00+01:00","date_resolution":"ns","date_timezone":"Europe/Berlin"}
+```
+
 Optional table fields preserve declared `dtypes`, `categorical_dtypes`,
 `index`, `attributes`, and `metadata`. Dtypes and categorical descriptors align
 with columns. A categorical descriptor contains `categories_dtype`, `ordered`,

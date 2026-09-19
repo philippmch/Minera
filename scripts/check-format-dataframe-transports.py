@@ -422,6 +422,36 @@ def check(executable, server, reference, output):
                             != metadata_table["rows"][0][0][key]
                         ):
                             raise ValueError("first-class metadata lost")
+                # A formatting rejection must retain typed date transport metadata.
+                date_table = wire_table(cases[0]["input"])
+                date_column = date_table["columns"].index("time:timestamp")
+                date_value = "2024-01-01T00:00:00.000000001+01:00"
+                date_table["rows"][0][date_column] = {
+                    "key": "time:timestamp",
+                    "kind": "date",
+                    "value": date_value,
+                    "typed_value": date_value,
+                    "date_resolution": "ns",
+                    "date_timezone": "Europe/Berlin",
+                }
+                date_request = json.dumps(
+                    {"table": date_table, "options": {"activity_key": "absent"}}
+                ).encode()
+                date_cli = subprocess.run(
+                    [str(executable), "-"],
+                    input=date_request,
+                    capture_output=True,
+                    timeout=15,
+                    creationflags=creationflags,
+                )
+                date_status, date_body = post(endpoint, date_request)
+                if date_cli.returncode != 1 or date_status != 400:
+                    raise ValueError("date metadata rejection boundary failed")
+                for response in (json.loads(date_cli.stdout), json.loads(date_body)):
+                    observed = response["input_after"]["rows"][0][date_column]
+                    for key in ("typed_value", "date_resolution", "date_timezone"):
+                        if observed.get(key) != date_table["rows"][0][date_column][key]:
+                            raise ValueError("date metadata lost through transport")
                 # File input/output, errors, unknown query options and CORS.
                 request_file = directory / "request.json"
                 request_file.write_text(
@@ -487,7 +517,7 @@ def check(executable, server, reference, output):
         "excluded_cases": excluded,
         "cli_comparisons": len(completed),
         "http_comparisons": len(completed),
-        "transport_boundary_checks": 12,
+        "transport_boundary_checks": 14,
         "native_sha256_before_and_after": hashes,
     }
     output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

@@ -723,6 +723,18 @@ void write_attribute_details(std::ostream& output,
                              const std::vector<EventAttribute>& attributes);
 void write_attribute(std::ostream& output, const EventAttribute& attribute);
 
+void write_date_metadata(std::ostream& output,
+                         const EventAttribute& attribute) {
+  if (attribute.is_null || attribute.kind != AttributeKind::kDate) return;
+  const auto* date = std::get_if<NativeDate>(&attribute.typed_value);
+  if (!date) return;
+  if (date->resolution == NativeDateResolution::kNanosecond)
+    output << ",\"date_resolution\":\"ns\"";
+  if (date->timezone && !date->timezone->empty())
+    output << ",\"date_timezone\":\""
+           << json_escape(*date->timezone) << '"';
+}
+
 // Table-only metadata is deliberately additive to the long-standing table
 // JSON shape. A missing dtype vector means that the source did not declare
 // dtypes; an explicit index is emitted only when the source supplied one.
@@ -830,6 +842,7 @@ void write_attribute(std::ostream& output, const EventAttribute& attribute) {
                   std::get_if<NativeDate>(&attribute.typed_value))
       output << '"' << json_escape(date_value->value) << '"';
   }
+  write_date_metadata(output, attribute);
   if (attribute.scalar_wrapper) output << ",\"scalar_wrapper\":true";
   if (attribute.scalar_children_list) output << ",\"scalar_children_list\":true";
   if (!attribute.children.empty()) {
@@ -891,6 +904,7 @@ void write_attribute_detail(std::ostream& output,
                  std::get_if<NativeDate>(&attribute.typed_value))
       output << '"' << json_escape(date_value->value) << '"';
   }
+  write_date_metadata(output, attribute);
   if (attribute.scalar_wrapper) output << ",\"scalar_wrapper\":true";
   if (attribute.scalar_children_list) output << ",\"scalar_children_list\":true";
   if (!attribute.children.empty()) {

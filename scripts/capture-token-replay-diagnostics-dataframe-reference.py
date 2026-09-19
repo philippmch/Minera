@@ -21,6 +21,9 @@ def describe_frame(frame):
                 tag["native_resolution"] = (
                     "ns" if getattr(value, "unit", "us") == "ns" else "us"
                 )
+                if getattr(value, "tzinfo", None) is not None:
+                    tag["native_timezone"] = str(value.tzinfo)
+
     return result
 
 
@@ -43,6 +46,48 @@ def capture(checkout):
     initial = Marking({place: 1})
     final = Marking({place: 1})
     cases = (
+        (
+            "date_berlin_dst",
+            [
+                pd.Timestamp("2024-01-01", tz="Europe/Berlin"),
+                pd.Timestamp("2024-07-01", tz="Europe/Berlin"),
+            ],
+        ),
+        (
+            "date_named_same_offset",
+            [
+                pd.Timestamp("2024-01-01", tz="Europe/Berlin"),
+                pd.Timestamp("2024-01-02", tz="Europe/Paris"),
+            ],
+        ),
+        (
+            "date_named_equal_instant",
+            [
+                pd.Timestamp("2024-01-01", tz="Europe/Berlin"),
+                pd.Timestamp("2023-12-31T23:00:00Z"),
+            ],
+        ),
+        (
+            "date_named_equal_utc_first",
+            [
+                pd.Timestamp("2023-12-31T23:00:00Z"),
+                pd.Timestamp("2024-01-01", tz="Europe/Berlin"),
+            ],
+        ),
+        (
+            "date_named_mixed_precision",
+            [
+                pd.Timestamp("2024-01-01", tz="Europe/Berlin").as_unit("us"),
+                pd.Timestamp("2024-07-01", tz="Europe/Berlin").as_unit("ns"),
+            ],
+        ),
+        (
+            "date_named_fold",
+            [
+                pd.Timestamp("2024-10-27T00:30:00Z").tz_convert("Europe/Berlin"),
+                pd.Timestamp("2024-10-27T01:30:00Z").tz_convert("Europe/Berlin"),
+            ],
+        ),
         (
             "date_naive",
             [
