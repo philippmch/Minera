@@ -1970,7 +1970,7 @@ The returned table contains `case_id`, `is_fit`, `trace_fitness`, `missing`,
 `remaining`, `produced`, and `consumed`, with a fresh RangeIndex and empty attrs.
 Valid typed empty input returns a zero-column table.
 
-The public corpus contains 41 cases: 37 successes and four expected rejections.
+The public corpus contains 55 cases: 50 successes and five expected rejections.
 It covers numeric boundaries, first-representative dtype inference, source order,
 empty inputs, missing case IDs, non-fitting linear traces, unknown activities,
 and custom case/activity/timestamp selectors. Generated native comparisons check
@@ -1978,13 +1978,40 @@ the full typed result, index, attrs, and unchanged input. The capture and
 validation are `docs/token-replay-diagnostics-dataframe-reference.json.gz` and
 `docs/token-replay-diagnostics-dataframe-evidence.json`.
 
-The isolated Release build, all 154 native suites, 102 script tests, six
+The isolated Release build, all 154 native suites, 103 script tests, seven
 optimized evidence checks, and 516 formatter interface comparisons pass.
 Independent review found no code issues.
 
 This finite matrix does not establish arbitrary extension or date/container
 case dtypes, Python exception-class identity, all replay parameters, or full
 parity. Structural coverage counts remain unchanged.
+
+
+## Date-valued replay case identifiers
+
+The expanded public dataframe diagnostics capture contains 55 replay cases and
+13 direct conversion comparisons. Date observations distinguish naive values
+from timezone-aware values, group equal aware instants across written offsets,
+and keep distinct nanosecond instants separate. First case representatives
+still determine source order and output dtype. Uniform naive, UTC, and fixed
+UTC-offset dates infer datetime columns; mixed offsets or naive/aware values
+retain object dtype.
+
+The capture records timestamp precision separately from its lexical value.
+Nanosecond precision at a whole second and mixed microsecond/nanosecond columns
+are therefore observable rather than inferred from nonzero fractional digits.
+Generated checks compare precision metadata as well as complete tables,
+conversion group membership, and unchanged inputs.
+
+Native grouping now uses an exact seconds/nanoseconds key with a separate
+awareness domain. The original typed date supplies the case label even when
+its outer lexical projection is stale. All 154 native suites pass, including
+the 55 replay and 13 conversion comparisons, as do 103 script tests, seven
+optimized evidence checks, and 516 formatter interface comparisons. Independent
+review is clear.
+
+Named timezone identity and arbitrary date/container or extension types remain
+outside this finite matrix. Full parity remains incomplete.
 
 
 ## Basic random-tree generation evidence

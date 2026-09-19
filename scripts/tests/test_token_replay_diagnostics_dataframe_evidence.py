@@ -18,8 +18,22 @@ LIST_REPORT = json.loads(
         (ROOT / "docs/token-replay-dataframe-grouping-reference.json.gz").read_bytes()
     )
 )
-DIGEST = "0b09ae6e916aeef34fce5cc616b1862d6f504ab5f821138ca472dffe75fb8840"
+DIGEST = "9911beb8f4a011f7290b095bff6275ebf4355541c88dc27ce314f2631ff38d68"
 NAMES = (
+    "date_naive",
+    "date_utc",
+    "date_same_instant_offsets",
+    "date_mixed_offsets",
+    "date_mixed_naive_aware",
+    "date_mixed_string",
+    "date_nanoseconds",
+    "date_mixed_precision",
+    "date_pre_epoch",
+    "date_offset_nanoseconds_equal",
+    "date_equal_mixed_precision",
+    "date_ns_whole",
+    "date_fixed_offset",
+    "date_nat",
     "empty",
     "typed_empty",
     "strings_source_order",
@@ -77,7 +91,7 @@ class DiagnosticsDataframeEvidenceTests(unittest.TestCase):
                 / "src/backend/tests/token_replay_diagnostics_dataframe_reference_cases.hpp"
             ).read_text(encoding="utf-8"),
         )
-        self.assertEqual(generated.count("inline void check_replay_dataframe_"), 41)
+        self.assertEqual(generated.count("inline void check_replay_dataframe_"), 55)
         changed = json.loads(RAW)
         changed["rows"][-1]["result"]["records"][0]["values"]["produced"] = 99
         with self.assertRaises(ValueError):
@@ -94,7 +108,7 @@ class DiagnosticsDataframeEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(REPORT["reference_version"], "2.7.22")
         self.assertEqual(REPORT["pandas_version"], "3.0.5")
-        self.assertEqual(REPORT["case_count"], 41)
+        self.assertEqual(REPORT["case_count"], 55)
         self.assertEqual(tuple(ROWS), NAMES)
         self.assertEqual(
             REPORT["parameters"],
@@ -162,9 +176,52 @@ class DiagnosticsDataframeEvidenceTests(unittest.TestCase):
         }.items():
             self.assertEqual(ROWS[name]["result"]["dtypes"]["case_id"], dtype)
 
+    def test_date_keys_precision_and_conversion(self):
+        self.assertEqual(
+            REPORT["conversion_provenance"]["installed_sha256"],
+            "1c3db08a9f48110a2309ee8fedec64c3138f7c16164573a1c2827f1df67605db",
+        )
+        self.assertEqual(
+            REPORT["conversion_provenance"]["installed_sha256"],
+            REPORT["conversion_provenance"]["pinned_sha256"],
+        )
+        self.assertEqual(
+            REPORT["conversion_provenance"]["commit"],
+            "0715c31f3f1d85924107d6aa5329806db69df899",
+        )
+        self.assertEqual(
+            sum("converted_activities" in row for row in REPORT["rows"]), 13
+        )
+        self.assertEqual(
+            ROWS["date_same_instant_offsets"]["converted_activities"], [["A", "B"]]
+        )
+        self.assertEqual(
+            ROWS["date_mixed_naive_aware"]["converted_activities"], [["A"], ["B"]]
+        )
+        self.assertEqual(
+            ROWS["date_nanoseconds"]["converted_activities"], [["A"], ["B"]]
+        )
+        for name, dtype in {
+            "date_naive": "datetime64[us]",
+            "date_utc": "datetime64[us, UTC]",
+            "date_fixed_offset": "datetime64[us, UTC+01:00]",
+            "date_mixed_offsets": "object",
+            "date_mixed_naive_aware": "object",
+            "date_ns_whole": "datetime64[ns]",
+        }.items():
+            self.assertEqual(ROWS[name]["result"]["dtypes"]["case_id"], dtype)
+        self.assertEqual(
+            ROWS["date_ns_whole"]["input"]["records"][0]["cell_tags"][
+                "case:concept:name"
+            ]["native_resolution"],
+            "ns",
+        )
+
     def test_expected_rejections(self):
         errors = {r["name"]: r["error"] for r in REPORT["rows"] if "error" in r}
-        self.assertEqual(set(errors), {"empty", "nan_keys", "none_keys", "nan_only"})
+        self.assertEqual(
+            set(errors), {"empty", "nan_keys", "none_keys", "nan_only", "date_nat"}
+        )
         for name in ("nan_keys", "none_keys", "nan_only"):
             self.assertEqual(
                 errors[name],

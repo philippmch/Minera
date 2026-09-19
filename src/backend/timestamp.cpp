@@ -166,6 +166,98 @@ std::optional<double> parse_timestamp(std::string_view text) {
   return seconds;
 }
 
+std::optional<ParsedExactTimestamp> parse_timestamp_exact(std::string_view text) {
+  std::size_t pos = 0;
+  unsigned year = 0;
+  unsigned month = 0;
+  unsigned day = 0;
+  if (!read_uint(text, pos, 4, year) || pos >= text.size() ||
+      text[pos] != '-')
+    return std::nullopt;
+  ++pos;
+  if (!read_uint(text, pos, 2, month) || pos >= text.size() ||
+      text[pos] != '-')
+    return std::nullopt;
+  ++pos;
+  if (!read_uint(text, pos, 2, day) || month < 1 || month > 12 || day < 1 ||
+      day > days_in_month(year, month))
+    return std::nullopt;
+
+  std::int64_t seconds = days_from_civil(year, month, day) * 86400;
+  std::uint32_t nanoseconds = 0;
+  bool timezone_aware = false;
+  std::int32_t offset_minutes = 0;
+  if (pos < text.size() &&
+      (text[pos] == 'T' || text[pos] == 't' || text[pos] == ' ')) {
+    ++pos;
+    unsigned hour = 0;
+    unsigned minute = 0;
+    if (!read_uint(text, pos, 2, hour) || pos >= text.size() ||
+        text[pos] != ':')
+      return std::nullopt;
+    ++pos;
+    if (!read_uint(text, pos, 2, minute) || hour > 23 || minute > 59)
+      return std::nullopt;
+    seconds += static_cast<std::int64_t>(hour) * 3600 + minute * 60;
+
+    if (pos < text.size() && text[pos] == ':') {
+      ++pos;
+      unsigned second = 0;
+      if (!read_uint(text, pos, 2, second) || second > 59)
+        return std::nullopt;
+      seconds += second;
+      if (pos < text.size() && text[pos] == '.') {
+        ++pos;
+        std::size_t digits = 0;
+        while (pos < text.size() &&
+               std::isdigit(static_cast<unsigned char>(text[pos])) != 0) {
+          if (digits >= 9) return std::nullopt;
+          nanoseconds = nanoseconds * 10 +
+                        static_cast<std::uint32_t>(text[pos] - '0');
+          ++digits;
+          ++pos;
+        }
+        if (digits == 0) return std::nullopt;
+        while (digits++ < 9) nanoseconds *= 10;
+      }
+    }
+
+    if (pos < text.size() && (text[pos] == 'Z' || text[pos] == 'z')) {
+      timezone_aware = true;
+      ++pos;
+    } else if (pos < text.size() &&
+               (text[pos] == '+' || text[pos] == '-')) {
+      timezone_aware = true;
+      const int sign = text[pos] == '-' ? -1 : 1;
+      ++pos;
+      unsigned offset_hour = 0;
+      unsigned offset_minute = 0;
+      if (!read_uint(text, pos, 2, offset_hour)) return std::nullopt;
+      if (pos < text.size() && text[pos] == ':') {
+        ++pos;
+        if (!read_uint(text, pos, 2, offset_minute)) return std::nullopt;
+      } else {
+        // The existing parser accepts the basic ±HH form as well as a minute
+        // component.  Preserve that compatibility while staying integral.
+        (void)read_uint(text, pos, 2, offset_minute);
+      }
+      if (offset_hour > 14 || offset_minute > 59 ||
+          (offset_hour == 14 && offset_minute != 0))
+        return std::nullopt;
+      offset_minutes = sign * static_cast<std::int32_t>(offset_hour * 60 +
+                                                         offset_minute);
+      seconds -= static_cast<std::int64_t>(offset_minutes) * 60;
+    }
+  }
+
+  while (pos < text.size() &&
+         std::isspace(static_cast<unsigned char>(text[pos])) != 0)
+    ++pos;
+  if (pos != text.size()) return std::nullopt;
+  return ParsedExactTimestamp{seconds, nanoseconds, timezone_aware,
+                              offset_minutes};
+}
+
 std::optional<std::int64_t> parse_timestamp_microseconds(std::string_view text) {
   // Validate the original shape before removing its fractional part.
   const auto parsed = parse_timestamp(text);
