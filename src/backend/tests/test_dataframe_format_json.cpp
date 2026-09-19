@@ -12,9 +12,28 @@ bool rejected(const std::string& input) {
   catch (const std::invalid_argument&) { return true; }
   return false;
 }
+
+void date_metadata_round_trips_and_rejects_malformed_values() {
+  const std::string valid = R"({"table":{"columns":["date"],"rows":[[{"kind":"date","value":"2024-01-01T00:00:00+01:00","typed_value":"2024-01-01T00:00:00+01:00","date_resolution":"ns","date_timezone":"Europe/Berlin"}],[{"kind":"date","value":"2024-01-01T00:00:00+00:00","typed_value":"2024-01-01T00:00:00+00:00","date_timezone":"UTC"}]]}})";
+  const auto result = minera::format_dataframe_json(valid);
+  assert(!result.success);
+  assert(result.body.find("\"date_resolution\":\"ns\"") != std::string::npos);
+  assert(result.body.find("\"date_timezone\":\"Europe/Berlin\"") != std::string::npos);
+  assert(result.body.find("\"date_timezone\":\"UTC\"") != std::string::npos);
+
+  for (const auto& invalid : std::vector<std::string>{
+      R"({"table":{"columns":["x"],"rows":[[{"kind":"string","value":"x","date_resolution":"ns"}]]}})",
+      R"({"table":{"columns":["x"],"rows":[[{"kind":"date","value":"2024-01-01","date_timezone":"UTC"}]]}})",
+      R"({"table":{"columns":["x"],"rows":[[{"kind":"date","value":"2024-01-01","typed_value":"2024-01-01","date_resolution":"ms"}]]}})",
+      R"({"table":{"columns":["x"],"rows":[[{"kind":"date","value":"2024-01-01","typed_value":"2024-01-01","date_timezone":""}]]}})",
+      R"({"table":{"columns":["x"],"rows":[[{"kind":"date","value":"2024-01-01","null":true,"date_timezone":"UTC"}]]}})",
+      R"({"table":{"columns":["x"],"rows":[[{"kind":"date","value":"2024-01-01","typed_value":"2024-01-01","date_timezone":1}]]}})"})
+    assert(rejected(invalid));
+}
 }
 
 int main() {
+  date_metadata_round_trips_and_rejects_malformed_values();
   const std::string valid = R"({"table":{"columns":["case:concept:name","concept:name","time:timestamp"],"dtypes":["uint64","str","str"],"rows":[[{"kind":"int","value":"18446744073709551615","typed_value":18446744073709551615},{"value":"A\uD83D\uDE00"},{"value":"2024-01-01"}]]}})";
   const auto result = minera::format_dataframe_json(valid);
   assert(result.success);

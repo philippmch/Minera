@@ -14,9 +14,9 @@
   "pandas_version": "3.0.5",
   "artifact": {
     "path": "docs/token-replay-diagnostics-dataframe-reference.json.gz",
-    "uncompressed_sha256": "9911beb8f4a011f7290b095bff6275ebf4355541c88dc27ce314f2631ff38d68",
-    "cases": 55,
-    "successes": 50,
+    "uncompressed_sha256": "7d00363d7fe3f03c09eb0075e87f33b0b928d25aa617f5c755aa8cfe98fd971f",
+    "cases": 61,
+    "successes": 56,
     "expected_errors": 5
   },
   "observations": [
@@ -26,39 +26,44 @@
     "Valid typed empty input returns a zero-column dataframe.",
     "Output has a fresh RangeIndex and empty attrs; input remains unchanged.",
     "Aware date keys group by exact normalized second/nanosecond; naive dates remain in a distinct equality domain.",
-    "Uniform naive/UTC/fixed-offset first representatives infer date dtype; mixed offsets or awareness retain object dtype.",
-    "Source date resolution is captured explicitly; surviving nanosecond representatives promote all output date cells to nanosecond resolution."
+    "Uniform naive/UTC/fixed-offset representatives infer date dtype; named-zone representatives retain their shared identity across changing offsets. Mixed awareness or distinct named zones retain object dtype.",
+    "Source date resolution is captured explicitly; surviving nanosecond representatives promote all output date cells to nanosecond resolution.",
+    "Equal aware instants retain the first timezone representative; the two instants in a repeated autumn hour remain distinct."
   ],
   "validation": {
-    "script_tests_passed": 103,
-    "independent_review": "No actionable findings after equality-operator, malformed-offset, and authoritative native date case-label corrections.",
+    "script_tests_passed": 104,
+    "independent_review": "No actionable findings in the named-timezone and JSON metadata checkpoint.",
     "release_build": "passed",
     "native_suites_passed": 154,
     "native_suites_failed": 0,
-    "native_comparisons": 68,
-    "replay_dataframe_comparisons": 55,
-    "direct_conversion_comparisons": 13,
-    "optimized_evidence_tests_passed": 7
+    "native_comparisons": 80,
+    "replay_dataframe_comparisons": 61,
+    "direct_conversion_comparisons": 19,
+    "optimized_evidence_tests_passed": 8
   },
   "limits": [
     "Finite public observations do not establish full parity.",
-    "Named timezone identity, arbitrary date/container case types, and extension dtypes remain unproven.",
+    "Arbitrary timezone-object classes, date/container case types, and extension dtypes remain unproven.",
     "Python exception-class identity is not claimed.",
     "Complete replay parameter and net-family parity remains unproven."
   ],
   "native_entry_point": "replay_dataframe_diagnostics",
-  "native_source_parent_commit": "5716d45ceeb83f9bdbb0d85873ad13e0ca531e4e",
-  "native_verified_staged_tree": "520f8de1f9f6567c84aaf89853eb1c52a96c5a40",
+  "native_source_parent_commit": "1c6004bbaacacc1543323870e5dd169b7b2aa537",
+  "native_verified_staged_tree": "131c8aca28a022216d7b7f2c1805a86f5d4d707d",
   "source_sha256_lf_normalized": {
     "include/minera/timestamp.hpp": "b6e0e2a5a3c301971fb51bc7b6a8a9bf8bf8dd6e4ed6dde087ec6a2b8dfdcb76",
     "src/backend/timestamp.cpp": "23d309ddedfbaf38c2d33359893662a912229de735938d1943231b2b058a03a4",
-    "src/backend/log_conversion.cpp": "cd438fc9f09c042c55cb298a2c1baf56db4ec242e327fba6aa2ed673b5697ff3",
-    "src/backend/token_replay_event_data.cpp": "3c6c018df33f1fab20845839796713bdaa9b7935742722e04ff189a3e37872da",
+    "src/backend/log_conversion.cpp": "95cba51dea1b4400c5ff998d1b799fae40a9ae4f94bbfe9cb1437a08077caba4",
+    "src/backend/token_replay_event_data.cpp": "0d55ce159f51834b54a73bcd22e6d1130e470cb7a60e2f9f33cd5497a9767780",
     "src/backend/tests/test_log_conversion.cpp": "d52deec26aea4d459ce6409affec2d888655b278ad091ba48db72a7197fc8301",
-    "src/backend/tests/token_replay_diagnostics_dataframe_reference_cases.hpp": "6672d89d20800ce65986450a74ab141fc9c92af742b9fd7ea1af4203604e5129",
-    "scripts/capture-token-replay-diagnostics-dataframe-reference.py": "03fdc57085e23cd402f6f3e50d39ffd2cf9d99f6d4b20653c050c2cdd2303b7f",
-    "scripts/generate-token-replay-diagnostics-dataframe-tests.py": "f2ad63fea53dc8be1c19e664a18221460e46bbb6cdcd17a0bfe82cbb4a8bd46c",
-    "scripts/tests/test_token_replay_diagnostics_dataframe_evidence.py": "d71a0686a0a273493acd9d532a2d61f8bbb9a25a2db4f9570ffc702090e9339e"
+    "src/backend/tests/token_replay_diagnostics_dataframe_reference_cases.hpp": "559d8903394469109be9ab58569f14e2163968fec15bd1f118a051408e2584a0",
+    "scripts/capture-token-replay-diagnostics-dataframe-reference.py": "540e8c1dd58d02c8d7aeb5c4fc3b84451b0bedc76ba4caa0243f2bdcece43155",
+    "scripts/generate-token-replay-diagnostics-dataframe-tests.py": "a4ea97aac225294b762fe210aea5b2f644cbd7f1fdae8c55f16168f81ba2e3f7",
+    "scripts/tests/test_token_replay_diagnostics_dataframe_evidence.py": "bacd14a2ddd5a52ae217483805a33f9dd8abb0ffcd86c4dc268cff9cd0b3ba87",
+    "include/minera/event_log.hpp": "706faefd04e7530682f1cbd1e12ef71c5beb040cedbb6186a5d3337359ee8a7c",
+    "src/backend/dataframe_format_json.cpp": "a57879e649a9b1072695e74891817935e138775fa5de97c7752579b8eec938d6",
+    "src/backend/tests/test_dataframe_format_json.cpp": "9cdfb3d51656114fdb35bde12d9df341ceab68a792edf04b97f4bf8b80fdca86",
+    "scripts/check-format-dataframe-transports.py": "d6ad83ec7f07a086dc812c07a45dfde6e4faf89306db69effae0b16f73f51174"
   },
   "conversion_provenance": {
     "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
@@ -70,8 +75,8 @@
     "pinned_sha256": "1c3db08a9f48110a2309ee8fedec64c3138f7c16164573a1c2827f1df67605db"
   },
   "native_test_executable_sha256": {
-    "minera_token_replay_dataframe_diagnostics_tests.exe": "9e2defe191d4290f0085e47ce527a0dab1929450f7daccc18373ffa5a2ae62ad",
-    "minera_log_conversion_tests.exe": "47ea340f7031af43365bc4f8e2cbe28b5f0f8abbee4566b579745e6bb617cd7b"
+    "minera_token_replay_dataframe_diagnostics_tests.exe": "d725ed44b29a3e8c426a47674b9b166d52e59f9e6b44e8492131bc1f7f3f3dd1",
+    "minera_log_conversion_tests.exe": "72b8fbf4d0e0d349f2cae7e1ff4435c4f88590a67ba62789c98dc94b4b147d85"
   },
   "formatter_transport_regression": {
     "reference_sha256": "e64650bf388858d9503862487f8bf8e30e95ee8a9a534729562762e711c532e3",
@@ -350,10 +355,10 @@
     },
     "cli_comparisons": 258,
     "http_comparisons": 258,
-    "transport_boundary_checks": 12,
+    "transport_boundary_checks": 14,
     "native_sha256_before_and_after": {
-      "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-comparison-checkpoint-build\\Release\\minera_format_dataframe.exe": "b39d7310fd93eb24e35e37a9acf60882a85f7f192db2d949da76d98d40ffc28c",
-      "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-comparison-checkpoint-build\\Release\\minera_server.exe": "bc656aa7ad8d4033be024566805048c0929e9ab364165bc25a276d1d018401d3"
+      "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-comparison-checkpoint-build\\Release\\minera_format_dataframe.exe": "9ba05b172978be2a199c52150b0f095a7a59925e114124c63e1bb12250718eb9",
+      "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-comparison-checkpoint-build\\Release\\minera_server.exe": "7b18e03ef7cf9af0f60930fa78ff709fdb6c6cca6645cc8e75c1ba18c0b7f046"
     }
   }
 }

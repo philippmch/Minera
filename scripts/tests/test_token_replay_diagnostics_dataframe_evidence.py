@@ -18,8 +18,14 @@ LIST_REPORT = json.loads(
         (ROOT / "docs/token-replay-dataframe-grouping-reference.json.gz").read_bytes()
     )
 )
-DIGEST = "9911beb8f4a011f7290b095bff6275ebf4355541c88dc27ce314f2631ff38d68"
+DIGEST = "7d00363d7fe3f03c09eb0075e87f33b0b928d25aa617f5c755aa8cfe98fd971f"
 NAMES = (
+    "date_berlin_dst",
+    "date_named_same_offset",
+    "date_named_equal_instant",
+    "date_named_equal_utc_first",
+    "date_named_mixed_precision",
+    "date_named_fold",
     "date_naive",
     "date_utc",
     "date_same_instant_offsets",
@@ -91,7 +97,7 @@ class DiagnosticsDataframeEvidenceTests(unittest.TestCase):
                 / "src/backend/tests/token_replay_diagnostics_dataframe_reference_cases.hpp"
             ).read_text(encoding="utf-8"),
         )
-        self.assertEqual(generated.count("inline void check_replay_dataframe_"), 55)
+        self.assertEqual(generated.count("inline void check_replay_dataframe_"), 61)
         changed = json.loads(RAW)
         changed["rows"][-1]["result"]["records"][0]["values"]["produced"] = 99
         with self.assertRaises(ValueError):
@@ -108,7 +114,7 @@ class DiagnosticsDataframeEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(REPORT["reference_version"], "2.7.22")
         self.assertEqual(REPORT["pandas_version"], "3.0.5")
-        self.assertEqual(REPORT["case_count"], 55)
+        self.assertEqual(REPORT["case_count"], 61)
         self.assertEqual(tuple(ROWS), NAMES)
         self.assertEqual(
             REPORT["parameters"],
@@ -190,7 +196,7 @@ class DiagnosticsDataframeEvidenceTests(unittest.TestCase):
             "0715c31f3f1d85924107d6aa5329806db69df899",
         )
         self.assertEqual(
-            sum("converted_activities" in row for row in REPORT["rows"]), 13
+            sum("converted_activities" in row for row in REPORT["rows"]), 19
         )
         self.assertEqual(
             ROWS["date_same_instant_offsets"]["converted_activities"], [["A", "B"]]
@@ -216,6 +222,32 @@ class DiagnosticsDataframeEvidenceTests(unittest.TestCase):
             ]["native_resolution"],
             "ns",
         )
+
+    def test_named_timezone_identity(self):
+        for name, dtype in {
+            "date_berlin_dst": "datetime64[us, Europe/Berlin]",
+            "date_named_same_offset": "object",
+            "date_named_equal_instant": "datetime64[us, Europe/Berlin]",
+            "date_named_equal_utc_first": "datetime64[us, UTC]",
+            "date_named_mixed_precision": "datetime64[ns, Europe/Berlin]",
+            "date_named_fold": "datetime64[us, Europe/Berlin]",
+        }.items():
+            self.assertEqual(ROWS[name]["result"]["dtypes"]["case_id"], dtype)
+        self.assertEqual(
+            ROWS["date_named_equal_instant"]["converted_activities"], [["A", "B"]]
+        )
+        self.assertEqual(
+            ROWS["date_named_fold"]["converted_activities"], [["A"], ["B"]]
+        )
+        tags = [
+            row["cell_tags"]["case_id"]
+            for row in ROWS["date_berlin_dst"]["result"]["records"]
+        ]
+        self.assertEqual(
+            [tag["native_timezone"] for tag in tags], ["Europe/Berlin"] * 2
+        )
+        self.assertTrue(tags[0]["value"].endswith("+01:00"))
+        self.assertTrue(tags[1]["value"].endswith("+02:00"))
 
     def test_expected_rejections(self):
         errors = {r["name"]: r["error"] for r in REPORT["rows"] if "error" in r}

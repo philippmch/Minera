@@ -247,7 +247,7 @@ std::vector<EventAttribute> attributes(const Json& value) {
 
 EventAttribute attribute(const Json& value, std::string default_key) {
   const auto& object = value.object();
-  fields(object, {"key", "value", "kind", "container", "null", "typed_value", "children", "scalar_wrapper", "scalar_children_list", "first_class_role", "first_class_state", "first_class_source_key"});
+  fields(object, {"key", "value", "kind", "container", "null", "typed_value", "date_resolution", "date_timezone", "children", "scalar_wrapper", "scalar_children_list", "first_class_role", "first_class_state", "first_class_source_key"});
   EventAttribute result{text(object, "key", std::move(default_key)), text(object, "value"), AttributeKind::kString};
   const auto kind = text(object, "kind", "string");
   if (kind == "string") result.kind = AttributeKind::kString;
@@ -308,6 +308,24 @@ EventAttribute attribute(const Json& value, std::string default_key) {
         if (scalar ? result.value != "true" && result.value != "True" && result.value != "1" : result.value != "false" && result.value != "False" && result.value != "0") invalid("boolean value disagrees with typed_value");
       } else if (result.kind == AttributeKind::kDate && result.value != std::get<NativeDate>(result.typed_value).value) invalid("date value disagrees with typed_value");
     }
+  }
+  if (const auto* resolution = optional(object, "date_resolution")) {
+    if (result.is_null || result.kind != AttributeKind::kDate ||
+        !std::holds_alternative<NativeDate>(result.typed_value))
+      invalid("date_resolution requires a non-null date typed_value");
+    const auto value = resolution->string();
+    if (value != "us" && value != "ns") invalid("invalid date_resolution");
+    std::get<NativeDate>(result.typed_value).resolution =
+        value == "ns" ? NativeDateResolution::kNanosecond
+                       : NativeDateResolution::kMicrosecond;
+  }
+  if (const auto* timezone = optional(object, "date_timezone")) {
+    if (result.is_null || result.kind != AttributeKind::kDate ||
+        !std::holds_alternative<NativeDate>(result.typed_value))
+      invalid("date_timezone requires a non-null date typed_value");
+    const auto value = timezone->string();
+    if (value.empty()) invalid("date_timezone must not be empty");
+    std::get<NativeDate>(result.typed_value).timezone = value;
   }
   const auto role = text(object, "first_class_role", "none");
   if (role == "none") result.first_class_role = FirstClassAttributeRole::kNone;

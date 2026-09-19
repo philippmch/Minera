@@ -45,11 +45,28 @@ ReplayNumber replay_number(const EventAttribute& field) {
   return std::stod(field.value);
 }
 
-std::optional<std::string> replay_datetime_dtype(const EventLog& log) {
+struct ReplayDateDtype {
+  std::string dtype;
+  std::optional<std::string> timezone;
+};
+
+std::string fixed_timezone_name(std::int32_t offset) {
+  if (offset == 0) return "UTC";
+  const auto magnitude = offset < 0 ? -offset : offset;
+  char zone[16];
+  std::snprintf(zone, sizeof(zone), "UTC%c%02d:%02d", offset < 0 ? '-' : '+',
+                magnitude / 60, magnitude % 60);
+  return zone;
+}
+
+std::optional<ReplayDateDtype> replay_datetime_dtype(const EventLog& log) {
   if (log.traces.empty()) return std::nullopt;
   bool nanoseconds = false;
   std::optional<bool> awareness;
   std::optional<std::int32_t> offset_minutes;
+  std::optional<std::string> named_timezone;
+  bool saw_named_timezone = false;
+  bool saw_unnamed_timezone = false;
   for (const auto& trace : log.traces) {
     if (!trace.case_id_attribute) return std::nullopt;
     const auto* date = std::get_if<NativeDate>(&trace.case_id_attribute->typed_value);
@@ -60,30 +77,42 @@ std::optional<std::string> replay_datetime_dtype(const EventLog& log) {
                   date->resolution == NativeDateResolution::kNanosecond;
     if (!awareness) {
       awareness = parsed->timezone_aware;
-      offset_minutes = parsed->offset_minutes;
-    } else if (*awareness != parsed->timezone_aware ||
-               (parsed->timezone_aware &&
-                *offset_minutes != parsed->offset_minutes)) {
+    } else if (*awareness != parsed->timezone_aware) {
       return std::nullopt;
     }
+    if (date->timezone) {
+      if (date->timezone->empty() || !parsed->timezone_aware ||
+          saw_unnamed_timezone)
+        return std::nullopt;
+      saw_named_timezone = true;
+      if (named_timezone && *named_timezone != *date->timezone)
+        return std::nullopt;
+      named_timezone = *date->timezone;
+    } else {
+      if (saw_named_timezone) return std::nullopt;
+      saw_unnamed_timezone = true;
+      if (parsed->timezone_aware) {
+        if (!offset_minutes)
+          offset_minutes = parsed->offset_minutes;
+        else if (*offset_minutes != parsed->offset_minutes)
+          return std::nullopt;
+      }
+    }
+  }
+  std::optional<std::string> timezone;
+  if (saw_named_timezone) {
+    timezone = named_timezone;
+  } else if (*awareness) {
+    timezone = fixed_timezone_name(*offset_minutes);
   }
   std::string dtype = std::string("datetime64[") +
       (nanoseconds ? "ns" : "us");
-  if (*awareness) {
-    const auto offset = *offset_minutes;
-    if (offset == 0) {
-      dtype += ", UTC";
-    } else {
-      const auto magnitude = offset < 0 ? -offset : offset;
-      char zone[16];
-      std::snprintf(zone, sizeof(zone), "UTC%c%02d:%02d", offset < 0 ? '-' : '+',
-                    magnitude / 60, magnitude % 60);
-      dtype += ", ";
-      dtype += zone;
-    }
+  if (timezone) {
+    dtype += ", ";
+    dtype += *timezone;
   }
   dtype += ']';
-  return dtype;
+  return ReplayDateDtype{std::move(dtype), std::move(timezone)};
 }
 
 bool alias(std::string_view key, FirstClassAttributeRole role) {
@@ -421,7 +450,7 @@ EventTable replay_dataframe_diagnostics(
     }
   }
   const auto date_dtype = replay_datetime_dtype(log);
-  const std::string case_dtype = date_dtype ? *date_dtype :
+  const std::string case_dtype = date_dtype ? date_dtype->dtype :
       strings ? "str" : booleans ? "bool" :
       integers ? (wide_unsigned ? (negative ? "object" : "uint64") : "int64") :
       numeric ? "float64" : "object";
@@ -453,6 +482,7 @@ EventTable replay_dataframe_diagnostics(
         key.value = date->value;
         if (case_dtype.find("datetime64[ns") == 0)
           date->resolution = NativeDateResolution::kNanosecond;
+        date->timezone = date_dtype->timezone;
       }
     } else if (case_dtype == "float64") {
       key = float_cell("case_id", std::visit([](auto value) { return static_cast<double>(value); }, replay_number(key)));
