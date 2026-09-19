@@ -1,5 +1,6 @@
 #include "minera/event_table_json.hpp"
 #include "minera/log_conversion.hpp"
+#include "minera/timestamp.hpp"
 #include "minera/xes_event_log_importer.hpp"
 
 #include <algorithm>
@@ -367,6 +368,21 @@ std::pair<AttributeKind, std::string> case_grouping_scalar(
     const EventAttribute& value) {
   const auto original = std::pair{value.kind, std::string("lexical:") + value.value};
   if (value.is_null) return original;
+  if (const auto* date = std::get_if<NativeDate>(&value.typed_value)) {
+    // NativeDate.value is the authoritative source spelling.  Keep naive and
+    // aware values in distinct domains, while aware values compare by their
+    // exact normalized instant rather than by offset spelling.  Invalid
+    // native dates retain a typed-value-specific key so they cannot alias a
+    // valid date through a stale EventAttribute::value projection.
+    const auto parsed = parse_timestamp_exact(date->value);
+    if (!parsed) {
+      return {AttributeKind::kDate, "invalid-date:" + date->value};
+    }
+    return {AttributeKind::kDate,
+            std::string("date:") + (parsed->timezone_aware ? "aware:" : "naive:") +
+                std::to_string(parsed->seconds) + ":" +
+                std::to_string(parsed->nanoseconds)};
+  }
   const auto integer = [](auto number) {
     return std::pair{AttributeKind::kInt, std::string("integer:") + std::to_string(number)};
   };
@@ -1203,12 +1219,17 @@ EventLog event_stream_to_event_log(const ConvertedEventStream& stream,
         log.traces.size());
     if (inserted) {
       Trace trace;
-      trace.case_id = case_state == FirstClassAttributeState::kPresent
-                          ? glue->value
-                          : std::string{};
+      if (case_state == FirstClassAttributeState::kPresent) {
+        if (const auto* date = std::get_if<NativeDate>(&glue->typed_value))
+          trace.case_id = date->value;
+        else
+          trace.case_id = glue->value;
+      }
       trace.case_id_state = case_state;
       trace.case_id_source_key = row_case_source_key;
       auto selected_case = *glue;
+      if (const auto* date = std::get_if<NativeDate>(&selected_case.typed_value))
+        selected_case.value = date->value;
       selected_case.key = row_case_source_key;
       selected_case.first_class_role = FirstClassAttributeRole::kNone;
       selected_case.first_class_state = FirstClassAttributeState::kMissing;
@@ -1233,7 +1254,13 @@ EventLog event_stream_to_event_log(const ConvertedEventStream& stream,
             attribute.key.erase(0, options.case_attribute_prefix.size());
           if (attribute.key == kActivityKey &&
               !options.case_attribute_prefix.empty()) {
-            if (!attribute.is_null) trace.case_id = attribute.value;
+            if (!attribute.is_null) {
+              if (const auto* date =
+                      std::get_if<NativeDate>(&attribute.typed_value))
+                trace.case_id = date->value;
+              else
+                trace.case_id = attribute.value;
+            }
             // A null canonical case label is an absent label, not an empty
             // replacement for the non-null glue value.
             continue;

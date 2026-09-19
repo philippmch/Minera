@@ -10,6 +10,7 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/log_util_json.hpp"
+#include "minera/timestamp.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "dataframe_conversion_metadata_reference_cases.hpp"
 #include "conversion_case_grouping_reference_cases.hpp"
@@ -657,6 +658,42 @@ void exact_uint64_values_are_serialized_without_rounding() {
          std::string::npos);
 }
 
+void native_date_payload_controls_case_grouping() {
+  assert(!minera::parse_timestamp_exact(
+      "2024-01-01T00:00:00+01:"));
+  const auto valid_offset = minera::parse_timestamp_exact(
+      "2024-01-01T00:00:00+01:00");
+  assert(valid_offset && valid_offset->timezone_aware &&
+         valid_offset->offset_minutes == 60);
+
+  minera::EventTable table;
+  table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  minera::EventAttribute first{"case:concept:name", "stale-first",
+                               minera::AttributeKind::kDate};
+  first.typed_value = minera::NativeDate{"2024-01-01T00:00:00Z"};
+  minera::EventAttribute second{"case:concept:name", "stale-second",
+                                minera::AttributeKind::kDate};
+  second.typed_value =
+      minera::NativeDate{"2024-01-01T01:00:00+01:00"};
+  table.rows = {{first, minera::EventAttribute{"concept:name", "A"},
+                 minera::EventAttribute{"time:timestamp", "2024-01-01T00:00:00Z",
+                                        minera::AttributeKind::kDate}},
+                {second, minera::EventAttribute{"concept:name", "B"},
+                 minera::EventAttribute{"time:timestamp", "2024-01-01T00:00:00Z",
+                                        minera::AttributeKind::kDate}}};
+  const auto converted = minera::event_table_to_event_log(table);
+  assert(converted.traces.size() == 1);
+  assert(converted.traces.front().events.size() == 2);
+  assert(converted.traces.front().case_id ==
+         "2024-01-01T00:00:00Z");
+  assert(converted.traces.front().case_id_attribute);
+  assert(converted.traces.front().case_id_attribute->value ==
+         "2024-01-01T00:00:00Z");
+  const auto* native = std::get_if<minera::NativeDate>(
+      &converted.traces.front().case_id_attribute->typed_value);
+  assert(native && native->value == "2024-01-01T00:00:00Z");
+}
+
 void csv_projection_preserves_schema_and_source_index_labels() {
   std::istringstream input(
       "case_id,activity,timestamp\n"
@@ -1094,6 +1131,7 @@ int main() {
   lazy_output_and_metadata_json_are_explicit();
   table_metadata_survives_conversion_and_serialization();
   exact_uint64_values_are_serialized_without_rounding();
+  native_date_payload_controls_case_grouping();
   csv_projection_preserves_schema_and_source_index_labels();
   dataframe_row_cap_counts_events_and_is_deterministic();
   graph_null_selectors_are_absent();

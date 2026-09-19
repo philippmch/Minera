@@ -6,6 +6,7 @@
 #include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
@@ -13,34 +14,76 @@
 
 #include "minera/log_conversion.hpp"
 #include "minera/dataframe_validation.hpp"
+#include "minera/timestamp.hpp"
 
 namespace minera {
 namespace {
 
 using ReplayNumber = std::variant<std::int64_t, std::uint64_t, double>;
 ReplayNumber replay_number(const EventAttribute& field) {
-    if (const auto* value = std::get_if<std::int64_t>(&field.typed_value)) return *value;
-    if (const auto* value = std::get_if<std::uint64_t>(&field.typed_value)) return *value;
-    if (const auto* value = std::get_if<double>(&field.typed_value)) return *value;
-    if (const auto* value = std::get_if<bool>(&field.typed_value)) return std::int64_t{*value ? 1 : 0};
-    if (field.kind == AttributeKind::kBoolean)
-      return std::int64_t{field.value == "true" || field.value == "1" ? 1 : 0};
-    if (field.kind == AttributeKind::kInt) {
-      auto text = std::string_view(field.value);
-      if (text.starts_with('+')) text.remove_prefix(1);
-      std::int64_t signed_value = 0;
-      const auto signed_result = std::from_chars(
-          text.data(), text.data() + text.size(), signed_value, 10);
-      if (signed_result.ec == std::errc{} && signed_result.ptr == text.data() + text.size())
-        return signed_value;
-      std::uint64_t unsigned_value = 0;
-      const auto unsigned_result = std::from_chars(
-          text.data(), text.data() + text.size(), unsigned_value, 10);
-      if (unsigned_result.ec == std::errc{} && unsigned_result.ptr == text.data() + text.size())
-        return unsigned_value;
-      throw std::invalid_argument("token replay: invalid integer case-id value");
+  if (const auto* value = std::get_if<std::int64_t>(&field.typed_value)) return *value;
+  if (const auto* value = std::get_if<std::uint64_t>(&field.typed_value)) return *value;
+  if (const auto* value = std::get_if<double>(&field.typed_value)) return *value;
+  if (const auto* value = std::get_if<bool>(&field.typed_value)) return std::int64_t{*value ? 1 : 0};
+  if (field.kind == AttributeKind::kBoolean)
+    return std::int64_t{field.value == "true" || field.value == "1" ? 1 : 0};
+  if (field.kind == AttributeKind::kInt) {
+    auto text = std::string_view(field.value);
+    if (text.starts_with('+')) text.remove_prefix(1);
+    std::int64_t signed_value = 0;
+    const auto signed_result = std::from_chars(
+        text.data(), text.data() + text.size(), signed_value, 10);
+    if (signed_result.ec == std::errc{} && signed_result.ptr == text.data() + text.size())
+      return signed_value;
+    std::uint64_t unsigned_value = 0;
+    const auto unsigned_result = std::from_chars(
+        text.data(), text.data() + text.size(), unsigned_value, 10);
+    if (unsigned_result.ec == std::errc{} && unsigned_result.ptr == text.data() + text.size())
+      return unsigned_value;
+    throw std::invalid_argument("token replay: invalid integer case-id value");
+  }
+  return std::stod(field.value);
+}
+
+std::optional<std::string> replay_datetime_dtype(const EventLog& log) {
+  if (log.traces.empty()) return std::nullopt;
+  bool nanoseconds = false;
+  std::optional<bool> awareness;
+  std::optional<std::int32_t> offset_minutes;
+  for (const auto& trace : log.traces) {
+    if (!trace.case_id_attribute) return std::nullopt;
+    const auto* date = std::get_if<NativeDate>(&trace.case_id_attribute->typed_value);
+    if (!date) return std::nullopt;
+    const auto parsed = parse_timestamp_exact(date->value);
+    if (!parsed) return std::nullopt;
+    nanoseconds = nanoseconds ||
+                  date->resolution == NativeDateResolution::kNanosecond;
+    if (!awareness) {
+      awareness = parsed->timezone_aware;
+      offset_minutes = parsed->offset_minutes;
+    } else if (*awareness != parsed->timezone_aware ||
+               (parsed->timezone_aware &&
+                *offset_minutes != parsed->offset_minutes)) {
+      return std::nullopt;
     }
-    return std::stod(field.value);
+  }
+  std::string dtype = std::string("datetime64[") +
+      (nanoseconds ? "ns" : "us");
+  if (*awareness) {
+    const auto offset = *offset_minutes;
+    if (offset == 0) {
+      dtype += ", UTC";
+    } else {
+      const auto magnitude = offset < 0 ? -offset : offset;
+      char zone[16];
+      std::snprintf(zone, sizeof(zone), "UTC%c%02d:%02d", offset < 0 ? '-' : '+',
+                    magnitude / 60, magnitude % 60);
+      dtype += ", ";
+      dtype += zone;
+    }
+  }
+  dtype += ']';
+  return dtype;
 }
 
 bool alias(std::string_view key, FirstClassAttributeRole role) {
@@ -377,7 +420,9 @@ EventTable replay_dataframe_diagnostics(
         wide_unsigned |= *value > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
     }
   }
-  const std::string case_dtype = strings ? "str" : booleans ? "bool" :
+  const auto date_dtype = replay_datetime_dtype(log);
+  const std::string case_dtype = date_dtype ? *date_dtype :
+      strings ? "str" : booleans ? "bool" :
       integers ? (wide_unsigned ? (negative ? "object" : "uint64") : "int64") :
       numeric ? "float64" : "object";
   result.columns = {"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"};
@@ -403,7 +448,13 @@ EventTable replay_dataframe_diagnostics(
     key.first_class_role = FirstClassAttributeRole::kNone;
     key.first_class_state = FirstClassAttributeState::kMissing;
     key.first_class_source_key.clear();
-    if (case_dtype == "float64") {
+    if (date_dtype) {
+      if (auto* date = std::get_if<NativeDate>(&key.typed_value)) {
+        key.value = date->value;
+        if (case_dtype.find("datetime64[ns") == 0)
+          date->resolution = NativeDateResolution::kNanosecond;
+      }
+    } else if (case_dtype == "float64") {
       key = float_cell("case_id", std::visit([](auto value) { return static_cast<double>(value); }, replay_number(key)));
     } else if (case_dtype == "int64") {
       const auto value = std::visit([](auto value) { return static_cast<std::int64_t>(value); }, replay_number(key));

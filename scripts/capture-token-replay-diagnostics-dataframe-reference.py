@@ -11,6 +11,19 @@ META = runpy.run_path(
 pm, pd = META["pm"], META["pd"]
 
 
+def describe_frame(frame):
+    result = META["FORMAT"]["describe_frame"](frame)
+    for row in result["records"]:
+        for column, label in enumerate(frame.columns):
+            tag = row["cell_tags"][str(label)]
+            if tag["kind"] == "date" and not tag["missing"]:
+                value = frame.iloc[row["position"], column]
+                tag["native_resolution"] = (
+                    "ns" if getattr(value, "unit", "us") == "ns" else "us"
+                )
+    return result
+
+
 def capture(checkout):
     if pm.__version__ != "2.7.22" or pd.__version__ != "3.0.5":
         raise RuntimeError("Wrong reference runtime")
@@ -30,6 +43,90 @@ def capture(checkout):
     initial = Marking({place: 1})
     final = Marking({place: 1})
     cases = (
+        (
+            "date_naive",
+            [
+                pd.Timestamp("2024-01-02"),
+                pd.Timestamp("2024-01-01"),
+                pd.Timestamp("2024-01-02"),
+            ],
+        ),
+        (
+            "date_utc",
+            [
+                pd.Timestamp("2024-01-02", tz="UTC"),
+                pd.Timestamp("2024-01-01", tz="UTC"),
+            ],
+        ),
+        (
+            "date_same_instant_offsets",
+            [
+                pd.Timestamp("2024-01-01T00:00:00Z"),
+                pd.Timestamp("2024-01-01T01:00:00+01:00"),
+            ],
+        ),
+        (
+            "date_mixed_offsets",
+            [
+                pd.Timestamp("2024-01-01T00:00:00Z"),
+                pd.Timestamp("2024-01-02T01:00:00+01:00"),
+            ],
+        ),
+        (
+            "date_mixed_naive_aware",
+            [pd.Timestamp("2024-01-01"), pd.Timestamp("2024-01-01", tz="UTC")],
+        ),
+        ("date_mixed_string", [pd.Timestamp("2024-01-01"), "2024-01-01"]),
+        (
+            "date_nanoseconds",
+            [
+                pd.Timestamp("2024-01-01T00:00:00.000000001"),
+                pd.Timestamp("2024-01-01T00:00:00.000000002"),
+            ],
+        ),
+        (
+            "date_mixed_precision",
+            [
+                pd.Timestamp("2024-01-01").as_unit("us"),
+                pd.Timestamp("2024-01-02").as_unit("ns"),
+            ],
+        ),
+        (
+            "date_pre_epoch",
+            [
+                pd.Timestamp("1969-12-31T23:59:59.999999999"),
+                pd.Timestamp("1970-01-01T00:00:00"),
+            ],
+        ),
+        (
+            "date_offset_nanoseconds_equal",
+            [
+                pd.Timestamp("2024-01-01T00:00:00.000000001Z"),
+                pd.Timestamp("2024-01-01T01:00:00.000000001+01:00"),
+            ],
+        ),
+        (
+            "date_equal_mixed_precision",
+            [
+                pd.Timestamp("2024-01-01").as_unit("us"),
+                pd.Timestamp("2024-01-01").as_unit("ns"),
+            ],
+        ),
+        (
+            "date_ns_whole",
+            [
+                pd.Timestamp("2024-01-01").as_unit("ns"),
+                pd.Timestamp("2024-01-02").as_unit("ns"),
+            ],
+        ),
+        (
+            "date_fixed_offset",
+            [
+                pd.Timestamp("2024-01-01T01:00:00+01:00"),
+                pd.Timestamp("2024-01-02T01:00:00+01:00"),
+            ],
+        ),
+        ("date_nat", [pd.NaT, pd.Timestamp("2024-01-01")]),
         ("empty", []),
         ("typed_empty", []),
         ("strings_source_order", ["z", "a", "z", "b"]),
@@ -79,7 +176,7 @@ def capture(checkout):
             frame["concept:name"] = pd.Series([], dtype="str")
         if name == "strings_source_order":
             frame.attrs["example"] = "not propagated"
-        row = {"name": name, "input": META["FORMAT"]["describe_frame"](frame)}
+        row = {"name": name, "input": describe_frame(frame)}
         try:
             result = pm.conformance_diagnostics_token_based_replay(
                 frame,
@@ -89,10 +186,16 @@ def capture(checkout):
                 return_diagnostics_dataframe=True,
                 opt_parameters={"show_progress_bar": False},
             )
-            row["result"] = META["FORMAT"]["describe_frame"](result)
+            row["result"] = describe_frame(result)
+            if name.startswith("date_"):
+                converted = pm.convert_to_event_log(frame)
+                row["converted_activities"] = [
+                    [event["concept:name"] for event in trace] for trace in converted
+                ]
+
         except Exception as error:
             row["error"] = {"type": type(error).__name__, "message": str(error)}
-        row["input_after"] = META["FORMAT"]["describe_frame"](frame)
+        row["input_after"] = describe_frame(frame)
         rows.append(row)
     linear = PetriNet("linear")
     places = [PetriNet.Place("p" + str(i)) for i in range(3)]
@@ -138,7 +241,7 @@ def capture(checkout):
             "name": name,
             "net_kind": "linear",
             "parameters": parameters,
-            "input": META["FORMAT"]["describe_frame"](frame),
+            "input": describe_frame(frame),
         }
         try:
             result = pm.conformance_diagnostics_token_based_replay(
@@ -150,16 +253,17 @@ def capture(checkout):
                 opt_parameters={"show_progress_bar": False},
                 **parameters,
             )
-            row["result"] = META["FORMAT"]["describe_frame"](result)
+            row["result"] = describe_frame(result)
         except Exception as error:
             row["error"] = {"type": type(error).__name__, "message": str(error)}
-        row["input_after"] = META["FORMAT"]["describe_frame"](frame)
+        row["input_after"] = describe_frame(frame)
         rows.append(row)
     return {
         "capture_id": "token_replay_diagnostics_dataframe",
         "reference_version": pm.__version__,
         "pandas_version": pd.__version__,
         "reference_provenance": proof,
+        "conversion_provenance": META["provenance"](pm.convert_to_event_log, checkout),
         "net": {
             "kind": "flower",
             "place": "p",

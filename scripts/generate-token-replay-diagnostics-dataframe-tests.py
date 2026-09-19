@@ -1,6 +1,7 @@
 """Generate native checks for pinned public dataframe replay diagnostics."""
 
 import argparse
+import copy
 import gzip
 import hashlib
 import json
@@ -10,8 +11,22 @@ import runpy
 FMT = runpy.run_path(
     str(Path(__file__).with_name("generate-format-dataframe-tests.py"))
 )
-DIGEST = "0b09ae6e916aeef34fce5cc616b1862d6f504ab5f821138ca472dffe75fb8840"
+DIGEST = "9911beb8f4a011f7290b095bff6275ebf4355541c88dc27ce314f2631ff38d68"
 NAMES = (
+    "date_naive",
+    "date_utc",
+    "date_same_instant_offsets",
+    "date_mixed_offsets",
+    "date_mixed_naive_aware",
+    "date_mixed_string",
+    "date_nanoseconds",
+    "date_mixed_precision",
+    "date_pre_epoch",
+    "date_offset_nanoseconds_equal",
+    "date_equal_mixed_precision",
+    "date_ns_whole",
+    "date_fixed_offset",
+    "date_nat",
     "empty",
     "typed_empty",
     "strings_source_order",
@@ -56,6 +71,35 @@ NAMES = (
 )
 
 
+def frame_code(name, frame):
+    transport = copy.deepcopy(frame)
+    for row in transport["records"]:
+        for tag in row["cell_tags"].values():
+            if "native_resolution" in tag:
+                if (
+                    tag["kind"] != "date"
+                    or tag["missing"]
+                    or tag["native_resolution"] not in ("us", "ns")
+                ):
+                    raise ValueError("Invalid date resolution metadata")
+                tag.pop("native_resolution")
+    out = FMT["frame_code"](name, transport)
+    for row in frame["records"]:
+        for column, label in enumerate(frame["columns"]):
+            tag = row["cell_tags"][str(label)]
+            if tag.get("native_resolution") == "ns":
+                out += (
+                    "  std::get<NativeDate>("
+                    + name
+                    + ".rows["
+                    + str(row["position"])
+                    + "]["
+                    + str(column)
+                    + "]->typed_value).resolution = NativeDateResolution::kNanosecond;\n"
+                )
+    return out
+
+
 def generate(raw):
     if hashlib.sha256(raw).hexdigest() != DIGEST:
         raise ValueError("Unreviewed diagnostics dataframe artifact")
@@ -68,7 +112,7 @@ def generate(raw):
     out = (
         "// Public artifact SHA256: "
         + DIGEST
-        + '\n#include "minera/conformance.hpp"\n'
+        + '\n#include "minera/conformance.hpp"\n#include "minera/log_conversion.hpp"\n'
         + FMT["DTYPE"]["PREAMBLE"]
         + "\n}\n"
         + FMT["PREAMBLE"].replace(
@@ -76,13 +120,14 @@ def generate(raw):
             "namespace replay_dataframe_reference",
         )
     )
+    out += 'inline void check_replay_table(const std::string& name, const EventTable& actual, const EventTable& expected) {\n  check_format_table(name, actual, expected);\n  for (std::size_t i=0; i<expected.rows.size(); ++i) for (std::size_t j=0; j<expected.columns.size(); ++j) {\n    if (!expected.rows[i][j]) continue;\n    const auto* date=std::get_if<NativeDate>(&expected.rows[i][j]->typed_value);\n    if (!date) continue;\n    const auto* observed=actual.rows[i][j] ? std::get_if<NativeDate>(&actual.rows[i][j]->typed_value) : nullptr;\n    if (!observed || observed->resolution != date->resolution) throw std::runtime_error(name + ": date precision differs");\n  }\n}\n'
     Q = json.dumps
     for i, row in enumerate(report["rows"]):
         if row["input"] != row["input_after"]:
             raise ValueError("Unexpected input mutation")
         out += "inline void check_replay_dataframe_" + str(i) + "() {\n"
-        out += FMT["frame_code"]("input", row["input"])
-        out += FMT["frame_code"]("expected_input", row["input_after"])
+        out += frame_code("input", row["input"])
+        out += frame_code("expected_input", row["input_after"])
         if row.get("net_kind") == "linear":
             out += '  PetriNet net; const auto p=net.add_place(), q=net.add_place(), r=net.add_place(); net.set_source(p); net.set_sink(r); net.set_activities({"A","B"}); net.add_transition(0,{p},{q}); net.add_transition(1,{q},{r});\n'
         else:
@@ -105,14 +150,33 @@ def generate(raw):
                 + ");\n"
             )
         else:
-            out += FMT["frame_code"]("expected", row["result"])
+            out += frame_code("expected", row["result"])
             out += (
-                "  check_format_table("
+                "  check_replay_table("
                 + Q(row["name"])
                 + ", replay_dataframe_diagnostics(input,net,options), expected);\n"
             )
+        if "converted_activities" in row:
+            out += "  const auto converted = event_table_to_event_log(input);\n"
+            out += (
+                "  if (converted.traces.size() != "
+                + str(len(row["converted_activities"]))
+                + ") throw std::runtime_error("
+                + Q(row["name"] + ": conversion group count differs")
+                + ");\n"
+            )
+            for j, activities in enumerate(row["converted_activities"]):
+                out += (
+                    "  { std::vector<std::string> activities; for (const auto& event : converted.traces["
+                    + str(j)
+                    + "].events) activities.push_back(event.activity); if (activities != std::vector<std::string>{"
+                    + ",".join(map(Q, activities))
+                    + "}) throw std::runtime_error("
+                    + Q(row["name"] + ": converted membership differs")
+                    + "); }\n"
+                )
         out += (
-            "  check_format_table("
+            "  check_replay_table("
             + Q(row["name"] + ": input after")
             + ", input, expected_input);\n}\n"
         )

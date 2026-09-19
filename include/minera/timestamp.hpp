@@ -7,6 +7,25 @@
 
 namespace minera {
 
+// An exact parsed timestamp keeps the integral UTC second and nanosecond
+// fraction separate from the source timezone awareness.  This is used for
+// equality/grouping paths where converting through double would collapse
+// adjacent nanoseconds or round large calendar values.
+struct ParsedExactTimestamp {
+  std::int64_t seconds = 0;
+  std::uint32_t nanoseconds = 0;
+  bool timezone_aware = false;
+  // Signed local offset in minutes.  It is metadata for dtype projection;
+  // equality of aware timestamps uses seconds/nanoseconds only.
+  std::int32_t offset_minutes = 0;
+};
+
+// Parses the same ISO-8601 timestamp forms as parse_timestamp, retaining up
+// to nanosecond precision and whether a timezone was supplied.  The result is
+// nullopt for malformed input; no floating-point conversion is performed.
+[[nodiscard]] std::optional<ParsedExactTimestamp> parse_timestamp_exact(
+    std::string_view text);
+
 // Parses an ISO-8601 timestamp into seconds since the Unix epoch (UTC). Accepts
 // "YYYY-MM-DDTHH:MM:SS" with an optional space instead of the 'T' separator,
 // optional fractional seconds, and an optional timezone (a trailing 'Z' or a
