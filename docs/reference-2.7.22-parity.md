@@ -1960,6 +1960,24 @@ inference. Native tables without declared dtypes use basic scalar-kind inference
 Full parity and structural coverage counts remain unchanged.
 
 
+## Replay diagnostics dataframe output: open implementation
+
+A separate public capture records 33 calls with
+`return_diagnostics_dataframe=True`: 29 successes and four expected errors.
+This mode retains exact case groups in first-occurrence order. Output dtype
+inference can round case identifiers without collapsing their rows, so converting
+the existing list diagnostics would lose cases. First scalar representatives
+determine the observed case dtype. A valid typed empty input returns no columns;
+nonempty output has seven diagnostic columns, a fresh RangeIndex, and empty attrs.
+All inputs remain unchanged.
+
+The native output path remains open. The capture and requirements are recorded
+in `docs/token-replay-diagnostics-dataframe-reference.json.gz` and
+`docs/token-replay-diagnostics-dataframe-evidence.json`. All 101 script tests and
+five optimized evidence checks pass. No native equivalence is claimed by this
+capture; non-fitting nets and custom selectors still need additional observations.
+
+
 ## Basic random-tree generation evidence
 
 The BASIC random-tree generator uses the seeded recursive-depth process-tree

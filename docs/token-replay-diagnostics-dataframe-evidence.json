@@ -1,0 +1,46 @@
+{
+  "status": "open_native_implementation",
+  "scope": "Public dataframe-form token replay diagnostics; evidence checkpoint, not native parity.",
+  "reference_provenance": {
+    "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+    "function": "conformance_diagnostics_token_based_replay",
+    "module": "pm4py.conformance",
+    "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], petri_net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, activity_key: str = 'concept:name', timestamp_key: str = 'time:timestamp', case_id_key: str = 'case:concept:name', return_diagnostics_dataframe: bool = False, opt_parameters: Optional[Dict[Any, Any]] = None) -> List[Dict[str, Any]]",
+    "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+    "installed_sha256": "17c44eaf3376645e3ed71ab6a521b5e0c4fb86840e69ad144f3419eb7434dbb1",
+    "pinned_sha256": "17c44eaf3376645e3ed71ab6a521b5e0c4fb86840e69ad144f3419eb7434dbb1"
+  },
+  "reference_version": "2.7.22",
+  "pandas_version": "3.0.5",
+  "artifact": {
+    "path": "docs/token-replay-diagnostics-dataframe-reference.json.gz",
+    "uncompressed_sha256": "187ff758e36739839dad681ccf95946398d764f0187ad89e961274d465e9a6f7",
+    "cases": 33,
+    "successes": 29,
+    "expected_errors": 4
+  },
+  "observations": [
+    "Rows retain exact case groups in first-occurrence order, unlike numeric group-index inference in the public list-output path.",
+    "Output case dtype is inferred from first representatives; inference can round distinct case values without merging their rows.",
+    "Diagnostic columns are case_id, is_fit, trace_fitness, missing, remaining, produced, consumed.",
+    "Valid typed empty input returns a zero-column dataframe.",
+    "Output has a fresh RangeIndex and empty attrs; input remains unchanged."
+  ],
+  "implementation_requirements": [
+    "Add a native dataframe diagnostic output entry point with shared public validation.",
+    "Replay exact case groups in source order rather than adapting already-collapsed list diagnostics.",
+    "Preserve typed case representatives through output dtype inference and reproduce schema, index, attrs, and token counters.",
+    "Compare native outputs against every captured case and extend the evidence with non-fitting nets and custom selectors."
+  ],
+  "validation": {
+    "script_tests_passed": 101,
+    "optimized_evidence_tests_passed": 5,
+    "native_comparisons": 0,
+    "native_build_required": false
+  },
+  "limits": [
+    "This is a public evidence checkpoint; native dataframe diagnostics output remains unimplemented.",
+    "Flower-net cases do not establish non-fitting diagnostics or arbitrary public parameters.",
+    "Full parity remains incomplete."
+  ]
+}
