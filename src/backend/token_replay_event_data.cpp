@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <map>
+#include <limits>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
@@ -15,6 +16,32 @@
 
 namespace minera {
 namespace {
+
+using ReplayNumber = std::variant<std::int64_t, std::uint64_t, double>;
+ReplayNumber replay_number(const EventAttribute& field) {
+    if (const auto* value = std::get_if<std::int64_t>(&field.typed_value)) return *value;
+    if (const auto* value = std::get_if<std::uint64_t>(&field.typed_value)) return *value;
+    if (const auto* value = std::get_if<double>(&field.typed_value)) return *value;
+    if (const auto* value = std::get_if<bool>(&field.typed_value)) return std::int64_t{*value ? 1 : 0};
+    if (field.kind == AttributeKind::kBoolean)
+      return std::int64_t{field.value == "true" || field.value == "1" ? 1 : 0};
+    if (field.kind == AttributeKind::kInt) {
+      auto text = std::string_view(field.value);
+      if (text.starts_with('+')) text.remove_prefix(1);
+      std::int64_t signed_value = 0;
+      const auto signed_result = std::from_chars(
+          text.data(), text.data() + text.size(), signed_value, 10);
+      if (signed_result.ec == std::errc{} && signed_result.ptr == text.data() + text.size())
+        return signed_value;
+      std::uint64_t unsigned_value = 0;
+      const auto unsigned_result = std::from_chars(
+          text.data(), text.data() + text.size(), unsigned_value, 10);
+      if (unsigned_result.ec == std::errc{} && unsigned_result.ptr == text.data() + text.size())
+        return unsigned_value;
+      throw std::invalid_argument("token replay: invalid integer case-id value");
+    }
+    return std::stod(field.value);
+}
 
 bool alias(std::string_view key, FirstClassAttributeRole role) {
   if (role == FirstClassAttributeRole::kActivity)
@@ -214,31 +241,8 @@ EventLog project_table(const EventTable& table, const TokenReplayOptions& option
     return kind == AttributeKind::kInt || kind == AttributeKind::kFloat ||
            kind == AttributeKind::kBoolean;
   };
-  using Number = std::variant<std::int64_t, std::uint64_t, double>;
-  const auto number = [](const EventAttribute& field) -> Number {
-    if (const auto* value = std::get_if<std::int64_t>(&field.typed_value)) return *value;
-    if (const auto* value = std::get_if<std::uint64_t>(&field.typed_value)) return *value;
-    if (const auto* value = std::get_if<double>(&field.typed_value)) return *value;
-    if (const auto* value = std::get_if<bool>(&field.typed_value)) return std::int64_t{*value ? 1 : 0};
-    if (field.kind == AttributeKind::kBoolean)
-      return std::int64_t{field.value == "true" || field.value == "1" ? 1 : 0};
-    if (field.kind == AttributeKind::kInt) {
-      auto text = std::string_view(field.value);
-      if (text.starts_with('+')) text.remove_prefix(1);
-      std::int64_t signed_value = 0;
-      const auto signed_result = std::from_chars(
-          text.data(), text.data() + text.size(), signed_value, 10);
-      if (signed_result.ec == std::errc{} && signed_result.ptr == text.data() + text.size())
-        return signed_value;
-      std::uint64_t unsigned_value = 0;
-      const auto unsigned_result = std::from_chars(
-          text.data(), text.data() + text.size(), unsigned_value, 10);
-      if (unsigned_result.ec == std::errc{} && unsigned_result.ptr == text.data() + text.size())
-        return unsigned_value;
-      throw std::invalid_argument("token replay: invalid integer case-id value");
-    }
-    return std::stod(field.value);
-  };
+  using Number = ReplayNumber;
+  const auto number = replay_number;
   const auto compare_integer_real = [](std::int64_t integer, double real) {
     // Do not round integer identifiers through double, including on platforms
     // where long double has no extra precision. Bound the cast before using it.
@@ -340,6 +344,85 @@ std::vector<TokenReplayTraceDiagnostics> replay_dataframe_traces(
   columns.timestamp_key = options.timestamp_attribute;
   check_dataframe_columns(table, columns);
   return replay_token_traces(EventDataView(table), net, options);
+}
+
+EventTable replay_dataframe_diagnostics(
+    const EventTable& table, const PetriNet& net, TokenReplayOptions options) {
+  DataFrameColumnOptions columns;
+  columns.activity_key = options.activity_attribute;
+  columns.case_id_key = options.case_id_attribute;
+  columns.timestamp_key = options.timestamp_attribute;
+  check_dataframe_columns(table, columns);
+  enforce_cap(table.size(), options);
+  // The public dataframe-return mode converts to exact source-order cases
+  // before replay; the list-return mode's inferred group index is not used.
+  auto log = project_stream(event_table_to_event_stream(table), options);
+  const auto diagnostics = replay_token_traces(log, net, options);
+  EventTable result;
+  result.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {}};
+  if (diagnostics.empty()) return result;
+
+  bool strings = true, booleans = true, integers = true, numeric = true;
+  bool negative = false, wide_unsigned = false;
+  for (const auto& trace : log.traces) {
+    const auto& key = *trace.case_id_attribute;
+    strings &= key.kind == AttributeKind::kString;
+    booleans &= key.kind == AttributeKind::kBoolean;
+    integers &= key.kind == AttributeKind::kInt;
+    numeric &= key.kind == AttributeKind::kInt || key.kind == AttributeKind::kFloat;
+    if (key.kind == AttributeKind::kInt) {
+      const auto number = replay_number(key);
+      if (const auto* value = std::get_if<std::int64_t>(&number)) negative |= *value < 0;
+      if (const auto* value = std::get_if<std::uint64_t>(&number))
+        wide_unsigned |= *value > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+    }
+  }
+  const std::string case_dtype = strings ? "str" : booleans ? "bool" :
+      integers ? (wide_unsigned ? (negative ? "object" : "uint64") : "int64") :
+      numeric ? "float64" : "object";
+  result.columns = {"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"};
+  result.dtypes = {case_dtype, "bool", "float64", "int64", "int64", "int64", "int64"};
+  const auto integer_cell = [](std::string key, std::uint64_t value) {
+    if (value > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
+      throw std::overflow_error("token replay: diagnostic counter exceeds int64");
+    EventAttribute cell{std::move(key), std::to_string(value), AttributeKind::kInt};
+    cell.typed_value = static_cast<std::int64_t>(value);
+    return cell;
+  };
+  const auto float_cell = [](std::string key, double value) {
+    char buffer[64];
+    const auto converted = std::to_chars(buffer, buffer + sizeof(buffer), value, std::chars_format::general);
+    if (converted.ec != std::errc{}) throw std::runtime_error("token replay: cannot format numeric diagnostic");
+    EventAttribute cell{std::move(key), std::string(buffer, converted.ptr), AttributeKind::kFloat};
+    cell.typed_value = value;
+    return cell;
+  };
+  for (std::size_t i = 0; i < diagnostics.size(); ++i) {
+    auto key = *log.traces[i].case_id_attribute;
+    key.key = "case_id";
+    key.first_class_role = FirstClassAttributeRole::kNone;
+    key.first_class_state = FirstClassAttributeState::kMissing;
+    key.first_class_source_key.clear();
+    if (case_dtype == "float64") {
+      key = float_cell("case_id", std::visit([](auto value) { return static_cast<double>(value); }, replay_number(key)));
+    } else if (case_dtype == "int64") {
+      const auto value = std::visit([](auto value) { return static_cast<std::int64_t>(value); }, replay_number(key));
+      key.value = std::to_string(value);
+      key.typed_value = value;
+    } else if (case_dtype == "uint64") {
+      const auto value = std::visit([](auto value) { return static_cast<std::uint64_t>(value); }, replay_number(key));
+      key.value = std::to_string(value);
+      key.typed_value = value;
+    }
+    const auto& row = diagnostics[i];
+    EventAttribute fit{"is_fit", row.trace_is_fit ? "true" : "false", AttributeKind::kBoolean};
+    fit.typed_value = row.trace_is_fit;
+    result.rows.push_back({std::move(key), std::move(fit), float_cell("trace_fitness", row.trace_fitness),
+        integer_cell("missing", row.missing), integer_cell("remaining", row.remaining),
+        integer_cell("produced", row.produced), integer_cell("consumed", row.consumed)});
+    result.index->labels.push_back({integer_cell("", i)});
+  }
+  return result;
 }
 
 EventLog normalize_token_replay_event_log(const EventDataView& data,

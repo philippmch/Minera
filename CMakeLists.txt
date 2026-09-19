@@ -450,6 +450,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_event_data_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_event_data_tests COMMAND minera_event_data_tests)
 
+  add_executable(minera_token_replay_dataframe_diagnostics_tests
+    src/backend/tests/test_token_replay_dataframe_diagnostics.cpp
+  )
+  target_link_libraries(minera_token_replay_dataframe_diagnostics_tests PRIVATE minera::core)
+  target_compile_features(minera_token_replay_dataframe_diagnostics_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_token_replay_dataframe_diagnostics_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_token_replay_dataframe_diagnostics_tests COMMAND minera_token_replay_dataframe_diagnostics_tests)
+
   add_executable(minera_dataframe_validation_tests
     src/backend/tests/test_dataframe_validation.cpp
   )

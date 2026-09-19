@@ -322,6 +322,11 @@ struct TokenReplayDiagnostics {
 [[nodiscard]] std::vector<TokenReplayTraceDiagnostics> replay_dataframe_traces(
     const EventTable& table, const PetriNet& net, TokenReplayOptions options = {});
 
+// Dataframe-form diagnostics use exact case groups in source order. Output
+// contains typed case identifiers and scalar fitness/token counters.
+[[nodiscard]] EventTable replay_dataframe_diagnostics(
+    const EventTable& table, const PetriNet& net, TokenReplayOptions options = {});
+
 // Flat replay projection does not require timestamps or reorder case events.
 [[nodiscard]] EventLog normalize_token_replay_event_log(
     const EventDataView& data, const TokenReplayOptions& options = {});
