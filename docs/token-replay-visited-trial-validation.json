@@ -1,0 +1,1728 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Exhaustive hidden-path trials respect already visited transitions while preserving successful-trial visited state.",
+  "artifacts": [
+    {
+      "path": "docs/token-replay-visited-trial-reference.json.gz",
+      "uncompressed_sha256": "c2ded7434b43d880aafa0c7c9878895defe61255cfcc42367667f76fe4f25e34",
+      "reference_provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "apply",
+        "module": "pm4py.algo.conformance.tokenreplay.algorithm",
+        "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, parameters: Optional[Dict[Any, Any]] = None, variant=<Variants.TOKEN_REPLAY: <module 'pm4py.algo.conformance.tokenreplay.variants.token_replay' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\conformance\\\\tokenreplay\\\\variants\\\\token_replay.py'>>) -> List[Dict[str, Any]]",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962",
+        "pinned_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962"
+      }
+    },
+    {
+      "path": "docs/token-replay-visited-trial-usage-reference.json.gz",
+      "uncompressed_sha256": "a6b82e3ccfddf78ee97572ab0ba6dc39886a4bf463ab705d24cc5b78416f60bb",
+      "reference_provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "compare_element_usage_two_logs",
+        "module": "pm4py.algo.comparison.petrinet.element_usage_comparison",
+        "signature": "(net: pm4py.objects.petri_net.obj.PetriNet, im: pm4py.objects.petri_net.obj.Marking, fm: pm4py.objects.petri_net.obj.Marking, log1: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], log2: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], parameters: Optional[Dict[Any, Any]] = None) -> Dict[Any, Any]",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "af79d6de71ae52df44a8e32db683e3a5ecff0dc4bddb1941aac55ed39faf1ad1",
+        "pinned_sha256": "af79d6de71ae52df44a8e32db683e3a5ecff0dc4bddb1941aac55ed39faf1ad1"
+      }
+    }
+  ],
+  "reference_repetition": {
+    "hash_seeds": [
+      0,
+      1,
+      17
+    ],
+    "identical_results": true,
+    "inputs_per_process": 84,
+    "replay_observations_per_process": 168,
+    "usage_observations_per_process": 84
+  },
+  "contract": [
+    "Pass the surrounding recursive search visited set into each exhaustive path trial.",
+    "Skip already visited transitions before testing whether they are enabled; continue through later path steps.",
+    "Successful trial firings do not add their transitions to the visited set."
+  ],
+  "validation": {
+    "replay": {
+      "checks": [
+        {
+          "id": "0:False",
+          "name": "weighted_deficit_2_tokens1_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "0:True",
+          "name": "weighted_deficit_2_tokens1_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "1:False",
+          "name": "weighted_deficit_2_tokens1_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "1:True",
+          "name": "weighted_deficit_2_tokens1_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "2:False",
+          "name": "weighted_deficit_2_tokens1_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "2:True",
+          "name": "weighted_deficit_2_tokens1_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "3:False",
+          "name": "weighted_deficit_2_tokens1_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "3:True",
+          "name": "weighted_deficit_2_tokens1_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "4:False",
+          "name": "weighted_deficit_2_tokens1_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "4:True",
+          "name": "weighted_deficit_2_tokens1_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "5:False",
+          "name": "weighted_deficit_2_tokens1_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "5:True",
+          "name": "weighted_deficit_2_tokens1_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "6:False",
+          "name": "weighted_deficit_2_tokens1_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "6:True",
+          "name": "weighted_deficit_2_tokens1_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "7:False",
+          "name": "weighted_deficit_2_tokens1_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "7:True",
+          "name": "weighted_deficit_2_tokens1_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "8:False",
+          "name": "weighted_deficit_2_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "8:True",
+          "name": "weighted_deficit_2_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "9:False",
+          "name": "weighted_deficit_2_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "9:True",
+          "name": "weighted_deficit_2_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "10:False",
+          "name": "weighted_deficit_2_tokens2_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "10:True",
+          "name": "weighted_deficit_2_tokens2_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "11:False",
+          "name": "weighted_deficit_2_tokens2_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "11:True",
+          "name": "weighted_deficit_2_tokens2_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "12:False",
+          "name": "weighted_deficit_2_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "12:True",
+          "name": "weighted_deficit_2_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "13:False",
+          "name": "weighted_deficit_2_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "13:True",
+          "name": "weighted_deficit_2_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "14:False",
+          "name": "weighted_deficit_2_tokens2_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "14:True",
+          "name": "weighted_deficit_2_tokens2_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "15:False",
+          "name": "weighted_deficit_2_tokens2_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "15:True",
+          "name": "weighted_deficit_2_tokens2_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "16:False",
+          "name": "weighted_deficit_2_tokens3_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "16:True",
+          "name": "weighted_deficit_2_tokens3_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "17:False",
+          "name": "weighted_deficit_2_tokens3_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "17:True",
+          "name": "weighted_deficit_2_tokens3_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "18:False",
+          "name": "weighted_deficit_2_tokens3_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "18:True",
+          "name": "weighted_deficit_2_tokens3_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "19:False",
+          "name": "weighted_deficit_2_tokens3_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "19:True",
+          "name": "weighted_deficit_2_tokens3_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "20:False",
+          "name": "weighted_deficit_2_tokens3_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "20:True",
+          "name": "weighted_deficit_2_tokens3_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "21:False",
+          "name": "weighted_deficit_2_tokens3_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "21:True",
+          "name": "weighted_deficit_2_tokens3_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "22:False",
+          "name": "weighted_deficit_2_tokens3_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "22:True",
+          "name": "weighted_deficit_2_tokens3_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "23:False",
+          "name": "weighted_deficit_2_tokens3_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "23:True",
+          "name": "weighted_deficit_2_tokens3_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "24:False",
+          "name": "weighted_deficit_4_tokens1_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "24:True",
+          "name": "weighted_deficit_4_tokens1_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "25:False",
+          "name": "weighted_deficit_4_tokens1_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "25:True",
+          "name": "weighted_deficit_4_tokens1_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "26:False",
+          "name": "weighted_deficit_4_tokens1_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "26:True",
+          "name": "weighted_deficit_4_tokens1_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "27:False",
+          "name": "weighted_deficit_4_tokens1_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "27:True",
+          "name": "weighted_deficit_4_tokens1_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "28:False",
+          "name": "weighted_deficit_4_tokens1_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "28:True",
+          "name": "weighted_deficit_4_tokens1_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "29:False",
+          "name": "weighted_deficit_4_tokens1_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "29:True",
+          "name": "weighted_deficit_4_tokens1_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "30:False",
+          "name": "weighted_deficit_4_tokens1_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "30:True",
+          "name": "weighted_deficit_4_tokens1_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "31:False",
+          "name": "weighted_deficit_4_tokens1_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "31:True",
+          "name": "weighted_deficit_4_tokens1_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "32:False",
+          "name": "weighted_deficit_4_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "32:True",
+          "name": "weighted_deficit_4_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "33:False",
+          "name": "weighted_deficit_4_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "33:True",
+          "name": "weighted_deficit_4_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "34:False",
+          "name": "weighted_deficit_4_tokens2_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "34:True",
+          "name": "weighted_deficit_4_tokens2_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "35:False",
+          "name": "weighted_deficit_4_tokens2_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "35:True",
+          "name": "weighted_deficit_4_tokens2_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "36:False",
+          "name": "weighted_deficit_4_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "36:True",
+          "name": "weighted_deficit_4_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "37:False",
+          "name": "weighted_deficit_4_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "37:True",
+          "name": "weighted_deficit_4_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "38:False",
+          "name": "weighted_deficit_4_tokens2_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "38:True",
+          "name": "weighted_deficit_4_tokens2_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "39:False",
+          "name": "weighted_deficit_4_tokens2_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "39:True",
+          "name": "weighted_deficit_4_tokens2_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "40:False",
+          "name": "weighted_deficit_4_tokens3_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "40:True",
+          "name": "weighted_deficit_4_tokens3_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "41:False",
+          "name": "weighted_deficit_4_tokens3_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "41:True",
+          "name": "weighted_deficit_4_tokens3_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "42:False",
+          "name": "weighted_deficit_4_tokens3_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "42:True",
+          "name": "weighted_deficit_4_tokens3_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "43:False",
+          "name": "weighted_deficit_4_tokens3_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "43:True",
+          "name": "weighted_deficit_4_tokens3_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "44:False",
+          "name": "weighted_deficit_4_tokens3_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "44:True",
+          "name": "weighted_deficit_4_tokens3_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "45:False",
+          "name": "weighted_deficit_4_tokens3_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "45:True",
+          "name": "weighted_deficit_4_tokens3_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "46:False",
+          "name": "weighted_deficit_4_tokens3_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "46:True",
+          "name": "weighted_deficit_4_tokens3_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "47:False",
+          "name": "weighted_deficit_4_tokens3_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "47:True",
+          "name": "weighted_deficit_4_tokens3_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "48:False",
+          "name": "weighted_deficit_9_tokens1_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "48:True",
+          "name": "weighted_deficit_9_tokens1_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "49:False",
+          "name": "weighted_deficit_9_tokens1_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "49:True",
+          "name": "weighted_deficit_9_tokens1_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "50:False",
+          "name": "weighted_deficit_9_tokens1_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "50:True",
+          "name": "weighted_deficit_9_tokens1_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "51:False",
+          "name": "weighted_deficit_9_tokens1_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "51:True",
+          "name": "weighted_deficit_9_tokens1_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "52:False",
+          "name": "weighted_deficit_9_tokens1_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "52:True",
+          "name": "weighted_deficit_9_tokens1_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "53:False",
+          "name": "weighted_deficit_9_tokens1_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "53:True",
+          "name": "weighted_deficit_9_tokens1_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "54:False",
+          "name": "weighted_deficit_9_tokens1_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "54:True",
+          "name": "weighted_deficit_9_tokens1_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "55:False",
+          "name": "weighted_deficit_9_tokens1_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "55:True",
+          "name": "weighted_deficit_9_tokens1_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "56:False",
+          "name": "weighted_deficit_9_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "56:True",
+          "name": "weighted_deficit_9_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "57:False",
+          "name": "weighted_deficit_9_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "57:True",
+          "name": "weighted_deficit_9_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "58:False",
+          "name": "weighted_deficit_9_tokens2_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "58:True",
+          "name": "weighted_deficit_9_tokens2_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "59:False",
+          "name": "weighted_deficit_9_tokens2_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "59:True",
+          "name": "weighted_deficit_9_tokens2_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "60:False",
+          "name": "weighted_deficit_9_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "60:True",
+          "name": "weighted_deficit_9_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "61:False",
+          "name": "weighted_deficit_9_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "61:True",
+          "name": "weighted_deficit_9_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "62:False",
+          "name": "weighted_deficit_9_tokens2_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "62:True",
+          "name": "weighted_deficit_9_tokens2_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "63:False",
+          "name": "weighted_deficit_9_tokens2_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "63:True",
+          "name": "weighted_deficit_9_tokens2_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "64:False",
+          "name": "weighted_deficit_9_tokens3_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "64:True",
+          "name": "weighted_deficit_9_tokens3_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "65:False",
+          "name": "weighted_deficit_9_tokens3_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "65:True",
+          "name": "weighted_deficit_9_tokens3_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "66:False",
+          "name": "weighted_deficit_9_tokens3_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "66:True",
+          "name": "weighted_deficit_9_tokens3_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "67:False",
+          "name": "weighted_deficit_9_tokens3_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "67:True",
+          "name": "weighted_deficit_9_tokens3_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "68:False",
+          "name": "weighted_deficit_9_tokens3_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "68:True",
+          "name": "weighted_deficit_9_tokens3_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "69:False",
+          "name": "weighted_deficit_9_tokens3_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "69:True",
+          "name": "weighted_deficit_9_tokens3_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "70:False",
+          "name": "weighted_deficit_9_tokens3_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "70:True",
+          "name": "weighted_deficit_9_tokens3_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "71:False",
+          "name": "weighted_deficit_9_tokens3_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "71:True",
+          "name": "weighted_deficit_9_tokens3_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "72:False",
+          "name": "multi_holdout_25_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "72:True",
+          "name": "multi_holdout_25_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "73:False",
+          "name": "multi_holdout_25_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "73:True",
+          "name": "multi_holdout_25_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "74:False",
+          "name": "multi_holdout_25_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "74:True",
+          "name": "multi_holdout_25_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "75:False",
+          "name": "multi_holdout_25_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "75:True",
+          "name": "multi_holdout_25_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "76:False",
+          "name": "multi_holdout_217_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "76:True",
+          "name": "multi_holdout_217_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "77:False",
+          "name": "multi_holdout_217_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "77:True",
+          "name": "multi_holdout_217_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "78:False",
+          "name": "multi_holdout_217_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "78:True",
+          "name": "multi_holdout_217_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "79:False",
+          "name": "multi_holdout_217_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "79:True",
+          "name": "multi_holdout_217_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "80:False",
+          "name": "multi_holdout_339_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "80:True",
+          "name": "multi_holdout_339_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "81:False",
+          "name": "multi_holdout_339_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "81:True",
+          "name": "multi_holdout_339_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "82:False",
+          "name": "multi_holdout_339_reverseFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "82:True",
+          "name": "multi_holdout_339_reverseFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "83:False",
+          "name": "multi_holdout_339_reverseTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "83:True",
+          "name": "multi_holdout_339_reverseTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        }
+      ],
+      "match_counts": {
+        "identity": 168,
+        "independent_hidden_order": 0,
+        "net_automorphism": 0
+      },
+      "unresolved": []
+    },
+    "usage": {
+      "checks": [
+        {
+          "name": "weighted_deficit_2_tokens1_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens1_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens1_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens1_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens1_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens1_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens1_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens1_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens2_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens2_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens2_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens2_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens3_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens3_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens3_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens3_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens3_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens3_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens3_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_2_tokens3_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens1_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens1_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens1_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens1_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens1_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens1_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens1_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens1_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens2_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens2_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens2_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens2_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens3_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens3_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens3_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens3_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens3_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens3_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens3_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_4_tokens3_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens1_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens1_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens1_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens1_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens1_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens1_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens1_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens1_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens2_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens2_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens2_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens2_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens3_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens3_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens3_exhaustiveFalse_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens3_exhaustiveFalse_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens3_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens3_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens3_exhaustiveTrue_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "weighted_deficit_9_tokens3_exhaustiveTrue_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "multi_holdout_25_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "multi_holdout_25_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "multi_holdout_25_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "multi_holdout_25_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "multi_holdout_217_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "multi_holdout_217_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "multi_holdout_217_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "multi_holdout_217_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "multi_holdout_339_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "multi_holdout_339_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "multi_holdout_339_reverseFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "multi_holdout_339_reverseTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        }
+      ],
+      "skipped": [],
+      "identity_matches": 84,
+      "net_automorphism_matches": 0,
+      "unresolved_reference_groups": [],
+      "excluded_reference_models": []
+    },
+    "regressions": {
+      "deficient": {
+        "observations": 288,
+        "match_counts": {
+          "identity": 288,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "exhaustive": {
+        "observations": 40,
+        "match_counts": {
+          "identity": 40,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "duplicate": {
+        "observations": 160,
+        "match_counts": {
+          "identity": 160,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "nested": {
+        "observations": 55,
+        "match_counts": {
+          "identity": 55,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "enabled": {
+        "observations": 2518,
+        "match_counts": {
+          "identity": 2518,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      }
+    },
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "independent_review": "clear"
+  },
+  "before": {
+    "replay_matches": 104,
+    "replay_observations": 168,
+    "usage_matches": 52,
+    "usage_observations": 84
+  },
+  "native_source_parent_commit": "f477e7745b70caab9e867c57f4346dd77f112f83",
+  "native_verified_staged_tree": "0b36bdf6b551ace9ffa8a02f70785aae11fa9896",
+  "native_executable_sha256": "6ea5b3ebe12d976dd46729237bd0778dc270afa8159e51b3af5ed44a9fb0b3ef",
+  "reproduction": [
+    "Decompress each reference gzip to JSON.",
+    "Run scripts/check-token-replay-native.py against the replay reference and scripts/check-petri-element-usage-native.py against the usage reference, supplying --reference, --native, and --output."
+  ],
+  "limits": [
+    "Finite observations do not establish full parity.",
+    "A separate exploratory 400-net matrix still contains strict differences, including variable reference route choices; these have not been normalized away or claimed as matches.",
+    "Existing recursion and native resource guards remain in effect."
+  ]
+}

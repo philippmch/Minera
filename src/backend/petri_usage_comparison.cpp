@@ -338,13 +338,15 @@ void route_hidden_before_event(Marking& marking, MarkingKeys& keys, std::size_t 
   const auto candidates = [&](std::size_t /*selected*/, const MarkingKeys& required_keys) {
     return silent_place_paths(keys, required_keys, net, place_names, 51, true);
   };
-  const auto trial = [&](std::size_t selected, const detail::HiddenPlacePath& path) {
+  const auto trial = [&](std::size_t selected, const detail::HiddenPlacePath& path,
+                         const std::vector<bool>& visited) {
     Marking trial_marking = marking;
     auto trial_keys = keys;
     ReplayUsage scratch{std::vector<std::uint64_t>(net.transitions().size(), 0),
                         std::vector<std::uint64_t>(net.place_count(), 0)};
     std::vector<std::size_t> accepted;
     for (const auto transition : path.transitions) {
+      if (visited[transition]) continue;
       if (!enabled(trial_marking, net.transitions()[transition])) break;
       fire(trial_marking, trial_keys, transition, net, scratch, accepted);
     }

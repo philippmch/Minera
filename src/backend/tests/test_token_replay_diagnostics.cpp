@@ -982,6 +982,25 @@ PetriNet deficient_input_route_net(std::size_t weight) {
   return net;
 }
 
+PetriNet exhaustive_weighted_deficit_net() {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto p0 = net.add_place();
+  net.add_place();  // p1 is intentionally disconnected.
+  const auto p2 = net.add_place();
+  net.add_place();  // p3 is intentionally disconnected.
+  const auto p4 = net.add_place();
+  const auto p5 = net.add_place();
+  const auto p6 = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(p0);
+  net.set_sink(sink);
+  net.add_transition(0, {p6, p5}, {sink});
+  net.add_transition(std::nullopt, {p0}, {p2});
+  net.add_transition(std::nullopt, {p2, p2}, {p4, p5});
+  return net;
+}
+
 void assert_hidden_route_usage(const PetriNet& net, int initial_tokens,
                               bool exhaustive,
                               const std::vector<std::size_t>& expected) {
@@ -1089,6 +1108,29 @@ void forward_deficient_input_keys_public_contract() {
         assert(transition.log1_occurrences == count);
         assert(transition.log2_occurrences == 0 && transition.total_occurrences == count);
       }
+    }
+  }
+}
+
+void forward_exhaustive_visited_trial_public_contract() {
+  const auto log = log_of({{"A"}});
+  for (const bool exhaustive : {false, true}) {
+    for (const int tokens : {2, 3}) {
+      auto net = exhaustive_weighted_deficit_net();
+      TokenReplayOptions options;
+      options.initial_marking = {tokens, 0, 0, 0, 0, 0, 0, 0};
+      options.final_marking = {0, 0, 0, 0, 0, 0, 0, 1};
+      options.place_names = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "sink"};
+      options.transition_names = {"visible", "t2", "t3"};
+      options.try_to_reach_final_marking_through_hidden = false;
+      options.exhaustive_invisible_exploration = exhaustive;
+      const auto row = replay_token_traces(log, net, options).front();
+      const std::vector<std::size_t> expected{1, 0};
+      assert(row.activated_transitions == expected);
+      assert(row.event_diagnostics.size() == 1);
+      assert(row.event_diagnostics.front().activated_transitions == expected);
+      consistent(log, net, options);
+      assert_hidden_route_usage(net, tokens, exhaustive, expected);
     }
   }
 }
@@ -1442,6 +1484,7 @@ int main() {
   explicit_marking_conformance_queries();
   forward_exhaustive_hidden_path_trials_public_contract();
   forward_deficient_input_keys_public_contract();
+  forward_exhaustive_visited_trial_public_contract();
   forward_nested_hidden_routing_public_contract();
   enabled_transition_worklist_public_contract();
   forward_cleaning_public_counter_contract();

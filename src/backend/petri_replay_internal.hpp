@@ -216,7 +216,7 @@ void route_hidden_dependencies(std::size_t transition_count, std::size_t target,
       // copy.  Only the prefix returned by a successful trial may affect the
       // caller's marking; failed candidates are discarded completely.
       for (const auto& path : initial_paths) {
-        const auto accepted = trial(selected, path);
+        const auto accepted = trial(selected, path, visited);
         if (accepted.empty()) continue;
         for (const auto transition : accepted) {
           emit(transition);
