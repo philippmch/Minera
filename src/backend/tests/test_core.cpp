@@ -6150,6 +6150,89 @@ void transition_system_positional_options_and_invalid_enums() {
   }
 }
 
+void decorate_model_treats_missing_custom_timestamps_as_untimed() {
+  const auto model_log = log_from_variants({{"a", "b"}});
+  const auto tree = minera::discover_process_tree(model_log);
+  const auto net = minera::to_petri_net(tree);
+
+  auto make_event = [](const char* case_id, const char* activity,
+                       const char* timestamp) {
+    minera::Event event;
+    event.case_id = case_id;
+    event.activity = activity;
+    event.timestamp = timestamp;
+    return event;
+  };
+  auto add_trace = [](minera::EventLog& log, const char* case_id,
+                      minera::Event first, minera::Event second) {
+    minera::Trace trace;
+    trace.case_id = case_id;
+    trace.events = {std::move(first), std::move(second)};
+    log.traces.push_back(std::move(trace));
+  };
+
+  minera::EventLog canonical;
+  add_trace(canonical, "timed",
+            make_event("timed", "a", "2024-01-01T00:00:00Z"),
+            make_event("timed", "b", "2024-01-01T00:00:01Z"));
+  add_trace(canonical, "sparse",
+            make_event("sparse", "a", "2024-01-01T00:00:02Z"),
+            make_event("sparse", "b", ""));
+  add_trace(canonical, "untimed", make_event("untimed", "a", ""),
+            make_event("untimed", "b", ""));
+
+  minera::EventLog custom;
+  auto custom_timed_a = make_event("timed", "a", "2099-01-01T00:00:00Z");
+  custom_timed_a.attributes.push_back(
+      {"custom_time", "2024-01-01T00:00:00Z", minera::AttributeKind::kDate});
+  auto custom_timed_b = make_event("timed", "b", "2099-01-01T00:00:01Z");
+  custom_timed_b.attributes.push_back(
+      {"custom_time", "2024-01-01T00:00:01Z", minera::AttributeKind::kDate});
+  add_trace(custom, "timed", std::move(custom_timed_a),
+            std::move(custom_timed_b));
+  auto custom_sparse_a = make_event("sparse", "a", "2099-01-01T00:00:02Z");
+  custom_sparse_a.attributes.push_back(
+      {"custom_time", "2024-01-01T00:00:02Z", minera::AttributeKind::kDate});
+  add_trace(custom, "sparse", std::move(custom_sparse_a),
+            make_event("sparse", "b", "2099-01-01T00:00:03Z"));
+  add_trace(custom, "untimed", make_event("untimed", "a",
+                                           "2099-01-01T00:00:04Z"),
+            make_event("untimed", "b", "2099-01-01T00:00:05Z"));
+
+  const auto canonical_decoration =
+      minera::decorate_model(canonical, net, "concept:name", "time:timestamp");
+  const auto custom_decoration =
+      minera::decorate_model(custom, net, "concept:name", "custom_time");
+  assert(canonical_decoration.trace_count == 3);
+  assert(custom_decoration.trace_count == 3);
+  assert(canonical_decoration.decorated_traces == 3);
+  assert(custom_decoration.decorated_traces == 3);
+  assert(canonical_decoration.transition_counts ==
+         custom_decoration.transition_counts);
+  assert(canonical_decoration.place_counts == custom_decoration.place_counts);
+  assert(canonical_decoration.place_waits.size() ==
+         custom_decoration.place_waits.size());
+  for (std::size_t place = 0; place < canonical_decoration.place_waits.size();
+       ++place) {
+    const auto& expected = canonical_decoration.place_waits[place];
+    const auto& actual = custom_decoration.place_waits[place];
+    assert(expected.count == actual.count);
+    assert(expected.min == actual.min);
+    assert(expected.median == actual.median);
+    assert(expected.max == actual.max);
+    assert(expected.mean == actual.mean);
+  }
+
+  bool missing_activity_threw = false;
+  try {
+    (void)minera::decorate_model(canonical, net, "missing_activity",
+                                 "time:timestamp");
+  } catch (const std::invalid_argument&) {
+    missing_activity_threw = true;
+  }
+  assert(missing_activity_threw);
+}
+
 }  // namespace
 
 void json_export_carries_dfg_and_edit_alignment_contract() {
@@ -6583,6 +6666,7 @@ int main() {
   parse_bpmn_rejects_unsupported_models();
   decorate_model_counts_firings_and_waits();
   decorate_model_skips_deviating_and_untimed_traces();
+  decorate_model_treats_missing_custom_timestamps_as_untimed();
   ptml_round_trip_preserves_replay_behavior();
   parse_ptml_reads_a_foreign_tree();
   parse_ptml_rejects_malformed_trees();

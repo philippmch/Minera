@@ -4122,10 +4122,17 @@ selectors, completion timestamps, missing attributes, overlapping intervals,
 and custom timestamp fields present only where the calculation needs them.
 This finite checkpoint does not establish arbitrary dataframe timestamp parity
 or Python exception-class and message identity for native rejections.
-The strict CLI comparison improves from 16/21 to 20/21. The sparse custom
-timestamp case passes direct C++ discovery, but the CLI's later model-decoration
-step still rejects its missing completion field; that integration difference
-is retained in `docs/heuristic-start-selector-validation.json`.
+The first selector fix improved the strict CLI comparison from 16/21 to 20/21;
+that historical result remains in `docs/heuristic-start-selector-validation.json`.
+The subsequent decoration fix treats missing custom timestamps as untimed,
+preserving firing counts while omitting waits without usable endpoints. It
+does not substitute canonical timestamps for the selected custom field, and
+missing activity fields still raise errors. All 21 selector cases now match,
+along with seven additional one- to four-event sparse timestamp cases. The
+reference observations and passing 154 native suites are recorded in
+`docs/heuristic-decoration-sparse-validation.json`. This validates native
+decoration's documented untimed-event behavior; it does not establish parity
+with every reference visualization variant.
 
 The C++ `HeuristicMinerOptions::start_timestamp_attribute` field is now
 `std::optional<std::string>` to distinguish omission from explicit selection.

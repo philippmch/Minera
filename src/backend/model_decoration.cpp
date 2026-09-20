@@ -32,13 +32,13 @@ bool standard_timestamp_attribute(std::string_view key) {
   return key.empty() || key == "time:timestamp" || key == "timestamp";
 }
 
-const std::string& selected_timestamp(const Event& event,
-                                      std::string_view timestamp_attribute) {
+std::string_view selected_timestamp(const Event& event,
+                                    std::string_view timestamp_attribute) {
   if (standard_timestamp_attribute(timestamp_attribute)) return event.timestamp;
   if (const auto* value = event.attribute(timestamp_attribute)) return *value;
-  throw std::invalid_argument(
-      "model decoration: event is missing timestamp attribute '" +
-      std::string(timestamp_attribute) + "'");
+  // A missing custom timestamp makes this event untimed. Do not substitute the
+  // canonical event timestamp: callers may deliberately select a sparse field.
+  return {};
 }
 
 }  // namespace
