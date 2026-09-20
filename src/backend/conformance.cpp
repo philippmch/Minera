@@ -749,24 +749,25 @@ class Replayer {
                                 const detail::ReplayMarkingKeys& required_keys) {
       return detail::silent_place_paths(keys, required_keys, net_, place_names);
     };
-    const auto trial = [&](std::size_t selected, const detail::HiddenPlacePath& path,
+    const auto trial = [&](std::size_t selected,
+                           const std::vector<detail::HiddenPlacePath>& paths,
                            const std::vector<bool>& visited) {
-      Marking trial_marking = marking;
-      auto trial_keys = keys;
-      Counts scratch;
-      scratch.places.resize(trial_marking.size());
-      std::vector<std::size_t> accepted;
-      for (const auto transition : path.transitions) {
-        if (visited[transition]) continue;
-        if (!enabled(trial_marking, transition)) break;
+      const auto fire_trial = [&](Marking& trial_marking,
+                                  detail::ReplayMarkingKeys& trial_keys,
+                                  std::size_t transition) {
+        Counts scratch;
+        scratch.places.resize(trial_marking.size());
         // The transition is enabled, so forward_fire performs the same
         // checked marking/key update without contributing diagnostics or
         // usage counts to the real replay.
         forward_fire(trial_marking, trial_keys, transition, scratch);
-        accepted.push_back(transition);
-      }
-      if (!enabled(trial_marking, selected)) accepted.clear();
-      return accepted;
+      };
+      return detail::exhaustive_hidden_transition_trial(
+          selected, paths, visited, marking, keys,
+          [&](const Marking& candidate, std::size_t transition) {
+            return enabled(candidate, transition);
+          },
+          fire_trial);
     };
     detail::route_hidden_dependencies(net_.transitions().size(), target, exhaustive,
         candidates, required,

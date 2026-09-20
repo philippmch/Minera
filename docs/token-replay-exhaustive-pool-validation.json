@@ -1,0 +1,1989 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Exhaustive routing searches the combined candidate transition pool transactionally in breadth-first order.",
+  "artifacts": [
+    {
+      "path": "docs/token-replay-exhaustive-pool-reference.json.gz",
+      "uncompressed_sha256": "bc1f49c09486cc03d43329bd29b43f2e9742a162dc4fe13aab6896c21f66f50f",
+      "reference_provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "apply",
+        "module": "pm4py.algo.conformance.tokenreplay.algorithm",
+        "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, parameters: Optional[Dict[Any, Any]] = None, variant=<Variants.TOKEN_REPLAY: <module 'pm4py.algo.conformance.tokenreplay.variants.token_replay' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\conformance\\\\tokenreplay\\\\variants\\\\token_replay.py'>>) -> List[Dict[str, Any]]",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962",
+        "pinned_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962"
+      }
+    },
+    {
+      "path": "docs/token-replay-exhaustive-pool-usage-reference.json.gz",
+      "uncompressed_sha256": "f814c4b8d5bbf4f751871aa5ac2489f4ef0685d25505ec991cba39f53d0f05f0",
+      "reference_provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "compare_element_usage_two_logs",
+        "module": "pm4py.algo.comparison.petrinet.element_usage_comparison",
+        "signature": "(net: pm4py.objects.petri_net.obj.PetriNet, im: pm4py.objects.petri_net.obj.Marking, fm: pm4py.objects.petri_net.obj.Marking, log1: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], log2: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], parameters: Optional[Dict[Any, Any]] = None) -> Dict[Any, Any]",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "af79d6de71ae52df44a8e32db683e3a5ecff0dc4bddb1941aac55ed39faf1ad1",
+        "pinned_sha256": "af79d6de71ae52df44a8e32db683e3a5ecff0dc4bddb1941aac55ed39faf1ad1"
+      }
+    },
+    {
+      "path": "docs/token-replay-exhaustive-pool-model-reference.json.gz",
+      "uncompressed_sha256": "32f07d720bb39d27f8be67057ab23fd9cbac04d0ee9142e585922859862279e8",
+      "reference_provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "enable_hidden_transitions",
+        "module": "pm4py.algo.conformance.tokenreplay.variants.token_replay",
+        "signature": "(net, marking, activated_transitions, visited_transitions, all_visited_markings, hidden_transitions_to_enable, t, exhaustive_invisible_exploration)",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "96fc7be0ed122d1afd2b824c4d2973e4d95990dcda650ffbe2b3b13ee86400b3",
+        "pinned_sha256": "96fc7be0ed122d1afd2b824c4d2973e4d95990dcda650ffbe2b3b13ee86400b3"
+      }
+    }
+  ],
+  "reference_repetition": {
+    "hash_seeds": [
+      0,
+      1,
+      17
+    ],
+    "identical_results": true,
+    "inputs_per_process": 96,
+    "replay_observations_per_process": 192,
+    "usage_observations_per_process": 96
+  },
+  "contract": [
+    "Deduplicate transitions in first-occurrence order across the structural candidate paths.",
+    "Search enabled transitions breadth-first on copied markings and marking keys.",
+    "Each transition may fire at most once in a trial, and transitions already visited by the surrounding search are excluded.",
+    "Commit only a complete sequence that enables the selected transition; unsuccessful searches leave replay state unchanged.",
+    "Successful trial firings do not modify the surrounding visited set."
+  ],
+  "validation": {
+    "replay": {
+      "checks": [
+        {
+          "id": "0:False",
+          "name": "pool_2_tokens1_events1_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "0:True",
+          "name": "pool_2_tokens1_events1_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "1:False",
+          "name": "pool_2_tokens1_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "1:True",
+          "name": "pool_2_tokens1_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "2:False",
+          "name": "pool_2_tokens1_events1_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "2:True",
+          "name": "pool_2_tokens1_events1_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "3:False",
+          "name": "pool_2_tokens1_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "3:True",
+          "name": "pool_2_tokens1_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "4:False",
+          "name": "pool_2_tokens1_events2_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "4:True",
+          "name": "pool_2_tokens1_events2_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "5:False",
+          "name": "pool_2_tokens1_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "5:True",
+          "name": "pool_2_tokens1_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "6:False",
+          "name": "pool_2_tokens1_events2_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "6:True",
+          "name": "pool_2_tokens1_events2_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "7:False",
+          "name": "pool_2_tokens1_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "7:True",
+          "name": "pool_2_tokens1_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "8:False",
+          "name": "pool_2_tokens1_events3_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "8:True",
+          "name": "pool_2_tokens1_events3_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "9:False",
+          "name": "pool_2_tokens1_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "9:True",
+          "name": "pool_2_tokens1_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "10:False",
+          "name": "pool_2_tokens1_events3_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "10:True",
+          "name": "pool_2_tokens1_events3_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "11:False",
+          "name": "pool_2_tokens1_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "11:True",
+          "name": "pool_2_tokens1_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "12:False",
+          "name": "pool_2_tokens2_events1_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "12:True",
+          "name": "pool_2_tokens2_events1_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "13:False",
+          "name": "pool_2_tokens2_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "13:True",
+          "name": "pool_2_tokens2_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "14:False",
+          "name": "pool_2_tokens2_events1_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "14:True",
+          "name": "pool_2_tokens2_events1_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "15:False",
+          "name": "pool_2_tokens2_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "15:True",
+          "name": "pool_2_tokens2_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "16:False",
+          "name": "pool_2_tokens2_events2_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "16:True",
+          "name": "pool_2_tokens2_events2_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "17:False",
+          "name": "pool_2_tokens2_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "17:True",
+          "name": "pool_2_tokens2_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "18:False",
+          "name": "pool_2_tokens2_events2_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "18:True",
+          "name": "pool_2_tokens2_events2_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "19:False",
+          "name": "pool_2_tokens2_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "19:True",
+          "name": "pool_2_tokens2_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "20:False",
+          "name": "pool_2_tokens2_events3_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "20:True",
+          "name": "pool_2_tokens2_events3_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "21:False",
+          "name": "pool_2_tokens2_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "21:True",
+          "name": "pool_2_tokens2_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "22:False",
+          "name": "pool_2_tokens2_events3_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "22:True",
+          "name": "pool_2_tokens2_events3_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "23:False",
+          "name": "pool_2_tokens2_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "23:True",
+          "name": "pool_2_tokens2_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "24:False",
+          "name": "pool_2_tokens3_events1_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "24:True",
+          "name": "pool_2_tokens3_events1_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "25:False",
+          "name": "pool_2_tokens3_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "25:True",
+          "name": "pool_2_tokens3_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "26:False",
+          "name": "pool_2_tokens3_events1_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "26:True",
+          "name": "pool_2_tokens3_events1_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "27:False",
+          "name": "pool_2_tokens3_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "27:True",
+          "name": "pool_2_tokens3_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "28:False",
+          "name": "pool_2_tokens3_events2_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "28:True",
+          "name": "pool_2_tokens3_events2_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "29:False",
+          "name": "pool_2_tokens3_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "29:True",
+          "name": "pool_2_tokens3_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "30:False",
+          "name": "pool_2_tokens3_events2_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "30:True",
+          "name": "pool_2_tokens3_events2_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "31:False",
+          "name": "pool_2_tokens3_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "31:True",
+          "name": "pool_2_tokens3_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "32:False",
+          "name": "pool_2_tokens3_events3_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "32:True",
+          "name": "pool_2_tokens3_events3_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "33:False",
+          "name": "pool_2_tokens3_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "33:True",
+          "name": "pool_2_tokens3_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "34:False",
+          "name": "pool_2_tokens3_events3_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "34:True",
+          "name": "pool_2_tokens3_events3_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "35:False",
+          "name": "pool_2_tokens3_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "35:True",
+          "name": "pool_2_tokens3_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "36:False",
+          "name": "pool_2_tokens4_events1_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "36:True",
+          "name": "pool_2_tokens4_events1_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "37:False",
+          "name": "pool_2_tokens4_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "37:True",
+          "name": "pool_2_tokens4_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "38:False",
+          "name": "pool_2_tokens4_events1_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "38:True",
+          "name": "pool_2_tokens4_events1_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "39:False",
+          "name": "pool_2_tokens4_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "39:True",
+          "name": "pool_2_tokens4_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "40:False",
+          "name": "pool_2_tokens4_events2_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "40:True",
+          "name": "pool_2_tokens4_events2_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "41:False",
+          "name": "pool_2_tokens4_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "41:True",
+          "name": "pool_2_tokens4_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "42:False",
+          "name": "pool_2_tokens4_events2_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "42:True",
+          "name": "pool_2_tokens4_events2_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "43:False",
+          "name": "pool_2_tokens4_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "43:True",
+          "name": "pool_2_tokens4_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "44:False",
+          "name": "pool_2_tokens4_events3_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "44:True",
+          "name": "pool_2_tokens4_events3_exhaustiveFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "45:False",
+          "name": "pool_2_tokens4_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "45:True",
+          "name": "pool_2_tokens4_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "46:False",
+          "name": "pool_2_tokens4_events3_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "46:True",
+          "name": "pool_2_tokens4_events3_exhaustiveFalse_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "47:False",
+          "name": "pool_2_tokens4_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "47:True",
+          "name": "pool_2_tokens4_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "48:False",
+          "name": "pool_3_tokens1_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "48:True",
+          "name": "pool_3_tokens1_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "49:False",
+          "name": "pool_3_tokens1_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "49:True",
+          "name": "pool_3_tokens1_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "50:False",
+          "name": "pool_3_tokens1_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "50:True",
+          "name": "pool_3_tokens1_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "51:False",
+          "name": "pool_3_tokens1_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "51:True",
+          "name": "pool_3_tokens1_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "52:False",
+          "name": "pool_3_tokens1_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "52:True",
+          "name": "pool_3_tokens1_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "53:False",
+          "name": "pool_3_tokens1_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "53:True",
+          "name": "pool_3_tokens1_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "54:False",
+          "name": "pool_3_tokens2_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "54:True",
+          "name": "pool_3_tokens2_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "55:False",
+          "name": "pool_3_tokens2_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "55:True",
+          "name": "pool_3_tokens2_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "56:False",
+          "name": "pool_3_tokens2_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "56:True",
+          "name": "pool_3_tokens2_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "57:False",
+          "name": "pool_3_tokens2_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "57:True",
+          "name": "pool_3_tokens2_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "58:False",
+          "name": "pool_3_tokens2_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "58:True",
+          "name": "pool_3_tokens2_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "59:False",
+          "name": "pool_3_tokens2_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "59:True",
+          "name": "pool_3_tokens2_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "60:False",
+          "name": "pool_3_tokens3_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "60:True",
+          "name": "pool_3_tokens3_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "61:False",
+          "name": "pool_3_tokens3_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "61:True",
+          "name": "pool_3_tokens3_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "62:False",
+          "name": "pool_3_tokens3_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "62:True",
+          "name": "pool_3_tokens3_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "63:False",
+          "name": "pool_3_tokens3_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "63:True",
+          "name": "pool_3_tokens3_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "64:False",
+          "name": "pool_3_tokens3_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "64:True",
+          "name": "pool_3_tokens3_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "65:False",
+          "name": "pool_3_tokens3_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "65:True",
+          "name": "pool_3_tokens3_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "66:False",
+          "name": "pool_3_tokens4_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "66:True",
+          "name": "pool_3_tokens4_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "67:False",
+          "name": "pool_3_tokens4_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "67:True",
+          "name": "pool_3_tokens4_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "68:False",
+          "name": "pool_3_tokens4_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "68:True",
+          "name": "pool_3_tokens4_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "69:False",
+          "name": "pool_3_tokens4_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "69:True",
+          "name": "pool_3_tokens4_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "70:False",
+          "name": "pool_3_tokens4_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "70:True",
+          "name": "pool_3_tokens4_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "71:False",
+          "name": "pool_3_tokens4_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "71:True",
+          "name": "pool_3_tokens4_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "72:False",
+          "name": "pool_9_tokens1_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "72:True",
+          "name": "pool_9_tokens1_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "73:False",
+          "name": "pool_9_tokens1_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "73:True",
+          "name": "pool_9_tokens1_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "74:False",
+          "name": "pool_9_tokens1_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "74:True",
+          "name": "pool_9_tokens1_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "75:False",
+          "name": "pool_9_tokens1_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "75:True",
+          "name": "pool_9_tokens1_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "76:False",
+          "name": "pool_9_tokens1_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "76:True",
+          "name": "pool_9_tokens1_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "77:False",
+          "name": "pool_9_tokens1_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "77:True",
+          "name": "pool_9_tokens1_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "78:False",
+          "name": "pool_9_tokens2_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "78:True",
+          "name": "pool_9_tokens2_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "79:False",
+          "name": "pool_9_tokens2_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "79:True",
+          "name": "pool_9_tokens2_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "80:False",
+          "name": "pool_9_tokens2_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "80:True",
+          "name": "pool_9_tokens2_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "81:False",
+          "name": "pool_9_tokens2_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "81:True",
+          "name": "pool_9_tokens2_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "82:False",
+          "name": "pool_9_tokens2_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "82:True",
+          "name": "pool_9_tokens2_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "83:False",
+          "name": "pool_9_tokens2_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "83:True",
+          "name": "pool_9_tokens2_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "84:False",
+          "name": "pool_9_tokens3_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "84:True",
+          "name": "pool_9_tokens3_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "85:False",
+          "name": "pool_9_tokens3_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "85:True",
+          "name": "pool_9_tokens3_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "86:False",
+          "name": "pool_9_tokens3_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "86:True",
+          "name": "pool_9_tokens3_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "87:False",
+          "name": "pool_9_tokens3_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "87:True",
+          "name": "pool_9_tokens3_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "88:False",
+          "name": "pool_9_tokens3_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "88:True",
+          "name": "pool_9_tokens3_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "89:False",
+          "name": "pool_9_tokens3_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "89:True",
+          "name": "pool_9_tokens3_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "90:False",
+          "name": "pool_9_tokens4_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "90:True",
+          "name": "pool_9_tokens4_events1_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "91:False",
+          "name": "pool_9_tokens4_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "91:True",
+          "name": "pool_9_tokens4_events1_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "92:False",
+          "name": "pool_9_tokens4_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "92:True",
+          "name": "pool_9_tokens4_events2_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "93:False",
+          "name": "pool_9_tokens4_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "93:True",
+          "name": "pool_9_tokens4_events2_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "94:False",
+          "name": "pool_9_tokens4_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "94:True",
+          "name": "pool_9_tokens4_events3_exhaustiveTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "95:False",
+          "name": "pool_9_tokens4_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "95:True",
+          "name": "pool_9_tokens4_events3_exhaustiveTrue_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        }
+      ],
+      "match_counts": {
+        "identity": 192,
+        "independent_hidden_order": 0,
+        "net_automorphism": 0
+      },
+      "unresolved": []
+    },
+    "usage": {
+      "checks": [
+        {
+          "name": "pool_2_tokens1_events1_exhaustiveFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens1_events1_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens1_events1_exhaustiveFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens1_events1_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens1_events2_exhaustiveFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens1_events2_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens1_events2_exhaustiveFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens1_events2_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens1_events3_exhaustiveFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens1_events3_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens1_events3_exhaustiveFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens1_events3_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens2_events1_exhaustiveFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens2_events1_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens2_events1_exhaustiveFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens2_events1_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens2_events2_exhaustiveFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens2_events2_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens2_events2_exhaustiveFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens2_events2_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens2_events3_exhaustiveFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens2_events3_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens2_events3_exhaustiveFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens2_events3_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens3_events1_exhaustiveFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens3_events1_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens3_events1_exhaustiveFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens3_events1_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens3_events2_exhaustiveFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens3_events2_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens3_events2_exhaustiveFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens3_events2_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens3_events3_exhaustiveFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens3_events3_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens3_events3_exhaustiveFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens3_events3_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens4_events1_exhaustiveFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens4_events1_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens4_events1_exhaustiveFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens4_events1_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens4_events2_exhaustiveFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens4_events2_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens4_events2_exhaustiveFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens4_events2_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens4_events3_exhaustiveFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens4_events3_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens4_events3_exhaustiveFalse_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_2_tokens4_events3_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens1_events1_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens1_events1_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens1_events2_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens1_events2_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens1_events3_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens1_events3_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens2_events1_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens2_events1_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens2_events2_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens2_events2_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens2_events3_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens2_events3_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens3_events1_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens3_events1_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens3_events2_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens3_events2_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens3_events3_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens3_events3_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens4_events1_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens4_events1_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens4_events2_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens4_events2_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens4_events3_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_3_tokens4_events3_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens1_events1_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens1_events1_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens1_events2_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens1_events2_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens1_events3_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens1_events3_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens2_events1_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens2_events1_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens2_events2_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens2_events2_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens2_events3_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens2_events3_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens3_events1_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens3_events1_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens3_events2_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens3_events2_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens3_events3_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens3_events3_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens4_events1_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens4_events1_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens4_events2_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens4_events2_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens4_events3_exhaustiveTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "pool_9_tokens4_events3_exhaustiveTrue_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        }
+      ],
+      "skipped": [],
+      "identity_matches": 96,
+      "net_automorphism_matches": 0,
+      "unresolved_reference_groups": [],
+      "excluded_reference_models": []
+    },
+    "regressions": {
+      "final-order": {
+        "observations": 192,
+        "match_counts": {
+          "identity": 192,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "visited": {
+        "observations": 168,
+        "match_counts": {
+          "identity": 168,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "deficient": {
+        "observations": 288,
+        "match_counts": {
+          "identity": 288,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "exhaustive": {
+        "observations": 40,
+        "match_counts": {
+          "identity": 40,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "duplicate": {
+        "observations": 160,
+        "match_counts": {
+          "identity": 160,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "nested": {
+        "observations": 55,
+        "match_counts": {
+          "identity": 55,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "enabled": {
+        "observations": 2518,
+        "match_counts": {
+          "identity": 2518,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      }
+    },
+    "independent_model_matches": 1400,
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "independent_review": "clear"
+  },
+  "before": {
+    "replay_matches": 120,
+    "replay_observations": 192,
+    "usage_matches": 60,
+    "usage_observations": 96
+  },
+  "native_source_parent_commit": "9ec9f7682142183b6474663b3781d96d2b4f698b",
+  "native_verified_staged_tree": "92a1f32c3ed8919ba4c10aa8305db44bf36e9501",
+  "native_executable_sha256": "1175aa4230d1563292f2e8a012d0a7db367e64e0dbd9ccbe0a7dbe8d42a7f076",
+  "reproduction": [
+    "Decompress each reference gzip to JSON.",
+    "Run scripts/check-token-replay-native.py against the replay reference and scripts/check-petri-element-usage-native.py against the usage reference, supplying --reference, --native, and --output.",
+    "The model reference retains input nets, ordered candidate paths, initial visited names, and exact public helper activation sequences."
+  ],
+  "limits": [
+    "Finite observations do not establish full parity.",
+    "The native exhaustive trial search explicitly reports its 4096-state and 64 MiB retained-node payload resource bounds; temporary firing scratch is outside that accounting.",
+    "Variable reference choices among alternative structural paths remain outside this deterministic checkpoint."
+  ]
+}

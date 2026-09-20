@@ -19,6 +19,7 @@ namespace minera::detail {
 using ReplayMarkingKeys = std::vector<bool>;
 using CleaningComponents = std::vector<std::vector<std::size_t>>;
 inline constexpr std::size_t kReplayStructuralSearchCap = 4096;
+inline constexpr std::size_t kReplayStructuralTrialMemoryCap = 64u * 1024u * 1024u;
 
 template <class Integer>
 ReplayMarkingKeys resolve_replay_marking_keys(
@@ -122,6 +123,102 @@ struct HiddenPlacePath {
   std::vector<std::size_t> transitions;
 };
 
+// Exhaustive hidden routing trials pool the transitions from all structural
+// candidate paths, then search each transition at most once per trial.  The
+// marking and membership keys are copied into every breadth-first node so a
+// failed trial cannot affect the caller's replay state.
+template <class Marking, class MarkingKeys, class Enabled, class Fire>
+std::vector<std::size_t> exhaustive_hidden_transition_trial(
+    std::size_t selected, const std::vector<HiddenPlacePath>& paths,
+    const std::vector<bool>& outer_visited, const Marking& initial_marking,
+    const MarkingKeys& initial_keys, const Enabled& enabled, const Fire& fire) {
+  std::vector<std::size_t> pool;
+  std::set<std::size_t> pooled;
+  for (const auto& path : paths) {
+    for (const auto transition : path.transitions) {
+      if (pooled.insert(transition).second) pool.push_back(transition);
+    }
+  }
+
+  struct Node {
+    Marking marking;
+    MarkingKeys keys;
+    std::vector<bool> used;
+    std::vector<std::size_t> path;
+  };
+
+  const auto checked_add = [](std::size_t left, std::size_t right,
+                             std::size_t& result) {
+    if (right > std::numeric_limits<std::size_t>::max() - left) return false;
+    result = left + right;
+    return true;
+  };
+  const auto checked_product = [](std::size_t left, std::size_t right,
+                                  std::size_t& result) {
+    if (left != 0 && right > std::numeric_limits<std::size_t>::max() / left)
+      return false;
+    result = left * right;
+    return true;
+  };
+  const auto payload_bytes = [&](std::size_t marking_size, std::size_t keys_size,
+                                 std::size_t used_size, std::size_t path_size) {
+    std::size_t bytes = sizeof(Node);
+    const auto add_product = [&](std::size_t count, std::size_t element_size) {
+      std::size_t product = 0;
+      if (!checked_product(count, element_size, product)) return false;
+      return checked_add(bytes, product, bytes);
+    };
+    if (!add_product(marking_size, sizeof(typename Marking::value_type)) ||
+        !add_product(keys_size, sizeof(typename MarkingKeys::value_type)) ||
+        !add_product(used_size, sizeof(bool)) ||
+        !add_product(path_size, sizeof(std::size_t)))
+      return std::numeric_limits<std::size_t>::max();
+    return bytes;
+  };
+  const auto memory_error = [] {
+    throw std::runtime_error(
+        "Petri replay exceeded the exhaustive hidden trial memory limit");
+  };
+  const auto initial_bytes = payload_bytes(initial_marking.size(), initial_keys.size(),
+                                           outer_visited.size(), 0);
+  if (initial_bytes > kReplayStructuralTrialMemoryCap) memory_error();
+
+  std::queue<Node> pending;
+  pending.push(Node{initial_marking, initial_keys, outer_visited, {}});
+  std::size_t retained_bytes = initial_bytes;
+  std::size_t queued = 1;
+  std::size_t explored = 0;
+  while (!pending.empty()) {
+    if (++explored > kReplayStructuralSearchCap)
+      throw std::runtime_error("Petri replay exceeded the exhaustive hidden trial state limit");
+    Node current = std::move(pending.front());
+    pending.pop();
+    if (enabled(current.marking, selected)) return current.path;
+    for (const auto transition : pool) {
+      if (current.used[transition] || !enabled(current.marking, transition)) continue;
+      const auto next_path_size = current.path.size() + 1;
+      const auto next_bytes = payload_bytes(current.marking.size(), current.keys.size(),
+                                            current.used.size(), next_path_size);
+      std::size_t retained_with_next = 0;
+      if (next_bytes == std::numeric_limits<std::size_t>::max() ||
+          !checked_add(retained_bytes, next_bytes, retained_with_next) ||
+          retained_with_next > kReplayStructuralTrialMemoryCap)
+        memory_error();
+      Node next = current;
+      fire(next.marking, next.keys, transition);
+      next.used[transition] = true;
+      next.path.push_back(transition);
+      retained_bytes = retained_with_next;
+      if (++queued > kReplayStructuralSearchCap)
+        throw std::runtime_error("Petri replay exceeded the exhaustive hidden trial queue limit");
+      pending.push(std::move(next));
+    }
+    retained_bytes -= payload_bytes(current.marking.size(), current.keys.size(),
+                                    current.used.size(), current.path.size());
+  }
+  return {};
+}
+
 // Structural place paths deliberately ignore enabling while searching. Replay
 // can retain an enabled prefix even when a later multi-input join is blocked.
 inline std::vector<HiddenPlacePath> silent_place_paths(
@@ -208,17 +305,11 @@ void route_hidden_dependencies(std::size_t transition_count, std::size_t target,
     const auto required_keys = required(selected);
     const auto initial_paths = candidates(selected, required_keys);
     if (exhaustive) {
-      // The public exhaustive helper trials every candidate against a marking
-      // copy.  Only the prefix returned by a successful trial may affect the
-      // caller's marking; failed candidates are discarded completely.
-      for (const auto& path : initial_paths) {
-        const auto accepted = trial(selected, path, visited);
-        if (accepted.empty()) continue;
-        for (const auto transition : accepted) {
-          emit(transition);
-        }
-        if (enabled(selected)) return;
-      }
+      // The public exhaustive helper pools candidate transitions and searches
+      // the pool transactionally. Only a successful path affects the caller.
+      const auto accepted = trial(selected, initial_paths, visited);
+      for (const auto transition : accepted) emit(transition);
+      if (enabled(selected)) return;
     } else {
       for (const auto& path : initial_paths) {
         bool progressed = false;
