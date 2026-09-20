@@ -1,0 +1,2866 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Freeze initially deficient target inputs separately in each pre-event hidden-routing invocation while recomputing paths from the updated marking.",
+  "artifacts": [
+    {
+      "path": "docs/token-replay-deficient-input-reference.json.gz",
+      "uncompressed_sha256": "b39598c44f97739a9ddda7709ac5d2cc509a2c86526b68f12242dcdb52884cdb",
+      "reference_provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "apply",
+        "module": "pm4py.algo.conformance.tokenreplay.algorithm",
+        "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, parameters: Optional[Dict[Any, Any]] = None, variant=<Variants.TOKEN_REPLAY: <module 'pm4py.algo.conformance.tokenreplay.variants.token_replay' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\conformance\\\\tokenreplay\\\\variants\\\\token_replay.py'>>) -> List[Dict[str, Any]]",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962",
+        "pinned_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962"
+      }
+    },
+    {
+      "path": "docs/token-replay-deficient-input-usage-reference.json.gz",
+      "uncompressed_sha256": "3b1b91d06a952b494df224094b900c9b6307eafefbb7afa73e1419c1e21fe8fd",
+      "reference_provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "compare_element_usage_two_logs",
+        "module": "pm4py.algo.comparison.petrinet.element_usage_comparison",
+        "signature": "(net: pm4py.objects.petri_net.obj.PetriNet, im: pm4py.objects.petri_net.obj.Marking, fm: pm4py.objects.petri_net.obj.Marking, log1: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], log2: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], parameters: Optional[Dict[Any, Any]] = None) -> Dict[Any, Any]",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "af79d6de71ae52df44a8e32db683e3a5ecff0dc4bddb1941aac55ed39faf1ad1",
+        "pinned_sha256": "af79d6de71ae52df44a8e32db683e3a5ecff0dc4bddb1941aac55ed39faf1ad1"
+      }
+    }
+  ],
+  "reference_repetition": {
+    "hash_seeds": [
+      0,
+      1,
+      17
+    ],
+    "identical_results": true,
+    "inputs_per_process": 144,
+    "replay_observations_per_process": 288,
+    "usage_observations_per_process": 144
+  },
+  "contract": [
+    "Compute deficient target input keys once at entry to each recursive invocation.",
+    "Recompute candidate paths from live marking keys and the frozen deficient target keys.",
+    "Nested invocations compute their own target keys from their entry marking.",
+    "Pre-event candidate paths sort by length, source place name, then target place name.",
+    "Return before dependency exploration when the enabled-prefix phase enables the selected target."
+  ],
+  "validation": {
+    "replay": {
+      "checks": [
+        {
+          "id": "0:False",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "0:True",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "1:False",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "1:True",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "2:False",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "2:True",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "3:False",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "3:True",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "4:False",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "4:True",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "5:False",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "5:True",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "6:False",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "6:True",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "7:False",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "7:True",
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "8:False",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "8:True",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "9:False",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "9:True",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "10:False",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "10:True",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "11:False",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "11:True",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "12:False",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "12:True",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "13:False",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "13:True",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "14:False",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "14:True",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "15:False",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "15:True",
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "16:False",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "16:True",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "17:False",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "17:True",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "18:False",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "18:True",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "19:False",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "19:True",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "20:False",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "20:True",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "21:False",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "21:True",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "22:False",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "22:True",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "23:False",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "23:True",
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "24:False",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "24:True",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "25:False",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "25:True",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "26:False",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "26:True",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "27:False",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "27:True",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "28:False",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "28:True",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "29:False",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "29:True",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "30:False",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "30:True",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "31:False",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "31:True",
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "32:False",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "32:True",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "33:False",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "33:True",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "34:False",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "34:True",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "35:False",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "35:True",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "36:False",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "36:True",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "37:False",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "37:True",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "38:False",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "38:True",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "39:False",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "39:True",
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "40:False",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "40:True",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "41:False",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "41:True",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "42:False",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "42:True",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "43:False",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "43:True",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "44:False",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "44:True",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "45:False",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "45:True",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "46:False",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "46:True",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "47:False",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "47:True",
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "48:False",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "48:True",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "49:False",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "49:True",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "50:False",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "50:True",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "51:False",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "51:True",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "52:False",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "52:True",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "53:False",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "53:True",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "54:False",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "54:True",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "55:False",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "55:True",
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "56:False",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "56:True",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "57:False",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "57:True",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "58:False",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "58:True",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "59:False",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "59:True",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "60:False",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "60:True",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "61:False",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "61:True",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "62:False",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "62:True",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "63:False",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "63:True",
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "64:False",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "64:True",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "65:False",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "65:True",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "66:False",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "66:True",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "67:False",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "67:True",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "68:False",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "68:True",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "69:False",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "69:True",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "70:False",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "70:True",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "71:False",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "71:True",
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "72:False",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "72:True",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "73:False",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "73:True",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "74:False",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "74:True",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "75:False",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "75:True",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "76:False",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "76:True",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "77:False",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "77:True",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "78:False",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "78:True",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "79:False",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "79:True",
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "80:False",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "80:True",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "81:False",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "81:True",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "82:False",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "82:True",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "83:False",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "83:True",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "84:False",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "84:True",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "85:False",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "85:True",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "86:False",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "86:True",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "87:False",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "87:True",
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "88:False",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "88:True",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "89:False",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "89:True",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "90:False",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "90:True",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "91:False",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "91:True",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "92:False",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "92:True",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "93:False",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "93:True",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "94:False",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "94:True",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "95:False",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "95:True",
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "96:False",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "96:True",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "97:False",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "97:True",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "98:False",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "98:True",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "99:False",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "99:True",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "100:False",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "100:True",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "101:False",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "101:True",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "102:False",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "102:True",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "103:False",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "103:True",
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "104:False",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "104:True",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "105:False",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "105:True",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "106:False",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "106:True",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "107:False",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "107:True",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "108:False",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "108:True",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "109:False",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "109:True",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "110:False",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "110:True",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "111:False",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "111:True",
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "112:False",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "112:True",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "113:False",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "113:True",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "114:False",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "114:True",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "115:False",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "115:True",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "116:False",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "116:True",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "117:False",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "117:True",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "118:False",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "118:True",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "119:False",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "119:True",
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "120:False",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "120:True",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "121:False",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "121:True",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "122:False",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "122:True",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "123:False",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "123:True",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "124:False",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "124:True",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "125:False",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "125:True",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "126:False",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "126:True",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "127:False",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "127:True",
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "128:False",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "128:True",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "129:False",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "129:True",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "130:False",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "130:True",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "131:False",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "131:True",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "132:False",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "132:True",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "133:False",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "133:True",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "134:False",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "134:True",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "135:False",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "135:True",
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "136:False",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "136:True",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "137:False",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "137:True",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "138:False",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "138:True",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "139:False",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "139:True",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "140:False",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "140:True",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "141:False",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "141:True",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "142:False",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "142:True",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "143:False",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "143:True",
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        }
+      ],
+      "match_counts": {
+        "identity": 288,
+        "independent_hidden_order": 0,
+        "net_automorphism": 0
+      },
+      "unresolved": []
+    },
+    "usage": {
+      "checks": [
+        {
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_4_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_5_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens1_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens2_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveFalse_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseFalse_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseFalse_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseTrue_weight1_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "subset_8_tokens3_exhaustiveTrue_reverseTrue_weight2_stop_True_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        }
+      ],
+      "skipped": [],
+      "identity_matches": 144,
+      "net_automorphism_matches": 0,
+      "unresolved_reference_groups": [],
+      "excluded_reference_models": []
+    },
+    "regressions": {
+      "exhaustive": {
+        "observations": 40,
+        "match_counts": {
+          "identity": 40,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "duplicate": {
+        "observations": 160,
+        "match_counts": {
+          "identity": 160,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "nested": {
+        "observations": 55,
+        "match_counts": {
+          "identity": 55,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "enabled": {
+        "observations": 2518,
+        "match_counts": {
+          "identity": 2518,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "exhaustive_usage": {
+        "observations": 20,
+        "identity_matches": 20
+      }
+    },
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "independent_review": "clear"
+  },
+  "before": {
+    "replay_matches": 240,
+    "replay_observations": 288,
+    "usage_matches": 120,
+    "usage_observations": 144
+  },
+  "native_source_parent_commit": "84720428cce7d0146038b48d89d708cac2bfd4d5",
+  "native_verified_staged_tree": "5d341d88e5a4cb84ec98ba373f978d3dc3ff1d4e",
+  "native_executable_sha256": "e80ed39d0c8952125567a0f63ab75f8b347502d1e1765e9b095197960d8c4be5",
+  "reproduction": [
+    "Decompress each reference gzip to JSON.",
+    "Run scripts/check-token-replay-native.py against the replay reference and scripts/check-petri-element-usage-native.py against the usage reference, supplying --reference, --native, and --output."
+  ],
+  "limits": [
+    "Finite observations do not establish full parity.",
+    "Competing shortest-path choices can depend on net construction order; this checkpoint retains both insertion orders without normalizing their results.",
+    "Existing recursion and native resource guards remain in effect."
+  ]
+}

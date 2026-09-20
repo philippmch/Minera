@@ -734,17 +734,20 @@ class Replayer {
                             const std::vector<std::string>& place_names,
                             bool exhaustive,
                             const Emit& emit) const {
-    const auto candidates = [&](std::size_t selected) {
-      Marking required(marking.size(), 0);
+    const auto required = [&](std::size_t selected) {
+      Marking needed(marking.size(), 0);
       for (const auto place : net_.transitions()[selected].inputs) {
-        if (required[place] == std::numeric_limits<int>::max())
+        if (needed[place] == std::numeric_limits<int>::max())
           throw std::overflow_error("token replay input multiplicity exceeds signed range");
-        ++required[place];
+        ++needed[place];
       }
-      for (std::size_t place = 0; place < required.size(); ++place)
-        if (marking[place] >= required[place]) required[place] = 0;
-      const auto required_keys = detail::resolve_replay_marking_keys({}, required, "required");
-      return detail::silent_place_paths(keys, required_keys, net_, place_names);
+      for (std::size_t place = 0; place < needed.size(); ++place)
+        if (marking[place] >= needed[place]) needed[place] = 0;
+      return detail::resolve_replay_marking_keys({}, needed, "required");
+    };
+    const auto candidates = [&](std::size_t /*selected*/,
+                                const detail::ReplayMarkingKeys& required_keys) {
+      return detail::silent_place_paths(keys, required_keys, net_, place_names, 51, true);
     };
     const auto trial = [&](std::size_t selected, const detail::HiddenPlacePath& path) {
       Marking trial_marking = marking;
@@ -764,7 +767,8 @@ class Replayer {
       return accepted;
     };
     detail::route_hidden_dependencies(net_.transitions().size(), target, exhaustive,
-        candidates, [&](auto transition) { return enabled(marking, transition); }, emit,
+        candidates, required,
+        [&](auto transition) { return enabled(marking, transition); }, emit,
         trial);
   }
 

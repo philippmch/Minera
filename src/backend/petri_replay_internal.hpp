@@ -127,7 +127,7 @@ struct HiddenPlacePath {
 inline std::vector<HiddenPlacePath> silent_place_paths(
     const ReplayMarkingKeys& source_keys, const ReplayMarkingKeys& target_keys, const PetriNet& net,
     const std::vector<std::string>& place_names,
-    std::size_t max_path_length = 51) {
+    std::size_t max_path_length = 51, bool source_before_target = false) {
   std::vector<std::vector<std::size_t>> outgoing(net.place_count());
   for (std::size_t t = 0; t < net.transitions().size(); ++t) {
     const auto& transition = net.transitions()[t];
@@ -175,6 +175,10 @@ inline std::vector<HiddenPlacePath> silent_place_paths(
     }
   }
   std::sort(result.begin(), result.end(), [&](const auto& left, const auto& right) {
+    if (source_before_target) {
+      return std::tuple{left.transitions.size(), std::string_view(place_names[left.source]), std::string_view(place_names[left.target]), left.source, left.target}
+           < std::tuple{right.transitions.size(), std::string_view(place_names[right.source]), std::string_view(place_names[right.target]), right.source, right.target};
+    }
     return std::tuple{left.transitions.size(), std::string_view(place_names[left.target]), std::string_view(place_names[left.source]), left.target, left.source}
          < std::tuple{right.transitions.size(), std::string_view(place_names[right.target]), std::string_view(place_names[right.source]), right.target, right.source};
   });
@@ -184,9 +188,10 @@ inline std::vector<HiddenPlacePath> silent_place_paths(
 // Public hidden routing first fires enabled path prefixes, then recomputes
 // paths and explores blocked dependencies. Visiting a target is distinct from
 // firing it: a failed recursive attempt still suppresses later visits.
-template <class Candidates, class Enabled, class Emit, class Trial>
+template <class Required, class Candidates, class Enabled, class Emit, class Trial>
 void route_hidden_dependencies(std::size_t transition_count, std::size_t target,
                                bool exhaustive, const Candidates& candidates,
+                               const Required& required,
                                const Enabled& enabled, const Emit& emit,
                                const Trial& trial) {
   std::vector<bool> visited(transition_count, false);
@@ -200,7 +205,12 @@ void route_hidden_dependencies(std::size_t transition_count, std::size_t target,
     if (++calls > kReplayStructuralSearchCap)
       throw std::runtime_error("Petri replay exceeded the pre-event routing state limit");
     visited[selected] = true;
-    const auto initial_paths = candidates(selected);
+    // Freeze the selected transition's deficient input keys for this
+    // invocation.  Candidate paths still recompute from the caller's live
+    // marking keys, but the target requirement must not change after an
+    // enabled prefix has fired.
+    const auto required_keys = required(selected);
+    const auto initial_paths = candidates(selected, required_keys);
     if (exhaustive) {
       // The public exhaustive helper trials every candidate against a marking
       // copy.  Only the prefix returned by a successful trial may affect the
@@ -226,7 +236,8 @@ void route_hidden_dependencies(std::size_t transition_count, std::size_t target,
         if (!progressed || enabled(selected)) break;
       }
     }
-    const auto paths = candidates(selected);
+    if (enabled(selected)) return;
+    const auto paths = candidates(selected, required_keys);
     for (const auto& path : paths) {
       for (const auto transition : path.transitions) {
         if (visited[transition]) continue;
