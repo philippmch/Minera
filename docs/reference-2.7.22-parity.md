@@ -4156,6 +4156,13 @@ production build passes. Offset-bearing constructed datetimes use ISO-string
 XES transport to preserve their clock fields; typed-date import normalization
 is a separate contract. These finite checks do not establish full parity.
 
+`docs/heuristic-workcalendar-reference.json` records eight further EventLog
+observations: omitted, closed-calendar, opaque-object, and `None` workcalendars
+produce identical waits and sojourns in both variants. The supplied calendar's
+methods are never called. Native output without a calendar option matches all
+eight observations; this does not provide an opaque Python-object API or prove
+the behavior of dataframe inputs or arbitrary calendar types.
+
 The PLUSPLUS variation independently implements the pinned interval abstraction.
 Lifecycle events are converted through case-insensitive start/complete matching
 with FIFO queues keyed by activity and lifecycle instance; unmatched completes
