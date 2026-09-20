@@ -127,7 +127,7 @@ struct HiddenPlacePath {
 inline std::vector<HiddenPlacePath> silent_place_paths(
     const ReplayMarkingKeys& source_keys, const ReplayMarkingKeys& target_keys, const PetriNet& net,
     const std::vector<std::string>& place_names,
-    std::size_t max_path_length = 51, bool source_before_target = false) {
+    std::size_t max_path_length = 51) {
   std::vector<std::vector<std::size_t>> outgoing(net.place_count());
   for (std::size_t t = 0; t < net.transitions().size(); ++t) {
     const auto& transition = net.transitions()[t];
@@ -175,12 +175,8 @@ inline std::vector<HiddenPlacePath> silent_place_paths(
     }
   }
   std::sort(result.begin(), result.end(), [&](const auto& left, const auto& right) {
-    if (source_before_target) {
-      return std::tuple{left.transitions.size(), std::string_view(place_names[left.source]), std::string_view(place_names[left.target]), left.source, left.target}
-           < std::tuple{right.transitions.size(), std::string_view(place_names[right.source]), std::string_view(place_names[right.target]), right.source, right.target};
-    }
-    return std::tuple{left.transitions.size(), std::string_view(place_names[left.target]), std::string_view(place_names[left.source]), left.target, left.source}
-         < std::tuple{right.transitions.size(), std::string_view(place_names[right.target]), std::string_view(place_names[right.source]), right.target, right.source};
+    return std::tuple{left.transitions.size(), std::string_view(place_names[left.source]), std::string_view(place_names[left.target]), left.source, left.target}
+         < std::tuple{right.transitions.size(), std::string_view(place_names[right.source]), std::string_view(place_names[right.target]), right.source, right.target};
   });
   return result;
 }

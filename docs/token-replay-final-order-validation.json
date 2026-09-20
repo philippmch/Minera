@@ -1,0 +1,1964 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Final-marking hidden routing uses the same source-before-target path tie order as pre-event routing.",
+  "artifacts": [
+    {
+      "path": "docs/token-replay-final-order-reference.json.gz",
+      "uncompressed_sha256": "5394de3c279628fd609566ec0c96057e7f592732f7ef247499e437c5bc8f238a",
+      "reference_provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "apply",
+        "module": "pm4py.algo.conformance.tokenreplay.algorithm",
+        "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, parameters: Optional[Dict[Any, Any]] = None, variant=<Variants.TOKEN_REPLAY: <module 'pm4py.algo.conformance.tokenreplay.variants.token_replay' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\conformance\\\\tokenreplay\\\\variants\\\\token_replay.py'>>) -> List[Dict[str, Any]]",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962",
+        "pinned_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962"
+      }
+    },
+    {
+      "path": "docs/token-replay-final-order-usage-reference.json.gz",
+      "uncompressed_sha256": "3b373221cde425f87b889537c847c4429d27b7772972a4efe0bad8842438b9a3",
+      "reference_provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "compare_element_usage_two_logs",
+        "module": "pm4py.algo.comparison.petrinet.element_usage_comparison",
+        "signature": "(net: pm4py.objects.petri_net.obj.PetriNet, im: pm4py.objects.petri_net.obj.Marking, fm: pm4py.objects.petri_net.obj.Marking, log1: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], log2: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], parameters: Optional[Dict[Any, Any]] = None) -> Dict[Any, Any]",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "af79d6de71ae52df44a8e32db683e3a5ecff0dc4bddb1941aac55ed39faf1ad1",
+        "pinned_sha256": "af79d6de71ae52df44a8e32db683e3a5ecff0dc4bddb1941aac55ed39faf1ad1"
+      }
+    }
+  ],
+  "reference_repetition": {
+    "hash_seeds": [
+      0,
+      1,
+      17
+    ],
+    "identical_results": true,
+    "inputs_per_process": 96,
+    "replay_observations_per_process": 192,
+    "usage_observations_per_process": 96
+  },
+  "contract": [
+    "Sort hidden paths by length, source place name, then target place name.",
+    "Use that order for both pre-event and final-marking routing.",
+    "Final routing retains its existing per-path target-coverage stopping checks and six-pass bound."
+  ],
+  "validation": {
+    "replay": {
+      "checks": [
+        {
+          "id": "0:False",
+          "name": "final_order_2_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "0:True",
+          "name": "final_order_2_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "1:False",
+          "name": "final_order_2_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "1:True",
+          "name": "final_order_2_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "2:False",
+          "name": "final_order_2_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "2:True",
+          "name": "final_order_2_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "3:False",
+          "name": "final_order_2_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "3:True",
+          "name": "final_order_2_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "4:False",
+          "name": "final_order_2_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "4:True",
+          "name": "final_order_2_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "5:False",
+          "name": "final_order_2_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "5:True",
+          "name": "final_order_2_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "6:False",
+          "name": "final_order_2_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "6:True",
+          "name": "final_order_2_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "7:False",
+          "name": "final_order_2_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "7:True",
+          "name": "final_order_2_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "8:False",
+          "name": "final_order_2_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "8:True",
+          "name": "final_order_2_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "9:False",
+          "name": "final_order_2_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "9:True",
+          "name": "final_order_2_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "10:False",
+          "name": "final_order_2_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "10:True",
+          "name": "final_order_2_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "11:False",
+          "name": "final_order_2_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "11:True",
+          "name": "final_order_2_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "12:False",
+          "name": "final_order_2_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "12:True",
+          "name": "final_order_2_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "13:False",
+          "name": "final_order_2_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "13:True",
+          "name": "final_order_2_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "14:False",
+          "name": "final_order_2_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "14:True",
+          "name": "final_order_2_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "15:False",
+          "name": "final_order_2_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "15:True",
+          "name": "final_order_2_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "16:False",
+          "name": "final_order_2_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "16:True",
+          "name": "final_order_2_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "17:False",
+          "name": "final_order_2_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "17:True",
+          "name": "final_order_2_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "18:False",
+          "name": "final_order_2_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "18:True",
+          "name": "final_order_2_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "19:False",
+          "name": "final_order_2_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "19:True",
+          "name": "final_order_2_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "20:False",
+          "name": "final_order_2_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "20:True",
+          "name": "final_order_2_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "21:False",
+          "name": "final_order_2_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "21:True",
+          "name": "final_order_2_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "22:False",
+          "name": "final_order_2_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "22:True",
+          "name": "final_order_2_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "23:False",
+          "name": "final_order_2_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "23:True",
+          "name": "final_order_2_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "24:False",
+          "name": "final_order_2_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "24:True",
+          "name": "final_order_2_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "25:False",
+          "name": "final_order_2_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "25:True",
+          "name": "final_order_2_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "26:False",
+          "name": "final_order_2_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "26:True",
+          "name": "final_order_2_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "27:False",
+          "name": "final_order_2_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "27:True",
+          "name": "final_order_2_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "28:False",
+          "name": "final_order_2_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "28:True",
+          "name": "final_order_2_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "29:False",
+          "name": "final_order_2_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "29:True",
+          "name": "final_order_2_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "30:False",
+          "name": "final_order_2_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "30:True",
+          "name": "final_order_2_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "31:False",
+          "name": "final_order_2_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "31:True",
+          "name": "final_order_2_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "32:False",
+          "name": "final_order_3_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "32:True",
+          "name": "final_order_3_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "33:False",
+          "name": "final_order_3_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "33:True",
+          "name": "final_order_3_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "34:False",
+          "name": "final_order_3_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "34:True",
+          "name": "final_order_3_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "35:False",
+          "name": "final_order_3_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "35:True",
+          "name": "final_order_3_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "36:False",
+          "name": "final_order_3_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "36:True",
+          "name": "final_order_3_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "37:False",
+          "name": "final_order_3_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "37:True",
+          "name": "final_order_3_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "38:False",
+          "name": "final_order_3_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "38:True",
+          "name": "final_order_3_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "39:False",
+          "name": "final_order_3_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "39:True",
+          "name": "final_order_3_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "40:False",
+          "name": "final_order_3_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "40:True",
+          "name": "final_order_3_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "41:False",
+          "name": "final_order_3_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "41:True",
+          "name": "final_order_3_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "42:False",
+          "name": "final_order_3_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "42:True",
+          "name": "final_order_3_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "43:False",
+          "name": "final_order_3_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "43:True",
+          "name": "final_order_3_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "44:False",
+          "name": "final_order_3_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "44:True",
+          "name": "final_order_3_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "45:False",
+          "name": "final_order_3_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "45:True",
+          "name": "final_order_3_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "46:False",
+          "name": "final_order_3_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "46:True",
+          "name": "final_order_3_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "47:False",
+          "name": "final_order_3_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "47:True",
+          "name": "final_order_3_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "48:False",
+          "name": "final_order_3_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "48:True",
+          "name": "final_order_3_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "49:False",
+          "name": "final_order_3_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "49:True",
+          "name": "final_order_3_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "50:False",
+          "name": "final_order_3_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "50:True",
+          "name": "final_order_3_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "51:False",
+          "name": "final_order_3_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "51:True",
+          "name": "final_order_3_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "52:False",
+          "name": "final_order_3_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "52:True",
+          "name": "final_order_3_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "53:False",
+          "name": "final_order_3_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "53:True",
+          "name": "final_order_3_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "54:False",
+          "name": "final_order_3_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "54:True",
+          "name": "final_order_3_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "55:False",
+          "name": "final_order_3_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "55:True",
+          "name": "final_order_3_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "56:False",
+          "name": "final_order_3_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "56:True",
+          "name": "final_order_3_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "57:False",
+          "name": "final_order_3_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "57:True",
+          "name": "final_order_3_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "58:False",
+          "name": "final_order_3_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "58:True",
+          "name": "final_order_3_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "59:False",
+          "name": "final_order_3_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "59:True",
+          "name": "final_order_3_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "60:False",
+          "name": "final_order_3_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "60:True",
+          "name": "final_order_3_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "61:False",
+          "name": "final_order_3_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "61:True",
+          "name": "final_order_3_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "62:False",
+          "name": "final_order_3_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "62:True",
+          "name": "final_order_3_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "63:False",
+          "name": "final_order_3_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "63:True",
+          "name": "final_order_3_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "64:False",
+          "name": "final_order_9_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "64:True",
+          "name": "final_order_9_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "65:False",
+          "name": "final_order_9_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "65:True",
+          "name": "final_order_9_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "66:False",
+          "name": "final_order_9_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "66:True",
+          "name": "final_order_9_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "67:False",
+          "name": "final_order_9_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "67:True",
+          "name": "final_order_9_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "68:False",
+          "name": "final_order_9_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "68:True",
+          "name": "final_order_9_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "69:False",
+          "name": "final_order_9_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "69:True",
+          "name": "final_order_9_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "70:False",
+          "name": "final_order_9_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "70:True",
+          "name": "final_order_9_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "71:False",
+          "name": "final_order_9_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "71:True",
+          "name": "final_order_9_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "72:False",
+          "name": "final_order_9_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "72:True",
+          "name": "final_order_9_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "73:False",
+          "name": "final_order_9_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "73:True",
+          "name": "final_order_9_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "74:False",
+          "name": "final_order_9_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "74:True",
+          "name": "final_order_9_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "75:False",
+          "name": "final_order_9_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "75:True",
+          "name": "final_order_9_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "76:False",
+          "name": "final_order_9_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "76:True",
+          "name": "final_order_9_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "77:False",
+          "name": "final_order_9_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "77:True",
+          "name": "final_order_9_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "78:False",
+          "name": "final_order_9_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "78:True",
+          "name": "final_order_9_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "79:False",
+          "name": "final_order_9_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "79:True",
+          "name": "final_order_9_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "80:False",
+          "name": "final_order_9_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "80:True",
+          "name": "final_order_9_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "81:False",
+          "name": "final_order_9_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "81:True",
+          "name": "final_order_9_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "82:False",
+          "name": "final_order_9_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "82:True",
+          "name": "final_order_9_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "83:False",
+          "name": "final_order_9_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "83:True",
+          "name": "final_order_9_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "84:False",
+          "name": "final_order_9_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "84:True",
+          "name": "final_order_9_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "85:False",
+          "name": "final_order_9_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "85:True",
+          "name": "final_order_9_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "86:False",
+          "name": "final_order_9_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "86:True",
+          "name": "final_order_9_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "87:False",
+          "name": "final_order_9_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "87:True",
+          "name": "final_order_9_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "88:False",
+          "name": "final_order_9_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "88:True",
+          "name": "final_order_9_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "89:False",
+          "name": "final_order_9_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "89:True",
+          "name": "final_order_9_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "90:False",
+          "name": "final_order_9_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "90:True",
+          "name": "final_order_9_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "91:False",
+          "name": "final_order_9_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "91:True",
+          "name": "final_order_9_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "92:False",
+          "name": "final_order_9_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "92:True",
+          "name": "final_order_9_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "93:False",
+          "name": "final_order_9_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "93:True",
+          "name": "final_order_9_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "94:False",
+          "name": "final_order_9_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "94:True",
+          "name": "final_order_9_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "95:False",
+          "name": "final_order_9_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "95:True",
+          "name": "final_order_9_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        }
+      ],
+      "match_counts": {
+        "identity": 192,
+        "independent_hidden_order": 0,
+        "net_automorphism": 0
+      },
+      "unresolved": []
+    },
+    "usage": {
+      "checks": [
+        {
+          "name": "final_order_2_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_2_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_3_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens1_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens1_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens1_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens1_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens2_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens2_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens2_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens2_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens3_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens3_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens3_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens3_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens4_unreachableFalse_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens4_unreachableFalse_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens4_unreachableTrue_renameFalse_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingFalse",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "final_order_9_tokens4_unreachableTrue_renameTrue_stop_False_repeat_0_routingTrue",
+          "match": true,
+          "match_kind": "identity"
+        }
+      ],
+      "skipped": [],
+      "identity_matches": 96,
+      "net_automorphism_matches": 0,
+      "unresolved_reference_groups": [],
+      "excluded_reference_models": []
+    },
+    "regressions": {
+      "visited": {
+        "observations": 168,
+        "match_counts": {
+          "identity": 168,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "deficient": {
+        "observations": 288,
+        "match_counts": {
+          "identity": 288,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "exhaustive": {
+        "observations": 40,
+        "match_counts": {
+          "identity": 40,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "duplicate": {
+        "observations": 160,
+        "match_counts": {
+          "identity": 160,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "nested": {
+        "observations": 55,
+        "match_counts": {
+          "identity": 55,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "enabled": {
+        "observations": 2518,
+        "match_counts": {
+          "identity": 2518,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      }
+    },
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "independent_review": "clear"
+  },
+  "before": {
+    "replay_matches": 164,
+    "replay_observations": 192,
+    "usage_matches": 90,
+    "usage_observations": 96
+  },
+  "native_source_parent_commit": "5cbba092cd71286574498a33332bf60d1466f77c",
+  "native_verified_staged_tree": "2ad5d6f64539aff6eb38b003df0a4f98a1cf3e1a",
+  "native_executable_sha256": "7245de285690211d3d22f0f1725fb5389065484f95138b951e8df42437d8c40e",
+  "reproduction": [
+    "Decompress each reference gzip to JSON.",
+    "Run scripts/check-token-replay-native.py against the replay reference and scripts/check-petri-element-usage-native.py against the usage reference, supplying --reference, --native, and --output."
+  ],
+  "limits": [
+    "Finite observations do not establish full parity.",
+    "Variable reference choices among alternative structural paths remain outside this deterministic checkpoint.",
+    "Existing path and native resource guards remain in effect."
+  ]
+}

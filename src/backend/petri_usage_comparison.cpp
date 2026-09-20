@@ -336,7 +336,7 @@ void route_hidden_before_event(Marking& marking, MarkingKeys& keys, std::size_t 
     return resolve_marking_keys({}, needed, "required");
   };
   const auto candidates = [&](std::size_t /*selected*/, const MarkingKeys& required_keys) {
-    return silent_place_paths(keys, required_keys, net, place_names, 51, true);
+    return silent_place_paths(keys, required_keys, net, place_names, 51);
   };
   const auto trial = [&](std::size_t selected, const detail::HiddenPlacePath& path,
                          const std::vector<bool>& visited) {
