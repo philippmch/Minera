@@ -1473,13 +1473,17 @@ routes, then source place names, then target place names. Routing stops before
 dependency exploration if the prefix already enables the target. Visited targets
 remain visited even if they never fire, and a blocked step does not discard later
 steps of its path.
-With `exhaustive_invisible_exploration=true`, candidate paths are first tried
-on temporary markings: only a path that enables the selected target is retained.
-Trials skip transitions already visited by the surrounding search and continue
-with later path steps. Successful trial firings do not themselves mark those
-transitions visited. This prevents a fallback dependency from refiring a visited
-producer merely to fill a weighted deficit.
-If no trial succeeds, dependency exploration runs without the preliminary
+With `exhaustive_invisible_exploration=true`, candidate paths supply a transition
+pool in first-occurrence order. Breadth-first exploration tries enabled pool
+transitions on temporary markings, using each transition at most once per trial
+and excluding transitions already visited by the surrounding search. Only a
+sequence that enables the selected target is retained. Successful trial firings
+do not themselves mark those transitions visited in the surrounding search.
+This prevents a fallback dependency from refiring a visited producer merely to
+fill a weighted deficit. The native trial search reports its 4,096-state bound
+and 64 MiB retained-node payload budget explicitly; temporary firing scratch
+is outside that accounting. If no trial succeeds, dependency
+exploration runs without the preliminary
 prefix pass. Both modes allow two invocation levels. The default dependency
 phase continues across candidate paths, checking target enablement within each path.
 This option defaults to false and is available in the native API,
@@ -1520,6 +1524,16 @@ All match exactly, including source-place renaming, reachable and unreachable
 final targets, token counts one through four, and disabled-routing controls.
 Results agree across hash seeds 0, 1, and 17. The validation record preserves the
 passing prior routing checkpoints and all 154 native test suites.
+
+The combined-pool checkpoint in
+`docs/token-replay-exhaustive-pool-reference.json.gz` retains 96 inputs with 192
+replay observations and a separate reference with 96 element-usage comparisons.
+All match exactly across token counts one through four, traces of one through
+three repeated events, and immediate-stop controls. Results agree across three
+fresh processes with hash seeds 0, 1, and 17. Its helper model artifact preserves
+1,400 exact public comparisons over 700 nets, including pre-visited transitions.
+The shortest enabling sequence may combine transitions from separate candidate
+paths; trying each structural path independently does not reproduce this behavior.
 
 Eventually-enabled visible transition diagnostics use the observed public FIFO
 worklist behavior. Silent IDs may occur more than once in the queue, each ID uses

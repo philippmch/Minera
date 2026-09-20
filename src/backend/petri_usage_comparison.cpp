@@ -338,20 +338,22 @@ void route_hidden_before_event(Marking& marking, MarkingKeys& keys, std::size_t 
   const auto candidates = [&](std::size_t /*selected*/, const MarkingKeys& required_keys) {
     return silent_place_paths(keys, required_keys, net, place_names, 51);
   };
-  const auto trial = [&](std::size_t selected, const detail::HiddenPlacePath& path,
+  const auto trial = [&](std::size_t selected,
+                         const std::vector<detail::HiddenPlacePath>& paths,
                          const std::vector<bool>& visited) {
-    Marking trial_marking = marking;
-    auto trial_keys = keys;
-    ReplayUsage scratch{std::vector<std::uint64_t>(net.transitions().size(), 0),
-                        std::vector<std::uint64_t>(net.place_count(), 0)};
-    std::vector<std::size_t> accepted;
-    for (const auto transition : path.transitions) {
-      if (visited[transition]) continue;
-      if (!enabled(trial_marking, net.transitions()[transition])) break;
-      fire(trial_marking, trial_keys, transition, net, scratch, accepted);
-    }
-    if (!enabled(trial_marking, net.transitions()[selected])) accepted.clear();
-    return accepted;
+    const auto fire_trial = [&](Marking& trial_marking, MarkingKeys& trial_keys,
+                                std::size_t transition) {
+      ReplayUsage scratch{std::vector<std::uint64_t>(net.transitions().size(), 0),
+                          std::vector<std::uint64_t>(net.place_count(), 0)};
+      std::vector<std::size_t> ignored;
+      fire(trial_marking, trial_keys, transition, net, scratch, ignored);
+    };
+    return detail::exhaustive_hidden_transition_trial(
+        selected, paths, visited, marking, keys,
+        [&](const Marking& candidate, std::size_t transition) {
+          return enabled(candidate, net.transitions()[transition]);
+        },
+        fire_trial);
   };
   detail::route_hidden_dependencies(net.transitions().size(), target, exhaustive,
       candidates, required,

@@ -3,6 +3,7 @@
 #include "minera/pnml.hpp"
 #include "minera/petri_usage_comparison.hpp"
 #include "../tools/pnml_model_options.hpp"
+#include "../petri_replay_internal.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -1021,6 +1022,24 @@ PetriNet final_path_order_net() {
   return net;
 }
 
+PetriNet exhaustive_pool_replay_net() {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto p0 = net.add_place();
+  const auto p2 = net.add_place();
+  const auto p4 = net.add_place();
+  const auto p5 = net.add_place();
+  const auto p6 = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(p0);
+  net.set_sink(sink);
+  net.add_transition(0, {p4, p5}, {sink});
+  net.add_transition(std::nullopt, {p0}, {p2, p6});
+  net.add_transition(std::nullopt, {p2}, {p5, p6});
+  net.add_transition(std::nullopt, {p0}, {p2, p4});
+  return net;
+}
+
 void assert_hidden_route_usage(const PetriNet& net, int initial_tokens,
                               bool exhaustive,
                               const std::vector<std::size_t>& expected) {
@@ -1189,6 +1208,106 @@ void forward_final_path_source_order_public_contract() {
       assert(transition.log2_occurrences == 0 && transition.total_occurrences == count);
     }
   }
+}
+
+void forward_exhaustive_candidate_pool_public_contract() {
+  const auto log = log_of({{"A", "A", "A"}});
+  const auto net = exhaustive_pool_replay_net();
+  TokenReplayOptions options;
+  options.initial_marking = {3, 0, 0, 0, 0, 0};
+  options.final_marking = {0, 0, 0, 0, 0, 1};
+  options.place_names = {"p0", "p2", "p4", "p5", "p6", "sink"};
+  options.transition_names = {"visible", "t1", "t2", "t8"};
+  options.exhaustive_invisible_exploration = true;
+  const auto row = replay_token_traces(log, net, options).front();
+  const std::vector<std::size_t> expected{3, 2, 0, 3, 2, 0, 3, 2, 0};
+  assert(row.activated_transitions == expected);
+  assert(row.event_diagnostics.size() == 3);
+  for (const auto& event : row.event_diagnostics)
+    assert((event.activated_transitions == std::vector<std::size_t>{3, 2, 0}));
+  consistent(log, net, options);
+
+  PetriUsageComparisonOptions usage_options;
+  usage_options.initial_marking = {3, 0, 0, 0, 0, 0};
+  usage_options.final_marking = {0, 0, 0, 0, 0, 1};
+  usage_options.place_names = options.place_names;
+  usage_options.transition_names = options.transition_names;
+  usage_options.exhaustive_invisible_exploration = true;
+  const auto comparison = compare_petri_usage(net, log, EventLog{}, usage_options);
+  for (const auto& transition : comparison.transitions) {
+    const auto count = static_cast<std::uint64_t>(std::count(
+        expected.begin(), expected.end(), transition.id));
+    assert(transition.log1_occurrences == count);
+    assert(transition.log2_occurrences == 0 && transition.total_occurrences == count);
+  }
+}
+
+void exhaustive_hidden_trial_resource_guard_contract() {
+  constexpr std::size_t branches = 13;
+  std::vector<int> marking(branches + 1, 1);
+  marking.back() = 0;
+  const auto initial_marking = marking;
+  std::vector<bool> keys(branches + 1, true);
+  keys.back() = false;
+  const auto initial_keys = keys;
+  std::vector<detail::HiddenPlacePath> paths;
+  for (std::size_t transition = 0; transition < branches; ++transition)
+    paths.push_back({0, 1, {transition}});
+  std::vector<bool> visited(branches + 1, false);
+  bool rejected = false;
+  try {
+    (void)detail::exhaustive_hidden_transition_trial(
+        branches, paths, visited, marking, keys,
+        [](const std::vector<int>& state, std::size_t transition) {
+          return state[transition] > 0;
+        },
+        [](std::vector<int>& state, std::vector<bool>& state_keys,
+           std::size_t transition) {
+          --state[transition];
+          state_keys[transition] = false;
+        });
+  } catch (const std::runtime_error&) {
+    rejected = true;
+  }
+  assert(rejected);
+  assert(marking == initial_marking && keys == initial_keys);
+}
+
+void exhaustive_hidden_trial_memory_guard_contract() {
+  constexpr std::size_t places = 100000;
+  constexpr std::size_t branches = 13;
+  std::vector<int> marking(places, 0);
+  for (std::size_t branch = 0; branch < branches; ++branch) marking[branch] = 1;
+  const auto initial_marking = marking;
+  std::vector<bool> keys(places, true);
+  const auto initial_keys = keys;
+  std::vector<detail::HiddenPlacePath> paths;
+  for (std::size_t transition = 0; transition < branches; ++transition)
+    paths.push_back({0, 1, {transition}});
+  std::vector<bool> visited(branches + 1, false);
+  std::size_t fire_count = 0;
+  bool rejected = false;
+  std::string message;
+  try {
+    (void)detail::exhaustive_hidden_transition_trial(
+        branches, paths, visited, marking, keys,
+        [](const std::vector<int>& state, std::size_t transition) {
+          return state[transition] > 0;
+        },
+        [&](std::vector<int>& state, std::vector<bool>& state_keys,
+            std::size_t transition) {
+          ++fire_count;
+          --state[transition];
+          state_keys[transition] = false;
+        });
+  } catch (const std::runtime_error& error) {
+    rejected = true;
+    message = error.what();
+  }
+  assert(rejected);
+  assert(message.find("memory limit") != std::string::npos);
+  assert(fire_count < detail::kReplayStructuralSearchCap);
+  assert(marking == initial_marking && keys == initial_keys);
 }
 
 // Public 2.7.22 nested-AND probes: blocked joins remain visited, while later
@@ -1542,6 +1661,9 @@ int main() {
   forward_deficient_input_keys_public_contract();
   forward_exhaustive_visited_trial_public_contract();
   forward_final_path_source_order_public_contract();
+  forward_exhaustive_candidate_pool_public_contract();
+  exhaustive_hidden_trial_resource_guard_contract();
+  exhaustive_hidden_trial_memory_guard_contract();
   forward_nested_hidden_routing_public_contract();
   enabled_transition_worklist_public_contract();
   forward_cleaning_public_counter_contract();
