@@ -1062,6 +1062,8 @@ void parse_mine_params_maps_csv_and_inductive_options() {
       {"heuristic_min_activity_count", "4"},
       {"heuristic_decoration", "performance"},
       {"heuristic_start_timestamp_attribute", "started_at"},
+      {"heuristic_business_hours", "true"},
+      {"heuristic_business_hour_slots", "0-3600,7200-10800"},
       {"heuristic_lifecycle_instance_attribute", "instance_id"},
       {"heuristic_dfg_pre_cleaning_noise_threshold", "0.1"},
       {"heuristic_loop_length_two_threshold", "0.6"},
@@ -1109,6 +1111,13 @@ void parse_mine_params_maps_csv_and_inductive_options() {
   assert(params.heuristic.decoration ==
          minera::HeuristicNetDecoration::kPerformance);
   assert(params.heuristic.start_timestamp_attribute == "started_at");
+  assert(params.heuristic.use_business_hours);
+  assert(params.heuristic.business_hour_slots_explicit);
+  assert(params.heuristic.business_hour_slots.size() == 2);
+  assert(params.heuristic.business_hour_slots[0].start_seconds == 0.0);
+  assert(params.heuristic.business_hour_slots[0].end_seconds == 3600.0);
+  assert(params.heuristic.business_hour_slots[1].start_seconds == 7200.0);
+  assert(params.heuristic.business_hour_slots[1].end_seconds == 10800.0);
   assert(params.heuristic.lifecycle_instance_attribute == "instance_id");
   assert(params.heuristic.dfg_pre_cleaning_noise_threshold == 0.1);
   assert(params.heuristic.loop_length_two_threshold == 0.6);
@@ -3348,6 +3357,10 @@ void parse_mine_params_rejects_unknown_heuristic_settings() {
            {"heuristic_activity_attribute", "   "},
            {"heuristic_timestamp_attribute", "   "},
            {"heuristic_decoration", "bogus"},
+           {"heuristic_business_hours", "maybe"},
+           {"heuristic_business_hour_slots", "0-0"},
+           {"heuristic_business_hour_slots", "0-604801"},
+           {"heuristic_business_hour_slots", "nan-10"},
            {"heuristic_performance_aggregation", "bogus"},
            {"heuristic_keep_once_per_case", "maybe"},
            {"heuristic_most_common_paths", "A-B"},
@@ -3361,6 +3374,34 @@ void parse_mine_params_rejects_unknown_heuristic_settings() {
     }
     assert(threw);
   }
+}
+
+void parse_mine_params_preserves_explicit_empty_heuristic_schedule() {
+  const auto defaults = minera::parse_mine_params(fields({}));
+  assert(!defaults.heuristic.use_business_hours);
+  assert(!defaults.heuristic.business_hour_slots_explicit);
+
+  const std::map<std::string, std::string> empty_fields{
+      {"heuristic_business_hours", "true"},
+      {"heuristic_business_hour_slots", ""},
+  };
+  const auto empty = minera::parse_mine_params(
+      fields(empty_fields), [&empty_fields](std::string_view name) {
+        return empty_fields.contains(std::string(name));
+      });
+  assert(empty.heuristic.use_business_hours);
+  assert(empty.heuristic.business_hour_slots_explicit);
+  assert(empty.heuristic.business_hour_slots.empty());
+
+  const std::map<std::string, std::string> none_fields{
+      {"heuristic_business_hour_slots", "none"},
+  };
+  const auto none = minera::parse_mine_params(
+      fields(none_fields), [&none_fields](std::string_view name) {
+        return none_fields.contains(std::string(name));
+      });
+  assert(none.heuristic.business_hour_slots_explicit);
+  assert(none.heuristic.business_hour_slots.empty());
 }
 
 void parse_mine_params_maps_spectrum_and_batch_options() {
@@ -4886,6 +4927,7 @@ int main() {
   parse_mine_params_rejects_invalid_inductive_options();
   parse_mine_params_accepts_infrequent_inductive_variant();
   parse_mine_params_rejects_unknown_heuristic_settings();
+  parse_mine_params_preserves_explicit_empty_heuristic_schedule();
   parse_mine_params_maps_spectrum_and_batch_options();
   parse_mine_params_preserves_empty_temporal_schedule();
   parse_mine_params_accepts_unbounded_temporal_zeta();

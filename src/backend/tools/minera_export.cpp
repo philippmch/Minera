@@ -300,7 +300,8 @@ std::vector<std::string> canonical_dfg_variants(
 }
 
 std::vector<minera::BusinessHourSlot> parse_dfg_business_hour_slots(
-    std::string_view value) {
+    std::string_view value,
+    std::string_view option_name = "--dfg-business-hour-slots") {
   std::vector<minera::BusinessHourSlot> slots;
   for (const auto& part : split_csv(value)) {
     auto separator = part.find(':');
@@ -308,7 +309,7 @@ std::vector<minera::BusinessHourSlot> parse_dfg_business_hour_slots(
     if (separator == std::string::npos || separator == 0 ||
         separator + 1 == part.size()) {
       throw std::invalid_argument(
-          "--dfg-business-hour-slots expects start-end second pairs");
+          std::string(option_name) + " expects start-end second pairs");
     }
     const auto parse = [&](std::string_view text) {
       std::string owned(text);
@@ -316,7 +317,7 @@ std::vector<minera::BusinessHourSlot> parse_dfg_business_hour_slots(
       const double result = std::strtod(owned.c_str(), &end);
       if (end != owned.c_str() + owned.size() || !std::isfinite(result)) {
         throw std::invalid_argument(
-            "--dfg-business-hour-slots expects finite seconds");
+            std::string(option_name) + " expects finite seconds");
       }
       return result;
     };
@@ -326,7 +327,7 @@ std::vector<minera::BusinessHourSlot> parse_dfg_business_hour_slots(
         parse(std::string_view(part).substr(separator + 1));
     if (start < 0.0 || start >= end || end > 604800.0) {
       throw std::invalid_argument(
-          "--dfg-business-hour-slots requires "
+          std::string(option_name) + " requires "
           "0 <= start < end <= 604800");
     }
     slots.push_back({start, end});
@@ -727,6 +728,10 @@ int usage(const char* program) {
                "  --heuristic-start-timestamp-attribute <name>\n"
                "                            Heuristics interval-start event attribute\n"
                "                            (default: CLASSIC completion; PLUSPLUS start_timestamp if present)\n"
+               "  --heuristic-business-hours\n"
+               "                            Measure heuristic waits/sojourns in business time\n"
+               "  --heuristic-business-hour-slots <start-end,...>\n"
+               "                            Weekly business slots; 'none' disables the schedule\n"
                "  --heuristic-lifecycle-instance-attribute <name>\n"
                "                            Miner++ lifecycle instance attribute\n"
                "                            (default: concept:instance)\n"
@@ -2168,6 +2173,29 @@ int main(int argc, char** argv) {
     const auto next = [&]() -> const char* {
       return i + 1 < argc ? argv[++i] : nullptr;
     };
+    if (arg == "--heuristic-business-hours") {
+      heuristic_options.use_business_hours = true;
+      continue;
+    }
+    if (arg == "--heuristic-business-hour-slots") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        heuristic_options.business_hour_slots_explicit = true;
+        if (std::string_view(value).empty() ||
+            std::string_view(value) == "none") {
+          heuristic_options.business_hour_slots.clear();
+        } else {
+          heuristic_options.business_hour_slots =
+              parse_dfg_business_hour_slots(
+                  value, "--heuristic-business-hour-slots");
+        }
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      continue;
+    }
     const auto powl_parse =
         parse_powl_cli_option(arg, argc, argv, i, powl_options);
     if (powl_parse == PowlCliParseStatus::kParsed) continue;

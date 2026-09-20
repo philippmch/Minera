@@ -1,5 +1,6 @@
 #include "minera/heuristic_miner.hpp"
 
+#include "business_hours.hpp"
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
@@ -119,6 +120,8 @@ struct Interval {
   std::string activity;
   double start = 0.0;
   double complete = 0.0;
+  std::optional<double> business_start;
+  std::optional<double> business_complete;
 };
 
 using NamePair = std::pair<std::string, std::string>;
@@ -206,6 +209,16 @@ double required_timestamp(const std::string& value,
   return *parsed;
 }
 
+double required_business_timestamp(std::string_view value,
+                                   std::string_view description) {
+  const auto local = detail::local_wall_timestamp(value);
+  if (!local)
+    throw std::invalid_argument(
+        "Heuristics Miner: invalid business-hours " + std::string(description) +
+        " timestamp");
+  return *local;
+}
+
 struct IntervalTrace {
   std::vector<Interval> sorted;
   std::vector<Interval> performance_order;
@@ -215,11 +228,21 @@ IntervalTrace to_intervals(const Trace& trace,
                            const HeuristicMinerOptions& options,
                            bool pre_interval_mode) {
   using LifecycleKey = std::pair<std::string, std::string>;
-  std::map<LifecycleKey, std::deque<double>> pending_starts;
+  struct PendingStart {
+    double timestamp = 0.0;
+    std::optional<double> business_timestamp;
+  };
+  std::map<LifecycleKey, std::deque<PendingStart>> pending_starts;
   std::vector<Interval> intervals;
   for (const auto& event : trace.events) {
+    const auto& timestamp_text = selected_timestamp(event, options);
     const double timestamp =
-        required_timestamp(selected_timestamp(event, options), "event");
+        required_timestamp(timestamp_text, "event");
+    const auto business_complete =
+        options.use_business_hours
+            ? std::optional<double>{
+                  required_business_timestamp(timestamp_text, "event")}
+            : std::optional<double>{};
     const auto& activity = selected_activity(event, options);
     if (pre_interval_mode) {
       const auto* value = selected_start_timestamp(event, options, true);
@@ -227,8 +250,14 @@ IntervalTrace to_intervals(const Trace& trace,
         throw std::invalid_argument(
             "Heuristics Miner PLUSPLUS interval input is missing the "
             "configured start timestamp");
+      const double start = required_timestamp(*value, "start");
+      const auto business_start =
+          options.use_business_hours
+              ? std::optional<double>{
+                    required_business_timestamp(*value, "start")}
+              : std::optional<double>{};
       intervals.push_back(
-          {activity, required_timestamp(*value, "start"), timestamp});
+          {activity, start, timestamp, business_start, business_complete});
       continue;
     }
     std::string instance;
@@ -238,18 +267,21 @@ IntervalTrace to_intervals(const Trace& trace,
     const LifecycleKey key{activity, instance};
     const std::string lifecycle = ascii_lower(event.lifecycle);
     if (lifecycle == "start") {
-      pending_starts[key].push_back(timestamp);
+      pending_starts[key].push_back({timestamp, business_complete});
       continue;
     }
     if (!lifecycle.empty() && lifecycle != "complete") continue;
 
     double start = timestamp;
+    auto business_start = business_complete;
     auto pending = pending_starts.find(key);
     if (pending != pending_starts.end() && !pending->second.empty()) {
-      start = pending->second.front();
+      start = pending->second.front().timestamp;
+      business_start = pending->second.front().business_timestamp;
       pending->second.pop_front();
     }
-    intervals.push_back({activity, start, timestamp});
+    intervals.push_back(
+        {activity, start, timestamp, business_start, business_complete});
   }
   IntervalTrace result;
   result.sorted = intervals;
@@ -266,6 +298,12 @@ PlusAbstraction build_plus_abstraction(
     const EventLog& log, const HeuristicMinerOptions& options) {
   PlusAbstraction out;
   std::set<std::string> known;
+  const auto business_slots =
+      options.use_business_hours
+          ? detail::normalize_business_hour_slots(
+                options.business_hour_slots,
+                options.business_hour_slots_explicit, "Heuristics Miner")
+          : std::vector<BusinessHourSlot>{};
   const bool pre_interval_mode =
       !log.traces.empty() && !log.traces.front().events.empty() &&
       selected_start_timestamp(log.traces.front().events.front(), options, true) !=
@@ -285,8 +323,13 @@ PlusAbstraction build_plus_abstraction(
       if (known.insert(interval.activity).second)
         out.activity_order.push_back(interval.activity);
       ++out.occurrences[interval.activity];
-      out.sojourn_sums[interval.activity] +=
-          interval.complete - interval.start;
+      double sojourn = interval.complete - interval.start;
+      if (options.use_business_hours) {
+        sojourn = detail::business_elapsed_seconds(
+            *interval.business_start, *interval.business_complete,
+            business_slots);
+      }
+      out.sojourn_sums[interval.activity] += sojourn;
     }
 
     // The PLUSPLUS abstraction keeps only the first activity that starts
@@ -321,9 +364,13 @@ PlusAbstraction build_plus_abstraction(
       const NamePair pair{performance[i - 1].activity,
                           performance[i].activity};
       ++out.direct_adjacency[pair];
-      const double wait =
-          std::max(0.0,
-                   performance[i].start - performance[i - 1].complete);
+      double wait = performance[i].start - performance[i - 1].complete;
+      if (options.use_business_hours) {
+        wait = detail::business_elapsed_seconds(
+            *performance[i - 1].business_complete,
+            *performance[i].business_start, business_slots);
+      }
+      wait = std::max(0.0, wait);
       out.wait_sums[pair] += wait;
       out.wait_samples[pair].push_back(wait);
     }
@@ -462,6 +509,12 @@ std::vector<HeuristicBundle> plus_bundles(
 HeuristicClassicDfgInput build_classic_input(
     const EventLog& log, const HeuristicMinerOptions& options) {
   HeuristicClassicDfgInput input;
+  const auto business_slots =
+      options.use_business_hours
+          ? detail::normalize_business_hour_slots(
+                options.business_hour_slots,
+                options.business_hour_slots_explicit, "Heuristics Miner")
+          : std::vector<BusinessHourSlot>{};
   std::vector<std::string> activities;
   std::set<std::string> known;
   std::map<std::string, std::uint64_t> occurrences;
@@ -502,8 +555,23 @@ HeuristicClassicDfgInput build_classic_input(
                 ? selected_timestamp(trace.events[i], options)
                 : *start_value,
             "start");
+        double elapsed = start - complete;
+        if (options.use_business_hours) {
+          const auto previous_local = detail::local_wall_timestamp(
+              selected_timestamp(trace.events[i - 1], options));
+          const auto current_local = detail::local_wall_timestamp(
+              start_value == nullptr
+                  ? selected_timestamp(trace.events[i], options)
+                  : *start_value);
+          if (!previous_local || !current_local)
+            throw std::invalid_argument(
+                "Heuristics Miner: invalid business-hours timestamp");
+          elapsed = detail::business_elapsed_seconds(*previous_local,
+                                                     *current_local,
+                                                     business_slots);
+        }
         (*input.performance_dfg)[pair].push_back(
-            std::max(0.0, start - complete));
+            std::max(0.0, elapsed));
       }
     }
     for (std::size_t i = 2; i < trace.events.size(); ++i) {

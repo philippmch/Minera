@@ -1029,6 +1029,9 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({
       heuristicStartTimestampAttribute: "  ",
     })).toBe(false);
+    expect(hasActiveMinerOptions({ heuristicBusinessHours: true })).toBe(true);
+    expect(hasActiveMinerOptions({ heuristicBusinessHours: false })).toBe(false);
+    expect(hasActiveMinerOptions({ heuristicBusinessHourSlots: "none" })).toBe(false);
     expect(hasActiveMinerOptions({
       heuristicLifecycleInstanceAttribute: "instance",
     })).toBe(true);

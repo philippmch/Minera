@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "minera/event_log.hpp"
+#include "minera/temporal_profile.hpp"
 
 namespace minera {
 
@@ -197,6 +198,12 @@ struct HeuristicMinerOptions {
   // native completion/lifecycle fallback.
   std::optional<std::string> start_timestamp_attribute = std::nullopt;
   std::string lifecycle_instance_attribute = "concept:instance";
+  bool use_business_hours = false;
+  // Empty uses the compatible Monday-Friday 07:00-17:00 schedule unless
+  // business_hour_slots_explicit is true.
+  std::vector<BusinessHourSlot> business_hour_slots;
+  // Distinguishes an omitted schedule from an explicitly empty schedule.
+  bool business_hour_slots_explicit = false;
 };
 
 struct HeuristicClassicDfgInput {

@@ -2257,6 +2257,20 @@ MineParams parse_mine_params(const FieldLookup& field,
       !value.empty()) {
     params.heuristic.start_timestamp_attribute = value;
   }
+  if (supplied("heuristic_business_hours")) {
+    params.heuristic.use_business_hours = parse_boolean(
+        field("heuristic_business_hours"), "heuristic_business_hours");
+  }
+  if (supplied("heuristic_business_hour_slots")) {
+    const auto value = trim_text(field("heuristic_business_hour_slots"));
+    params.heuristic.business_hour_slots_explicit = true;
+    if (value.empty() || value == "none") {
+      params.heuristic.business_hour_slots.clear();
+    } else {
+      params.heuristic.business_hour_slots = parse_business_hour_slots(
+          value, "heuristic_business_hour_slots");
+    }
+  }
   if (const auto value = field("heuristic_lifecycle_instance_attribute");
       !value.empty()) {
     params.heuristic.lifecycle_instance_attribute = value;

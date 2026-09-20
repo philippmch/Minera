@@ -1,0 +1,92 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Classic and PLUSPLUS business-hours waiting times plus PLUSPLUS sojourn durations, with CLI/request/frontend integration.",
+  "artifacts": [
+    {
+      "path": "docs/heuristic-business-hours-native-checks.json.gz",
+      "uncompressed_sha256": "e1482c869eccb8e0e07141728c5d2d1f37119923542a59541728088273f2dbee"
+    },
+    {
+      "path": "docs/heuristic-business-hours-reference.json.gz",
+      "uncompressed_sha256": "223dfee6644e34f583f33321b6f61ace7254b7e837b19e1d1e5b1840b3f01fdf"
+    }
+  ],
+  "before": {
+    "observations": 126,
+    "matches": 21,
+    "unsupported_option_rejections": 105
+  },
+  "after": {
+    "observations": 126,
+    "matches": 126
+  },
+  "regressions": {
+    "selector": {
+      "observations": 21,
+      "matched": 21
+    },
+    "sparse": {
+      "observations": 7,
+      "matched": 7
+    }
+  },
+  "cli_error_diagnostics": [
+    {
+      "option": "--heuristic-business-hour-slots",
+      "value": "bad",
+      "exit_code": 2,
+      "stderr": "error: --heuristic-business-hour-slots expects start-end second pairs\n",
+      "matched": true
+    },
+    {
+      "option": "--heuristic-business-hour-slots",
+      "value": "1-nan",
+      "exit_code": 2,
+      "stderr": "error: --heuristic-business-hour-slots expects finite seconds\n",
+      "matched": true
+    },
+    {
+      "option": "--heuristic-business-hour-slots",
+      "value": "5-4",
+      "exit_code": 2,
+      "stderr": "error: --heuristic-business-hour-slots requires 0 <= start < end <= 604800\n",
+      "matched": true
+    },
+    {
+      "option": "--heuristic-business-hour-slots",
+      "value": "0-604801",
+      "exit_code": 2,
+      "stderr": "error: --heuristic-business-hour-slots requires 0 <= start < end <= 604800\n",
+      "matched": true
+    },
+    {
+      "option": "--dfg-business-hour-slots",
+      "value": "bad",
+      "exit_code": 2,
+      "stderr": "error: --dfg-business-hour-slots expects start-end second pairs\n",
+      "matched": true
+    }
+  ],
+  "native_source_parent_commit": "90b14c958c00977b8329df79f5b43af8b0458d02",
+  "native_verified_staged_tree": "033e5fdb44c454240b8a5aaa0a9f6f435a557b90",
+  "native_executable_sha256": "cbccafa087ba3861919b71413035aef8092ac14b844dc112cff3320bd1d3251a",
+  "validation": {
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "frontend_tests_passed": 624,
+    "frontend_production_build": "passed",
+    "independent_review": "clear"
+  },
+  "native_checker_script": "import argparse,hashlib,json,subprocess\nfrom pathlib import Path\np=argparse.ArgumentParser();p.add_argument('--output',required=True);a=p.parse_args()\nref=json.loads(Path('build/heuristic-business-hours-reference.json').read_text());exe=Path('build/petri-comparison-checkpoint-build/Release/minera_export.exe');checks=[]\nfor i,r in enumerate(ref['observations']):\n x=Path(f'build/heuristic-business-{i}.xes');x.write_text(r['native_xes'],encoding='utf-8');out=Path(f'build/heuristic-business-{i}-native.json')\n cmd=[str(exe),str(x),'--heuristic-variant',r['variant'].lower(),'--heuristic-decoration',r['decoration'],'-o',str(out)]\n if 'pm4py:param:start_timestamp_key' in r['parameters']:cmd+=['--heuristic-start-timestamp-attribute',r['parameters']['pm4py:param:start_timestamp_key']]\n if r['business_hours']:cmd+=['--heuristic-business-hours']\n if r['slots'] is not None:cmd+=['--heuristic-business-hour-slots',','.join(f'{start}-{end}' for start,end in r['slots']) or 'none']\n proc=subprocess.run(cmd,capture_output=True,text=True,timeout=30);actual=None;sojourn=None;frequency=None;match=False\n if proc.returncode==0:\n  net=json.loads(out.read_text(encoding='utf-8'))['heuristics_net'];names=net['activities'];actual=sorted([[[names[e['source']],names[e['target']]],e['mean_wait_seconds']] for e in net['relation_statistics'] if e['direct_adjacency_frequency']]);sojourn={names[e['activity']]:e['mean_sojourn_seconds'] for e in net['activity_statistics']}\n  frequency=sorted([[[names[e['source']],names[e['target']]],e['raw_frequency']] for e in net['relation_statistics'] if e['raw_frequency']])\n  match=(frequency==r['frequency_dfg']) and (r['performance_dfg'] is None or actual==r['performance_dfg']) and (r['variant']=='CLASSIC' or sojourn==r['sojourn_times'])\n checks.append(dict(index=i,name=r['name'],expected_performance=r['performance_dfg'],expected_sojourn=r['sojourn_times'],actual_performance=actual,actual_sojourn=sojourn,expected_frequency=r['frequency_dfg'],actual_frequency=frequency,exit_code=proc.returncode,stderr=proc.stderr,matched=match))\nr=dict(checks=checks,native_executable_sha256=hashlib.sha256(exe.read_bytes()).hexdigest());Path(a.output).write_text(json.dumps(r,indent=2),encoding='utf-8');print(sum(c['matched'] for c in checks),'/',len(checks));print('successful but different:',[c['name'] for c in checks if c['exit_code']==0 and not c['matched']])\n",
+  "reproduction": [
+    "Decompress the reference artifact to build/heuristic-business-hours-reference.json.",
+    "Restore native_checker_script to build/check-heuristic-business-hours.py and run with --output, using the recorded Release executable path.",
+    "Use native_xes ISO-string transport: typed XES date import has separate normalization semantics and is not a faithful transport for constructed datetime offsets."
+  ],
+  "limits": [
+    "Finite constructed EventLog observations; native ISO-string transport preserves input offsets without exercising XES date normalization.",
+    "Opaque workcalendar objects and holiday behavior are outside this fixture.",
+    "DFG-input performance samples have no timestamps and are not converted by the business-hours option.",
+    "Finite observations do not establish full parity or upgrade structural coverage."
+  ]
+}

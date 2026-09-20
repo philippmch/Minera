@@ -5,7 +5,7 @@ import { alphaValidationMessage, tokenReplayInputOptionsFromForm, tokenReplayInp
 import { TOKEN_REPLAY_POLICY_DEFAULTS, TokenReplayPolicyControls, tokenReplayPolicyOptionsFromForm,
   tokenReplayPoliciesAreDirty } from "../../src/components/Filters";
 import { TokenReplayRootCauseControls, tokenReplayRootCauseOptionsFromForm } from "../../src/components/Filters";
-import { alphaOptionsFromForm, alphaSettingsAreDirty, attributeOccurrenceValidationMessage, caseGroupingValidationMessage, correlationValidationMessage, footprintsValidationMessage, heuristicStartTimestampOptionsFromForm, heuristicStartTimestampPlaceholder, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
+import { alphaOptionsFromForm, alphaSettingsAreDirty, attributeOccurrenceValidationMessage, caseGroupingValidationMessage, correlationValidationMessage, footprintsValidationMessage, heuristicBusinessHourSlotsValidationMessage, heuristicBusinessHoursOptionsAreActive, heuristicStartTimestampOptionsFromForm, heuristicStartTimestampPlaceholder, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
 
 describe("token replay policy controls", () => {
   it("disables only forward-only policies backwards without changing retained values", () => {
@@ -96,6 +96,22 @@ describe("heuristic start-time control", () => {
     expect(heuristicStartTimestampPlaceholder("classic", "  ")).toBe("time:timestamp");
     expect(heuristicStartTimestampPlaceholder("plusplus")).toBe("start_timestamp");
     expect(heuristicStartTimestampPlaceholder("plusplus", "finished_at")).toBe("start_timestamp");
+  });
+
+  it("enables schedules for Classic performance and all Miner++ decorations", () => {
+    expect(heuristicBusinessHoursOptionsAreActive("classic", "frequency")).toBe(false);
+    expect(heuristicBusinessHoursOptionsAreActive("classic", "performance")).toBe(true);
+    expect(heuristicBusinessHoursOptionsAreActive("plusplus", "frequency")).toBe(true);
+    expect(heuristicBusinessHoursOptionsAreActive("plusplus", "performance")).toBe(true);
+  });
+
+  it("validates weekly schedules only when business hours are enabled", () => {
+    expect(heuristicBusinessHourSlotsValidationMessage("", true)).toBeNull();
+    expect(heuristicBusinessHourSlotsValidationMessage("none", true)).toBeNull();
+    expect(heuristicBusinessHourSlotsValidationMessage(" 32400-61200,378000-406800 ", true)).toBeNull();
+    expect(heuristicBusinessHourSlotsValidationMessage("0-0", true)).toMatch(/within one week/);
+    expect(heuristicBusinessHourSlotsValidationMessage("0:3600", true)).toMatch(/start-end/);
+    expect(heuristicBusinessHourSlotsValidationMessage("0-0", false)).toBeNull();
   });
 });
 
