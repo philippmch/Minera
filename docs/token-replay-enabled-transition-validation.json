@@ -1,0 +1,90 @@
+{
+  "status": "finite_native_matrix_passed",
+  "scope": "Eventually-enabled visible transition diagnostics after token replay; precision searches remain unchanged.",
+  "reference_version": "2.7.22",
+  "reference_provenance": {
+    "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+    "function": "get_visible_transitions_eventually_enabled_by_marking",
+    "module": "pm4py.objects.petri_net.utils.align_utils",
+    "signature": "(net, marking)",
+    "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+    "installed_sha256": "b3d4de50eb30983355e13b7a49433ea0e34a0752dc4a346757f1102a46cad2ea",
+    "pinned_sha256": "b3d4de50eb30983355e13b7a49433ea0e34a0752dc4a346757f1102a46cad2ea"
+  },
+  "artifacts": [
+    {
+      "path": "docs/token-replay-enabled-transition-reference.json.gz",
+      "uncompressed_sha256": "b9bc595fb07a9f1dc7d3845cc6ffb3b76d0cd3926e09ed02f0ed21a7a4a59482"
+    },
+    {
+      "path": "docs/token-replay-enabled-transition-cycle-reference.json.gz",
+      "uncompressed_sha256": "f558023bd127443741e25f5603834fb4ca967453bbf473c004d0fa1bd3aaf890"
+    }
+  ],
+  "observations": {
+    "inputs": 1259,
+    "replay_observations": 2518,
+    "helper_observations": 1259,
+    "fresh_process_focus_inputs": 18,
+    "hash_seeds": [
+      0,
+      1,
+      17
+    ],
+    "focus_identical": true
+  },
+  "contract": [
+    "Discover enabled transitions in transition-name order and collect visible transitions.",
+    "Queue silent transition IDs in FIFO order, permitting duplicate entries. Each discovery replaces that transition\u2019s stored marking.",
+    "Each popped ID uses its latest stored marking; deduplicate transition/marking pairs at processing time.",
+    "This can suppress reachable alternatives that exact marking-state reachability would retain. Weighted inputs may require repeated firings of the same silent transition."
+  ],
+  "validation": {
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "strict_replay_matches": 2518,
+    "match_counts": {
+      "identity": 2518,
+      "independent_hidden_order": 0,
+      "net_automorphism": 0
+    },
+    "previous_exhaustive_matches": 40,
+    "regressions": {
+      "duplicate": {
+        "observations": 160,
+        "match_counts": {
+          "identity": 160,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      },
+      "nested": {
+        "observations": 55,
+        "match_counts": {
+          "identity": 55,
+          "independent_hidden_order": 0,
+          "net_automorphism": 0
+        }
+      }
+    },
+    "independent_review": "No actionable findings remain after the queue-bound correction.",
+    "native_suite_execution": "153 unchanged suites passed the full run; the repaired diagnostic fixture suite passed its targeted rerun.",
+    "explicit_zero_marking_probes": 360,
+    "explicit_zero_diagnostic_differences": 0
+  },
+  "previous_native_matches": 2424,
+  "previous_native_observations": 2516,
+  "native_source_parent_commit": "47411a251842a7f29024700bb0783defaca27ab2",
+  "native_verified_staged_tree": "a23662d0fa995ab11ea3574759ef5c3c0ab45257",
+  "native_executable_sha256": "1c80299aeb6c5042a53fbd25640bffb93e9e05a3de7ad914403450d23f1bc679",
+  "reproduction": [
+    "Decompress the replay reference gzip to JSON.",
+    "Run scripts/check-token-replay-native.py --reference <JSON> --native <minera_export> --output <report>.",
+    "Use the existing capture(case, pltr) helper in scripts/capture-token-replay-reference.py to recapture each selected input with both fitness modes against the pinned runtime."
+  ],
+  "limits": [
+    "Finite observations do not establish full parity.",
+    "Duplicate transition-name tie behavior and arbitrary extended-arc net behavior are not established by this matrix.",
+    "Two token-producing cyclic public probes did not complete within eight seconds; bounded outcomes are retained in the cycle artifact. Native diagnostic searches retain explicit resource guards."
+  ]
+}

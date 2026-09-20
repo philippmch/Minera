@@ -8,6 +8,8 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
+#include <utility>
 
 using namespace minera;
 
@@ -153,6 +155,158 @@ void hidden_routing_policies_and_enabled_ids() {
   assert(row.missing == 1 && row.remaining == 1);
   assert((row.enabled_transitions == std::vector<std::size_t>{1}));
   consistent(log_of({{"a", "b"}, {"a"}, {}}), net, options);
+}
+
+PetriNet exhaustive_competing_route_net();
+
+void enabled_transition_worklist_public_contract() {
+  const auto empty_trace = log_of({{}});
+
+  // A silent transition can be fired repeatedly on successive markings.  The
+  // worklist must retain its latest marking for the duplicate queue entries;
+  // deduplicating the transition at enqueue time misses the visible step.
+  PetriNet finite_repeat;
+  finite_repeat.set_activities({"A"});
+  finite_repeat.add_place();  // p0
+  finite_repeat.add_place();  // a
+  finite_repeat.add_place();  // sink
+  finite_repeat.set_source(0);
+  finite_repeat.set_sink(2);
+  finite_repeat.add_transition(std::nullopt, {0}, {1});
+  finite_repeat.add_transition(0, {1, 1}, {2});
+  for (const int tokens : {1, 2, 3}) {
+    TokenReplayOptions options;
+    options.initial_marking = {tokens, 0, 0};
+    options.final_marking = {0, 0, 0};
+    options.try_to_reach_final_marking_through_hidden = false;
+    const auto row = replay_token_traces(empty_trace, finite_repeat, options).front();
+    assert(row.enabled_transitions == (tokens == 1
+        ? std::vector<std::size_t>{}
+        : std::vector<std::size_t>{1}));
+  }
+
+  // Weighted input arcs must be checked with their full multiplicity.
+  PetriNet weighted;
+  weighted.set_activities({"A"});
+  weighted.add_place();  // p0
+  weighted.add_place();  // a
+  weighted.add_place();  // sink
+  weighted.set_source(0);
+  weighted.set_sink(2);
+  weighted.add_transition(std::nullopt, {0, 0}, {1});
+  weighted.add_transition(0, {1}, {2});
+  for (const int tokens : {1, 2, 3}) {
+    TokenReplayOptions options;
+    options.initial_marking = {tokens, 0, 0};
+    options.final_marking = {0, 0, 0};
+    options.try_to_reach_final_marking_through_hidden = false;
+    const auto row = replay_token_traces(empty_trace, weighted, options).front();
+    assert(row.enabled_transitions == (tokens == 1
+        ? std::vector<std::size_t>{}
+        : std::vector<std::size_t>{1}));
+  }
+
+  // A finite self-loop must not be revisited forever when its marking is
+  // unchanged, while the visible transition at that marking remains enabled.
+  PetriNet self_loop;
+  self_loop.set_activities({"A"});
+  self_loop.add_place();
+  self_loop.add_place();
+  self_loop.set_source(0);
+  self_loop.set_sink(1);
+  self_loop.add_transition(std::nullopt, {0}, {0});
+  self_loop.add_transition(0, {0}, {1});
+  TokenReplayOptions self_loop_options;
+  self_loop_options.initial_marking = {1, 0};
+  self_loop_options.final_marking = {0, 0};
+  self_loop_options.try_to_reach_final_marking_through_hidden = false;
+  assert(replay_token_traces(empty_trace, self_loop, self_loop_options).front()
+             .enabled_transitions == std::vector<std::size_t>{1});
+
+  // Duplicate queue entries from many unchanged self-loops remain bounded by
+  // the distinct transition/marking expansion limit rather than an arbitrary
+  // fixed queue-size cutoff.
+  PetriNet many_self_loops;
+  many_self_loops.set_activities({"A"});
+  many_self_loops.add_place();
+  many_self_loops.add_place();
+  many_self_loops.set_source(0);
+  many_self_loops.set_sink(1);
+  for (int i = 0; i < 129; ++i)
+    many_self_loops.add_transition(std::nullopt, {0}, {0});
+  many_self_loops.add_transition(0, {0}, {1});
+  TokenReplayOptions many_self_loop_options;
+  many_self_loop_options.initial_marking = {1, 0};
+  many_self_loop_options.final_marking = {0, 0};
+  many_self_loop_options.try_to_reach_final_marking_through_hidden = false;
+  assert(replay_token_traces(empty_trace, many_self_loops, many_self_loop_options)
+             .front().enabled_transitions == std::vector<std::size_t>{129});
+
+  // The unbounded token-producing variant is rejected by the native diagnostic
+  // search guard instead of silently returning a partial enabled set.
+  PetriNet producer;
+  producer.set_activities({"A"});
+  producer.add_place();
+  producer.add_place();
+  producer.add_place();
+  producer.set_source(0);
+  producer.set_sink(2);
+  producer.add_transition(std::nullopt, {0}, {0, 1});
+  producer.add_transition(0, {1, 1}, {2});
+  TokenReplayOptions producer_options;
+  producer_options.initial_marking = {1, 0, 0};
+  producer_options.final_marking = {0, 0, 0};
+  producer_options.try_to_reach_final_marking_through_hidden = false;
+  bool producer_rejected = false;
+  try {
+    (void)replay_token_traces(empty_trace, producer, producer_options);
+  } catch (const std::runtime_error&) {
+    producer_rejected = true;
+  }
+  assert(producer_rejected);
+
+  // Effective transition names, including metadata supplied by callers, set
+  // the traversal order.  Renaming the competing branch changes reachability.
+  for (const auto& names_and_expected : {
+      std::pair<std::vector<std::string>, std::vector<std::size_t>>{
+          {"visible", "t0", "t1", "t3", "t4"}, {}},
+      std::pair<std::vector<std::string>, std::vector<std::size_t>>{
+          {"visible", "t0", "t1", "a", "t4"}, {0}}}) {
+    auto net = exhaustive_competing_route_net();
+    TokenReplayOptions options;
+    options.initial_marking = {1, 1, 0, 0, 0, 0};
+    options.final_marking = {0, 0, 0, 0, 0, 0};
+    options.try_to_reach_final_marking_through_hidden = false;
+    options.transition_names = names_and_expected.first;
+    const auto row = replay_token_traces(empty_trace, net, options).front();
+    assert(row.enabled_transitions == names_and_expected.second);
+  }
+
+  // This weighted competing-route fixture catches state-at-enqueue
+  // deduplication: t0 must be replayed from its refreshed marking before the
+  // visible transition can be discovered.
+  PetriNet weighted_competing;
+  weighted_competing.set_activities({"A"});
+  for (int i = 0; i < 7; ++i) weighted_competing.add_place();
+  weighted_competing.set_source(0);
+  weighted_competing.set_sink(6);
+  weighted_competing.add_transition(0, {5, 5}, {6});
+  weighted_competing.add_transition(std::nullopt, {1, 1}, {3, 5});
+  weighted_competing.add_transition(std::nullopt, {1}, {4});
+  weighted_competing.add_transition(std::nullopt, {3}, {4, 5});
+  weighted_competing.add_transition(std::nullopt, {3}, {4});
+  weighted_competing.add_transition(std::nullopt, {0, 0}, {1});
+  weighted_competing.add_transition(std::nullopt, {2}, {5});
+  weighted_competing.add_transition(std::nullopt, {1}, {4, 5});
+  weighted_competing.add_transition(std::nullopt, {3}, {5, 4});
+  TokenReplayOptions weighted_options;
+  weighted_options.initial_marking = {3, 0, 0, 1, 0, 0, 0};
+  weighted_options.final_marking = {0, 0, 0, 0, 0, 0, 0};
+  weighted_options.try_to_reach_final_marking_through_hidden = false;
+  weighted_options.transition_names = {
+      "visible", "t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7"};
+  assert(replay_token_traces(empty_trace, weighted_competing, weighted_options)
+             .front().enabled_transitions == std::vector<std::size_t>{0});
 }
 
 void deviations_unknowns_and_stopping() {
@@ -1204,6 +1358,7 @@ int main() {
   explicit_marking_conformance_queries();
   forward_exhaustive_hidden_path_trials_public_contract();
   forward_nested_hidden_routing_public_contract();
+  enabled_transition_worklist_public_contract();
   forward_cleaning_public_counter_contract();
   forward_weighted_repair_and_partial_stop_contract();
   forward_final_zero_key_and_path_boundary_contract();

@@ -608,13 +608,85 @@ class Replayer {
   }
 
   [[nodiscard]] std::vector<std::size_t> enabled_transition_ids(
-      const Marking& marking) const {
-    std::vector<std::size_t> result;
-    for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
-      if (!net_.transitions()[t].silent() &&
-          silent_path(marking, [&](const Marking& m) { return enabled(m, t); }))
-        result.push_back(t);
+      const Marking& marking,
+      const std::vector<std::string>& configured_transition_names) const {
+    if (net_.has_extended_arcs()) {
+      std::vector<std::size_t> result;
+      for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
+        if (!net_.transitions()[t].silent() &&
+            silent_path(marking, [&](const Marking& m) { return enabled(m, t); }))
+          result.push_back(t);
+      }
+      return result;
     }
+
+    const auto transition_names = detail::replay_element_names(
+        configured_transition_names, net_.transitions().size(), "t",
+        "transition_names");
+    std::vector<std::size_t> order(net_.transitions().size());
+    for (std::size_t t = 0; t < order.size(); ++t) order[t] = t;
+    std::sort(order.begin(), order.end(), [&](const auto left, const auto right) {
+      return std::tie(transition_names[left], left) <
+             std::tie(transition_names[right], right);
+    });
+
+    std::vector<bool> visible_enabled(net_.transitions().size(), false);
+    std::vector<std::optional<Marking>> latest_marking(net_.transitions().size());
+    std::queue<std::size_t> pending;
+    std::vector<std::unordered_set<Marking, MarkingHash>> visited(
+        net_.transitions().size());
+    const auto transition_count = net_.transitions().size();
+    const auto expansion_slots = kSilentSearchCap + 1;
+    const std::size_t worklist_cap =
+        transition_count != 0 &&
+                expansion_slots > std::numeric_limits<std::size_t>::max() /
+                    transition_count
+            ? std::numeric_limits<std::size_t>::max()
+            : expansion_slots * transition_count;
+    const auto enqueue = [&](std::size_t transition) {
+      if (pending.size() >= worklist_cap)
+        throw std::runtime_error("enabled transition diagnostic worklist exceeded limit");
+      pending.push(transition);
+    };
+    const auto discover = [&](const Marking& reached) {
+      // The public helper walks a FIFO worklist.  Every newly reached marking
+      // refreshes the latest state for each enabled silent transition and
+      // appends that transition, including duplicates, to the worklist.
+      for (const auto transition : order) {
+        if (!enabled(reached, transition)) continue;
+        if (!net_.transitions()[transition].silent()) {
+          visible_enabled[transition] = true;
+          continue;
+        }
+        latest_marking[transition] = reached;
+        enqueue(transition);
+      }
+    };
+    discover(marking);
+
+    // A token-producing silent cycle can generate infinitely many distinct
+    // markings.  Bound diagnostic-only exploration just as the other silent
+    // searches are bounded, while keeping finite self-loops terminating via
+    // the transition-plus-marking visited key.
+    std::size_t expanded = 0;
+    while (!pending.empty()) {
+      const auto transition = pending.front();
+      pending.pop();
+      const auto& latest = *latest_marking[transition];
+      if (!visited[transition].insert(latest).second) continue;
+      if (expanded++ >= kSilentSearchCap)
+        throw std::runtime_error("enabled transition diagnostic search exceeded limit");
+      Marking next = latest;
+      Counts scratch;
+      fire(next, transition, scratch);
+      discover(next);
+    }
+
+    // The public helper returns a set. Keep the existing native diagnostic
+    // ordering stable by emitting transition IDs in index order.
+    std::vector<std::size_t> result;
+    for (std::size_t t = 0; t < visible_enabled.size(); ++t)
+      if (visible_enabled[t]) result.push_back(t);
     return result;
   }
 
@@ -3047,7 +3119,8 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
     row.missing = counts.missing;
     row.remaining = counts.remaining;
     row.places = std::move(counts.places);
-    row.enabled_transitions = replayer.enabled_transition_ids(row.reached_marking);
+    row.enabled_transitions = replayer.enabled_transition_ids(
+        row.reached_marking, options.transition_names);
     for (const auto index : row.unknown_event_indices) {
       row.unknown_activities.push_back(names[index].value_or(""));
       row.unknown_activity_is_null.push_back(!names[index]);
