@@ -12,11 +12,10 @@
 
 #include "minera/timestamp.hpp"
 
+#include "business_hours.hpp"
+
 namespace minera {
 namespace {
-
-constexpr double kDaySeconds = 86400.0;
-constexpr double kWeekSeconds = 7.0 * kDaySeconds;
 
 double required_timestamp(std::string_view text,
                           std::string_view description) {
@@ -70,97 +69,6 @@ const std::string& timestamp_value(const Event& event,
   throw std::invalid_argument(
       "DFG discovery: event is missing timestamp attribute '" +
       options.timestamp_attribute + "'");
-}
-
-std::optional<double> local_wall_timestamp(std::string_view text) {
-  if (!parse_timestamp(text)) return std::nullopt;
-  std::size_t end = text.size();
-  while (end > 0 &&
-         std::isspace(static_cast<unsigned char>(text[end - 1])) != 0) {
-    --end;
-  }
-  const auto timezone = text.substr(0, end).find_first_of("Zz+-", 10);
-  if (timezone != std::string_view::npos) end = timezone;
-  return parse_timestamp(text.substr(0, end));
-}
-
-std::vector<BusinessHourSlot> normalized_business_slots(
-    const DfgStatisticalOptions& options) {
-  auto slots = options.business_hour_slots;
-  if (slots.empty() && !options.business_hour_slots_explicit) {
-    slots.reserve(5);
-    for (int day = 0; day < 5; ++day) {
-      const double start = day * kDaySeconds + 7.0 * 3600.0;
-      slots.push_back({start, start + 10.0 * 3600.0});
-    }
-  }
-  for (const auto& slot : slots) {
-    if (!std::isfinite(slot.start_seconds) ||
-        !std::isfinite(slot.end_seconds) || slot.start_seconds < 0.0 ||
-        slot.start_seconds >= slot.end_seconds ||
-        slot.end_seconds > kWeekSeconds) {
-      throw std::invalid_argument(
-          "DFG discovery: business-hour slots must satisfy 0 <= start < end <= 604800");
-    }
-  }
-  std::sort(slots.begin(), slots.end(), [](const auto& lhs, const auto& rhs) {
-    return std::tie(lhs.start_seconds, lhs.end_seconds) <
-           std::tie(rhs.start_seconds, rhs.end_seconds);
-  });
-  std::vector<BusinessHourSlot> merged;
-  for (const auto& slot : slots) {
-    // The source business-hours helper unifies slots whose gap is at most one
-    // second, including fractional-second gaps.
-    if (!merged.empty() &&
-        slot.start_seconds <= merged.back().end_seconds + 1.0) {
-      merged.back().end_seconds =
-          std::max(merged.back().end_seconds, slot.end_seconds);
-    } else {
-      merged.push_back(slot);
-    }
-  }
-  return merged;
-}
-
-double active_business_segment(double start, double end,
-                               const std::vector<BusinessHourSlot>& slots) {
-  double total = 0.0;
-  for (const auto& slot : slots) {
-    const double overlap_start = std::max(start, slot.start_seconds);
-    const double overlap_end = std::min(end, slot.end_seconds);
-    if (overlap_end > overlap_start) total += overlap_end - overlap_start;
-  }
-  return total;
-}
-
-double business_elapsed(double start, double end,
-                        const std::vector<BusinessHourSlot>& slots) {
-  if (end <= start || slots.empty()) return 0.0;
-  // 1970-01-01 was Thursday; shift the epoch so weeks begin Monday.
-  constexpr double epoch_to_monday = 3.0 * kDaySeconds;
-  const double adjusted_start = start + epoch_to_monday;
-  const double adjusted_end = end + epoch_to_monday;
-  const auto start_week = static_cast<long long>(
-      std::floor(adjusted_start / kWeekSeconds));
-  const auto end_week =
-      static_cast<long long>(std::floor(adjusted_end / kWeekSeconds));
-  const double start_offset =
-      adjusted_start - static_cast<double>(start_week) * kWeekSeconds;
-  const double end_offset =
-      adjusted_end - static_cast<double>(end_week) * kWeekSeconds;
-  if (start_week == end_week) {
-    return active_business_segment(start_offset, end_offset, slots);
-  }
-  double weekly_total = 0.0;
-  for (const auto& slot : slots)
-    weekly_total += slot.end_seconds - slot.start_seconds;
-  double total = active_business_segment(start_offset, kWeekSeconds, slots) +
-                 active_business_segment(0.0, end_offset, slots);
-  const auto full_weeks = end_week - start_week - 1;
-  if (full_weeks > 0) {
-    total += static_cast<double>(full_weeks) * weekly_total;
-  }
-  return total;
 }
 
 DfgPerformanceSummary summarize(const std::vector<double>& values) {
@@ -412,7 +320,10 @@ DfgPerformance discover_performance_dfg(
     const EventLog& log, const DfgStatisticalOptions& options) {
   std::map<DfgActivityPair, std::vector<double>> observations;
   const auto slots = options.use_business_hours
-                         ? normalized_business_slots(options)
+                         ? detail::normalize_business_hour_slots(
+                               options.business_hour_slots,
+                               options.business_hour_slots_explicit,
+                               "DFG discovery")
                          : std::vector<BusinessHourSlot>{};
   for (const auto& trace : log.traces) {
     for (std::size_t i = 1; i < trace.events.size(); ++i) {
@@ -427,13 +338,14 @@ DfgPerformance discover_performance_dfg(
       double elapsed = current_start - previous_complete;
       if (options.use_business_hours) {
         const auto previous_local =
-            local_wall_timestamp(previous_complete_text);
-        const auto current_local = local_wall_timestamp(current_start_text);
+            detail::local_wall_timestamp(previous_complete_text);
+        const auto current_local = detail::local_wall_timestamp(current_start_text);
         if (!previous_local || !current_local) {
           throw std::invalid_argument(
               "DFG discovery: invalid business-hours timestamp");
         }
-        elapsed = business_elapsed(*previous_local, *current_local, slots);
+        elapsed = detail::business_elapsed_seconds(*previous_local, *current_local,
+                                                   slots);
       }
       observations[{activity_value(previous, options),
                     activity_value(current, options)}].push_back(

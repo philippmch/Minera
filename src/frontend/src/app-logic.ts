@@ -97,6 +97,7 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
         options.heuristicDecoration !== "frequency") ||
       (options.heuristicPerformanceAggregation &&
         options.heuristicPerformanceAggregation !== "mean") ||
+      options.heuristicBusinessHours === true ||
       (options.heuristicDfgPreCleaningNoiseThreshold !== undefined &&
         options.heuristicDfgPreCleaningNoiseThreshold !== 0.05) ||
       (options.heuristicLoopLengthTwoThreshold !== undefined &&

@@ -4140,6 +4140,22 @@ String assignments remain supported; callers that read it as a string must
 handle the omitted value. The existing explicit-empty native fallback remains
 an extension, while the UI treats a blank field as automatic selection.
 
+Classic and PLUSPLUS expose business-hours performance waits through the native
+options, CLI, request parser, and UI. PLUSPLUS also applies the schedule to
+activity sojourn times, including frequency decoration. Omitted schedules use
+Monday-Friday 07:00-17:00; explicit empty schedules contribute zero time. Custom
+slots use seconds from Monday and retain the DFG helper's one-second gap merge.
+Business durations use local clock fields, while interval ordering and
+concurrency retain absolute instants. Supplied DFG performance samples are not
+reinterpreted because they contain no timestamps.
+
+The business-hours reference and validation artifacts retain 126 matching
+public-API comparisons, plus 21 start-selector and seven sparse-decoration
+regressions. All 154 native suites and 624 frontend tests pass, and the frontend
+production build passes. Offset-bearing constructed datetimes use ISO-string
+XES transport to preserve their clock fields; typed-date import normalization
+is a separate contract. These finite checks do not establish full parity.
+
 The PLUSPLUS variation independently implements the pinned interval abstraction.
 Lifecycle events are converted through case-insensitive start/complete matching
 with FIFO queues keyed by activity and lifecycle instance; unmatched completes

@@ -639,6 +639,85 @@ void start_selector_defaults_and_validation() {
   assert(relation(plus_lifecycle, "A", "B").mean_wait_seconds == 19.0);
 }
 
+void business_hours_cover_heuristic_waits_and_sojourns() {
+  const auto friday_to_monday = log({trace({
+      event("A", "2024-01-05T16:00:00Z"),
+      event("B", "2024-01-08T10:00:00Z"),
+  })});
+
+  HeuristicMinerOptions classic;
+  classic.decoration = HeuristicNetDecoration::kPerformance;
+  classic.use_business_hours = true;
+  const auto default_schedule =
+      discover_heuristics_net(friday_to_monday, classic);
+  assert(std::abs(relation(default_schedule, "A", "B").mean_wait_seconds -
+                  14400.0) < 1e-9);
+
+  // A custom all-week slot exposes the raw 66-hour span, while an explicitly
+  // empty schedule measures no elapsed business time.
+  classic.business_hour_slots = {{0.0, 604800.0}};
+  classic.business_hour_slots_explicit = true;
+  const auto all_day = discover_heuristics_net(friday_to_monday, classic);
+  assert(std::abs(relation(all_day, "A", "B").mean_wait_seconds -
+                  237600.0) < 1e-9);
+
+  classic.business_hour_slots.clear();
+  const auto no_business_time =
+      discover_heuristics_net(friday_to_monday, classic);
+  assert(relation(no_business_time, "A", "B").mean_wait_seconds == 0.0);
+
+  // Business time follows local wall-clock values after parsing UTC offsets;
+  // this pair is positive in UTC but reversed in local wall time.
+  classic.business_hour_slots_explicit = false;
+  const auto mixed_offsets = log({trace({
+      event("A", "2024-01-08T12:00:00+05:30"),
+      event("B", "2024-01-08T10:00:00+00:00"),
+  })});
+  const auto mixed_net = discover_heuristics_net(mixed_offsets, classic);
+  assert(relation(mixed_net, "A", "B").mean_wait_seconds == 0.0);
+
+  auto plus = plus_options();
+  plus.decoration = HeuristicNetDecoration::kFrequency;
+  plus.use_business_hours = true;
+  const auto intervals = log({trace({
+      interval("A", "2024-01-05T15:00:00+05:30",
+               "2024-01-05T16:00:00+05:30"),
+      interval("B", "2024-01-08T09:00:00+00:00",
+               "2024-01-08T10:00:00+00:00"),
+  })});
+  const auto plus_net = discover_heuristics_net(intervals, plus);
+  assert(std::abs(activity_stat(plus_net, "A").mean_sojourn_seconds -
+                  3600.0) < 1e-9);
+  assert(std::abs(activity_stat(plus_net, "B").mean_sojourn_seconds -
+                  3600.0) < 1e-9);
+  assert(std::abs(relation(plus_net, "A", "B").mean_wait_seconds -
+                  10800.0) < 1e-9);
+
+  const auto negative_interval = log({trace({
+      interval("N", "2024-01-08T10:00:00+00:00",
+               "2024-01-08T09:00:00+00:00"),
+  })});
+  const auto negative_net = discover_heuristics_net(negative_interval, plus);
+  assert(activity_stat(negative_net, "N").mean_sojourn_seconds == 0.0);
+
+  auto a_start = event("A", "2024-01-05T15:00:00+05:30", "start");
+  auto a_complete = event("A", "2024-01-05T16:00:00+05:30", "complete");
+  auto b_start = event("B", "2024-01-08T09:00:00+00:00", "start");
+  auto b_complete = event("B", "2024-01-08T10:00:00+00:00", "complete");
+  for (auto* current : {&a_start, &a_complete})
+    attr(*current, "concept:instance", "a1");
+  for (auto* current : {&b_start, &b_complete})
+    attr(*current, "concept:instance", "b1");
+  const auto lifecycle_net = discover_heuristics_net(
+      log({trace({a_start, b_start, a_complete, b_complete})}), plus);
+  assert(std::abs(activity_stat(lifecycle_net, "A").mean_sojourn_seconds -
+                  3600.0) < 1e-9);
+  assert(std::abs(activity_stat(lifecycle_net, "B").mean_sojourn_seconds -
+                  3600.0) < 1e-9);
+  assert(std::abs(relation(lifecycle_net, "A", "B").mean_wait_seconds -
+                  10800.0) < 1e-9);
+}
+
 void configurable_activity_and_timestamp_fields() {
   auto a = event("canonical-a", "not-a-canonical-time");
   auto b = event("canonical-b", "also-not-a-canonical-time");
@@ -712,6 +791,7 @@ int main() {
   classic_active_nodes_conversion_and_dfg_inference();
   classic_performance_aggregations_and_validation();
   start_selector_defaults_and_validation();
+  business_hours_cover_heuristic_waits_and_sojourns();
   configurable_activity_and_timestamp_fields();
   std::cout << "heuristic variant tests passed\n";
 }

@@ -478,6 +478,10 @@ export interface MinerOptions {
     | "sum"
     | "raw_values"
     | "all";
+  /** Use business-hour calendars for heuristic performance and sojourn times. */
+  heuristicBusinessHours?: boolean;
+  /** Optional weekly business-hour slots; blank uses Mon–Fri 07:00–17:00, `none` is explicitly empty. */
+  heuristicBusinessHourSlots?: string;
   /** Classic DFG pre-cleaning noise threshold (default 0.05). */
   heuristicDfgPreCleaningNoiseThreshold?: number;
   /** Classic two-step-loop threshold (default 0.5). */
@@ -993,6 +997,33 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
       "heuristic_performance_aggregation",
       options.heuristicPerformanceAggregation,
     );
+  if (options.heuristicBusinessHours)
+    add("heuristic_business_hours", "true");
+  if (options.heuristicBusinessHours &&
+      options.heuristicBusinessHourSlots !== undefined) {
+    const slots = options.heuristicBusinessHourSlots.trim();
+    if (slots) {
+      if (slots.toLowerCase() === "none") {
+        add("heuristic_business_hour_slots", "none");
+      } else {
+        const validSlots = slots.split(",").every((slot) => {
+          const match = slot.trim().match(
+            /^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/,
+          );
+          if (!match) return false;
+          const start = Number(match[1]);
+          const end = Number(match[2]);
+          return Number.isFinite(start) && Number.isFinite(end) &&
+            start >= 0 && start < end && end <= 604800;
+        });
+        if (!validSlots)
+          throw new Error(
+            "heuristicBusinessHourSlots must be `none` or start-end pairs within one week",
+          );
+        add("heuristic_business_hour_slots", slots);
+      }
+    }
+  }
   if (
     options.heuristicDfgPreCleaningNoiseThreshold !== undefined &&
     options.heuristicDfgPreCleaningNoiseThreshold !== 0.05

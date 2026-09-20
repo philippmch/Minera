@@ -148,6 +148,40 @@ describe("Heuristic request options", () => {
     expect(mineFormEntries({ heuristicStartTimestampAttribute: " began " }))
       .toEqual([["heuristic_start_timestamp_attribute", "began"]]);
   });
+
+  it("serializes business-hour schedules only when enabled", () => {
+    expect(mineFormEntries({ heuristicBusinessHours: true })).toEqual([
+      ["heuristic_business_hours", "true"],
+    ]);
+    expect(mineFormEntries({
+      heuristicBusinessHours: true,
+      heuristicBusinessHourSlots: " none ",
+    })).toEqual([
+      ["heuristic_business_hours", "true"],
+      ["heuristic_business_hour_slots", "none"],
+    ]);
+    expect(mineFormEntries({
+      heuristicBusinessHours: true,
+      heuristicBusinessHourSlots: " 32400-61200,378000-406800 ",
+    })).toEqual([
+      ["heuristic_business_hours", "true"],
+      ["heuristic_business_hour_slots", "32400-61200,378000-406800"],
+    ]);
+    expect(mineFormEntries({
+      heuristicBusinessHours: false,
+      heuristicBusinessHourSlots: "not-a-schedule",
+    })).toEqual([]);
+    expect(mineFormEntries({
+      heuristicBusinessHourSlots: "none",
+    })).toEqual([]);
+  });
+
+  it("rejects malformed enabled business-hour schedules", () => {
+    for (const slots of ["0-0", "0-604801", "0:3600", "0-3600,", "none,0-3600"]) {
+      expect(() => mineFormEntries({ heuristicBusinessHours: true,
+        heuristicBusinessHourSlots: slots })).toThrow(/heuristicBusinessHourSlots/);
+    }
+  });
 });
 
 describe("Footprints request options", () => {

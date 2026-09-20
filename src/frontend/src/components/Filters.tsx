@@ -624,6 +624,34 @@ export function heuristicStartTimestampPlaceholder(
   return completionTimestamp.trim() || "time:timestamp";
 }
 
+/** Whether heuristic business-hour controls affect the selected variant/decor. */
+export function heuristicBusinessHoursOptionsAreActive(
+  variant: "classic" | "plusplus",
+  decoration: "frequency" | "performance",
+): boolean {
+  return variant === "plusplus" || decoration === "performance";
+}
+
+/** Validates the optional weekly schedule while the business-hours control is active. */
+export function heuristicBusinessHourSlotsValidationMessage(
+  value: string,
+  enabled: boolean,
+): string | null {
+  const slots = value.trim();
+  if (!enabled || !slots || slots.toLowerCase() === "none") return null;
+  const valid = slots.split(",").every((slot) => {
+    const match = slot.trim().match(/^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/);
+    if (!match) return false;
+    const start = Number(match[1]);
+    const end = Number(match[2]);
+    return Number.isFinite(start) && Number.isFinite(end) &&
+      start >= 0 && start < end && end <= 604800;
+  });
+  return valid
+    ? null
+    : "Heuristic business-hour slots must be `none` or start-end pairs within one week.";
+}
+
 // A compact, collapsible bar for the log filters and the miner settings.
 // Every apply re-mines the original upload with the full spec, so nothing
 // compounds and every setting can always be widened again.
@@ -778,6 +806,9 @@ export function Filters({
   ] = useState<
     "mean" | "median" | "min" | "max" | "stdev" | "sum" | "raw_values" | "all"
   >("mean");
+  const [heuristicBusinessHours, setHeuristicBusinessHours] = useState(false);
+  const [heuristicBusinessHourSlots, setHeuristicBusinessHourSlots] =
+    useState("");
   const [
     heuristicDfgPreCleaningNoiseThreshold,
     setHeuristicDfgPreCleaningNoiseThreshold,
@@ -797,6 +828,10 @@ export function Filters({
     heuristicLifecycleInstanceAttribute,
     setHeuristicLifecycleInstanceAttribute,
   ] = useState("concept:instance");
+  const heuristicBusinessHoursOptionsActive = heuristicBusinessHoursOptionsAreActive(
+    heuristicVariant,
+    heuristicDecoration,
+  );
   const [powlVariant, setPowlVariant] = useState<"tree" | "brute_force" | "maximal" | "dynamic_clustering" | "dynamic_clustering_plain">("maximal");
   const [powlFilteringType, setPowlFilteringType] = useState<"decreasing_factor" | "dynamic">("decreasing_factor");
   const [powlFilteringThreshold, setPowlFilteringThreshold] = useState("");
@@ -1230,6 +1265,11 @@ export function Filters({
     removeUnconnected: alphaRemoveUnconnected,
     maxRowsToMaterialize: alphaMaxRowsToMaterialize,
   });
+  const heuristicBusinessHourSlotsValidationError =
+    heuristicBusinessHourSlotsValidationMessage(
+      heuristicBusinessHourSlots,
+      heuristicBusinessHoursOptionsActive && heuristicBusinessHours,
+    );
   const powlValidationError = powlValidationMessage({
     filteringThreshold: powlFilteringThreshold,
     orderFrequencyRatio: powlOrderFrequencyRatio,
@@ -1279,7 +1319,8 @@ export function Filters({
         numericAttributeValidationError || topActivitiesValidationError ||
         relativeAttributeValidationError || attributeOccurrenceValidationError ||
         variantCoverageValidationError || repetitionValidationError ||
-        caseGroupingValidationError || alphaValidationError || powlValidationError ||
+        caseGroupingValidationError || alphaValidationError ||
+        heuristicBusinessHourSlotsValidationError || powlValidationError ||
         footprintsValidationError || correlationValidationError ||
         selectorValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
@@ -1470,6 +1511,12 @@ export function Filters({
         heuristicPerformanceAggregation !== "mean"
           ? heuristicPerformanceAggregation
           : undefined,
+      heuristicBusinessHours:
+        heuristicBusinessHoursOptionsActive && heuristicBusinessHours
+          ? true : undefined,
+      heuristicBusinessHourSlots:
+        heuristicBusinessHoursOptionsActive && heuristicBusinessHours
+          ? heuristicBusinessHourSlots.trim() || undefined : undefined,
       heuristicDfgPreCleaningNoiseThreshold: toFloat(
         heuristicDfgPreCleaningNoiseThreshold,
       ),
@@ -1778,6 +1825,8 @@ export function Filters({
     setHeuristicMinActivityCount("");
     setHeuristicDecoration("frequency");
     setHeuristicPerformanceAggregation("mean");
+    setHeuristicBusinessHours(false);
+    setHeuristicBusinessHourSlots("");
     setHeuristicDfgPreCleaningNoiseThreshold("0.05");
     setHeuristicLoopLengthTwoThreshold("0.5");
     setHeuristicKeepOncePerCase(false);
@@ -1993,6 +2042,7 @@ export function Filters({
     heuristicMinActivityCount !== "" ||
     heuristicDecoration !== "frequency" ||
     heuristicPerformanceAggregation !== "mean" ||
+    heuristicBusinessHoursOptionsActive && heuristicBusinessHours ||
     heuristicDfgPreCleaningNoiseThreshold !== "0.05" ||
     heuristicLoopLengthTwoThreshold !== "0.5" ||
     heuristicKeepOncePerCase ||
@@ -3852,6 +3902,25 @@ export function Filters({
                 <option value="performance">performance</option>
               </select>
             </label>
+            <label className="filters-field filters-check">
+              <input
+                type="checkbox"
+                checked={heuristicBusinessHours}
+                disabled={!heuristicBusinessHoursOptionsActive}
+                onChange={(e) => setHeuristicBusinessHours(e.target.checked)}
+              />
+              <span>Use business hours for performance/sojourn</span>
+            </label>
+            <label className="filters-field filters-field-wide">
+              <span>Heuristic business-hour slots <small>(weekly seconds, start-end pairs)</small></span>
+              <input
+                type="text"
+                placeholder="none or 25200-61200,..."
+                value={heuristicBusinessHourSlots}
+                disabled={!heuristicBusinessHoursOptionsActive || !heuristicBusinessHours}
+                onChange={(e) => setHeuristicBusinessHourSlots(e.target.value)}
+              />
+            </label>
             <label className="filters-field">
               <span>Heuristic: start-time attribute</span>
               <input
@@ -4351,12 +4420,13 @@ export function Filters({
             relativeAttributeValidationError || attributeOccurrenceValidationError ||
             variantCoverageValidationError || repetitionValidationError ||
             caseGroupingValidationError || alphaValidationError || powlValidationError ||
+            heuristicBusinessHourSlotsValidationError ||
             footprintsValidationError || correlationValidationError ||
             selectorValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || alphaValidationError || powlValidationError || footprintsValidationError || correlationValidationError || selectorValidationError}</p>
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || alphaValidationError || heuristicBusinessHourSlotsValidationError || powlValidationError || footprintsValidationError || correlationValidationError || selectorValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || alphaValidationError || powlValidationError || footprintsValidationError || correlationValidationError || selectorValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || alphaValidationError || heuristicBusinessHourSlotsValidationError || powlValidationError || footprintsValidationError || correlationValidationError || selectorValidationError)}>
               Apply
             </button>
             <button
