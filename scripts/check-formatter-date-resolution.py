@@ -62,12 +62,10 @@ def compare(row, actual):
                         raise ValueError(
                             "Date resolution differs: " + key + "/" + column
                         )
-                    # Input metadata must survive. Formatter output timezone is
-                    # represented by its UTC dtype and resolved lexical offset.
-                    if key == "input_after" and cell.get("date_timezone") != tag.get(
-                        "native_timezone"
-                    ):
-                        raise ValueError("Input timezone metadata differs")
+                    if cell.get("date_timezone") != tag.get("native_timezone"):
+                        raise ValueError(
+                            "Date timezone metadata differs: " + key + "/" + column
+                        )
 
 
 def check(executable, reference):

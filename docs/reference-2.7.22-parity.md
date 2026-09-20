@@ -2046,10 +2046,12 @@ columns and custom start timestamps.
 The separate 21-case capture covers naive, UTC, and Berlin timestamps; object
 and declared datetime columns; microseconds and nanoseconds; mixed precision;
 custom start columns; and explicit format strings. The checker compares complete
-results and post-call inputs, then explicitly checks date resolution metadata.
+results and post-call inputs, then explicitly checks date resolution and
+timezone metadata. Normalized output dates carry UTC timezone identity,
+matching their dtype and resolved lexical offset.
 All 21 new CLI comparisons, 154 native suites, 107 script tests, three optimized
 evidence tests, and 258 CLI plus 258 HTTP formatter regressions pass. Independent
-review is clear. Output timezone metadata remains outside this precision check.
+review is clear. All 21 cases also verify output UTC timezone metadata.
 The evidence is `docs/formatter-date-resolution-reference.json.gz` and
 `docs/formatter-date-resolution-validation.json`. These observations do not
 establish arbitrary date-object, timezone, or complete formatter parity.

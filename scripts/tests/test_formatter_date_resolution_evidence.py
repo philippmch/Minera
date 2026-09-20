@@ -45,6 +45,10 @@ class FormatterDateResolutionEvidence(unittest.TestCase):
                 "table": CHECK["wire"](row["result"]),
             }
             CHECK["compare"](row, actual)
+            damaged_timezone = copy.deepcopy(actual)
+            damaged_timezone["table"]["rows"][0][2].pop("date_timezone")
+            with self.assertRaisesRegex(ValueError, "Date timezone metadata differs"):
+                CHECK["compare"](row, damaged_timezone)
             if row["name"].endswith("object_ns"):
                 damaged = copy.deepcopy(actual)
                 damaged["table"]["rows"][0][2]["date_resolution"] = "us"
