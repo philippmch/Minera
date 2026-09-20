@@ -1535,6 +1535,18 @@ fresh processes with hash seeds 0, 1, and 17. Its helper model artifact preserve
 The shortest enabling sequence may combine transitions from separate candidate
 paths; trying each structural path independently does not reproduce this behavior.
 
+The flood-cleaning repeated-event checkpoint in
+`docs/token-replay-flood-multievent-validation.json` retains 148 acyclic inputs:
+131 initial observations match exactly and 17 remain strict differences.
+Resampling those 17 inputs yields 221 exact matches among 484 observations;
+all 263 strict differences are preserved. Each affected input produces an exact
+native match in both diagnostic modes within the sampled public outcomes.
+This establishes finite sampled support only, not equal outcome probabilities
+or correlations. One resampling batch reached its 20-second bound with four
+of 30 requested observations persisted; all 148 initial isolated captures
+completed within their individual five-second bounds. No production behavior
+or coverage classification changes in this evidence checkpoint.
+
 Eventually-enabled visible transition diagnostics use the observed public FIFO
 worklist behavior. Silent IDs may occur more than once in the queue, each ID uses
 its latest discovered marking, and transition/marking pairs are deduplicated when
