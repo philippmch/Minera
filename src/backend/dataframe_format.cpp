@@ -472,7 +472,7 @@ EventAttribute date_cell(std::string key, const std::optional<EventAttribute>& s
   EventAttribute result{std::move(key), value, AttributeKind::kDate};
   result.typed_value = NativeDate{value, precision == "ns"
                                            ? NativeDateResolution::kNanosecond
-                                           : NativeDateResolution::kMicrosecond};
+                                           : NativeDateResolution::kMicrosecond, "UTC"};
   result.first_class_state = FirstClassAttributeState::kPresent;
   result.container = AttributeContainerKind::kScalar;
   result.children.clear();

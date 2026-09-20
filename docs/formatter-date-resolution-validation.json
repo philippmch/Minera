@@ -33,30 +33,29 @@
     "Europe_Berlin_explicit_ns"
   ],
   "cli_comparisons": 21,
-  "native_sha256_before_and_after": "77e31796aa8b2071f59092bca8522cae427bce4454acaed9acbbbdfb8f988db3",
+  "native_sha256_before_and_after": "e9c10453160ca1c1717a859e5affc74182bda7502cb10cb8a1b3f4e1742282a0",
   "status": "finite_native_matrix_passed",
-  "scope": "Typed-date formatter resolution; full parity remains incomplete.",
-  "native_source_parent_commit": "22019f262904e65497db91855237e626f11281c5",
-  "native_verified_staged_tree": "2f39ecc62add8c836d5ba777846bb044e3d2012c",
+  "scope": "Typed-date formatter resolution and output UTC timezone metadata; full parity remains incomplete.",
+  "native_source_parent_commit": "68b80bc05f995608f4e5ccd80e01638a2eedf6e7",
+  "native_verified_staged_tree": "0d27d12fb02bf23e136b5a437d6251b343450945",
   "validation": {
     "release_build": "passed",
     "native_suites_passed": 154,
     "native_suites_failed": 0,
     "script_tests_passed": 107,
     "optimized_evidence_tests_passed": 3,
-    "independent_review": "No actionable findings."
+    "independent_review": "No actionable findings; output timezone matches resolved values, dtype, and all 21 pinned public cases."
   },
   "limits": [
     "Finite observations do not establish complete formatter parity.",
-    "Output timezone metadata is not compared; UTC dtype and resolved lexical offset are compared.",
     "Arbitrary timestamp objects, precision units beyond the native us/ns model, and timezone behavior remain unproven."
   ],
   "source_sha256_lf_normalized": {
-    "src/backend/dataframe_format.cpp": "899e87d10c18a9050833401a48771460f240c8486aa480353dbed959ad9413b9",
-    "src/backend/tests/test_dataframe_format.cpp": "60c4711c8321796e826c4f4da651f3cabf9db0ce9c6c5b74333e94321ec32be1",
+    "src/backend/dataframe_format.cpp": "7fe895eb1b8c28f9f44d8f317ad5ae5df63302a4d9363bf88771727ddfd8dc32",
+    "src/backend/tests/test_dataframe_format.cpp": "be9433932620c016af082f1313979b530edb02db0962aac70c6470d4b3634e1b",
     "scripts/capture-formatter-date-resolution-reference.py": "d246d5eec1c87f418c33f394b6eb870595492bdcfbae279bf0e9c1c62b8bac37",
-    "scripts/check-formatter-date-resolution.py": "6b4574b1ce044ae96cf31e4ac9b8dfa356a0aafc78d135459eceb28c980e5b4e",
-    "scripts/tests/test_formatter_date_resolution_evidence.py": "9f9036207db62490dddb430dd53c477a87bfdab2c7e469cf8cd45ac3c0002835"
+    "scripts/check-formatter-date-resolution.py": "db38fd491bc49d704581b3e184ab742d0ecc91843b762e4cada1045834332cce",
+    "scripts/tests/test_formatter_date_resolution_evidence.py": "a941ebf931545cc6ace7641e4ad6871a0e83d9c900781dec8659393b814fab53"
   },
   "formatter_transport_regression": {
     "reference_sha256": "e64650bf388858d9503862487f8bf8e30e95ee8a9a534729562762e711c532e3",
@@ -337,8 +336,8 @@
     "http_comparisons": 258,
     "transport_boundary_checks": 14,
     "native_sha256_before_and_after": {
-      "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-comparison-checkpoint-build\\Release\\minera_format_dataframe.exe": "77e31796aa8b2071f59092bca8522cae427bce4454acaed9acbbbdfb8f988db3",
-      "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-comparison-checkpoint-build\\Release\\minera_server.exe": "d4b22965360e866b681e66db92f1784d7d0d97797330cdafc588daf5192dfddb"
+      "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-comparison-checkpoint-build\\Release\\minera_format_dataframe.exe": "e9c10453160ca1c1717a859e5affc74182bda7502cb10cb8a1b3f4e1742282a0",
+      "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-comparison-checkpoint-build\\Release\\minera_server.exe": "2227087d62d451412fe9b70f0710baf171466417253c1e36b371fd4690af6aa8"
     }
   }
 }

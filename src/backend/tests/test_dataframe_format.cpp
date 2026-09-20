@@ -164,6 +164,7 @@ void native_date_resolution_is_preserved_for_object_columns() {
     assert(date != nullptr);
     assert(date->resolution == test.resolution);
     assert(date->value == test.expected_value);
+    assert(date->timezone == std::optional<std::string>("UTC"));
   }
 }
 
