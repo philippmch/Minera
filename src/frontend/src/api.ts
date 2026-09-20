@@ -486,7 +486,7 @@ export interface MinerOptions {
   heuristicKeepOncePerCase?: boolean;
   /** Comma-separated classic path exemptions in `A -> B` syntax. */
   heuristicMostCommonPaths?: string;
-  /** Miner++ generic event attribute holding interval start timestamps. */
+  /** Optional event attribute holding interval start timestamps; empty means automatic. */
   heuristicStartTimestampAttribute?: string;
   /** Miner++ generic event attribute distinguishing lifecycle instances. */
   heuristicLifecycleInstanceAttribute?: string;
@@ -1013,14 +1013,11 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("heuristic_keep_once_per_case", "true");
   if (options.heuristicMostCommonPaths?.trim())
     add("heuristic_most_common_paths", options.heuristicMostCommonPaths.trim());
-  if (
-    options.heuristicStartTimestampAttribute &&
-    options.heuristicStartTimestampAttribute !== "start_timestamp"
-  )
-    add(
-      "heuristic_start_timestamp_attribute",
-      options.heuristicStartTimestampAttribute,
-    );
+  if (options.heuristicStartTimestampAttribute !== undefined) {
+    const value = options.heuristicStartTimestampAttribute.trim();
+    if (value)
+      add("heuristic_start_timestamp_attribute", value);
+  }
   if (
     options.heuristicLifecycleInstanceAttribute &&
     options.heuristicLifecycleInstanceAttribute !== "concept:instance"

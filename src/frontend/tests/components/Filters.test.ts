@@ -5,7 +5,7 @@ import { alphaValidationMessage, tokenReplayInputOptionsFromForm, tokenReplayInp
 import { TOKEN_REPLAY_POLICY_DEFAULTS, TokenReplayPolicyControls, tokenReplayPolicyOptionsFromForm,
   tokenReplayPoliciesAreDirty } from "../../src/components/Filters";
 import { TokenReplayRootCauseControls, tokenReplayRootCauseOptionsFromForm } from "../../src/components/Filters";
-import { alphaOptionsFromForm, alphaSettingsAreDirty, attributeOccurrenceValidationMessage, caseGroupingValidationMessage, correlationValidationMessage, footprintsValidationMessage, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
+import { alphaOptionsFromForm, alphaSettingsAreDirty, attributeOccurrenceValidationMessage, caseGroupingValidationMessage, correlationValidationMessage, footprintsValidationMessage, heuristicStartTimestampOptionsFromForm, heuristicStartTimestampPlaceholder, inductiveOptionsFromForm, inductiveSettingsAreDirty, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
 
 describe("token replay policy controls", () => {
   it("disables only forward-only policies backwards without changing retained values", () => {
@@ -75,6 +75,27 @@ describe("token replay policy controls", () => {
     expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayWalkThroughHiddenTransitions).toBe(true);
     expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayIncludeTraceDiagnostics).toBe(false);
     expect(TOKEN_REPLAY_POLICY_DEFAULTS.tokenReplayIncludeDurationDiagnostics).toBe(false);
+  });
+});
+
+describe("heuristic start-time control", () => {
+  it("keeps automatic selection empty and preserves explicit selectors", () => {
+    expect(heuristicStartTimestampOptionsFromForm("")).toEqual({});
+    expect(heuristicStartTimestampOptionsFromForm("  ")).toEqual({});
+    expect(heuristicStartTimestampOptionsFromForm(" start_timestamp ")).toEqual({
+      heuristicStartTimestampAttribute: "start_timestamp",
+    });
+    expect(heuristicStartTimestampOptionsFromForm(" began ")).toEqual({
+      heuristicStartTimestampAttribute: "began",
+    });
+  });
+
+  it("shows each variant's conventional automatic selector", () => {
+    expect(heuristicStartTimestampPlaceholder("classic")).toBe("time:timestamp");
+    expect(heuristicStartTimestampPlaceholder("classic", " finished_at ")).toBe("finished_at");
+    expect(heuristicStartTimestampPlaceholder("classic", "  ")).toBe("time:timestamp");
+    expect(heuristicStartTimestampPlaceholder("plusplus")).toBe("start_timestamp");
+    expect(heuristicStartTimestampPlaceholder("plusplus", "finished_at")).toBe("start_timestamp");
   });
 });
 

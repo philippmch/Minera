@@ -103,8 +103,7 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
         options.heuristicLoopLengthTwoThreshold !== 0.5) ||
       options.heuristicKeepOncePerCase === true ||
       Boolean(options.heuristicMostCommonPaths?.trim()) ||
-      (options.heuristicStartTimestampAttribute &&
-        options.heuristicStartTimestampAttribute !== "start_timestamp") ||
+      Boolean(options.heuristicStartTimestampAttribute?.trim()) ||
       (options.heuristicLifecycleInstanceAttribute &&
         options.heuristicLifecycleInstanceAttribute !== "concept:instance") ||
       (options.transitionView && options.transitionView !== "sequence") ||

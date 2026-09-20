@@ -605,6 +605,25 @@ export function alphaSettingsAreDirty(input: AlphaSettingsForm): boolean {
     (input.activityAttribute.trim() || "concept:name") !== "concept:name";
 }
 
+/** Converts the optional heuristic interval-start selector from the form. */
+export function heuristicStartTimestampOptionsFromForm(
+  value: string,
+): Pick<MinerOptions, "heuristicStartTimestampAttribute"> {
+  const normalized = value.trim();
+  return normalized
+    ? { heuristicStartTimestampAttribute: normalized }
+    : {};
+}
+
+/** Returns the conventional automatic selector shown for each heuristic variant. */
+export function heuristicStartTimestampPlaceholder(
+  variant: "classic" | "plusplus",
+  completionTimestamp = "time:timestamp",
+): string {
+  if (variant === "plusplus") return "start_timestamp";
+  return completionTimestamp.trim() || "time:timestamp";
+}
+
 // A compact, collapsible bar for the log filters and the miner settings.
 // Every apply re-mines the original upload with the full spec, so nothing
 // compounds and every setting can always be widened again.
@@ -773,7 +792,7 @@ export function Filters({
   const [
     heuristicStartTimestampAttribute,
     setHeuristicStartTimestampAttribute,
-  ] = useState("start_timestamp");
+  ] = useState("");
   const [
     heuristicLifecycleInstanceAttribute,
     setHeuristicLifecycleInstanceAttribute,
@@ -1460,10 +1479,7 @@ export function Filters({
       heuristicKeepOncePerCase: heuristicKeepOncePerCase || undefined,
       heuristicMostCommonPaths:
         heuristicMostCommonPaths.trim() || undefined,
-      heuristicStartTimestampAttribute:
-        heuristicStartTimestampAttribute !== "start_timestamp"
-          ? heuristicStartTimestampAttribute
-          : undefined,
+      ...heuristicStartTimestampOptionsFromForm(heuristicStartTimestampAttribute),
       heuristicLifecycleInstanceAttribute:
         heuristicLifecycleInstanceAttribute !== "concept:instance"
           ? heuristicLifecycleInstanceAttribute
@@ -1766,7 +1782,7 @@ export function Filters({
     setHeuristicLoopLengthTwoThreshold("0.5");
     setHeuristicKeepOncePerCase(false);
     setHeuristicMostCommonPaths("");
-    setHeuristicStartTimestampAttribute("start_timestamp");
+    setHeuristicStartTimestampAttribute("");
     setHeuristicLifecycleInstanceAttribute("concept:instance");
     setPowlVariant("maximal");
     setPowlFilteringType("decreasing_factor");
@@ -1981,7 +1997,7 @@ export function Filters({
     heuristicLoopLengthTwoThreshold !== "0.5" ||
     heuristicKeepOncePerCase ||
     heuristicMostCommonPaths.trim() !== "" ||
-    heuristicStartTimestampAttribute !== "start_timestamp" ||
+    heuristicStartTimestampAttribute.trim() !== "" ||
     heuristicLifecycleInstanceAttribute !== "concept:instance";
   const ltlDirty = ltlVariant !== "" || ltlAttributeValues.trim() !== "" ||
     ltlAttributeKey.trim() !== "" || ltlResourceKey.trim() !== "" ||
@@ -3837,11 +3853,14 @@ export function Filters({
               </select>
             </label>
             <label className="filters-field">
-              <span>Miner++: start-time attribute</span>
+              <span>Heuristic: start-time attribute</span>
               <input
                 type="text"
+                placeholder={heuristicStartTimestampPlaceholder(
+                  heuristicVariant,
+                  heuristicTimestampAttribute,
+                )}
                 value={heuristicStartTimestampAttribute}
-                disabled={heuristicVariant !== "plusplus"}
                 onChange={(e) =>
                   setHeuristicStartTimestampAttribute(e.target.value)
                 }

@@ -4110,6 +4110,29 @@ A public classic DFG-input entry point supports explicit or inferred
 activities, occurrences, boundaries, window-two paths, triples, and performance
 samples; PLUSPLUS rejects DFG-only input as in the reference.
 
+Start timestamp selection distinguishes an omitted selector from an explicit
+attribute. Classic performance discovery defaults to completion timestamps,
+even if events carry `start_timestamp`; an explicitly selected start attribute
+is required on each destination event. PLUSPLUS retains its conventional
+`start_timestamp` default and lifecycle conversion when that field is absent.
+The UI preserves explicit conventional selectors and displays each variant's
+automatic default. `docs/heuristic-start-selector-reference.json.gz` preserves
+21 public EventLog observations covering both variants, conventional and custom
+selectors, completion timestamps, missing attributes, overlapping intervals,
+and custom timestamp fields present only where the calculation needs them.
+This finite checkpoint does not establish arbitrary dataframe timestamp parity
+or Python exception-class and message identity for native rejections.
+The strict CLI comparison improves from 16/21 to 20/21. The sparse custom
+timestamp case passes direct C++ discovery, but the CLI's later model-decoration
+step still rejects its missing completion field; that integration difference
+is retained in `docs/heuristic-start-selector-validation.json`.
+
+The C++ `HeuristicMinerOptions::start_timestamp_attribute` field is now
+`std::optional<std::string>` to distinguish omission from explicit selection.
+String assignments remain supported; callers that read it as a string must
+handle the omitted value. The existing explicit-empty native fallback remains
+an extension, while the UI treats a blank field as automatic selection.
+
 The PLUSPLUS variation independently implements the pinned interval abstraction.
 Lifecycle events are converted through case-insensitive start/complete matching
 with FIFO queues keyed by activity and lifecycle instance; unmatched completes
