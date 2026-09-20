@@ -1,0 +1,1162 @@
+{
+  "status": "finite_native_matrix_passed",
+  "scope": "Five duplicate-label nets with hidden walking enabled and all sixteen combinations of exhaustive exploration, flood cleaning, final hidden routing, and immediate stopping; each observed with and without place/transition fitness.",
+  "reference_provenance": {
+    "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+    "function": "apply",
+    "module": "pm4py.algo.conformance.tokenreplay.algorithm",
+    "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, parameters: Optional[Dict[Any, Any]] = None, variant=<Variants.TOKEN_REPLAY: <module 'pm4py.algo.conformance.tokenreplay.variants.token_replay' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\conformance\\\\tokenreplay\\\\variants\\\\token_replay.py'>>) -> List[Dict[str, Any]]",
+    "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+    "installed_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962",
+    "pinned_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962"
+  },
+  "artifact": {
+    "path": "docs/token-replay-duplicate-controls-reference.json.gz",
+    "uncompressed_sha256": "fae22290de1b5590365a4eaa25e569392f7d2ee4fc5b671487fa4eed66515da8",
+    "inputs": 80,
+    "public_observations": 160
+  },
+  "native_source_commit": "3f8383aa68f61af5e664ba56658c9e2afc658ef6",
+  "native_executable_sha256": "a415c6c84447046a43dd03478e3aecb7ad6dbe8f88998f2ae59ec562cbb952f8",
+  "validation": {
+    "checks": [
+      {
+        "id": "0:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "0:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "1:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "1:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "2:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "2:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "3:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "3:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "4:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "4:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "5:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "5:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "6:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "6:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "7:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "7:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "8:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "8:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "9:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "9:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "10:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "10:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "11:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "11:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "12:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "12:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "13:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "13:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "14:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "14:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "15:False",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "15:True",
+        "name": "preevent_duplicate_order_after_route_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "16:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "16:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "17:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "17:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "18:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "18:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "19:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "19:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "20:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "20:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "21:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "21:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "22:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "22:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "23:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "23:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "24:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "24:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "25:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "25:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "26:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "26:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "27:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "27:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "28:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "28:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "29:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "29:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "30:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "30:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "31:False",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "31:True",
+        "name": "preevent_duplicate_order_original_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "32:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "32:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "33:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "33:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "34:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "34:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "35:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "35:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "36:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "36:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "37:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "37:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "38:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "38:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "39:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "39:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "40:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "40:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "41:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "41:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "42:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "42:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "43:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "43:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "44:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "44:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "45:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "45:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "46:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "46:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "47:False",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "47:True",
+        "name": "preevent_duplicate_order_renamed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "48:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "48:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "49:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "49:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "50:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "50:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "51:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "51:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "52:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "52:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "53:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "53:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "54:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "54:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "55:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "55:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "56:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "56:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "57:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "57:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "58:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "58:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "59:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "59:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "60:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "60:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "61:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "61:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "62:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "62:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "63:False",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "63:True",
+        "name": "preevent_duplicate_order_reversed_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "64:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "64:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "65:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "65:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanFalse_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "66:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "66:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "67:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "67:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanFalse_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "68:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "68:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "69:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "69:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanTrue_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "70:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "70:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "71:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "71:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveFalse_cleanTrue_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "72:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "72:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "73:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "73:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanFalse_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "74:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "74:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "75:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "75:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanFalse_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "76:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "76:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "77:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "77:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanTrue_finalFalse_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "78:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopFalse",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "78:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopFalse",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "79:False",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopTrue",
+        "pltr": false,
+        "matched": true,
+        "match_kind": "identity"
+      },
+      {
+        "id": "79:True",
+        "name": "preevent_duplicate_target_reachable_False_False_False_walk_exhaustiveTrue_cleanTrue_finalTrue_stopTrue",
+        "pltr": true,
+        "matched": true,
+        "match_kind": "identity"
+      }
+    ],
+    "match_counts": {
+      "identity": 160,
+      "independent_hidden_order": 0,
+      "net_automorphism": 0
+    },
+    "unresolved": []
+  },
+  "reproduce": [
+    "Decompress the reference gzip to a JSON file.",
+    "Run scripts/check-token-replay-native.py --reference <decompressed.json> --native <minera_export executable> --output <report.json>.",
+    "For a fresh pinned public observation, pass each selected case to capture(case, pltr) in scripts/capture-token-replay-reference.py for both pltr values, with warnings suppressed before imports and show_progress_bar disabled by the capture helper."
+  ],
+  "limits": [
+    "This is a finite evidence checkpoint, with no production behavior changes and no claim of full parity.",
+    "Each matrix input has one public observation per fitness mode in a single process with PYTHONHASHSEED=0.",
+    "These nets do not establish the selection rule when multiple duplicate-label transitions are initially enabled.",
+    "Arbitrary competing silent routes, other net families, and cross-process nondeterminism remain unproven."
+  ]
+}
