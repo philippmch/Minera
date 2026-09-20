@@ -1,3 +1,4 @@
+#include "case_relations_input.hpp"
 // Local application server: serves the built frontend and mines uploaded
 // CSV event logs with the native core via POST /api/mine.
 
@@ -4969,17 +4970,35 @@ void handle_case_relations(const httplib::Request& request,
               base_data.table, incoming_data.table, relation_table, options), options),
           "application/json");
     } else {
-      const auto relations = minera::parse_case_relations_csv(
-          relation_input, left_column, right_column);
-      const auto base = base_is_xes ? minera::import_xes_event_log(base_input)
-                                    : minera::import_csv_event_log(base_input);
-      const auto incoming =
-          incoming_is_xes ? minera::import_xes_event_log(incoming_input)
-                          : minera::import_csv_event_log(incoming_input);
-      response.set_content(
-          minera::case_relations_json(minera::merge_case_relations(
-              base, incoming, relations, options), options.variant),
-          "application/json");
+      std::optional<decltype(minera::import_csv_event_data(base_input))> base_csv;
+      std::optional<decltype(minera::import_csv_event_data(incoming_input))> incoming_csv;
+      if (!base_is_xes) base_csv = minera::import_csv_event_data(base_input);
+      if (!incoming_is_xes) incoming_csv = minera::import_csv_event_data(incoming_input);
+      const auto* csv_table = base_csv ? &base_csv->table
+                                      : (incoming_csv ? &incoming_csv->table : nullptr);
+      const bool explicit_case = request.has_param("merge_case_id_key");
+      const bool explicit_timestamp = request.has_param("merge_timestamp_key");
+      if (csv_table && !explicit_case)
+        options.case_id_key = minera::tools::relation_role_column(
+            *csv_table, minera::FirstClassAttributeRole::kCaseId, "case_id");
+      if (csv_table && !explicit_timestamp)
+        options.timestamp_key = minera::tools::relation_role_column(
+            *csv_table, minera::FirstClassAttributeRole::kTimestamp, "timestamp");
+      auto base_table = base_is_xes
+          ? minera::tools::relation_xes_table(minera::import_xes_event_log(base_input), options,
+                                            explicit_case, explicit_timestamp)
+          : std::move(base_csv->table);
+      auto incoming_table = incoming_is_xes
+          ? minera::tools::relation_xes_table(minera::import_xes_event_log(incoming_input), options,
+                                            explicit_case, explicit_timestamp)
+          : std::move(incoming_csv->table);
+      if (!base_is_xes) { normalize_csv_timestamp_missingness(base_table); minera::tools::relation_csv_dates(base_table, options.timestamp_key); }
+      if (!incoming_is_xes) { normalize_csv_timestamp_missingness(incoming_table); minera::tools::relation_csv_dates(incoming_table, options.timestamp_key); }
+      options.relation_left_column = left_column;
+      options.relation_right_column = right_column;
+      const auto relation_table = minera::parse_case_relations_table_csv(relation_input);
+      response.set_content(minera::case_relations_json(minera::merge_case_relations(
+          base_table, incoming_table, relation_table, options), options), "application/json");
     }
   } catch (const std::exception& error) {
     response.status = 400;

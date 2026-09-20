@@ -1702,8 +1702,8 @@ extra fields and explicitly selected relation headers. Configured blank CSV
 timestamps remain missing; empty custom text fields remain present strings.
 The compatibility log uses the selected case and timestamp columns even when
 the source CSV contains other first-class columns. XES and mixed-format inputs
-retain the EventLog route. CLI merge output
-supports `-o` with checked flushing.
+now use the table route described below. CLI merge output supports `-o` with
+checked flushing.
 
 `scripts/capture-case-relations-table-reference.py` captures 43 public cases using
 PM4Py 2.7.22 and pandas 3.0.5. Algorithm and PANDAS variant module bytes match
@@ -1764,10 +1764,41 @@ pandas extension dtype, arbitrary precision integer, category object, timezone o
 missing-value identity. Generated rejection checks require native validation
 errors rather than exact Python exception class/message equality. CSV adapters
 do not yet infer pandas column dtypes or expose the full typed/null identifier
-surface, and XES/mixed adapters have not moved to the table surface. These finite
-observations do not establish complete dataframe or family parity. Non-string
+surface, while mixed/XES adapters now use the table surface described below.
+These finite observations do not establish complete dataframe or family parity. Non-string
 index names, specialized index-level metadata and range parameters not recoverable
 from empty/singleton labels remain outside the current table metadata model.
+
+## Mixed-format case-relation adapters
+
+CLI and HTTP case-relation merging now return typed tables for XES/CSV,
+CSV/XES, and XES/XES inputs, alongside the compatibility log projection.
+Relation metadata and duplicate relation rows flow through the table merger.
+The CSV-only path retains its existing behavior.
+
+When merge selectors are omitted, the CSV side supplies its resolved case and
+timestamp headers; XES values are projected onto those aliases. Selected CSV
+date cells are parsed to native dates in mixed merges so sorting remains
+chronological. XES tables carry basic scalar dtype declarations, allowing
+missing numeric values to promote during table merging. CSV relation keys
+remain strings, and incompatible numeric XES case keys are rejected.
+
+Explicit case selectors use the corresponding XES trace attribute. An alias
+collision preserves the original event field under an `event:` prefix (repeated
+until unique); the requested alias carries the selected trace or timestamp
+value. Explicit timestamp selectors remain exact. The public table retains
+source case attributes; a compatibility log may retain the original trace name
+when a different trace attribute supplies the grouping key.
+
+The expanded transport suite checks 25 scenarios, including both mixed
+orientations, typed date/numeric values, missing cells, duplicate relations,
+extra relation columns, missing selectors, and case/activity/timestamp name
+collisions, mixed numeric promotion, and empty CSV inputs with configured
+headers. All 154 native suites and 110 script tests pass; review is clear.
+Validation is recorded in
+`docs/case-relations-mixed-validation.json`. These adapter checks do not prove
+exhaustive XES dtype inference, arbitrary CSV type inference, or complete
+case-relation parity.
 
 ## Dataframe formatting evidence
 

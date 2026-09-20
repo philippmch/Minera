@@ -1,0 +1,96 @@
+{
+  "checks": [
+    "CLI lexical timestamps, missing configured timestamps, duplicate relations and case order",
+    "CLI preserves base row labels and expanded incoming row labels through sorting",
+    "CLI output file matches stdout",
+    "CLI invalid output destination rejected",
+    "HTTP merge matches CLI including compatibility log",
+    "HTTP missing timestamp column rejected",
+    "CLI and HTTP preserve explicit missing canonical selector",
+    "CLI and HTTP support one-sided timestamp columns",
+    "CLI and HTTP honor explicit canonical column when both aliases exist",
+    "CLI and HTTP project selected case/timestamp columns into compatibility log",
+    "CLI and HTTP preserve quoted relation metadata, collision suffixes and explicit relation selectors",
+    "CLI custom import columns retain default relation selectors and log roles",
+    "Mixed XES/CSV CLI and HTTP honor explicit relation selectors over unused suffixes",
+    "XES/CSV CLI/HTTP typed tables retain duplicate relations and extra metadata",
+    "XES/CSV CLI/HTTP reject missing explicit timestamp selector",
+    "CSV/XES CLI/HTTP typed tables retain duplicate relations and extra metadata",
+    "CSV/XES CLI/HTTP reject missing explicit timestamp selector",
+    "XES/XES CLI/HTTP typed tables retain duplicate relations and extra metadata",
+    "XES/XES CLI/HTTP reject missing explicit timestamp selector",
+    "CLI/HTTP retain XES role and colliding event column concept:name",
+    "CLI/HTTP retain XES role and colliding event column foo",
+    "CLI/HTTP retain XES role and colliding event column timestamp",
+    "CLI/HTTP XES numeric promotion with XES base",
+    "CLI/HTTP XES numeric promotion with empty CSV headers",
+    "CLI/HTTP preserve numeric XES case types and reject incompatible string relation keys"
+  ],
+  "native_sha256_before_and_after": {
+    "export": "a415c6c84447046a43dd03478e3aecb7ad6dbe8f88998f2ae59ec562cbb952f8",
+    "server": "a186d07e12532ef34404a757dad35ef18181bf0b3334dab226ceb86312bad8e7"
+  },
+  "status": "finite_mixed_adapter_checks_passed",
+  "scope": "Typed case-relation table adapters for XES/CSV, CSV/XES and XES/XES; full parity remains incomplete.",
+  "native_source_parent_commit": "5c4d679c93cac325d8c3389bd8434bf36186458d",
+  "native_verified_staged_tree": "cdcde4df8a963f6d0c193fd4b2d5a9b3ada513bd",
+  "source_sha256_lf_normalized": {
+    "src/backend/tools/minera_export.cpp": "f205b3655fe212d806cac7d651e9da43208b4e6adc1568f3c3fea6187083252e",
+    "src/backend/tools/minera_server.cpp": "1cda20b82d43975dcbf08ed12f4c3c743e24b14ec8ecef95b2f4bb53e852d6d0",
+    "src/backend/tools/case_relations_input.hpp": "f73fd157b116923b5cf363acf12ba42964bfb1b8371c906a990c8d35e75ac62a",
+    "scripts/check-case-relations-transport.py": "ce421ed622a4d29630488c2533e8a7c9028bd14d974d261aadf3733bc40450c9"
+  },
+  "validation": {
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "native_suites_failed": 0,
+    "script_tests_passed": 110,
+    "transport_scenarios_passed": 25,
+    "independent_review": "Selector collisions and numeric dtype inference corrected; no actionable findings remain."
+  },
+  "limits": [
+    "Adapter checks do not establish complete XES, CSV, dtype-inference or case-relation parity.",
+    "CSV fields and relation IDs retain the existing reader contract; numeric XES IDs do not silently match relation strings.",
+    "Public exception-class identity is not claimed.",
+    "Compatibility log trace names can retain source concept:name attributes when a custom attribute supplies the grouping key."
+  ],
+  "auxiliary_public_observations": [
+    {
+      "provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "apply",
+        "module": "pm4py.algo.merging.case_relations.algorithm",
+        "signature": "(dataframe1: pandas.DataFrame, dataframe2: pandas.DataFrame, case_relations: pandas.DataFrame, variant=<Variants.PANDAS: <module 'pm4py.algo.merging.case_relations.variants.pandas' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\merging\\\\case_relations\\\\variants\\\\pandas.py'>>, parameters: Optional[Dict[Any, Any]] = None) -> pandas.DataFrame",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "21c9af044eda66e346b9003cd9bd7420c2074f2ccd4a81fa67f6e7e39c47a73c",
+        "pinned_sha256": "21c9af044eda66e346b9003cd9bd7420c2074f2ccd4a81fa67f6e7e39c47a73c"
+      },
+      "error": {
+        "type": "ValueError",
+        "message": "You are trying to merge on int64 and str columns for key 'case:concept:name'. If you wish to proceed you should use pd.concat"
+      },
+      "input_summary": "Incoming numeric case ID 1 and relation right key string 1; canonical public case column names."
+    },
+    {
+      "provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "apply",
+        "module": "pm4py.algo.merging.case_relations.algorithm",
+        "signature": "(dataframe1: pandas.DataFrame, dataframe2: pandas.DataFrame, case_relations: pandas.DataFrame, variant=<Variants.PANDAS: <module 'pm4py.algo.merging.case_relations.variants.pandas' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\merging\\\\case_relations\\\\variants\\\\pandas.py'>>, parameters: Optional[Dict[Any, Any]] = None) -> pandas.DataFrame",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "21c9af044eda66e346b9003cd9bd7420c2074f2ccd4a81fa67f6e7e39c47a73c",
+        "pinned_sha256": "21c9af044eda66e346b9003cd9bd7420c2074f2ccd4a81fa67f6e7e39c47a73c"
+      },
+      "dtypes": {
+        "case:concept:name": "str",
+        "concept:name": "str",
+        "time:timestamp": "datetime64[us, UTC]",
+        "score": "float64",
+        "case:concept:name_LEFT": "str",
+        "case:concept:name_RIGHT": "str"
+      },
+      "success": true,
+      "input_summary": "Incoming integer score 7 with no score column on base; source case IDs are strings and timestamps UTC dates."
+    }
+  ]
+}

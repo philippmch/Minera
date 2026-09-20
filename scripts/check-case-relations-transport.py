@@ -221,6 +221,134 @@ def run(export, server):
             with urllib.request.urlopen(urllib.request.Request(url + query, payload, {"Content-Type": content_type}), timeout=30) as response:
                 require(json.load(response) == legacy, "HTTP and CLI mixed XES merges differ")
             checks.append("Mixed XES/CSV CLI and HTTP honor explicit relation selectors over unused suffixes")
+            require("table" in legacy, "mixed XES/CSV merge omitted typed table")
+            require("lhs" in legacy["table"]["columns"] and "rhs" in legacy["table"]["columns"],
+                    "mixed merge dropped relation selector columns")
+            incoming_xes = root / "incoming.xes"
+            incoming_xes.write_text('<log xes.version="1.0"><trace><string key="concept:name" value="R1"/>'
+                                    '<event><string key="concept:name" value="incoming"/>'
+                                    '<date key="time:timestamp" value="2024-01-02T00:00:00Z"/>'
+                                    '<int key="score" value="7"/></event></trace></log>', encoding="utf-8")
+            base.write_text("case_id,activity,timestamp\nL1,base,2024-01-01T00:00:00Z\n", encoding="utf-8")
+            relations.write_text("case_id_LEFT,case_id_RIGHT,relation_note\nL1,R1,first\nL1,R1,second\n", encoding="utf-8")
+            for label, base_path, incoming_path in (
+                    ("XES/CSV", xes, incoming),
+                    ("CSV/XES", base, incoming_xes),
+                    ("XES/XES", xes, incoming_xes)):
+                mixed_command = [str(export), str(base_path), "--merge-case-relations", str(incoming_path),
+                                 "--case-relations", str(relations)]
+                result = subprocess.run(mixed_command, capture_output=True, text=True, timeout=30)
+                require(result.returncode == 0, label + " CLI merge failed: " + result.stderr)
+                mixed = json.loads(result.stdout)
+                table = mixed["table"]
+                require(len(table["rows"]) == 3, label + " lost duplicate relation expansion")
+                note_index = table["columns"].index("relation_note")
+                notes = [row[note_index]["value"] for row in table["rows"] if row[note_index] is not None]
+                require(notes == ["first", "second"], label + " relation metadata/order differs")
+                require([event["activity"] for trace in mixed["log"]["traces"] for event in trace["events"]]
+                        == ["base", "incoming", "incoming"], label + " compatibility activity/order differs")
+                dates = [cell for row in table["rows"] for cell in row
+                         if cell is not None and cell.get("kind") == "date" and isinstance(cell.get("typed_value"), str)]
+                require(dates, label + " lost typed XES dates")
+                if incoming_path == incoming_xes:
+                    score_index = table["columns"].index("score")
+                    scores = [row[score_index] for row in table["rows"]
+                              if row[score_index] is not None and not row[score_index].get("null", False)]
+                    require(len(scores) == 2 and all(cell["kind"] == "float" and cell["typed_value"] == 7 for cell in scores),
+                            label + " lost numeric XES values or missing-value float promotion")
+                    missing_score = table["rows"][0][score_index]
+                    require(missing_score is None or missing_score.get("null", False), label + " filled missing XES attribute")
+                payload, content_type = multipart({"base_log": base_path, "incoming_log": incoming_path,
+                                                   "case_relations": relations})
+                with urllib.request.urlopen(urllib.request.Request(url, payload, {"Content-Type": content_type}), timeout=30) as response:
+                    require(json.load(response) == mixed, label + " HTTP/CLI responses differ")
+                checks.append(label + " CLI/HTTP typed tables retain duplicate relations and extra metadata")
+                rejected = subprocess.run(mixed_command + ["--merge-timestamp-key", "absent"],
+                                          capture_output=True, text=True, timeout=30)
+                require(rejected.returncode != 0, label + " CLI accepted missing explicit selector")
+                try:
+                    urllib.request.urlopen(urllib.request.Request(url + "?merge_timestamp_key=absent", payload,
+                                             {"Content-Type": content_type}), timeout=30).close()
+                except urllib.error.HTTPError as error:
+                    require(error.code == 400, label + " missing selector HTTP status differs")
+                else:
+                    raise RuntimeError(label + " HTTP accepted missing explicit selector")
+                checks.append(label + " CLI/HTTP reject missing explicit timestamp selector")
+            for selector, trace_key, left_value, right_value, collision_key in (
+                    ("concept:name", "concept:name", "L1", "R1", "concept:name"),
+                    ("foo", "foo", "LX", "RX", "foo"),
+                    (None, "concept:name", "L1", "R1", "timestamp")):
+                for path, case, selected, activity, day in ((xes, "L1", left_value, "base", "01"),
+                                                           (incoming_xes, "R1", right_value, "incoming", "02")):
+                    trace_extra = '' if trace_key == "concept:name" else '<string key="foo" value="' + selected + '"/>'
+                    event_extra = '' if collision_key == "concept:name" else '<string key="' + collision_key + '" value="event-' + activity + '"/>'
+                    path.write_text('<log><trace><string key="concept:name" value="' + case + '"/>' + trace_extra
+                                    + '<event><string key="concept:name" value="' + activity + '"/>' + event_extra
+                                    + '<date key="time:timestamp" value="2024-01-' + day + 'T00:00:00Z"/></event></trace></log>', encoding="utf-8")
+                relation_key = selector or "case_id"
+                relations.write_text(relation_key + "_LEFT," + relation_key + "_RIGHT\n" + left_value + "," + right_value + "\n", encoding="utf-8")
+                other = incoming if selector is None else incoming_xes
+                args = [str(export), str(xes), "--merge-case-relations", str(other), "--case-relations", str(relations)]
+                if selector is not None: args += ["--merge-case-id-key", selector]
+                result = subprocess.run(args, capture_output=True, text=True, timeout=30)
+                require(result.returncode == 0, "XES collision merge failed: " + result.stderr)
+                collided = json.loads(result.stdout)
+                require([event["activity"] for event in collided["log"]["traces"][0]["events"]] == ["base", "incoming"],
+                        "XES collision lost activity or timestamp ordering")
+                case_column = collided["table"]["columns"].index(selector or "case_id")
+                require(all(row[case_column]["value"] == left_value for row in collided["table"]["rows"]), "XES collision selected wrong case")
+                column = collided["table"]["columns"].index("event:" + collision_key)
+                require(collided["table"]["rows"][0][column]["value"] == ("base" if collision_key == "concept:name" else "event-base"),
+                        "XES collision discarded original field")
+                payload, content_type = multipart({"base_log": xes, "incoming_log": other, "case_relations": relations})
+                query = "?" + urllib.parse.urlencode({"merge_case_id_key": selector}) if selector else ""
+                with urllib.request.urlopen(urllib.request.Request(url + query, payload, {"Content-Type": content_type}), timeout=30) as response:
+                    require(json.load(response) == collided, "XES collision HTTP/CLI differs")
+                checks.append("CLI/HTTP retain XES role and colliding event column " + collision_key)
+            xes.write_text('<log><trace><string key="concept:name" value="L1"/><event>'
+                           '<string key="concept:name" value="base"/><int key="n" value="0"/>'
+                           '<date key="time:timestamp" value="2024-01-01T00:00:00Z"/></event></trace></log>', encoding="utf-8")
+            incoming_xes.write_text('<log><trace><string key="concept:name" value="R1"/>'
+                                    '<event><string key="concept:name" value="incoming"/><int key="n" value="1"/>'
+                                    '<date key="time:timestamp" value="2024-01-02T00:00:00Z"/></event>'
+                                    '<event><string key="concept:name" value="incoming"/><float key="n" value="2.5"/>'
+                                    '<date key="time:timestamp" value="2024-01-03T00:00:00Z"/></event></trace></log>', encoding="utf-8")
+            relations.write_text("case_id_LEFT,case_id_RIGHT\nL1,R1\n", encoding="utf-8")
+            for empty_base in (False, True):
+                if empty_base:
+                    base.write_text("case_id,activity,timestamp\n", encoding="utf-8")
+                source = base if empty_base else xes
+                result = subprocess.run([str(export), str(source), "--merge-case-relations", str(incoming_xes),
+                                         "--case-relations", str(relations)], capture_output=True, text=True, timeout=30)
+                require(result.returncode == 0, "XES numeric mixture/empty alias failed: " + result.stderr)
+                body = json.loads(result.stdout)
+                column = body["table"]["columns"].index("n")
+                cells = [row[column] for row in body["table"]["rows"]]
+                require(all(cell["kind"] == "float" for cell in cells), "XES mixed numeric column did not promote")
+                require([cell["typed_value"] for cell in cells] == ([1, 2.5] if empty_base else [0, 1, 2.5]),
+                        "XES numeric values/order changed")
+                payload, content_type = multipart({"base_log": source, "incoming_log": incoming_xes, "case_relations": relations})
+                with urllib.request.urlopen(urllib.request.Request(url, payload, {"Content-Type": content_type}), timeout=30) as response:
+                    require(json.load(response) == body, "XES numeric/empty alias HTTP/CLI differs")
+                checks.append("CLI/HTTP XES numeric promotion with " + ("empty CSV headers" if empty_base else "XES base"))
+            base.write_text("case_id,activity,timestamp\nL1,base,2024-01-01T00:00:00Z\n", encoding="utf-8")
+            incoming_xes.write_text('<log xes.version="1.0"><trace><int key="concept:name" value="1"/>'
+                                    '<event><string key="concept:name" value="incoming"/>'
+                                    '<date key="time:timestamp" value="2024-01-02T00:00:00Z"/>'
+                                    '</event></trace></log>', encoding="utf-8")
+            relations.write_text("case_id_LEFT,case_id_RIGHT\nL1,1\n", encoding="utf-8")
+            result = subprocess.run([str(export), str(base), "--merge-case-relations", str(incoming_xes),
+                                     "--case-relations", str(relations)], capture_output=True, text=True, timeout=30)
+            require(result.returncode != 0, "numeric XES case joined string relation key")
+            payload, content_type = multipart({"base_log": base, "incoming_log": incoming_xes,
+                                               "case_relations": relations})
+            try:
+                urllib.request.urlopen(urllib.request.Request(url, payload, {"Content-Type": content_type}), timeout=30).close()
+            except urllib.error.HTTPError as error:
+                require(error.code == 400, "numeric XES/string relation error status differs")
+            else:
+                raise RuntimeError("HTTP numeric XES case joined string relation key")
+            checks.append("CLI/HTTP preserve numeric XES case types and reject incompatible string relation keys")
         finally:
             process.terminate()
             try:
