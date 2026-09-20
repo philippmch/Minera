@@ -7,8 +7,10 @@
 #include <cstdio>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace {
 using namespace minera;
@@ -33,6 +35,15 @@ EventAttribute null_cell(std::string key) {
 EventAttribute nan_cell(std::string key) {
   EventAttribute result{std::move(key), "nan", AttributeKind::kFloat};
   result.typed_value = std::numeric_limits<double>::quiet_NaN();
+  return result;
+}
+
+EventAttribute native_date_cell(
+    std::string key, std::string value, NativeDateResolution resolution,
+    std::optional<std::string> timezone = std::nullopt) {
+  EventAttribute result{std::move(key), value, AttributeKind::kDate};
+  result.typed_value = NativeDate{std::move(value), resolution,
+                                  std::move(timezone)};
   return result;
 }
 
@@ -108,6 +119,120 @@ void missing_selector_does_not_mutate_input() {
   assert(table.dtypes == before.dtypes);
 }
 
+void native_date_resolution_is_preserved_for_object_columns() {
+  struct Case {
+    const char* value;
+    const char* timezone;
+    NativeDateResolution resolution;
+    const char* dtype;
+    const char* expected_value;
+  };
+  const Case cases[] = {
+      {"2024-01-01T00:00:00", nullptr,
+       NativeDateResolution::kMicrosecond, "datetime64[us, UTC]",
+       "2024-01-01T00:00:00+00:00"},
+      {"2024-01-01T00:00:00", nullptr,
+       NativeDateResolution::kNanosecond, "datetime64[ns, UTC]",
+       "2024-01-01T00:00:00+00:00"},
+      {"2024-01-01T00:00:00+00:00", "UTC",
+       NativeDateResolution::kMicrosecond, "datetime64[us, UTC]",
+       "2024-01-01T00:00:00+00:00"},
+      {"2024-01-01T00:00:00+00:00", "UTC",
+       NativeDateResolution::kNanosecond, "datetime64[ns, UTC]",
+       "2024-01-01T00:00:00+00:00"},
+      {"2024-01-01T00:00:00+01:00", "Europe/Berlin",
+       NativeDateResolution::kMicrosecond, "datetime64[us, UTC]",
+       "2023-12-31T23:00:00+00:00"},
+      {"2024-01-01T00:00:00+01:00", "Europe/Berlin",
+       NativeDateResolution::kNanosecond, "datetime64[ns, UTC]",
+       "2023-12-31T23:00:00+00:00"},
+  };
+  for (const auto& test : cases) {
+    EventTable table;
+    table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+    table.rows = {{text_cell("case:concept:name", "C"),
+                  text_cell("concept:name", "A"),
+                  native_date_cell("time:timestamp", test.value,
+                                   test.resolution,
+                                   test.timezone ? std::optional<std::string>(test.timezone)
+                                                 : std::nullopt)}};
+    table.dtypes = {"str", "str", "object"};
+
+    const auto result = format_dataframe(table);
+    assert(result.dtypes[2] == test.dtype);
+    const auto* date = std::get_if<NativeDate>(&result.rows[0][2]->typed_value);
+    assert(date != nullptr);
+    assert(date->resolution == test.resolution);
+    assert(date->value == test.expected_value);
+  }
+}
+
+void mixed_native_date_resolution_promotes_to_nanoseconds() {
+  EventTable table;
+  table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  table.rows = {{text_cell("case:concept:name", "C"),
+                text_cell("concept:name", "A"),
+                native_date_cell("time:timestamp", "2024-01-01T00:00:00",
+                                 NativeDateResolution::kMicrosecond)},
+               {text_cell("case:concept:name", "C"),
+                text_cell("concept:name", "A"),
+                native_date_cell("time:timestamp", "2024-01-02T00:00:00",
+                                 NativeDateResolution::kNanosecond)}};
+  table.dtypes = {"str", "str", "object"};
+
+  const auto result = format_dataframe(table);
+  assert(result.dtypes[2] == "datetime64[ns, UTC]");
+  for (const auto& row : result.rows) {
+    const auto* date = std::get_if<NativeDate>(&row[2]->typed_value);
+    assert(date != nullptr);
+    assert(date->resolution == NativeDateResolution::kNanosecond);
+  }
+}
+
+void undeclared_native_nanosecond_dtype_is_inferred() {
+  EventTable table;
+  table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  table.rows = {{text_cell("case:concept:name", "C"),
+                text_cell("concept:name", "A"),
+                native_date_cell("time:timestamp", "2024-01-01T00:00:00",
+                                 NativeDateResolution::kNanosecond)}};
+
+  const auto result = format_dataframe(table);
+  assert(result.dtypes[2] == "datetime64[ns, UTC]");
+  const auto* date = std::get_if<NativeDate>(&result.rows[0][2]->typed_value);
+  assert(date != nullptr);
+  assert(date->resolution == NativeDateResolution::kNanosecond);
+}
+
+void native_start_timestamp_resolution_is_preserved() {
+  EventTable table;
+  table.columns = {"case:concept:name", "concept:name", "time:timestamp",
+                   "start"};
+  table.rows = {{text_cell("case:concept:name", "C"),
+                text_cell("concept:name", "A"),
+                native_date_cell("time:timestamp", "2024-01-01T00:00:00",
+                                 NativeDateResolution::kMicrosecond),
+                native_date_cell("start", "2024-01-01T00:00:00",
+                                 NativeDateResolution::kNanosecond)}};
+  table.dtypes = {"str", "str", "datetime64[us]", "object"};
+  DataFrameFormatOptions options;
+  options.start_timestamp_key = "start";
+
+  const auto result = format_dataframe(table, options);
+  const auto timestamp = result.column_index("time:timestamp");
+  const auto start = result.column_index("start");
+  const auto start_timestamp = result.column_index("start_timestamp");
+  assert(result.dtypes[timestamp] == "datetime64[us, UTC]");
+  assert(result.dtypes[start] == "datetime64[ns, UTC]");
+  assert(result.dtypes[start_timestamp] == "datetime64[ns, UTC]");
+  for (const auto column : {start, start_timestamp}) {
+    const auto* date =
+        std::get_if<NativeDate>(&result.rows[0][column]->typed_value);
+    assert(date != nullptr);
+    assert(date->resolution == NativeDateResolution::kNanosecond);
+  }
+}
+
 }  // namespace
 
 int main() try {
@@ -116,6 +241,10 @@ int main() try {
   null_timestamp_is_dropped_and_start_can_be_disabled();
   nan_required_values_are_missing();
   missing_selector_does_not_mutate_input();
+  native_date_resolution_is_preserved_for_object_columns();
+  mixed_native_date_resolution_promotes_to_nanoseconds();
+  undeclared_native_nanosecond_dtype_is_inferred();
+  native_start_timestamp_resolution_is_preserved();
 } catch (const std::exception& error) {
   return (std::fputs(error.what(), stderr), 1);
 }
