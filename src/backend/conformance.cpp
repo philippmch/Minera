@@ -749,13 +749,15 @@ class Replayer {
                                 const detail::ReplayMarkingKeys& required_keys) {
       return detail::silent_place_paths(keys, required_keys, net_, place_names, 51, true);
     };
-    const auto trial = [&](std::size_t selected, const detail::HiddenPlacePath& path) {
+    const auto trial = [&](std::size_t selected, const detail::HiddenPlacePath& path,
+                           const std::vector<bool>& visited) {
       Marking trial_marking = marking;
       auto trial_keys = keys;
       Counts scratch;
       scratch.places.resize(trial_marking.size());
       std::vector<std::size_t> accepted;
       for (const auto transition : path.transitions) {
+        if (visited[transition]) continue;
         if (!enabled(trial_marking, transition)) break;
         // The transition is enabled, so forward_fire performs the same
         // checked marking/key update without contributing diagnostics or

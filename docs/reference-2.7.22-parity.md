@@ -1474,6 +1474,10 @@ remain visited even if they never fire, and a blocked step does not discard late
 steps of its path.
 With `exhaustive_invisible_exploration=true`, candidate paths are first tried
 on temporary markings: only a path that enables the selected target is retained.
+Trials skip transitions already visited by the surrounding search and continue
+with later path steps. Successful trial firings do not themselves mark those
+transitions visited. This prevents a fallback dependency from refiring a visited
+producer merely to fill a weighted deficit.
 If no trial succeeds, dependency exploration runs without the preliminary
 prefix pass. Both modes allow two invocation levels. The default dependency
 phase continues across candidate paths, checking target enablement within each path.
@@ -1499,6 +1503,14 @@ both exploration modes, and immediate-stop controls. Results agree across three
 fresh processes with hash seeds 0, 1, and 17. Its validation record also preserves
 the passing exhaustive, duplicate-label, nested-route, and enabled-transition
 regressions. These finite checks do not establish full parity.
+
+The visited-trial checkpoint in
+`docs/token-replay-visited-trial-reference.json.gz` retains 84 inputs, 168 replay
+observations, and a separate reference with 84 element-usage comparisons. All
+match exactly and agree across three fresh processes with hash seeds 0, 1, and
+17. Public helper probes separately distinguish skipping a visited prefix from
+discarding its whole path, and confirm that successful trials leave the visited
+set unchanged. The validation record preserves the preceding routing regressions.
 
 Eventually-enabled visible transition diagnostics use the observed public FIFO
 worklist behavior. Silent IDs may occur more than once in the queue, each ID uses
