@@ -2057,6 +2057,27 @@ The evidence is `docs/formatter-date-resolution-reference.json.gz` and
 establish arbitrary date-object, timezone, or complete formatter parity.
 
 
+## Container-valued conversion case identifiers
+
+Public stream conversion compares tuple case identifiers recursively and treats
+frozensets as unordered sets. Numeric equality remains exact across integer,
+float, and boolean children. Empty tuples, empty frozensets, strings, and nulls
+remain distinct domains. Lists, dictionaries, and mutable sets are unhashable,
+including when nested in tuple keys. Explicit null cells remain null regardless
+of container tags, including inside tuple keys.
+
+The pinned capture contains 15 cases, including five expected errors. Generated
+native checks compare group membership, source order, first typed representatives,
+error messages, and unchanged inputs. The artifacts are
+`docs/container-case-grouping-reference.json.gz` and
+`docs/container-case-grouping-validation.json`. All 154 native suites, 110 script
+tests, three optimized evidence tests, and 516 CLI/HTTP comparisons pass. Review
+found a null-container regression, which was corrected and verified.
+Python exception-class identity,
+arbitrary Python objects, and exhaustive container/replay behavior remain outside
+this finite evidence. Full parity remains incomplete.
+
+
 ## Basic random-tree generation evidence
 
 The BASIC random-tree generator uses the seeded recursive-depth process-tree

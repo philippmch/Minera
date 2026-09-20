@@ -14,6 +14,7 @@
 #include "minera/xes_event_log_importer.hpp"
 #include "dataframe_conversion_metadata_reference_cases.hpp"
 #include "conversion_case_grouping_reference_cases.hpp"
+#include "container_case_grouping_reference_cases.hpp"
 
 namespace {
 
@@ -1109,9 +1110,41 @@ void xes_result_serialization_preserves_missing_cells_and_schema() {
   assert(rejected);
 }
 
+void null_container_case_keys_remain_null() {
+  using namespace minera;
+  EventStream input;
+  for (const auto kind : {AttributeContainerKind::kScalar,
+                         AttributeContainerKind::kTuple,
+                         AttributeContainerKind::kFrozenSet,
+                         AttributeContainerKind::kList,
+                         AttributeContainerKind::kContainer,
+                         AttributeContainerKind::kSet}) {
+    EventAttribute key{"case:concept:name", ""};
+    key.is_null = true;
+    key.container = kind;
+    input.events.push_back({{key, EventAttribute{"concept:name", "A"}}});
+  }
+  const auto actual = event_stream_to_event_log(input);
+  if (actual.traces.size() != 1 || actual.traces[0].events.size() != 6)
+    throw std::runtime_error("null container case keys split or lost events");
+  for (auto& record : input.events) {
+    auto child = record.fields[0];
+    child.key.clear();
+    EventAttribute key{"case:concept:name", ""};
+    key.container = AttributeContainerKind::kTuple;
+    key.children.push_back(child);
+    record.fields[0] = key;
+  }
+  const auto nested = event_stream_to_event_log(input);
+  if (nested.traces.size() != 1 || nested.traces[0].events.size() != 6)
+    throw std::runtime_error("nested null case keys split or lost events");
+}
+
 int main() {
+  null_container_case_keys_remain_null();
   check_public_dataframe_conversion_metadata();
   check_public_conversion_case_grouping();
+  check_public_container_case_grouping();
   lexical_numeric_case_values_group_without_losing_strings();
   explicit_native_table_origin_survives_conversion();
   xes_result_serialization_preserves_missing_cells_and_schema();

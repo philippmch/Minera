@@ -364,7 +364,7 @@ void infer_standard_extensions(const LogConversionTable& table,
 // Numeric Python dictionary keys compare by value across bool/int/float.
 // Canonical integer strings retain exact uint64/int64 boundaries without
 // rounding through double; nonintegral/out-of-range floats have separate keys.
-std::pair<AttributeKind, std::string> case_grouping_scalar(
+std::pair<AttributeKind, std::string> scalar_grouping_key(
     const EventAttribute& value) {
   const auto original = std::pair{value.kind, std::string("lexical:") + value.value};
   if (value.is_null) return original;
@@ -429,6 +429,71 @@ std::pair<AttributeKind, std::string> case_grouping_scalar(
     if (parse(number)) return floating(number);
   }
   return original;
+}
+
+void append_grouping_part(std::string& result, std::string_view part) {
+  // Length delimiters keep values such as ("a:b", "c") distinct from
+  // ("a", "b:c") and avoid relying on an escaped separator alphabet.
+  result += std::to_string(part.size());
+  result.push_back(':');
+  result.append(part);
+}
+
+std::string grouping_component(const EventAttribute& value) {
+  if (value.is_null || value.container == AttributeContainerKind::kScalar) {
+    const auto scalar = scalar_grouping_key(value);
+    std::string result = "scalar";
+    result.push_back(value.is_null ? '1' : '0');
+    result += std::to_string(static_cast<int>(scalar.first));
+    append_grouping_part(result, scalar.second);
+    return result;
+  }
+  switch (value.container) {
+    case AttributeContainerKind::kScalar:
+      break;
+    case AttributeContainerKind::kTuple:
+    case AttributeContainerKind::kFrozenSet: {
+      std::vector<std::string> children;
+      children.reserve(value.children.size());
+      for (const auto& child : value.children)
+        children.push_back(grouping_component(child));
+      if (value.container == AttributeContainerKind::kFrozenSet) {
+        std::sort(children.begin(), children.end());
+        children.erase(std::unique(children.begin(), children.end()),
+                       children.end());
+      }
+      std::string result = value.container == AttributeContainerKind::kTuple
+                               ? "tuple"
+                               : "frozenset";
+      append_grouping_part(result, value.is_null ? "1" : "0");
+      append_grouping_part(result, std::to_string(static_cast<int>(value.kind)));
+      append_grouping_part(result, std::to_string(children.size()));
+      for (const auto& child : children) append_grouping_part(result, child);
+      return result;
+    }
+    case AttributeContainerKind::kList:
+      throw std::invalid_argument("unhashable type: 'list'");
+    case AttributeContainerKind::kContainer:
+      throw std::invalid_argument("unhashable type: 'dict'");
+    case AttributeContainerKind::kSet:
+      throw std::invalid_argument("unhashable type: 'set'");
+  }
+  throw std::invalid_argument("log conversion: invalid attribute container kind");
+}
+
+std::pair<AttributeKind, std::string> case_grouping_scalar(
+    const EventAttribute& value) {
+  if (value.is_null) return scalar_grouping_key(value);
+  if (value.container == AttributeContainerKind::kList)
+    throw std::invalid_argument("unhashable type: 'list'");
+  if (value.container == AttributeContainerKind::kContainer)
+    throw std::invalid_argument("unhashable type: 'dict'");
+  if (value.container == AttributeContainerKind::kSet)
+    throw std::invalid_argument("unhashable type: 'set'");
+  if (value.container == AttributeContainerKind::kTuple ||
+      value.container == AttributeContainerKind::kFrozenSet)
+    return {value.kind, grouping_component(value)};
+  return scalar_grouping_key(value);
 }
 
 bool is_case_attribute_field(const EventAttribute& field,
