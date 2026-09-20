@@ -1,0 +1,275 @@
+{
+  "status": "strict_differences_retained",
+  "scope": "Repeated-event replay with token-flood cleaning enabled on 148 generated acyclic nets.",
+  "artifacts": [
+    {
+      "path": "docs/token-replay-flood-multievent-reference.json.gz",
+      "uncompressed_sha256": "dd65cd32eccd3aa557597f884f55557280f40f2c9a71ef3ede0b129d8ff94474"
+    },
+    {
+      "path": "docs/token-replay-flood-multievent-resampled-reference.json.gz",
+      "uncompressed_sha256": "5dc5be47bcfd05803a647bb695cad7e9f901abfeda3abf871efe851fad0a6747"
+    },
+    {
+      "path": "docs/token-replay-flood-multievent-native-checks.json.gz",
+      "uncompressed_sha256": "726a4d3534c11a7b80e83ae24ec4ef7b0ae8b642bfaac6081b0cb36d0d479ddc"
+    }
+  ],
+  "reference_provenance": {
+    "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+    "function": "apply",
+    "module": "pm4py.algo.conformance.tokenreplay.algorithm",
+    "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, parameters: Optional[Dict[Any, Any]] = None, variant=<Variants.TOKEN_REPLAY: <module 'pm4py.algo.conformance.tokenreplay.variants.token_replay' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\conformance\\\\tokenreplay\\\\variants\\\\token_replay.py'>>) -> List[Dict[str, Any]]",
+    "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+    "installed_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962",
+    "pinned_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962"
+  },
+  "initial": {
+    "inputs": 148,
+    "observations": 148,
+    "identity_matches": 131,
+    "strict_differences": 17,
+    "pltr": false,
+    "per_input_timeout_seconds": 5,
+    "unresolved": []
+  },
+  "resampled": {
+    "inputs": 17,
+    "observations": 484,
+    "identity_matches": 221,
+    "strict_differences": 263,
+    "per_input_mode_support": [
+      {
+        "name": "multievent_holdout_62_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 10
+      },
+      {
+        "name": "multievent_holdout_62_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 5
+      },
+      {
+        "name": "multievent_holdout_95_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 2,
+        "identity_matches": 1
+      },
+      {
+        "name": "multievent_holdout_95_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 2,
+        "identity_matches": 1
+      },
+      {
+        "name": "multievent_holdout_100_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 8
+      },
+      {
+        "name": "multievent_holdout_100_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 8
+      },
+      {
+        "name": "multievent_holdout_132_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 4
+      },
+      {
+        "name": "multievent_holdout_132_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 12
+      },
+      {
+        "name": "multievent_holdout_141_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 7
+      },
+      {
+        "name": "multievent_holdout_141_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 6
+      },
+      {
+        "name": "multievent_holdout_151_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 8
+      },
+      {
+        "name": "multievent_holdout_151_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 8
+      },
+      {
+        "name": "multievent_holdout_191_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 6
+      },
+      {
+        "name": "multievent_holdout_191_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 5
+      },
+      {
+        "name": "multievent_holdout_206_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 3
+      },
+      {
+        "name": "multievent_holdout_206_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 5
+      },
+      {
+        "name": "multievent_holdout_221_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 6
+      },
+      {
+        "name": "multievent_holdout_221_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 7
+      },
+      {
+        "name": "multievent_holdout_228_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 7
+      },
+      {
+        "name": "multievent_holdout_228_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 10
+      },
+      {
+        "name": "multievent_holdout_230_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 5
+      },
+      {
+        "name": "multievent_holdout_230_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 4
+      },
+      {
+        "name": "multievent_holdout_237_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 1
+      },
+      {
+        "name": "multievent_holdout_237_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 2
+      },
+      {
+        "name": "multievent_holdout_252_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 9
+      },
+      {
+        "name": "multievent_holdout_252_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 7
+      },
+      {
+        "name": "multievent_holdout_261_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 9
+      },
+      {
+        "name": "multievent_holdout_261_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 7
+      },
+      {
+        "name": "multievent_holdout_268_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 10
+      },
+      {
+        "name": "multievent_holdout_268_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 9
+      },
+      {
+        "name": "multievent_holdout_286_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 8
+      },
+      {
+        "name": "multievent_holdout_286_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 6
+      },
+      {
+        "name": "multievent_holdout_295_stop_False_repeat_0",
+        "pltr": false,
+        "observations": 15,
+        "identity_matches": 10
+      },
+      {
+        "name": "multievent_holdout_295_stop_False_repeat_0",
+        "pltr": true,
+        "observations": 15,
+        "identity_matches": 7
+      }
+    ],
+    "unresolved": [
+      {
+        "name": "multievent_holdout_95_stop_False_repeat_0",
+        "reason": "resampling batch reached its 20-second bound",
+        "persisted_observations": 4,
+        "requested_observations": 30
+      }
+    ]
+  },
+  "native_commit": "d1eac5d9a0a66d231a5ad8abfaf7b1716158c309",
+  "native_executable_sha256": "1175aa4230d1563292f2e8a012d0a7db367e64e0dbd9ccbe0a7dbe8d42a7f076",
+  "verification": {
+    "production_changes": false,
+    "previous_native_suites_passed": 154,
+    "previous_validation": "docs/token-replay-exhaustive-pool-validation.json",
+    "checks": "Existing strict native replay checker; identity matches only. No mismatch normalization or waiver."
+  },
+  "reproduction": [
+    "Decompress the two reference artifacts and run scripts/check-token-replay-native.py with --reference, --native, and --output.",
+    "Public results can vary on repeated construction; the stored reports preserve the observations actually captured."
+  ],
+  "limits": [
+    "Finite sampled support does not establish full parity or equal outcome probabilities or correlations.",
+    "All 17 initially differing inputs have at least one exact native match among resampled public results in each PLTR mode; all strict differences remain recorded.",
+    "Input 95 resampling reached a 20-second batch bound with four persisted observations out of 30 requested; this does not establish noncompletion of an individual input.",
+    "The initial isolated 148-input capture completed every input within its five-second bound.",
+    "No coverage classification is upgraded by this evidence checkpoint."
+  ]
+}
