@@ -161,6 +161,16 @@ const std::string& selected_activity(const Event& event,
       options.activity_attribute + "'");
 }
 
+const std::string& required_activity(const Event& event,
+                                     const HeuristicMinerOptions& options) {
+  if (standard_activity_attribute(options.activity_attribute) &&
+      !event.has_activity()) {
+    throw std::invalid_argument(
+        "Heuristics Miner PLUSPLUS: event is missing activity attribute");
+  }
+  return selected_activity(event, options);
+}
+
 bool standard_timestamp_attribute(std::string_view key) {
   return key.empty() || key == "time:timestamp" || key == "timestamp";
 }
@@ -174,6 +184,16 @@ const std::string& selected_timestamp(const Event& event,
   throw std::invalid_argument(
       "Heuristics Miner: event is missing timestamp attribute '" +
       options.timestamp_attribute + "'");
+}
+
+const std::string& required_timestamp_text(
+    const Event& event, const HeuristicMinerOptions& options) {
+  if (standard_timestamp_attribute(options.timestamp_attribute) &&
+      !event.has_timestamp()) {
+    throw std::invalid_argument(
+        "Heuristics Miner PLUSPLUS: event is missing timestamp attribute");
+  }
+  return selected_timestamp(event, options);
 }
 
 const std::string* selected_start_timestamp(
@@ -229,22 +249,20 @@ IntervalTrace to_intervals(const Trace& trace,
                            bool pre_interval_mode) {
   using LifecycleKey = std::pair<std::string, std::string>;
   struct PendingStart {
-    double timestamp = 0.0;
-    std::optional<double> business_timestamp;
+    std::string timestamp_text;
   };
   std::map<LifecycleKey, std::deque<PendingStart>> pending_starts;
   std::vector<Interval> intervals;
   for (const auto& event : trace.events) {
-    const auto& timestamp_text = selected_timestamp(event, options);
-    const double timestamp =
-        required_timestamp(timestamp_text, "event");
-    const auto business_complete =
-        options.use_business_hours
-            ? std::optional<double>{
-                  required_business_timestamp(timestamp_text, "event")}
-            : std::optional<double>{};
-    const auto& activity = selected_activity(event, options);
+    const auto& timestamp_text = required_timestamp_text(event, options);
+    const auto& activity = required_activity(event, options);
     if (pre_interval_mode) {
+      const double timestamp = required_timestamp(timestamp_text, "event");
+      const auto business_complete =
+          options.use_business_hours
+              ? std::optional<double>{
+                    required_business_timestamp(timestamp_text, "event")}
+              : std::optional<double>{};
       const auto* value = selected_start_timestamp(event, options, true);
       if (value == nullptr)
         throw std::invalid_argument(
@@ -260,24 +278,44 @@ IntervalTrace to_intervals(const Trace& trace,
           {activity, start, timestamp, business_start, business_complete});
       continue;
     }
+
+    // Lifecycle events with an explicit non-start/complete transition are
+    // ignored after required field presence has been checked.  An explicitly
+    // present empty transition is also ignored; an omitted transition remains
+    // the atomic/completion form below.
+    const bool lifecycle_present = event.has_lifecycle();
+    const std::string lifecycle = ascii_lower(event.lifecycle);
     std::string instance;
-    if (const auto* value = event.attribute(
-            options.lifecycle_instance_attribute))
+    if (const auto* value =
+            event.attribute(options.lifecycle_instance_attribute))
       instance = *value;
     const LifecycleKey key{activity, instance};
-    const std::string lifecycle = ascii_lower(event.lifecycle);
+    if ((lifecycle_present && lifecycle.empty()) ||
+        (!lifecycle.empty() && lifecycle != "start" &&
+         lifecycle != "complete"))
+      continue;
+
     if (lifecycle == "start") {
-      pending_starts[key].push_back({timestamp, business_complete});
+      pending_starts[key].push_back({timestamp_text});
       continue;
     }
-    if (!lifecycle.empty() && lifecycle != "complete") continue;
 
+    const double timestamp = required_timestamp(timestamp_text, "event");
+    const auto business_complete =
+        options.use_business_hours
+            ? std::optional<double>{
+                  required_business_timestamp(timestamp_text, "event")}
+            : std::optional<double>{};
     double start = timestamp;
     auto business_start = business_complete;
     auto pending = pending_starts.find(key);
     if (pending != pending_starts.end() && !pending->second.empty()) {
-      start = pending->second.front().timestamp;
-      business_start = pending->second.front().business_timestamp;
+      start = required_timestamp(pending->second.front().timestamp_text,
+                                 "start");
+      if (options.use_business_hours) {
+        business_start = required_business_timestamp(
+            pending->second.front().timestamp_text, "start");
+      }
       pending->second.pop_front();
     }
     intervals.push_back(

@@ -4172,6 +4172,20 @@ input globally. Eventual-follow and concurrency calculations use stable
 start-time ordering, while pre-interval performance edges preserve the input
 trace order.
 
+Lifecycle conversion distinguishes an omitted transition (a completion) from
+an explicit empty transition (ignored). It requires selected activity and
+timestamp fields even on ignored events, but parses timestamps only when they
+contribute to an interval: unused start timestamps and timestamps on ignored
+lifecycle transitions need not be valid dates. A malformed start timestamp
+still fails when a matching completion consumes it. Pre-interval input retains
+its required start and completion timestamp validation.
+
+The lifecycle reference and validation artifacts retain 72 cases spanning
+canonical/custom completion fields and ordinary/business time. Matches improved
+from 56 to 72; successful outputs compare frequencies, waits, and sojourns,
+while error cases check rejection only. All 154 native suites and 154 earlier
+business-hours, start-selector, and sparse-decoration comparisons pass.
+
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),
 activity/path occurrence filtering, direct-adjacency mean waits, mean sojourn

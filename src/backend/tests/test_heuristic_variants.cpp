@@ -180,6 +180,104 @@ void lifecycle_fifo_and_configurable_interval_attribute() {
   assert(threw);
 }
 
+void lifecycle_input_shapes_defer_ignored_timestamp_parsing() {
+  auto options = plus_options();
+  options.decoration = HeuristicNetDecoration::kPerformance;
+  options.use_business_hours = true;
+
+  auto unknown_bad_time = event("X", "garbage", "schedule");
+  unknown_bad_time.timestamp_state = FirstClassAttributeState::kPresent;
+  auto unknown_empty_time = event("Y", "", "schedule");
+  unknown_empty_time.timestamp_state = FirstClassAttributeState::kPresent;
+  const auto valid = log({trace({
+      unknown_bad_time,
+      unknown_empty_time,
+      event("A", "2026-01-05T10:00:00Z"),
+      event("B", "2026-01-05T12:00:00Z"),
+  })});
+  const auto ignored = discover_heuristics_net(valid, options);
+  assert(std::abs(relation(ignored, "A", "B").mean_wait_seconds -
+                  7200.0) < 1e-9);
+
+  auto missing_time = event("X", "", "schedule");
+  bool missing_time_threw = false;
+  try {
+    (void)discover_heuristics_net(
+        log({trace({missing_time, event("A", "2026-01-05T10:00:00Z")})}),
+        options);
+  } catch (const std::invalid_argument&) {
+    missing_time_threw = true;
+  }
+  assert(missing_time_threw);
+
+  auto unmatched_bad_start = event("X", "garbage", "start");
+  unmatched_bad_start.timestamp_state = FirstClassAttributeState::kPresent;
+  const auto unmatched = discover_heuristics_net(
+      log({trace({unmatched_bad_start, event("A", "2026-01-05T10:00:00Z"),
+                  event("B", "2026-01-05T12:00:00Z")})}),
+      options);
+  assert(std::abs(relation(unmatched, "A", "B").mean_wait_seconds -
+                  7200.0) < 1e-9);
+
+  auto paired_bad_start = event("A", "garbage", "start");
+  paired_bad_start.timestamp_state = FirstClassAttributeState::kPresent;
+  bool paired_start_threw = false;
+  try {
+    (void)discover_heuristics_net(
+        log({trace({paired_bad_start,
+                    event("A", "2026-01-05T10:00:00Z"),
+                    event("B", "2026-01-05T12:00:00Z")})}),
+        options);
+  } catch (const std::invalid_argument&) {
+    paired_start_threw = true;
+  }
+  assert(paired_start_threw);
+
+  auto explicit_empty_lifecycle = event("A", "garbage", "");
+  explicit_empty_lifecycle.timestamp_state =
+      FirstClassAttributeState::kPresent;
+  explicit_empty_lifecycle.lifecycle_state =
+      FirstClassAttributeState::kPresent;
+  const auto empty_lifecycle = discover_heuristics_net(
+      log({trace({explicit_empty_lifecycle,
+                  event("B", "2026-01-05T12:00:00Z")})}),
+      options);
+  assert((empty_lifecycle.activities == std::vector<std::string>{"B"}));
+  assert(empty_lifecycle.relation_statistics.empty());
+
+  // A missing lifecycle field is the atomic/completion form and still parses
+  // its timestamp, unlike the explicit empty lifecycle above.
+  const auto omitted_lifecycle = discover_heuristics_net(
+      log({trace({event("A", "2026-01-05T10:00:00Z"),
+                  event("B", "2026-01-05T12:00:00Z")})}),
+      options);
+  assert(std::abs(relation(omitted_lifecycle, "A", "B").mean_wait_seconds -
+                  7200.0) < 1e-9);
+
+  auto custom_unknown = event("X", "", "schedule");
+  attr(custom_unknown, "occurred", "garbage");
+  auto custom_a = event("A", "");
+  attr(custom_a, "occurred", "2026-01-05T10:00:00Z");
+  auto custom_b = event("B", "");
+  attr(custom_b, "occurred", "2026-01-05T12:00:00Z");
+  auto custom_options = options;
+  custom_options.timestamp_attribute = "occurred";
+  const auto custom = discover_heuristics_net(
+      log({trace({custom_unknown, custom_a, custom_b})}), custom_options);
+  assert(std::abs(relation(custom, "A", "B").mean_wait_seconds -
+                  7200.0) < 1e-9);
+
+  const auto custom_missing = event("X", "", "schedule");
+  bool custom_missing_threw = false;
+  try {
+    (void)discover_heuristics_net(
+        log({trace({custom_missing, custom_a, custom_b})}), custom_options);
+  } catch (const std::invalid_argument&) {
+    custom_missing_threw = true;
+  }
+  assert(custom_missing_threw);
+}
+
 void filtering_and_unfiltered_statistics() {
   const auto source = log({
       trace({interval("A", "2026-01-01T00:00:00Z",
@@ -779,6 +877,7 @@ void configurable_activity_and_timestamp_fields() {
 int main() {
   interval_abstraction_and_strict_threshold();
   lifecycle_fifo_and_configurable_interval_attribute();
+  lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   filtering_and_unfiltered_statistics();
   dependency_concurrency_and_no_connect_all();
   and_bundles_are_overlapping_maximal_cliques();
