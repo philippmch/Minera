@@ -369,7 +369,19 @@ std::string source_dtype(const EventTable& table, std::size_t column) {
   if (all_bool && has_value) return "bool";
   if (all_int && has_value) return "int64";
   if (all_float && has_value) return "float64";
-  if (all_date && has_value) return "datetime64[us]";
+  if (all_date && has_value) {
+    // An object-free table can still carry the source timestamp unit on each
+    // native date cell. Preserve that unit when inferring the dataframe dtype;
+    // whole-second nanosecond timestamps otherwise look indistinguishable
+    // from microsecond timestamps after their lexical value is parsed.
+    for (const auto& row : table.rows) {
+      if (column >= row.size() || cell_missing(row[column])) continue;
+      if (const auto* date = std::get_if<NativeDate>(&row[column]->typed_value))
+        if (date->resolution == NativeDateResolution::kNanosecond)
+          return "datetime64[ns]";
+    }
+    return "datetime64[us]";
+  }
   return "str";
 }
 
@@ -381,6 +393,14 @@ std::string date_precision(const EventTable& table, std::size_t column,
   if (dtype.find("[ms") != std::string::npos) return "us";
   if (dtype.find("[s") != std::string::npos) return "s";
   if (table.rows.empty()) return "s";
+  // Object columns retain the native unit carried by typed date cells. This
+  // matters for whole-second nanosecond timestamps, whose parsed fraction is
+  // zero and therefore cannot establish nanosecond precision on its own.
+  for (const auto& row : table.rows) {
+    if (column >= row.size() || cell_missing(row[column])) continue;
+    if (const auto* date = std::get_if<NativeDate>(&row[column]->typed_value))
+      if (date->resolution == NativeDateResolution::kNanosecond) return "ns";
+  }
   for (const auto& row : table.rows)
     if (!cell_missing(row[column]) && numeric_kind(*row[column])) return "ns";
   if (std::none_of(parsed.begin(), parsed.end(),

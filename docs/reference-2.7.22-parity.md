@@ -2035,6 +2035,26 @@ database lookups. Arbitrary timezone-object classes and complete parity remain
 unproven.
 
 
+## Typed-date formatter resolution
+
+The public formatter retains nanosecond resolution for whole-second typed
+Timestamp values in object columns. Resolution is observable even when all
+fractional digits are zero. The native formatter now uses the supplied date
+resolution when inferring the output datetime unit, including mixed-resolution
+columns and custom start timestamps.
+
+The separate 21-case capture covers naive, UTC, and Berlin timestamps; object
+and declared datetime columns; microseconds and nanoseconds; mixed precision;
+custom start columns; and explicit format strings. The checker compares complete
+results and post-call inputs, then explicitly checks date resolution metadata.
+All 21 new CLI comparisons, 154 native suites, 107 script tests, three optimized
+evidence tests, and 258 CLI plus 258 HTTP formatter regressions pass. Independent
+review is clear. Output timezone metadata remains outside this precision check.
+The evidence is `docs/formatter-date-resolution-reference.json.gz` and
+`docs/formatter-date-resolution-validation.json`. These observations do not
+establish arbitrary date-object, timezone, or complete formatter parity.
+
+
 ## Basic random-tree generation evidence
 
 The BASIC random-tree generator uses the seeded recursive-depth process-tree
