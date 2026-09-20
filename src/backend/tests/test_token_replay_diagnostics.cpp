@@ -939,6 +939,49 @@ PetriNet exhaustive_competing_route_net() {
   return net;
 }
 
+PetriNet deficient_input_route_net(std::size_t weight) {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto p0 = net.add_place();
+  const auto p1 = net.add_place();
+  const auto p2 = net.add_place();
+  const auto p3 = net.add_place();
+  net.add_place();  // p4 is intentionally disconnected, as in the public net.
+  const auto p5 = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(p0);
+  net.set_sink(sink);
+  const auto repeated = [weight](std::size_t place) {
+    return std::vector<std::size_t>(weight, place);
+  };
+  net.add_transition(0, [&] {
+    auto inputs = repeated(p3);
+    const auto p5_inputs = repeated(p5);
+    inputs.insert(inputs.end(), p5_inputs.begin(), p5_inputs.end());
+    return inputs;
+  }(), repeated(sink));
+  net.add_transition(std::nullopt, repeated(p0), [&] {
+    auto outputs = repeated(p1);
+    const auto p3_outputs = repeated(p3);
+    outputs.insert(outputs.end(), p3_outputs.begin(), p3_outputs.end());
+    return outputs;
+  }());
+  net.add_transition(std::nullopt, [&] {
+    auto inputs = repeated(p2);
+    const auto p1_inputs = repeated(p1);
+    inputs.insert(inputs.end(), p1_inputs.begin(), p1_inputs.end());
+    return inputs;
+  }(), repeated(p3));
+  net.add_transition(std::nullopt, [&] {
+    auto inputs = repeated(p2);
+    const auto p3_inputs = repeated(p3);
+    inputs.insert(inputs.end(), p3_inputs.begin(), p3_inputs.end());
+    return inputs;
+  }(), repeated(p5));
+  net.add_transition(std::nullopt, repeated(p0), repeated(p2));
+  return net;
+}
+
 void assert_hidden_route_usage(const PetriNet& net, int initial_tokens,
                               bool exhaustive,
                               const std::vector<std::size_t>& expected) {
@@ -1005,6 +1048,47 @@ void forward_exhaustive_hidden_path_trials_public_contract() {
       assert(row.event_diagnostics.front().activated_transitions == wanted);
       consistent(log, net, options);
       assert_hidden_route_usage(net, tokens, exhaustive, wanted);
+    }
+  }
+}
+
+void forward_deficient_input_keys_public_contract() {
+  const auto log = log_of({{"A"}});
+  for (const std::size_t weight : {std::size_t{1}, std::size_t{2}}) {
+    for (const bool exhaustive : {false, true}) {
+      auto net = deficient_input_route_net(weight);
+      TokenReplayOptions options;
+      options.initial_marking.assign(net.place_count(), 0);
+      options.initial_marking[0] = static_cast<int>(2 * weight);
+      options.final_marking.assign(net.place_count(), 0);
+      options.final_marking.back() = static_cast<int>(weight);
+      options.place_names = {"p0", "p1", "p2", "p3", "p4", "p5", "sink"};
+      options.transition_names = {"visible", "t0", "t1", "t3", "t5"};
+      options.try_to_reach_final_marking_through_hidden = false;
+      options.exhaustive_invisible_exploration = exhaustive;
+      const auto row = replay_token_traces(log, net, options).front();
+      const std::vector<std::size_t> expected = exhaustive
+          ? std::vector<std::size_t>{1, 4, 3, 0}
+          : std::vector<std::size_t>{1, 4, 2, 0};
+      assert(row.activated_transitions == expected);
+      assert(row.event_diagnostics.size() == 1);
+      assert(row.event_diagnostics.front().activated_transitions == expected);
+      consistent(log, net, options);
+
+      PetriUsageComparisonOptions usage_options;
+      usage_options.initial_marking.assign(options.initial_marking.begin(), options.initial_marking.end());
+      usage_options.final_marking.assign(options.final_marking.begin(), options.final_marking.end());
+      usage_options.place_names = options.place_names;
+      usage_options.transition_names = options.transition_names;
+      usage_options.try_to_reach_final_marking_through_hidden = false;
+      usage_options.exhaustive_invisible_exploration = exhaustive;
+      const auto comparison = compare_petri_usage(net, log, EventLog{}, usage_options);
+      for (const auto& transition : comparison.transitions) {
+        const auto count = static_cast<std::uint64_t>(std::count(
+            expected.begin(), expected.end(), transition.id));
+        assert(transition.log1_occurrences == count);
+        assert(transition.log2_occurrences == 0 && transition.total_occurrences == count);
+      }
     }
   }
 }
@@ -1357,6 +1441,7 @@ int main() {
   supplied_marking_firing_overflow();
   explicit_marking_conformance_queries();
   forward_exhaustive_hidden_path_trials_public_contract();
+  forward_deficient_input_keys_public_contract();
   forward_nested_hidden_routing_public_contract();
   enabled_transition_worklist_public_contract();
   forward_cleaning_public_counter_contract();

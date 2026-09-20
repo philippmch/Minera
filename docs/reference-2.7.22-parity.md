@@ -1464,8 +1464,14 @@ separately from the observed public path and final-pass limits.
 
 Default pre-event routing fires enabled path prefixes until the target becomes
 enabled or a candidate yields no new firing, then recomputes candidates and
-explores blocked dependencies. Visited targets remain visited even if they
-never fire, and a blocked step does not discard later steps of its path.
+explores blocked dependencies. Each recursive invocation freezes its initially
+deficient target input places; recomputation uses those same target places with
+the updated marking keys. A prefix that supplies an input does not remove that
+input from the invocation's later path search. Pre-event paths prefer shorter
+routes, then source place names, then target place names. Routing stops before
+dependency exploration if the prefix already enables the target. Visited targets
+remain visited even if they never fire, and a blocked step does not discard later
+steps of its path.
 With `exhaustive_invisible_exploration=true`, candidate paths are first tried
 on temporary markings: only a path that enables the selected target is retained.
 If no trial succeeds, dependency exploration runs without the preliminary
@@ -1484,6 +1490,15 @@ checkpoint also closes the four diagnostic mismatches originally recorded in
 observations now match. Reference results were
 identical across three fresh processes with hash seeds 0, 1, and 17. The existing
 160 duplicate-label and 55 nested-route observations still match.
+
+The deficient-input checkpoint in
+`docs/token-replay-deficient-input-reference.json.gz` retains 144 inputs with
+288 replay observations, plus 144 separate element-usage comparisons. All match
+exactly, including reversed construction order, weighted arcs, token counts,
+both exploration modes, and immediate-stop controls. Results agree across three
+fresh processes with hash seeds 0, 1, and 17. Its validation record also preserves
+the passing exhaustive, duplicate-label, nested-route, and enabled-transition
+regressions. These finite checks do not establish full parity.
 
 Eventually-enabled visible transition diagnostics use the observed public FIFO
 worklist behavior. Silent IDs may occur more than once in the queue, each ID uses

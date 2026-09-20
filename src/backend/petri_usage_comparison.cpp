@@ -328,12 +328,15 @@ void route_hidden_before_event(Marking& marking, MarkingKeys& keys, std::size_t 
                                std::vector<std::size_t>& activated,
                                const std::vector<std::string>& place_names,
                                bool exhaustive) {
-  const auto candidates = [&](std::size_t selected) {
-    Marking required(marking.size(), 0);
-    for (const auto place : net.transitions()[selected].inputs) checked_token_add(required[place]);
-    for (std::size_t place = 0; place < required.size(); ++place)
-      if (marking[place] >= required[place]) required[place] = 0;
-    return silent_place_paths(keys, resolve_marking_keys({}, required, "required"), net, place_names, 51);
+  const auto required = [&](std::size_t selected) {
+    Marking needed(marking.size(), 0);
+    for (const auto place : net.transitions()[selected].inputs) checked_token_add(needed[place]);
+    for (std::size_t place = 0; place < needed.size(); ++place)
+      if (marking[place] >= needed[place]) needed[place] = 0;
+    return resolve_marking_keys({}, needed, "required");
+  };
+  const auto candidates = [&](std::size_t /*selected*/, const MarkingKeys& required_keys) {
+    return silent_place_paths(keys, required_keys, net, place_names, 51, true);
   };
   const auto trial = [&](std::size_t selected, const detail::HiddenPlacePath& path) {
     Marking trial_marking = marking;
@@ -349,7 +352,8 @@ void route_hidden_before_event(Marking& marking, MarkingKeys& keys, std::size_t 
     return accepted;
   };
   detail::route_hidden_dependencies(net.transitions().size(), target, exhaustive,
-      candidates, [&](auto transition) { return enabled(marking, net.transitions()[transition]); },
+      candidates, required,
+      [&](auto transition) { return enabled(marking, net.transitions()[transition]); },
       [&](auto transition) { fire(marking, keys, transition, net, usage, activated); }, trial);
 }
 
