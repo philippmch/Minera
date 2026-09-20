@@ -1,0 +1,253 @@
+{
+  "reference_version": "2.7.22",
+  "provenance": [
+    {
+      "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+      "function": "apply_heu",
+      "module": "pm4py.algo.discovery.heuristics.algorithm",
+      "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream, pandas.DataFrame], parameters: Optional[Dict[Any, Any]] = None, variant=<Variants.CLASSIC: <module 'pm4py.algo.discovery.heuristics.variants.classic' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\discovery\\\\heuristics\\\\variants\\\\classic.py'>>) -> pm4py.objects.heuristics_net.obj.HeuristicsNet",
+      "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+      "installed_sha256": "8dd60f778b47bb969d9f5ea68e962263b8e343fe61cf8ce1b667b91f944439b0",
+      "pinned_sha256": "8dd60f778b47bb969d9f5ea68e962263b8e343fe61cf8ce1b667b91f944439b0"
+    },
+    {
+      "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+      "function": "apply_heu",
+      "module": "pm4py.algo.discovery.heuristics.variants.classic",
+      "signature": "(log: pm4py.objects.log.obj.EventLog, parameters: Optional[Dict[Any, Any]] = None) -> pm4py.objects.heuristics_net.obj.HeuristicsNet",
+      "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+      "installed_sha256": "240610dad47ed5d6e7b11db6de6dad34eb617ca646a79a95ad034e64fb1b8d5a",
+      "pinned_sha256": "240610dad47ed5d6e7b11db6de6dad34eb617ca646a79a95ad034e64fb1b8d5a"
+    },
+    {
+      "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+      "function": "apply_heu",
+      "module": "pm4py.algo.discovery.heuristics.variants.plusplus",
+      "signature": "(log: pm4py.objects.log.obj.EventLog, parameters: Optional[Dict[Any, Any]] = None) -> pm4py.objects.heuristics_net.obj.HeuristicsNet",
+      "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+      "installed_sha256": "e2ea1532ff750456752de09859629c1c8e69010ad6d85cfb4f7567525dcc4206",
+      "pinned_sha256": "e2ea1532ff750456752de09859629c1c8e69010ad6d85cfb4f7567525dcc4206"
+    },
+    {
+      "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+      "function": "apply",
+      "module": "pm4py.algo.discovery.dfg.variants.performance",
+      "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream], parameters: Optional[Dict[Union[str, pm4py.algo.discovery.dfg.variants.performance.Parameters], Any]] = None) -> Dict[Tuple[str, str], float]",
+      "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+      "installed_sha256": "a8713bc8e55453f516692973a65e05c4c285eb5bb6b32534e2fea0c670972bd8",
+      "pinned_sha256": "a8713bc8e55453f516692973a65e05c4c285eb5bb6b32534e2fea0c670972bd8"
+    },
+    {
+      "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+      "function": "get_seconds",
+      "module": "pm4py.util.business_hours",
+      "signature": "(self)",
+      "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+      "installed_sha256": "5a13a3757e8bfc2f0209cd4b31a092f4aa976cb4cd7743a9ccb0533ef7837e35",
+      "pinned_sha256": "5a13a3757e8bfc2f0209cd4b31a092f4aa976cb4cd7743a9ccb0533ef7837e35"
+    }
+  ],
+  "observations": [
+    {
+      "variant": "CLASSIC",
+      "calendar": "omitted",
+      "performance": [
+        [
+          [
+            "A",
+            "B"
+          ],
+          39600.0
+        ]
+      ],
+      "sojourn": {}
+    },
+    {
+      "variant": "CLASSIC",
+      "calendar": "closed",
+      "performance": [
+        [
+          [
+            "A",
+            "B"
+          ],
+          39600.0
+        ]
+      ],
+      "sojourn": {},
+      "calls": []
+    },
+    {
+      "variant": "CLASSIC",
+      "calendar": "opaque",
+      "performance": [
+        [
+          [
+            "A",
+            "B"
+          ],
+          39600.0
+        ]
+      ],
+      "sojourn": {}
+    },
+    {
+      "variant": "CLASSIC",
+      "calendar": "none",
+      "performance": [
+        [
+          [
+            "A",
+            "B"
+          ],
+          39600.0
+        ]
+      ],
+      "sojourn": {}
+    },
+    {
+      "variant": "PLUSPLUS",
+      "calendar": "omitted",
+      "performance": [
+        [
+          [
+            "A",
+            "B"
+          ],
+          39600.0
+        ]
+      ],
+      "sojourn": {
+        "A": 3600.0,
+        "B": 39600.0
+      }
+    },
+    {
+      "variant": "PLUSPLUS",
+      "calendar": "closed",
+      "performance": [
+        [
+          [
+            "A",
+            "B"
+          ],
+          39600.0
+        ]
+      ],
+      "sojourn": {
+        "A": 3600.0,
+        "B": 39600.0
+      },
+      "calls": []
+    },
+    {
+      "variant": "PLUSPLUS",
+      "calendar": "opaque",
+      "performance": [
+        [
+          [
+            "A",
+            "B"
+          ],
+          39600.0
+        ]
+      ],
+      "sojourn": {
+        "A": 3600.0,
+        "B": 39600.0
+      }
+    },
+    {
+      "variant": "PLUSPLUS",
+      "calendar": "none",
+      "performance": [
+        [
+          [
+            "A",
+            "B"
+          ],
+          39600.0
+        ]
+      ],
+      "sojourn": {
+        "A": 3600.0,
+        "B": 39600.0
+      }
+    }
+  ],
+  "native": [
+    {
+      "variant": "CLASSIC",
+      "command": [
+        "build\\petri-comparison-checkpoint-build\\Release\\minera_export.exe",
+        "build\\heuristic-workcalendar.xes",
+        "--heuristic-variant",
+        "classic",
+        "--heuristic-decoration",
+        "performance",
+        "--heuristic-start-timestamp-attribute",
+        "start_timestamp",
+        "--heuristic-business-hours",
+        "-o",
+        "build\\heuristic-workcalendar-CLASSIC.json"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "performance": [
+        [
+          [
+            "A",
+            "B"
+          ],
+          39600
+        ]
+      ],
+      "sojourn": {
+        "A": 0,
+        "B": 0
+      }
+    },
+    {
+      "variant": "PLUSPLUS",
+      "command": [
+        "build\\petri-comparison-checkpoint-build\\Release\\minera_export.exe",
+        "build\\heuristic-workcalendar.xes",
+        "--heuristic-variant",
+        "plusplus",
+        "--heuristic-decoration",
+        "performance",
+        "--heuristic-start-timestamp-attribute",
+        "start_timestamp",
+        "--heuristic-business-hours",
+        "-o",
+        "build\\heuristic-workcalendar-PLUSPLUS.json"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "performance": [
+        [
+          [
+            "A",
+            "B"
+          ],
+          39600
+        ]
+      ],
+      "sojourn": {
+        "A": 3600,
+        "B": 39600
+      }
+    }
+  ],
+  "native_executable_sha256": "cbccafa087ba3861919b71413035aef8092ac14b844dc112cff3320bd1d3251a",
+  "source_commit": "aa81568caee5f647bbe22cafa4344de58717a6d9",
+  "public_capture_script": "import warnings\nwarnings.filterwarnings('ignore')\nimport json\nfrom datetime import datetime\nfrom pm4py.algo.discovery.heuristics import algorithm\nfrom pm4py.objects.log.obj import EventLog,Trace,Event\nclass Calendar:\n def __init__(self): self.calls=[]\n def is_working_day(self,*a,**k): self.calls.append(['is_working_day', str(a)]); return False\n def is_holiday(self,*a,**k): self.calls.append(['is_holiday', str(a)]); return True\nrows=[]\nfor variant in ['CLASSIC','PLUSPLUS']:\n for kind in ['omitted','closed','opaque','none']:\n  cal=Calendar() if kind=='closed' else object() if kind=='opaque' else None\n  p={'heu_net_decoration':'performance','pm4py:param:start_timestamp_key':'start_timestamp','business_hours':True}\n  if kind!='omitted': p['workcalendar']=cal\n  log=EventLog([Trace([Event({'concept:name':a,'start_timestamp':datetime.fromisoformat(s),'time:timestamp':datetime.fromisoformat(e)}) for a,s,e in [('A','2026-01-01T08:00:00+00:00','2026-01-01T09:00:00+00:00'),('B','2026-01-02T10:00:00+00:00','2026-01-05T11:00:00+00:00')]])])\n  r={'variant':variant,'calendar':kind}\n  try:\n   n=algorithm.apply_heu(log,parameters=p,variant=getattr(algorithm.Variants,variant));r.update(performance=[[list(k),v] for k,v in sorted(n.performance_dfg.items())],sojourn=getattr(n,'sojourn_times',None))\n  except Exception as e:r.update(error=type(e).__name__,message=str(e))\n  if kind=='closed':r['calls']=cal.calls\n  rows.append(r)\nprint(json.dumps(rows,indent=2))\n",
+  "native_xes": "<log><trace><event><string key=\"concept:name\" value=\"A\"/><string key=\"start_timestamp\" value=\"2026-01-01T08:00:00+00:00\"/><string key=\"time:timestamp\" value=\"2026-01-01T09:00:00+00:00\"/></event><event><string key=\"concept:name\" value=\"B\"/><string key=\"start_timestamp\" value=\"2026-01-02T10:00:00+00:00\"/><string key=\"time:timestamp\" value=\"2026-01-05T11:00:00+00:00\"/></event></trace></log>",
+  "conclusion": "In these eight EventLog observations, workcalendar is ignored: omitted, closed-calendar, opaque object and None yield identical waiting and sojourn values. The closed-calendar methods are never called. Native output without a calendar parameter matches each reference observation.",
+  "limits": [
+    "Finite EventLog observations only; no claim for dataframe inputs or arbitrary calendar types.",
+    "Native options do not accept opaque Python calendar objects; this is output evidence, not opaque-object API compatibility.",
+    "No holiday-aware native calculation is warranted by these observations.",
+    "No structural coverage upgrade or full parity claim."
+  ]
+}
