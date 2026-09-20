@@ -4186,6 +4186,16 @@ from 56 to 72; successful outputs compare frequencies, waits, and sojourns,
 while error cases check rejection only. All 154 native suites and 154 earlier
 business-hours, start-selector, and sparse-decoration comparisons pass.
 
+Heuristics JSON preserves round-trip double precision for dependencies,
+representations, wait statistics, and sojourns. The writer restores its caller's
+stream precision on both normal completion and an output exception. This avoids
+six-significant-digit rounding such as `0.666667` for a dependency of two thirds.
+`docs/heuristic-graph-reference.json.gz` and the precision validation artifacts
+retain 480 graph comparisons and 16 performance comparisons: exact matches
+improved from 379 to 496. All 154 native suites and 226 earlier timestamp,
+business-hours, and lifecycle comparisons pass. The graph checks cover active
+nodes and accepted edges, not full object equivalence or structural completion.
+
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),
 activity/path occurrence filtering, direct-adjacency mean waits, mean sojourn

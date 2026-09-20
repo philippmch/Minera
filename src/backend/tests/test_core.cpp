@@ -5182,6 +5182,84 @@ void heuristic_miner_detects_self_loops() {
   assert(net_edge(net, "A", "B") != nullptr);
 }
 
+void json_export_preserves_heuristic_double_precision() {
+  minera::EventLog log;
+  for (std::size_t index = 0; index < 2; ++index) {
+    minera::Trace trace;
+    trace.case_id = std::to_string(index);
+    minera::Event first;
+    first.activity = "A";
+    first.timestamp = "2026-01-05T00:00:00.1Z";
+    minera::Event second;
+    second.activity = "B";
+    second.timestamp = "2026-01-05T00:00:00.43333333333333335Z";
+    trace.events = {std::move(first), std::move(second)};
+    log.traces.push_back(std::move(trace));
+  }
+
+  minera::HeuristicMinerOptions options;
+  options.decoration = minera::HeuristicNetDecoration::kPerformance;
+  options.dependency_threshold = 0.0;
+  const auto heuristics = minera::discover_heuristics_net(log, options);
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto* dependency = net_edge(heuristics, "A", "B");
+  assert(dependency != nullptr);
+
+  const auto source = net_activity(heuristics, "A");
+  const auto target = net_activity(heuristics, "B");
+  const minera::HeuristicRelationStatistics* relation = nullptr;
+  for (const auto& candidate : heuristics.relation_statistics) {
+    if (candidate.source == source && candidate.target == target) {
+      relation = &candidate;
+      break;
+    }
+  }
+  assert(relation != nullptr);
+  assert(relation->mean_wait_seconds != 0.0);
+
+  std::ostringstream output;
+  output.precision(3);
+  minera::write_analysis_json(output, "precision", log, graph, nullptr,
+                              nullptr, &heuristics);
+  assert(output.precision() == 3);
+  const auto json = output.str();
+  const auto net_begin = json.find("\"heuristics_net\"");
+  assert(net_begin != std::string::npos);
+  const auto read_number = [&](const std::string& key) {
+    const std::string marker = "\"" + key + "\": ";
+    const auto position = json.find(marker, net_begin);
+    assert(position != std::string::npos);
+    return std::stod(json.substr(position + marker.size()));
+  };
+  assert(read_number("dependency") == dependency->dependency);
+  assert(read_number("mean_wait_seconds") == relation->mean_wait_seconds);
+
+  // The heuristic writer restores the caller's stream precision for the
+  // document sections that follow it.
+  output << "|sentinel=" << (1.0 / 3.0);
+  assert(output.str().ends_with("|sentinel=0.333"));
+
+  class FailingHeuristicsBuffer : public std::stringbuf {
+    std::streamsize xsputn(const char* text, std::streamsize count) override {
+      if (str().find("\"heuristics_net\"") != std::string::npos)
+        throw std::runtime_error("output sink failed");
+      return std::stringbuf::xsputn(text, count);
+    }
+  } failing_buffer;
+  std::ostream failing_output(&failing_buffer);
+  failing_output.precision(3);
+  failing_output.exceptions(std::ios::badbit);
+  bool failed = false;
+  try {
+    minera::write_analysis_json(failing_output, "precision", log, graph,
+                                nullptr, nullptr, &heuristics);
+  } catch (const std::exception&) {
+    failed = true;
+  }
+  assert(failed);
+  assert(failing_output.precision() == 3);
+}
+
 void heuristic_miner_handles_an_empty_log() {
   const auto net = minera::discover_heuristics_net(minera::EventLog{});
   assert(net.activities.empty());
@@ -6703,6 +6781,7 @@ int main() {
   heuristics_net_translates_an_and_split_and_join();
   heuristics_net_keeps_exclusive_branches_exclusive();
   heuristics_net_handles_a_self_loop();
+  json_export_preserves_heuristic_double_precision();
   importer_handles_a_header_only_log();
   importer_strips_a_utf8_bom();
   dfg_handles_single_event_traces();

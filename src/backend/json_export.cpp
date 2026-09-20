@@ -921,6 +921,12 @@ void write_petri_net(std::ostream& out,
 void write_heuristics_net(std::ostream& out,
                           const HeuristicsNet& net,
                           const DirectlyFollowsGraph& graph) {
+  struct RestorePrecision {
+    std::ostream& stream;
+    std::streamsize precision;
+    ~RestorePrecision() { stream.precision(precision); }
+  } restore_precision{
+      out, out.precision(std::numeric_limits<double>::max_digits10)};
   // Canonical nets share the document-wide activity ids; nets built from a
   // generic activity field keep a self-contained local id space.
   const auto resolve = [&](std::size_t local) {

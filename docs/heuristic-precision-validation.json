@@ -1,0 +1,56 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Round-trip double precision in heuristics JSON; active-node and accepted-edge graph comparisons plus performance values.",
+  "reference_artifact": {
+    "path": "docs/heuristic-graph-reference.json.gz",
+    "uncompressed_sha256": "9181a5da70e5b0e1075df068abbc97937ec71eaef2e065fe5dcb70ae6b27c92f"
+  },
+  "native_artifact": {
+    "path": "docs/heuristic-precision-native-checks.json.gz",
+    "uncompressed_sha256": "c52e07b2c16c8883b9660043d828a378a0353f8073085fe5989484f0afa63372"
+  },
+  "before": {
+    "graph_cases": 480,
+    "graph_matches": 377,
+    "performance_cases": 16,
+    "performance_matches": 2
+  },
+  "after": {
+    "cases": 496,
+    "matches": 496
+  },
+  "regressions": {
+    "lifecycle": {
+      "observations": 72,
+      "matches": 72
+    },
+    "business": {
+      "observations": 126,
+      "matches": 126
+    },
+    "selector": {
+      "observations": 21,
+      "matches": 21
+    },
+    "sparse": {
+      "observations": 7,
+      "matches": 7
+    }
+  },
+  "validation": {
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "independent_review": "clear"
+  },
+  "native_source_parent_commit": "faafbb02b713b7cf87d2df75aabb63ae42048d6a",
+  "native_verified_staged_tree": "b6052d7bc9ae3915240e8d86556134b2e5b44f22",
+  "native_executable_sha256": "40924f567c5adf3c54de8e0dd824343f9a03ae74700343f14b56879309bc0c84",
+  "native_checker_script": "import argparse,gzip,hashlib,json,subprocess\nfrom pathlib import Path\np=argparse.ArgumentParser();p.add_argument('--output',required=True);a=p.parse_args()\nref=json.loads(gzip.decompress(Path('docs/heuristic-graph-reference.json.gz').read_bytes()));exe=Path('build/petri-comparison-checkpoint-build/Release/minera_export.exe');checks=[]\nflags={'dependency_thresh':'--dependency-threshold','and_measure_thresh':'--and-threshold','min_act_count':'--heuristic-min-activity-count','min_dfg_occurrences':'--min-edge-frequency','dfg_pre_cleaning_noise_thresh':'--heuristic-dfg-pre-cleaning-noise-threshold','loop_length_two_thresh':'--heuristic-loop-length-two-threshold'}\nfor i,(kind,r) in enumerate([('graph',r) for r in ref['observations']]+[('numeric',r) for r in ref['numeric_observations']]):\n x=Path(f'build/heuristic-precision-{i}.xes');x.write_text(r['xes'],encoding='utf-8');out=x.with_suffix('.json')\n cmd=[str(exe),str(x),'--heuristic-variant',r['variant'].lower(),'-o',str(out)]\n if kind=='graph':\n  for k,v in r['parameters'].items():cmd +=[flags[k],str(v)]\n else:\n  cmd+=['--heuristic-decoration','performance','--heuristic-start-timestamp-attribute','start_timestamp']\n  if r['business']:cmd+=['--heuristic-business-hours']\n row={'kind':kind,'index':i,'expected':r['expected']}\n try:\n  proc=subprocess.run(cmd,capture_output=True,text=True,timeout=30);row.update(exit_code=proc.returncode,stderr=proc.stderr)\n  if proc.returncode==0:\n   payload=json.loads(out.read_text());n=payload['heuristics_net'];names=n['activities'] if n['activity_ids_are_local'] else [v['name'] for v in payload['activities']]\n   actual={'edges':sorted([[names[e['source']],names[e['target']],e['dependency'],e['frequency'],e['representation']] for e in n['edges']])}\n   if kind=='graph':actual['active']=sorted(names[v] for v in n['active_activities'])\n   else:\n    actual['wait']=sorted([[[names[e['source']],names[e['target']]],e['mean_wait_seconds']] for e in n['relation_statistics'] if e['direct_adjacency_frequency']]);actual['sojourn']={names[e['activity']]:e['mean_sojourn_seconds'] for e in n['activity_statistics']} if r['variant']=='PLUSPLUS' else {}\n   row['actual']=actual\n except subprocess.TimeoutExpired:row.update(timeout=True)\n row['matched']=row.get('actual')==row['expected'];checks.append(row)\n if (i+1)%80==0:print(i+1,'cases checked',flush=True)\nreport={'checks':checks,'native_executable_sha256':hashlib.sha256(exe.read_bytes()).hexdigest()};Path(a.output).write_text(json.dumps(report,indent=2)+'\\n',encoding='utf-8');print(sum(c['matched'] for c in checks),'/',len(checks));print([c['index'] for c in checks if not c['matched']])\n",
+  "limits": [
+    "Finite EventLog graph observations: 80 fixed/seeded logs, both variants, three threshold profiles.",
+    "Exact numeric comparisons; active-node and edge list order is canonicalized by activity names only.",
+    "Only accepted edges, their numeric values and active nodes are compared here; this is not complete HeuristicsNet object equivalence.",
+    "No full parity or structural coverage upgrade is claimed.",
+    "Sixteen additional performance observations compare edge values, mean waits and PLUSPLUS mean sojourns, with ordinary and business time."
+  ]
+}
