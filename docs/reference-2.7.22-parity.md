@@ -1478,12 +1478,27 @@ the frontend comparison controls.
 The exhaustive-path checkpoint retains 20 inputs in
 `docs/token-replay-exhaustive-path-reference.json.gz` and a separate element-usage
 reference. All 20 usage comparisons and the routing, marking, fitness, and token
-counters in all 40 replay observations match. Complete replay output matches
-36 of 40 observations; four retain an `enabled_transitions_in_marking` mismatch
-on the four-token competing-route input. The strict failures remain recorded in
-`docs/token-replay-exhaustive-path-validation.json`. Reference results were
+counters in all 40 replay observations match. The subsequent enabled-transition
+checkpoint also closes the four diagnostic mismatches originally recorded in
+`docs/token-replay-exhaustive-path-validation.json`, so all 40 complete replay
+observations now match. Reference results were
 identical across three fresh processes with hash seeds 0, 1, and 17. The existing
 160 duplicate-label and 55 nested-route observations still match.
+
+Eventually-enabled visible transition diagnostics use the observed public FIFO
+worklist behavior. Silent IDs may occur more than once in the queue, each ID uses
+its latest discovered marking, and transition/marking pairs are deduplicated when
+popped. Discovery visits transitions in name order. This differs from exact
+marking-state reachability; precision retains its separate exact search, and
+extended-arc nets retain their existing native diagnostic search.
+`docs/token-replay-enabled-transition-reference.json.gz` preserves 1,259 inputs
+and 2,518 complete replay observations, including weighted repeated firings,
+renamed competing routes, and 129 silent self-loops. All match the strict native
+checker. Eighteen focused inputs also agree across hash seeds 0, 1, and 17.
+Token-producing cyclic public probes exceeded an eight-second bound; native
+diagnostics report explicit resource errors at the search limit rather than
+returning partial transition sets. Validation and the bounded reference outcomes
+are retained alongside the main fixture artifact.
 
 Native comparison and PNML documents preserve optional per-place initial and
 final marking-key metadata, including explicit zero-valued entries. Omitting
