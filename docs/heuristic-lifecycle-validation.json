@@ -1,0 +1,51 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "PLUSPLUS lifecycle timestamp evaluation and explicit-empty lifecycle handling",
+  "reference_artifact": {
+    "path": "docs/heuristic-lifecycle-reference.json.gz",
+    "uncompressed_sha256": "91fb1a7dee10872afefeab404d67d34445fd28ebc86a4dd949fe2f96adc73f6a"
+  },
+  "native_artifact": {
+    "path": "docs/heuristic-lifecycle-native-checks.json.gz",
+    "uncompressed_sha256": "c1227bce835ec06c5d9c46563af140061eca560ef0efdedf8a7f98a02dff6206"
+  },
+  "before": {
+    "cases": 72,
+    "matches": 56
+  },
+  "after": {
+    "cases": 72,
+    "matches": 72,
+    "successful_outputs": 56,
+    "rejection_checks": 16
+  },
+  "regressions": {
+    "business": {
+      "observations": 126,
+      "matches": 126
+    },
+    "selector": {
+      "observations": 21,
+      "matches": 21
+    },
+    "sparse": {
+      "observations": 7,
+      "matches": 7
+    }
+  },
+  "validation": {
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "independent_review": "clear"
+  },
+  "native_source_parent_commit": "3a47a4f7e7afdc64aec3b0149c72acd9cd9aa7c0",
+  "native_verified_staged_tree": "6c64d9a53f31b3058b5038676d6b20ee28403e62",
+  "native_executable_sha256": "33c2a60783dd4d98545599958513524ce92a2f31f3a43fa53c8d43c04b29863f",
+  "native_checker_script": "import argparse,gzip,hashlib,json,subprocess\nfrom pathlib import Path\np=argparse.ArgumentParser();p.add_argument('--output',required=True);a=p.parse_args()\nref=json.loads(gzip.decompress(Path('docs/heuristic-lifecycle-reference.json.gz').read_bytes()))\nexe=Path('build/petri-comparison-checkpoint-build/Release/minera_export.exe');checks=[]\nfor i,r in enumerate(ref['observations']):\n x=Path(f'build/heuristic-lifecycle-{i}.xes');x.write_text(r['xes'],encoding='utf-8');out=x.with_suffix('.json')\n cmd=[str(exe),str(x),'--heuristic-variant','plusplus','--heuristic-decoration','performance','-o',str(out)]\n if r['business']:cmd+=['--heuristic-business-hours']\n if r['custom']:cmd+=['--heuristic-timestamp-attribute','finished']\n proc=subprocess.run(cmd,capture_output=True,text=True,timeout=30)\n row={'name':r['name'],'exit_code':proc.returncode,'stderr':proc.stderr}\n if proc.returncode==0:\n  payload=json.loads(out.read_text());n=payload['heuristics_net'];names=n['activities'] if n['activity_ids_are_local'] else [v['name'] for v in payload['activities']]\n  row['actual']={'frequency':sorted([[[names[v['source']],names[v['target']]],v['raw_frequency']] for v in n['relation_statistics'] if v['raw_frequency']]),'wait':sorted([[[names[v['source']],names[v['target']]],v['mean_wait_seconds']] for v in n['relation_statistics'] if v['direct_adjacency_frequency']]),'sojourn':{names[v['activity']]:v['mean_sojourn_seconds'] for v in n['activity_statistics']}}\n if 'expected' in r:\n  row['expected']=r['expected'];row['matched']=row.get('actual')==r['expected']\n else:\n  row['reference_error']=r['reference_error'];row['matched']=proc.returncode!=0\n checks.append(row)\nreport={'checks':checks,'native_executable_sha256':hashlib.sha256(exe.read_bytes()).hexdigest()}\nPath(a.output).write_text(json.dumps(report,indent=2)+'\\n',encoding='utf-8')\nprint(sum(r['matched'] for r in checks),'/',len(checks));print([r['name'] for r in checks if not r['matched']])\n",
+  "limits": [
+    "Finite EventLog lifecycle and interval boundary observations only.",
+    "Successful results compare exact frequencies, waiting durations and sojourns; error cases compare rejection only, not exception classes or messages.",
+    "ISO-string XES preserves constructed datetime offsets; typed-date import normalization remains a separate contract.",
+    "No full parity or structural coverage upgrade is claimed."
+  ]
+}
