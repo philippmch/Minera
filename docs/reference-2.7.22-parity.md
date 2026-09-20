@@ -1462,15 +1462,28 @@ Native structural searches report their 4,096-place and one-million-stored-step
 limits explicitly. Pre-event dependency routing reports its 4,096-call guard
 separately from the observed public path and final-pass limits.
 
-Pre-event routing first fires enabled path prefixes until a candidate yields
-no new firing, then recomputes candidates and explores blocked dependencies.
-Visited targets remain visited even if they never fire, and a blocked step
-does not discard later steps of its path. Public helper observations support
-two invocation levels by default and one with
-`exhaustive_invisible_exploration=true`; the latter can leave more tokens
-unrouted. This option defaults to false and is available in the native API,
+Default pre-event routing fires enabled path prefixes until the target becomes
+enabled or a candidate yields no new firing, then recomputes candidates and
+explores blocked dependencies. Visited targets remain visited even if they
+never fire, and a blocked step does not discard later steps of its path.
+With `exhaustive_invisible_exploration=true`, candidate paths are first tried
+on temporary markings: only a path that enables the selected target is retained.
+If no trial succeeds, dependency exploration runs without the preliminary
+prefix pass. Both modes allow two invocation levels. The default dependency
+phase continues across candidate paths, checking target enablement within each path.
+This option defaults to false and is available in the native API,
 `--compare-petri-exhaustive-invisible-exploration`, strict server parsing, and
 the frontend comparison controls.
+
+The exhaustive-path checkpoint retains 20 inputs in
+`docs/token-replay-exhaustive-path-reference.json.gz` and a separate element-usage
+reference. All 20 usage comparisons and the routing, marking, fitness, and token
+counters in all 40 replay observations match. Complete replay output matches
+36 of 40 observations; four retain an `enabled_transitions_in_marking` mismatch
+on the four-token competing-route input. The strict failures remain recorded in
+`docs/token-replay-exhaustive-path-validation.json`. Reference results were
+identical across three fresh processes with hash seeds 0, 1, and 17. The existing
+160 duplicate-label and 55 nested-route observations still match.
 
 Native comparison and PNML documents preserve optional per-place initial and
 final marking-key metadata, including explicit zero-valued entries. Omitting

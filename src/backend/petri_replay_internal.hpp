@@ -184,12 +184,16 @@ inline std::vector<HiddenPlacePath> silent_place_paths(
 // Public hidden routing first fires enabled path prefixes, then recomputes
 // paths and explores blocked dependencies. Visiting a target is distinct from
 // firing it: a failed recursive attempt still suppresses later visits.
-template <class Candidates, class Enabled, class Emit>
+template <class Candidates, class Enabled, class Emit, class Trial>
 void route_hidden_dependencies(std::size_t transition_count, std::size_t target,
                                bool exhaustive, const Candidates& candidates,
-                               const Enabled& enabled, const Emit& emit) {
+                               const Enabled& enabled, const Emit& emit,
+                               const Trial& trial) {
   std::vector<bool> visited(transition_count, false);
-  const std::size_t recursion_limit = exhaustive ? 1 : 2;
+  // Both modes allow one dependency expansion below the selected transition.
+  // Exhaustive mode differs by trying each candidate transactionally before
+  // it commits any prefix; it does not reduce the search depth.
+  constexpr std::size_t recursion_limit = 2;
   std::size_t calls = 0;
   const auto explore = [&](auto&& self, std::size_t selected, std::size_t depth) -> void {
     if (depth >= recursion_limit || visited[selected]) return;
@@ -197,16 +201,30 @@ void route_hidden_dependencies(std::size_t transition_count, std::size_t target,
       throw std::runtime_error("Petri replay exceeded the pre-event routing state limit");
     visited[selected] = true;
     const auto initial_paths = candidates(selected);
-    for (const auto& path : initial_paths) {
-      bool progressed = false;
-      for (const auto transition : path.transitions) {
-        if (visited[transition]) continue;
-        if (!enabled(transition)) break;
-        emit(transition);
-        visited[transition] = true;
-        progressed = true;
+    if (exhaustive) {
+      // The public exhaustive helper trials every candidate against a marking
+      // copy.  Only the prefix returned by a successful trial may affect the
+      // caller's marking; failed candidates are discarded completely.
+      for (const auto& path : initial_paths) {
+        const auto accepted = trial(selected, path);
+        if (accepted.empty()) continue;
+        for (const auto transition : accepted) {
+          emit(transition);
+        }
+        if (enabled(selected)) return;
       }
-      if (!progressed) break;
+    } else {
+      for (const auto& path : initial_paths) {
+        bool progressed = false;
+        for (const auto transition : path.transitions) {
+          if (visited[transition]) continue;
+          if (!enabled(transition)) break;
+          emit(transition);
+          visited[transition] = true;
+          progressed = true;
+        }
+        if (!progressed || enabled(selected)) break;
+      }
     }
     const auto paths = candidates(selected);
     for (const auto& path : paths) {
@@ -221,7 +239,10 @@ void route_hidden_dependencies(std::size_t transition_count, std::size_t target,
         // A still-blocked dependency does not discard later path steps.
         if (enabled(selected)) break;
       }
-      if (enabled(selected)) break;
+      // Non-exhaustive routing keeps examining later paths even after one
+      // path enables the selected transition.  Exhaustive mode retains the
+      // original outer break after its transactional trial fallback.
+      if (exhaustive && enabled(selected)) break;
     }
   };
   explore(explore, target, 0);

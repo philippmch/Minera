@@ -751,6 +751,110 @@ void forward_bpmn_greedy_routing_public_contract() {
   consistent(log, interleaving_net, {});
 }
 
+PetriNet exhaustive_minimal_net() {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto p0 = net.add_place();
+  const auto p1 = net.add_place();
+  const auto p5 = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(p0);
+  net.set_sink(sink);
+  net.add_transition(0, {p5}, {sink});
+  net.add_transition(std::nullopt, {p0, p1}, {p5});
+  net.add_transition(std::nullopt, {p0}, {p1});
+  return net;
+}
+
+PetriNet exhaustive_competing_route_net() {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto p0 = net.add_place();
+  const auto p2 = net.add_place();
+  const auto p3 = net.add_place();
+  const auto p4 = net.add_place();
+  const auto p5 = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(p0);
+  net.set_sink(sink);
+  net.add_transition(0, {p3, p5}, {sink});
+  net.add_transition(std::nullopt, {p0}, {p4});
+  net.add_transition(std::nullopt, {p0}, {p2, p3});
+  net.add_transition(std::nullopt, {p2}, {p4, p3});
+  net.add_transition(std::nullopt, {p0, p4}, {p5});
+  return net;
+}
+
+void assert_hidden_route_usage(const PetriNet& net, int initial_tokens,
+                              bool exhaustive,
+                              const std::vector<std::size_t>& expected) {
+  PetriUsageComparisonOptions options;
+  options.initial_marking.assign(net.place_count(), 0);
+  options.initial_marking[0] = static_cast<std::uint32_t>(initial_tokens);
+  options.final_marking.assign(net.place_count(), 0);
+  options.final_marking.back() = 1;
+  options.try_to_reach_final_marking_through_hidden = false;
+  options.exhaustive_invisible_exploration = exhaustive;
+  const auto comparison = compare_petri_usage(net, log_of({{"A"}}), EventLog{}, options);
+  assert(comparison.transitions.size() == net.transitions().size());
+  for (const auto& record : comparison.transitions) {
+    const auto count = static_cast<std::uint64_t>(std::count(
+        expected.begin(), expected.end(), record.id));
+    assert(record.log1_occurrences == count);
+    assert(record.log2_occurrences == 0 && record.total_occurrences == count);
+  }
+}
+
+void forward_exhaustive_hidden_path_trials_public_contract() {
+  const auto log = log_of({{"A"}});
+  for (const bool exhaustive : {false, true}) {
+    for (const int tokens : {1, 2}) {
+      auto net = exhaustive_minimal_net();
+      TokenReplayOptions options;
+      options.initial_marking = {tokens, 0, 0, 0};
+      options.final_marking = {0, 0, 0, 1};
+      options.exhaustive_invisible_exploration = exhaustive;
+      const auto row = replay_token_traces(log, net, options).front();
+      const std::vector<std::size_t> expected = tokens == 1
+          ? std::vector<std::size_t>{2, 0}
+          : std::vector<std::size_t>{2, 1, 0};
+      assert(row.activated_transitions == expected);
+      assert(row.reached_marking == (tokens == 1
+          ? std::vector<int>{0, 1, 0, 1}
+          : std::vector<int>{0, 0, 0, 1}));
+      assert(row.missing == (tokens == 1 ? 1U : 0U));
+      assert(row.remaining == (tokens == 1 ? 1U : 0U));
+      assert(row.trace_is_fit == (tokens == 2));
+      consistent(log, net, options);
+      assert_hidden_route_usage(net, tokens, exhaustive, expected);
+    }
+  }
+
+  // The competing routes share p4.  The public non-exhaustive mode keeps the
+  // later route after t4, while exhaustive mode trials discard the dead-end
+  // t0 path when only two p0 tokens are available.
+  const std::vector<std::vector<std::size_t>> expected{
+      {2, 1, 3, 0}, {2, 1, 4, 3, 0}, {2, 1, 4, 3, 0},
+      {2, 3, 4, 0}, {2, 1, 4, 0}, {2, 1, 4, 0}};
+  std::size_t expected_index = 0;
+  for (const bool exhaustive : {false, true}) {
+    for (const int tokens : {2, 3, 4}) {
+      auto net = exhaustive_competing_route_net();
+      TokenReplayOptions options;
+      options.initial_marking = {tokens, 0, 0, 0, 0, 0};
+      options.final_marking = {0, 0, 0, 0, 0, 1};
+      options.exhaustive_invisible_exploration = exhaustive;
+      const auto row = replay_token_traces(log, net, options).front();
+      const auto& wanted = expected[expected_index++];
+      assert(row.activated_transitions == wanted);
+      assert(row.event_diagnostics.size() == 1);
+      assert(row.event_diagnostics.front().activated_transitions == wanted);
+      consistent(log, net, options);
+      assert_hidden_route_usage(net, tokens, exhaustive, wanted);
+    }
+  }
+}
+
 // Public 2.7.22 nested-AND probes: blocked joins remain visited, while later
 // steps of their paths can still fire. These are routing, not language, tests.
 struct NestedRoutingNet {
@@ -1098,6 +1202,7 @@ int main() {
   supplied_pnml_model_defaults_and_keys();
   supplied_marking_firing_overflow();
   explicit_marking_conformance_queries();
+  forward_exhaustive_hidden_path_trials_public_contract();
   forward_nested_hidden_routing_public_contract();
   forward_cleaning_public_counter_contract();
   forward_weighted_repair_and_partial_stop_contract();

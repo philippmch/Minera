@@ -674,8 +674,26 @@ class Replayer {
       const auto required_keys = detail::resolve_replay_marking_keys({}, required, "required");
       return detail::silent_place_paths(keys, required_keys, net_, place_names);
     };
+    const auto trial = [&](std::size_t selected, const detail::HiddenPlacePath& path) {
+      Marking trial_marking = marking;
+      auto trial_keys = keys;
+      Counts scratch;
+      scratch.places.resize(trial_marking.size());
+      std::vector<std::size_t> accepted;
+      for (const auto transition : path.transitions) {
+        if (!enabled(trial_marking, transition)) break;
+        // The transition is enabled, so forward_fire performs the same
+        // checked marking/key update without contributing diagnostics or
+        // usage counts to the real replay.
+        forward_fire(trial_marking, trial_keys, transition, scratch);
+        accepted.push_back(transition);
+      }
+      if (!enabled(trial_marking, selected)) accepted.clear();
+      return accepted;
+    };
     detail::route_hidden_dependencies(net_.transitions().size(), target, exhaustive,
-        candidates, [&](auto transition) { return enabled(marking, transition); }, emit);
+        candidates, [&](auto transition) { return enabled(marking, transition); }, emit,
+        trial);
   }
 
   // One precision/clean-run search step's outcome — its marking and token

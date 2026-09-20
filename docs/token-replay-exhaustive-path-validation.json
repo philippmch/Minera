@@ -1,0 +1,1354 @@
+{
+  "status": "routing_corrected_with_known_enabled_transition_diagnostic_gap",
+  "scope": "Shared forward replay and element-usage hidden routing: transactional exhaustive path trials, bounded dependency fallback, and default-mode candidate phase ordering.",
+  "artifacts": [
+    {
+      "path": "docs/token-replay-exhaustive-path-reference.json.gz",
+      "uncompressed_sha256": "b31189cfd7dc0af7c41b0a1f1fe8362b81376e8cacea8fc156a32d15df4d1c5d",
+      "observations": 40,
+      "reference_provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "apply",
+        "module": "pm4py.algo.conformance.tokenreplay.algorithm",
+        "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, parameters: Optional[Dict[Any, Any]] = None, variant=<Variants.TOKEN_REPLAY: <module 'pm4py.algo.conformance.tokenreplay.variants.token_replay' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\conformance\\\\tokenreplay\\\\variants\\\\token_replay.py'>>) -> List[Dict[str, Any]]",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962",
+        "pinned_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962"
+      }
+    },
+    {
+      "path": "docs/token-replay-exhaustive-path-usage-reference.json.gz",
+      "uncompressed_sha256": "7288dd6f8c3cd278b652eb41419a2b2cd6aa282d26588da3cb8fbc71c56575c1",
+      "observations": 20,
+      "reference_provenance": {
+        "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "function": "compare_element_usage_two_logs",
+        "module": "pm4py.algo.comparison.petrinet.element_usage_comparison",
+        "signature": "(net: pm4py.objects.petri_net.obj.PetriNet, im: pm4py.objects.petri_net.obj.Marking, fm: pm4py.objects.petri_net.obj.Marking, log1: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], log2: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], parameters: Optional[Dict[Any, Any]] = None) -> Dict[Any, Any]",
+        "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+        "installed_sha256": "af79d6de71ae52df44a8e32db683e3a5ecff0dc4bddb1941aac55ed39faf1ad1",
+        "pinned_sha256": "af79d6de71ae52df44a8e32db683e3a5ecff0dc4bddb1941aac55ed39faf1ad1"
+      }
+    }
+  ],
+  "helper_provenance": {
+    "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+    "function": "apply_hidden_trans",
+    "module": "pm4py.algo.conformance.tokenreplay.variants.token_replay",
+    "signature": "(t, net, marking, places_shortest_paths_by_hidden, act_tr, rec_depth, visit_trans, vis_mark, exhaustive_invisible_exploration)",
+    "method": "opaque module bytes, CRLF normalized to LF, no source decoding",
+    "installed_sha256": "96fc7be0ed122d1afd2b824c4d2973e4d95990dcda650ffbe2b3b13ee86400b3",
+    "pinned_sha256": "96fc7be0ed122d1afd2b824c4d2973e4d95990dcda650ffbe2b3b13ee86400b3"
+  },
+  "reference_repetition": {
+    "fresh_process_hash_seeds": [
+      0,
+      1,
+      17
+    ],
+    "identical_results": true,
+    "public_calls": 180,
+    "additional_single_process_observations": 400
+  },
+  "validation": {
+    "replay": {
+      "checks": [
+        {
+          "id": "0:False",
+          "name": "minimal_tokens1_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "0:True",
+          "name": "minimal_tokens1_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "1:False",
+          "name": "minimal_tokens1_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "1:True",
+          "name": "minimal_tokens1_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "2:False",
+          "name": "minimal_tokens1_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "2:True",
+          "name": "minimal_tokens1_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "3:False",
+          "name": "minimal_tokens1_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "3:True",
+          "name": "minimal_tokens1_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "4:False",
+          "name": "minimal_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "4:True",
+          "name": "minimal_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "5:False",
+          "name": "minimal_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "5:True",
+          "name": "minimal_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "6:False",
+          "name": "minimal_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "6:True",
+          "name": "minimal_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "7:False",
+          "name": "minimal_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "7:True",
+          "name": "minimal_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "8:False",
+          "name": "exhaustive_prefix_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "8:True",
+          "name": "exhaustive_prefix_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "9:False",
+          "name": "exhaustive_prefix_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "9:True",
+          "name": "exhaustive_prefix_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "10:False",
+          "name": "exhaustive_prefix_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "10:True",
+          "name": "exhaustive_prefix_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "11:False",
+          "name": "exhaustive_prefix_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "11:True",
+          "name": "exhaustive_prefix_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "12:False",
+          "name": "exhaustive_prefix_tokens3_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "12:True",
+          "name": "exhaustive_prefix_tokens3_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "13:False",
+          "name": "exhaustive_prefix_tokens3_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "13:True",
+          "name": "exhaustive_prefix_tokens3_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "14:False",
+          "name": "exhaustive_prefix_tokens3_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "14:True",
+          "name": "exhaustive_prefix_tokens3_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "15:False",
+          "name": "exhaustive_prefix_tokens3_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "15:True",
+          "name": "exhaustive_prefix_tokens3_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "16:False",
+          "name": "exhaustive_prefix_tokens4_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "16:True",
+          "name": "exhaustive_prefix_tokens4_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "17:False",
+          "name": "exhaustive_prefix_tokens4_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "17:True",
+          "name": "exhaustive_prefix_tokens4_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": true,
+          "match_kind": "identity"
+        },
+        {
+          "id": "18:False",
+          "name": "exhaustive_prefix_tokens4_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": false,
+          "matched": false,
+          "mismatch": "traces[0].enabled_transitions_in_marking.set.length",
+          "native": {
+            "family": "TOKEN_REPLAY",
+            "variant": "forward",
+            "traces": [
+              {
+                "trace_index": 0,
+                "case_id": "0",
+                "trace_is_fit": false,
+                "trace_fitness": 0.8888888888888888,
+                "produced": 9,
+                "consumed": 7,
+                "missing": 0,
+                "remaining": 2,
+                "replay_stopped": false,
+                "replayed_events": 1,
+                "activated_transitions": [
+                  2,
+                  1,
+                  4,
+                  0
+                ],
+                "transitions_with_problems": [],
+                "enabled_transitions": [
+                  0
+                ],
+                "reached_marking": [
+                  1,
+                  1,
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "reached_marking_keys": [
+                  true,
+                  true,
+                  false,
+                  false,
+                  false,
+                  true
+                ],
+                "unknown_event_indices": [],
+                "event_diagnostics": [
+                  {
+                    "event_index": 0,
+                    "activated_transitions": [
+                      2,
+                      1,
+                      4,
+                      0
+                    ],
+                    "transitions_with_problems": []
+                  }
+                ],
+                "unknown_activities": [],
+                "unknown_activity_is_null": [],
+                "places": [
+                  {
+                    "missing": 0,
+                    "remaining": 1,
+                    "consumed": 3,
+                    "produced": 4
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 1,
+                    "consumed": 0,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "expected": {
+            "id": "18:False",
+            "enable_pltr_fitness": false,
+            "parameters": {
+              "walk_through_hidden_trans": true,
+              "try_to_reach_final_marking_through_hidden": false,
+              "stop_immediately_unfit": false,
+              "exhaustive_invisible_exploration": true,
+              "cleaning_token_flood": false,
+              "show_progress_bar": false,
+              "enable_pltr_fitness": false
+            },
+            "result": [
+              {
+                "trace_is_fit": false,
+                "trace_fitness": 0.8888888888888888,
+                "activated_transitions": [
+                  {
+                    "transition": "t1"
+                  },
+                  {
+                    "transition": "t0"
+                  },
+                  {
+                    "transition": "t4"
+                  },
+                  {
+                    "transition": "visible"
+                  }
+                ],
+                "reached_marking": {
+                  "marking": {
+                    "p0": 1,
+                    "p2": 1,
+                    "sink": 1
+                  }
+                },
+                "enabled_transitions_in_marking": {
+                  "set": []
+                },
+                "transitions_with_problems": [],
+                "missing_tokens": 0,
+                "consumed_tokens": 7,
+                "remaining_tokens": 2,
+                "produced_tokens": 9
+              }
+            ],
+            "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, parameters: Optional[Dict[Any, Any]] = None, variant=<Variants.TOKEN_REPLAY: <module 'pm4py.algo.conformance.tokenreplay.variants.token_replay' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\conformance\\\\tokenreplay\\\\variants\\\\token_replay.py'>>) -> List[Dict[str, Any]]"
+          }
+        },
+        {
+          "id": "18:True",
+          "name": "exhaustive_prefix_tokens4_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "pltr": true,
+          "matched": false,
+          "mismatch": "traces[0].enabled_transitions_in_marking.set.length",
+          "native": {
+            "family": "TOKEN_REPLAY",
+            "variant": "forward",
+            "traces": [
+              {
+                "trace_index": 0,
+                "case_id": "0",
+                "trace_is_fit": false,
+                "trace_fitness": 0.8888888888888888,
+                "produced": 9,
+                "consumed": 7,
+                "missing": 0,
+                "remaining": 2,
+                "replay_stopped": false,
+                "replayed_events": 1,
+                "activated_transitions": [
+                  2,
+                  1,
+                  4,
+                  0
+                ],
+                "transitions_with_problems": [],
+                "enabled_transitions": [
+                  0
+                ],
+                "reached_marking": [
+                  1,
+                  1,
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "reached_marking_keys": [
+                  true,
+                  true,
+                  false,
+                  false,
+                  false,
+                  true
+                ],
+                "unknown_event_indices": [],
+                "event_diagnostics": [
+                  {
+                    "event_index": 0,
+                    "activated_transitions": [
+                      2,
+                      1,
+                      4,
+                      0
+                    ],
+                    "transitions_with_problems": []
+                  }
+                ],
+                "unknown_activities": [],
+                "unknown_activity_is_null": [],
+                "places": [
+                  {
+                    "missing": 0,
+                    "remaining": 1,
+                    "consumed": 3,
+                    "produced": 4
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 1,
+                    "consumed": 0,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "expected": {
+            "id": "18:True",
+            "enable_pltr_fitness": true,
+            "parameters": {
+              "walk_through_hidden_trans": true,
+              "try_to_reach_final_marking_through_hidden": false,
+              "stop_immediately_unfit": false,
+              "exhaustive_invisible_exploration": true,
+              "cleaning_token_flood": false,
+              "show_progress_bar": false,
+              "enable_pltr_fitness": true
+            },
+            "result": [
+              [
+                {
+                  "trace_is_fit": false,
+                  "trace_fitness": 0.8888888888888888,
+                  "activated_transitions": [
+                    {
+                      "transition": "t1"
+                    },
+                    {
+                      "transition": "t0"
+                    },
+                    {
+                      "transition": "t4"
+                    },
+                    {
+                      "transition": "visible"
+                    }
+                  ],
+                  "reached_marking": {
+                    "marking": {
+                      "p0": 1,
+                      "p2": 1,
+                      "sink": 1
+                    }
+                  },
+                  "enabled_transitions_in_marking": {
+                    "set": []
+                  },
+                  "transitions_with_problems": [],
+                  "missing_tokens": 0,
+                  "consumed_tokens": 7,
+                  "remaining_tokens": 2,
+                  "produced_tokens": 9
+                }
+              ],
+              {
+                "mapping": [
+                  [
+                    {
+                      "place": "p0"
+                    },
+                    {
+                      "underfed_traces": {
+                        "set": []
+                      },
+                      "overfed_traces": {
+                        "set": [
+                          {
+                            "trace_index": 0
+                          }
+                        ]
+                      },
+                      "m": 0,
+                      "r": 1,
+                      "c": 3,
+                      "p": 4
+                    }
+                  ],
+                  [
+                    {
+                      "place": "p2"
+                    },
+                    {
+                      "underfed_traces": {
+                        "set": []
+                      },
+                      "overfed_traces": {
+                        "set": [
+                          {
+                            "trace_index": 0
+                          }
+                        ]
+                      },
+                      "m": 0,
+                      "r": 1,
+                      "c": 0,
+                      "p": 1
+                    }
+                  ],
+                  [
+                    {
+                      "place": "p3"
+                    },
+                    {
+                      "underfed_traces": {
+                        "set": []
+                      },
+                      "overfed_traces": {
+                        "set": []
+                      },
+                      "m": 0,
+                      "r": 0,
+                      "c": 1,
+                      "p": 1
+                    }
+                  ],
+                  [
+                    {
+                      "place": "p4"
+                    },
+                    {
+                      "underfed_traces": {
+                        "set": []
+                      },
+                      "overfed_traces": {
+                        "set": []
+                      },
+                      "m": 0,
+                      "r": 0,
+                      "c": 1,
+                      "p": 1
+                    }
+                  ],
+                  [
+                    {
+                      "place": "p5"
+                    },
+                    {
+                      "underfed_traces": {
+                        "set": []
+                      },
+                      "overfed_traces": {
+                        "set": []
+                      },
+                      "m": 0,
+                      "r": 0,
+                      "c": 1,
+                      "p": 1
+                    }
+                  ],
+                  [
+                    {
+                      "place": "sink"
+                    },
+                    {
+                      "underfed_traces": {
+                        "set": []
+                      },
+                      "overfed_traces": {
+                        "set": []
+                      },
+                      "m": 0,
+                      "r": 0,
+                      "c": 1,
+                      "p": 1
+                    }
+                  ]
+                ]
+              },
+              {
+                "mapping": [
+                  [
+                    {
+                      "transition": "visible"
+                    },
+                    {
+                      "underfed_traces": {},
+                      "fit_traces": {
+                        "mapping": [
+                          [
+                            {
+                              "trace_index": 0
+                            },
+                            [
+                              {
+                                "concept:name": "A"
+                              }
+                            ]
+                          ]
+                        ]
+                      }
+                    }
+                  ]
+                ]
+              },
+              {}
+            ],
+            "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, parameters: Optional[Dict[Any, Any]] = None, variant=<Variants.TOKEN_REPLAY: <module 'pm4py.algo.conformance.tokenreplay.variants.token_replay' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\conformance\\\\tokenreplay\\\\variants\\\\token_replay.py'>>) -> List[Dict[str, Any]]"
+          }
+        },
+        {
+          "id": "19:False",
+          "name": "exhaustive_prefix_tokens4_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": false,
+          "matched": false,
+          "mismatch": "traces[0].enabled_transitions_in_marking.set.length",
+          "native": {
+            "family": "TOKEN_REPLAY",
+            "variant": "forward",
+            "traces": [
+              {
+                "trace_index": 0,
+                "case_id": "0",
+                "trace_is_fit": false,
+                "trace_fitness": 0.8888888888888888,
+                "produced": 9,
+                "consumed": 7,
+                "missing": 0,
+                "remaining": 2,
+                "replay_stopped": false,
+                "replayed_events": 1,
+                "activated_transitions": [
+                  2,
+                  3,
+                  0,
+                  4
+                ],
+                "transitions_with_problems": [],
+                "enabled_transitions": [
+                  4
+                ],
+                "reached_marking": [
+                  1,
+                  1,
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "reached_marking_keys": [
+                  true,
+                  true,
+                  false,
+                  false,
+                  false,
+                  true
+                ],
+                "unknown_event_indices": [],
+                "event_diagnostics": [
+                  {
+                    "event_index": 0,
+                    "activated_transitions": [
+                      2,
+                      3,
+                      0,
+                      4
+                    ],
+                    "transitions_with_problems": []
+                  }
+                ],
+                "unknown_activities": [],
+                "unknown_activity_is_null": [],
+                "places": [
+                  {
+                    "missing": 0,
+                    "remaining": 1,
+                    "consumed": 3,
+                    "produced": 4
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 1,
+                    "consumed": 0,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "expected": {
+            "id": "19:False",
+            "enable_pltr_fitness": false,
+            "parameters": {
+              "walk_through_hidden_trans": true,
+              "try_to_reach_final_marking_through_hidden": false,
+              "stop_immediately_unfit": false,
+              "exhaustive_invisible_exploration": true,
+              "cleaning_token_flood": false,
+              "show_progress_bar": false,
+              "enable_pltr_fitness": false
+            },
+            "result": [
+              {
+                "trace_is_fit": false,
+                "trace_fitness": 0.8888888888888888,
+                "activated_transitions": [
+                  {
+                    "transition": "t1"
+                  },
+                  {
+                    "transition": "t0"
+                  },
+                  {
+                    "transition": "t4"
+                  },
+                  {
+                    "transition": "visible"
+                  }
+                ],
+                "reached_marking": {
+                  "marking": {
+                    "p0": 1,
+                    "p2": 1,
+                    "sink": 1
+                  }
+                },
+                "enabled_transitions_in_marking": {
+                  "set": []
+                },
+                "transitions_with_problems": [],
+                "missing_tokens": 0,
+                "consumed_tokens": 7,
+                "remaining_tokens": 2,
+                "produced_tokens": 9
+              }
+            ],
+            "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, parameters: Optional[Dict[Any, Any]] = None, variant=<Variants.TOKEN_REPLAY: <module 'pm4py.algo.conformance.tokenreplay.variants.token_replay' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\conformance\\\\tokenreplay\\\\variants\\\\token_replay.py'>>) -> List[Dict[str, Any]]"
+          }
+        },
+        {
+          "id": "19:True",
+          "name": "exhaustive_prefix_tokens4_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "pltr": true,
+          "matched": false,
+          "mismatch": "traces[0].enabled_transitions_in_marking.set.length",
+          "native": {
+            "family": "TOKEN_REPLAY",
+            "variant": "forward",
+            "traces": [
+              {
+                "trace_index": 0,
+                "case_id": "0",
+                "trace_is_fit": false,
+                "trace_fitness": 0.8888888888888888,
+                "produced": 9,
+                "consumed": 7,
+                "missing": 0,
+                "remaining": 2,
+                "replay_stopped": false,
+                "replayed_events": 1,
+                "activated_transitions": [
+                  2,
+                  3,
+                  0,
+                  4
+                ],
+                "transitions_with_problems": [],
+                "enabled_transitions": [
+                  4
+                ],
+                "reached_marking": [
+                  1,
+                  1,
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "reached_marking_keys": [
+                  true,
+                  true,
+                  false,
+                  false,
+                  false,
+                  true
+                ],
+                "unknown_event_indices": [],
+                "event_diagnostics": [
+                  {
+                    "event_index": 0,
+                    "activated_transitions": [
+                      2,
+                      3,
+                      0,
+                      4
+                    ],
+                    "transitions_with_problems": []
+                  }
+                ],
+                "unknown_activities": [],
+                "unknown_activity_is_null": [],
+                "places": [
+                  {
+                    "missing": 0,
+                    "remaining": 1,
+                    "consumed": 3,
+                    "produced": 4
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 1,
+                    "consumed": 0,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  },
+                  {
+                    "missing": 0,
+                    "remaining": 0,
+                    "consumed": 1,
+                    "produced": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "expected": {
+            "id": "19:True",
+            "enable_pltr_fitness": true,
+            "parameters": {
+              "walk_through_hidden_trans": true,
+              "try_to_reach_final_marking_through_hidden": false,
+              "stop_immediately_unfit": false,
+              "exhaustive_invisible_exploration": true,
+              "cleaning_token_flood": false,
+              "show_progress_bar": false,
+              "enable_pltr_fitness": true
+            },
+            "result": [
+              [
+                {
+                  "trace_is_fit": false,
+                  "trace_fitness": 0.8888888888888888,
+                  "activated_transitions": [
+                    {
+                      "transition": "t1"
+                    },
+                    {
+                      "transition": "t0"
+                    },
+                    {
+                      "transition": "t4"
+                    },
+                    {
+                      "transition": "visible"
+                    }
+                  ],
+                  "reached_marking": {
+                    "marking": {
+                      "p0": 1,
+                      "p2": 1,
+                      "sink": 1
+                    }
+                  },
+                  "enabled_transitions_in_marking": {
+                    "set": []
+                  },
+                  "transitions_with_problems": [],
+                  "missing_tokens": 0,
+                  "consumed_tokens": 7,
+                  "remaining_tokens": 2,
+                  "produced_tokens": 9
+                }
+              ],
+              {
+                "mapping": [
+                  [
+                    {
+                      "place": "p0"
+                    },
+                    {
+                      "underfed_traces": {
+                        "set": []
+                      },
+                      "overfed_traces": {
+                        "set": [
+                          {
+                            "trace_index": 0
+                          }
+                        ]
+                      },
+                      "m": 0,
+                      "r": 1,
+                      "c": 3,
+                      "p": 4
+                    }
+                  ],
+                  [
+                    {
+                      "place": "p2"
+                    },
+                    {
+                      "underfed_traces": {
+                        "set": []
+                      },
+                      "overfed_traces": {
+                        "set": [
+                          {
+                            "trace_index": 0
+                          }
+                        ]
+                      },
+                      "m": 0,
+                      "r": 1,
+                      "c": 0,
+                      "p": 1
+                    }
+                  ],
+                  [
+                    {
+                      "place": "p3"
+                    },
+                    {
+                      "underfed_traces": {
+                        "set": []
+                      },
+                      "overfed_traces": {
+                        "set": []
+                      },
+                      "m": 0,
+                      "r": 0,
+                      "c": 1,
+                      "p": 1
+                    }
+                  ],
+                  [
+                    {
+                      "place": "p4"
+                    },
+                    {
+                      "underfed_traces": {
+                        "set": []
+                      },
+                      "overfed_traces": {
+                        "set": []
+                      },
+                      "m": 0,
+                      "r": 0,
+                      "c": 1,
+                      "p": 1
+                    }
+                  ],
+                  [
+                    {
+                      "place": "p5"
+                    },
+                    {
+                      "underfed_traces": {
+                        "set": []
+                      },
+                      "overfed_traces": {
+                        "set": []
+                      },
+                      "m": 0,
+                      "r": 0,
+                      "c": 1,
+                      "p": 1
+                    }
+                  ],
+                  [
+                    {
+                      "place": "sink"
+                    },
+                    {
+                      "underfed_traces": {
+                        "set": []
+                      },
+                      "overfed_traces": {
+                        "set": []
+                      },
+                      "m": 0,
+                      "r": 0,
+                      "c": 1,
+                      "p": 1
+                    }
+                  ]
+                ]
+              },
+              {
+                "mapping": [
+                  [
+                    {
+                      "transition": "visible"
+                    },
+                    {
+                      "underfed_traces": {},
+                      "fit_traces": {
+                        "mapping": [
+                          [
+                            {
+                              "trace_index": 0
+                            },
+                            [
+                              {
+                                "concept:name": "A"
+                              }
+                            ]
+                          ]
+                        ]
+                      }
+                    }
+                  ]
+                ]
+              },
+              {}
+            ],
+            "signature": "(log: Union[pm4py.objects.log.obj.EventLog, pm4py.objects.log.obj.EventStream, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, parameters: Optional[Dict[Any, Any]] = None, variant=<Variants.TOKEN_REPLAY: <module 'pm4py.algo.conformance.tokenreplay.variants.token_replay' from 'C:\\\\Users\\\\pmoch\\\\AppData\\\\Local\\\\Temp\\\\minera-ref-runtime-0715c31\\\\pm4py\\\\algo\\\\conformance\\\\tokenreplay\\\\variants\\\\token_replay.py'>>) -> List[Dict[str, Any]]"
+          }
+        }
+      ],
+      "match_counts": {
+        "identity": 36,
+        "independent_hidden_order": 0,
+        "net_automorphism": 0
+      },
+      "unresolved": []
+    },
+    "element_usage": {
+      "checks": [
+        {
+          "name": "minimal_tokens1_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "minimal_tokens1_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "minimal_tokens1_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "minimal_tokens1_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "minimal_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "minimal_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "minimal_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "minimal_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "exhaustive_prefix_tokens2_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "exhaustive_prefix_tokens2_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "exhaustive_prefix_tokens2_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "exhaustive_prefix_tokens2_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "exhaustive_prefix_tokens3_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "exhaustive_prefix_tokens3_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "exhaustive_prefix_tokens3_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "exhaustive_prefix_tokens3_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "exhaustive_prefix_tokens4_exhaustiveFalse_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "exhaustive_prefix_tokens4_exhaustiveFalse_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "exhaustive_prefix_tokens4_exhaustiveTrue_reverseFalse_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        },
+        {
+          "name": "exhaustive_prefix_tokens4_exhaustiveTrue_reverseTrue_stop_False_repeat_0",
+          "match": true,
+          "match_kind": "identity"
+        }
+      ],
+      "skipped": [],
+      "identity_matches": 20,
+      "net_automorphism_matches": 0,
+      "unresolved_reference_groups": [],
+      "excluded_reference_models": []
+    },
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "script_tests_passed": 110,
+    "independent_review": "No actionable findings in the staged routing diff.",
+    "duplicate_label_regression_observations": 160,
+    "nested_regression_observations": 55,
+    "stable_competing_route_observations": 10,
+    "routing_and_counter_observations_matched": 40,
+    "complete_replay_observations_matched": 36
+  },
+  "before": {
+    "replay_matches": 16,
+    "replay_observations": 40,
+    "element_usage_matches": 12,
+    "element_usage_observations": 20
+  },
+  "native_source_parent_commit": "0c38f611640dbb2a72181415f9155de1b7c7ce31",
+  "native_verified_staged_tree": "8695db0b148325b0dc58ffd86456d79913addbfc",
+  "native_executable_sha256": "56dacea95f52ff10a2d3e72878536464d998dfc856fe942fb76e8cc50e7e42f2",
+  "reproduction": [
+    "Decompress each reference gzip into JSON.",
+    "Run scripts/check-token-replay-native.py with --reference <replay JSON> --native <minera_export> --output <replay report>.",
+    "Run scripts/check-petri-element-usage-native.py with --reference <usage JSON> --native <minera_export> --output <usage report>.",
+    "Fresh public replay observations use capture(case, pltr) from scripts/capture-token-replay-reference.py with each selected fixture and both fitness modes."
+  ],
+  "limits": [
+    "Finite public observations do not establish full parity or exhaustive net-family coverage.",
+    "Four of forty complete replay observations remain mismatched only in enabled_transitions_in_marking: initial four-token exhaustive competing-route cases, both construction orders and both fitness modes. Native reports visible as eventually enabled; the reference reports an empty set. The full strict checker failures are retained above.",
+    "Exploratory competing-route nets still exhibit reference order dependence; no arbitrary transition renaming or relaxed diagnostic comparison was introduced.",
+    "Explicit native structural search guards remain in place."
+  ]
+}

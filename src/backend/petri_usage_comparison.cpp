@@ -335,9 +335,22 @@ void route_hidden_before_event(Marking& marking, MarkingKeys& keys, std::size_t 
       if (marking[place] >= required[place]) required[place] = 0;
     return silent_place_paths(keys, resolve_marking_keys({}, required, "required"), net, place_names, 51);
   };
+  const auto trial = [&](std::size_t selected, const detail::HiddenPlacePath& path) {
+    Marking trial_marking = marking;
+    auto trial_keys = keys;
+    ReplayUsage scratch{std::vector<std::uint64_t>(net.transitions().size(), 0),
+                        std::vector<std::uint64_t>(net.place_count(), 0)};
+    std::vector<std::size_t> accepted;
+    for (const auto transition : path.transitions) {
+      if (!enabled(trial_marking, net.transitions()[transition])) break;
+      fire(trial_marking, trial_keys, transition, net, scratch, accepted);
+    }
+    if (!enabled(trial_marking, net.transitions()[selected])) accepted.clear();
+    return accepted;
+  };
   detail::route_hidden_dependencies(net.transitions().size(), target, exhaustive,
       candidates, [&](auto transition) { return enabled(marking, net.transitions()[transition]); },
-      [&](auto transition) { fire(marking, keys, transition, net, usage, activated); });
+      [&](auto transition) { fire(marking, keys, transition, net, usage, activated); }, trial);
 }
 
 ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
