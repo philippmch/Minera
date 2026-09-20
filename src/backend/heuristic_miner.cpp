@@ -174,11 +174,15 @@ const std::string& selected_timestamp(const Event& event,
 }
 
 const std::string* selected_start_timestamp(
-    const Event& event, const HeuristicMinerOptions& options) {
-  if (options.start_timestamp_attribute.empty()) return nullptr;
-  if (standard_timestamp_attribute(options.start_timestamp_attribute))
+    const Event& event, const HeuristicMinerOptions& options,
+    bool plus_plus_default = false) {
+  if (!options.start_timestamp_attribute) {
+    return plus_plus_default ? event.attribute("start_timestamp") : nullptr;
+  }
+  if (options.start_timestamp_attribute->empty()) return nullptr;
+  if (standard_timestamp_attribute(*options.start_timestamp_attribute))
     return &event.timestamp;
-  return event.attribute(options.start_timestamp_attribute);
+  return event.attribute(*options.start_timestamp_attribute);
 }
 
 std::string canonical_activity_attribute(
@@ -218,7 +222,7 @@ IntervalTrace to_intervals(const Trace& trace,
         required_timestamp(selected_timestamp(event, options), "event");
     const auto& activity = selected_activity(event, options);
     if (pre_interval_mode) {
-      const auto* value = selected_start_timestamp(event, options);
+      const auto* value = selected_start_timestamp(event, options, true);
       if (value == nullptr)
         throw std::invalid_argument(
             "Heuristics Miner PLUSPLUS interval input is missing the "
@@ -264,7 +268,7 @@ PlusAbstraction build_plus_abstraction(
   std::set<std::string> known;
   const bool pre_interval_mode =
       !log.traces.empty() && !log.traces.front().events.empty() &&
-      selected_start_timestamp(log.traces.front().events.front(), options) !=
+      selected_start_timestamp(log.traces.front().events.front(), options, true) !=
           nullptr;
   for (const auto& trace : log.traces) {
     const auto converted =
@@ -487,9 +491,16 @@ HeuristicClassicDfgInput build_classic_input(
             selected_timestamp(trace.events[i - 1], options), "event");
         const auto* start_value =
             selected_start_timestamp(trace.events[i], options);
-        const auto& fallback = selected_timestamp(trace.events[i], options);
+        if (options.start_timestamp_attribute &&
+            !options.start_timestamp_attribute->empty() &&
+            start_value == nullptr)
+          throw std::invalid_argument(
+              "Heuristics Miner CLASSIC is missing the configured start "
+              "timestamp attribute");
         const double start = required_timestamp(
-            start_value == nullptr ? fallback : *start_value,
+            start_value == nullptr
+                ? selected_timestamp(trace.events[i], options)
+                : *start_value,
             "start");
         (*input.performance_dfg)[pair].push_back(
             std::max(0.0, start - complete));

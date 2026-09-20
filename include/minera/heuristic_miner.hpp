@@ -188,7 +188,14 @@ struct HeuristicMinerOptions {
   double loop_length_two_threshold = 0.5;
   bool keep_once_per_case = false;
   std::set<std::pair<std::string, std::string>> most_common_paths;
-  std::string start_timestamp_attribute = "start_timestamp";
+  // An omitted selector has variant-specific defaults: CLASSIC uses event
+  // completion timestamps, while PLUSPLUS probes the conventional
+  // `start_timestamp` attribute before falling back to lifecycle conversion.
+  // An explicitly selected nonempty attribute must exist for CLASSIC
+  // performance; PLUSPLUS retains its interval/lifecycle detection.
+  // An explicit empty string keeps the
+  // native completion/lifecycle fallback.
+  std::optional<std::string> start_timestamp_attribute = std::nullopt;
   std::string lifecycle_instance_attribute = "concept:instance";
 };
 

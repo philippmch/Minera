@@ -138,6 +138,18 @@ describe("Alpha request options", () => {
   });
 });
 
+describe("Heuristic request options", () => {
+  it("omits automatic start-time selection but preserves explicit conventional names", () => {
+    expect(mineFormEntries({ heuristicStartTimestampAttribute: undefined })).toEqual([]);
+    expect(mineFormEntries({ heuristicStartTimestampAttribute: "" })).toEqual([]);
+    expect(mineFormEntries({ heuristicStartTimestampAttribute: "  " })).toEqual([]);
+    expect(mineFormEntries({ heuristicStartTimestampAttribute: " start_timestamp " }))
+      .toEqual([["heuristic_start_timestamp_attribute", "start_timestamp"]]);
+    expect(mineFormEntries({ heuristicStartTimestampAttribute: " began " }))
+      .toEqual([["heuristic_start_timestamp_attribute", "began"]]);
+  });
+});
+
 describe("Footprints request options", () => {
   it("serializes every discovery and conformance selector", () => {
     expect(mineFormEntries({

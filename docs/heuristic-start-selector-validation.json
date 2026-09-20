@@ -1,0 +1,1079 @@
+{
+  "status": "verified_discovery_fix_with_retained_cli_difference",
+  "scope": "Heuristics EventLog/XES omitted and explicit start timestamp selectors, preserving PLUSPLUS interval defaults.",
+  "reference_artifact": {
+    "path": "docs/heuristic-start-selector-reference.json.gz",
+    "uncompressed_sha256": "e4a7189089f96f08f05a815be9c793844b8c66cb89130ad50bed6a5e3fb9830e"
+  },
+  "before": {
+    "checks": [
+      {
+        "index": 0,
+        "variant": "CLASSIC",
+        "selector": null,
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": false
+      },
+      {
+        "index": 1,
+        "variant": "CLASSIC",
+        "selector": null,
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": false
+      },
+      {
+        "index": 2,
+        "variant": "CLASSIC",
+        "selector": "start_timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 3,
+        "variant": "CLASSIC",
+        "selector": "start_timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 4,
+        "variant": "CLASSIC",
+        "selector": "custom_start",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            4.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            4
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 5,
+        "variant": "CLASSIC",
+        "selector": "custom_start",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.5
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.5
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 6,
+        "variant": "CLASSIC",
+        "selector": "time:timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 7,
+        "variant": "CLASSIC",
+        "selector": "time:timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 8,
+        "variant": "CLASSIC",
+        "selector": "missing",
+        "expected": {
+          "error": "KeyError"
+        },
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": false
+      },
+      {
+        "index": 9,
+        "variant": "CLASSIC",
+        "selector": "missing",
+        "expected": {
+          "error": "KeyError"
+        },
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": false
+      },
+      {
+        "index": 10,
+        "variant": "PLUSPLUS",
+        "selector": null,
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 11,
+        "variant": "PLUSPLUS",
+        "selector": null,
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 12,
+        "variant": "PLUSPLUS",
+        "selector": "start_timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 13,
+        "variant": "PLUSPLUS",
+        "selector": "start_timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 14,
+        "variant": "PLUSPLUS",
+        "selector": "custom_start",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            4.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            4
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 15,
+        "variant": "PLUSPLUS",
+        "selector": "custom_start",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.5
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.5
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 16,
+        "variant": "PLUSPLUS",
+        "selector": "time:timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 17,
+        "variant": "PLUSPLUS",
+        "selector": "time:timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 18,
+        "variant": "PLUSPLUS",
+        "selector": "missing",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 19,
+        "variant": "PLUSPLUS",
+        "selector": "missing",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 20,
+        "variant": "CLASSIC",
+        "selector": "started",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3.0
+          ]
+        ],
+        "actual": null,
+        "exit_code": 1,
+        "stderr": "error: Heuristics Miner: event is missing timestamp attribute 'finished'\n",
+        "matched": false
+      }
+    ],
+    "native_executable_sha256": "1175aa4230d1563292f2e8a012d0a7db367e64e0dbd9ccbe0a7dbe8d42a7f076"
+  },
+  "after": {
+    "checks": [
+      {
+        "index": 0,
+        "variant": "CLASSIC",
+        "selector": null,
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 1,
+        "variant": "CLASSIC",
+        "selector": null,
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 2,
+        "variant": "CLASSIC",
+        "selector": "start_timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 3,
+        "variant": "CLASSIC",
+        "selector": "start_timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 4,
+        "variant": "CLASSIC",
+        "selector": "custom_start",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            4.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            4
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 5,
+        "variant": "CLASSIC",
+        "selector": "custom_start",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.5
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.5
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 6,
+        "variant": "CLASSIC",
+        "selector": "time:timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 7,
+        "variant": "CLASSIC",
+        "selector": "time:timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 8,
+        "variant": "CLASSIC",
+        "selector": "missing",
+        "expected": {
+          "error": "KeyError"
+        },
+        "actual": null,
+        "exit_code": 1,
+        "stderr": "error: Heuristics Miner CLASSIC is missing the configured start timestamp attribute\n",
+        "matched": true
+      },
+      {
+        "index": 9,
+        "variant": "CLASSIC",
+        "selector": "missing",
+        "expected": {
+          "error": "KeyError"
+        },
+        "actual": null,
+        "exit_code": 1,
+        "stderr": "error: Heuristics Miner CLASSIC is missing the configured start timestamp attribute\n",
+        "matched": true
+      },
+      {
+        "index": 10,
+        "variant": "PLUSPLUS",
+        "selector": null,
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 11,
+        "variant": "PLUSPLUS",
+        "selector": null,
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 12,
+        "variant": "PLUSPLUS",
+        "selector": "start_timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 13,
+        "variant": "PLUSPLUS",
+        "selector": "start_timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 14,
+        "variant": "PLUSPLUS",
+        "selector": "custom_start",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            4.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            4
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 15,
+        "variant": "PLUSPLUS",
+        "selector": "custom_start",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.5
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            2.5
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 16,
+        "variant": "PLUSPLUS",
+        "selector": "time:timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 17,
+        "variant": "PLUSPLUS",
+        "selector": "time:timestamp",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 18,
+        "variant": "PLUSPLUS",
+        "selector": "missing",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 19,
+        "variant": "PLUSPLUS",
+        "selector": "missing",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19.0
+          ]
+        ],
+        "actual": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            19
+          ]
+        ],
+        "exit_code": 0,
+        "stderr": "",
+        "matched": true
+      },
+      {
+        "index": 20,
+        "variant": "CLASSIC",
+        "selector": "started",
+        "expected": [
+          [
+            [
+              "A",
+              "B"
+            ],
+            3.0
+          ]
+        ],
+        "actual": null,
+        "exit_code": 1,
+        "stderr": "error: model decoration: event is missing timestamp attribute 'finished'\n",
+        "matched": false
+      }
+    ],
+    "native_executable_sha256": "6a227b46bbb010ecab69c6160700638015b3f685f966b4348006ea7a38da93ad"
+  },
+  "native_source_parent_commit": "3977e5ad4b8bced28ffaa754453c2e695d956c3a",
+  "native_verified_staged_tree": "e3525ff15351b0bd183a0fe2d7214790ff9a58b9",
+  "validation": {
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "sparse_custom_timestamp_direct_api_regression": "passed in minera_heuristic_variants_tests",
+    "frontend_tests_passed_before_placeholder_review": 620,
+    "frontend_filter_tests_passed_after_review": 37,
+    "frontend_production_build": "passed",
+    "independent_review": "clear"
+  },
+  "native_checker_script": "import argparse,hashlib,json,subprocess\nfrom pathlib import Path\np=argparse.ArgumentParser();p.add_argument('--output',required=True);a=p.parse_args()\nref=json.loads(Path('build/heuristic-start-selector-reference.json').read_text(encoding='utf-8'));exe=Path('build/petri-comparison-checkpoint-build/Release/minera_export.exe');checks=[]\nfor i,r in enumerate(ref['observations']):\n x=Path(f'build/heuristic-selector-{i}.xes');x.write_text(r['xes'],encoding='utf-8');out=Path(f'build/heuristic-selector-{i}-native.json')\n cmd=[str(exe),str(x),'--heuristic-variant',r['variant'].lower(),'--heuristic-decoration','performance','-o',str(out)]\n if r['selector'] is not None:cmd+=['--heuristic-start-timestamp-attribute',r['selector']]\n if 'pm4py:param:timestamp_key' in r['parameters']:cmd+=['--heuristic-timestamp-attribute',r['parameters']['pm4py:param:timestamp_key']]\n proc=subprocess.run(cmd,capture_output=True,text=True,timeout=30)\n actual=None\n if proc.returncode==0:\n  net=json.loads(out.read_text(encoding='utf-8'))['heuristics_net'];names=net['activities'];actual=sorted([[ [names[e['source']],names[e['target']]],e['mean_wait_seconds']] for e in net['relation_statistics'] if e['direct_adjacency_frequency']])\n matched=(proc.returncode==1 and 'start timestamp' in proc.stderr and str(r['selector']) in proc.stderr) if 'error' in r else proc.returncode==0 and actual==r['performance_dfg']\n checks.append(dict(index=i,variant=r['variant'],selector=r['selector'],expected=r.get('performance_dfg',{'error':r.get('error')}),actual=actual,exit_code=proc.returncode,stderr=proc.stderr,matched=matched))\nreport=dict(checks=checks,native_executable_sha256=hashlib.sha256(exe.read_bytes()).hexdigest());Path(a.output).write_text(json.dumps(report,indent=2),encoding='utf-8');print(sum(c['matched'] for c in checks),'/',len(checks));print([(c['index'],c['expected'],c['actual']) for c in checks if not c['matched']])\n",
+  "reproduction": [
+    "Restore the reference artifact JSON to build/heuristic-start-selector-reference.json.",
+    "Restore native_checker_script to build/check-heuristic-start-selector.py and run it with --output, using the Release minera_export.exe location recorded in the script.",
+    "The reference artifact embeds its public-only capture script; configure the pinned runtime PYTHONPATH before executing it."
+  ],
+  "limits": [
+    "Finite EventLog/XES start-selector evidence only; dataframe selectors and arbitrary malformed timestamp cells are not established.",
+    "Native rejection comparisons establish rejection, not Python exception-class or message identity.",
+    "The CLI all-model export still rejects sparse custom completion timestamps in later model decoration. Strict CLI result is 20/21, not 21/21; the direct C++ discovery regression passes this case.",
+    "The C++ start_timestamp_attribute field is now optional<string>; callers that inspect it as a string must handle the omitted value. String assignments remain supported.",
+    "The native C++ API retains an explicit empty string as a completion/lifecycle fallback extension; the CLI rejects empty selectors and the UI uses empty for automatic.",
+    "This checkpoint does not upgrade structural coverage or establish full parity."
+  ]
+}

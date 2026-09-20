@@ -954,7 +954,7 @@ describe("hasActiveMinerOptions", () => {
       heuristicLoopLengthTwoThreshold: 0.5,
       heuristicActivityAttribute: "concept:name",
       heuristicTimestampAttribute: "time:timestamp",
-      heuristicStartTimestampAttribute: "start_timestamp",
+      heuristicStartTimestampAttribute: "",
       heuristicLifecycleInstanceAttribute: "concept:instance",
     })).toBe(false);
     expect(hasActiveMinerOptions({ dfgStatisticalVariants: [], dfgCausalVariants: [] })).toBe(false);
@@ -1023,6 +1023,12 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({
       heuristicStartTimestampAttribute: "started_at",
     })).toBe(true);
+    expect(hasActiveMinerOptions({
+      heuristicStartTimestampAttribute: "start_timestamp",
+    })).toBe(true);
+    expect(hasActiveMinerOptions({
+      heuristicStartTimestampAttribute: "  ",
+    })).toBe(false);
     expect(hasActiveMinerOptions({
       heuristicLifecycleInstanceAttribute: "instance",
     })).toBe(true);

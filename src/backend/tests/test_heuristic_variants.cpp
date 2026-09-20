@@ -574,6 +574,71 @@ void classic_performance_aggregations_and_validation() {
   assert(invalid);
 }
 
+void start_selector_defaults_and_validation() {
+  auto first = interval("A", "2026-07-01T00:00:00Z",
+                        "2026-07-01T00:00:00Z");
+  auto second = interval("B", "2026-07-01T00:00:03Z",
+                         "2026-07-01T00:00:19Z");
+  attr(second, "custom_start", "2026-07-01T00:00:04Z");
+  const auto source = log({trace({first, second})});
+
+  HeuristicMinerOptions classic;
+  classic.decoration = HeuristicNetDecoration::kPerformance;
+  const auto completion = discover_heuristics_net(source, classic);
+  assert(relation(completion, "A", "B").mean_wait_seconds == 19.0);
+
+  classic.start_timestamp_attribute = "start_timestamp";
+  const auto conventional = discover_heuristics_net(source, classic);
+  assert(relation(conventional, "A", "B").mean_wait_seconds == 3.0);
+
+  classic.start_timestamp_attribute = "custom_start";
+  const auto custom = discover_heuristics_net(source, classic);
+  assert(relation(custom, "A", "B").mean_wait_seconds == 4.0);
+
+  auto sparse_first = event("A", "");
+  attr(sparse_first, "finished", "2026-07-01T00:00:00Z");
+  auto sparse_second = event("B", "");
+  attr(sparse_second, "started", "2026-07-01T00:00:03Z");
+  classic.timestamp_attribute = "finished";
+  classic.start_timestamp_attribute = "started";
+  const auto sparse = discover_heuristics_net(
+      log({trace({sparse_first, sparse_second})}), classic);
+  assert(relation(sparse, "A", "B").mean_wait_seconds == 3.0);
+
+  classic.start_timestamp_attribute = "time:timestamp";
+  classic.timestamp_attribute = "time:timestamp";
+  const auto explicit_completion = discover_heuristics_net(source, classic);
+  assert(relation(explicit_completion, "A", "B").mean_wait_seconds == 19.0);
+
+  classic.start_timestamp_attribute = "missing_start";
+  bool missing_threw = false;
+  try {
+    (void)discover_heuristics_net(source, classic);
+  } catch (const std::invalid_argument&) {
+    missing_threw = true;
+  }
+  assert(missing_threw);
+
+  auto negative = event("B", "2026-07-01T00:00:20Z");
+  attr(negative, "start_timestamp", "2026-06-30T23:59:58Z");
+  classic.start_timestamp_attribute = "start_timestamp";
+  const auto clamped = discover_heuristics_net(
+      log({trace({interval("A", "2026-07-01T00:00:00Z",
+                           "2026-07-01T00:00:10Z"),
+                  negative})}),
+      classic);
+  assert(relation(clamped, "A", "B").mean_wait_seconds == 0.0);
+
+  auto plus = plus_options();
+  plus.decoration = HeuristicNetDecoration::kPerformance;
+  const auto plus_default = discover_heuristics_net(source, plus);
+  assert(relation(plus_default, "A", "B").mean_wait_seconds == 3.0);
+
+  plus.start_timestamp_attribute = "missing_start";
+  const auto plus_lifecycle = discover_heuristics_net(source, plus);
+  assert(relation(plus_lifecycle, "A", "B").mean_wait_seconds == 19.0);
+}
+
 void configurable_activity_and_timestamp_fields() {
   auto a = event("canonical-a", "not-a-canonical-time");
   auto b = event("canonical-b", "also-not-a-canonical-time");
@@ -646,6 +711,7 @@ int main() {
   classic_length_two_rescue_and_reference_quirk();
   classic_active_nodes_conversion_and_dfg_inference();
   classic_performance_aggregations_and_validation();
+  start_selector_defaults_and_validation();
   configurable_activity_and_timestamp_fields();
   std::cout << "heuristic variant tests passed\n";
 }
