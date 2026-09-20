@@ -747,7 +747,7 @@ class Replayer {
     };
     const auto candidates = [&](std::size_t /*selected*/,
                                 const detail::ReplayMarkingKeys& required_keys) {
-      return detail::silent_place_paths(keys, required_keys, net_, place_names, 51, true);
+      return detail::silent_place_paths(keys, required_keys, net_, place_names);
     };
     const auto trial = [&](std::size_t selected, const detail::HiddenPlacePath& path,
                            const std::vector<bool>& visited) {

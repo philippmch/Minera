@@ -1001,6 +1001,26 @@ PetriNet exhaustive_weighted_deficit_net() {
   return net;
 }
 
+PetriNet final_path_order_net() {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto p0 = net.add_place();
+  const auto p1 = net.add_place();
+  net.add_place();  // p2 is intentionally disconnected.
+  const auto p3 = net.add_place();
+  const auto p4 = net.add_place();
+  const auto p5 = net.add_place();
+  const auto p6 = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(p0);
+  net.set_sink(sink);
+  net.add_transition(0, {p6, p4, p4, p5}, {sink});
+  net.add_transition(std::nullopt, {p0, p0, p1}, {p5});
+  net.add_transition(std::nullopt, {p3}, {p5});
+  net.add_transition(std::nullopt, {p0}, {p3, p6});
+  return net;
+}
+
 void assert_hidden_route_usage(const PetriNet& net, int initial_tokens,
                               bool exhaustive,
                               const std::vector<std::size_t>& expected) {
@@ -1131,6 +1151,42 @@ void forward_exhaustive_visited_trial_public_contract() {
       assert(row.event_diagnostics.front().activated_transitions == expected);
       consistent(log, net, options);
       assert_hidden_route_usage(net, tokens, exhaustive, expected);
+    }
+  }
+}
+
+void forward_final_path_source_order_public_contract() {
+  const auto empty = log_of({{}});
+  for (const bool renamed : {false, true}) {
+    const auto net = final_path_order_net();
+    TokenReplayOptions options;
+    options.initial_marking = {2, 0, 0, 0, 0, 0, 0, 0};
+    options.final_marking = {0, 0, 0, 0, 0, 1, 1, 0};
+    options.place_names = renamed
+        ? std::vector<std::string>{"z0", "p1", "p2", "a3", "p4", "p5", "p6", "sink"}
+        : std::vector<std::string>{"p0", "p1", "p2", "p3", "p4", "p5", "p6", "sink"};
+    options.transition_names = {"visible", "t0", "t1", "t2"};
+    options.try_to_reach_final_marking_through_hidden = true;
+    const auto row = replay_token_traces(empty, net, options).front();
+    const std::vector<std::size_t> expected = renamed
+        ? std::vector<std::size_t>{3, 2}
+        : std::vector<std::size_t>{3, 3, 2};
+    assert(row.activated_transitions == expected);
+    assert(row.event_diagnostics.empty());
+    consistent(empty, net, options);
+
+    PetriUsageComparisonOptions usage_options;
+    usage_options.initial_marking = {2, 0, 0, 0, 0, 0, 0, 0};
+    usage_options.final_marking = {0, 0, 0, 0, 0, 1, 1, 0};
+    usage_options.place_names = options.place_names;
+    usage_options.transition_names = options.transition_names;
+    usage_options.try_to_reach_final_marking_through_hidden = true;
+    const auto comparison = compare_petri_usage(net, empty, EventLog{}, usage_options);
+    for (const auto& transition : comparison.transitions) {
+      const auto count = static_cast<std::uint64_t>(std::count(
+          expected.begin(), expected.end(), transition.id));
+      assert(transition.log1_occurrences == count);
+      assert(transition.log2_occurrences == 0 && transition.total_occurrences == count);
     }
   }
 }
@@ -1485,6 +1541,7 @@ int main() {
   forward_exhaustive_hidden_path_trials_public_contract();
   forward_deficient_input_keys_public_contract();
   forward_exhaustive_visited_trial_public_contract();
+  forward_final_path_source_order_public_contract();
   forward_nested_hidden_routing_public_contract();
   enabled_transition_worklist_public_contract();
   forward_cleaning_public_counter_contract();

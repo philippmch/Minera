@@ -1448,8 +1448,9 @@ its 4,096-expansion or one-million-stored-place resource limits.
 Hidden final routing retains enabled prefixes of shortest structural paths,
 including progress toward a join that remains disabled. It makes at most six
 passes, with at most 51 silent transitions in each candidate path. Competing paths
-prefer shorter routes and then place names. The supplied-PNML comparison route
-preserves original place and transition IDs for these choices. Pre-event
+prefer shorter routes, then source place names, then target place names. The
+supplied-PNML comparison route preserves original place and transition IDs for
+these choices. Pre-event
 routing separately targets deficient transition inputs, retains enabled
 prefixes, and recursively supplies blocked joins. Candidate paths have at most
 51 silent transitions, and a hidden transition is not repeatedly fired to
@@ -1511,6 +1512,14 @@ match exactly and agree across three fresh processes with hash seeds 0, 1, and
 17. Public helper probes separately distinguish skipping a visited prefix from
 discarding its whole path, and confirm that successful trials leave the visited
 set unchanged. The validation record preserves the preceding routing regressions.
+
+Final routing uses the same source-before-target ordering. The checkpoint in
+`docs/token-replay-final-order-reference.json.gz` retains 96 inputs with 192
+replay observations and a separate reference with 96 element-usage comparisons.
+All match exactly, including source-place renaming, reachable and unreachable
+final targets, token counts one through four, and disabled-routing controls.
+Results agree across hash seeds 0, 1, and 17. The validation record preserves the
+passing prior routing checkpoints and all 154 native test suites.
 
 Eventually-enabled visible transition diagnostics use the observed public FIFO
 worklist behavior. Silent IDs may occur more than once in the queue, each ID uses
