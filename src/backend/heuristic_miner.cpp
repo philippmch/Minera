@@ -2,6 +2,7 @@
 
 #include "business_hours.hpp"
 #include "exact_mean.hpp"
+#include "exact_stdev.hpp"
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
@@ -706,13 +707,7 @@ WaitSummary summarize_waits(const std::vector<double>& values) {
   result.median =
       sorted.size() % 2 == 0 ? (sorted[middle - 1] + sorted[middle]) / 2.0
                              : sorted[middle];
-  if (values.size() > 1) {
-    double squared = 0.0;
-    for (const auto value : values)
-      squared += (value - result.mean) * (value - result.mean);
-    result.stdev =
-        std::sqrt(squared / static_cast<double>(values.size() - 1));
-  }
+  result.stdev = detail::exact_stdev(values);
   return result;
 }
 

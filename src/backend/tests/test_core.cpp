@@ -3,6 +3,7 @@
 #undef NDEBUG
 
 #include "../exact_mean.hpp"
+#include "../exact_stdev.hpp"
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
@@ -64,6 +65,10 @@
 namespace {
 
 std::uint64_t exact_mean_bits(double value) {
+  return std::bit_cast<std::uint64_t>(value);
+}
+
+std::uint64_t exact_stdev_bits(double value) {
   return std::bit_cast<std::uint64_t>(value);
 }
 
@@ -135,6 +140,41 @@ void exact_mean_matches_python_statistics_goldens() {
       {positive_infinity, negative_infinity})));
   assert(std::isnan(minera::detail::exact_mean(
       {std::numeric_limits<double>::quiet_NaN(), 1.0})));
+}
+
+void exact_stdev_matches_python_statistics_goldens() {
+  const double min_subnormal = std::numeric_limits<double>::denorm_min();
+  const double max_finite = std::numeric_limits<double>::max();
+  const std::vector<std::pair<std::vector<double>, std::uint64_t>> goldens = {
+      {{}, 0x0000000000000000},
+      {{1.0}, 0x0000000000000000},
+      {{0.123456, 0.234567, 0.345678}, 0x3fbc71c53f39d1b3},
+      {{1000000000000001.0 / 1e6, 1000000000000002.0 / 1e6},
+       0x3ea974b2334f2346},
+      {{1000000000000001.0 / 1e6, 1000000000000002.0 / 1e6,
+        1000000000000003.0 / 1e6},
+       0x3eb10282531bc6ad},
+      {{max_finite, 0.0}, 0x7fe6a09e667f3bcc},
+      {{1e308, -1e308, 3.0}, 0x7fe1ccf385ebc8a0},
+      {{min_subnormal, 0.0}, 0x0000000000000001},
+      {{0.0, 0.0, 0.0, min_subnormal}, 0x0000000000000000},
+      {{0.0, 0.0, 0.0, 3.0 * min_subnormal}, 0x0000000000000002},
+      {{0.0, 0.0, 0.0, 5.0 * min_subnormal}, 0x0000000000000002},
+      {{-std::ldexp(1.0, -53), -std::ldexp(1.0, -53),
+        -std::ldexp(1.0, -53), 1.0},
+       0x3fe0000000000000},
+      {{-std::ldexp(1.0, -53), -std::ldexp(1.0, -53),
+        -std::ldexp(1.0, -53), std::nextafter(1.0, 2.0)},
+       0x3fe0000000000002},
+  };
+  for (const auto& [values, expected_bits] : goldens)
+    assert(exact_stdev_bits(minera::detail::exact_stdev(values)) ==
+           expected_bits);
+
+  assert(std::isnan(minera::detail::exact_stdev(
+      {std::numeric_limits<double>::quiet_NaN(), 1.0})));
+  assert(std::isnan(minera::detail::exact_stdev(
+      {std::numeric_limits<double>::infinity(), 1.0})));
 }
 
 void process_tree_alignment_json_carries_failure_and_moves() {
@@ -6744,6 +6784,7 @@ void csv_case_aliases_are_opt_in_and_exact_columns_win() {
 
 int main() {
   exact_mean_matches_python_statistics_goldens();
+  exact_stdev_matches_python_statistics_goldens();
   csv_case_aliases_are_opt_in_and_exact_columns_win();
   ilp_json_is_standalone_and_deterministic();
   trace_variant_query_json_is_standalone_and_deterministic();

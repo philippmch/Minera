@@ -1,17 +1,70 @@
 {
-  "status": "reference_gap_confirmed",
-  "cases": 640,
-  "matches": 568,
-  "mismatches": 72,
-  "mismatch_modes": {
-    "stdev": 36,
-    "all": 36
+  "status": "verified_finite_checkpoint",
+  "scope": "Heuristics sample standard deviation with exact finite arithmetic and one binary64 rounding.",
+  "artifacts": {
+    "docs/heuristic-aggregation-reference.json.gz": {
+      "uncompressed_sha256": "e8604e3daba3a60f72f1f76e4f5f5cebe323d42807fef1eca557ad95561745d9"
+    },
+    "docs/heuristic-stdev-arithmetic-reference.json.gz": {
+      "uncompressed_sha256": "2ba69ad618d194a82fef4b4c447124f889aaf248573ef3330a4da1b5f6dcdd5c"
+    },
+    "docs/heuristic-aggregation-native-checks.json.gz": {
+      "uncompressed_sha256": "57d6bb55db9b6d0431dfbcf9b5522dfe73782eaaeb46bcacc0f0ff19ea8153bf"
+    }
   },
-  "native_source_commit": "4b53b6605d66eaee9b74c4779b4ec7fb6154fabf",
-  "native_executable_sha256": "2f26ac068a065d148390607764d1dd0cadc2f8301a5c2e386da643dcb39744e4",
+  "before": {
+    "cases": 640,
+    "matches": 568
+  },
+  "after": {
+    "cases": 640,
+    "matches": 640
+  },
+  "arithmetic": {
+    "cases": 1037,
+    "matches": 1037
+  },
+  "regressions": {
+    "subsecond": {
+      "cases": 672,
+      "matches": 672
+    },
+    "precision": {
+      "cases": 496,
+      "matches": 496
+    },
+    "lifecycle": {
+      "cases": 72,
+      "matches": 72
+    },
+    "business": {
+      "cases": 126,
+      "matches": 126
+    },
+    "selector": {
+      "cases": 21,
+      "matches": 21
+    },
+    "sparse": {
+      "cases": 7,
+      "matches": 7
+    }
+  },
+  "validation": {
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "independent_review": "clear"
+  },
+  "native_source_parent_commit": "3b915258f28354859838ceb119764b0378a95daa",
+  "native_verified_staged_tree": "7a97cf66c365e8b6c8f7d16850b89c81ab7b1f93",
+  "native_executable_sha256": "f0f65fcb8ce09541957dbd8e4eb11375d488f5571d24cb88a106506bbd336768",
   "native_checker_script": "import argparse,gzip,hashlib,json,subprocess\nfrom pathlib import Path\np=argparse.ArgumentParser();p.add_argument('--output',required=True);a=p.parse_args()\nref=json.loads(gzip.decompress(Path('docs/heuristic-aggregation-reference.json.gz').read_bytes()))\nexe=Path('build/petri-comparison-checkpoint-build/Release/minera_export.exe');before=hashlib.sha256(exe.read_bytes()).hexdigest();checks=[]\nfor i,r in enumerate(ref['observations']):\n x=Path(f'build/aggregation-check-{i}.xes');x.write_text(r['xes']);out=x.with_suffix('.json')\n row={'name':r['name'],'expected':r['expected']}\n try:\n  proc=subprocess.run([str(exe),str(x),'--heuristic-variant','classic','--heuristic-decoration','performance','--heuristic-performance-aggregation',r['aggregation'],'-o',str(out)],capture_output=True,text=True,timeout=30)\n  row.update(exit_code=proc.returncode,stderr=proc.stderr)\n  if proc.returncode==0:\n   net=json.loads(out.read_text())['heuristics_net'];stat=net['relation_statistics'][0]\n   if r['aggregation']=='raw_values': actual=stat['wait_samples']\n   elif r['aggregation']=='all': actual={agg:stat[key] for agg,key in [('mean','mean_wait_seconds'),('median','median_wait_seconds'),('min','min_wait_seconds'),('max','max_wait_seconds'),('sum','sum_wait_seconds'),('stdev','stdev_wait_seconds')]}\n   else: actual=net['edges'][0]['representation']\n   row['actual']=actual\n except subprocess.TimeoutExpired: row['timeout']=True\n row['matched']=row.get('actual')==row['expected'];checks.append(row)\n if (i+1)%160==0: print(i+1,'checked',flush=True)\nafter=hashlib.sha256(exe.read_bytes()).hexdigest();assert before==after\nPath(a.output).write_text(json.dumps({'checks':checks,'native_executable_sha256':after},indent=2)+'\\n',encoding='utf-8')\nprint(sum(r['matched'] for r in checks),'/',len(checks));print([r['name'] for r in checks if not r['matched']][:20])\n",
+  "arithmetic_probe_cmake": "cmake_minimum_required(VERSION 3.20)\nproject(heuristic_stdev_arithmetic_probe LANGUAGES CXX)\nadd_executable(heuristic_stdev_arithmetic_probe ../heuristic-stdev-arithmetic-probe.cpp)\ntarget_compile_features(heuristic_stdev_arithmetic_probe PRIVATE cxx_std_20)\ntarget_include_directories(heuristic_stdev_arithmetic_probe PRIVATE ../petri-comparison-checkpoint-source/src/backend)\n",
+  "helper_sha256": "6773caa96e83353a60f47f6fa41461b44dcfb9d884be74c44d43f1e23cb4e6a0",
   "limits": [
-    "Finite numeric observations; no full object parity or structural coverage upgrade.",
-    "Exact standard-deviation implementation is pending."
+    "Finite public Classic EventLog numeric aggregation observations do not establish full object parity.",
+    "Raw/all values are compared through native relation statistics; edge representations remain scalar means for these modes.",
+    "True result overflow and nonfinite input exception mapping remain outside this numeric checkpoint.",
+    "No structural coverage upgrade is claimed."
   ]
 }
