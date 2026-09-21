@@ -734,6 +734,36 @@ double performance_representation(
   return summary.mean;
 }
 
+HeuristicPerformanceSummary performance_summary_value(const WaitSummary& summary) {
+  return {summary.mean, summary.median, summary.minimum, summary.maximum,
+          summary.stdev, summary.sum};
+}
+
+std::optional<HeuristicPerformanceValue> structured_performance_representation(
+    const WaitSummary& summary, HeuristicNetDecoration decoration,
+    HeuristicPerformanceAggregation aggregation) {
+  // PM4Py only exposes a structured performance value when the relation has
+  // at least one directly observed wait.  EFG-only relations and native
+  // connect_all fallbacks retain their scalar compatibility projection.
+  if (decoration != HeuristicNetDecoration::kPerformance ||
+      summary.samples.empty())
+    return std::nullopt;
+  switch (aggregation) {
+    case HeuristicPerformanceAggregation::kRawValues:
+      return HeuristicPerformanceValue{summary.samples};
+    case HeuristicPerformanceAggregation::kAll:
+      return HeuristicPerformanceValue{performance_summary_value(summary)};
+    case HeuristicPerformanceAggregation::kMean:
+    case HeuristicPerformanceAggregation::kMedian:
+    case HeuristicPerformanceAggregation::kMinimum:
+    case HeuristicPerformanceAggregation::kMaximum:
+    case HeuristicPerformanceAggregation::kStandardDeviation:
+    case HeuristicPerformanceAggregation::kSum:
+      return std::nullopt;
+  }
+  return std::nullopt;
+}
+
 std::uint64_t pair_count(const HeuristicFrequencyDfg& dfg,
                          const std::string& source,
                          const std::string& target) {
@@ -882,8 +912,12 @@ HeuristicsNet discover_classic_dfg(
             ? static_cast<double>(count)
             : performance_representation(summary,
                                          options.performance_aggregation);
-    net.edges.push_back({ids.at(pair.first), ids.at(pair.second),
-                         dependencies.at(pair), count, representation, false});
+    HeuristicDependency edge{ids.at(pair.first), ids.at(pair.second),
+                             dependencies.at(pair), count, representation,
+                             false};
+    edge.representation_value = structured_performance_representation(
+        summary, options.decoration, options.performance_aggregation);
+    net.edges.push_back(std::move(edge));
   }
 
   // Optional compatibility extension, disabled by default.
@@ -1017,9 +1051,11 @@ HeuristicsNet discover_classic_dfg(
                 ? static_cast<double>(frequency)
                 : performance_representation(
                       summary, options.performance_aggregation);
-        net.edges.push_back(
-            {ids.at(direction.first), ids.at(direction.second), 0.0,
-             frequency, representation, true});
+        HeuristicDependency edge{ids.at(direction.first), ids.at(direction.second),
+                                 0.0, frequency, representation, true};
+        edge.representation_value = structured_performance_representation(
+            summary, options.decoration, options.performance_aggregation);
+        net.edges.push_back(std::move(edge));
       }
     }
   }
@@ -1105,13 +1141,16 @@ HeuristicsNet discover_classic_dfg(
             ? static_cast<double>(cleaned)
             : performance_representation(summary,
                                          options.performance_aggregation);
-    net.relation_statistics.push_back(
-        {ids.at(pair.first), ids.at(pair.second), cleaned,
-         static_cast<std::uint64_t>(summary.samples.size()), summary.mean,
-         raw_count, cleaned, representation,
-         edge_it != net.edges.end() && edge_it->length_two_loop,
-         summary.samples, summary.median, summary.minimum, summary.maximum,
-         summary.stdev, summary.sum});
+    HeuristicRelationStatistics relation{
+        ids.at(pair.first), ids.at(pair.second), cleaned,
+        static_cast<std::uint64_t>(summary.samples.size()), summary.mean,
+        raw_count, cleaned, representation,
+        edge_it != net.edges.end() && edge_it->length_two_loop,
+        summary.samples, summary.median, summary.minimum, summary.maximum,
+        summary.stdev, summary.sum};
+    relation.representation_value = structured_performance_representation(
+        summary, options.decoration, options.performance_aggregation);
+    net.relation_statistics.push_back(std::move(relation));
   }
   std::sort(net.edges.begin(), net.edges.end(),
             [](const auto& lhs, const auto& rhs) {
@@ -1189,17 +1228,25 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
             ? static_cast<double>(frequency)
             : performance_representation(summary,
                                          options.performance_aggregation);
-    net.relation_statistics.push_back(
-        {source->second, target->second, frequency, direct_frequency,
-         mean_wait, frequency, frequency, representation, false,
-         summary.samples, summary.median, summary.minimum, summary.maximum,
-         summary.stdev, summary.sum});
+    HeuristicRelationStatistics relation{
+        source->second, target->second, frequency, direct_frequency, mean_wait,
+        frequency, frequency, representation, false, summary.samples,
+        summary.median, summary.minimum, summary.maximum, summary.stdev,
+        summary.sum};
+    relation.representation_value = structured_performance_representation(
+        summary, options.decoration, options.performance_aggregation);
+    net.relation_statistics.push_back(std::move(relation));
     const double dependency =
         plus_dependency(abstraction, pair.first, pair.second,
                         options.min_frequency);
     if (dependency > effective_dependency_threshold(options))
-      net.edges.push_back({source->second, target->second, dependency,
-                           frequency, representation, false});
+    {
+      HeuristicDependency edge{source->second, target->second, dependency,
+                               frequency, representation, false};
+      edge.representation_value = structured_performance_representation(
+          summary, options.decoration, options.performance_aggregation);
+      net.edges.push_back(std::move(edge));
+    }
   }
   for (const auto& [pair, frequency] : abstraction.concurrency) {
     const auto first = ids.find(pair.first);

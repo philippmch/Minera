@@ -134,6 +134,28 @@ void interval_abstraction_and_strict_threshold() {
   }
   assert(saw_ab && saw_bc);
 
+  // An eventually-follows-only relation has no direct wait sample.  Even for
+  // raw/all performance selections it keeps the scalar zero projection.
+  const auto efg_only = log({trace({
+      interval("A", "2026-01-02T00:00:00Z", "2026-01-02T00:00:05Z"),
+      interval("B", "2026-01-02T00:00:01Z", "2026-01-02T00:00:10Z"),
+      interval("C", "2026-01-02T00:00:06Z", "2026-01-02T00:00:07Z"),
+  })});
+  options.dependency_threshold = 0.0;
+  options.performance_aggregation =
+      HeuristicPerformanceAggregation::kRawValues;
+  const auto raw_efg = discover_heuristics_net(efg_only, options);
+  const auto* raw_efg_edge = edge(raw_efg, "A", "C");
+  assert(raw_efg_edge != nullptr);
+  assert(raw_efg_edge->representation == 0.0);
+  assert(!raw_efg_edge->representation_value.has_value());
+  options.performance_aggregation = HeuristicPerformanceAggregation::kAll;
+  const auto all_efg = discover_heuristics_net(efg_only, options);
+  const auto* all_efg_edge = edge(all_efg, "A", "C");
+  assert(all_efg_edge != nullptr);
+  assert(all_efg_edge->representation == 0.0);
+  assert(!all_efg_edge->representation_value.has_value());
+
   options.dependency_threshold = 0.49;
   const auto relaxed = discover_heuristics_net(
       log({trace({a_start, b_start, a_complete, b_complete, c})}), options);
@@ -579,6 +601,24 @@ void classic_length_two_rescue_and_reference_quirk() {
   assert(edge(net, "B", "A")->frequency == 0);
   assert(edge(net, "B", "A")->dependency == 0.0);
 
+  auto performance_loop = loop;
+  performance_loop.performance_dfg.emplace();
+  (*performance_loop.performance_dfg)[{"A", "B"}] = {2.0};
+  (*performance_loop.performance_dfg)[{"A", "C"}] = {10.0};
+  (*performance_loop.performance_dfg)[{"B", "A"}] = {4.0};
+  auto performance_options = options;
+  performance_options.decoration = HeuristicNetDecoration::kPerformance;
+  performance_options.performance_aggregation =
+      HeuristicPerformanceAggregation::kRawValues;
+  const auto performance_net =
+      discover_heuristics_net(performance_loop, performance_options);
+  assert((std::get<std::vector<double>>(
+              *edge(performance_net, "A", "B")->representation_value) ==
+          std::vector<double>{2.0}));
+  assert((std::get<std::vector<double>>(
+              *edge(performance_net, "B", "A")->representation_value) ==
+          std::vector<double>{4.0}));
+
   options.loop_length_two_threshold = 0.500001;
   assert(edge(discover_heuristics_net(loop, options), "A", "B") == nullptr);
 
@@ -649,6 +689,51 @@ void classic_performance_aggregations_and_validation() {
   assert(stat.sum_wait_seconds == 20.0);
   assert(std::abs(stat.stdev_wait_seconds - std::sqrt(50.0)) < 1e-9);
   assert(edge(net, "A", "B")->representation == 10.0);
+  const auto* all_edge = edge(net, "A", "B");
+  assert(all_edge->representation_value.has_value());
+  const auto& all_edge_summary =
+      std::get<HeuristicPerformanceSummary>(*all_edge->representation_value);
+  assert(all_edge_summary.mean == 10.0);
+  assert(all_edge_summary.median == 10.0);
+  assert(all_edge_summary.minimum == 5.0);
+  assert(all_edge_summary.maximum == 15.0);
+  assert(std::abs(all_edge_summary.stdev - std::sqrt(50.0)) < 1e-9);
+  assert(all_edge_summary.sum == 20.0);
+  assert(stat.representation_value.has_value());
+  assert(std::get<HeuristicPerformanceSummary>(*stat.representation_value).sum ==
+         20.0);
+
+  options.performance_aggregation = HeuristicPerformanceAggregation::kRawValues;
+  const auto raw = discover_heuristics_net(
+      log({trace({a1, b1}), trace({a2, b2})}), options);
+  const auto* raw_edge = edge(raw, "A", "B");
+  assert(raw_edge->representation == 10.0);  // scalar compatibility value
+  assert(raw_edge->representation_value.has_value());
+  assert((std::get<std::vector<double>>(*raw_edge->representation_value) ==
+          std::vector<double>{5.0, 15.0}));
+  assert((std::get<std::vector<double>>(
+              *relation(raw, "A", "B").representation_value) ==
+          std::vector<double>{5.0, 15.0}));
+
+  // PLUSPLUS uses the same public raw/all value shapes while retaining its
+  // established scalar compatibility projection.
+  auto plus = plus_options();
+  plus.decoration = HeuristicNetDecoration::kPerformance;
+  plus.performance_aggregation = HeuristicPerformanceAggregation::kRawValues;
+  const auto plus_raw = discover_heuristics_net(
+      log({trace({a1, b1}), trace({a2, b2})}), plus);
+  const auto* plus_raw_edge = edge(plus_raw, "A", "B");
+  assert(plus_raw_edge->representation == 10.0);
+  assert((std::get<std::vector<double>>(
+              *plus_raw_edge->representation_value) ==
+          std::vector<double>{5.0, 15.0}));
+  plus.performance_aggregation = HeuristicPerformanceAggregation::kAll;
+  const auto plus_all = discover_heuristics_net(
+      log({trace({a1, b1}), trace({a2, b2})}), plus);
+  const auto& plus_all_summary = std::get<HeuristicPerformanceSummary>(
+      *edge(plus_all, "A", "B")->representation_value);
+  assert(plus_all_summary.mean == 10.0);
+  assert(plus_all_summary.sum == 20.0);
 
   auto input = classic_input({{{"A", "B"}, 1}});
   input.performance_dfg.emplace();  // explicitly supplied but incomplete

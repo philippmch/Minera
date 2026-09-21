@@ -1,0 +1,67 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Classic and PLUSPLUS structured raw/all edge and relation representations with scalar compatibility fallback.",
+  "artifacts": {
+    "docs/heuristic-structured-reference.json.gz": {
+      "uncompressed_sha256": "28dabd5d785be32757544f83a0c065ba608570344674a11562ce084c91361536"
+    },
+    "docs/heuristic-structured-native-checks.json.gz": {
+      "uncompressed_sha256": "61d479d91f8118707295f4713e5527bfbefaa666c2f6ada89e1751159e028595"
+    }
+  },
+  "before": {
+    "cases": 1384,
+    "matches": 1028
+  },
+  "after": {
+    "cases": 1384,
+    "matches": 1384
+  },
+  "regressions": {
+    "aggregation": {
+      "cases": 640,
+      "matches": 640
+    },
+    "subsecond": {
+      "cases": 672,
+      "matches": 672
+    },
+    "precision": {
+      "cases": 496,
+      "matches": 496
+    },
+    "lifecycle": {
+      "cases": 72,
+      "matches": 72
+    },
+    "business": {
+      "cases": 126,
+      "matches": 126
+    },
+    "selector": {
+      "cases": 21,
+      "matches": 21
+    },
+    "sparse": {
+      "cases": 7,
+      "matches": 7
+    }
+  },
+  "validation": {
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "frontend_tests_passed": 624,
+    "frontend_production_build": "passed",
+    "independent_review": "clear"
+  },
+  "native_source_parent_commit": "858bbbde82259be21a590a32d7d65b68289ade39",
+  "native_verified_staged_tree": "bd2ccebb25b13aeb7c2de5eb9ea10846180104a1",
+  "native_executable_sha256": "943a1ca8b2a93a6dffe04713e23b025c217b80ad32655fff981b2003c07289d0",
+  "native_checker_script": "import argparse,gzip,hashlib,json,subprocess\nfrom pathlib import Path\np=argparse.ArgumentParser();p.add_argument('--output',required=True);p.add_argument('--start-index',type=int,default=0);args=p.parse_args()\nref=json.loads(gzip.decompress(Path('docs/heuristic-structured-reference.json.gz').read_bytes()));exe=Path('build/petri-comparison-checkpoint-build/Release/minera_export.exe');before=hashlib.sha256(exe.read_bytes()).hexdigest();checks=[]\nflags={'dependency_thresh':'--dependency-threshold','and_measure_thresh':'--and-threshold','min_act_count':'--heuristic-min-activity-count','min_dfg_occurrences':'--min-edge-frequency','dfg_pre_cleaning_noise_thresh':'--heuristic-dfg-pre-cleaning-noise-threshold','loop_length_two_thresh':'--heuristic-loop-length-two-threshold'}\nfor i,r in enumerate(ref['observations'][args.start_index:],start=args.start_index):\n x=Path(f'build/heuristic-structured-{i}.xes');x.write_text(r['xes']);out=x.with_suffix('.json')\n cmd=[str(exe),str(x),'--heuristic-variant',r['variant'].lower(),'--heuristic-decoration',r['decoration'],'--heuristic-performance-aggregation',r['aggregation'],'-o',str(out)]\n if 'pm4py:param:start_timestamp_key' in r['parameters']: cmd+=['--heuristic-start-timestamp-attribute',r['parameters']['pm4py:param:start_timestamp_key']]\n for key,flag in flags.items():\n  if key in r['parameters']: cmd += [flag,str(r['parameters'][key])]\n row={'name':r['name'],'expected':r.get('expected'),'expected_error':r.get('expected_error')}\n try:\n  proc=subprocess.run(cmd,capture_output=True,text=True,timeout=30);row.update(exit_code=proc.returncode,stderr=proc.stderr)\n  if proc.returncode==0:\n   payload=json.loads(out.read_text());net=payload['heuristics_net'];names=net['activities'] if net['activity_ids_are_local'] else [a['name'] for a in payload['activities']]\n   edges=[[names[e['source']],names[e['target']],e['dependency'],e['frequency'],e['representation']] for e in net['edges']]\n   actual={'active':sorted(names[i] for i in net['active_activities']),'edges':sorted(edges,key=lambda e:json.dumps(e,sort_keys=True))}\n   if r['decoration']=='performance': actual['performance']=sorted([[[names[s['source']],names[s['target']]],s['representation']] for s in net['relation_statistics'] if s['direct_adjacency_frequency']])\n   row['actual']=actual\n  row['matched']=proc.returncode!=0 if 'expected_error' in r else row.get('actual')==r['expected']\n except subprocess.TimeoutExpired: row.update(timeout=True,matched=False)\n checks.append(row)\n if (i+1)%108==0: print(i+1,'checked',flush=True)\nafter=hashlib.sha256(exe.read_bytes()).hexdigest();assert before==after\nPath(args.output).write_text(json.dumps({'checks':checks,'native_executable_sha256':after},indent=2)+'\\n',encoding='utf-8')\nprint(sum(r['matched'] for r in checks),'/',len(checks));print([r['name'] for r in checks if not r['matched']][:25])\n",
+  "limits": [
+    "Finite EventLog comparisons under selected loops, thresholds and filtering do not establish full object parity.",
+    "The old C++ scalar representation remains a compatibility view; the optional structured value controls JSON when present.",
+    "Native connect_all remains an extension outside public reference comparisons.",
+    "No structural coverage upgrade is claimed."
+  ]
+}

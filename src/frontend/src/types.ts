@@ -2875,11 +2875,25 @@ export interface HeuristicEdge {
   dependency: number;
   /** Direct successions observed (|source > target|). */
   frequency: number;
-  /** Frequency count or mean wait, according to the selected decoration. */
-  representation?: number;
+  /** Frequency count or selected performance aggregate. */
+  representation?: HeuristicPerformanceValue;
   /** True when classic discovery rescued this relation as a length-two loop. */
   length_two_loop?: boolean;
 }
+
+export interface HeuristicPerformanceSummary {
+  median: number;
+  min: number;
+  max: number;
+  stdev: number;
+  sum: number;
+  mean: number;
+}
+
+export type HeuristicPerformanceValue =
+  | number
+  | number[]
+  | HeuristicPerformanceSummary;
 
 export interface HeuristicsNet {
   variant?: "classic" | "plusplus";
@@ -2917,7 +2931,7 @@ export interface HeuristicsNet {
     mean_wait_seconds: number;
     raw_frequency?: number;
     cleaned_frequency?: number;
-    representation?: number;
+    representation?: HeuristicPerformanceValue;
     length_two_loop?: boolean;
     wait_samples?: number[];
     median_wait_seconds?: number;

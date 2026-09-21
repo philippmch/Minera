@@ -4228,7 +4228,25 @@ build, all 154 native suites, 1,394 earlier regression comparisons, and independ
 review passed. Native zero-for-fewer-than-two-samples, nonfinite input, and true
 result-overflow behavior remain native conventions; exception equivalence is
 not claimed. Raw/all values are verified through relation statistics, while
-edge representations still use scalar means. Structural coverage remains partial.
+edge representations still use scalar means at that checkpoint. Structural
+coverage remains partial.
+
+The structured-value follow-up preserves `raw_values` arrays and `all` summary
+objects in Classic and PLUSPLUS edge and relation JSON representations. The
+existing C++ scalar field remains a compatibility view, with an optional owning
+payload for structured values. Frequency decorations, scalar aggregations,
+PLUSPLUS pairs without direct wait samples, and native `connect_all` fallback
+edges retain scalar representations. Rescued Classic loop edges use each
+direction's own samples.
+
+`docs/heuristic-structured-reference.json.gz` and its native-checks and validation
+artifacts retain 1,384 public comparisons across graph thresholds, all eight
+aggregation modes, and reordered, overlapping, and touching intervals. Exact
+matches improved from 1,028 to 1,384. The isolated Release build, all 154 native
+suites, all 624 frontend tests, the frontend production build, 2,034 earlier
+regression comparisons, and independent review passed. These finite EventLog
+checks do not establish full object parity, cover the native `connect_all`
+extension as a reference behavior, or change structural coverage.
 
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),
