@@ -4248,6 +4248,23 @@ regression comparisons, and independent review passed. These finite EventLog
 checks do not establish full object parity, cover the native `connect_all`
 extension as a reference behavior, or change structural coverage.
 
+Classic and PLUSPLUS now expose accepted numeric `and_measures_in` and
+`and_measures_out` alongside their existing bundles. Each record retains the
+center activity, name-ordered neighbor pair, and score. Classic records scores
+at its inclusive threshold before length-two loop rescue; PLUSPLUS uses its
+strict threshold. The public C++ fields are appended, and JSON uses the existing
+activity-ID mapping and full double precision.
+
+`docs/heuristic-and-reference.json.gz` and its native-checks and validation
+artifacts retain 620 comparisons across five AND thresholds, graph filters,
+loops, and interval ordering/overlap cases. All 620 existing graphs already
+matched before this change; the missing score arrays are now present and match
+exactly, including the 93 cases with nonempty measures. All 620 bundle outputs
+remain unchanged. The isolated Release build, 154 native suites, 624 frontend
+tests, frontend production build, 3,418 earlier reference comparisons, and
+independent review passed. This verifies finite AND-score behavior, not full
+HeuristicsNet object equivalence; structural coverage remains partial.
+
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),
 activity/path occurrence filtering, direct-adjacency mean waits, mean sojourn

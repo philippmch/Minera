@@ -540,7 +540,7 @@ void sort_bundles_by_activity_name(
 }
 
 std::vector<HeuristicBundle> plus_bundles(
-    const PlusAbstraction& abstraction, const HeuristicsNet& net,
+    const PlusAbstraction& abstraction, HeuristicsNet& net,
     std::size_t center, const std::vector<std::size_t>& neighbours,
     bool outgoing, double threshold, std::uint64_t min_frequency) {
   const std::size_t k = neighbours.size();
@@ -566,8 +566,14 @@ std::vector<HeuristicBundle> plus_bundles(
                     get_count(abstraction.eventually_follows, middle, n2)
               : get_count(abstraction.eventually_follows, n1, middle) +
                     get_count(abstraction.eventually_follows, n2, middle));
-      if (numerator / denominator > threshold)
+      const double value = numerator / denominator;
+      if (value > threshold) {
         adjacent[i][j] = adjacent[j][i] = true;
+        auto& measures =
+            outgoing ? net.and_measures_out : net.and_measures_in;
+        measures.push_back(
+            {center, neighbours[i], neighbours[j], value});
+      }
     }
   }
 
@@ -986,8 +992,14 @@ HeuristicsNet discover_classic_dfg(
                    : pair_count(net.cleaned_dfg, first, middle) +
                          pair_count(net.cleaned_dfg, second, middle)) +
               1);
-          if (numerator / denominator >= options.and_threshold)
+          const double value = numerator / denominator;
+          if (value >= options.and_threshold) {
             destination.insert({center, neighbours[i], neighbours[j]});
+            auto& measures =
+                outgoing ? net.and_measures_out : net.and_measures_in;
+            measures.push_back(
+                {center, neighbours[i], neighbours[j], value});
+          }
         }
       }
     };

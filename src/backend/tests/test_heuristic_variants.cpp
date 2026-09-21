@@ -89,6 +89,23 @@ const HeuristicActivityStatistics& activity_stat(const HeuristicsNet& net,
   return net.activity_statistics.front();
 }
 
+const HeuristicAndMeasure* and_measure(const HeuristicsNet& net, bool outgoing,
+                                       const std::string& center,
+                                       const std::string& first,
+                                       const std::string& second) {
+  const auto activity_id = activity(net, center);
+  const auto first_id = activity(net, first);
+  const auto second_id = activity(net, second);
+  const auto& measures =
+      outgoing ? net.and_measures_out : net.and_measures_in;
+  for (const auto& measure : measures) {
+    if (measure.activity == activity_id && measure.first == first_id &&
+        measure.second == second_id)
+      return &measure;
+  }
+  return nullptr;
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -496,6 +513,89 @@ HeuristicClassicDfgInput classic_input(
   return input;
 }
 
+void and_measure_payload_matches_threshold_boundaries() {
+  auto classic_input_value = classic_input(
+      {{{"A", "B"}, 2}, {{"A", "C"}, 2}, {{"B", "C"}, 3}});
+  classic_input_value.activities = std::vector<std::string>{"A", "B", "C"};
+  HeuristicMinerOptions classic_options;
+  classic_options.dependency_threshold = 0.0;
+  classic_options.dfg_pre_cleaning_noise_threshold = 0.0;
+  classic_options.and_threshold = 0.6;
+  const auto classic_at_boundary =
+      discover_heuristics_net(classic_input_value, classic_options);
+  const auto* classic_measure =
+      and_measure(classic_at_boundary, true, "A", "B", "C");
+  assert(classic_measure != nullptr);
+  assert(std::abs(classic_measure->value - 0.6) < 1e-12);
+
+  classic_options.and_threshold = 0.600001;
+  const auto classic_above_boundary =
+      discover_heuristics_net(classic_input_value, classic_options);
+  assert(and_measure(classic_above_boundary, true, "A", "B", "C") ==
+         nullptr);
+
+  auto zero_input = classic_input({{{"A", "B"}, 1}, {{"A", "C"}, 1}});
+  zero_input.activities = std::vector<std::string>{"A", "B", "C"};
+  classic_options.and_threshold = 0.0;
+  const auto classic_zero =
+      discover_heuristics_net(zero_input, classic_options);
+  const auto* zero_measure =
+      and_measure(classic_zero, true, "A", "B", "C");
+  assert(zero_measure != nullptr);
+  assert(zero_measure->value == 0.0);
+
+  // PLUSPLUS retains only the first eventually-following activity, so use
+  // two-event traces to make A>B=3, A>C=2, and B>C=3 exactly.
+  const auto plus_source = log({
+      trace({interval("A", "2026-07-01T00:00:00Z",
+                      "2026-07-01T00:00:00Z"),
+             interval("B", "2026-07-01T00:00:01Z",
+                      "2026-07-01T00:00:01Z")}),
+      trace({interval("A", "2026-07-02T00:00:00Z",
+                      "2026-07-02T00:00:00Z"),
+             interval("B", "2026-07-02T00:00:01Z",
+                      "2026-07-02T00:00:01Z")}),
+      trace({interval("A", "2026-07-03T00:00:00Z",
+                      "2026-07-03T00:00:00Z"),
+             interval("B", "2026-07-03T00:00:01Z",
+                      "2026-07-03T00:00:01Z")}),
+      trace({interval("A", "2026-07-04T00:00:00Z",
+                      "2026-07-04T00:00:00Z"),
+             interval("C", "2026-07-04T00:00:01Z",
+                      "2026-07-04T00:00:01Z")}),
+      trace({interval("A", "2026-07-05T00:00:00Z",
+                      "2026-07-05T00:00:00Z"),
+             interval("C", "2026-07-05T00:00:01Z",
+                      "2026-07-05T00:00:01Z")}),
+      trace({interval("B", "2026-07-06T00:00:00Z",
+                      "2026-07-06T00:00:00Z"),
+             interval("C", "2026-07-06T00:00:01Z",
+                      "2026-07-06T00:00:01Z")}),
+      trace({interval("B", "2026-07-07T00:00:00Z",
+                      "2026-07-07T00:00:00Z"),
+             interval("C", "2026-07-07T00:00:01Z",
+                      "2026-07-07T00:00:01Z")}),
+      trace({interval("B", "2026-07-08T00:00:00Z",
+                      "2026-07-08T00:00:00Z"),
+             interval("C", "2026-07-08T00:00:01Z",
+                      "2026-07-08T00:00:01Z")}),
+  });
+  auto plus_options_at_boundary = plus_options();
+  plus_options_at_boundary.dependency_threshold = 0.0;
+  plus_options_at_boundary.and_threshold = 0.6;
+  const auto plus_at_boundary =
+      discover_heuristics_net(plus_source, plus_options_at_boundary);
+  assert(and_measure(plus_at_boundary, true, "A", "B", "C") == nullptr);
+
+  plus_options_at_boundary.and_threshold = 0.599999;
+  const auto plus_below_boundary =
+      discover_heuristics_net(plus_source, plus_options_at_boundary);
+  const auto* plus_measure =
+      and_measure(plus_below_boundary, true, "A", "B", "C");
+  assert(plus_measure != nullptr);
+  assert(std::abs(plus_measure->value - 0.6) < 1e-12);
+}
+
 void classic_defaults_dependency_filters_and_self_loop() {
   auto input = classic_input({{{"A", "B"}, 1}});
   auto net = discover_heuristics_net(input);
@@ -600,6 +700,16 @@ void classic_length_two_rescue_and_reference_quirk() {
   assert(edge(net, "A", "B")->frequency == 2);
   assert(edge(net, "B", "A")->frequency == 0);
   assert(edge(net, "B", "A")->dependency == 0.0);
+
+  // AND scores are captured before length-two rescue.  Even a permissive
+  // threshold must not cause the newly rescued B edge to be folded into a
+  // second pass around A.
+  auto no_recompute_options = options;
+  no_recompute_options.and_threshold = -0.1;
+  const auto no_recompute =
+      discover_heuristics_net(loop, no_recompute_options);
+  assert(no_recompute.and_measures_in.empty());
+  assert(no_recompute.and_measures_out.empty());
 
   auto performance_loop = loop;
   performance_loop.performance_dfg.emplace();
@@ -1038,6 +1148,7 @@ int main() {
   filtering_and_unfiltered_statistics();
   dependency_concurrency_and_no_connect_all();
   and_bundles_are_overlapping_maximal_cliques();
+  and_measure_payload_matches_threshold_boundaries();
   performance_sorting_and_mean();
   invalid_timestamps_throw_only_for_plus_plus();
   classic_defaults_dependency_filters_and_self_loop();
