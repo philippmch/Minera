@@ -1038,6 +1038,22 @@ void write_heuristics_net(std::ostream& out,
         << (edge.length_two_loop ? "true" : "false") << '}'
         << (i + 1 < net.edges.size() ? ", " : "");
   }
+  out << "], \"dependency_measures\": [";
+  for (std::size_t i = 0; i < net.dependency_measures.size(); ++i) {
+    const auto& measure = net.dependency_measures[i];
+    out << "{\"source\": " << resolve(measure.source)
+        << ", \"target\": " << resolve(measure.target)
+        << ", \"value\": " << measure.value << '}'
+        << (i + 1 < net.dependency_measures.size() ? ", " : "");
+  }
+  out << "], \"loop_length_two\": [";
+  for (std::size_t i = 0; i < net.loop_length_two.size(); ++i) {
+    const auto& loop = net.loop_length_two[i];
+    out << "{\"source\": " << resolve(loop.source)
+        << ", \"target\": " << resolve(loop.target)
+        << ", \"frequency\": " << loop.frequency << '}'
+        << (i + 1 < net.loop_length_two.size() ? ", " : "");
+  }
   out << "], \"start_activities\": ";
   write_ids(net.start_activities);
   out << ", \"end_activities\": ";

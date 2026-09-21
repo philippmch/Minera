@@ -106,6 +106,29 @@ const HeuristicAndMeasure* and_measure(const HeuristicsNet& net, bool outgoing,
   return nullptr;
 }
 
+const HeuristicDependencyMeasure* dependency_measure(
+    const HeuristicsNet& net, const std::string& source,
+    const std::string& target) {
+  const auto source_id = activity(net, source);
+  const auto target_id = activity(net, target);
+  for (const auto& measure : net.dependency_measures) {
+    if (measure.source == source_id && measure.target == target_id)
+      return &measure;
+  }
+  return nullptr;
+}
+
+const HeuristicLoopLengthTwo* loop_length_two(
+    const HeuristicsNet& net, const std::string& source,
+    const std::string& target) {
+  const auto source_id = activity(net, source);
+  const auto target_id = activity(net, target);
+  for (const auto& loop : net.loop_length_two) {
+    if (loop.source == source_id && loop.target == target_id) return &loop;
+  }
+  return nullptr;
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -596,6 +619,88 @@ void and_measure_payload_matches_threshold_boundaries() {
   assert(std::abs(plus_measure->value - 0.6) < 1e-12);
 }
 
+void dependency_and_loop_payloads_keep_filtered_values() {
+  auto classic = classic_input(
+      {{{"A", "B"}, 1}, {{"B", "A"}, 3}});
+  classic.activities = std::vector<std::string>{"A", "B"};
+  HeuristicMinerOptions classic_options;
+  classic_options.dependency_threshold = 0.9;
+  classic_options.dfg_pre_cleaning_noise_threshold = 0.0;
+  const auto classic_rejected =
+      discover_heuristics_net(classic, classic_options);
+  assert(classic_rejected.edges.empty());
+  assert(std::abs(dependency_measure(classic_rejected, "A", "B")->value +
+                  0.4) <
+         1e-12);
+  assert(std::abs(dependency_measure(classic_rejected, "B", "A")->value -
+                  0.4) <
+         1e-12);
+
+  auto filtered_loop = classic_input({{{"A", "B"}, 1},
+                                      {{"B", "A"}, 1},
+                                      {{"A", "C"}, 10}});
+  filtered_loop.activities =
+      std::vector<std::string>{"A", "B", "C"};
+  filtered_loop.activity_counts = std::map<std::string, std::uint64_t>{
+      {"A", 12}, {"B", 1}, {"C", 10}};
+  filtered_loop.frequency_triples[{"A", "B", "A"}] = 1;
+  classic_options.dependency_threshold = 0.0;
+  classic_options.min_frequency = 2;
+  classic_options.min_activity_count = 3;
+  classic_options.loop_length_two_threshold = 0.5;
+  const auto filtered =
+      discover_heuristics_net(filtered_loop, classic_options);
+  assert(loop_length_two(filtered, "A", "B") != nullptr);
+  assert(loop_length_two(filtered, "A", "B")->frequency == 1);
+  assert(edge(filtered, "A", "B") == nullptr);
+
+  auto zero_loop = filtered_loop;
+  zero_loop.dfg[{"B", "D"}] = 10;
+  zero_loop.activities =
+      std::vector<std::string>{"A", "B", "C", "D"};
+  zero_loop.activity_counts = std::map<std::string, std::uint64_t>{
+      {"A", 12}, {"B", 11}, {"C", 10}, {"D", 10}};
+  classic_options.min_frequency = 1;
+  classic_options.min_activity_count = 1;
+  classic_options.dfg_pre_cleaning_noise_threshold = 0.9;
+  const auto zero = discover_heuristics_net(zero_loop, classic_options);
+  assert(loop_length_two(zero, "A", "B") != nullptr);
+  assert(loop_length_two(zero, "A", "B")->frequency == 0);
+  assert(edge(zero, "A", "B") == nullptr);
+  assert(loop_length_two(zero, "B", "A") == nullptr);
+
+  const auto plus_source = log({
+      trace({interval("A", "2026-08-01T00:00:00Z",
+                      "2026-08-01T00:00:00Z"),
+             interval("B", "2026-08-01T00:00:01Z",
+                      "2026-08-01T00:00:01Z")}),
+      trace({interval("B", "2026-08-02T00:00:00Z",
+                      "2026-08-02T00:00:00Z"),
+             interval("A", "2026-08-02T00:00:01Z",
+                      "2026-08-02T00:00:01Z")}),
+      trace({interval("B", "2026-08-03T00:00:00Z",
+                      "2026-08-03T00:00:00Z"),
+             interval("A", "2026-08-03T00:00:01Z",
+                      "2026-08-03T00:00:01Z")}),
+      trace({interval("B", "2026-08-04T00:00:00Z",
+                      "2026-08-04T00:00:00Z"),
+             interval("A", "2026-08-04T00:00:01Z",
+                      "2026-08-04T00:00:01Z")}),
+  });
+  auto plus_options_value = plus_options();
+  plus_options_value.dependency_threshold = 0.9;
+  const auto plus_rejected =
+      discover_heuristics_net(plus_source, plus_options_value);
+  assert(plus_rejected.edges.empty());
+  assert(std::abs(dependency_measure(plus_rejected, "A", "B")->value +
+                  0.5) <
+         1e-12);
+  assert(std::abs(dependency_measure(plus_rejected, "B", "A")->value -
+                  0.5) <
+         1e-12);
+  assert(plus_rejected.loop_length_two.empty());
+}
+
 void classic_defaults_dependency_filters_and_self_loop() {
   auto input = classic_input({{{"A", "B"}, 1}});
   auto net = discover_heuristics_net(input);
@@ -700,6 +805,9 @@ void classic_length_two_rescue_and_reference_quirk() {
   assert(edge(net, "A", "B")->frequency == 2);
   assert(edge(net, "B", "A")->frequency == 0);
   assert(edge(net, "B", "A")->dependency == 0.0);
+  assert(loop_length_two(net, "A", "B") != nullptr);
+  assert(loop_length_two(net, "A", "B")->frequency == 2);
+  assert(loop_length_two(net, "B", "A") == nullptr);
 
   // AND scores are captured before length-two rescue.  Even a permissive
   // threshold must not cause the newly rescued B edge to be folded into a
@@ -1149,6 +1257,7 @@ int main() {
   dependency_concurrency_and_no_connect_all();
   and_bundles_are_overlapping_maximal_cliques();
   and_measure_payload_matches_threshold_boundaries();
+  dependency_and_loop_payloads_keep_filtered_values();
   performance_sorting_and_mean();
   invalid_timestamps_throw_only_for_plus_plus();
   classic_defaults_dependency_filters_and_self_loop();

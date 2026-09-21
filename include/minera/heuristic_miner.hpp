@@ -139,6 +139,18 @@ struct HeuristicAndMeasure {
   double value = 0.0;
 };
 
+struct HeuristicDependencyMeasure {
+  std::size_t source = 0;
+  std::size_t target = 0;
+  double value = 0.0;
+};
+
+struct HeuristicLoopLengthTwo {
+  std::size_t source = 0;
+  std::size_t target = 0;
+  std::uint64_t frequency = 0;
+};
+
 // A heuristics net: the dependency graph the Heuristic Miner discovers. Unlike
 // the raw directly-follows graph it keeps only edges whose dependency measure
 // and frequency clear the configured thresholds, which is what lets it ignore
@@ -186,6 +198,8 @@ struct HeuristicsNet {
   HeuristicTripleFrequencies frequency_triples;
   std::vector<HeuristicAndMeasure> and_measures_in;
   std::vector<HeuristicAndMeasure> and_measures_out;
+  std::vector<HeuristicDependencyMeasure> dependency_measures;
+  std::vector<HeuristicLoopLengthTwo> loop_length_two;
 };
 
 struct HeuristicMinerOptions {
@@ -214,7 +228,8 @@ struct HeuristicMinerOptions {
   //   (|b>c| + |c>b|) / (|a>b| + |a>c| + 1) >= and_threshold
   // (mirrored for joins). 0.65 is the customary default.
   double and_threshold = 0.65;
-  // PLUSPLUS-only filters. Classic discovery intentionally ignores them.
+  // Minimum activity occurrence filter. Classic applies it while accepting
+  // edges; PLUSPLUS applies it while retaining activities and relations.
   std::uint64_t min_activity_count = 1;
   HeuristicNetDecoration decoration = HeuristicNetDecoration::kFrequency;
   HeuristicPerformanceAggregation performance_aggregation =
