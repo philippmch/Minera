@@ -4282,12 +4282,35 @@ frontend production build, 4,038 earlier reference comparisons, and independent
 review passed. This is finite data preservation evidence; structural coverage
 and full object equivalence remain incomplete.
 
-`docs/heuristic-dfg-metadata-reference.json.gz` separately retains 52 public DFG
-metadata observations for follow-up; native comparison is pending. In particular,
-with noise cleaning disabled the public object can retain dependencies whose
-endpoints are absent from an explicit activity list. The native ID projection
-still needs an adapter-level mapping for that behavior. Explicit metadata
-combinations and exception equivalence are not covered by the EventLog claim.
+Classic DFG inputs now preserve declared activity order and duplicates, raw
+occurrence maps, and list-or-map boundary metadata independently of their unique
+internal activity IDs. Graph-bearing names can receive IDs without becoming
+declared fallback nodes. Positive noise cleaning rejects undeclared DFG
+endpoints; disabled cleaning permits them. Missing occurrence entries skip edge
+candidates, while fallback node creation validates declared counts strictly.
+Inferred boundaries retain DFG traversal order, and length-two rescue requires
+an actual forward DFG entry even when the minimum frequency is zero. Direct DFG
+IDs are local, and converting an intentionally empty discovered net no longer
+creates transitions from its internal label table.
+
+The JSON `metadata` object retains declared activities, occurrence counts, and
+boundary list/map shapes. Classic EventLog boundaries remain maps; PLUSPLUS
+metadata contains retained activities and counts. The new
+`docs/heuristic-dfg-input-reference.json.gz` fixture matches all 1,350 cases,
+improving from 239 before this checkpoint. The earlier 52 observations in
+`docs/heuristic-dfg-metadata-reference.json.gz` also match, as do all 124
+EventLog metadata observations in
+`docs/heuristic-eventlog-metadata-reference.json.gz`. Reference rejections are
+compared as acceptance versus rejection, without claiming Python exception
+class or message identity. These finite cases do not establish full object,
+adapter, or structural coverage completion. Custom activity-selector exports
+of filtered raw statistics remain a separate follow-up.
+
+`docs/heuristic-dfg-input-native-checks.json.gz` and
+`docs/heuristic-dfg-input-validation.json` retain the before/after comparisons,
+probe sources, binary hashes, and verified source tree. The isolated Release
+build, all 154 native suites, 624 frontend tests, frontend production build,
+5,209 earlier reference comparisons, and independent review passed.
 
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),

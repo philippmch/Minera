@@ -701,6 +701,92 @@ void dependency_and_loop_payloads_keep_filtered_values() {
   assert(plus_rejected.loop_length_two.empty());
 }
 
+void classic_dfg_metadata_registry_and_lookup_order() {
+  auto input = classic_input({{{"A", "B"}, 1}});
+  input.activities = std::vector<std::string>{"A"};
+  HeuristicMinerOptions options;
+  options.dfg_pre_cleaning_noise_threshold = 0.0;
+
+  // Foreign DFG endpoints are retained in the local id table when noise
+  // cleaning is disabled, while metadata keeps only the declared names and
+  // inferred boundary lists.
+  auto net = discover_heuristics_net(input, options);
+  assert(net.activity_ids_are_local);
+  assert((net.activities == std::vector<std::string>{"A", "B"}));
+  assert(net.metadata.has_value());
+  assert((net.metadata->activities == std::vector<std::string>{"A"}));
+  assert((net.metadata->activities_occurrences ==
+          std::map<std::string, std::uint64_t>{{"A", 1}}));
+  assert(std::holds_alternative<std::vector<std::string>>(
+      net.metadata->start_activities));
+  assert(std::get<std::vector<std::string>>(net.metadata->start_activities) ==
+         std::vector<std::string>{"A"});
+  assert(std::get<std::vector<std::string>>(net.metadata->end_activities) ==
+         std::vector<std::string>{"B"});
+  assert(net.active_activities.size() == 1);
+  assert(net.activities[net.active_activities.front()] == "A");
+
+  // New boundary variants take precedence and preserve their raw shape,
+  // including duplicate list entries and explicit zero map counts.
+  input.start_activities = HeuristicBoundaryActivities{
+      std::vector<std::string>{"B", "A", "B"}};
+  input.end_activities = HeuristicBoundaryActivities{
+      std::map<std::string, std::uint64_t>{{"B", 0}, {"A", 2}}};
+  net = discover_heuristics_net(input, options);
+  assert(std::get<std::vector<std::string>>(net.metadata->start_activities) ==
+         std::vector<std::string>({"B", "A", "B"}));
+  const std::map<std::string, std::uint64_t> expected_end_counts{
+      {"A", 2}, {"B", 0}};
+  assert((std::get<std::map<std::string, std::uint64_t>>(
+             net.metadata->end_activities) ==
+         expected_end_counts));
+
+  // A dependency or frequency rejection skips occurrence lookup. Missing
+  // counts simply prevent an edge from being accepted; declared names become
+  // strict only when the no-edge fallback validates them.
+  auto empty_declared = classic_input({{{"A", "B"}, 1}});
+  empty_declared.activities = std::vector<std::string>{};
+  empty_declared.activity_counts = std::map<std::string, std::uint64_t>{};
+  auto rejected = options;
+  rejected.dependency_threshold = 1.0;
+  const auto no_nodes = discover_heuristics_net(empty_declared, rejected);
+  assert(no_nodes.active_activities.empty());
+  const auto no_nodes_petri = to_petri_net(no_nodes);
+  assert(no_nodes_petri.transitions().empty());
+  rejected.dependency_threshold = 0.5;
+  rejected.min_frequency = 2;
+  (void)discover_heuristics_net(empty_declared, rejected);
+  rejected.min_frequency = 1;
+  (void)discover_heuristics_net(empty_declared, rejected);
+
+  auto missing_declared_source = classic_input({{{"A", "B"}, 1}});
+  missing_declared_source.activities = std::vector<std::string>{"A"};
+  missing_declared_source.activity_counts =
+      std::map<std::string, std::uint64_t>{};
+  bool threw = false;
+  try {
+    (void)discover_heuristics_net(missing_declared_source, rejected);
+  } catch (const std::exception&) {
+    threw = true;
+  }
+  assert(threw);
+
+  auto missing_fallback = classic_input({{{"A", "B"}, 1}});
+  missing_fallback.activities =
+      std::vector<std::string>{"A", "B", "Z"};
+  missing_fallback.activity_counts =
+      std::map<std::string, std::uint64_t>{{"A", 1}, {"B", 1}};
+  auto fallback_options = options;
+  fallback_options.dependency_threshold = 1.0;
+  threw = false;
+  try {
+    (void)discover_heuristics_net(missing_fallback, fallback_options);
+  } catch (const std::exception&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void classic_defaults_dependency_filters_and_self_loop() {
   auto input = classic_input({{{"A", "B"}, 1}});
   auto net = discover_heuristics_net(input);
@@ -1258,6 +1344,7 @@ int main() {
   and_bundles_are_overlapping_maximal_cliques();
   and_measure_payload_matches_threshold_boundaries();
   dependency_and_loop_payloads_keep_filtered_values();
+  classic_dfg_metadata_registry_and_lookup_order();
   performance_sorting_and_mean();
   invalid_timestamps_throw_only_for_plus_plus();
   classic_defaults_dependency_filters_and_self_loop();

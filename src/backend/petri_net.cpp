@@ -375,7 +375,11 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
   };
 
   std::vector<std::size_t> active = heuristics.active_activities;
-  if (active.empty()) {
+  // Legacy hand-built nets omitted active_activities and should continue to
+  // use every registry entry.  Discovered DFG nets carry metadata even when
+  // their explicit declaration intentionally leaves the active node set
+  // empty; preserve that empty graph during conversion.
+  if (active.empty() && !heuristics.metadata.has_value()) {
     active.resize(n);
     for (std::size_t i = 0; i < n; ++i) active[i] = i;
   }

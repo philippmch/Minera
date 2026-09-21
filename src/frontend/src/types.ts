@@ -2914,6 +2914,18 @@ export interface HeuristicLoopLengthTwo {
   frequency: number;
 }
 
+export type HeuristicBoundaryActivities =
+  | string[]
+  | Record<string, number>;
+
+export interface HeuristicNetMetadata {
+  activities: string[];
+  activities_occurrences: Record<string, number>;
+  /** The native wire format contains exactly one inner list or map. */
+  start_activities: [HeuristicBoundaryActivities];
+  end_activities: [HeuristicBoundaryActivities];
+}
+
 export interface HeuristicsNet {
   variant?: "classic" | "plusplus";
   decoration?: "frequency" | "performance";
@@ -2987,6 +2999,7 @@ export interface HeuristicsNet {
   and_measures_out?: HeuristicAndMeasure[];
   dependency_measures?: HeuristicDependencyMeasure[];
   loop_length_two?: HeuristicLoopLengthTwo[];
+  metadata?: HeuristicNetMetadata;
   output_bundles?: { activity: number; bundles: number[][] }[];
   input_bundles?: { activity: number; bundles: number[][] }[];
 }
