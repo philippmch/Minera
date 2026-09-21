@@ -771,6 +771,37 @@ std::optional<HeuristicPerformanceValue> structured_performance_representation(
   return std::nullopt;
 }
 
+// Already-aggregated DFG values retain their full typed payload in
+// representation_value.  The legacy scalar field has no faithful projection
+// for arrays, objects, strings, booleans, or integers, so those opaque values
+// use the documented zero compatibility fallback. Root null instead requests
+// the public frequency fallback handled below.
+bool is_null_performance_value(const HeuristicPerformanceValue& value) {
+  const auto* structured = std::get_if<HeuristicStructuredValue>(&value);
+  return structured &&
+         std::holds_alternative<std::nullptr_t>(structured->value);
+}
+
+HeuristicPerformanceValue decorated_representation(
+    const HeuristicPerformanceValue& value, std::uint64_t frequency) {
+  // An explicit root null is the public edge constructor's frequency
+  // fallback. The original map still retains null; nested nulls stay opaque.
+  if (is_null_performance_value(value))
+    return HeuristicStructuredValue{frequency};
+  return value;
+}
+
+double compatibility_representation(
+    const HeuristicPerformanceValue& value, std::uint64_t frequency) {
+  if (is_null_performance_value(value)) return static_cast<double>(frequency);
+  if (const auto* scalar = std::get_if<double>(&value)) return *scalar;
+  if (const auto* structured = std::get_if<HeuristicStructuredValue>(&value)) {
+    if (const auto* scalar = std::get_if<double>(&structured->value))
+      return *scalar;
+  }
+  return 0.0;
+}
+
 std::uint64_t pair_count(const HeuristicFrequencyDfg& dfg,
                          const std::string& source,
                          const std::string& target) {
@@ -819,15 +850,29 @@ HeuristicsNet discover_classic_dfg(
   if (options.variant == HeuristicMinerVariant::kPlusPlus)
     throw std::invalid_argument(
         "Heuristics Miner PLUSPLUS does not support DFG input");
+  // Direct DFG inputs have no event-log decoration pass to establish the
+  // performance mode.  An already-aggregated map is itself an explicit
+  // performance request; with neither performance map, retain the public
+  // frequency default even when the caller left the option at performance.
+  const auto effective_decoration =
+      input.performance_values
+          ? HeuristicNetDecoration::kPerformance
+          : input.performance_dfg ? options.decoration
+                                  : HeuristicNetDecoration::kFrequency;
+  const bool use_structured_values = input.performance_values.has_value();
+  const bool use_legacy_samples =
+      !use_structured_values && input.performance_dfg.has_value();
+
   HeuristicsNet net;
   net.variant = HeuristicMinerVariant::kClassic;
-  net.decoration = options.decoration;
+  net.decoration = effective_decoration;
   net.performance_aggregation = options.performance_aggregation;
   net.activity_attribute = canonical_activity_attribute(options);
   net.timestamp_attribute = canonical_timestamp_attribute(options);
   net.raw_dfg = input.dfg;
   net.window_two_dfg = input.window_two_dfg;
   net.frequency_triples = input.frequency_triples;
+  net.performance_values = input.performance_values;
 
   // Keep declared names separate from the internal id table.  A direct DFG
   // without an explicit declaration uses its endpoint names as declarations;
@@ -869,8 +914,14 @@ HeuristicsNet discover_classic_dfg(
     intern(middle);
     intern(last);
   }
-  if (input.performance_dfg) {
+  if (input.performance_dfg && !input.performance_values) {
     for (const auto& [pair, _] : *input.performance_dfg) {
+      intern(pair.first);
+      intern(pair.second);
+    }
+  }
+  if (input.performance_values) {
+    for (const auto& [pair, _] : *input.performance_values) {
       intern(pair.first);
       intern(pair.second);
     }
@@ -954,11 +1005,18 @@ HeuristicsNet discover_classic_dfg(
   }
 
   net.cleaned_dfg = clean_classic_dfg(input, options, net.activities);
-  if (input.performance_dfg) {
+  if (input.performance_dfg && !input.performance_values) {
     for (const auto& [pair, _] : net.cleaned_dfg)
       if (!input.performance_dfg->contains(pair))
         throw std::invalid_argument(
             "Classic heuristic performance DFG is missing a cleaned path");
+  }
+  if (input.performance_values) {
+    for (const auto& [pair, _] : net.cleaned_dfg)
+      if (!input.performance_values->contains(pair))
+        throw std::invalid_argument(
+            "Classic heuristic decorated performance DFG is missing a "
+            "cleaned path");
   }
   const double dependency_threshold = effective_dependency_threshold(options);
   std::vector<bool> active(net.activities.size(), false);
@@ -1006,24 +1064,31 @@ HeuristicsNet discover_classic_dfg(
     if (!accepted_by_threshold(pair)) continue;
     initially_accepted.insert(pair);
     active[ids.at(pair.first)] = active[ids.at(pair.second)] = true;
-    const auto waits = input.performance_dfg
+    const HeuristicPerformanceValue* decorated =
+        use_structured_values ? &input.performance_values->at(pair) : nullptr;
+    const auto waits = use_legacy_samples
                            ? input.performance_dfg->find(pair)
                            : HeuristicPerformanceDfg::const_iterator{};
     const WaitSummary summary =
-        summarize_waits(!input.performance_dfg ||
+        summarize_waits(!use_legacy_samples ||
                                 waits == input.performance_dfg->end()
                             ? std::vector<double>{}
                             : waits->second);
     const double representation =
-        options.decoration == HeuristicNetDecoration::kFrequency
-            ? static_cast<double>(count)
-            : performance_representation(summary,
-                                         options.performance_aggregation);
+        decorated != nullptr
+            ? compatibility_representation(*decorated, count)
+            : effective_decoration == HeuristicNetDecoration::kFrequency
+                  ? static_cast<double>(count)
+                  : performance_representation(summary,
+                                               options.performance_aggregation);
     HeuristicDependency edge{ids.at(pair.first), ids.at(pair.second),
                              dependencies.at(pair), count, representation,
                              false};
-    edge.representation_value = structured_performance_representation(
-        summary, options.decoration, options.performance_aggregation);
+    if (decorated != nullptr)
+      edge.representation_value = decorated_representation(*decorated, count);
+    else
+      edge.representation_value = structured_performance_representation(
+          summary, effective_decoration, options.performance_aggregation);
     net.edges.push_back(std::move(edge));
   }
 
@@ -1159,24 +1224,36 @@ HeuristicsNet discover_classic_dfg(
         if (!added_loop_edges.insert(direction).second) continue;
         const auto frequency =
             pair_count(net.cleaned_dfg, direction.first, direction.second);
-        const auto waits =
-            input.performance_dfg
+        const bool cleaned_direction = net.cleaned_dfg.contains(direction);
+        const HeuristicPerformanceValue* decorated =
+            use_structured_values && cleaned_direction
+                ? &input.performance_values->at(direction)
+                : nullptr;
+        const auto waits = use_legacy_samples
                 ? input.performance_dfg->find(direction)
                 : HeuristicPerformanceDfg::const_iterator{};
         const WaitSummary summary =
-            summarize_waits(!input.performance_dfg ||
+            summarize_waits(!use_legacy_samples ||
                                     waits == input.performance_dfg->end()
                                 ? std::vector<double>{}
                                 : waits->second);
         const double representation =
-            options.decoration == HeuristicNetDecoration::kFrequency
-                ? static_cast<double>(frequency)
-                : performance_representation(
-                      summary, options.performance_aggregation);
+            decorated != nullptr
+                ? compatibility_representation(*decorated, frequency)
+                : effective_decoration == HeuristicNetDecoration::kFrequency
+                      ? static_cast<double>(frequency)
+                      : performance_representation(
+                            summary, options.performance_aggregation);
         HeuristicDependency edge{ids.at(direction.first), ids.at(direction.second),
                                  0.0, frequency, representation, true};
-        edge.representation_value = structured_performance_representation(
-            summary, options.decoration, options.performance_aggregation);
+        if (decorated != nullptr)
+          edge.representation_value =
+              decorated_representation(*decorated, frequency);
+        else if (use_structured_values)
+          edge.representation_value.reset();
+        else
+          edge.representation_value = structured_performance_representation(
+              summary, effective_decoration, options.performance_aggregation);
         net.edges.push_back(std::move(edge));
       }
     }
@@ -1253,11 +1330,16 @@ HeuristicsNet discover_classic_dfg(
     if (!ids.contains(pair.first) || !ids.contains(pair.second)) continue;
     const auto raw_count = pair_count(input.dfg, pair.first, pair.second);
     const auto cleaned = pair_count(net.cleaned_dfg, pair.first, pair.second);
-    const auto waits = input.performance_dfg
+    const HeuristicPerformanceValue* decorated = nullptr;
+    if (input.performance_values && net.cleaned_dfg.contains(pair)) {
+      const auto value = input.performance_values->find(pair);
+      if (value != input.performance_values->end()) decorated = &value->second;
+    }
+    const auto waits = use_legacy_samples
                            ? input.performance_dfg->find(pair)
                            : HeuristicPerformanceDfg::const_iterator{};
     const WaitSummary summary =
-        summarize_waits(!input.performance_dfg ||
+        summarize_waits(!use_legacy_samples ||
                                 waits == input.performance_dfg->end()
                             ? std::vector<double>{}
                             : waits->second);
@@ -1267,10 +1349,12 @@ HeuristicsNet discover_classic_dfg(
                  edge.target == ids.at(pair.second);
         });
     const double representation =
-        options.decoration == HeuristicNetDecoration::kFrequency
-            ? static_cast<double>(cleaned)
-            : performance_representation(summary,
-                                         options.performance_aggregation);
+        decorated != nullptr
+            ? compatibility_representation(*decorated, cleaned)
+            : effective_decoration == HeuristicNetDecoration::kFrequency
+                  ? static_cast<double>(cleaned)
+                  : performance_representation(summary,
+                                               options.performance_aggregation);
     HeuristicRelationStatistics relation{
         ids.at(pair.first), ids.at(pair.second), cleaned,
         static_cast<std::uint64_t>(summary.samples.size()), summary.mean,
@@ -1278,8 +1362,14 @@ HeuristicsNet discover_classic_dfg(
         edge_it != net.edges.end() && edge_it->length_two_loop,
         summary.samples, summary.median, summary.minimum, summary.maximum,
         summary.stdev, summary.sum};
-    relation.representation_value = structured_performance_representation(
-        summary, options.decoration, options.performance_aggregation);
+    if (decorated != nullptr)
+      relation.representation_value =
+          decorated_representation(*decorated, cleaned);
+    else if (use_structured_values)
+      relation.representation_value.reset();
+    else
+      relation.representation_value = structured_performance_representation(
+          summary, effective_decoration, options.performance_aggregation);
     net.relation_statistics.push_back(std::move(relation));
   }
   std::sort(net.edges.begin(), net.edges.end(),

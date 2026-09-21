@@ -1,0 +1,67 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Already-aggregated Classic DFG JSON-compatible performance values, map-presence decoration semantics and loop-rescue representation. Existing EventLog and native sample-based aggregation retained.",
+  "before": {
+    "cases": 1152,
+    "matches": 48,
+    "unsupported_input_cases": 1056,
+    "existing_absent_map_behavior_mismatches": 48
+  },
+  "after": {
+    "cases": 1152,
+    "matches": 1152
+  },
+  "prior_reference_comparisons": 6923,
+  "validation": {
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "frontend_tests_passed": 624,
+    "frontend_production_build": "passed",
+    "independent_review": "clear"
+  },
+  "native_source_parent_commit": "eeb2bfeade9c185cdb19d33ec854de6277fbc8d1",
+  "native_verified_staged_tree": "5aa50ee6f466c8a31ac5fbbdf9a1d85c0f9d3361",
+  "native_executable_sha256": "5d9b99c86e3a7454f08dc2f8e76c25a85802de627c2af238da4ce858c6b2741d",
+  "core_library_sha256": "6974f1e49a9c24bb99bc35544af32f5d90969d03823fe63d669b9f2894ee8e35",
+  "probe_executable_sha256": "6ea10c626b5ad76939105f5e8123d5f2fc7040d621ec1fcfbde622c87159c8eb",
+  "artifacts": {
+    "docs/heuristic-dfg-values-reference.json.gz": {
+      "uncompressed_sha256": "b791bcfabbd7a3f67ea5fc374b5b5a38feaec0f16b2302407c2f9634c7c1a677"
+    },
+    "docs/heuristic-dfg-values-native-checks.json.gz": {
+      "uncompressed_sha256": "e3c605389ecceccaeddf7d4d1eda56172380d361e60c2abb02a10ce8c2feff8d"
+    }
+  },
+  "native_checker_script": "import argparse,gzip,hashlib,json,subprocess\nfrom pathlib import Path\np=argparse.ArgumentParser();p.add_argument('--output',required=True);args=p.parse_args()\nrows=json.loads(gzip.decompress(Path('docs/heuristic-dfg-values-reference.json.gz').read_bytes()))['observations']\ndef q(s):return '\"'+s.replace('\\\\','\\\\\\\\').replace('\"','\\\\\"')+'\"'\ndef value(v):\n if v is None:return 'n'\n if isinstance(v,bool):return 'b '+str(int(v))\n if isinstance(v,int):return ('i ' if v<0 else 'u ')+str(v)\n if isinstance(v,float):return 'd '+repr(v)\n if isinstance(v,str):return 's '+q(v)\n if isinstance(v,list):return 'a '+str(len(v))+' '+' '.join(value(x)for x in v)\n return 'o '+str(len(v))+' '+' '.join(q(k)+' '+value(x)for k,x in v.items())\ndef same(a,b):\n if isinstance(a,bool) or isinstance(b,bool):return type(a)is type(b) and a==b\n if isinstance(a,dict) and isinstance(b,dict):return a.keys()==b.keys() and all(same(a[k],b[k])for k in a)\n if isinstance(a,list) and isinstance(b,list):return len(a)==len(b) and all(same(x,y)for x,y in zip(a,b))\n return a==b\nlines=[str(len(rows))]\nfor r in rows:\n fields=[q(r['name'])]\n for key in ['dfg','window_two_dfg','frequency_triples']:\n  fields += [str(len(r[key])),' '.join(' '.join(q(a)for a in entry[:-1])+' '+str(entry[-1])for entry in r[key])]\n perf=r['performance'];fields+=['0' if perf is None else '1 '+str(len(perf))+' '+' '.join(q(a)+' '+q(b)+' '+value(v)for a,b,v in perf)]\n params=r['parameters'];fields += [str(params.get('dependency_thresh',.5)),str(params.get('dfg_pre_cleaning_noise_thresh',.05)),str(params.get('min_dfg_occurrences',1)),str(int(params['heu_net_decoration']=='performance')),str(['mean','sum','raw_values'].index(params['aggregationMeasure']))]\n lines.append(' '.join(fields))\ninputs=Path('build/heuristic-dfg-values-input.txt');inputs.write_text('\\n'.join(lines)+'\\n',encoding='utf-8')\nexe=Path('build/heuristic-dfg-values-probe-build/Release/heuristic_dfg_values_probe.exe');core=Path('build/petri-comparison-checkpoint-build/Release/minera_core.lib');h=lambda p:hashlib.sha256(p.read_bytes()).hexdigest();hashes={'probe_executable_sha256':h(exe),'core_library_sha256':h(core)}\nproc=subprocess.run([str(exe),str(inputs)],capture_output=True,encoding='utf-8',timeout=60,check=True);payloads=json.loads(proc.stdout);assert len(payloads)==len(rows);checks=[]\nfor r,payload in zip(rows,payloads):\n actual=payload;loop_relations_consistent=True\n if 'heuristics_net'in payload:\n  net=payload['heuristics_net'];names=net['activities'];edges=[[names[e['source']],names[e['target']],e['dependency'],e['frequency'],e['representation']]for e in net['edges']]\n  actual={'decoration':net['decoration'],'active':sorted(names[i]for i in net['active_activities']),'edges':sorted(edges,key=lambda e:json.dumps(e,sort_keys=True)),'metadata':net['metadata'],'performance':None if 'performance_dfg'not in net else sorted([[names[x['source']],names[x['target']],x['value']]for x in net['performance_dfg']]),'dependencies':sorted([[names[x['source']],names[x['target']],x['value']]for x in net['dependency_measures']])}\n  for edge in net['edges']:\n   if edge['length_two_loop']:\n    matches=[x for x in net['relation_statistics'] if x['source']==edge['source'] and x['target']==edge['target']]\n    loop_relations_consistent &= len(matches)==1 and same(matches[0]['representation'],edge['representation'])\n matched=bool(actual.get('rejected'))if'expected_error'in r else same(actual,r['expected'])\n checks.append({'name':r['name'],'expected':r.get('expected'),'expected_error':r.get('expected_error'),'actual':actual,'loop_relations_consistent':loop_relations_consistent,'matched':matched and loop_relations_consistent})\nassert hashes=={'probe_executable_sha256':h(exe),'core_library_sha256':h(core)}\nreport=dict(hashes,checks=checks,values_api_enabled='HAS_DFG_VALUES:BOOL=ON'in Path('build/heuristic-dfg-values-probe-build/CMakeCache.txt').read_text(),probe_source=Path('build/heuristic-dfg-values-probe-source/main.cpp').read_text(),input_sha256=h(inputs),checker_script=Path(__file__).read_text())\nPath(args.output).write_text(json.dumps(report,indent=2)+'\\n',encoding='utf-8')\nprint(sum(x['matched']for x in checks),'/',len(checks),'unsupported',sum(bool(x['actual'].get('unsupported'))for x in checks));print([x['name']for x in checks if not x['matched']][:15])\n",
+  "probe_cmake": "cmake_minimum_required(VERSION 3.20)\nproject(heuristic_dfg_values_probe LANGUAGES CXX)\noption(HAS_DFG_VALUES \"Use opaque DFG values API\" OFF)\nadd_executable(heuristic_dfg_values_probe main.cpp)\ntarget_compile_features(heuristic_dfg_values_probe PRIVATE cxx_std_20)\ntarget_include_directories(heuristic_dfg_values_probe PRIVATE ../petri-comparison-checkpoint-source/include)\ntarget_link_libraries(heuristic_dfg_values_probe PRIVATE \"${CMAKE_CURRENT_SOURCE_DIR}/../petri-comparison-checkpoint-build/Release/minera_core.lib\" bcrypt winsqlite3 ws2_32)\nif(HAS_DFG_VALUES)\n target_compile_definitions(heuristic_dfg_values_probe PRIVATE HAS_DFG_VALUES)\nendif()\n",
+  "limits": [
+    "Finite Classic DFG inputs with JSON-compatible values; native signed/unsigned 64-bit integer bounds apply.",
+    "Arbitrary Python objects and non-string mapping keys are not represented by this transport.",
+    "Reference rejection outcome compared without exception-class/message identity.",
+    "Full object, adapter and structural coverage remain incomplete."
+  ],
+  "nonfinite_reference_observations": [
+    {
+      "input_class": "nan",
+      "accepted": true,
+      "preserved": true
+    },
+    {
+      "input_class": "positive_infinity",
+      "accepted": true,
+      "preserved": true
+    },
+    {
+      "input_class": "negative_infinity",
+      "accepted": true,
+      "preserved": true
+    },
+    {
+      "input_class": "nested",
+      "accepted": true,
+      "preserved": true
+    }
+  ],
+  "nonfinite_capture_script": "import warnings\nwarnings.filterwarnings('ignore')\nimport json,math\nfrom pathlib import Path\nfrom pm4py.algo.discovery.heuristics.variants import classic\nrows=[]\nfor label,value in [('nan',float('nan')),('positive_infinity',float('inf')),('negative_infinity',float('-inf')),('nested',{'x':[float('inf')]})]:\n n=classic.apply_heu_dfg({('A','B'):1},performance_dfg={('A','B'):value})\n edge=next(iter(next(iter(n.nodes['A'].output_connections.values()))))\n actual=edge.repr_value\n matched=(math.isnan(actual)if label=='nan'else actual==value)\n rows.append({'input_class':label,'accepted':True,'preserved':matched})\n assert matched\nPath('build/heuristic-dfg-nonfinite-probe.json').write_text(json.dumps(rows,indent=2))\nprint(rows)\n",
+  "nonfinite_transport_behavior": "Discovery retains nonfinite supplied values; JSON export rejects them with invalid_argument because they are not JSON numbers."
+}
