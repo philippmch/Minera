@@ -5424,6 +5424,57 @@ void json_export_preserves_heuristic_dfg_metadata_shapes() {
          std::string::npos);
 }
 
+void json_export_rejects_non_finite_heuristic_performance_values() {
+  const double infinity = std::numeric_limits<double>::infinity();
+  minera::HeuristicPerformanceSummary summary;
+  summary.mean = infinity;
+
+  minera::HeuristicStructuredValue structured_root{
+      minera::HeuristicStructuredValue::Value{infinity}};
+  minera::HeuristicStructuredValue array_leaf{
+      minera::HeuristicStructuredValue::Value{-infinity}};
+  minera::HeuristicStructuredValue::Array nested_array{array_leaf};
+  minera::HeuristicStructuredValue structured_array{
+      minera::HeuristicStructuredValue::Value{std::move(nested_array)}};
+  minera::HeuristicStructuredValue object_leaf{
+      minera::HeuristicStructuredValue::Value{infinity}};
+  minera::HeuristicStructuredValue::Object nested_object_map;
+  nested_object_map.emplace("nested", object_leaf);
+  minera::HeuristicStructuredValue structured_object{
+      minera::HeuristicStructuredValue::Value{
+          std::move(nested_object_map)}};
+
+  const std::vector<minera::HeuristicPerformanceValue> invalid_values = {
+      std::numeric_limits<double>::quiet_NaN(),
+      std::vector<double>{1.0, infinity},
+      summary,
+      structured_root,
+      structured_array,
+      structured_object};
+  for (const auto& value : invalid_values) {
+    minera::HeuristicClassicDfgInput input;
+    input.dfg[{"A", "B"}] = 1;
+    input.performance_values.emplace();
+    (*input.performance_values)[{"A", "B"}] = value;
+    minera::HeuristicMinerOptions options;
+    options.dfg_pre_cleaning_noise_threshold = 0.0;
+
+    // Discovery preserves the public payload, including non-finite values;
+    // validation belongs to the JSON boundary.
+    const auto heuristics = minera::discover_heuristics_net(input, options);
+    assert(heuristics.performance_values.has_value());
+    assert(heuristics.performance_values->contains({"A", "B"}));
+
+    minera::DirectlyFollowsGraph graph;
+    graph.ensure_activity("A");
+    graph.ensure_activity("B");
+    assert(throws([&] {
+      (void)minera::analysis_json("non-finite", minera::EventLog{}, graph,
+                                  nullptr, nullptr, &heuristics);
+    }));
+  }
+}
+
 void heuristic_miner_handles_an_empty_log() {
   const auto net = minera::discover_heuristics_net(minera::EventLog{});
   assert(net.activities.empty());
@@ -6964,6 +7015,7 @@ int main() {
   heuristics_net_handles_a_self_loop();
   json_export_preserves_heuristic_double_precision();
   json_export_preserves_heuristic_dfg_metadata_shapes();
+  json_export_rejects_non_finite_heuristic_performance_values();
   importer_handles_a_header_only_log();
   importer_strips_a_utf8_bom();
   dfg_handles_single_event_traces();

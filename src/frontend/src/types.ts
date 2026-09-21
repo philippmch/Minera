@@ -2890,10 +2890,19 @@ export interface HeuristicPerformanceSummary {
   mean: number;
 }
 
+export type HeuristicStructuredValue =
+  | null
+  | boolean
+  | number
+  | string
+  | HeuristicStructuredValue[]
+  | { [key: string]: HeuristicStructuredValue };
+
 export type HeuristicPerformanceValue =
   | number
   | number[]
-  | HeuristicPerformanceSummary;
+  | HeuristicPerformanceSummary
+  | HeuristicStructuredValue;
 
 export interface HeuristicAndMeasure {
   activity: number;
@@ -2989,6 +2998,11 @@ export interface HeuristicsNet {
   raw_dfg?: { source: number; target: number; count: number }[];
   cleaned_dfg?: { source: number; target: number; count: number }[];
   window_two_dfg?: { source: number; target: number; count: number }[];
+  performance_dfg?: {
+    source: number;
+    target: number;
+    value: HeuristicPerformanceValue;
+  }[];
   frequency_triples?: {
     first: number;
     middle: number;

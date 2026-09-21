@@ -1061,6 +1061,86 @@ void classic_performance_aggregations_and_validation() {
   assert(invalid);
 }
 
+void classic_decorated_dfg_values_preserve_typed_payloads() {
+  auto input = classic_input({{{"A", "B"}, 2}, {{"A", "C"}, 10}});
+  input.activities = std::vector<std::string>{"A", "B", "C"};
+  input.activity_counts =
+      std::map<std::string, std::uint64_t>{{"A", 12}, {"B", 2},
+                                           {"C", 10}};
+  input.frequency_triples[{"A", "B", "A"}] = 1;
+
+  HeuristicStructuredValue object_value;
+  object_value.value = HeuristicStructuredValue::Object{
+      {"kind", HeuristicStructuredValue{std::string("already-aggregated")}}};
+  input.performance_values.emplace();
+  input.performance_dfg.emplace();  // The new map overrides incomplete samples.
+  input.performance_values->emplace(
+      std::make_pair(std::string("A"), std::string("B")),
+      HeuristicPerformanceValue{object_value});
+  input.performance_values->emplace(
+      std::make_pair(std::string("A"), std::string("C")),
+      HeuristicPerformanceValue{HeuristicStructuredValue{7.25}});
+  // Extra values are retained and interned, but do not become fallback nodes.
+  input.performance_values->emplace(
+      std::make_pair(std::string("extra-source"), std::string("extra-target")),
+      HeuristicPerformanceValue{object_value});
+  input.performance_values->emplace(
+      std::make_pair(std::string("B"), std::string("A")),
+      HeuristicPerformanceValue{3.5});
+
+  HeuristicMinerOptions options;
+  options.dependency_threshold = 0.9;
+  options.dfg_pre_cleaning_noise_threshold = 0.0;
+  // The new map selects performance mode even when the option says frequency.
+  options.decoration = HeuristicNetDecoration::kFrequency;
+  const auto net = discover_heuristics_net(input, options);
+  assert(net.decoration == HeuristicNetDecoration::kPerformance);
+  assert(net.performance_values.has_value());
+  assert(net.performance_values->size() == 4);
+  const auto* forward = edge(net, "A", "B");
+  assert(forward != nullptr);
+  assert(forward->representation == 0.0);
+  assert(forward->representation_value.has_value());
+  const auto& forward_value = std::get<HeuristicStructuredValue>(
+      *forward->representation_value);
+  const auto& forward_object =
+      std::get<HeuristicStructuredValue::Object>(forward_value.value);
+  assert(std::get<std::string>(forward_object.at("kind").value) ==
+         "already-aggregated");
+  assert(edge(net, "A", "C")->representation == 7.25);
+  assert(net.activities[activity(net, "extra-source")] == "extra-source");
+  assert(std::find(net.active_activities.begin(), net.active_activities.end(),
+                   activity(net, "extra-source")) ==
+         net.active_activities.end());
+
+  // A rescued reverse direction has no cleaned DFG value, so an extra reverse
+  // entry cannot leak into its scalar or structured representation.
+  const auto* rescued_reverse = edge(net, "B", "A");
+  assert(rescued_reverse != nullptr && rescued_reverse->length_two_loop);
+  assert(rescued_reverse->representation == 0.0);
+  assert(!rescued_reverse->representation_value.has_value());
+  const auto& reverse_relation = relation(net, "B", "A");
+  assert(reverse_relation.representation == 0.0);
+  assert(!reverse_relation.representation_value.has_value());
+
+  (*input.performance_values)[{"A", "C"}] = HeuristicStructuredValue{nullptr};
+  const auto null_net = discover_heuristics_net(input, options);
+  assert(edge(null_net, "A", "C")->representation == 10.0);
+  const auto& null_map_value = std::get<HeuristicStructuredValue>(
+      null_net.performance_values->at({"A", "C"}));
+  assert(std::holds_alternative<std::nullptr_t>(null_map_value.value));
+
+  // With neither performance map, direct DFG discovery keeps its public
+  // frequency decoration even if the caller requests performance.
+  auto no_values = input;
+  no_values.performance_values.reset();
+  no_values.performance_dfg.reset();
+  options.decoration = HeuristicNetDecoration::kPerformance;
+  const auto frequency_net = discover_heuristics_net(no_values, options);
+  assert(frequency_net.decoration == HeuristicNetDecoration::kFrequency);
+  assert(edge(frequency_net, "A", "C")->representation == 10.0);
+}
+
 void start_selector_defaults_and_validation() {
   auto first = interval("A", "2026-07-01T00:00:00Z",
                         "2026-07-01T00:00:00Z");
@@ -1353,6 +1433,7 @@ int main() {
   classic_length_two_rescue_and_reference_quirk();
   classic_active_nodes_conversion_and_dfg_inference();
   classic_performance_aggregations_and_validation();
+  classic_decorated_dfg_values_preserve_typed_payloads();
   start_selector_defaults_and_validation();
   business_hours_cover_heuristic_waits_and_sojourns();
   subsecond_timestamps_preserve_exact_order_and_business_prefix();

@@ -4332,6 +4332,41 @@ source tree and binary hashes. The isolated Release build, 154 native suites,
 624 frontend tests, frontend production build, 6,559 earlier reference
 comparisons, and independent review passed.
 
+Direct Classic DFG inputs now accept an additional `performance_values` map of
+already-aggregated values. Scalars, ordered arrays, strings, nulls, booleans,
+and nested string-keyed objects retain their payloads rather than entering the
+sample aggregator. The legacy `performance_dfg` sample field remains supported;
+the new field takes precedence when both are supplied. A supplied value map
+selects performance decoration regardless of the decoration option. With
+neither map, direct DFG discovery uses frequency representation. Existing
+EventLog aggregation continues to use the native sample path.
+
+The new map is retained on the net and exported as `performance_dfg`, including
+extra pairs that do not create nodes. An explicit root null stays null in that
+map but selects the path frequency for edge/relation representation; nested
+nulls remain part of their payload. Every cleaned DFG pair must have a value,
+even if later dependency filters reject its edge. A rescued reverse loop absent
+from the cleaned DFG gets scalar zero even when an extra reverse value was
+supplied. Typed values are authoritative; opaque non-double values use zero in
+the legacy scalar representation field. Wrapped root doubles retain their
+numeric projection. Discovery preserves nonfinite input values, while JSON
+export rejects them because NaN and infinity are not JSON numbers.
+
+`docs/heuristic-dfg-values-reference.json.gz` captures 1,152 public cases,
+including missing/empty maps, nested values, large signed/unsigned integers,
+filtering, decoration/aggregation options, and directional loop rescue. The
+baseline could not express 1,056 cases and exposed 48 no-map decoration
+mismatches; 48 cases already matched. This transport supports JSON-compatible
+values within native integer ranges, not arbitrary Python objects or non-string
+mapping keys. Full object, adapter, and structural coverage remain incomplete.
+
+All 1,152 cases now match. `docs/heuristic-dfg-values-native-checks.json.gz`
+and `docs/heuristic-dfg-values-validation.json` retain the comparisons, probe,
+checker, source and binary hashes, and four public nonfinite-value observations.
+The isolated Release build, 154 native suites, 624 frontend tests, frontend
+production build, 6,923 earlier reference comparisons, and independent review
+passed. These finite checks do not establish full parity.
+
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),
 activity/path occurrence filtering, direct-adjacency mean waits, mean sojourn

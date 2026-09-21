@@ -53,8 +53,23 @@ struct HeuristicPerformanceSummary {
   double sum = 0.0;
 };
 
+// An opaque JSON value used by already-aggregated performance DFG inputs.
+// Keeping the native integer alternatives separate from double preserves the
+// exact value through export, while the recursive containers retain nested
+// PM4Py values without imposing a schema on callers.
+struct HeuristicStructuredValue {
+  using Array = std::vector<HeuristicStructuredValue>;
+  using Object = std::map<std::string, HeuristicStructuredValue>;
+  using Value = std::variant<std::nullptr_t, bool, std::int64_t,
+                             std::uint64_t, double, std::string, Array,
+                             Object>;
+
+  Value value = nullptr;
+};
+
 using HeuristicPerformanceValue =
-    std::variant<double, std::vector<double>, HeuristicPerformanceSummary>;
+    std::variant<double, std::vector<double>, HeuristicPerformanceSummary,
+                 HeuristicStructuredValue>;
 
 // A directed dependency between two activities accepted by the Heuristic Miner,
 // carrying both how often it was observed and how reliable the ordering is.
@@ -65,8 +80,9 @@ struct HeuristicDependency {
   std::uint64_t frequency = 0;  // |source > target|: direct successions observed
   double representation = 0.0;
   bool length_two_loop = false;
-  // Structured raw/all value, when the selected decoration and aggregation
-  // support one.  Empty means that callers should use `representation`.
+  // Typed raw/all output or an already-aggregated DFG value. Empty means use
+  // `representation`; opaque non-double DFG values use zero in that legacy
+  // scalar field and preserve their complete payload here.
   std::optional<HeuristicPerformanceValue> representation_value;
 };
 
@@ -81,6 +97,8 @@ using HeuristicTripleFrequencies =
              std::uint64_t>;
 using HeuristicPerformanceDfg =
     std::map<std::pair<std::string, std::string>, std::vector<double>>;
+using HeuristicDecoratedDfg =
+    std::map<std::pair<std::string, std::string>, HeuristicPerformanceValue>;
 
 struct HeuristicActivityStatistics {
   std::size_t activity = 0;
@@ -106,8 +124,8 @@ struct HeuristicRelationStatistics {
   double max_wait_seconds = 0.0;
   double stdev_wait_seconds = 0.0;
   double sum_wait_seconds = 0.0;
-  // Structured raw/all value, when the selected decoration and aggregation
-  // support one.  Empty means that callers should use `representation`.
+  // Typed raw/all output or an already-aggregated DFG value, with the same
+  // legacy scalar fallback as HeuristicDependency::representation_value.
   std::optional<HeuristicPerformanceValue> representation_value;
 };
 
@@ -219,6 +237,8 @@ struct HeuristicsNet {
   std::vector<HeuristicDependencyMeasure> dependency_measures;
   std::vector<HeuristicLoopLengthTwo> loop_length_two;
   std::optional<HeuristicNetMetadata> metadata;
+  // Retains an explicitly supplied already-aggregated performance DFG.
+  std::optional<HeuristicDecoratedDfg> performance_values;
 };
 
 struct HeuristicMinerOptions {
@@ -282,9 +302,13 @@ struct HeuristicClassicDfgInput {
   std::optional<std::map<std::string, std::uint64_t>> end_counts;
   HeuristicFrequencyDfg window_two_dfg;
   HeuristicTripleFrequencies frequency_triples;
+  // Legacy native sample input, aggregated according to the miner options.
   std::optional<HeuristicPerformanceDfg> performance_dfg;
   std::optional<HeuristicBoundaryActivities> start_activities;
   std::optional<HeuristicBoundaryActivities> end_activities;
+  // Already-aggregated values, preserved verbatim. Takes precedence over the
+  // legacy sample map and selects performance decoration when supplied.
+  std::optional<HeuristicDecoratedDfg> performance_values;
 };
 
 // Discovers a heuristics net from an event log. The dependency of a over b is

@@ -930,8 +930,102 @@ void write_heuristic_performance_summary(
       << ", \"mean\": " << summary.mean << '}';
 }
 
+[[noreturn]] void throw_non_finite_heuristic_performance_value() {
+  throw std::invalid_argument(
+      "heuristic performance values must contain only finite numbers");
+}
+
+void validate_heuristic_structured_value(
+    const HeuristicStructuredValue& value) {
+  std::visit(
+      [&](const auto& selected) {
+        using Value = std::decay_t<decltype(selected)>;
+        if constexpr (std::is_same_v<Value, double>) {
+          if (!std::isfinite(selected))
+            throw_non_finite_heuristic_performance_value();
+        } else if constexpr (std::is_same_v<
+                                 Value, HeuristicStructuredValue::Array>) {
+          for (const auto& item : selected)
+            validate_heuristic_structured_value(item);
+        } else if constexpr (std::is_same_v<
+                                 Value, HeuristicStructuredValue::Object>) {
+          for (const auto& [_, item] : selected)
+            validate_heuristic_structured_value(item);
+        }
+      },
+      value.value);
+}
+
+void validate_heuristic_performance_value(
+    const HeuristicPerformanceValue& value) {
+  std::visit(
+      [](const auto& selected) {
+        using Value = std::decay_t<decltype(selected)>;
+        if constexpr (std::is_same_v<Value, double>) {
+          if (!std::isfinite(selected))
+            throw_non_finite_heuristic_performance_value();
+        } else if constexpr (std::is_same_v<Value, std::vector<double>>) {
+          for (const double item : selected) {
+            if (!std::isfinite(item))
+              throw_non_finite_heuristic_performance_value();
+          }
+        } else if constexpr (std::is_same_v<Value,
+                                            HeuristicPerformanceSummary>) {
+          for (const double item : {selected.mean, selected.median,
+                                    selected.minimum, selected.maximum,
+                                    selected.stdev, selected.sum}) {
+            if (!std::isfinite(item))
+              throw_non_finite_heuristic_performance_value();
+          }
+        } else {
+          validate_heuristic_structured_value(selected);
+        }
+      },
+      value);
+}
+
+void write_heuristic_structured_value(
+    std::ostream& out, const HeuristicStructuredValue& value) {
+  std::visit(
+      [&](const auto& selected) {
+        using Value = std::decay_t<decltype(selected)>;
+        if constexpr (std::is_same_v<Value, std::nullptr_t>) {
+          out << "null";
+        } else if constexpr (std::is_same_v<Value, bool>) {
+          out << (selected ? "true" : "false");
+        } else if constexpr (std::is_same_v<Value, std::int64_t> ||
+                             std::is_same_v<Value, std::uint64_t> ||
+                             std::is_same_v<Value, double>) {
+          out << selected;
+        } else if constexpr (std::is_same_v<Value, std::string>) {
+          write_json_string(out, selected);
+        } else if constexpr (std::is_same_v<
+                                 Value, HeuristicStructuredValue::Array>) {
+          out << '[';
+          for (std::size_t i = 0; i < selected.size(); ++i) {
+            if (i != 0) out << ", ";
+            write_heuristic_structured_value(out, selected[i]);
+          }
+          out << ']';
+        } else {
+          out << '{';
+          std::size_t i = 0;
+          for (const auto& [key, item] : selected) {
+            if (i != 0) out << ", ";
+            write_json_string(out, key);
+            out << ": ";
+            write_heuristic_structured_value(out, item);
+            ++i;
+          }
+          out << '}';
+        }
+      },
+      value.value);
+}
+
 void write_heuristic_performance_value(
     std::ostream& out, const HeuristicPerformanceValue& value) {
+  validate_heuristic_performance_value(value);
   std::visit(
       [&](const auto& selected) {
         using Value = std::decay_t<decltype(selected)>;
@@ -942,8 +1036,11 @@ void write_heuristic_performance_value(
           for (std::size_t i = 0; i < selected.size(); ++i)
             out << selected[i] << (i + 1 < selected.size() ? ", " : "");
           out << ']';
-        } else {
+        } else if constexpr (std::is_same_v<Value,
+                                            HeuristicPerformanceSummary>) {
           write_heuristic_performance_summary(out, selected);
+        } else {
+          write_heuristic_structured_value(out, selected);
         }
       },
       value);
@@ -958,6 +1055,22 @@ void write_heuristics_net(std::ostream& out,
     ~RestorePrecision() { stream.precision(precision); }
   } restore_precision{
       out, out.precision(std::numeric_limits<double>::max_digits10)};
+  // Validate every typed performance payload before emitting the first byte of
+  // this net.  This keeps non-finite values from producing invalid JSON even
+  // when they are nested inside an already-aggregated DFG object or a
+  // representation retained on an edge/relation statistic.
+  if (net.performance_values) {
+    for (const auto& [_, value] : *net.performance_values)
+      validate_heuristic_performance_value(value);
+  }
+  for (const auto& edge : net.edges) {
+    if (edge.representation_value)
+      validate_heuristic_performance_value(*edge.representation_value);
+  }
+  for (const auto& stat : net.relation_statistics) {
+    if (stat.representation_value)
+      validate_heuristic_performance_value(*stat.representation_value);
+  }
   // PLUSPLUS can retain raw statistics for activities filtered out of the
   // native node table.  The exported local-id table must still identify those
   // name-based records, while graph ids and metadata keep their native shape.
@@ -990,6 +1103,12 @@ void write_heuristics_net(std::ostream& out,
       append_name(first);
       append_name(middle);
       append_name(last);
+    }
+    if (net.performance_values) {
+      for (const auto& [pair, _] : *net.performance_values) {
+        append_name(pair.first);
+        append_name(pair.second);
+      }
     }
   }
   // Canonical nets share the document-wide activity ids; nets built from a
@@ -1067,6 +1186,17 @@ void write_heuristics_net(std::ostream& out,
     out << ", \"length_two_loop\": "
         << (edge.length_two_loop ? "true" : "false") << '}'
         << (i + 1 < net.edges.size() ? ", " : "");
+  }
+  if (net.performance_values) {
+    out << "], \"performance_dfg\": [";
+    std::size_t index = 0;
+    for (const auto& [pair, value] : *net.performance_values) {
+      out << "{\"source\": " << resolve_name(pair.first)
+          << ", \"target\": " << resolve_name(pair.second)
+          << ", \"value\": ";
+      write_heuristic_performance_value(out, value);
+      out << '}' << (++index < net.performance_values->size() ? ", " : "");
+    }
   }
   out << "], \"dependency_measures\": [";
   for (std::size_t i = 0; i < net.dependency_measures.size(); ++i) {
