@@ -1,0 +1,41 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Preserve filtered raw activity and concurrency labels in local-ID heuristics JSON without changing mined graph IDs, nodes, or metadata.",
+  "before": {
+    "cases": 240,
+    "matches": 212
+  },
+  "after": {
+    "cases": 240,
+    "matches": 240
+  },
+  "unchanged_graph_payloads": 240,
+  "unchanged_previously_matching_wire_payloads": 212,
+  "prior_reference_comparisons": 6559,
+  "validation": {
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "frontend_tests_passed": 624,
+    "frontend_production_build": "passed",
+    "independent_review": "clear"
+  },
+  "native_source_parent_commit": "f7f5bf633ec2481ad877689946f9fcbb8aebf303",
+  "native_verified_staged_tree": "a8a7f7374371b0b95ee467dc0f18057db2854800",
+  "native_executable_sha256": "2eab96c177efe47e995b99cae23e911c836f250f659aa3fe267de5d3a44e2fe5",
+  "core_library_sha256": "dbb74346b92c08caac66ecea053e1d5748acfe19026ca79ba02630def614be59",
+  "artifacts": {
+    "docs/heuristic-local-labels-reference.json.gz": {
+      "uncompressed_sha256": "9a7e93092b9559a17d001aecd4a05c9e45f0c42ef047996ff9d8823c3c685d1b"
+    },
+    "docs/heuristic-local-labels-native-checks.json.gz": {
+      "uncompressed_sha256": "a8661ba70d71a4d9323bdd2a9bc121028ac94c8d2e177c51b664819fe46556f8"
+    }
+  },
+  "native_checker_script": "import argparse, gzip, hashlib, json, subprocess\nfrom pathlib import Path\n\np = argparse.ArgumentParser(); p.add_argument('--output', required=True); args = p.parse_args()\nref = json.loads(gzip.decompress(Path('docs/heuristic-local-labels-reference.json.gz').read_bytes()))\nexe = Path('build/petri-comparison-checkpoint-build/Release/minera_export.exe')\nbefore = hashlib.sha256(exe.read_bytes()).hexdigest(); checks = []\nclass CheckedNames(list):\n def __getitem__(self, index):\n  if index < 0 or index >= len(self):\n   self.invalid_ids.append(index)\n   return f'<invalid activity ID {index}>'\n  return super().__getitem__(index)\nfor i, r in enumerate(ref['observations']):\n x = Path(f'build/heuristic-local-labels-{i}.xes'); x.write_text(r['xes'], encoding='utf-8'); out = x.with_suffix('.json')\n cmd = [str(exe), str(x), '--heuristic-variant', r['variant'].lower(), '--heuristic-decoration', r['decoration'], '--heuristic-activity-attribute', r['selector'], '--heuristic-start-timestamp-attribute', 'start_timestamp', '--heuristic-min-activity-count', str(r['minimum']), '-o', str(out)]\n proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)\n row = {'name': r['name'], 'expected': r.get('expected'), 'expected_error': r.get('expected_error'), 'exit_code': proc.returncode, 'stderr': proc.stderr}\n if proc.returncode == 0:\n  payload = json.loads(out.read_text(encoding='utf-8')); net = payload['heuristics_net']\n  names = CheckedNames(net['activities'] if net['activity_ids_are_local'] else [a['name'] for a in payload['activities']]); names.invalid_ids = []\n  edges = [[names[e['source']], names[e['target']], e['dependency'], e['frequency'], e['representation']] for e in net['edges']]\n  actual = {'metadata': net['metadata'], 'active': sorted(names[a] for a in net['active_activities']), 'edges': sorted(edges, key=lambda e: json.dumps(e, sort_keys=True)), 'sojourn': {names[s['activity']]: s['mean_sojourn_seconds'] for s in net['raw_activity_statistics']}, 'raw_occurrences': {names[s['activity']]: s['occurrences'] for s in net['raw_activity_statistics']}, 'raw_concurrency': sorted([[names[s['first']], names[s['second']], s['frequency']] for s in net['raw_concurrency_statistics']]), 'dependencies': sorted([[names[s['source']], names[s['target']], s['value']] for s in net['dependency_measures']])}\n  row['actual'] = actual\n  row['raw_ids_unique'] = len(actual['raw_occurrences']) == len(net['raw_activity_statistics'])\n  row['unchanged_graph'] = {k: net[k] for k in ['active_activities', 'edges', 'activity_statistics', 'relation_statistics', 'concurrency_statistics', 'start_activities', 'end_activities', 'input_bundles', 'output_bundles', 'metadata']}\n  row['registry'] = net['activities']\n  row['wire_sha256'] = hashlib.sha256(json.dumps(net, sort_keys=True).encode()).hexdigest()\n  row['invalid_ids'] = names.invalid_ids\n row['matched'] = proc.returncode != 0 if 'expected_error' in r else row.get('actual') == r['expected'] and row.get('raw_ids_unique', False) and not row.get('invalid_ids')\n checks.append(row)\n if (i + 1) % 60 == 0: print(i + 1, 'checked', flush=True)\nafter = hashlib.sha256(exe.read_bytes()).hexdigest(); assert before == after\nPath(args.output).write_text(json.dumps({'native_executable_sha256': after, 'checks': checks, 'checker_script': Path(__file__).read_text(encoding='utf-8')}, indent=2) + '\\n', encoding='utf-8')\nprint(sum(r['matched'] for r in checks), '/', len(checks)); print([r['name'] for r in checks if not r['matched']][:15])\n",
+  "limits": [
+    "Finite EventLog selector, activity-filter, interval-overlap and decoration combinations.",
+    "Native raw occurrence counts are compared with counts of input events; other expected projections are public pinned-reference outputs.",
+    "No full object, adapter or structural coverage completion claim."
+  ],
+  "payload_hash_method": "Parsed heuristics_net JSON serialized with sorted object keys"
+}
