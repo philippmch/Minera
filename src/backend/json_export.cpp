@@ -958,6 +958,40 @@ void write_heuristics_net(std::ostream& out,
     ~RestorePrecision() { stream.precision(precision); }
   } restore_precision{
       out, out.precision(std::numeric_limits<double>::max_digits10)};
+  // PLUSPLUS can retain raw statistics for activities filtered out of the
+  // native node table.  The exported local-id table must still identify those
+  // name-based records, while graph ids and metadata keep their native shape.
+  std::vector<std::string> export_activities = net.activities;
+  std::unordered_map<std::string, std::size_t> export_ids;
+  if (net.activity_ids_are_local) {
+    for (std::size_t i = 0; i < export_activities.size(); ++i)
+      export_ids.emplace(export_activities[i], i);
+    const auto append_name = [&](const std::string& name) {
+      const auto result = export_ids.emplace(name, export_activities.size());
+      if (result.second) export_activities.push_back(name);
+    };
+    for (const auto& stat : net.raw_activity_statistics)
+      append_name(stat.activity);
+    for (const auto& stat : net.raw_concurrency_statistics) {
+      append_name(stat.first);
+      append_name(stat.second);
+    }
+    const auto append_dfg_names = [&](const HeuristicFrequencyDfg& dfg) {
+      for (const auto& [pair, _] : dfg) {
+        append_name(pair.first);
+        append_name(pair.second);
+      }
+    };
+    append_dfg_names(net.raw_dfg);
+    append_dfg_names(net.cleaned_dfg);
+    append_dfg_names(net.window_two_dfg);
+    for (const auto& [triple, _] : net.frequency_triples) {
+      const auto& [first, middle, last] = triple;
+      append_name(first);
+      append_name(middle);
+      append_name(last);
+    }
+  }
   // Canonical nets share the document-wide activity ids; nets built from a
   // generic activity field keep a self-contained local id space.
   const auto resolve = [&](std::size_t local) {
@@ -968,11 +1002,7 @@ void write_heuristics_net(std::ostream& out,
   };
   const auto resolve_name = [&](const std::string& name) {
     if (net.activity_ids_are_local) {
-      const auto it = std::find(net.activities.begin(), net.activities.end(),
-                               name);
-      return it == net.activities.end()
-                 ? std::size_t{0}
-                 : static_cast<std::size_t>(it - net.activities.begin());
+      return export_ids.at(name);
     }
     const auto id = graph.activity_id(name);
     return id ? *id : std::size_t{0};
@@ -1018,9 +1048,9 @@ void write_heuristics_net(std::ostream& out,
   out << ", \"activity_ids_are_local\": "
       << (net.activity_ids_are_local ? "true" : "false")
       << ", \"activities\": [";
-  for (std::size_t i = 0; i < net.activities.size(); ++i) {
-    write_json_string(out, net.activities[i]);
-    if (i + 1 < net.activities.size()) out << ", ";
+  for (std::size_t i = 0; i < export_activities.size(); ++i) {
+    write_json_string(out, export_activities[i]);
+    if (i + 1 < export_activities.size()) out << ", ";
   }
   out << "], \"edges\": [";
   for (std::size_t i = 0; i < net.edges.size(); ++i) {

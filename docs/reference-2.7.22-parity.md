@@ -4303,14 +4303,34 @@ EventLog metadata observations in
 `docs/heuristic-eventlog-metadata-reference.json.gz`. Reference rejections are
 compared as acceptance versus rejection, without claiming Python exception
 class or message identity. These finite cases do not establish full object,
-adapter, or structural coverage completion. Custom activity-selector exports
-of filtered raw statistics remain a separate follow-up.
+adapter, or structural coverage completion.
 
 `docs/heuristic-dfg-input-native-checks.json.gz` and
 `docs/heuristic-dfg-input-validation.json` retain the before/after comparisons,
 probe sources, binary hashes, and verified source tree. The isolated Release
 build, all 154 native suites, 624 frontend tests, frontend production build,
 5,209 earlier reference comparisons, and independent review passed.
+
+Custom activity-selector JSON exports now preserve the names of raw statistics
+whose activities were filtered out by PLUSPLUS. The exported local label table
+starts with the native activity IDs, then appends missing names referenced by
+raw activity/concurrency statistics and name-based DFG/triple fields. Graph
+nodes, edges, native activity tables, and declared metadata remain unchanged.
+An all-filtered net retains an empty active-node list while its raw statistics
+still have valid labels. Canonical document-wide activity IDs are unchanged.
+
+`docs/heuristic-local-labels-reference.json.gz` retains 240 public comparisons
+covering canonical/custom labels, partial/complete activity filtering, interval
+overlap, both variants and decorations, empty logs, and escaped/Unicode labels.
+All 240 now match, compared with 212 before the fix. All 240 graph payloads are
+unchanged, and the 212 previously matching JSON payloads remain identical.
+This is finite export preservation evidence, not full object or adapter parity.
+
+`docs/heuristic-local-labels-native-checks.json.gz` and
+`docs/heuristic-local-labels-validation.json` retain the comparisons, checker,
+source tree and binary hashes. The isolated Release build, 154 native suites,
+624 frontend tests, frontend production build, 6,559 earlier reference
+comparisons, and independent review passed.
 
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),
