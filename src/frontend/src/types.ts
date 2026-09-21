@@ -2902,6 +2902,18 @@ export interface HeuristicAndMeasure {
   value: number;
 }
 
+export interface HeuristicDependencyMeasure {
+  source: number;
+  target: number;
+  value: number;
+}
+
+export interface HeuristicLoopLengthTwo {
+  source: number;
+  target: number;
+  frequency: number;
+}
+
 export interface HeuristicsNet {
   variant?: "classic" | "plusplus";
   decoration?: "frequency" | "performance";
@@ -2973,6 +2985,8 @@ export interface HeuristicsNet {
   }[];
   and_measures_in?: HeuristicAndMeasure[];
   and_measures_out?: HeuristicAndMeasure[];
+  dependency_measures?: HeuristicDependencyMeasure[];
+  loop_length_two?: HeuristicLoopLengthTwo[];
   output_bundles?: { activity: number; bundles: number[][] }[];
   input_bundles?: { activity: number; bundles: number[][] }[];
 }

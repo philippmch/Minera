@@ -888,6 +888,13 @@ HeuristicsNet discover_classic_dfg(
   for (const auto& [pair, count] : net.cleaned_dfg)
     dependencies[pair] =
         classic_dependency(net.cleaned_dfg, pair.first, pair.second);
+  for (const auto& [pair, value] : dependencies) {
+    const auto source = ids.find(pair.first);
+    const auto target = ids.find(pair.second);
+    if (source != ids.end() && target != ids.end())
+      net.dependency_measures.push_back(
+          {source->second, target->second, value});
+  }
 
   const auto activity_count = [&](const std::string& name) {
     const auto it = occurrences.find(name);
@@ -1030,6 +1037,9 @@ HeuristicsNet discover_classic_dfg(
       const double l2 = static_cast<double>(v1 + v2) /
                         static_cast<double>(v1 + v2 + 1);
       if (l2 < options.loop_length_two_threshold) continue;
+      net.loop_length_two.push_back(
+          {first_id, ids.at(second), pair_count(net.cleaned_dfg, first,
+                                                second)});
       const NamePair forward{first, second};
       const NamePair backward{second, first};
       if (pair_count(net.cleaned_dfg, first, second) <
@@ -1251,6 +1261,8 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
     const double dependency =
         plus_dependency(abstraction, pair.first, pair.second,
                         options.min_frequency);
+    net.dependency_measures.push_back(
+        {source->second, target->second, dependency});
     if (dependency > effective_dependency_threshold(options))
     {
       HeuristicDependency edge{source->second, target->second, dependency,

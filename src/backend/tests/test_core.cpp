@@ -5435,6 +5435,8 @@ void heuristic_miner_and_threshold_controls_split_semantics() {
   minera::write_analysis_json(output, "and-measures", log, graph, nullptr,
                               nullptr, &and_net);
   const auto json = output.str();
+  assert(json.find("\"dependency_measures\": [") != std::string::npos);
+  assert(json.find("\"loop_length_two\": []") != std::string::npos);
   assert(json.find("\"and_measures_in\": [") != std::string::npos);
   assert(json.find("\"and_measures_out\": [") != std::string::npos);
   assert(json.find("], \"output_bundles\":") != std::string::npos);

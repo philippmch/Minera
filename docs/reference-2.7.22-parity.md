@@ -4265,6 +4265,30 @@ tests, frontend production build, 3,418 earlier reference comparisons, and
 independent review passed. This verifies finite AND-score behavior, not full
 HeuristicsNet object equivalence; structural coverage remains partial.
 
+Heuristics nets now expose `dependency_measures` for retained DFG relations,
+including negative and dependency-threshold-rejected values. Classic uses the
+cleaned DFG before edge frequency/activity filters; PLUSPLUS records each
+retained relation before applying the dependency threshold. Classic also exposes
+directional `loop_length_two` counts for pre-rescue nodes. These are cleaned DFG
+counts recorded after the loop-ratio check but before later edge filters, so a
+count can be zero or refer to an inactive target. PLUSPLUS has no such loop data.
+
+`docs/heuristic-matrix-reference.json.gz` and its native-checks and validation
+artifacts retain 1,171 public EventLog comparisons, including 290 cases with
+nonempty loop counts. Existing graphs already matched before the new arrays;
+all new arrays now match exactly, with all existing bundles and AND measures
+unchanged. The isolated Release build, all 154 native suites, 624 frontend tests,
+frontend production build, 4,038 earlier reference comparisons, and independent
+review passed. This is finite data preservation evidence; structural coverage
+and full object equivalence remain incomplete.
+
+`docs/heuristic-dfg-metadata-reference.json.gz` separately retains 52 public DFG
+metadata observations for follow-up; native comparison is pending. In particular,
+with noise cleaning disabled the public object can retain dependencies whose
+endpoints are absent from an explicit activity list. The native ID projection
+still needs an adapter-level mapping for that behavior. Explicit metadata
+combinations and exception equivalence are not covered by the EventLog claim.
+
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),
 activity/path occurrence filtering, direct-adjacency mean waits, mean sojourn
