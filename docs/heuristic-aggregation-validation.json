@@ -1,0 +1,17 @@
+{
+  "status": "reference_gap_confirmed",
+  "cases": 640,
+  "matches": 568,
+  "mismatches": 72,
+  "mismatch_modes": {
+    "stdev": 36,
+    "all": 36
+  },
+  "native_source_commit": "4b53b6605d66eaee9b74c4779b4ec7fb6154fabf",
+  "native_executable_sha256": "2f26ac068a065d148390607764d1dd0cadc2f8301a5c2e386da643dcb39744e4",
+  "native_checker_script": "import argparse,gzip,hashlib,json,subprocess\nfrom pathlib import Path\np=argparse.ArgumentParser();p.add_argument('--output',required=True);a=p.parse_args()\nref=json.loads(gzip.decompress(Path('docs/heuristic-aggregation-reference.json.gz').read_bytes()))\nexe=Path('build/petri-comparison-checkpoint-build/Release/minera_export.exe');before=hashlib.sha256(exe.read_bytes()).hexdigest();checks=[]\nfor i,r in enumerate(ref['observations']):\n x=Path(f'build/aggregation-check-{i}.xes');x.write_text(r['xes']);out=x.with_suffix('.json')\n row={'name':r['name'],'expected':r['expected']}\n try:\n  proc=subprocess.run([str(exe),str(x),'--heuristic-variant','classic','--heuristic-decoration','performance','--heuristic-performance-aggregation',r['aggregation'],'-o',str(out)],capture_output=True,text=True,timeout=30)\n  row.update(exit_code=proc.returncode,stderr=proc.stderr)\n  if proc.returncode==0:\n   net=json.loads(out.read_text())['heuristics_net'];stat=net['relation_statistics'][0]\n   if r['aggregation']=='raw_values': actual=stat['wait_samples']\n   elif r['aggregation']=='all': actual={agg:stat[key] for agg,key in [('mean','mean_wait_seconds'),('median','median_wait_seconds'),('min','min_wait_seconds'),('max','max_wait_seconds'),('sum','sum_wait_seconds'),('stdev','stdev_wait_seconds')]}\n   else: actual=net['edges'][0]['representation']\n   row['actual']=actual\n except subprocess.TimeoutExpired: row['timeout']=True\n row['matched']=row.get('actual')==row['expected'];checks.append(row)\n if (i+1)%160==0: print(i+1,'checked',flush=True)\nafter=hashlib.sha256(exe.read_bytes()).hexdigest();assert before==after\nPath(a.output).write_text(json.dumps({'checks':checks,'native_executable_sha256':after},indent=2)+'\\n',encoding='utf-8')\nprint(sum(r['matched'] for r in checks),'/',len(checks));print([r['name'] for r in checks if not r['matched']][:20])\n",
+  "limits": [
+    "Finite numeric observations; no full object parity or structural coverage upgrade.",
+    "Exact standard-deviation implementation is pending."
+  ]
+}
