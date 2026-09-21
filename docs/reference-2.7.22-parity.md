@@ -4216,14 +4216,19 @@ suites and 722 earlier regression comparisons passed. These finite checks do
 not establish full object parity or change structural coverage.
 
 The aggregation follow-up retains 640 public Classic observations over 80
-duration datasets and eight aggregation modes. The baseline matches 568:
-36 standard-deviation results and their 36 `all` results differ because the
-native variance calculation uses rounded floating intermediates. Mean, median,
-minimum, maximum, sum, and raw values match this corpus. The reference and
-baseline artifacts are `docs/heuristic-aggregation-*.json*`; an additional
-1,037 public Python `statistics.stdev` bit goldens cover signed cancellation,
-very large values, subnormals, and halfway rounding. Implementation of exact
-standard-deviation arithmetic is pending; structural coverage remains partial.
+duration datasets and eight aggregation modes. Exact matches improved from
+568 to 640 after replacing rounded variance intermediates with exact integer
+first and second moments and one nearest-even square-root rounding. This
+fixes 36 standard-deviation results and their 36 `all` results. Mean, median,
+minimum, maximum, sum, and raw values continue to match this corpus.
+The reference and validation artifacts are `docs/heuristic-aggregation-*.json*`.
+All 1,037 public Python `statistics.stdev` bit goldens pass, including signed
+cancellation, very large values, subnormals, and halfway rounding. The Release
+build, all 154 native suites, 1,394 earlier regression comparisons, and independent
+review passed. Native zero-for-fewer-than-two-samples, nonfinite input, and true
+result-overflow behavior remain native conventions; exception equivalence is
+not claimed. Raw/all values are verified through relation statistics, while
+edge representations still use scalar means. Structural coverage remains partial.
 
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),
