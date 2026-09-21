@@ -1120,6 +1120,19 @@ void write_heuristics_net(std::ostream& out,
     }
     out << ']';
   };
+  const auto write_and_measures =
+      [&](const std::vector<HeuristicAndMeasure>& measures) {
+        out << '[';
+        for (std::size_t i = 0; i < measures.size(); ++i) {
+          const auto& measure = measures[i];
+          out << "{\"activity\": " << resolve(measure.activity)
+              << ", \"first\": " << resolve(measure.first)
+              << ", \"second\": " << resolve(measure.second)
+              << ", \"value\": " << measure.value << '}'
+              << (i + 1 < measures.size() ? ", " : "");
+        }
+        out << ']';
+      };
   out << "], \"raw_dfg\": ";
   write_frequency_dfg(net.raw_dfg);
   out << ", \"cleaned_dfg\": ";
@@ -1138,6 +1151,10 @@ void write_heuristics_net(std::ostream& out,
           << (++index < net.frequency_triples.size() ? ", " : "");
     }
   }
+  out << "], \"and_measures_in\": ";
+  write_and_measures(net.and_measures_in);
+  out << ", \"and_measures_out\": ";
+  write_and_measures(net.and_measures_out);
   const auto write_bundles = [&](const auto& by_activity) {
     out << '[';
     for (std::size_t activity = 0; activity < by_activity.size(); ++activity) {
@@ -1150,7 +1167,7 @@ void write_heuristics_net(std::ostream& out,
     }
     out << ']';
   };
-  out << "], \"output_bundles\": ";
+  out << ", \"output_bundles\": ";
   write_bundles(net.output_bundles);
   out << ", \"input_bundles\": ";
   write_bundles(net.input_bundles);

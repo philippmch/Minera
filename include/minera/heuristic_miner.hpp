@@ -129,6 +129,16 @@ struct HeuristicRawConcurrencyStatistics {
   std::uint64_t frequency = 0;
 };
 
+// One accepted AND relation around an activity.  `activity` is the center
+// node; `first` and `second` are the name-sorted neighbours whose score
+// cleared the configured AND threshold.
+struct HeuristicAndMeasure {
+  std::size_t activity = 0;
+  std::size_t first = 0;
+  std::size_t second = 0;
+  double value = 0.0;
+};
+
 // A heuristics net: the dependency graph the Heuristic Miner discovers. Unlike
 // the raw directly-follows graph it keeps only edges whose dependency measure
 // and frequency clear the configured thresholds, which is what lets it ignore
@@ -174,6 +184,8 @@ struct HeuristicsNet {
   HeuristicFrequencyDfg cleaned_dfg;
   HeuristicFrequencyDfg window_two_dfg;
   HeuristicTripleFrequencies frequency_triples;
+  std::vector<HeuristicAndMeasure> and_measures_in;
+  std::vector<HeuristicAndMeasure> and_measures_out;
 };
 
 struct HeuristicMinerOptions {

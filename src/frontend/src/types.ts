@@ -2895,6 +2895,13 @@ export type HeuristicPerformanceValue =
   | number[]
   | HeuristicPerformanceSummary;
 
+export interface HeuristicAndMeasure {
+  activity: number;
+  first: number;
+  second: number;
+  value: number;
+}
+
 export interface HeuristicsNet {
   variant?: "classic" | "plusplus";
   decoration?: "frequency" | "performance";
@@ -2964,6 +2971,8 @@ export interface HeuristicsNet {
     last: number;
     count: number;
   }[];
+  and_measures_in?: HeuristicAndMeasure[];
+  and_measures_out?: HeuristicAndMeasure[];
   output_bundles?: { activity: number; bundles: number[][] }[];
   input_bundles?: { activity: number; bundles: number[][] }[];
 }

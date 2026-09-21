@@ -5427,6 +5427,19 @@ void heuristic_miner_and_threshold_controls_split_semantics() {
   for (const auto& bundle : xor_net.output_bundles[a_id_xor]) {
     assert(bundle.size() == 1);
   }
+
+  // The accepted numeric score is part of the serialized net and must leave
+  // the following bundle arrays as valid JSON fields.
+  const auto graph = minera::discover_directly_follows_graph(log);
+  std::ostringstream output;
+  minera::write_analysis_json(output, "and-measures", log, graph, nullptr,
+                              nullptr, &and_net);
+  const auto json = output.str();
+  assert(json.find("\"and_measures_in\": [") != std::string::npos);
+  assert(json.find("\"and_measures_out\": [") != std::string::npos);
+  assert(json.find("], \"output_bundles\":") != std::string::npos);
+  assert(json.find("\"value\": 0.9230769230769231") !=
+         std::string::npos);
 }
 
 void heuristic_miner_min_frequency_drops_rare_edges() {
