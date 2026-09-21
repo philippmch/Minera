@@ -816,6 +816,78 @@ void business_hours_cover_heuristic_waits_and_sojourns() {
                   10800.0) < 1e-9);
 }
 
+void subsecond_timestamps_preserve_exact_order_and_business_prefix() {
+  const auto source = log({trace({
+      event("A", "2026-01-02T16:59:59.999998Z"),
+      event("B", "2026-01-05T07:00:00.000003Z"),
+  })});
+  auto classic = HeuristicMinerOptions{};
+  classic.decoration = HeuristicNetDecoration::kPerformance;
+  classic.start_timestamp_attribute = "start_timestamp";
+  auto b = source.traces.front().events.back();
+  attr(b, "start_timestamp", "2026-01-05T07:00:00.000001Z");
+  const auto exact = discover_heuristics_net(
+      log({trace({source.traces.front().events.front(), b})}), classic);
+  assert(relation(exact, "A", "B").mean_wait_seconds == 223200.000003);
+
+  classic.use_business_hours = true;
+  const auto business = discover_heuristics_net(
+      log({trace({source.traces.front().events.front(), b})}), classic);
+  assert(std::abs(relation(business, "A", "B").mean_wait_seconds -
+                  3.00002284348011e-6) < 1e-18);
+
+  // At the upper calendar boundary, binary64 epoch values cannot distinguish
+  // adjacent microseconds. Exact interval keys must still retain the EFG edge
+  // and reject the false overlap.
+  auto plus = plus_options();
+  plus.decoration = HeuristicNetDecoration::kPerformance;
+  const auto large_year = log({trace({
+      interval("A", "9999-01-01T00:00:00.000000Z",
+               "9999-01-01T00:00:00.000001Z"),
+      interval("B", "9999-01-01T00:00:00.000002Z",
+               "9999-01-01T00:00:00.000003Z"),
+  })});
+  const auto net = discover_heuristics_net(large_year, plus);
+  assert(relation(net, "A", "B").eventually_follows_frequency == 1);
+  assert(relation(net, "A", "B").mean_wait_seconds == 1e-6);
+  assert(net.concurrency_statistics.empty());
+
+  // Sojourns retain the endpoint-float subtraction used by datetime.timestamp
+  // even though their ordering and waits use exact microseconds.
+  const auto pre_epoch = log({trace({
+      interval("A", "1900-01-01T00:00:00.000001Z",
+               "1900-01-01T00:00:00.000003Z"),
+      interval("B", "1900-01-01T00:00:00.000004Z",
+               "1900-01-01T00:00:00.000007Z"),
+  })});
+  const auto old_net = discover_heuristics_net(pre_epoch, plus);
+  assert(activity_stat(old_net, "A").mean_sojourn_seconds ==
+         1.9073486328125e-6);
+
+  const auto epoch_boundary = discover_heuristics_net(log({trace({
+      interval("A", "1969-12-31T23:59:59.999999Z",
+               "1970-01-01T00:00:00.000000Z"),
+      interval("B", "1970-01-01T00:00:00.000001Z",
+               "1970-01-01T00:00:00.000002Z"),
+  })}), plus);
+  assert(activity_stat(epoch_boundary, "A").mean_sojourn_seconds == 1e-6);
+  assert(relation(epoch_boundary, "A", "B").mean_wait_seconds == 1e-6);
+
+  const auto long_interval = log({trace({
+      interval("A", "0001-01-01T00:00:00.000000Z",
+               "0001-01-01T00:00:00.000000Z"),
+      interval("B", "9999-01-01T00:00:00.000017Z",
+               "9999-01-01T00:00:00.000017Z"),
+  })});
+  // Public timedelta.total_seconds(): round the integer duration only once.
+  for (auto options : {classic, plus}) {
+    options.use_business_hours = false;
+    const auto long_net = discover_heuristics_net(long_interval, options);
+    assert(relation(long_net, "A", "B").mean_wait_seconds ==
+           0x1.25d6941400000p+38);
+  }
+}
+
 void configurable_activity_and_timestamp_fields() {
   auto a = event("canonical-a", "not-a-canonical-time");
   auto b = event("canonical-b", "also-not-a-canonical-time");
@@ -891,6 +963,7 @@ int main() {
   classic_performance_aggregations_and_validation();
   start_selector_defaults_and_validation();
   business_hours_cover_heuristic_waits_and_sojourns();
+  subsecond_timestamps_preserve_exact_order_and_business_prefix();
   configurable_activity_and_timestamp_fields();
   std::cout << "heuristic variant tests passed\n";
 }

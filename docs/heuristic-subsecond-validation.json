@@ -1,0 +1,100 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Heuristics microsecond interval ordering, ordinary waits, public epoch-float sojourns, business-prefix arithmetic and exact mean aggregation.",
+  "reference_artifact": {
+    "path": "docs/heuristic-subsecond-reference.json.gz",
+    "uncompressed_sha256": "c3adbe6fc218a645bd163949d55fd09e92d93bd81cdc2d12efa28bbd4d34593b"
+  },
+  "native_artifact": {
+    "path": "docs/heuristic-subsecond-native-checks.json.gz",
+    "uncompressed_sha256": "93cb6c372efc2b5b7ebc9e81381c82aa22d6ed2eef31b2e09d0e531babcd88f9"
+  },
+  "before": {
+    "cases": 672,
+    "matches": 266
+  },
+  "after": {
+    "cases": 672,
+    "matches": 672
+  },
+  "regressions": {
+    "precision": {
+      "observations": 496,
+      "matches": 496
+    },
+    "lifecycle": {
+      "observations": 72,
+      "matches": 72
+    },
+    "business": {
+      "observations": 126,
+      "matches": 126
+    },
+    "selector": {
+      "observations": 21,
+      "matches": 21
+    },
+    "sparse": {
+      "observations": 7,
+      "matches": 7
+    }
+  },
+  "validation": {
+    "release_build": "passed",
+    "native_suites_passed": 154,
+    "independent_review": "clear",
+    "mean_goldens": "public Python statistics.mean fixed-bit tests including signed cancellation, overflow, subnormal and normal ties"
+  },
+  "native_source_parent_commit": "dd514a740d7a8d6cd76a1e5fb4cd52cdd78f7716",
+  "native_verified_staged_tree": "41471c6d31c031d18108a87c3a648dcc458b460e",
+  "native_executable_sha256": "2f26ac068a065d148390607764d1dd0cadc2f8301a5c2e386da643dcb39744e4",
+  "native_checker_script": "import argparse,gzip,hashlib,json,subprocess\nfrom pathlib import Path\np=argparse.ArgumentParser();p.add_argument('--output',required=True);a=p.parse_args();ref=json.loads(gzip.decompress(Path('docs/heuristic-subsecond-reference.json.gz').read_bytes()));exe=Path('build/petri-comparison-checkpoint-build/Release/minera_export.exe');checks=[]\nfor i,r in enumerate(ref['observations']):\n x=Path(f'build/heuristic-subsecond-check-{i}.xes');x.write_text(r['xes'],encoding='utf-8');out=x.with_suffix('.json');cmd=[str(exe),str(x),'--heuristic-variant',r['variant'].lower(),'--heuristic-decoration','performance','--heuristic-start-timestamp-attribute','start_timestamp','-o',str(out)]\n if r['business']:cmd+=['--heuristic-business-hours']\n if 'business_hour_slots' in r['parameters']:cmd+=['--heuristic-business-hour-slots',','.join(f'{start}-{end}' for start,end in r['parameters']['business_hour_slots']) or 'none']\n row={'index':i,'name':r['name'],'expected':r['expected']}\n try:\n  proc=subprocess.run(cmd,capture_output=True,text=True,timeout=30);row.update(exit_code=proc.returncode,stderr=proc.stderr)\n  if proc.returncode==0:\n   payload=json.loads(out.read_text());n=payload['heuristics_net'];names=n['activities'] if n['activity_ids_are_local'] else [v['name'] for v in payload['activities']]\n   row['actual']={'wait':sorted([[[names[e['source']],names[e['target']]],e['mean_wait_seconds']] for e in n['relation_statistics'] if e['direct_adjacency_frequency']]),'sojourn':{names[e['activity']]:e['mean_sojourn_seconds'] for e in n['activity_statistics']} if r['variant']=='PLUSPLUS' else {},'edges':sorted([[names[e['source']],names[e['target']],e['dependency'],e['frequency'],e['representation']] for e in n['edges']])}\n except subprocess.TimeoutExpired:row['timeout']=True\n row['matched']=row.get('actual')==row['expected'];checks.append(row)\n if (i+1)%160==0:print(i+1,'cases checked',flush=True)\nreport={'checks':checks,'native_executable_sha256':hashlib.sha256(exe.read_bytes()).hexdigest()};Path(a.output).write_text(json.dumps(report,indent=2)+'\\n',encoding='utf-8');print(sum(c['matched'] for c in checks),'/',len(checks));print('first mismatches:',[c['index'] for c in checks if not c['matched']][:25])\n",
+  "limits": [
+    "Finite EventLog observations across microsecond waits/sojourns, business schedules, negative epochs, timezone offsets and year9999.",
+    "Exact numeric comparisons; named accepted edges are sorted only to disregard presentation order.",
+    "ISO-string XES preserves constructed datetime clock fields and offsets; typed-date import normalization is separate.",
+    "Ordinary PLUSPLUS sojourns intentionally retain public timestamp-float subtraction behavior, which can lose microseconds at large years.",
+    "No full object parity or structural coverage upgrade is claimed."
+  ],
+  "public_reference_replay": {
+    "cases": 672,
+    "matches": 672,
+    "environment": {
+      "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+      "dependencies": {
+        "numpy": "2.4.6",
+        "pandas": "3.0.6",
+        "pm4py": "2.7.22"
+      },
+      "provenance": [
+        {
+          "module": "pm4py.algo.discovery.heuristics.algorithm",
+          "sha256": "8dd60f778b47bb969d9f5ea68e962263b8e343fe61cf8ce1b667b91f944439b0",
+          "method": "opaque pinned module bytes, CRLF normalized; no source decoding"
+        },
+        {
+          "module": "pm4py.algo.discovery.heuristics.variants.classic",
+          "sha256": "240610dad47ed5d6e7b11db6de6dad34eb617ca646a79a95ad034e64fb1b8d5a",
+          "method": "opaque pinned module bytes, CRLF normalized; no source decoding"
+        },
+        {
+          "module": "pm4py.algo.discovery.heuristics.variants.plusplus",
+          "sha256": "e2ea1532ff750456752de09859629c1c8e69010ad6d85cfb4f7567525dcc4206",
+          "method": "opaque pinned module bytes, CRLF normalized; no source decoding"
+        },
+        {
+          "module": "pm4py.algo.discovery.dfg.variants.performance",
+          "sha256": "a8713bc8e55453f516692973a65e05c4c285eb5bb6b32534e2fea0c670972bd8",
+          "method": "opaque pinned module bytes, CRLF normalized; no source decoding"
+        },
+        {
+          "module": "pm4py.util.business_hours",
+          "sha256": "5a13a3757e8bfc2f0209cd4b31a092f4aa976cb4cd7743a9ccb0533ef7837e35",
+          "method": "opaque pinned module bytes, CRLF normalized; no source decoding"
+        }
+      ],
+      "cases": 48
+    },
+    "script": "import warnings\nwarnings.filterwarnings('ignore')\nimport gzip,json,sys\nfrom datetime import datetime\nfrom pathlib import Path\nfrom xml.etree import ElementTree as ET\nfrom pm4py.algo.discovery.heuristics import algorithm\nfrom pm4py.objects.log.obj import EventLog,Trace,Event\nref=json.loads(gzip.decompress(Path('docs/heuristic-subsecond-reference.json.gz').read_bytes()))\nchecks=[]\nfor row in ref['observations']:\n traces=[]\n for trace in ET.fromstring(row['xes']).findall('trace'):\n  events=[]\n  for event in trace.findall('event'):\n   fields={a.attrib['key']:a.attrib['value'] for a in event}\n   for key in ['time:timestamp','start_timestamp']:\n    if key in fields: fields[key]=datetime.fromisoformat(fields[key])\n   events.append(Event(fields))\n  traces.append(Trace(events))\n try:\n  net=algorithm.apply_heu(EventLog(traces),parameters=row['parameters'],variant=getattr(algorithm.Variants,row['variant']))\n  actual={'wait':sorted([[list(k),v] for k,v in net.performance_dfg.items()]),'sojourn':net.sojourn_times if row['variant']=='PLUSPLUS' else {},'edges':sorted([[a,b.node_name,e.dependency_value,e.dfg_value,e.repr_value] for a,node in net.nodes.items() for b,edges in node.output_connections.items() for e in edges])}\n  checks.append({'name':row['name'],'matched':actual==row['expected'],'actual':actual})\n except Exception as exc:\n  checks.append({'name':row['name'],'matched':False,'error_type':type(exc).__name__,'error':str(exc)})\nPath('build/heuristic-subsecond-reference-replay.json').write_text(json.dumps({'checks':checks,'python':sys.version},indent=2)+'\\n',encoding='utf-8')\nprint(sum(r['matched'] for r in checks),'/',len(checks),'public replay matches')\nassert all(r['matched'] for r in checks)\n"
+  }
+}

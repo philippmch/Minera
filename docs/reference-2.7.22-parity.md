@@ -4196,6 +4196,25 @@ improved from 379 to 496. All 154 native suites and 226 earlier timestamp,
 business-hours, and lifecycle comparisons pass. The graph checks cover active
 nodes and accepted edges, not full object equivalence or structural completion.
 
+Heuristics interval sorting, overlap, and ordinary waits now retain integer
+microseconds. Ordinary PLUSPLUS sojourns retain the reference's subtraction of
+floating epoch endpoints, including its loss of microseconds at large years.
+Epoch endpoints and long wait durations round the exact microsecond ratio once;
+this also avoids cancellation immediately before 1970. Performance means use an
+exact binary64 accumulator with one nearest-even rounding, while other
+aggregation modes retain their existing arithmetic.
+
+Business-time arithmetic keeps exact integer week boundaries and follows the
+reference's ordered weekly-total and prefix subtraction. This preserves its
+fractional rounding at working-slot and weekend boundaries. The existing DFG
+double-based helper is unchanged. `docs/heuristic-subsecond-reference.json.gz`
+and its native-checks and validation artifacts retain 672 comparisons spanning
+fractional durations, custom schedules, offsets, negative epochs, and years
+1–9999. Exact matches improved from 266 to 672; all 672 public observations also
+replayed identically on the restored pinned reference runtime. All 154 native
+suites and 722 earlier regression comparisons passed. These finite checks do
+not establish full object parity or change structural coverage.
+
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),
 activity/path occurrence filtering, direct-adjacency mean waits, mean sojourn
