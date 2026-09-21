@@ -2,6 +2,7 @@
 // test, so its asserts must never compile away. Must precede <cassert>.
 #undef NDEBUG
 
+#include "../exact_mean.hpp"
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
@@ -43,6 +44,8 @@
 #include "minera/xes_export.hpp"
 
 #include <algorithm>
+#include <array>
+#include <bit>
 #include <cassert>
 #include <cstdint>
 #include <cmath>
@@ -59,6 +62,80 @@
 #include <vector>
 
 namespace {
+
+std::uint64_t exact_mean_bits(double value) {
+  return std::bit_cast<std::uint64_t>(value);
+}
+
+void exact_mean_matches_python_statistics_goldens() {
+  // Expected bits were generated with the public Python 3 stdlib call
+  // statistics.mean, then frozen here so this native test has no runtime
+  // dependency on Python.  The generated matrix exercises every subset of a
+  // small signed basis and adds a deterministic cancellation term to every
+  // even subset.
+  const std::array<double, 4> basis = {1.0, -2.0, 4.0, -8.0};
+  const std::array<std::uint64_t, 15> matrix_expected = {
+      0x3ff0000000000000, 0xc008000000000000, 0xbfe0000000000000,
+      0x3ff8000000000000, 0x4004000000000000, 0xbfe5555555555555,
+      0x3ff0000000000000, 0xc012000000000000, 0xc00c000000000000,
+      0xc012aaaaaaaaaaab, 0xc008000000000000, 0xbffaaaaaaaaaaaab,
+      0xbff0000000000000, 0xc004000000000000, 0xbff4000000000000};
+  for (std::size_t mask = 1; mask <= basis.size() * 3 + 3; ++mask) {
+    std::vector<double> values;
+    for (std::size_t index = 0; index < basis.size(); ++index) {
+      if ((mask & (std::size_t{1} << index)) != 0)
+        values.push_back(basis[index]);
+    }
+    if ((mask & 1u) == 0) values.push_back(-basis[mask % basis.size()]);
+    assert(exact_mean_bits(minera::detail::exact_mean(values)) ==
+           matrix_expected[mask - 1]);
+  }
+
+  const double max_finite = std::numeric_limits<double>::max();
+  const double min_subnormal = std::numeric_limits<double>::denorm_min();
+  struct Golden {
+    std::vector<double> values;
+    std::uint64_t expected_bits;
+  };
+  const std::vector<Golden> focused = {
+      {{}, 0x0000000000000000},
+      {{0.123456, 0.234567, 0.345678}, 0x3fce064a9cdc4439},
+      {{1.0, 2.0, 2.0}, 0x3ffaaaaaaaaaaaab},
+      {{1.0, std::nextafter(1.0, 2.0)}, 0x3ff0000000000000},
+      {{std::nextafter(1.0, 2.0),
+        std::nextafter(std::nextafter(1.0, 2.0), 2.0)},
+       0x3ff0000000000002},
+      {{std::nextafter(std::numeric_limits<double>::min(), 0.0),
+        std::numeric_limits<double>::min()}, 0x0010000000000000},
+      {{max_finite, max_finite, -max_finite}, 0x7fd5555555555555},
+      {{1e308, -1e308, 3.0}, 0x3ff0000000000000},
+      {{-1.0, -2.0, 4.0}, 0x3fd5555555555555},
+      {{min_subnormal, 0.0}, 0x0000000000000000},
+      {{-min_subnormal, 0.0}, 0x8000000000000000},
+      {{min_subnormal, min_subnormal, 0.0}, 0x0000000000000001},
+      {{min_subnormal, 0.0, 0.0}, 0x0000000000000000},
+      {{max_finite, -max_finite, min_subnormal},
+       0x0000000000000000},
+      {{std::ldexp(1.0, 1000), std::ldexp(1.0, 999),
+        -std::ldexp(1.0, 998), std::ldexp(1.0, 998)},
+       0x7e58000000000000},
+      {{-max_finite, -max_finite, max_finite}, 0xffd5555555555555}};
+  for (const auto& golden : focused) {
+    assert(exact_mean_bits(minera::detail::exact_mean(golden.values)) ==
+           golden.expected_bits);
+  }
+
+  const auto positive_infinity = std::numeric_limits<double>::infinity();
+  const auto negative_infinity = -positive_infinity;
+  assert(std::isinf(minera::detail::exact_mean({positive_infinity, 1.0})) &&
+         minera::detail::exact_mean({positive_infinity, 1.0}) > 0.0);
+  assert(std::isinf(minera::detail::exact_mean({negative_infinity, 1.0})) &&
+         minera::detail::exact_mean({negative_infinity, 1.0}) < 0.0);
+  assert(std::isnan(minera::detail::exact_mean(
+      {positive_infinity, negative_infinity})));
+  assert(std::isnan(minera::detail::exact_mean(
+      {std::numeric_limits<double>::quiet_NaN(), 1.0})));
+}
 
 void process_tree_alignment_json_carries_failure_and_moves() {
   minera::ProcessTreeAlignmentResult result;
@@ -6666,6 +6743,7 @@ void csv_case_aliases_are_opt_in_and_exact_columns_win() {
 }
 
 int main() {
+  exact_mean_matches_python_statistics_goldens();
   csv_case_aliases_are_opt_in_and_exact_columns_win();
   ilp_json_is_standalone_and_deterministic();
   trace_variant_query_json_is_standalone_and_deterministic();
