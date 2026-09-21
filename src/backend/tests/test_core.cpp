@@ -5395,6 +5395,35 @@ void json_export_preserves_heuristic_double_precision() {
          std::string::npos);
 }
 
+void json_export_preserves_heuristic_dfg_metadata_shapes() {
+  minera::HeuristicClassicDfgInput input;
+  input.dfg[{"A", "B"}] = 1;
+  input.activities = std::vector<std::string>{"A", "A", "B"};
+  input.activity_counts =
+      std::map<std::string, std::uint64_t>{{"A", 1}, {"B", 1}};
+  input.start_activities = minera::HeuristicBoundaryActivities{
+      std::vector<std::string>{"A", "B", "A"}};
+  input.end_activities = minera::HeuristicBoundaryActivities{
+      std::map<std::string, std::uint64_t>{{"A", 2}, {"B", 0}}};
+  minera::HeuristicMinerOptions options;
+  options.dfg_pre_cleaning_noise_threshold = 0.0;
+  const auto heuristics = minera::discover_heuristics_net(input, options);
+  minera::DirectlyFollowsGraph graph;
+  graph.ensure_activity("unrelated");
+  std::ostringstream output;
+  minera::write_analysis_json(output, "dfg-metadata", minera::EventLog{},
+                              graph, nullptr, nullptr, &heuristics);
+  const auto json = output.str();
+  assert(json.find("\"activity_ids_are_local\": true") !=
+         std::string::npos);
+  assert(json.find(
+             "\"metadata\": {\"activities\": [\"A\", \"A\", \"B\"], "
+             "\"activities_occurrences\": {\"A\": 1, \"B\": 1}, "
+             "\"start_activities\": [[\"A\", \"B\", \"A\"]], "
+             "\"end_activities\": [{\"A\": 2, \"B\": 0}]}") !=
+         std::string::npos);
+}
+
 void heuristic_miner_handles_an_empty_log() {
   const auto net = minera::discover_heuristics_net(minera::EventLog{});
   assert(net.activities.empty());
@@ -6934,6 +6963,7 @@ int main() {
   heuristics_net_keeps_exclusive_branches_exclusive();
   heuristics_net_handles_a_self_loop();
   json_export_preserves_heuristic_double_precision();
+  json_export_preserves_heuristic_dfg_metadata_shapes();
   importer_handles_a_header_only_log();
   importer_strips_a_utf8_bom();
   dfg_handles_single_event_traces();

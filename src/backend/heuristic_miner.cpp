@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -828,50 +829,128 @@ HeuristicsNet discover_classic_dfg(
   net.window_two_dfg = input.window_two_dfg;
   net.frequency_triples = input.frequency_triples;
 
+  // Keep declared names separate from the internal id table.  A direct DFG
+  // without an explicit declaration uses its endpoint names as declarations;
+  // an explicit declaration (including an empty one) remains authoritative
+  // for fallback-node creation and metadata ordering.
+  std::vector<std::string> declared_activities;
   if (input.activities) {
-    net.activities = *input.activities;
+    declared_activities = *input.activities;
   } else {
     std::set<std::string> inferred;
     for (const auto& [pair, _] : input.dfg) {
       inferred.insert(pair.first);
       inferred.insert(pair.second);
     }
-    net.activities.assign(inferred.begin(), inferred.end());
+    declared_activities.assign(inferred.begin(), inferred.end());
   }
+
+  // The registry starts in declared order (preserving EventLog ordering),
+  // then receives names referenced by graph statistics.  Occurrence-only and
+  // boundary-only metadata keys remain name-based and do not become nodes.
   std::unordered_map<std::string, std::size_t> ids;
-  for (std::size_t i = 0; i < net.activities.size(); ++i)
-    ids[net.activities[i]] = i;
+  const auto intern = [&](const std::string& name) {
+    const auto [it, inserted] = ids.try_emplace(name, net.activities.size());
+    if (inserted) net.activities.push_back(name);
+    return it->second;
+  };
+  for (const auto& activity : declared_activities) intern(activity);
+  for (const auto& [pair, _] : input.dfg) {
+    intern(pair.first);
+    intern(pair.second);
+  }
+  for (const auto& [pair, _] : input.window_two_dfg) {
+    intern(pair.first);
+    intern(pair.second);
+  }
+  for (const auto& [triple, _] : input.frequency_triples) {
+    const auto& [first, middle, last] = triple;
+    intern(first);
+    intern(middle);
+    intern(last);
+  }
+  if (input.performance_dfg) {
+    for (const auto& [pair, _] : *input.performance_dfg) {
+      intern(pair.first);
+      intern(pair.second);
+    }
+  }
+  // Positive noise cleaning follows the public endpoint validation: foreign
+  // DFG names are accepted only when pre-cleaning is explicitly disabled.
+  if (input.activities && options.dfg_pre_cleaning_noise_threshold > 0.0) {
+    for (const auto& [pair, _] : input.dfg) {
+      if (std::find(declared_activities.begin(), declared_activities.end(),
+                    pair.first) == declared_activities.end() ||
+          std::find(declared_activities.begin(), declared_activities.end(),
+                    pair.second) == declared_activities.end())
+        throw std::invalid_argument(
+            "Classic heuristic DFG contains an activity missing from the "
+            "declared activity list");
+    }
+  }
 
   const auto occurrences =
       input.activity_counts.value_or(
-          infer_activity_counts(input.dfg, net.activities));
+          infer_activity_counts(input.dfg, declared_activities));
   std::map<std::string, std::uint64_t> starts;
   std::map<std::string, std::uint64_t> ends;
-  if (input.start_counts) {
+  HeuristicBoundaryActivities metadata_starts;
+  HeuristicBoundaryActivities metadata_ends;
+  const auto inferred_boundaries = [&]() {
+    std::set<std::string> incoming;
+    std::set<std::string> outgoing;
+    for (const auto& [pair, _] : input.dfg) {
+      outgoing.insert(pair.first);
+      incoming.insert(pair.second);
+    }
+    std::vector<std::string> inferred_starts;
+    std::vector<std::string> inferred_ends;
+    std::set<std::string> seen_starts;
+    std::set<std::string> seen_ends;
+    for (const auto& [pair, _] : input.dfg) {
+      if (!incoming.contains(pair.first) &&
+          seen_starts.insert(pair.first).second)
+        inferred_starts.push_back(pair.first);
+      if (!outgoing.contains(pair.second) &&
+          seen_ends.insert(pair.second).second)
+        inferred_ends.push_back(pair.second);
+    }
+    return std::pair{std::move(inferred_starts), std::move(inferred_ends)};
+  };
+  const auto [inferred_starts, inferred_ends] = inferred_boundaries();
+  const auto boundary_counts = [](const HeuristicBoundaryActivities& value) {
+    return std::visit(
+        [](const auto& selected) {
+          using Value = std::decay_t<decltype(selected)>;
+          std::map<std::string, std::uint64_t> result;
+          if constexpr (std::is_same_v<Value, std::vector<std::string>>) {
+            for (const auto& name : selected) result[name] = 1;
+          } else {
+            result = selected;
+          }
+          return result;
+        },
+        value);
+  };
+  if (input.start_activities) {
+    metadata_starts = *input.start_activities;
+    starts = boundary_counts(*input.start_activities);
+  } else if (input.start_counts) {
+    metadata_starts = *input.start_counts;
     starts = *input.start_counts;
   } else {
-    std::set<std::string> incoming;
-    std::set<std::string> outgoing;
-    for (const auto& [pair, _] : input.dfg) {
-      outgoing.insert(pair.first);
-      incoming.insert(pair.second);
-    }
-    for (const auto& activity : net.activities)
-      if (outgoing.contains(activity) && !incoming.contains(activity))
-        starts[activity] = 1;
+    metadata_starts = inferred_starts;
+    for (const auto& activity : inferred_starts) starts[activity] = 1;
   }
-  if (input.end_counts) {
+  if (input.end_activities) {
+    metadata_ends = *input.end_activities;
+    ends = boundary_counts(*input.end_activities);
+  } else if (input.end_counts) {
+    metadata_ends = *input.end_counts;
     ends = *input.end_counts;
   } else {
-    std::set<std::string> incoming;
-    std::set<std::string> outgoing;
-    for (const auto& [pair, _] : input.dfg) {
-      outgoing.insert(pair.first);
-      incoming.insert(pair.second);
-    }
-    for (const auto& activity : net.activities)
-      if (incoming.contains(activity) && !outgoing.contains(activity))
-        ends[activity] = 1;
+    metadata_ends = inferred_ends;
+    for (const auto& activity : inferred_ends) ends[activity] = 1;
   }
 
   net.cleaned_dfg = clean_classic_dfg(input, options, net.activities);
@@ -900,13 +979,28 @@ HeuristicsNet discover_classic_dfg(
     const auto it = occurrences.find(name);
     return it == occurrences.end() ? std::uint64_t{0} : it->second;
   };
+  const auto required_activity_count = [&](const std::string& name) {
+    return occurrences.at(name);
+  };
   const auto accepted_by_threshold = [&](const NamePair& pair) {
-    const auto count = pair_count(net.cleaned_dfg, pair.first, pair.second);
     const auto dep = dependencies.find(pair);
-    return activity_count(pair.first) >= options.min_activity_count &&
-           activity_count(pair.second) >= options.min_activity_count &&
-           count >= options.min_frequency && dep != dependencies.end() &&
-           dep->second >= dependency_threshold;
+    // Keep the public short-circuit order: rejected dependencies and
+    // below-frequency paths must not touch occurrence metadata.  Once both
+    // graph gates pass, source membership/count is checked before target.
+    if (dep == dependencies.end() ||
+        !(dep->second >= dependency_threshold))
+      return false;
+    const auto count = pair_count(net.cleaned_dfg, pair.first, pair.second);
+    if (count < options.min_frequency) return false;
+    const auto source_count = occurrences.find(pair.first);
+    // Missing occurrence entries reject this candidate without throwing;
+    // the declared fallback node path below still validates counts strictly.
+    if (source_count == occurrences.end()) return false;
+    if (source_count->second < options.min_activity_count)
+      return false;
+    const auto target_count = occurrences.find(pair.second);
+    if (target_count == occurrences.end()) return false;
+    return target_count->second >= options.min_activity_count;
   };
   for (const auto& [pair, count] : net.cleaned_dfg) {
     if (!accepted_by_threshold(pair)) continue;
@@ -1042,10 +1136,16 @@ HeuristicsNet discover_classic_dfg(
                                                 second)});
       const NamePair forward{first, second};
       const NamePair backward{second, first};
-      if (pair_count(net.cleaned_dfg, first, second) <
-              options.min_frequency ||
-          activity_count(first) < options.min_activity_count ||
-          activity_count(second) < options.min_activity_count)
+      // A foreign triple is observable as loop metadata, but it only rescues
+      // an edge when the cleaned DFG contains the forward path itself.  This
+      // presence guard is distinct from min_frequency so a zero threshold
+      // cannot manufacture zero-frequency edges from triple-only names.
+      if (!net.cleaned_dfg.contains(forward) ||
+          pair_count(net.cleaned_dfg, first, second) < options.min_frequency)
+        continue;
+      const auto first_count = required_activity_count(first);
+      if (first_count < options.min_activity_count) continue;
+      if (required_activity_count(second) < options.min_activity_count)
         continue;
       const bool forward_dep =
           dependencies.contains(forward) &&
@@ -1084,8 +1184,16 @@ HeuristicsNet discover_classic_dfg(
 
   if (std::none_of(active.begin(), active.end(), [](bool value) {
         return value;
-      }))
-    std::fill(active.begin(), active.end(), true);
+      })) {
+    // Fallback nodes come only from the declared activity list.  Validate
+    // those counts strictly at the point where the public implementation
+    // consults fallback nodes; inactive declared names may remain absent from
+    // the raw metadata map when an edge already made nodes active.
+    for (const auto& name : declared_activities) {
+      (void)required_activity_count(name);
+      active[ids.at(name)] = true;
+    }
+  }
   for (std::size_t id = 0; id < active.size(); ++id)
     if (active[id]) net.active_activities.push_back(id);
   for (const auto id : net.active_activities) {
@@ -1179,6 +1287,12 @@ HeuristicsNet discover_classic_dfg(
               return std::tie(lhs.source, lhs.target) <
                      std::tie(rhs.source, rhs.target);
             });
+  HeuristicNetMetadata metadata;
+  metadata.activities = input.activities ? *input.activities : declared_activities;
+  metadata.activities_occurrences = occurrences;
+  metadata.start_activities = std::move(metadata_starts);
+  metadata.end_activities = std::move(metadata_ends);
+  net.metadata = std::move(metadata);
   return net;
 }
 
@@ -1312,6 +1426,25 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
     sort_bundles_by_activity_name(net.input_bundles[activity],
                                   net.activities);
   }
+  HeuristicNetMetadata metadata;
+  metadata.activities = net.activities;
+  metadata.activities_occurrences = {};
+  metadata.start_activities = std::map<std::string, std::uint64_t>{};
+  metadata.end_activities = std::map<std::string, std::uint64_t>{};
+  // PLUSPLUS exposes the retained activity table and filtered occurrence /
+  // boundary dictionaries.  Low-count raw activities stay in the raw
+  // statistics vectors but do not leak into this public metadata object.
+  for (const auto& stat : net.activity_statistics) {
+    const auto& name = net.activities[stat.activity];
+    metadata.activities_occurrences[name] = stat.occurrences;
+    if (stat.start_occurrences > 0)
+      std::get<std::map<std::string, std::uint64_t>>(
+          metadata.start_activities)[name] = stat.start_occurrences;
+    if (stat.end_occurrences > 0)
+      std::get<std::map<std::string, std::uint64_t>>(
+          metadata.end_activities)[name] = stat.end_occurrences;
+  }
+  net.metadata = std::move(metadata);
   return net;
 }
 
@@ -1331,7 +1464,11 @@ HeuristicsNet discover_heuristics_net(
 HeuristicsNet discover_heuristics_net(
     const HeuristicClassicDfgInput& input,
     const HeuristicMinerOptions& options) {
-  return discover_classic_dfg(input, options);
+  auto net = discover_classic_dfg(input, options);
+  // Direct DFG discovery has no external activity registry; ids are local to
+  // the returned activity table even when names happen to be canonical.
+  net.activity_ids_are_local = true;
+  return net;
 }
 
 }  // namespace minera

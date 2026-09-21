@@ -151,6 +151,24 @@ struct HeuristicLoopLengthTwo {
   std::uint64_t frequency = 0;
 };
 
+// Boundary statistics in the public DFG object are either an ordered list of
+// activity names (direct DFG input) or a name-to-count mapping (event-log
+// input).  The JSON wire format wraps each selected value in one outer array.
+using HeuristicBoundaryActivities =
+    std::variant<std::vector<std::string>,
+                 std::map<std::string, std::uint64_t>>;
+
+// Raw metadata retained from the public heuristic-miner input.  This is kept
+// separate from the internal activity-id table in HeuristicsNet: callers can
+// inspect declared names, duplicate ordering, and unprojected boundary/count
+// data without changing the ids used by graph consumers.
+struct HeuristicNetMetadata {
+  std::vector<std::string> activities;
+  std::map<std::string, std::uint64_t> activities_occurrences;
+  HeuristicBoundaryActivities start_activities;
+  HeuristicBoundaryActivities end_activities;
+};
+
 // A heuristics net: the dependency graph the Heuristic Miner discovers. Unlike
 // the raw directly-follows graph it keeps only edges whose dependency measure
 // and frequency clear the configured thresholds, which is what lets it ignore
@@ -200,6 +218,7 @@ struct HeuristicsNet {
   std::vector<HeuristicAndMeasure> and_measures_out;
   std::vector<HeuristicDependencyMeasure> dependency_measures;
   std::vector<HeuristicLoopLengthTwo> loop_length_two;
+  std::optional<HeuristicNetMetadata> metadata;
 };
 
 struct HeuristicMinerOptions {
@@ -264,6 +283,8 @@ struct HeuristicClassicDfgInput {
   HeuristicFrequencyDfg window_two_dfg;
   HeuristicTripleFrequencies frequency_triples;
   std::optional<HeuristicPerformanceDfg> performance_dfg;
+  std::optional<HeuristicBoundaryActivities> start_activities;
+  std::optional<HeuristicBoundaryActivities> end_activities;
 };
 
 // Discovers a heuristics net from an event log. The dependency of a over b is

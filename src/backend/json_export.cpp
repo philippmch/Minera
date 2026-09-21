@@ -1187,6 +1187,54 @@ void write_heuristics_net(std::ostream& out,
   write_bundles(net.output_bundles);
   out << ", \"input_bundles\": ";
   write_bundles(net.input_bundles);
+  if (net.metadata) {
+    const auto write_boundary = [&](const HeuristicBoundaryActivities& value) {
+      // Public boundary values are represented as a one-element outer array,
+      // preserving whether the selected inner value was a list or map.
+      out << '[';
+      std::visit(
+          [&](const auto& selected) {
+            using Value = std::decay_t<decltype(selected)>;
+            if constexpr (std::is_same_v<Value, std::vector<std::string>>) {
+              out << '[';
+              for (std::size_t i = 0; i < selected.size(); ++i) {
+                write_json_string(out, selected[i]);
+                if (i + 1 < selected.size()) out << ", ";
+              }
+              out << ']';
+            } else {
+              out << '{';
+              std::size_t i = 0;
+              for (const auto& [name, count] : selected) {
+                write_json_string(out, name);
+                out << ": " << count;
+                if (++i < selected.size()) out << ", ";
+              }
+              out << '}';
+            }
+          },
+          value);
+      out << ']';
+    };
+    out << ", \"metadata\": {\"activities\": [";
+    for (std::size_t i = 0; i < net.metadata->activities.size(); ++i) {
+      write_json_string(out, net.metadata->activities[i]);
+      if (i + 1 < net.metadata->activities.size()) out << ", ";
+    }
+    out << "], \"activities_occurrences\": {";
+    std::size_t occurrence_index = 0;
+    for (const auto& [name, count] : net.metadata->activities_occurrences) {
+      write_json_string(out, name);
+      out << ": " << count;
+      if (++occurrence_index < net.metadata->activities_occurrences.size())
+        out << ", ";
+    }
+    out << "}, \"start_activities\": ";
+    write_boundary(net.metadata->start_activities);
+    out << ", \"end_activities\": ";
+    write_boundary(net.metadata->end_activities);
+    out << '}';
+  }
   out << '}';
 }
 
