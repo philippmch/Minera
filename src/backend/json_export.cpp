@@ -918,6 +918,37 @@ void write_petri_net(std::ostream& out,
   out << "]}";
 }
 
+void write_heuristic_performance_summary(
+    std::ostream& out, const HeuristicPerformanceSummary& summary) {
+  // Match PM4Py's public all-aggregation object keys.  The native scalar
+  // representation remains available separately for compatibility callers.
+  out << "{\"median\": " << summary.median
+      << ", \"min\": " << summary.minimum
+      << ", \"max\": " << summary.maximum
+      << ", \"stdev\": " << summary.stdev
+      << ", \"sum\": " << summary.sum
+      << ", \"mean\": " << summary.mean << '}';
+}
+
+void write_heuristic_performance_value(
+    std::ostream& out, const HeuristicPerformanceValue& value) {
+  std::visit(
+      [&](const auto& selected) {
+        using Value = std::decay_t<decltype(selected)>;
+        if constexpr (std::is_same_v<Value, double>) {
+          out << selected;
+        } else if constexpr (std::is_same_v<Value, std::vector<double>>) {
+          out << '[';
+          for (std::size_t i = 0; i < selected.size(); ++i)
+            out << selected[i] << (i + 1 < selected.size() ? ", " : "");
+          out << ']';
+        } else {
+          write_heuristic_performance_summary(out, selected);
+        }
+      },
+      value);
+}
+
 void write_heuristics_net(std::ostream& out,
                           const HeuristicsNet& net,
                           const DirectlyFollowsGraph& graph) {
@@ -998,8 +1029,12 @@ void write_heuristics_net(std::ostream& out,
         << ", \"target\": " << resolve(edge.target)
         << ", \"dependency\": " << edge.dependency
         << ", \"frequency\": " << edge.frequency
-        << ", \"representation\": " << edge.representation
-        << ", \"length_two_loop\": "
+        << ", \"representation\": ";
+    if (edge.representation_value)
+      write_heuristic_performance_value(out, *edge.representation_value);
+    else
+      out << edge.representation;
+    out << ", \"length_two_loop\": "
         << (edge.length_two_loop ? "true" : "false") << '}'
         << (i + 1 < net.edges.size() ? ", " : "");
   }
@@ -1031,8 +1066,12 @@ void write_heuristics_net(std::ostream& out,
         << ", \"mean_wait_seconds\": " << stat.mean_wait_seconds
         << ", \"raw_frequency\": " << stat.raw_frequency
         << ", \"cleaned_frequency\": " << stat.cleaned_frequency
-        << ", \"representation\": " << stat.representation
-        << ", \"length_two_loop\": "
+        << ", \"representation\": ";
+    if (stat.representation_value)
+      write_heuristic_performance_value(out, *stat.representation_value);
+    else
+      out << stat.representation;
+    out << ", \"length_two_loop\": "
         << (stat.length_two_loop ? "true" : "false")
         << ", \"wait_samples\": [";
     for (std::size_t j = 0; j < stat.wait_samples.size(); ++j) {

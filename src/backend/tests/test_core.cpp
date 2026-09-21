@@ -5375,6 +5375,24 @@ void json_export_preserves_heuristic_double_precision() {
   }
   assert(failed);
   assert(failing_output.precision() == 3);
+
+  options.performance_aggregation =
+      minera::HeuristicPerformanceAggregation::kRawValues;
+  const auto raw_heuristics = minera::discover_heuristics_net(log, options);
+  std::ostringstream raw_output;
+  minera::write_analysis_json(raw_output, "structured", log, graph, nullptr,
+                              nullptr, &raw_heuristics);
+  const auto raw_json = raw_output.str();
+  assert(raw_json.find("\"representation\": [") != std::string::npos);
+
+  options.performance_aggregation = minera::HeuristicPerformanceAggregation::kAll;
+  const auto all_heuristics = minera::discover_heuristics_net(log, options);
+  std::ostringstream all_output;
+  minera::write_analysis_json(all_output, "structured", log, graph, nullptr,
+                              nullptr, &all_heuristics);
+  const auto all_json = all_output.str();
+  assert(all_json.find("\"representation\": {\"median\": ") !=
+         std::string::npos);
 }
 
 void heuristic_miner_handles_an_empty_log() {

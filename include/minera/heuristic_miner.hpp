@@ -8,6 +8,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "minera/event_log.hpp"
@@ -40,6 +41,21 @@ enum class HeuristicPerformanceAggregation {
   kAll,
 };
 
+// The structured performance values returned by the raw_values and all
+// aggregations.  Their values mirror the public JSON representation; the
+// scalar `representation` fields below remain the compatibility projection.
+struct HeuristicPerformanceSummary {
+  double mean = 0.0;
+  double median = 0.0;
+  double minimum = 0.0;
+  double maximum = 0.0;
+  double stdev = 0.0;
+  double sum = 0.0;
+};
+
+using HeuristicPerformanceValue =
+    std::variant<double, std::vector<double>, HeuristicPerformanceSummary>;
+
 // A directed dependency between two activities accepted by the Heuristic Miner,
 // carrying both how often it was observed and how reliable the ordering is.
 struct HeuristicDependency {
@@ -49,6 +65,9 @@ struct HeuristicDependency {
   std::uint64_t frequency = 0;  // |source > target|: direct successions observed
   double representation = 0.0;
   bool length_two_loop = false;
+  // Structured raw/all value, when the selected decoration and aggregation
+  // support one.  Empty means that callers should use `representation`.
+  std::optional<HeuristicPerformanceValue> representation_value;
 };
 
 // One bundle of an activity's split (or join): the neighbours it activates
@@ -87,6 +106,9 @@ struct HeuristicRelationStatistics {
   double max_wait_seconds = 0.0;
   double stdev_wait_seconds = 0.0;
   double sum_wait_seconds = 0.0;
+  // Structured raw/all value, when the selected decoration and aggregation
+  // support one.  Empty means that callers should use `representation`.
+  std::optional<HeuristicPerformanceValue> representation_value;
 };
 
 struct HeuristicConcurrencyStatistics {
