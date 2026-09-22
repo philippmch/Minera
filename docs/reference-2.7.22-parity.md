@@ -4367,6 +4367,26 @@ The isolated Release build, 154 native suites, 624 frontend tests, frontend
 production build, 6,923 earlier reference comparisons, and independent review
 passed. These finite checks do not establish full parity.
 
+Classic length-two loop rescue now checks occurrence-map membership before
+applying activity thresholds. Missing counts skip rescue, including at a zero
+threshold; explicit zero counts remain eligible at that threshold. Loop
+statistics are still recorded before these filters, and fallback nodes retain
+their strict required-count validation.
+
+`docs/heuristic-loop-membership-reference.json.gz` captures 384 public cases
+across missing, zero, and positive counts for three activities, three activity
+thresholds, and two DFG shapes. The baseline matched 370 cases and incorrectly
+rejected the remaining 14. The corpus includes 181 expected rejections that
+preserve fallback validation; rejection evidence concerns outcomes rather than
+Python exception identity.
+
+All 384 cases now match. `docs/heuristic-loop-membership-native-checks.json.gz`
+and `docs/heuristic-loop-membership-validation.json` retain the before/after
+comparisons, probe and checker, source and binary hashes, and build/test logs.
+The isolated Release build, all 154 native suites, and 4,293 earlier DFG,
+performance-value, dependency/loop, and AND reference comparisons passed.
+Structural coverage remains partial and unchanged.
+
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),
 activity/path occurrence filtering, direct-adjacency mean waits, mean sojourn
