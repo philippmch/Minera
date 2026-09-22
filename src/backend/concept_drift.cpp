@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 #include "minera/timestamp.hpp"
+#include "exact_count_ratio.hpp"
 
 namespace minera {
 namespace {
@@ -19,6 +20,30 @@ constexpr std::size_t kMaxPermutations = 1'000'000;
 constexpr long double kMaxPermutationWork = 200'000'000.0L;
 constexpr long double kMaxMaterializedTraceCopies = 2'000'000.0L;
 constexpr long double kMaxCumulativeEventCopies = 20'000'000.0L;
+
+std::optional<double> precise_epoch_seconds(std::string_view text) {
+  const auto parsed = parse_timestamp_exact(text);
+  // Keep the existing parser's additional accepted forms, including fractions
+  // longer than nine digits. Exact ISO instants take the integer path below.
+  if (!parsed) return parse_timestamp(text);
+  const bool negative = parsed->seconds < 0;
+  const auto seconds = negative
+                           ? std::uint64_t{0} -
+                                 static_cast<std::uint64_t>(parsed->seconds)
+                           : static_cast<std::uint64_t>(parsed->seconds);
+  constexpr std::uint64_t scale = 1000000000;
+  // Four-digit years need fewer than 69 bits for epoch nanoseconds. Split the
+  // product into 32-bit limbs so the calculation also works on MSVC.
+  const auto low = (seconds & 0xffffffffULL) * scale;
+  const auto high = (seconds >> 32) * scale;
+  auto numerator = detail::add(detail::CountUint128{0, low},
+                               detail::CountUint128{high >> 32, high << 32});
+  const auto fraction = detail::CountUint128::from_uint64(parsed->nanoseconds);
+  numerator = negative ? detail::subtract(numerator, fraction)
+                       : detail::add(numerator, fraction);
+  return detail::exact_ratio(numerator,
+                            detail::CountUint128::from_uint64(scale), negative);
+}
 
 void validate_options(const ConceptDriftOptions& options, std::size_t trace_count,
                      std::size_t event_count, std::size_t feature_size) {
@@ -436,7 +461,7 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
         throw std::invalid_argument(
             "concept drift: selected case-start timestamp is missing");
       }
-      const auto parsed = parse_timestamp(*timestamp);
+      const auto parsed = precise_epoch_seconds(*timestamp);
       if (!parsed || !std::isfinite(*parsed)) {
         throw std::invalid_argument(
             "concept drift: case-start timestamp is not finite");
