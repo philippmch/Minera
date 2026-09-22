@@ -1703,6 +1703,32 @@ The focused native suite, 6,442 prior BOSE comparisons, and five CLI checks pass
 These finite checks do not establish complete BOSE parity, pandas nanosecond
 timestamp semantics, or validation of manually constructed nonfinite results.
 
+### BOSE grouped-log timestamp and case-selector checkpoint
+
+Detection validates the first selected timestamp of every input trace, including
+traces inside a raw sub-log and calls with timestamp output disabled. Missing,
+null, or invalid first timestamps are rejected. Later-event timestamps do not
+participate in this validation; the first event supplies the case-start time even
+when a later event has an earlier timestamp. Custom timestamp keys are honored.
+The existing output flag still controls the timestamp arrays in the result.
+
+An already grouped EventLog supplies its own trace boundaries. As in the pinned
+public adapter, a custom case-id selector does not require a matching trace or
+event attribute and does not regroup those traces. The selector remains in the
+result metadata; the separate import/grouping surfaces retain their own rules.
+
+`docs/bose-grouped-adapter-reference.json.gz` retains 288 public calls projected
+to 576 native comparisons across both timestamp-output settings. Inputs cover
+empty, single-case, and multi-case logs; sub-log sizes 1 and 2; standard and custom
+selectors; missing, null, or invalid timestamps at different positions; and
+reversed event times. Native checks retain acceptance, returned activity
+sequences, raw sub-log starts, and drift timestamps. This grouped-log checkpoint
+does not attest for dataframe grouping or arbitrary timestamp-cell type semantics.
+All 576 comparisons pass, up from 429 before the change. The focused native
+suite, 7,686 prior comparisons, eight CLI checks, and independent review pass.
+`docs/bose-grouped-adapter-validation.json` records the verified build and evidence
+hashes. No module or dispatcher status is promoted.
+
 ## Trace-variant query anonymization evidence
 
 The native trace-variant query surface supports both Laplace and SaCoFa
