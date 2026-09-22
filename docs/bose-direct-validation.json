@@ -1,0 +1,25 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Direct BOSE string activity traces: raw groups, ranked signed change points, signed options and RNG state",
+  "public_cases": 3240,
+  "accepted": 2220,
+  "regression_comparisons": 13704,
+  "cli_checks": 14,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "parent_commit": "b6340260f97d37a77ac71c9a84555515e68de162",
+  "verified_code_tree": "7cfc7ec4e96466ac7e6623047815bbe9d17d670d",
+  "core_library_sha256": "a95d1015a69aeb5328873d7bdad1e78650c9ad1899cf72d6f48231a8d68e041c",
+  "artifacts": {
+    "docs/bose-direct-reference.json.gz": "e2c11b0f60125cef64b52c36c75c3380f613b4dc66151cf5719c7fcdfc979746",
+    "docs/bose-direct-native-checks.json.gz": "526db4be0db64b4648f561269889cf15b1ae7a0162d0f2b4ca0dc3e103efe9f6"
+  },
+  "limits": [
+    "No module or dispatcher status promotion.",
+    "String activity labels only; Python non-string labels and container identity remain outside this typed API.",
+    "Explicit seeds and resource limits are native extensions.",
+    "Rejection acceptance is compared, not language-specific exception classes.",
+    "The numeric implementation targets the previously observed pinned NumPy/OpenBLAS runtime.",
+    "DataFrame adapters and returned DataFrame metadata remain unverified."
+  ]
+}

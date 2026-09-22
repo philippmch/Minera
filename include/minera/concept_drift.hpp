@@ -67,6 +67,28 @@ struct ConceptDriftResult {
   std::string case_id_attribute = "case:concept:name";
 };
 
+// Signed direct-trace BOSE options. This mirrors the Python-facing detector's
+// parameters, including its signed slicing behavior. The native implementation
+// applies explicit resource bounds before materializing windows or shuffles.
+struct ConceptDriftTraceOptions {
+  std::int64_t sub_log_size = 50;
+  std::int64_t window_size = 8;
+  std::int64_t num_permutations = 100;
+  double threshold = 0.5;
+  std::int64_t max_no_change_points = 5;
+  std::uint64_t seed = 0;
+};
+
+struct ConceptDriftTraceChangePoint {
+  std::int64_t sublog_index = 0;
+  double p_value = 1.0;
+};
+
+struct ConceptDriftTraceResult {
+  std::vector<std::vector<std::vector<std::string>>> sublogs;
+  std::vector<ConceptDriftTraceChangePoint> change_points;
+};
+
 [[nodiscard]] std::vector<std::string> extract_concept_drift_activities(
     const EventLog& log);
 
@@ -120,6 +142,19 @@ compute_concept_drift_follows_relation(
     const std::vector<std::vector<double>>& first,
     const std::vector<std::vector<double>>& second,
     std::int64_t num_permutations, std::mt19937& rng);
+
+// Detect BOSE drift directly from activity traces, without EventLog timestamp
+// validation. Raw consecutive trace groups and p-value-ranked change points
+// are returned. Signed options preserve Python list/range edge behavior.
+[[nodiscard]] ConceptDriftTraceResult detect_concept_drift_traces(
+    const std::vector<std::vector<std::string>>& traces,
+    ConceptDriftTraceOptions options = {});
+
+// Continue a caller-owned NumPy-compatible MT19937 stream. The seeded
+// overload constructs the same engine and delegates to this overload.
+[[nodiscard]] ConceptDriftTraceResult detect_concept_drift_traces(
+    const std::vector<std::vector<std::string>>& traces,
+    ConceptDriftTraceOptions options, std::mt19937& rng);
 
 [[nodiscard]] ConceptDriftResult detect_concept_drift(
     const EventLog& log, ConceptDriftOptions options = {});
