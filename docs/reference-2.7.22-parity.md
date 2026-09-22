@@ -1750,6 +1750,25 @@ and native checks are retained in `docs/bose-seeded-reference.json.gz` and
 records the build and evidence hashes. These checks do not promote the BOSE
 module or dispatcher to complete parity.
 
+### BOSE explicit feature-alphabet checkpoint
+
+The standalone feature extractor preserves the supplied alphabet's order and
+multiplicity. A repeated target repeats its feature triple, and repeated source
+entries contribute separately to the relation-type counts. Multiplicity weights
+and cached unique-target triples avoid quadratic work for duplicate alphabets.
+Event labels absent
+from the supplied alphabet are rejected. Automatic alphabet discovery remains
+sorted and unique, including the alphabet used by detection.
+
+`docs/bose-alphabet-reference.json.gz` retains 3,159 public observations covering
+reversed and duplicated labels, absent labels, empty alphabets/logs/traces, and
+empty or whitespace labels. All 3,159 feature-value and acceptance comparisons
+pass, up from 220 before the change. The focused native suite, 8,622 prior BOSE
+comparisons, and 14 CLI checks also pass. Native results and verification hashes
+are retained in `docs/bose-alphabet-native-checks.json.gz` and
+`docs/bose-alphabet-validation.json`. This checkpoint does not promote the BOSE
+module or dispatcher to complete parity.
+
 ## Trace-variant query anonymization evidence
 
 The native trace-variant query surface supports both Laplace and SaCoFa

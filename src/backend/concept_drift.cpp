@@ -367,34 +367,37 @@ std::vector<std::string> extract_concept_drift_activities(
 
 std::vector<double> extract_concept_drift_features(
     const std::vector<Trace>& traces,
-    const std::vector<std::string>& sorted_activities) {
-  return extract_concept_drift_features(traces, sorted_activities,
+    const std::vector<std::string>& activities) {
+  return extract_concept_drift_features(traces, activities,
                                          "concept:name");
 }
 
 std::vector<double> extract_concept_drift_features(
     const std::vector<Trace>& traces,
-    const std::vector<std::string>& sorted_activities,
+    const std::vector<std::string>& alphabet,
     std::string_view activity_attribute) {
   if (activity_attribute.empty()) {
     throw std::invalid_argument(
         "concept drift: activity_attribute must not be empty");
   }
-  // Normalize the supplied alphabet as well: this keeps the standalone
-  // extractor deterministic when callers provide activities in input order.
-  std::vector<std::string> activities = sorted_activities;
-  std::sort(activities.begin(), activities.end());
-  activities.erase(std::unique(activities.begin(), activities.end()),
-                   activities.end());
-  const std::size_t n = activities.size();
-  if (n > std::numeric_limits<std::size_t>::max() / 3) {
+  const std::size_t alphabet_size = alphabet.size();
+  if (alphabet_size > std::numeric_limits<std::size_t>::max() / 3) {
     throw std::invalid_argument("concept drift: activity feature vector is too large");
   }
+  // Keep an internal unique index for relation counting while retaining the
+  // caller's alphabet positions for the output (including duplicates).
   std::unordered_map<std::string, std::size_t> ids;
-  ids.reserve(n);
-  for (std::size_t i = 0; i < n; ++i) ids.emplace(activities[i], i);
-  std::vector<std::size_t> trace_counts(n, 0);
-  std::vector<std::size_t> follows(n * n, 0);
+  ids.reserve(alphabet_size);
+  for (const auto& activity : alphabet) {
+    if (!ids.contains(activity)) ids.emplace(activity, ids.size());
+  }
+  const std::size_t unique_size = ids.size();
+  if (unique_size != 0 &&
+      unique_size > std::numeric_limits<std::size_t>::max() / unique_size) {
+    throw std::invalid_argument("concept drift: activity relation matrix is too large");
+  }
+  std::vector<std::size_t> trace_counts(unique_size, 0);
+  std::vector<std::size_t> follows(unique_size * unique_size, 0);
 
   for (const auto& trace : traces) {
     std::unordered_set<std::size_t> present;
@@ -407,32 +410,55 @@ std::vector<double> extract_concept_drift_features(
       const auto* activity = event_value(event, activity_attribute);
       if (!activity) continue;
       const auto target_it = ids.find(*activity);
-      if (target_it == ids.end()) continue;
+      if (target_it == ids.end()) {
+        throw std::invalid_argument(
+            "concept drift: event activity is absent from the supplied alphabet");
+      }
       const std::size_t target = target_it->second;
       present.insert(target);
-      for (const std::size_t source : seen) relation.insert(source * n + target);
+      for (const std::size_t source : seen)
+        relation.insert(source * unique_size + target);
       seen.push_back(target);
     }
     for (const auto source : present) ++trace_counts[source];
     for (const auto key : relation) ++follows[key];
   }
 
-  std::vector<double> features;
-  features.reserve(n * 3);
-  for (std::size_t target = 0; target < n; ++target) {
+  std::vector<std::size_t> ordered_ids;
+  ordered_ids.reserve(alphabet_size);
+  std::vector<std::size_t> multiplicities(unique_size, 0);
+  for (const auto& activity : alphabet) {
+    const auto id = ids.at(activity);
+    ordered_ids.push_back(id);
+    ++multiplicities[id];
+  }
+  std::vector<std::size_t> always_by_target(unique_size, 0);
+  std::vector<std::size_t> sometimes_by_target(unique_size, 0);
+  std::vector<std::size_t> never_by_target(unique_size, 0);
+  for (std::size_t target = 0; target < unique_size; ++target) {
     std::size_t always = 0, sometimes = 0, never = 0;
-    for (std::size_t source = 0; source < n; ++source) {
-      if (trace_counts[source] == 0 || follows[source * n + target] == 0) {
-        ++never;
-      } else if (follows[source * n + target] == trace_counts[source]) {
-        ++always;
+    for (std::size_t source = 0; source < unique_size; ++source) {
+      if (trace_counts[source] == 0 ||
+          follows[source * unique_size + target] == 0) {
+        never += multiplicities[source];
+      } else if (follows[source * unique_size + target] ==
+                 trace_counts[source]) {
+        always += multiplicities[source];
       } else {
-        ++sometimes;
+        sometimes += multiplicities[source];
       }
     }
-    features.push_back(static_cast<double>(always));
-    features.push_back(static_cast<double>(sometimes));
-    features.push_back(static_cast<double>(never));
+    always_by_target[target] = always;
+    sometimes_by_target[target] = sometimes;
+    never_by_target[target] = never;
+  }
+
+  std::vector<double> features;
+  features.reserve(alphabet_size * 3);
+  for (const std::size_t target : ordered_ids) {
+    features.push_back(static_cast<double>(always_by_target[target]));
+    features.push_back(static_cast<double>(sometimes_by_target[target]));
+    features.push_back(static_cast<double>(never_by_target[target]));
   }
   return features;
 }

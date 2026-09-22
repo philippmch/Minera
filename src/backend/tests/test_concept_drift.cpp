@@ -269,6 +269,35 @@ int main() {
   assert(features[3] == 0.0 && features[4] == 1.0 && features[5] == 2.0);
   assert(features[6] == 0.0 && features[7] == 1.0 && features[8] == 2.0);
 
+  const std::vector<minera::Trace> alphabet_traces = {
+      trace({"a", "b", "c"}, "alphabet-abc"),
+      trace({"a", "c"}, "alphabet-ac"),
+      trace({"b", "a"}, "alphabet-ba")};
+  const auto reversed_alphabet_features = minera::extract_concept_drift_features(
+      alphabet_traces, {"c", "b", "a"});
+  assert((reversed_alphabet_features ==
+          std::vector<double>{0, 2, 1, 0, 1, 2, 0, 1, 2}));
+  const auto duplicate_alphabet_features = minera::extract_concept_drift_features(
+      {trace({"a", "b"}, "alphabet-duplicate")}, {"a", "b", "a"});
+  assert((duplicate_alphabet_features ==
+          std::vector<double>{0, 0, 3, 2, 0, 1, 0, 0, 3}));
+  const std::vector<std::string> many_duplicate_labels(10'000, "a");
+  const auto many_duplicate_features = minera::extract_concept_drift_features(
+      {trace({"a", "a"}, "many-duplicates")}, many_duplicate_labels);
+  assert(many_duplicate_features.size() == many_duplicate_labels.size() * 3);
+  for (std::size_t i = 0; i < many_duplicate_features.size(); i += 3) {
+    assert(many_duplicate_features[i] == 10'000.0);
+    assert(many_duplicate_features[i + 1] == 0.0);
+    assert(many_duplicate_features[i + 2] == 0.0);
+  }
+  assert(throws_invalid([&] {
+    (void)minera::extract_concept_drift_features(
+        {trace({"a", "missing"}, "alphabet-missing")}, {"a", "b"});
+  }));
+  assert(minera::extract_concept_drift_features(
+             std::vector<minera::Trace>{}, std::vector<std::string>{})
+             .empty());
+
   minera::EventLog projected = log;
   for (auto& current : projected.traces) {
     current.attributes.push_back({"case:order", "batch-" + current.case_id});
