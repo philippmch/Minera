@@ -1,0 +1,15 @@
+{
+  "status": "observed_public_contract_gap",
+  "public_cases": 110,
+  "reference_accepted": 46,
+  "native_accepted": 0,
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "module_sha256": "93be9fa9b11b6efac69bc4817a22a7343c4ca424b249d17f5efb9e8b8cd902ef",
+  "native_commit": "95148912151fed5010a2a7970176e0f96e26e439",
+  "artifact_sha256": "112cac04425eece77ff434a0fbf9551150cbcc94456fb771752c9b54299eb39d",
+  "limits": [
+    "Public signed EventLog apply contract; no module status promotion.",
+    "Native probe exercises the existing strict EventLog detector, not a signed apply adapter.",
+    "No exception-class equivalence claim; regeneration and signed adapter behavior remain implementation gaps."
+  ]
+}
