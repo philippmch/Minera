@@ -1791,6 +1791,25 @@ These helper contracts do not establish
 standalone permutation-test or DataFrame adapter parity, and do not promote the
 BOSE module or dispatcher to complete.
 
+### BOSE table case-ordering checkpoint
+
+Selected-case timestamp lookup now sorts mixed numeric/string case IDs with
+numbers first and follows declared categorical order while ignoring unused
+categories. Standard activity projection retains its separate scalar ordering.
+The table adapter compares date case keys at exact nanosecond precision, so
+distinct cases within one microsecond remain separate in both grouping paths.
+These changes are local to the BOSE adapter.
+
+All 58 captured public ordering cases pass, including categorical
+and mixed-key controls, exact returned frames, timestamps, probabilities, and
+post-call RNG state. All 18,599 prior BOSE comparisons, 14 CLI checks, and the
+native test suite pass. Independent review reports no actionable findings.
+
+Evidence is in `docs/bose-table-order-reference.json.gz`,
+`docs/bose-table-order-native-checks.json.gz`, and
+`docs/bose-table-order-validation.json`. This remains a finite checkpoint;
+coverage statuses are unchanged.
+
 ### BOSE DataFrame adapter checkpoint
 
 `apply_concept_drift_table` accepts native `EventTable` input and returns

@@ -1,0 +1,22 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "BOSE table selected case mixed/categorical ordering and exact nanosecond case keys",
+  "public_cases": 58,
+  "regression_comparisons": 18599,
+  "cli_checks": 14,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "parent_commit": "6ac38276f13bab8342249a128ada5f125bfe248f",
+  "verified_code_tree": "bf69907e4212e8995ae99c5db650628e7dc6c921",
+  "core_library_sha256": "b7e6e533a09ef56b7d5a0226d8efa0707c41cc6fe96f146a6080e24fe7b80e47",
+  "artifacts": {
+    "docs/bose-table-order-reference.json.gz": "7c495adf61ab65124d167c251c1b8a166342eaebf234411f1a20d5278adbb33f",
+    "docs/bose-table-order-native-checks.json.gz": "a9c426eef46cdd6075a07df5aa4f97392aafab95eef2b3745397eee2b9a5dff7"
+  },
+  "limits": [
+    "No module or dispatcher status promotion.",
+    "Finite scalar/categorical/date-key corpus does not establish all pandas container or null-identity behavior.",
+    "Explicit seeds and resource bounds remain native extensions.",
+    "Rejection acceptance is compared, not language-specific exception classes."
+  ]
+}

@@ -3,8 +3,15 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <limits>
+#include <optional>
 #include <set>
 #include <stdexcept>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "minera/dataframe_validation.hpp"
 #include "minera/timestamp.hpp"
@@ -25,11 +32,133 @@ bool missing_table_cell(const std::optional<EventAttribute>& cell) {
   return real && std::isnan(*real);
 }
 
+struct ExactDateKey {
+  std::int64_t seconds = 0;
+  std::uint32_t nanoseconds = 0;
+  bool timezone_aware = false;
+};
+
+ExactDateKey exact_date_key(const EventAttribute& value) {
+  if (value.kind != AttributeKind::kDate &&
+      !std::holds_alternative<NativeDate>(value.typed_value))
+    throw std::invalid_argument("concept drift table: value is not a date");
+  const auto* native = std::get_if<NativeDate>(&value.typed_value);
+  const auto parsed = parse_timestamp_exact(native ? native->value : value.value);
+  if (!parsed)
+    throw std::invalid_argument("concept drift table: invalid date key");
+  return {parsed->seconds, parsed->nanoseconds, parsed->timezone_aware};
+}
+
+int compare_exact_dates(const EventAttribute& left,
+                        const EventAttribute& right) {
+  const auto a = exact_date_key(left);
+  const auto b = exact_date_key(right);
+  if (a.timezone_aware != b.timezone_aware)
+    throw std::invalid_argument(
+        "concept drift table: date keys have incompatible time zones");
+  if (a.seconds != b.seconds) return a.seconds < b.seconds ? -1 : 1;
+  if (a.nanoseconds != b.nanoseconds)
+    return a.nanoseconds < b.nanoseconds ? -1 : 1;
+  return 0;
+}
+
+int compare_same_kind(const EventAttribute& left,
+                      const EventAttribute& right) {
+  const auto kind = native_scalar_order_kind(left);
+  if (kind == NativeScalarOrderKind::kUnsupported ||
+      kind != native_scalar_order_kind(right))
+    throw std::invalid_argument(
+        "concept drift table: incompatible scalar key types");
+  if (kind == NativeScalarOrderKind::kDate) {
+    // The shared comparator performs the existing date-kind and aware/naive
+    // validation. Refine its microsecond comparison with the nanoseconds that
+    // pandas datetime64[ns] keys retain.
+    (void)native_scalar_key_compare(left, right);
+    return compare_exact_dates(left, right);
+  }
+  return native_scalar_key_compare(left, right);
+}
+
 struct ScalarLess {
   bool operator()(const EventAttribute& left, const EventAttribute& right) const {
-    return native_scalar_key_compare(left, right) < 0;
+    return compare_same_kind(left, right) < 0;
   }
 };
+
+std::string table_key_identity(const EventAttribute& value) {
+  const auto kind = native_scalar_order_kind(value);
+  if (kind == NativeScalarOrderKind::kDate) {
+    const auto date = exact_date_key(value);
+    return "date:" + std::to_string(date.timezone_aware) + ":" +
+           std::to_string(date.seconds) + ":" +
+           std::to_string(date.nanoseconds);
+  }
+  if (kind == NativeScalarOrderKind::kUnsupported)
+    throw std::invalid_argument("concept drift table: unordered key");
+  return std::to_string(static_cast<int>(kind)) + ":" +
+         root_cause_scalar_key_fingerprint(value);
+}
+
+int compare_selected_keys(const EventAttribute& left,
+                          const EventAttribute& right) {
+  const auto left_kind = native_scalar_order_kind(left);
+  const auto right_kind = native_scalar_order_kind(right);
+  if (left_kind != right_kind) {
+    const bool numeric_string =
+        (left_kind == NativeScalarOrderKind::kNumeric &&
+         right_kind == NativeScalarOrderKind::kString) ||
+        (left_kind == NativeScalarOrderKind::kString &&
+         right_kind == NativeScalarOrderKind::kNumeric);
+    if (!numeric_string)
+      throw std::invalid_argument(
+          "concept drift table: incompatible selected case key types");
+    return left_kind == NativeScalarOrderKind::kNumeric ? -1 : 1;
+  }
+  return compare_same_kind(left, right);
+}
+
+const EventTableCategoricalDtype* category_descriptor(
+    const EventTable& table, std::size_t column) {
+  if (table.categorical_dtypes.empty() ||
+      column >= table.categorical_dtypes.size() ||
+      !table.categorical_dtypes[column])
+    return nullptr;
+  return &*table.categorical_dtypes[column];
+}
+
+using CategoryRanks = std::unordered_map<std::string, std::size_t>;
+
+CategoryRanks category_ranks(const EventTableCategoricalDtype* descriptor) {
+  CategoryRanks result;
+  if (!descriptor) return result;
+  result.reserve(descriptor->categories.size());
+  for (std::size_t index = 0; index < descriptor->categories.size(); ++index)
+    result.emplace(table_key_identity(descriptor->categories[index]), index);
+  return result;
+}
+
+std::optional<std::size_t> category_rank(const EventAttribute& value,
+                                         const CategoryRanks& ranks) {
+  if (ranks.empty()) return std::nullopt;
+  const auto identity = table_key_identity(value);
+  const auto found = ranks.find(identity);
+  return found == ranks.end() ? std::nullopt
+                              : std::optional<std::size_t>(found->second);
+}
+
+int compare_selected_keys(const EventAttribute& left,
+                          const EventAttribute& right,
+                          const CategoryRanks& ranks) {
+  if (!ranks.empty()) {
+    const auto left_category = category_rank(left, ranks);
+    const auto right_category = category_rank(right, ranks);
+    if (left_category && right_category && *left_category != *right_category)
+      return *left_category < *right_category ? -1 : 1;
+    if (left_category != right_category)
+      return left_category ? -1 : 1;
+  }
+  return compare_selected_keys(left, right);
+}
 
 const EventAttribute& ordered_cell(const std::optional<EventAttribute>& cell) {
   if (missing_table_cell(cell) || native_scalar_order_kind(*cell) == NativeScalarOrderKind::kUnsupported)
@@ -56,6 +185,40 @@ double table_epoch(const EventAttribute* cell) {
   numerator = negative ? detail::subtract(numerator, fraction) : detail::add(numerator, fraction);
   return detail::exact_ratio(numerator, detail::CountUint128::from_uint64(scale), negative);
 }
+
+struct SelectedGroup {
+  EventAttribute key;
+  const EventAttribute* first_time = nullptr;
+};
+
+std::vector<SelectedGroup> collect_selected_groups(
+    const EventTable& table, std::size_t case_column,
+    std::size_t timestamp_column, std::size_t trace_limit) {
+  std::vector<SelectedGroup> groups;
+  std::unordered_map<std::string, std::size_t> positions;
+  positions.reserve(std::min(table.rows.size(), trace_limit));
+  for (const auto& row : table.rows) {
+    if (missing_table_cell(row[case_column])) continue;
+    const auto& key = ordered_cell(row[case_column]);
+    const auto identity = table_key_identity(key);
+    const auto [entry, inserted] = positions.emplace(identity, groups.size());
+    if (inserted) {
+      if (groups.size() >= trace_limit)
+        throw std::invalid_argument(
+            "concept drift table: selected case groups exceed safe bound");
+      groups.push_back(SelectedGroup{key, nullptr});
+    }
+    auto& group = groups[entry->second];
+    if (!group.first_time && !missing_table_cell(row[timestamp_column]))
+      group.first_time = &*row[timestamp_column];
+  }
+  const auto ranks = category_ranks(category_descriptor(table, case_column));
+  std::sort(groups.begin(), groups.end(),
+            [&](const SelectedGroup& left, const SelectedGroup& right) {
+              return compare_selected_keys(left.key, right.key, ranks) < 0;
+            });
+  return groups;
+}
 }  // namespace
 
 ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
@@ -68,18 +231,12 @@ ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
   const auto selected_time = table.column_index(options.timestamp_attribute);
   // Timestamp lookup and activity projection use distinct grouping paths in
   // the public adapter. Group-first timestamps skip null cells.
-  std::map<EventAttribute, const EventAttribute*, ScalarLess> first_times;
-  for (const auto& row : table.rows) {
-    if (missing_table_cell(row[selected_case])) continue;
-    const auto& key = ordered_cell(row[selected_case]);
-    auto [entry, inserted] = first_times.try_emplace(key, nullptr);
-    if (inserted && first_times.size() > trace_limit)
-      throw std::invalid_argument("concept drift table: selected case groups exceed safe bound");
-    if (!entry->second && !missing_table_cell(row[selected_time])) entry->second = &*row[selected_time];
-  }
+  const auto selected_groups = collect_selected_groups(
+      table, selected_case, selected_time, trace_limit);
   std::vector<double> timestamps;
-  timestamps.reserve(first_times.size());
-  for (const auto& [key, value] : first_times) timestamps.push_back(table_epoch(value));
+  timestamps.reserve(selected_groups.size());
+  for (const auto& group : selected_groups)
+    timestamps.push_back(table_epoch(group.first_time));
 
   check_dataframe_columns(table);
   const auto standard_case = table.column_index("case:concept:name");
