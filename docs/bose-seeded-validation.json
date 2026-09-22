@@ -1,0 +1,25 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "NumPy legacy scalar-seeded BOSE permutation stream and exact full detection outputs",
+  "public_detection_cases": 360,
+  "baseline_matches": 293,
+  "final_matches": 360,
+  "public_shuffle_state_cases": 54,
+  "public_permutation_cases": 48,
+  "regression_comparisons": 8262,
+  "cli_checks": 14,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "parent_commit": "42f041e723df29acf8ca3f03cf543a3a430c5b06",
+  "verified_code_tree": "8fabc6fba37247a0dfc747b38cefa790e7f2416d",
+  "core_library_sha256": "743e9dbfd3006769a14e9c6eb431d034f5d92270d153f985f146f85928ee5e5b",
+  "artifacts": {
+    "docs/bose-seeded-reference.json.gz": "4fe9a2f88b423e2b6cdfc63258490775549428236872663f8f23a3b50bc2fcaa",
+    "docs/bose-seeded-native-checks.json.gz": "c9ef1bc464a1a9ae24de03ac0f2ad7f4a66686869e67e016e5d6c2c97e15f05e"
+  },
+  "limits": [
+    "No module or dispatcher status promotion.",
+    "Wider native seeds are deterministic extensions, not NumPy scalar-seed parity.",
+    "Finite grouped EventLog inputs do not establish arbitrary floating-point feature, dataframe adapter, or complete BOSE behavior."
+  ]
+}

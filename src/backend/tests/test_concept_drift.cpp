@@ -1,5 +1,7 @@
 #include <cassert>
 #include <cmath>
+#include <cstdint>
+#include <limits>
 #include <locale>
 #include <stdexcept>
 #include <vector>
@@ -349,6 +351,43 @@ int main() {
          "before");
   assert(*boundary_result.returned_sublogs[0].traces[0].events[0].attribute(
              "event:detail") == "kept");
+
+  // The low 32-bit seed follows NumPy's legacy MT19937 permutation stream.
+  // This four-trace window has a stable public p-value at 256 permutations.
+  minera::ConceptDriftOptions numpy_stream_options;
+  numpy_stream_options.sub_log_size = 1;
+  numpy_stream_options.window_size = 2;
+  numpy_stream_options.num_permutations = 256;
+  numpy_stream_options.threshold = 1.0;
+  numpy_stream_options.seed = 0;
+  const auto numpy_stream_result =
+      minera::detect_concept_drift(log, numpy_stream_options);
+  assert(numpy_stream_result.change_points.size() == 1);
+  assert(numpy_stream_result.change_points[0].sublog_index == 2);
+  assert(numpy_stream_result.change_points[0].p_value == 0.30078125);
+  const auto numpy_stream_repeat =
+      minera::detect_concept_drift(log, numpy_stream_options);
+  assert(numpy_stream_repeat.change_points.size() ==
+         numpy_stream_result.change_points.size());
+  assert(numpy_stream_repeat.change_points[0].sublog_index ==
+         numpy_stream_result.change_points[0].sublog_index);
+  assert(numpy_stream_repeat.change_points[0].p_value ==
+         numpy_stream_result.change_points[0].p_value);
+
+  // Values outside NumPy's scalar seed range remain deterministic through the
+  // documented native 64-bit extension.
+  numpy_stream_options.seed = std::numeric_limits<std::uint64_t>::max();
+  const auto wide_seed_result =
+      minera::detect_concept_drift(log, numpy_stream_options);
+  const auto wide_seed_repeat =
+      minera::detect_concept_drift(log, numpy_stream_options);
+  assert(wide_seed_result.change_points.size() == 1);
+  assert(wide_seed_repeat.change_points.size() ==
+         wide_seed_result.change_points.size());
+  assert(wide_seed_repeat.change_points[0].sublog_index ==
+         wide_seed_result.change_points[0].sublog_index);
+  assert(wide_seed_repeat.change_points[0].p_value ==
+         wide_seed_result.change_points[0].p_value);
 
   options.threshold = 0.0;
   assert(minera::detect_concept_drift(log, options).change_points.empty());
