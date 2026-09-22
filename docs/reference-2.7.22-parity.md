@@ -1791,6 +1791,24 @@ These helper contracts do not establish
 standalone permutation-test or DataFrame adapter parity, and do not promote the
 BOSE module or dispatcher to complete.
 
+### BOSE signed EventLog apply contract
+
+A 110-call public EventLog audit captures signed option handling, empty inputs,
+returned frame regeneration, and post-call NumPy state. The reference accepts
+46 calls; the existing strict native EventLog detector accepts none of this
+signed/threshold-1.1 corpus. This identifies a missing apply adapter rather than
+establishing equivalence for the strict diagnostic API.
+
+The public apply path regenerates canonical DataFrames with fresh case IDs,
+RangeIndex labels, and synthetic timestamps, discarding input log, trace, and
+event markers. Negative options retain signed slicing and RNG behavior. The
+native diagnostic result instead preserves the source EventLog context.
+
+`docs/bose-log-signed-contract-reference.json.gz` retains public observations,
+capture/probe source, native observations, and inputs;
+`docs/bose-log-signed-contract-validation.json` identifies the observed gap.
+No coverage status is promoted.
+
 ### BOSE table case-ordering checkpoint
 
 Selected-case timestamp lookup now sorts mixed numeric/string case IDs with
