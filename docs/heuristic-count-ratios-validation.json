@@ -1,0 +1,33 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Classic DFG exact uint64 count ratios and frequency representations; explicit occurrence metadata.",
+  "before": {
+    "cases": 1828,
+    "matches": 828,
+    "invalid_json": 12
+  },
+  "after": {
+    "cases": 1828,
+    "matches": 1828
+  },
+  "arithmetic_golden_comparisons": 10185,
+  "prior_reference_comparisons": 8459,
+  "native_suites": 154,
+  "build": "passed",
+  "independent_review": "clear",
+  "parent_commit": "dfd7437e89113d28ae336972f2d6fb104da72195",
+  "verified_staged_tree": "704ae2b67b8d8a0600a48924da7d4a8af5a899ac",
+  "core_library_sha256": "d0347eea04e6bd7af174700a6ecd1fbe9c3313f4eef1347db4c9d60baca35482",
+  "native_executable_sha256": "7a2d11214ab5e8e9e7df93536f4ad5dceac99a4e231d9adde5e38611f512b971",
+  "probe_executable_sha256": "b98f38322f6021406cf2713aff89b7b179f60e61440d6e8b91ab403e42fb7d73",
+  "artifacts": {
+    "docs/heuristic-count-ratios-native-checks.json.gz": "39a017095f710fc64a2226d60e80e5c6d8d03a4da6fd6fbcb293c1d4b17cd28c",
+    "docs/heuristic-count-ratios-reference.json.gz": "a692310b4013cb60931de5278f25b0b709f639206cac90a16aa1402514d2b01c",
+    "docs/heuristic-count-ratio-arithmetic-reference.json.gz": "74a03edca0b6ee68ed1771ef0c4af2c4260167517717ec4e82e789e1732ac700"
+  },
+  "limits": [
+    "Finite uint64 count inputs and explicitly supplied occurrences.",
+    "Inferred occurrence overflow and arbitrary-size counts remain outside this checkpoint.",
+    "Full object/adapter and structural parity remains incomplete."
+  ]
+}

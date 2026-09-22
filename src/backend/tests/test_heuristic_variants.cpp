@@ -1,10 +1,12 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/petri_net.hpp"
+#include "../exact_count_ratio.hpp"
 
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -993,6 +995,46 @@ void classic_length_two_rescue_requires_occurrence_membership() {
   check_case(true, 1, 2, false);
 }
 
+void classic_large_count_ratios_and_representations() {
+  const auto maximum = std::numeric_limits<std::uint64_t>::max();
+  using namespace minera::detail;
+  assert(exact_ratio(add(maximum, maximum), add_one(add(0, 0))) ==
+         std::ldexp(1.0, 65));
+  assert(exact_ratio(add(maximum, maximum), add_one(add(maximum, maximum))) == 1.0);
+  assert(exact_ratio(add((std::uint64_t{1} << 53) + 1, 0),
+                     add_one(add((std::uint64_t{1} << 53) - 1, 0))) == 1.0);
+  auto input = classic_input({{{"A", "B"}, (std::uint64_t{1} << 53) + 1},
+                              {{"B", "A"}, std::uint64_t{1} << 53}});
+  input.activity_counts = std::map<std::string, std::uint64_t>{{"A", 100}, {"B", 100}};
+  HeuristicMinerOptions options;
+  options.dependency_threshold = 0.0;
+  options.dfg_pre_cleaning_noise_threshold = 0.0;
+  const auto net = discover_heuristics_net(input, options);
+  const auto* forward = edge(net, "A", "B");
+  assert(forward && forward->dependency == 5.551115123125782e-17);
+  assert(edge(net, "B", "A") == nullptr);
+  assert(std::get<std::uint64_t>(std::get<HeuristicStructuredValue>(
+      *forward->representation_value).value) == (std::uint64_t{1} << 53) + 1);
+
+  auto loop = classic_input({{{"A", "B"}, 1}, {{"A", "C"}, 10}});
+  loop.activity_counts = std::map<std::string, std::uint64_t>{{"A", 100}, {"B", 100}, {"C", 100}};
+  loop.frequency_triples[{"A", "B", "A"}] = maximum;
+  loop.frequency_triples[{"B", "A", "B"}] = 1;
+  options.dependency_threshold = 0.8;
+  options.loop_length_two_threshold = 1.0;
+  assert(edge(discover_heuristics_net(loop, options), "A", "B") != nullptr);
+
+  auto split = classic_input({{{"A", "B"}, maximum}, {{"A", "C"}, 0},
+                              {{"B", "C"}, maximum}, {{"C", "B"}, 0}});
+  split.activity_counts = loop.activity_counts;
+  options.dependency_threshold = -1.0;
+  options.min_frequency = 0;
+  const auto split_net = discover_heuristics_net(split, options);
+  assert(!split_net.and_measures_out.empty());
+  for (const auto& measure : split_net.and_measures_out)
+    assert(std::isfinite(measure.value));
+}
+
 void classic_active_nodes_conversion_and_dfg_inference() {
   auto input = classic_input({{{"B", "C"}, 2}, {{"A", "B"}, 4}});
   auto inferred = discover_heuristics_net(input);
@@ -1488,6 +1530,7 @@ int main() {
   classic_and_maximal_cliques_at_equality();
   classic_length_two_rescue_and_reference_quirk();
   classic_length_two_rescue_requires_occurrence_membership();
+  classic_large_count_ratios_and_representations();
   classic_active_nodes_conversion_and_dfg_inference();
   classic_performance_aggregations_and_validation();
   classic_decorated_dfg_values_preserve_typed_payloads();
