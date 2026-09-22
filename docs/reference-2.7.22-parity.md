@@ -1618,6 +1618,25 @@ adapters. Strict variant/request parsing, standalone JSON, CLI, cached-session
 server, complete frontend controls and response validation, and positive/no-drift
 native regression fixtures are included.
 
+### BOSE empty-label relation-feature checkpoint
+
+Automatic activity extraction now retains empty-string labels, including labels
+selected from generic event attributes. An empty label followed by `A` produces
+the alphabet `["", "A"]` and feature vector `[0, 0, 2, 1, 0, 1]`, matching the
+pinned public API. Previously the empty label disappeared from the alphabet and
+changed the feature dimensions and relation counts.
+
+`docs/bose-features-reference.json.gz` captures 5,958 public relation-feature
+cases: empty logs, one or two traces of up to four events, repeated activities,
+empty/space labels, and an additional absent alphabet member. All 5,958 native
+comparisons pass after the correction, versus 2,110 before it. The native checks
+artifact retains both outcomes, probe source, and a passing XES/CLI custom-key
+check. The focused concept-drift suite also passes, covering automatic and
+custom-key discovery. `docs/bose-features-validation.json` records the built
+code tree and artifact hashes. The BOSE module and dispatcher remain partial:
+this finite feature checkpoint does not establish randomized window-test or
+complete adapter parity.
+
 ## Trace-variant query anonymization evidence
 
 The native trace-variant query surface supports both Laplace and SaCoFa

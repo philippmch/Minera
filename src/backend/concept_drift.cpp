@@ -117,7 +117,7 @@ std::vector<std::string> sorted_activities_from_traces(
   for (const auto& trace : traces) {
     for (const auto& event : trace.events) {
       const auto* value = event_value(event, activity_attribute);
-      if (value && !value->empty()) activities.push_back(*value);
+      if (value) activities.push_back(*value);
     }
   }
   std::sort(activities.begin(), activities.end());

@@ -1,0 +1,27 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Preserve empty-string activity labels in automatic BOSE relation-feature alphabets and drift detection.",
+  "before": {
+    "matches": 2110,
+    "cases": 5958
+  },
+  "after": {
+    "matches": 5958,
+    "cases": 5958
+  },
+  "native_suites": 1,
+  "cli_checks": 1,
+  "build": "passed",
+  "parent_commit": "2cb4fd8e32872933b38b4d4140a56b157a08257c",
+  "verified_code_tree": "fb25d57df200695916232a233771294dcc439d6c",
+  "core_library_sha256": "81c09dc433d26d8d6a403aa7954680c4a262ca340df2955a00f23a6ed8967fbe",
+  "cli_executable_sha256": "d7c639533b6fbbece08e2a8676ce5d3271492bb395459eed79a56094ce9bd666",
+  "artifacts": {
+    "docs/bose-features-reference.json.gz": "c413f10f54850c80669435e188fd1df405e3d79da0ada3508dc335c9b74065fe",
+    "docs/bose-features-native-checks.json.gz": "9ab8f65b371bcf7c96633f8c4590414085849cbfd42a1066fe36c81ed6a85c97"
+  },
+  "limits": [
+    "Finite feature-extraction cases; no promotion of BOSE module or dispatcher status.",
+    "Randomized permutation tests, full adapter behavior, and complete concept-drift parity remain unproven."
+  ]
+}
