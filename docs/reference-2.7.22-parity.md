@@ -1769,6 +1769,28 @@ are retained in `docs/bose-alphabet-native-checks.json.gz` and
 `docs/bose-alphabet-validation.json`. This checkpoint does not promote the BOSE
 module or dispatcher to complete parity.
 
+### BOSE standalone relation and splitting helpers
+
+`compute_concept_drift_follows_relation` exposes the eventual-follow relation as
+a set of activity pairs. The supplied alphabet restricts targets, while sources
+may be outside that alphabet. Repeated labels can produce a self-pair, but an
+event never follows itself. Duplicate alphabet entries do not duplicate pairs.
+
+`split_concept_drift_sublogs` exposes consecutive trace groups and the
+`keep_leftover` control. Negative sizes return no groups, zero is rejected even
+for an empty log, and positive sizes retain or drop the last partial group as
+requested. Native log, trace, and event metadata is copied with each group.
+
+`docs/bose-helpers-reference.json.gz` retains 1,166 public observations, including
+empty and repeated labels, incomplete alphabets, empty traces, both leftover
+settings, and signed 64-bit size extremes. All 1,166 comparisons pass, along with
+11,781 prior comparisons, 14 CLI checks, the focused native suite, and independent
+review. `docs/bose-helpers-native-checks.json.gz` retains the results and
+`docs/bose-helpers-validation.json` records build and evidence hashes.
+These helper contracts do not establish
+standalone permutation-test or DataFrame adapter parity, and do not promote the
+BOSE module or dispatcher to complete.
+
 ## Trace-variant query anonymization evidence
 
 The native trace-variant query surface supports both Laplace and SaCoFa

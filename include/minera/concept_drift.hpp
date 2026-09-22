@@ -2,8 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "minera/event_log.hpp"
@@ -87,6 +89,21 @@ struct ConceptDriftResult {
 
 [[nodiscard]] std::vector<double> extract_concept_drift_features(
     const EventLog& log);
+
+// Return ordered eventual-follow pairs from one trace. The alphabet filters
+// target labels only; source labels may be any selected event label. Missing
+// generic selector values are skipped, and repeated labels produce one set
+// entry per pair.
+[[nodiscard]] std::set<std::pair<std::string, std::string>>
+compute_concept_drift_follows_relation(
+    const Trace& trace, const std::vector<std::string>& alphabet,
+    std::string_view activity_attribute = "concept:name");
+
+// Split a log into consecutive trace groups. Negative sizes return no groups,
+// zero is invalid, and a final partial group is retained only when requested.
+[[nodiscard]] std::vector<EventLog> split_concept_drift_sublogs(
+    const EventLog& log, std::int64_t sub_log_size = 50,
+    bool keep_leftover = true);
 
 [[nodiscard]] ConceptDriftResult detect_concept_drift(
     const EventLog& log, ConceptDriftOptions options = {});
