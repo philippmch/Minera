@@ -1,0 +1,22 @@
+{
+  "status": "observed_public_contract",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "parent_commit": "5642104de570704ddf6d8e7019b2ff0f1a5d2fe3",
+  "scope": "Public BOSE direct activity-trace detector: raw trace grouping and ordered change-point correspondence to public apply",
+  "public_calls": 360,
+  "matched": 360,
+  "artifacts": {
+    "docs/bose-direct-contract-reference.json.gz": "6b802d8f929afdf189da99bd63528f0e81aeec1fc17d236148ccf63c9864c524",
+    "docs/bose-direct-contract-checks.json.gz": "868382a7dc00a0631e3891c19d5a957b98074eda6a4af00dbe680f327c395229"
+  },
+  "findings": [
+    "Direct detector returns all raw trace groups and ranked [sublog index, probability] pairs.",
+    "Empty input returns two empty lists.",
+    "All observed ordered change points match the prior seeded public apply corpus."
+  ],
+  "remaining": [
+    "Native direct activity-trace entry point is absent.",
+    "Zero and negative options, empty traces, and non-string labels need separate contract evidence.",
+    "No module or dispatcher status promotion; this verifies public reference behavior, not native direct-call parity."
+  ]
+}
