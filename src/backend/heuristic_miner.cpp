@@ -835,13 +835,13 @@ double classic_dependency(const HeuristicFrequencyDfg& dfg,
   return detail::exact_signed_count_ratio(forward, reverse);
 }
 
-std::map<std::string, std::uint64_t> infer_activity_counts(
+std::map<std::string, HeuristicOccurrenceCount> infer_activity_counts(
     const HeuristicFrequencyDfg& dfg,
     const std::vector<std::string>& activities) {
-  std::map<std::string, std::uint64_t> result;
+  std::map<std::string, HeuristicOccurrenceCount> result;
   for (const auto& activity : activities) {
-    std::uint64_t incoming = 0;
-    std::uint64_t outgoing = 0;
+    HeuristicOccurrenceCount incoming{0};
+    HeuristicOccurrenceCount outgoing{0};
     bool has_incoming = false;
     bool has_outgoing = false;
     for (const auto& [pair, count] : dfg) {
@@ -854,8 +854,8 @@ std::map<std::string, std::uint64_t> infer_activity_counts(
         has_incoming = true;
       }
     }
-    std::uint64_t total = incoming + outgoing;
-    if (has_incoming && has_outgoing) total /= 2;
+    auto total = incoming + outgoing;
+    if (has_incoming && has_outgoing) total = total.rounded_half();
     result[activity] = total;
   }
   return result;
@@ -957,9 +957,13 @@ HeuristicsNet discover_classic_dfg(
     }
   }
 
-  const auto occurrences =
-      input.activity_counts.value_or(
-          infer_activity_counts(input.dfg, declared_activities));
+  std::map<std::string, HeuristicOccurrenceCount> occurrences;
+  if (input.activity_counts) {
+    for (const auto& [name, count] : *input.activity_counts)
+      occurrences.emplace(name, count);
+  } else {
+    occurrences = infer_activity_counts(input.dfg, declared_activities);
+  }
   std::map<std::string, std::uint64_t> starts;
   std::map<std::string, std::uint64_t> ends;
   HeuristicBoundaryActivities metadata_starts;
@@ -1052,7 +1056,7 @@ HeuristicsNet discover_classic_dfg(
 
   const auto activity_count = [&](const std::string& name) {
     const auto it = occurrences.find(name);
-    return it == occurrences.end() ? std::uint64_t{0} : it->second;
+    return it == occurrences.end() ? HeuristicOccurrenceCount{0} : it->second;
   };
   const auto required_activity_count = [&](const std::string& name) {
     return occurrences.at(name);

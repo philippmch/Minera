@@ -718,7 +718,7 @@ void classic_dfg_metadata_registry_and_lookup_order() {
   assert(net.metadata.has_value());
   assert((net.metadata->activities == std::vector<std::string>{"A"}));
   assert((net.metadata->activities_occurrences ==
-          std::map<std::string, std::uint64_t>{{"A", 1}}));
+          std::map<std::string, HeuristicOccurrenceCount>{{"A", 1}}));
   assert(std::holds_alternative<std::vector<std::string>>(
       net.metadata->start_activities));
   assert(std::get<std::vector<std::string>>(net.metadata->start_activities) ==
@@ -1033,6 +1033,66 @@ void classic_large_count_ratios_and_representations() {
   assert(!split_net.and_measures_out.empty());
   for (const auto& measure : split_net.and_measures_out)
     assert(std::isfinite(measure.value));
+
+  // Inferred reciprocal maxima use the public binary64 average: (2 * M) / 2
+  // rounds to 2^64, so the metadata and activity statistics need a wider
+  // occurrence representation than the uint64 input edge counts.
+  auto inferred_options = options;
+  inferred_options.dependency_threshold = 0.0;
+  inferred_options.min_frequency = 1;
+  inferred_options.min_activity_count = 0;
+  const auto reciprocal = discover_heuristics_net(
+      classic_input({{{"A", "B"}, maximum},
+                     {{"B", "A"}, maximum}}),
+      inferred_options);
+  assert(reciprocal.metadata->activities_occurrences.at("A").to_string() ==
+         "18446744073709551616");
+  assert(reciprocal.metadata->activities_occurrences.at("B").to_string() ==
+         "18446744073709551616");
+  assert(activity_stat(reciprocal, "A").occurrences.to_string() ==
+         "18446744073709551616");
+  assert(activity_stat(reciprocal, "B").occurrences.to_string() ==
+         "18446744073709551616");
+
+  // One-sided fanout sums both maximum uint64 edges exactly.
+  const auto fanout = discover_heuristics_net(
+      classic_input({{{"A", "B"}, maximum},
+                     {{"A", "C"}, maximum}}),
+      inferred_options);
+  assert(fanout.metadata->activities_occurrences.at("A").to_string() ==
+         "36893488147419103230");
+  assert(edge(fanout, "A", "B") != nullptr);
+  assert(edge(fanout, "A", "C") != nullptr);
+
+  // The average around 2^53 follows binary64 ties-to-even rounding.
+  const auto high_average = discover_heuristics_net(
+      classic_input({{{"A", "B"}, (std::uint64_t{1} << 53) + 1},
+                     {{"B", "A"}, std::uint64_t{1} << 53}}),
+      inferred_options);
+  assert(high_average.metadata->activities_occurrences.at("A").to_string() ==
+         "9007199254740992");
+  assert(high_average.metadata->activities_occurrences.at("B").to_string() ==
+         "9007199254740992");
+
+  // A widened inferred count still participates in the uint64 threshold.
+  auto maximum_threshold = inferred_options;
+  maximum_threshold.min_activity_count = maximum;
+  const auto threshold_net = discover_heuristics_net(
+      classic_input({{{"A", "B"}, maximum}}), maximum_threshold);
+  assert(edge(threshold_net, "A", "B") != nullptr);
+  assert(threshold_net.active_activities.size() == 2);
+
+  // Explicit occurrence maps remain authoritative and exact.
+  auto explicit_input = classic_input(
+      {{{"A", "B"}, maximum}, {{"B", "A"}, maximum}});
+  explicit_input.activity_counts =
+      std::map<std::string, std::uint64_t>{{"A", maximum}, {"B", 0}};
+  const auto explicit_net =
+      discover_heuristics_net(explicit_input, inferred_options);
+  assert(explicit_net.metadata->activities_occurrences.at("A").to_string() ==
+         "18446744073709551615");
+  assert(explicit_net.metadata->activities_occurrences.at("B").to_string() ==
+         "0");
 }
 
 void classic_active_nodes_conversion_and_dfg_inference() {
