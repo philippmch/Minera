@@ -90,6 +90,99 @@ void validate_options(const ConceptDriftOptions& options, std::size_t trace_coun
   }
 }
 
+[[noreturn]] void reject_activity_selector(std::string_view selector,
+                                         std::string_view reason) {
+  throw std::invalid_argument(
+      "concept drift: selected activity selector '" + std::string(selector) +
+      "' " + std::string(reason));
+}
+
+const EventAttribute* event_attribute_entry(const Event& event,
+                                           std::string_view key) {
+  for (const auto& attribute : event.attributes) {
+    if (attribute.key == key) return &attribute;
+  }
+  return nullptr;
+}
+
+void validate_activity_attribute_cell(const EventAttribute& attribute,
+                                     std::string_view selector) {
+  if (attribute.is_null ||
+      attribute.first_class_state == FirstClassAttributeState::kNull) {
+    reject_activity_selector(selector, "must be non-null");
+  }
+  if (attribute.container != AttributeContainerKind::kScalar ||
+      !attribute.children.empty() || attribute.scalar_wrapper ||
+      attribute.scalar_children_list) {
+    reject_activity_selector(selector, "must be a scalar string");
+  }
+  // A monostate typed value means that no native value was supplied.  It is
+  // the normal representation for manually constructed string cells; only a
+  // native string kind with no conflicting typed value is accepted here.
+  if (attribute.kind != AttributeKind::kString ||
+      !std::holds_alternative<std::monostate>(attribute.typed_value)) {
+    reject_activity_selector(selector, "must be a string");
+  }
+  if (attribute.first_class_role != FirstClassAttributeRole::kNone &&
+      attribute.first_class_state == FirstClassAttributeState::kMissing) {
+    reject_activity_selector(selector, "is missing");
+  }
+}
+
+void validate_activity_field(std::string_view selector,
+                            FirstClassAttributeState state, bool has_value,
+                            const std::optional<EventAttribute>& metadata) {
+  if (state == FirstClassAttributeState::kNull ||
+      (metadata &&
+       (metadata->is_null ||
+        metadata->first_class_state == FirstClassAttributeState::kNull))) {
+    reject_activity_selector(selector, "must be non-null");
+  }
+  if (!has_value) {
+    reject_activity_selector(selector, "is missing");
+  }
+  if (metadata) validate_activity_attribute_cell(*metadata, selector);
+}
+
+void validate_selected_activity_values(const EventLog& log,
+                                       std::string_view selector) {
+  for (const auto& trace : log.traces) {
+    if (trace.events.empty()) {
+      throw std::invalid_argument(
+          "concept drift: every trace must contain at least one event");
+    }
+    for (const auto& event : trace.events) {
+      // Standard aliases select the corresponding first-class projection.
+      if (selector == "concept:name" || selector == "activity") {
+        validate_activity_field(selector, event.activity_state,
+                                event.has_activity(), event.activity_attribute);
+        continue;
+      }
+      if (selector == "timestamp" || selector == "time:timestamp") {
+        validate_activity_field(selector, event.timestamp_state,
+                                event.has_timestamp(), event.timestamp_attribute);
+        continue;
+      }
+      if (selector == "resource" || selector == "org:resource") {
+        validate_activity_field(selector, event.resource_state,
+                                event.has_resource(), event.resource_attribute);
+        continue;
+      }
+      if (selector == "lifecycle" || selector == "lifecycle:transition") {
+        validate_activity_field(selector, event.lifecycle_state,
+                                event.has_lifecycle(), event.lifecycle_attribute);
+        continue;
+      }
+
+      const auto* attribute = event_attribute_entry(event, selector);
+      if (!attribute) {
+        reject_activity_selector(selector, "is missing");
+      }
+      validate_activity_attribute_cell(*attribute, selector);
+    }
+  }
+}
+
 const std::string* event_value(const Event& event, std::string_view key) {
   if (key.empty() || key == "activity" || key == "concept:name")
     return &event.activity;
@@ -267,6 +360,15 @@ std::vector<double> extract_concept_drift_features(const EventLog& log) {
 
 ConceptDriftResult detect_concept_drift(const EventLog& log,
                                         ConceptDriftOptions options) {
+  if (options.activity_attribute.empty()) {
+    throw std::invalid_argument(
+        "concept drift: activity_attribute must not be empty");
+  }
+  // Reject oversized trace materialization before inspecting every event or
+  // deriving the alphabet. Event- and feature-dependent bounds are checked
+  // again below once their sizes are known.
+  validate_options(options, log.traces.size(), 0, 0);
+  validate_selected_activity_values(log, options.activity_attribute);
   const auto activities = extract_concept_drift_activities(
       log, options.activity_attribute);
   if (activities.size() > std::numeric_limits<std::size_t>::max() / 3) {

@@ -1656,6 +1656,29 @@ built code and reused native-suite evidence. Exact randomized p-values and ranke
 boundary order are not compared. No production behavior or coverage classification
 changes in this checkpoint; window-test and adapter proof remain incomplete.
 
+### BOSE activity-input validation checkpoint
+
+Detection validates the selected activity on every input event before feature
+extraction. Missing, null, and non-string scalar or container values are rejected
+instead of skipped or converted through a text projection. Standard activity,
+resource, lifecycle, and timestamp aliases respect first-class presence and
+attribute metadata. An explicitly present empty string remains a valid label;
+an absent first-class field is distinct from it. Empty traces are rejected, while
+an empty log is accepted. Standalone relation-feature utilities retain their
+separate string-vector behavior.
+
+`docs/bose-activity-input-reference.json.gz` retains 244 public EventLog
+observations for the standard activity, resource, lifecycle, and a custom key.
+The cases include missing and null values, integers, floats, booleans, dates,
+lists, tuples, wrapped values, bytes, UUIDs, empty strings, and empty inputs.
+Accepted string cases compare alphabets and feature vectors; rejected cases
+compare acceptance, retaining the public exception details without equating
+Python and C++ exception types. The native checks artifact and validation file
+record all 244 matching outcomes (52 matched before the correction), four passing
+XES/CLI checks, and 6,198 passing prior feature/segment comparisons. The focused
+native concept-drift suite passes. Timestamp and case ordering,
+dataframe adapters, and complete BOSE behavior remain outside this checkpoint.
+
 ## Trace-variant query anonymization evidence
 
 The native trace-variant query surface supports both Laplace and SaCoFa

@@ -1,0 +1,30 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "BOSE detection rejects absent/null/non-string selected activity values and empty traces; present empty-string labels and empty logs remain valid.",
+  "before": {
+    "matches": 52,
+    "cases": 244
+  },
+  "after": {
+    "matches": 244,
+    "cases": 244
+  },
+  "prior_reference_comparisons": 6198,
+  "cli_checks": 4,
+  "native_suites": 1,
+  "build": "passed",
+  "independent_review": "clear",
+  "parent_commit": "72d681a1c3fb4e81df330af475ec1b1369f96341",
+  "verified_code_tree": "a4dd679c29c612b6c7d76903ac55f3bc34043cf4",
+  "core_library_sha256": "6c59a64a00a36b6937c971dac5b35a1ff331dd080419a5714032a96ede8128a6",
+  "cli_executable_sha256": "f3c673c7b5b8d2b96eadcce37ac3e2aa835b9682e3a30ea1443518639f836ac2",
+  "artifacts": {
+    "docs/bose-activity-input-reference.json.gz": "187d704271fdf79e05f9986b10ea2326ae50fdececaecb4686aadebe6e575629",
+    "docs/bose-activity-input-native-checks.json.gz": "c9b71a91ce5733c421336175c7ff0205e0848bbea591b5ccf0a5f8682f190e14"
+  },
+  "limits": [
+    "Finite EventLog selected-activity input checks; no module or dispatcher status promotion.",
+    "Standalone feature utility behavior is unchanged.",
+    "Full dataframe, timestamp/case selector, ordering, permutation-test, and adapter parity remain unproven."
+  ]
+}
