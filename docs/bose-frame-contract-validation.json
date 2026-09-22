@@ -1,0 +1,21 @@
+{
+  "status": "observed_public_contract",
+  "scope": "Public DataFrame adapter grouping and generated output schema; no native adapter claim",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "parent_commit": "bd78f6b1534535e13842e9eb3efbd9e5386f93ab",
+  "adapter_cases": 26,
+  "grouping_cases": 72,
+  "grouping_matched": 72,
+  "artifacts": {
+    "docs/bose-frame-contract-reference.json.gz": "66343f64c2c98a0639366236fa4f0f66d0a3b097d589916e294358acef689aaf"
+  },
+  "findings": [
+    "For the 72 observed cases, sorted unique case labels select contiguous positional slices from their first occurrence with length equal to their frequency.",
+    "This differs from gather-by-case grouping for interleaved inputs; frame index labels did not alter the observed behavior.",
+    "Returned frames regenerate case IDs, timestamps, three standard columns and a fresh index; extra columns and frame attrs were dropped in the observed cases."
+  ],
+  "limits": [
+    "Finite public behavior evidence; no native implementation or coverage status promotion.",
+    "Custom selectors, dtype variants, missing values and generated metadata need broader evidence before adapter completion."
+  ]
+}
