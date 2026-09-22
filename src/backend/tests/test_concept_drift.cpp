@@ -14,6 +14,7 @@
 #include "bose_permutation_numeric_fixture.hpp"
 #include "bose_table_extra_tests.hpp"
 #include "bose_table_order_tests.hpp"
+#include "bose_table_activity_tests.hpp"
 
 namespace {
 
@@ -44,6 +45,7 @@ bool throws_invalid(const auto& fn) {
 int main() {
   test_bose_table_edges();
   test_bose_table_ordering();
+  test_bose_table_activity_kinds();
   // Epoch seconds and p-values must survive the JSON boundary exactly, even
   // when the caller's global locale uses a comma as the decimal separator.
   struct CommaDecimal : std::numpunct<char> {

@@ -1,0 +1,22 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "BOSE table activity-kind ordering and deferred output rejection",
+  "public_cases": 184,
+  "regression_comparisons": 18657,
+  "cli_checks": 14,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "parent_commit": "090990a57061e2f58665d181e919011cd954cf58",
+  "verified_code_tree": "7540ab3f1f296ccb548b9f47d5cbede83232369b",
+  "core_library_sha256": "1bc63835886153c87563994865053b7e42396ccf22b7a65e07cff7d5306c22ac",
+  "artifacts": {
+    "docs/bose-table-activity-reference.json.gz": "5be0f731b7dd93284c56ce20cd22fc614482ae9527f135d9f708290b282730f8",
+    "docs/bose-table-activity-native-checks.json.gz": "8a2a0d1c35933c1f129db39320b0c0aac7ee34de7cd6bc3baa40a7b5eeaeb345"
+  },
+  "limits": [
+    "No coverage status promotion.",
+    "Finite scalar/tuple/null cases do not prove all pandas identity and container behavior.",
+    "Explicit seed and resource bounds remain native extensions.",
+    "Rejection acceptance and RNG are compared, not language-specific exception classes."
+  ]
+}
