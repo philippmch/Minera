@@ -1,0 +1,21 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Ordered activity sequences and event counts in returned BOSE segments, and selected boundary sets.",
+  "matches": 240,
+  "cases": 240,
+  "production_changes": false,
+  "verified_commit": "7b0e5a81dee42dd6be06b49ba095cd9f9bd28fab",
+  "core_library_sha256": "81c09dc433d26d8d6a403aa7954680c4a262ca340df2955a00f23a6ed8967fbe",
+  "probe_executable_sha256": "42c3e210652d8633752e600b3dbf3603096a1b3b167f6d91ec92a3822abfa9dd",
+  "native_suite_evidence_reused": "docs/bose-features-validation.json",
+  "artifacts": {
+    "docs/bose-returned-logs-reference.json.gz": "c40fd05e303b47c63ba6612f6ba228b45682a7e3a552c57c2e77a70b8583d348",
+    "docs/bose-returned-logs-native-checks.json.gz": "9bae233fc45f1a30150ad3d2397a5f6cf87a1927c47e5be1330858b1eb94548b"
+  },
+  "normalization": "Compare ordered per-trace activity sequences instead of reference-generated case IDs or synthetic output timestamps. Input case IDs and timestamps are retained natively as an extension.",
+  "limits": [
+    "Finite increasing-timestamp EventLog corpus; no coverage status promotion.",
+    "Exact permutation p-values and p-value-ranked boundary order are recorded but not compared.",
+    "Missing selectors, typed labels, event/case ordering, and complete adapter semantics remain unproven."
+  ]
+}

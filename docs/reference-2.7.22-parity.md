@@ -1637,6 +1637,25 @@ code tree and artifact hashes. The BOSE module and dispatcher remain partial:
 this finite feature checkpoint does not establish randomized window-test or
 complete adapter parity.
 
+### BOSE returned-log content checkpoint
+
+The pinned public `bose.apply` reconstructs each returned segment with case IDs
+starting from zero and synthetic event timestamps. Repeated output case IDs do
+not imply repeated input cases. Native returned logs retain the original trace
+and event metadata as an extension, so behavioral comparisons use ordered
+activity sequences within each returned trace and segment.
+
+`docs/bose-returned-logs-reference.json.gz` retains 240 public observations across
+raw sub-log sizes 1, 2, and 3; zero to three behavioral segments; unequal segment
+lengths; and trailing partial sub-logs. All 240 comparisons match the existing
+native implementation by returned activity sequences, event counts, and selected
+boundary sets. The fixture also retains generated case IDs, output timestamps,
+and drift p-values. `docs/bose-returned-logs-native-checks.json.gz` records the
+native outputs and comparison probe; the validation file identifies the unchanged
+built code and reused native-suite evidence. Exact randomized p-values and ranked
+boundary order are not compared. No production behavior or coverage classification
+changes in this checkpoint; window-test and adapter proof remain incomplete.
+
 ## Trace-variant query anonymization evidence
 
 The native trace-variant query surface supports both Laplace and SaCoFa
