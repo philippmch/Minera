@@ -16,8 +16,9 @@ enum class ConceptDriftVariant {
 };
 
 // Configuration for the eventual-follow relation feature and window test.
-// A fixed seed makes the stochastic test reproducible; callers can select a
-// different stream without changing any of the extracted features.
+// Seeds through UINT32_MAX reproduce NumPy's legacy RandomState stream. A
+// wider seed uses a deterministic native extension seeded from its low and
+// high 32-bit words.
 struct ConceptDriftOptions {
   ConceptDriftVariant variant = ConceptDriftVariant::kBose;
   std::size_t sub_log_size = 50;

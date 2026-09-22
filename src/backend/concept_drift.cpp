@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <numeric>
 #include <random>
@@ -277,7 +278,7 @@ std::vector<std::string> sorted_activities_from_traces(
 
 double permutation_p_value(const std::vector<std::vector<double>>& first,
                            const std::vector<std::vector<double>>& second,
-                           std::mt19937_64& rng) {
+                           std::mt19937& rng) {
   const std::size_t n1 = first.size();
   const std::size_t n2 = second.size();
   const std::size_t dimensions = first.front().size();
@@ -301,9 +302,27 @@ double permutation_p_value(const std::vector<std::vector<double>>& first,
     observed_squared += delta * delta;
   }
 
-  // The caller requests the number of permutations by repeating this helper;
-  // this function performs one shuffle and returns an indicator in [0, 1].
-  std::shuffle(indices.begin(), indices.end(), rng);
+  // NumPy's legacy RandomState uses a descending Fisher-Yates shuffle with a
+  // rejection-sampled mask. std::shuffle has implementation-defined draws and
+  // therefore cannot reproduce that public stream across runtimes.
+  if (indices.size() > std::numeric_limits<std::uint32_t>::max()) {
+    throw std::invalid_argument(
+        "concept drift: permutation index range exceeds 32-bit BOSE stream");
+  }
+  for (std::size_t i = indices.size(); i > 1; --i) {
+    const auto upper = static_cast<std::uint32_t>(i - 1);
+    std::uint32_t mask = upper;
+    mask |= mask >> 1;
+    mask |= mask >> 2;
+    mask |= mask >> 4;
+    mask |= mask >> 8;
+    mask |= mask >> 16;
+    std::uint32_t draw = 0;
+    do {
+      draw = rng() & mask;
+    } while (draw > upper);
+    std::swap(indices[i - 1], indices[draw]);
+  }
   std::vector<double> perm1(dimensions, 0.0), perm2(dimensions, 0.0);
   for (std::size_t i = 0; i < n1; ++i)
     for (std::size_t d = 0; d < dimensions; ++d)
@@ -318,6 +337,16 @@ double permutation_p_value(const std::vector<std::vector<double>>& first,
     perm_squared += delta * delta;
   }
   return perm_squared >= observed_squared ? 1.0 : 0.0;
+}
+
+std::mt19937 make_bose_rng(std::uint64_t seed) {
+  if (seed <= std::numeric_limits<std::uint32_t>::max()) {
+    return std::mt19937(static_cast<std::uint32_t>(seed));
+  }
+  const std::uint32_t low = static_cast<std::uint32_t>(seed);
+  const std::uint32_t high = static_cast<std::uint32_t>(seed >> 32);
+  std::seed_seq native_extension{low, high};
+  return std::mt19937(native_extension);
 }
 
 }  // namespace
@@ -501,7 +530,7 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
   }
 
   if (result.feature_vectors.size() >= 2 * options.window_size) {
-    std::mt19937_64 rng(options.seed);
+    std::mt19937 rng = make_bose_rng(options.seed);
     const std::size_t windows =
         result.feature_vectors.size() - 2 * options.window_size + 1;
     std::vector<ConceptDriftChangePoint> candidates;

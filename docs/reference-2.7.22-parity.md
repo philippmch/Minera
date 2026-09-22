@@ -1729,6 +1729,27 @@ suite, 7,686 prior comparisons, eight CLI checks, and independent review pass.
 `docs/bose-grouped-adapter-validation.json` records the verified build and evidence
 hashes. No module or dispatcher status is promoted.
 
+### BOSE seeded permutation-stream checkpoint
+
+The native detector uses a 32-bit MT19937 stream with explicit descending
+Fisher-Yates shuffling and bit-mask rejection sampling. Scalar seeds through
+`UINT32_MAX` reproduce the pinned adapter's NumPy legacy random stream; wider
+native seeds remain deterministic through a two-word seed sequence. This changes
+the previous native seeded results, which used a different generator and the
+standard library's implementation-dependent shuffle. Each permutation starts
+from the original concatenated windows, and successive windows share the stream.
+
+Public black-box probes compare shuffle outputs and final random states across
+54 seed/length combinations, and permutation-test outputs across 48 calls.
+The native detector is also compared against complete public adapter results,
+including exact p-values, ordered capped boundaries, and returned trace content.
+All 360 comparisons pass, up from 293 before the change. The focused native
+suite, 8,262 prior comparisons, and 14 CLI checks pass. Reference observations
+and native checks are retained in `docs/bose-seeded-reference.json.gz` and
+`docs/bose-seeded-native-checks.json.gz`; `docs/bose-seeded-validation.json`
+records the build and evidence hashes. These checks do not promote the BOSE
+module or dispatcher to complete parity.
+
 ## Trace-variant query anonymization evidence
 
 The native trace-variant query surface supports both Laplace and SaCoFa
