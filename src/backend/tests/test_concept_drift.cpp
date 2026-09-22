@@ -37,6 +37,8 @@ int main() {
   // in the alphabet used by both standalone extraction and drift detection.
   minera::EventLog empty_label_log;
   empty_label_log.traces = {trace({"", "a"}, "empty-label")};
+  empty_label_log.traces.front().events.front().activity_state =
+      minera::FirstClassAttributeState::kPresent;
   assert((minera::extract_concept_drift_activities(empty_label_log) ==
           std::vector<std::string>{"", "a"}));
   const std::vector<double> empty_label_features{0, 0, 2, 1, 0, 1};
@@ -55,12 +57,110 @@ int main() {
   assert(selected_empty_result.activities == empty_label_result.activities);
   assert(selected_empty_result.feature_vectors == empty_label_result.feature_vectors);
 
+  // A missing default activity and a missing generic selector are invalid for
+  // detection, while the standalone feature extractors retain their
+  // historical permissive behavior.
+  minera::EventLog missing_default_activity;
+  missing_default_activity.traces = {trace({"a"}, "missing-default")};
+  missing_default_activity.traces.front().events.front().activity.clear();
+  assert(throws_invalid([&] {
+    (void)minera::detect_concept_drift(missing_default_activity);
+  }));
+
+  minera::EventLog empty_trace_log;
+  empty_trace_log.traces.emplace_back();
+  assert(throws_invalid(
+      [&] { (void)minera::detect_concept_drift(empty_trace_log); }));
+
   minera::EventLog log;
   log.traces = {trace({"a", "b"}, "c1"), trace({"a", "b"}, "c2"),
                 trace({"a", "c"}, "c3"), trace({"a", "c"}, "c4")};
   log.attributes.push_back({"fixture", "concept-drift"});
   log.traces[0].attributes.push_back({"case:group", "before"});
   log.traces[0].events[0].attributes.push_back({"event:detail", "kept"});
+
+  minera::ConceptDriftOptions missing_activity_options;
+  missing_activity_options.activity_attribute = "missing";
+  assert(throws_invalid(
+      [&] { (void)minera::detect_concept_drift(log, missing_activity_options); }));
+
+  // Generic activity cells must remain scalar strings.  Their lexical text
+  // is not enough to make numeric, null, or container values valid labels.
+  const auto rejects_generic_activity = [](minera::EventAttribute cell) {
+    minera::EventLog candidate;
+    candidate.traces = {trace({"a", "b"}, "generic-validation")};
+    for (auto& event : candidate.traces.front().events) {
+      cell.key = "selected";
+      event.attributes.push_back(cell);
+    }
+    minera::ConceptDriftOptions candidate_options;
+    candidate_options.activity_attribute = "selected";
+    return throws_invalid([&] {
+      (void)minera::detect_concept_drift(candidate, candidate_options);
+    });
+  };
+  assert(rejects_generic_activity(
+      {"selected", "", minera::AttributeKind::kString, true}));
+  minera::EventAttribute numeric_activity{"selected", "1",
+                                          minera::AttributeKind::kInt};
+  numeric_activity.typed_value = std::int64_t{1};
+  assert(rejects_generic_activity(numeric_activity));
+  minera::EventAttribute container_activity{"selected", "A",
+                                            minera::AttributeKind::kString};
+  container_activity.container = minera::AttributeContainerKind::kList;
+  assert(rejects_generic_activity(container_activity));
+
+  // Empty strings are valid first-class labels when presence is explicit.
+  minera::EventLog first_class_metadata_log;
+  first_class_metadata_log.traces = {trace({"a"}, "first-class")};
+  auto& first_class_event = first_class_metadata_log.traces.front().events.front();
+  first_class_event.activity = "";
+  first_class_event.activity_state = minera::FirstClassAttributeState::kPresent;
+  first_class_event.activity_attribute =
+      minera::EventAttribute{"concept:name", "", minera::AttributeKind::kString};
+  assert(minera::detect_concept_drift(first_class_metadata_log)
+             .activities == std::vector<std::string>{""});
+  first_class_event.activity = "visible";
+  first_class_event.activity_state = minera::FirstClassAttributeState::kNull;
+  assert(throws_invalid([&] {
+    (void)minera::detect_concept_drift(first_class_metadata_log);
+  }));
+
+  // The resource, lifecycle, and timestamp aliases use their own first-class
+  // presence state and selected metadata, just like concept:name.
+  const auto first_class_alias_accepts = [](std::string selector,
+                                            std::string value,
+                                            minera::EventAttribute metadata) {
+    minera::EventLog candidate;
+    candidate.traces = {trace({"unused"}, "alias")};
+    auto& event = candidate.traces.front().events.front();
+    if (selector == "org:resource") {
+      event.resource = std::move(value);
+      event.resource_state = minera::FirstClassAttributeState::kPresent;
+      event.resource_attribute = std::move(metadata);
+    } else if (selector == "lifecycle:transition") {
+      event.lifecycle = std::move(value);
+      event.lifecycle_state = minera::FirstClassAttributeState::kPresent;
+      event.lifecycle_attribute = std::move(metadata);
+    } else {
+      event.timestamp = std::move(value);
+      event.timestamp_state = minera::FirstClassAttributeState::kPresent;
+      event.timestamp_attribute = std::move(metadata);
+    }
+    minera::ConceptDriftOptions candidate_options;
+    candidate_options.activity_attribute = std::move(selector);
+    return !throws_invalid([&] {
+      (void)minera::detect_concept_drift(candidate, candidate_options);
+    });
+  };
+  assert(first_class_alias_accepts(
+      "org:resource", "", {"org:resource", "", minera::AttributeKind::kString}));
+  assert(first_class_alias_accepts(
+      "lifecycle:transition", "L", {"lifecycle:transition", "L",
+                                       minera::AttributeKind::kString}));
+  assert(first_class_alias_accepts(
+      "time:timestamp", "2024-01-01T00:00:00Z",
+      {"time:timestamp", "2024-01-01T00:00:00Z", minera::AttributeKind::kString}));
 
   const auto activities = minera::extract_concept_drift_activities(log);
   assert((activities == std::vector<std::string>{"a", "b", "c"}));
@@ -187,15 +287,27 @@ int main() {
       [&] { (void)minera::detect_concept_drift(bad_timestamp, options); }));
 
   minera::EventLog oversized;
+  const auto throws_materialization_limit = [](const auto& fn) {
+    try {
+      fn();
+    } catch (const std::invalid_argument& error) {
+      return std::string(error.what()).find(
+                 "cumulative sub-log materialization exceeds safe bound") !=
+             std::string::npos;
+    }
+    return false;
+  };
+  // The cheap trace-count guard runs before per-event validation, avoiding
+  // materializing millions of events merely to exercise this resource limit.
   oversized.traces.resize(2500);
   options.include_timestamps = false;
   options.sub_log_size = 1;
-  assert(throws_invalid(
+  assert(throws_materialization_limit(
       [&] { (void)minera::detect_concept_drift(oversized, options); }));
 
   minera::EventLog oversized_sublog;
   oversized_sublog.traces.resize(1'000'001);
   options.sub_log_size = oversized_sublog.traces.size();
-  assert(throws_invalid(
+  assert(throws_materialization_limit(
       [&] { (void)minera::detect_concept_drift(oversized_sublog, options); }));
 }
