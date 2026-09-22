@@ -276,35 +276,8 @@ std::vector<std::string> sorted_activities_from_traces(
   return activities;
 }
 
-double permutation_p_value(const std::vector<std::vector<double>>& first,
-                           const std::vector<std::vector<double>>& second,
+void numpy_shuffle_indices(std::vector<std::size_t>& indices,
                            std::mt19937& rng) {
-  const std::size_t n1 = first.size();
-  const std::size_t n2 = second.size();
-  const std::size_t dimensions = first.front().size();
-  std::vector<std::vector<double>> all;
-  all.reserve(n1 + n2);
-  all.insert(all.end(), first.begin(), first.end());
-  all.insert(all.end(), second.begin(), second.end());
-  std::vector<std::size_t> indices(all.size());
-  std::iota(indices.begin(), indices.end(), 0);
-
-  std::vector<double> mean1(dimensions, 0.0), mean2(dimensions, 0.0);
-  for (const auto& row : first)
-    for (std::size_t d = 0; d < dimensions; ++d) mean1[d] += row[d];
-  for (const auto& row : second)
-    for (std::size_t d = 0; d < dimensions; ++d) mean2[d] += row[d];
-  for (double& value : mean1) value /= static_cast<double>(n1);
-  for (double& value : mean2) value /= static_cast<double>(n2);
-  double observed_squared = 0.0;
-  for (std::size_t d = 0; d < dimensions; ++d) {
-    const double delta = mean1[d] - mean2[d];
-    observed_squared += delta * delta;
-  }
-
-  // NumPy's legacy RandomState uses a descending Fisher-Yates shuffle with a
-  // rejection-sampled mask. std::shuffle has implementation-defined draws and
-  // therefore cannot reproduce that public stream across runtimes.
   if (indices.size() > std::numeric_limits<std::uint32_t>::max()) {
     throw std::invalid_argument(
         "concept drift: permutation index range exceeds 32-bit BOSE stream");
@@ -323,20 +296,182 @@ double permutation_p_value(const std::vector<std::vector<double>>& first,
     } while (draw > upper);
     std::swap(indices[i - 1], indices[draw]);
   }
-  std::vector<double> perm1(dimensions, 0.0), perm2(dimensions, 0.0);
-  for (std::size_t i = 0; i < n1; ++i)
-    for (std::size_t d = 0; d < dimensions; ++d)
-      perm1[d] += all[indices[i]][d];
-  for (std::size_t i = n1; i < n1 + n2; ++i)
-    for (std::size_t d = 0; d < dimensions; ++d)
-      perm2[d] += all[indices[i]][d];
-  double perm_squared = 0.0;
-  for (std::size_t d = 0; d < dimensions; ++d) {
-    const double delta = perm1[d] / static_cast<double>(n1) -
-                         perm2[d] / static_cast<double>(n2);
-    perm_squared += delta * delta;
+}
+
+std::size_t matrix_width(const std::vector<std::vector<double>>& matrix) {
+  if (matrix.empty()) return 0;
+  const std::size_t width = matrix.front().size();
+  for (const auto& row : matrix) {
+    if (row.size() != width) {
+      throw std::invalid_argument(
+          "concept drift: permutation matrices must be rectangular");
+    }
   }
-  return perm_squared >= observed_squared ? 1.0 : 0.0;
+  return width;
+}
+
+std::size_t checked_combined_row_count(
+    const std::vector<std::vector<double>>& first,
+    const std::vector<std::vector<double>>& second) {
+  const std::size_t first_rows = first.empty() ? 1 : first.size();
+  const std::size_t second_rows = second.empty() ? 1 : second.size();
+  if (first_rows > std::numeric_limits<std::size_t>::max() - second_rows) {
+    throw std::invalid_argument(
+        "concept drift: permutation row count is too large");
+  }
+  return first_rows + second_rows;
+}
+
+std::size_t validate_permutation_shape(
+    const std::vector<std::vector<double>>& first,
+    const std::vector<std::vector<double>>& second) {
+  const std::size_t first_width = matrix_width(first);
+  const std::size_t second_width = matrix_width(second);
+  if (first_width != second_width) {
+    throw std::invalid_argument(
+        "concept drift: permutation matrices must have matching dimensions");
+  }
+  return first_width;
+}
+
+void validate_permutation_work(std::int64_t num_permutations,
+                               std::size_t row_count,
+                               std::size_t dimensions) {
+  if (row_count > std::numeric_limits<std::uint32_t>::max()) {
+    throw std::invalid_argument(
+        "concept drift: permutation index range exceeds 32-bit BOSE stream");
+  }
+  if (num_permutations > static_cast<std::int64_t>(kMaxPermutations)) {
+    throw std::invalid_argument(
+        "concept drift: num_permutations exceeds safe bound");
+  }
+  const long double work = static_cast<long double>(num_permutations) *
+                           static_cast<long double>(row_count) *
+                           static_cast<long double>(std::max<std::size_t>(1, dimensions));
+  if (!std::isfinite(work) || work > kMaxPermutationWork) {
+    throw std::invalid_argument(
+        "concept drift: requested permutation work exceeds safe bound");
+  }
+}
+
+// Single-column means reduce a contiguous column. Match the observed
+// eight-lane, block-128 pairwise reduction before dividing by the row count.
+double single_column_sum(const std::vector<std::vector<double>>& rows,
+                         const std::vector<std::size_t>* order,
+                         std::size_t start, std::size_t count) {
+  const auto value = [&](std::size_t i) {
+    const auto index = order ? (*order)[start + i] : start + i;
+    return rows[index][0];
+  };
+  if (count < 8) {
+    double sum = 0.0;
+    for (std::size_t i = 0; i < count; ++i) sum += value(i);
+    return sum;
+  }
+  if (count > 128) {
+    const auto half = (count / 2) / 8 * 8;
+    return single_column_sum(rows, order, start, half) +
+           single_column_sum(rows, order, start + half, count - half);
+  }
+  double lanes[8];
+  for (std::size_t j = 0; j < 8; ++j) lanes[j] = value(j);
+  std::size_t i = 8;
+  for (; i + 8 <= count; i += 8)
+    for (std::size_t j = 0; j < 8; ++j) lanes[j] += value(i + j);
+  double sum = ((lanes[0] + lanes[1]) + (lanes[2] + lanes[3])) +
+               ((lanes[4] + lanes[5]) + (lanes[6] + lanes[7]));
+  for (; i < count; ++i) sum += value(i);
+  return sum;
+}
+
+double difference_norm(const std::vector<double>& first,
+                       const std::vector<double>& second) {
+  // The pinned numeric runtime accumulates full blocks in 16 fused lanes,
+  // combines lane offsets 2, 4, 8, then 1, and adds the tail sequentially.
+  // Use scalar operations to make this reduction order explicit.
+  double lanes[16]{};
+  const std::size_t end = first.size() / 16 * 16;
+  for (std::size_t i = 0; i < end; i += 16) {
+    for (std::size_t j = 0; j < 16; ++j) {
+      const double delta = first[i + j] - second[i + j];
+      lanes[j] = std::fma(delta, delta, lanes[j]);
+    }
+  }
+  for (std::size_t i = 0; i < 16; i += 4) {
+    lanes[i] += lanes[i + 2];
+    lanes[i + 1] += lanes[i + 3];
+  }
+  for (std::size_t i = 0; i < 16; i += 8) {
+    lanes[i] += lanes[i + 4];
+    lanes[i + 1] += lanes[i + 5];
+  }
+  lanes[0] += lanes[8];
+  lanes[1] += lanes[9];
+  double squared = lanes[0] + lanes[1];
+  for (std::size_t i = end; i < first.size(); ++i) {
+    const double delta = first[i] - second[i];
+    const volatile double square = delta * delta;  // Separate tail rounding.
+    squared += square;
+  }
+  return std::sqrt(squared);
+}
+
+double permutation_p_value(const std::vector<std::vector<double>>& first,
+                           const std::vector<std::vector<double>>& second,
+                           std::mt19937& rng) {
+  const std::size_t n1 = first.size();
+  const std::size_t n2 = second.size();
+  const std::size_t dimensions = first.empty() ? 0 : first.front().size();
+  std::vector<std::vector<double>> all;
+  all.reserve((n1 == 0 ? 1 : n1) + (n2 == 0 ? 1 : n2));
+  if (first.empty()) {
+    all.emplace_back();
+  } else {
+    all.insert(all.end(), first.begin(), first.end());
+  }
+  if (second.empty()) {
+    all.emplace_back();
+  } else {
+    all.insert(all.end(), second.begin(), second.end());
+  }
+  std::vector<std::size_t> indices(all.size());
+  std::iota(indices.begin(), indices.end(), 0);
+
+  std::vector<double> mean1(dimensions, 0.0), mean2(dimensions, 0.0);
+  if (dimensions == 1) {
+    mean1[0] = single_column_sum(first, nullptr, 0, n1);
+    mean2[0] = single_column_sum(second, nullptr, 0, n2);
+  } else {
+    for (const auto& row : first)
+      for (std::size_t d = 0; d < dimensions; ++d) mean1[d] += row[d];
+    for (const auto& row : second)
+      for (std::size_t d = 0; d < dimensions; ++d) mean2[d] += row[d];
+  }
+  for (double& value : mean1) value /= static_cast<double>(n1);
+  for (double& value : mean2) value /= static_cast<double>(n2);
+  const double observed_norm = difference_norm(mean1, mean2);
+
+  // NumPy's legacy RandomState uses a descending Fisher-Yates shuffle with a
+  // rejection-sampled mask. std::shuffle has implementation-defined draws and
+  // therefore cannot reproduce that public stream across runtimes.
+  numpy_shuffle_indices(indices, rng);
+  if (dimensions == 0)
+    return first.empty() && second.empty() ? 0.0 : 1.0;
+  std::vector<double> perm1(dimensions, 0.0), perm2(dimensions, 0.0);
+  if (dimensions == 1) {
+    perm1[0] = single_column_sum(all, &indices, 0, n1);
+    perm2[0] = single_column_sum(all, &indices, n1, n2);
+  } else {
+    for (std::size_t i = 0; i < n1; ++i)
+      for (std::size_t d = 0; d < dimensions; ++d)
+        perm1[d] += all[indices[i]][d];
+    for (std::size_t i = n1; i < n1 + n2; ++i)
+      for (std::size_t d = 0; d < dimensions; ++d)
+        perm2[d] += all[indices[i]][d];
+  }
+  for (double& value : perm1) value /= static_cast<double>(n1);
+  for (double& value : perm2) value /= static_cast<double>(n2);
+  return difference_norm(perm1, perm2) >= observed_norm ? 1.0 : 0.0;
 }
 
 std::mt19937 make_bose_rng(std::uint64_t seed) {
@@ -532,6 +667,36 @@ std::vector<EventLog> split_concept_drift_sublogs(
     start += count;
   }
   return result;
+}
+
+double concept_drift_permutation_test(
+    const std::vector<std::vector<double>>& first,
+    const std::vector<std::vector<double>>& second,
+    std::int64_t num_permutations, std::mt19937& rng) {
+  const std::size_t dimensions = validate_permutation_shape(first, second);
+  if (num_permutations == 0) {
+    throw std::invalid_argument(
+        "concept drift: num_permutations must not be zero");
+  }
+  if (num_permutations < 0)
+    return 0.0 / static_cast<double>(num_permutations);
+
+  const std::size_t row_count = checked_combined_row_count(first, second);
+  validate_permutation_work(num_permutations, row_count, dimensions);
+  double exceedances = 0.0;
+  for (std::int64_t permutation = 0; permutation < num_permutations;
+       ++permutation) {
+    exceedances += permutation_p_value(first, second, rng);
+  }
+  return exceedances / static_cast<double>(num_permutations);
+}
+
+double concept_drift_permutation_test(
+    const std::vector<std::vector<double>>& first,
+    const std::vector<std::vector<double>>& second,
+    std::int64_t num_permutations, std::uint64_t seed) {
+  auto rng = make_bose_rng(seed);
+  return concept_drift_permutation_test(first, second, num_permutations, rng);
 }
 
 ConceptDriftResult detect_concept_drift(const EventLog& log,

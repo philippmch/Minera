@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <set>
+#include <random>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -104,6 +105,21 @@ compute_concept_drift_follows_relation(
 [[nodiscard]] std::vector<EventLog> split_concept_drift_sublogs(
     const EventLog& log, std::int64_t sub_log_size = 50,
     bool keep_leftover = true);
+
+// Compare two feature windows by a seeded permutation test. Matrix rows must
+// be rectangular with matching widths; negative counts return signed zero,
+// zero is invalid, and positive work is bounded for safe materialization.
+[[nodiscard]] double concept_drift_permutation_test(
+    const std::vector<std::vector<double>>& first,
+    const std::vector<std::vector<double>>& second,
+    std::int64_t num_permutations = 100, std::uint64_t seed = 0);
+
+// Continue a caller-owned MT19937 stream. The state overload consumes exactly
+// the same shuffle draws as the seeded overload and leaves the engine advanced.
+[[nodiscard]] double concept_drift_permutation_test(
+    const std::vector<std::vector<double>>& first,
+    const std::vector<std::vector<double>>& second,
+    std::int64_t num_permutations, std::mt19937& rng);
 
 [[nodiscard]] ConceptDriftResult detect_concept_drift(
     const EventLog& log, ConceptDriftOptions options = {});

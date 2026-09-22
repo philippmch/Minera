@@ -1791,6 +1791,34 @@ These helper contracts do not establish
 standalone permutation-test or DataFrame adapter parity, and do not promote the
 BOSE module or dispatcher to complete.
 
+### BOSE standalone permutation-test checkpoint
+
+`concept_drift_permutation_test` exposes permutation probabilities for numeric
+feature matrices. One overload accepts a seed; another advances a supplied
+MT19937 engine so callers can continue the same random stream across tests.
+Shape validation precedes sampling. Ragged matrices and mismatched widths are
+rejected, zero permutations are rejected, and negative counts return negative
+zero without drawing random values. Empty and zero-column matrices retain the
+reference's distinct result and shuffle-state behavior.
+
+The comparison uses Euclidean distances after square-root rounding. Single-column
+means use the observed eight-lane, block-128 reduction. Squared distances use
+16 fused accumulation lanes, merge offsets 2/4/8/1, and a separately rounded
+scalar tail. This matches the observed NumPy 2.4.6 / SciPy OpenBLAS 0.3.31.188.0
+Windows x86_64 runtime; different BLAS implementations, dtypes, and array layouts
+are not established by this checkpoint. Native work limits bound positive
+permutation requests, including zero-column shuffling.
+
+`docs/bose-permutation-reference.json.gz` retains 757 public cases, including
+four floating-point distance ties and a cancellation-heavy mean that failed
+the initial scalar implementation. All 757 result and RNG-next-word checks
+pass, together with 12,947 prior comparisons, 14 CLI checks, and the focused
+native suite. Independent reduction models match 882 dot products and 204
+single-column means. Results and numeric probe sources are retained in
+`docs/bose-permutation-native-checks.json.gz`; build and evidence hashes are in
+`docs/bose-permutation-validation.json`. These contracts do not complete the
+DataFrame adapter or establish full BOSE module/dispatcher parity.
+
 ## Trace-variant query anonymization evidence
 
 The native trace-variant query surface supports both Laplace and SaCoFa

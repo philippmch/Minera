@@ -1,0 +1,26 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Standalone seeded/stateful BOSE permutation probabilities and RNG consumption",
+  "public_cases": 757,
+  "accepted": 559,
+  "regression_comparisons": 12947,
+  "dot_reduction_checks": 882,
+  "mean_reduction_checks": 204,
+  "cli_checks": 14,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "parent_commit": "cf0ed3088c74784004ae9ab19c7581f5efb323cf",
+  "verified_code_tree": "14437d0ea98b91d4d5a0dde4bce204639c9d9d53",
+  "core_library_sha256": "337693540902f0838b0dcc29d0efc856d72c73321adfa1f209d3489ad5dc2273",
+  "artifacts": {
+    "docs/bose-permutation-reference.json.gz": "d7450c12b8ec6c184748b3faba57c2d174efb8334e3c4c99f92817228d06218d",
+    "docs/bose-permutation-native-checks.json.gz": "adc23167d6cdf07e4e527ef6ad07276cbc659fcd2b287efa075cb0c03e28915a"
+  },
+  "limits": [
+    "No module or dispatcher status promotion.",
+    "Explicit seed overload and positive work limits are native extensions.",
+    "Rejection acceptance is compared, not language-specific exception classes.",
+    "Numeric reductions target the observed NumPy 2.4.6 / SciPy OpenBLAS 0.3.31.188.0 Windows x86_64 runtime; different BLAS, dtype, or array layout semantics are not established.",
+    "DataFrame adapters remain outside this checkpoint."
+  ]
+}
