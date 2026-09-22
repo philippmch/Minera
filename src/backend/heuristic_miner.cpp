@@ -1,6 +1,7 @@
 #include "minera/heuristic_miner.hpp"
 
 #include "business_hours.hpp"
+#include "exact_count_ratio.hpp"
 #include "exact_mean.hpp"
 #include "exact_stdev.hpp"
 #include "minera/timestamp.hpp"
@@ -802,6 +803,19 @@ double compatibility_representation(
   return 0.0;
 }
 
+std::optional<HeuristicPerformanceValue> exact_frequency_representation(
+    std::uint64_t frequency, HeuristicNetDecoration decoration) {
+  // Binary64 represents every integer through 2^53 exactly.  Keep the
+  // established scalar-only shape for those values, and retain a typed
+  // integer payload when the compatibility projection could lose a unit.
+  constexpr std::uint64_t kMaxExactBinary64Integer = std::uint64_t{1} << 53;
+  if (decoration != HeuristicNetDecoration::kFrequency ||
+      frequency <= kMaxExactBinary64Integer)
+    return std::nullopt;
+  return HeuristicPerformanceValue{
+      HeuristicStructuredValue{HeuristicStructuredValue::Value{frequency}}};
+}
+
 std::uint64_t pair_count(const HeuristicFrequencyDfg& dfg,
                          const std::string& source,
                          const std::string& target) {
@@ -812,10 +826,13 @@ std::uint64_t pair_count(const HeuristicFrequencyDfg& dfg,
 double classic_dependency(const HeuristicFrequencyDfg& dfg,
                           const std::string& source,
                           const std::string& target) {
-  const double forward = static_cast<double>(pair_count(dfg, source, target));
-  if (source == target) return forward / (forward + 1.0);
-  const double reverse = static_cast<double>(pair_count(dfg, target, source));
-  return (forward - reverse) / (forward + reverse + 1.0);
+  const std::uint64_t forward = pair_count(dfg, source, target);
+  if (source == target)
+    return detail::exact_ratio(
+        detail::CountUint128::from_uint64(forward),
+        detail::add_one(detail::CountUint128::from_uint64(forward)));
+  const std::uint64_t reverse = pair_count(dfg, target, source);
+  return detail::exact_signed_count_ratio(forward, reverse);
 }
 
 std::map<std::string, std::uint64_t> infer_activity_counts(
@@ -1091,6 +1108,10 @@ HeuristicsNet discover_classic_dfg(
                              false};
     if (decorated != nullptr)
       edge.representation_value = decorated_representation(*decorated, count);
+    else if (!use_structured_values &&
+             effective_decoration == HeuristicNetDecoration::kFrequency)
+      edge.representation_value = exact_frequency_representation(
+          count, effective_decoration);
     else
       edge.representation_value = structured_performance_representation(
           summary, effective_decoration, options.performance_aggregation);
@@ -1120,9 +1141,12 @@ HeuristicsNet discover_classic_dfg(
       if (best && !initially_accepted.contains(*best)) {
         const auto count =
             pair_count(net.cleaned_dfg, best->first, best->second);
-        net.edges.push_back({ids.at(best->first), ids.at(best->second),
-                             best_dep, count,
-                             static_cast<double>(count), false});
+        HeuristicDependency edge{ids.at(best->first), ids.at(best->second),
+                                 best_dep, count,
+                                 static_cast<double>(count), false};
+        edge.representation_value = exact_frequency_representation(
+            count, effective_decoration);
+        net.edges.push_back(std::move(edge));
         initially_accepted.insert(*best);
         active[ids.at(best->first)] = active[ids.at(best->second)] = true;
       }
@@ -1153,17 +1177,18 @@ HeuristicsNet discover_classic_dfg(
           const auto& first = net.activities[neighbours[i]];
           const auto& second = net.activities[neighbours[j]];
           const auto& middle = net.activities[center];
-          const double numerator = static_cast<double>(
-              pair_count(net.cleaned_dfg, first, second) +
+          const auto numerator = detail::add(
+              pair_count(net.cleaned_dfg, first, second),
               pair_count(net.cleaned_dfg, second, first));
-          const double denominator = static_cast<double>(
-              (outgoing
-                   ? pair_count(net.cleaned_dfg, middle, first) +
-                         pair_count(net.cleaned_dfg, middle, second)
-                   : pair_count(net.cleaned_dfg, first, middle) +
-                         pair_count(net.cleaned_dfg, second, middle)) +
-              1);
-          const double value = numerator / denominator;
+          const auto base = outgoing
+                                ? detail::add(
+                                      pair_count(net.cleaned_dfg, middle, first),
+                                      pair_count(net.cleaned_dfg, middle, second))
+                                : detail::add(
+                                      pair_count(net.cleaned_dfg, first, middle),
+                                      pair_count(net.cleaned_dfg, second, middle));
+          const double value =
+              detail::exact_ratio(numerator, detail::add_one(base));
           if (value >= options.and_threshold) {
             destination.insert({center, neighbours[i], neighbours[j]});
             auto& measures =
@@ -1198,8 +1223,9 @@ HeuristicsNet discover_classic_dfg(
       const auto reverse = loop_triples.find({second, first});
       const std::uint64_t v2 =
           reverse == loop_triples.end() ? 0 : reverse->second;
-      const double l2 = static_cast<double>(v1 + v2) /
-                        static_cast<double>(v1 + v2 + 1);
+      const auto loop_count = detail::add(v1, v2);
+      const double l2 = detail::exact_ratio(loop_count,
+                                            detail::add_one(loop_count));
       if (l2 < options.loop_length_two_threshold) continue;
       net.loop_length_two.push_back(
           {first_id, ids.at(second), pair_count(net.cleaned_dfg, first,
@@ -1257,6 +1283,10 @@ HeuristicsNet discover_classic_dfg(
         if (decorated != nullptr)
           edge.representation_value =
               decorated_representation(*decorated, frequency);
+        else if (!use_structured_values &&
+                 effective_decoration == HeuristicNetDecoration::kFrequency)
+          edge.representation_value = exact_frequency_representation(
+              frequency, effective_decoration);
         else if (use_structured_values)
           edge.representation_value.reset();
         else
@@ -1373,6 +1403,10 @@ HeuristicsNet discover_classic_dfg(
     if (decorated != nullptr)
       relation.representation_value =
           decorated_representation(*decorated, cleaned);
+    else if (!use_structured_values &&
+             effective_decoration == HeuristicNetDecoration::kFrequency)
+      relation.representation_value = exact_frequency_representation(
+          cleaned, effective_decoration);
     else if (use_structured_values)
       relation.representation_value.reset();
     else

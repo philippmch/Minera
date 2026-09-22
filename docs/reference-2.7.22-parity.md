@@ -4387,6 +4387,31 @@ The isolated Release build, all 154 native suites, and 4,293 earlier DFG,
 performance-value, dependency/loop, and AND reference comparisons passed.
 Structural coverage remains partial and unchanged.
 
+Classic DFG dependency, AND, and length-two-loop ratios now preserve integer
+sums and differences until the final correctly rounded binary64 division.
+This avoids erased dependencies between adjacent large counts and wrapping
+uint64 sums. Large frequency representations retain exact uint64 payloads in
+JSON for both edges and relation statistics; the legacy scalar field remains
+a binary64 compatibility projection. Existing performance values and ordinary
+small-count payload shapes are preserved.
+`docs/heuristic-count-ratios-reference.json.gz` captures 1,828 public cases for
+self-loops, bidirectional paths, splits, joins, and length-two loops, including
+threshold equality and adjacent binary64 thresholds. The baseline matches 828
+cases and emits invalid JSON in 12 cases. The fixture supplies occurrence
+counts explicitly; inferred occurrence overflow is a separate remaining gap.
+
+All 1,828 cases now match, and 10,185 independent Python integer-division
+golden comparisons pass bit for bit, including rounding ties and ratios above
+one. `docs/heuristic-count-ratio-arithmetic-reference.json.gz` records those
+arithmetic expectations separately from the public behavioral corpus.
+
+`docs/heuristic-count-ratios-native-checks.json.gz` and
+`docs/heuristic-count-ratios-validation.json` retain the comparisons, checkers,
+probe sources, source-tree and binary hashes, and review result. The isolated
+Release build, all 154 native suites, 8,459 prior reference comparisons, and
+independent review passed. These finite checks leave inferred-count overflow,
+arbitrary-size inputs, and full object/adapter and structural parity incomplete.
+
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),
 activity/path occurrence filtering, direct-adjacency mean waits, mean sojourn
