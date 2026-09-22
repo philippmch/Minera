@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "minera/event_log.hpp"
+#include "minera/event_data.hpp"
 
 namespace minera {
 
@@ -88,6 +89,27 @@ struct ConceptDriftTraceResult {
   std::vector<std::vector<std::vector<std::string>>> sublogs;
   std::vector<ConceptDriftTraceChangePoint> change_points;
 };
+
+struct ConceptDriftTableOptions : ConceptDriftTraceOptions {
+  std::string activity_attribute = "concept:name";
+  std::string timestamp_attribute = "time:timestamp";
+  std::string case_id_attribute = "case:concept:name";
+};
+
+struct ConceptDriftTableResult {
+  std::vector<EventTable> returned_tables;
+  std::vector<double> change_timestamps;
+  std::vector<double> p_values;
+};
+
+// Apply the BOSE DataFrame adapter, including its positional case projection
+// and regenerated output frames. Selected case/timestamp columns control the
+// separate change-time lookup; projection also requires the standard columns.
+[[nodiscard]] ConceptDriftTableResult apply_concept_drift_table(
+    const EventTable& table, ConceptDriftTableOptions options = {});
+
+[[nodiscard]] ConceptDriftTableResult apply_concept_drift_table(
+    const EventTable& table, ConceptDriftTableOptions options, std::mt19937& rng);
 
 [[nodiscard]] std::vector<std::string> extract_concept_drift_activities(
     const EventLog& log);

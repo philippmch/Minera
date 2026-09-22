@@ -45,6 +45,7 @@ add_library(minera_core
   src/backend/token_replay_event_data.cpp
   src/backend/communication_history.cpp
   src/backend/concept_drift.cpp
+  src/backend/concept_drift_table.cpp
   src/backend/cycle_time.cpp
   src/backend/correlation_miner.cpp
   src/backend/clustering.cpp
