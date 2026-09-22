@@ -1,0 +1,24 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Grouped BOSE first-event timestamp validation and case-selector handling",
+  "public_calls": 288,
+  "comparisons": 576,
+  "baseline_matches": 429,
+  "final_matches": 576,
+  "regression_comparisons": 7686,
+  "cli_checks": 8,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "parent_commit": "2977213043f2e9b0ef7b618b4487463a460fa9f3",
+  "verified_code_tree": "e13cabd38ec79e6fd2820e4eb844d66a91881171",
+  "core_library_sha256": "917ccdf6fd67d83f23de51ca7c33e7463773a19d4cd9f47ed0c06ff96addc9e2",
+  "artifacts": {
+    "docs/bose-grouped-adapter-reference.json.gz": "7f4745274da48ff6341a101498a073aee91cd9887606409decdb049473513bde",
+    "docs/bose-grouped-adapter-native-checks.json.gz": "d1f52d7b7e3f7800449cc47c8f1f05a88668cea987a222294c0021854cebf99b"
+  },
+  "limits": [
+    "No module or dispatcher status promotion.",
+    "Dataframe grouping and arbitrary timestamp cell types are outside this checkpoint.",
+    "Cross-RNG exact p-values are not compared."
+  ]
+}

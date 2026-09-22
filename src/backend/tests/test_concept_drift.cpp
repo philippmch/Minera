@@ -84,6 +84,51 @@ int main() {
              .sublog_start_timestamps.front() ==
          *minera::parse_timestamp(long_fraction));
 
+  // BOSE checks only the first event of every trace, even when timestamps are
+  // omitted from the result. Later-event timestamp gaps do not affect it.
+  minera::EventLog missing_first_timestamp;
+  missing_first_timestamp.traces = {trace({"a"}, "first-time"),
+                                    trace({"b"}, "second-time")};
+  missing_first_timestamp.traces[1].events.front().timestamp.clear();
+  minera::ConceptDriftOptions timestamp_contract;
+  timestamp_contract.sub_log_size = 2;
+  timestamp_contract.include_timestamps = false;
+  assert(throws_invalid([&] {
+    (void)minera::detect_concept_drift(missing_first_timestamp,
+                                       timestamp_contract);
+  }));
+  timestamp_contract.include_timestamps = true;
+  assert(throws_invalid([&] {
+    (void)minera::detect_concept_drift(missing_first_timestamp,
+                                       timestamp_contract);
+  }));
+
+  minera::EventLog missing_later_timestamp;
+  missing_later_timestamp.traces = {trace({"a", "b"}, "later-time")};
+  missing_later_timestamp.traces.front().events.back().timestamp.clear();
+  timestamp_contract.include_timestamps = false;
+  assert(!throws_invalid([&] {
+    (void)minera::detect_concept_drift(missing_later_timestamp,
+                                       timestamp_contract);
+  }));
+  timestamp_contract.include_timestamps = true;
+  const auto missing_later_result =
+      minera::detect_concept_drift(missing_later_timestamp, timestamp_contract);
+  assert(missing_later_result.sublog_start_timestamps.size() == 1);
+
+  minera::EventLog custom_timestamp_log;
+  custom_timestamp_log.traces = {trace({"a", "b"}, "custom-time")};
+  custom_timestamp_log.traces.front().events[0].attributes.push_back(
+      {"started_at", "2024-01-01T00:00:00Z"});
+  custom_timestamp_log.traces.front().events[1].attributes.push_back(
+      {"started_at", "1970-01-01T00:00:00Z"});
+  timestamp_contract.timestamp_attribute = "started_at";
+  const auto custom_timestamp_result =
+      minera::detect_concept_drift(custom_timestamp_log, timestamp_contract);
+  assert(custom_timestamp_result.sublog_start_timestamps.size() == 1);
+  assert(custom_timestamp_result.sublog_start_timestamps.front() ==
+         *minera::parse_timestamp("2024-01-01T00:00:00Z"));
+
   // Empty strings are labels, not absent activity attributes. Preserve them
   // in the alphabet used by both standalone extraction and drift detection.
   minera::EventLog empty_label_log;
@@ -327,7 +372,8 @@ int main() {
   assert(throws_invalid([&] { (void)minera::detect_concept_drift(log, options); }));
   options.activity_attribute = "concept:name";
   options.case_id_attribute = "missing_case_key";
-  assert(throws_invalid([&] { (void)minera::detect_concept_drift(log, options); }));
+  const auto grouped_case_result = minera::detect_concept_drift(log, options);
+  assert(grouped_case_result.case_id_attribute == "missing_case_key");
 
   minera::EventLog bad_timestamp;
   bad_timestamp.traces.push_back(trace({"a"}, "bad"));

@@ -219,14 +219,45 @@ const std::string* event_value(const Event& event, std::string_view key) {
   return event.attribute(key);
 }
 
-const std::string* trace_value(const Trace& trace, std::string_view key) {
-  if (key.empty() || key == "case_id" || key == "case:id" ||
-      key == "case:concept:name" || key == "concept:name") {
-    return &trace.case_id;
+const std::string* selected_timestamp_value(const Event& event,
+                                            std::string_view selector) {
+  const auto first_class = [&](const std::string& value,
+                               FirstClassAttributeState state,
+                               bool has_value,
+                               const std::optional<EventAttribute>& metadata)
+      -> const std::string* {
+    if (state == FirstClassAttributeState::kNull ||
+        (metadata &&
+         (metadata->is_null ||
+          metadata->first_class_state == FirstClassAttributeState::kNull))) {
+      return nullptr;
+    }
+    return has_value ? &value : nullptr;
+  };
+
+  if (selector == "timestamp" || selector == "time:timestamp") {
+    return first_class(event.timestamp, event.timestamp_state,
+                       event.has_timestamp(), event.timestamp_attribute);
   }
-  if (const auto* value = trace.attribute(key)) return value;
-  if (!trace.events.empty()) return event_value(trace.events.front(), key);
-  return nullptr;
+  if (selector == "activity" || selector == "concept:name") {
+    return first_class(event.activity, event.activity_state,
+                       event.has_activity(), event.activity_attribute);
+  }
+  if (selector == "resource" || selector == "org:resource") {
+    return first_class(event.resource, event.resource_state,
+                       event.has_resource(), event.resource_attribute);
+  }
+  if (selector == "lifecycle" || selector == "lifecycle:transition") {
+    return first_class(event.lifecycle, event.lifecycle_state,
+                       event.has_lifecycle(), event.lifecycle_attribute);
+  }
+
+  const auto* attribute = event_attribute_entry(event, selector);
+  if (!attribute || attribute->is_null ||
+      attribute->first_class_state == FirstClassAttributeState::kNull) {
+    return nullptr;
+  }
+  return &attribute->value;
 }
 
 std::vector<std::string> sorted_activities_from_traces(
@@ -407,11 +438,26 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
   }
   validate_options(options, log.traces.size(), event_count,
                    activities.size() * 3);
+
+  // BOSE validates the first event timestamp of every grouped trace before
+  // doing any window work. Cache those values independently of whether the
+  // caller asks for timestamp arrays in the result; later events are not part
+  // of this case-start contract.
+  std::vector<double> case_start_times;
+  case_start_times.reserve(log.traces.size());
   for (const auto& trace : log.traces) {
-    if (!trace_value(trace, options.case_id_attribute)) {
+    const auto* timestamp = selected_timestamp_value(
+        trace.events.front(), options.timestamp_attribute);
+    if (!timestamp || timestamp->empty()) {
       throw std::invalid_argument(
-          "concept drift: selected case-id attribute is missing");
+          "concept drift: selected case-start timestamp is missing");
     }
+    const auto parsed = precise_epoch_seconds(*timestamp);
+    if (!parsed || !std::isfinite(*parsed)) {
+      throw std::invalid_argument(
+          "concept drift: case-start timestamp is not finite");
+    }
+    case_start_times.push_back(*parsed);
   }
 
   ConceptDriftResult result;
@@ -450,24 +496,8 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
     cumulative_copy.traces.insert(cumulative_copy.traces.end(), log.traces.begin(),
                                    log.traces.begin() + end);
     result.cumulative_sublogs.push_back(std::move(cumulative_copy));
-    if (options.include_timestamps) {
-      if (log.traces[start].events.empty()) {
-        throw std::invalid_argument(
-            "concept drift: requested timestamp for an empty case");
-      }
-      const auto* timestamp = event_value(
-          log.traces[start].events.front(), options.timestamp_attribute);
-      if (!timestamp || timestamp->empty()) {
-        throw std::invalid_argument(
-            "concept drift: selected case-start timestamp is missing");
-      }
-      const auto parsed = precise_epoch_seconds(*timestamp);
-      if (!parsed || !std::isfinite(*parsed)) {
-        throw std::invalid_argument(
-            "concept drift: case-start timestamp is not finite");
-      }
-      result.sublog_start_timestamps.push_back(*parsed);
-    }
+    if (options.include_timestamps)
+      result.sublog_start_timestamps.push_back(case_start_times[start]);
   }
 
   if (result.feature_vectors.size() >= 2 * options.window_size) {
