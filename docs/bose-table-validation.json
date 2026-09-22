@@ -1,0 +1,24 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "BOSE EventTable adapter: positional case projection, selected timestamp lookup and regenerated returned frames",
+  "public_cases": 1655,
+  "accepted": 1367,
+  "regression_comparisons": 16944,
+  "cli_checks": 14,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "parent_commit": "258e91461a70793d3cbcf951277c8a35d7f444c0",
+  "verified_code_tree": "3533e39b4ba98159a8db1fa7ccfd6d1631339e06",
+  "core_library_sha256": "1712e7feaaeddb212fb513ef3d18e96538ee4a0b9f421925e7f43ce02e4d367c",
+  "artifacts": {
+    "docs/bose-table-reference.json.gz": "88084bc6b9a2424984a6dfc6ed1a60c4582882cc48964263f1150bd8a47d63cd",
+    "docs/bose-table-native-checks.json.gz": "a9380edee4baffd87bea6d77849d3f9660c2dd0ea981c69466d051e04d7ddbd8"
+  },
+  "limits": [
+    "No module or dispatcher status promotion.",
+    "Finite typed-table corpus does not prove all pandas scalar/container, categorical, null identity or timestamp-resolution behavior.",
+    "Explicit seeds and resource bounds are native extensions.",
+    "Rejection acceptance is compared, not language-specific exception classes.",
+    "Numerical reductions target the previously observed pinned NumPy/OpenBLAS runtime."
+  ]
+}

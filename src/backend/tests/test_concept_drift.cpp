@@ -12,6 +12,7 @@
 #include "minera/json_export.hpp"
 #include "minera/timestamp.hpp"
 #include "bose_permutation_numeric_fixture.hpp"
+#include "bose_table_extra_tests.hpp"
 
 namespace {
 
@@ -40,6 +41,7 @@ bool throws_invalid(const auto& fn) {
 }  // namespace
 
 int main() {
+  test_bose_table_edges();
   // Epoch seconds and p-values must survive the JSON boundary exactly, even
   // when the caller's global locale uses a comma as the decimal separator.
   struct CommaDecimal : std::numpunct<char> {
@@ -553,6 +555,64 @@ int main() {
     (void)minera::detect_concept_drift_traces(direct_traces,
                                                oversized_window_options);
   }));
+
+  // BOSE's table adapter projects contiguous slices beginning at the first
+  // occurrence of each sorted case, even when case rows are interleaved.
+  minera::EventTable bose_table;
+  bose_table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  bose_table.dtypes = {"str", "str", "datetime64[us, UTC]"};
+  const std::vector<std::string> table_cases = {"b", "a", "b", "a"};
+  const std::vector<std::string> table_activities = {"B", "A", "C", "D"};
+  for (std::size_t i = 0; i < table_cases.size(); ++i) {
+    const auto timestamp = minera::format_timestamp_microseconds(1577836803.0 - i);
+    minera::EventAttribute date{"time:timestamp", timestamp, minera::AttributeKind::kDate};
+    date.typed_value = minera::NativeDate{timestamp};
+    bose_table.rows.push_back({minera::EventAttribute{"case:concept:name", table_cases[i]},
+                               minera::EventAttribute{"concept:name", table_activities[i]}, date});
+  }
+  bose_table.attributes.push_back({"extra", "discarded"});
+  minera::ConceptDriftTableOptions table_options;
+  table_options.sub_log_size = 1;
+  table_options.window_size = 1;
+  table_options.num_permutations = 1;
+  table_options.threshold = 1.1;
+  std::mt19937 table_rng(0);
+  const auto table_result = minera::apply_concept_drift_table(
+      bose_table, table_options, table_rng);
+  assert(table_rng() == 2'546'248'239u);
+  assert(table_result.change_timestamps == std::vector<double>{1577836803.0});
+  assert(table_result.p_values == std::vector<double>{1.0});
+  assert(table_result.returned_tables.size() == 2);
+  const std::vector<std::vector<std::string>> projected_labels = {{"A", "C"}, {"B", "A"}};
+  for (std::size_t i = 0; i < table_result.returned_tables.size(); ++i) {
+    const auto& frame = table_result.returned_tables[i];
+    assert(frame.columns == bose_table.columns);
+    assert(frame.dtypes == bose_table.dtypes);
+    assert(frame.attributes.empty());
+    assert(frame.metadata == minera::EventDataMetadata{});
+    assert(frame.index && frame.index->kind == "RangeIndex");
+    assert(frame.rows.size() == 2);
+    for (std::size_t j = 0; j < frame.rows.size(); ++j) {
+      assert(frame.rows[j][0]->value == "0");
+      assert(frame.rows[j][1]->value == projected_labels[i][j]);
+      assert(minera::parse_timestamp(frame.rows[j][2]->value) == 10000000.0 + j);
+      const auto* date = std::get_if<minera::NativeDate>(&frame.rows[j][2]->typed_value);
+      assert(date && date->resolution == minera::NativeDateResolution::kMicrosecond);
+      assert(date->timezone == std::optional<std::string>{"UTC"});
+      assert(std::get<minera::EventAttribute>(frame.index->labels[j].value).value == std::to_string(j));
+    }
+  }
+  // An out-of-range change-time lookup happens after all window shuffles.
+  table_options.window_size = 0;
+  std::mt19937 rejected_table_rng(0);
+  bool table_boundary_rejected = false;
+  try {
+    (void)minera::apply_concept_drift_table(bose_table, table_options, rejected_table_rng);
+  } catch (const std::exception&) {
+    table_boundary_rejected = true;
+  }
+  assert(table_boundary_rejected);
+  assert(rejected_table_rng() == 3'626'093'760u);
 
   minera::EventLog projected = log;
   for (auto& current : projected.traces) {

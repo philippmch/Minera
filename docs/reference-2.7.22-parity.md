@@ -1791,6 +1791,37 @@ These helper contracts do not establish
 standalone permutation-test or DataFrame adapter parity, and do not promote the
 BOSE module or dispatcher to complete.
 
+### BOSE DataFrame adapter checkpoint
+
+`apply_concept_drift_table` accepts native `EventTable` input and returns
+regenerated frames, ranked change timestamps, and probabilities. It preserves
+the pinned adapter's separate grouping paths: selected case/time columns drive
+group-first timestamp lookup, while standard case IDs drive contiguous activity
+slices beginning at each sorted case's first occurrence. This deliberately
+reproduces the observed behavior on interleaved rows. The shared direct detector
+retains signed option behavior and caller-owned MT19937 continuation.
+
+Returned frames contain the three canonical columns with `str`, `str`, and
+`datetime64[us, UTC]` dtypes, fresh case IDs and RangeIndex labels, and synthetic
+timestamps starting at epoch second 10,000,000 for each frame. Input extras and
+metadata are discarded. Numeric activity labels fail during frame construction
+after permutation sampling; selected timestamp index failures also preserve
+the observed RNG advancement. Singleton null cases and numeric NaN case groups
+are covered separately from the general scalar ordering path.
+
+All 1,655 public comparisons pass, including 1,367 accepted calls, row-order,
+selector, signed-boundary, dtype/null, numeric-key, and 120 timestamp-precision
+cases. Comparisons include frame columns/dtypes/content/index, empty metadata,
+ranked timestamps/probabilities, signed zero, and post-call RNG state. All 16,944
+prior BOSE comparisons, 14 CLI checks, and the native test suite pass. Independent
+review reports no actionable findings.
+
+Evidence is in `docs/bose-table-reference.json.gz`,
+`docs/bose-table-native-checks.json.gz`, and `docs/bose-table-validation.json`.
+Resource bounds and explicit seeding remain native extensions. This finite
+checkpoint does not establish every pandas scalar/container, categorical, null
+identity, or timestamp-resolution behavior. No coverage status is promoted.
+
 ### BOSE direct activity-trace detector checkpoint
 
 The native `detect_concept_drift_traces` API accepts string activity traces
