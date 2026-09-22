@@ -85,6 +85,163 @@ struct ScalarLess {
   }
 };
 
+enum class ActivityFamily { kString, kNumeric, kBytes, kDate, kNull, kTuple };
+
+constexpr std::size_t kMaxActivityTupleDepth = 128;
+constexpr std::size_t kMaxActivityTupleNodes = 1'000'000;
+
+struct ActivityTraversal {
+  std::size_t nodes = 0;
+};
+
+bool activity_nan(const EventAttribute& value) {
+  if (const auto* number = std::get_if<double>(&value.typed_value))
+    return std::isnan(*number);
+  return value.kind == AttributeKind::kFloat &&
+         (value.value == "nan" || value.value == "NaN" ||
+          value.value == "NAN");
+}
+
+ActivityFamily activity_family_shallow(const EventAttribute& value) {
+  if (value.is_null || value.first_class_state == FirstClassAttributeState::kNull)
+    return ActivityFamily::kNull;
+  if (value.container == AttributeContainerKind::kTuple)
+    return ActivityFamily::kTuple;
+  if (value.container != AttributeContainerKind::kScalar ||
+      value.scalar_wrapper || value.scalar_children_list ||
+      !value.children.empty())
+    throw std::invalid_argument(
+        "concept drift table: mutable activity containers are unsupported");
+  if (value.kind == AttributeKind::kBytes)
+    return ActivityFamily::kBytes;
+  if (value.kind == AttributeKind::kDate ||
+      std::holds_alternative<NativeDate>(value.typed_value))
+    return ActivityFamily::kDate;
+  if (value.kind == AttributeKind::kInt || value.kind == AttributeKind::kFloat ||
+      value.kind == AttributeKind::kBoolean ||
+      std::holds_alternative<std::int64_t>(value.typed_value) ||
+      std::holds_alternative<std::uint64_t>(value.typed_value) ||
+      std::holds_alternative<double>(value.typed_value) ||
+      std::holds_alternative<bool>(value.typed_value))
+    return ActivityFamily::kNumeric;
+  return ActivityFamily::kString;
+}
+
+ActivityFamily validate_activity_tree(const EventAttribute& value,
+                                      std::size_t depth,
+                                      ActivityTraversal& traversal) {
+  if (depth > kMaxActivityTupleDepth ||
+      traversal.nodes++ >= kMaxActivityTupleNodes)
+    throw std::invalid_argument(
+        "concept drift table: activity tuple nesting exceeds safe bound");
+  const auto family = activity_family_shallow(value);
+  if (family == ActivityFamily::kTuple)
+    for (const auto& child : value.children)
+      (void)validate_activity_tree(child, depth + 1, traversal);
+  return family;
+}
+
+ActivityFamily activity_family(const EventAttribute& value) {
+  ActivityTraversal traversal;
+  return validate_activity_tree(value, 0, traversal);
+}
+
+std::string activity_identity_impl(const EventAttribute& value,
+                                   std::size_t depth) {
+  if (depth > kMaxActivityTupleDepth)
+    throw std::invalid_argument(
+        "concept drift table: activity tuple nesting exceeds safe bound");
+  switch (const auto family = activity_family_shallow(value)) {
+    case ActivityFamily::kNull:
+      return "null";
+    case ActivityFamily::kNumeric:
+      return activity_nan(value)
+                 ? "numeric:nan:" +
+                       std::to_string(value.typed_value.scalar_identity())
+                 : "numeric:" + root_cause_scalar_key_fingerprint(value);
+    case ActivityFamily::kString:
+      return "string:" + root_cause_scalar_key_fingerprint(value);
+    case ActivityFamily::kBytes:
+      return "bytes:" + root_cause_scalar_key_fingerprint(value);
+    case ActivityFamily::kDate: {
+      const auto date = exact_date_key(value);
+      return "date:" + std::to_string(date.timezone_aware) + ":" +
+             std::to_string(date.seconds) + ":" +
+             std::to_string(date.nanoseconds);
+    }
+    case ActivityFamily::kTuple: {
+      std::string result = "tuple:" + std::to_string(value.children.size());
+      for (const auto& child : value.children) {
+        const auto child_identity = activity_identity_impl(child, depth + 1);
+        result += ":" + std::to_string(child_identity.size()) + ":" +
+                  child_identity;
+      }
+      return result;
+    }
+  }
+  throw std::invalid_argument("concept drift table: invalid activity key");
+}
+
+std::string activity_identity(const EventAttribute& value) {
+  ActivityTraversal traversal;
+  (void)validate_activity_tree(value, 0, traversal);
+  return activity_identity_impl(value, 0);
+}
+
+int compare_activity_values_impl(const EventAttribute& left,
+                                 const EventAttribute& right,
+                                 std::size_t depth) {
+  if (depth > kMaxActivityTupleDepth)
+    throw std::invalid_argument(
+        "concept drift table: activity tuple nesting exceeds safe bound");
+  const auto left_family = activity_family_shallow(left);
+  const auto right_family = activity_family_shallow(right);
+  if (left_family != right_family)
+    throw std::invalid_argument(
+        "concept drift table: incompatible activity key types");
+  switch (left_family) {
+    case ActivityFamily::kNull:
+      return 0;
+    case ActivityFamily::kNumeric: {
+      const bool left_nan = activity_nan(left), right_nan = activity_nan(right);
+      if (left_nan || right_nan) {
+        if (left_nan && right_nan) {
+          const auto left_identity = left.typed_value.scalar_identity();
+          const auto right_identity = right.typed_value.scalar_identity();
+          if (left_identity == right_identity) return 0;
+          return left_identity < right_identity ? -1 : 1;
+        }
+        return left_nan ? -1 : 1;
+      }
+      return compare_same_kind(left, right);
+    }
+    case ActivityFamily::kString:
+    case ActivityFamily::kBytes:
+    case ActivityFamily::kDate:
+      return compare_same_kind(left, right);
+    case ActivityFamily::kTuple: {
+      const auto common = std::min(left.children.size(), right.children.size());
+      for (std::size_t index = 0; index < common; ++index) {
+        const auto order =
+            compare_activity_values_impl(left.children[index],
+                                         right.children[index], depth + 1);
+        if (order != 0) return order;
+      }
+      if (left.children.size() == right.children.size()) return 0;
+      return left.children.size() < right.children.size() ? -1 : 1;
+    }
+  }
+  throw std::invalid_argument("concept drift table: invalid activity key");
+}
+
+int compare_activity_values(const EventAttribute& left,
+                            const EventAttribute& right) {
+  ActivityTraversal traversal;
+  (void)validate_activity_tree(left, 0, traversal);
+  (void)validate_activity_tree(right, 0, traversal);
+  return compare_activity_values_impl(left, right, 0);
+}
+
 std::string table_key_identity(const EventAttribute& value) {
   const auto kind = native_scalar_order_kind(value);
   if (kind == NativeScalarOrderKind::kDate) {
@@ -270,30 +427,61 @@ ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
   for (const auto& [key, group] : groups) projection.push_back(group);
   if (null_group) projection.push_back(*null_group);
 
-  // Numeric labels retain exact scalar ordering/equality in the feature
-  // alphabet. Ordered surrogate strings let the established BOSE core handle
-  // their statistics; original event displays remain separate for output.
-  std::map<EventAttribute, std::string, ScalarLess> alphabet;
-  bool nonstring_activity = false;
-  for (const auto& group : projection)
-    for (std::size_t i = group.first; i < group.first + group.count; ++i)
-      {
-        const auto& value = ordered_cell(table.rows[i][activity]);
-        nonstring_activity |= native_scalar_order_kind(value) != NativeScalarOrderKind::kString;
-        alphabet.try_emplace(value);
-      }
+  // Activity labels have a separate key path from case grouping. The detector
+  // still receives strings, but scalar aliases, nulls, NaNs, and immutable
+  // tuples are compared before assigning ordered surrogate labels.
+  EventAttribute null_activity{table.columns[activity], "",
+                               AttributeKind::kString, true};
+  null_activity.first_class_state = FirstClassAttributeState::kNull;
+  std::vector<std::vector<const EventAttribute*>> activity_cells;
+  struct ActivityEntry {
+    const EventAttribute* value = nullptr;
+    std::string identity;
+  };
+  std::vector<ActivityEntry> activity_values;
+  std::unordered_map<std::string, std::size_t> activity_positions;
+  activity_cells.reserve(projection.size());
+  for (const auto& group : projection) {
+    auto& cells = activity_cells.emplace_back();
+    cells.reserve(group.count);
+    for (std::size_t i = group.first; i < group.first + group.count; ++i) {
+      const auto* value = table.rows[i][activity]
+                              ? &*table.rows[i][activity]
+                              : &null_activity;
+      cells.push_back(value);
+      const auto identity = activity_identity(*value);
+      if (activity_positions.emplace(identity, activity_values.size()).second)
+        activity_values.push_back(ActivityEntry{value, identity});
+    }
+  }
+  std::sort(activity_values.begin(), activity_values.end(),
+            [](const ActivityEntry& left, const ActivityEntry& right) {
+              return compare_activity_values(*left.value, *right.value) < 0;
+            });
+  const bool nonstring_activity =
+      !activity_values.empty() &&
+      activity_family(*activity_values.front().value) != ActivityFamily::kString;
+  std::unordered_map<std::string, std::string> alphabet;
+  alphabet.reserve(activity_values.size());
   std::size_t label_index = 0;
-  for (auto& [key, label] : alphabet) label = std::to_string(1'000'000'000ULL + label_index++);
+  for (const auto& entry : activity_values)
+    alphabet.emplace(entry.identity,
+                     std::to_string(1'000'000'000ULL + label_index++));
   std::vector<std::vector<std::string>> encoded, displayed;
   encoded.reserve(projection.size());
   displayed.reserve(projection.size());
-  for (const auto& group : projection) {
+  for (const auto& cells : activity_cells) {
     encoded.emplace_back(); displayed.emplace_back();
-    encoded.back().reserve(group.count); displayed.back().reserve(group.count);
-    for (std::size_t i = group.first; i < group.first + group.count; ++i) {
-      const auto& value = *table.rows[i][activity];
-      encoded.back().push_back(alphabet.at(value));
-      displayed.back().push_back(root_cause_attribute_category(value));
+    encoded.back().reserve(cells.size()); displayed.back().reserve(cells.size());
+    for (const auto* value : cells) {
+      const auto found = alphabet.find(activity_identity(*value));
+      if (found == alphabet.end())
+        throw std::invalid_argument(
+            "concept drift table: activity key encoding failed");
+      encoded.back().push_back(found->second);
+      displayed.back().push_back(
+          nonstring_activity ? std::string{}
+                             : root_cause_attribute_category(*value));
     }
   }
   const auto detected = detect_concept_drift_traces(encoded, options, rng);

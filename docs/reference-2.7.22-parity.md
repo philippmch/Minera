@@ -1809,6 +1809,29 @@ capture/probe source, native observations, and inputs;
 `docs/bose-log-signed-contract-validation.json` identifies the observed gap.
 No coverage status is promoted.
 
+### BOSE table activity-kind checkpoint
+
+The table adapter validates activity ordering separately from case grouping.
+Homogeneous null values and immutable tuples can reach the direct detector;
+non-string output activities reject during frame construction after stochastic
+work. Negative sub-log sizes that emit no frames preserve the reference's
+accepted empty result. Incompatible mixed activity kinds still reject before
+permutation sampling.
+
+Tuple comparisons preserve NaN identity: shared NaN members allow comparison
+to proceed to later elements, while distinct NaNs stop that prefix comparison.
+The corpus includes both paths and incompatible tail controls.
+
+All 184 captured public activity-kind calls pass, comparing
+acceptance, returned frames, timestamps, probabilities, and post-call RNG state.
+All 18,657 prior BOSE comparisons, 14 CLI checks, and the native suite pass;
+independent review is clear. Evidence is in
+`docs/bose-table-activity-reference.json.gz`,
+`docs/bose-table-activity-native-checks.json.gz`, and
+`docs/bose-table-activity-validation.json`. These finite cases do not establish
+all pandas scalar identity or container behavior, and coverage statuses remain
+unchanged.
+
 ### BOSE table case-ordering checkpoint
 
 Selected-case timestamp lookup now sorts mixed numeric/string case IDs with
