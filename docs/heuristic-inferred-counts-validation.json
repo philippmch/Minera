@@ -1,0 +1,31 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Exact inferred Classic DFG occurrence totals and binary64-rounded two-sided averages, authoritative 128-bit metadata/statistics and checked narrowing.",
+  "before": {
+    "cases": 2690,
+    "matches": 1146
+  },
+  "after": {
+    "cases": 2690,
+    "matches": 2690
+  },
+  "arithmetic_golden_comparisons": 10061,
+  "prior_reference_comparisons": 10287,
+  "native_suites": 154,
+  "build": "passed",
+  "independent_review": "clear",
+  "parent_commit": "9073042b997d69258e88d49e6da9d06e279ee697",
+  "verified_staged_tree": "ce75ffd3004e8373c5aab7d55b8bf59593efaabe",
+  "core_library_sha256": "02d4f2c864fd9160e7cdaccb176f9e1ac3b7ba4b5e1e3e192436d9db4ce44a04",
+  "native_executable_sha256": "8c7bc964f3b3e9c5812e8fa750515aaeb9253c575270ed667987905c88d62a0d",
+  "probe_executable_sha256": "b62b46755cdc94087aa84f1e4b1a4d63e247648a0c74de9cc850016f2076aba1",
+  "artifacts": {
+    "docs/heuristic-inferred-counts-native-checks.json.gz": "f63aafef8379e792fd762c8c5803df1d1caa9ccd3d13a3b923d2fbdf4d339a82",
+    "docs/heuristic-inferred-counts-reference.json.gz": "a58580d2a3e6e4ecde0fc7722d3a89dd6c3c6728a90e782d1db6c5324d886f4d",
+    "docs/heuristic-occurrence-arithmetic-reference.json.gz": "5b1033ac6d7a7b933c30d080518bdf7774f60d0abe1f0a481518e62f2030a51b"
+  },
+  "limits": [
+    "Finite Classic DFG cases with uint64 edge counts.",
+    "No arbitrary-size raw count input or full object/adapter and structural parity claim."
+  ]
+}

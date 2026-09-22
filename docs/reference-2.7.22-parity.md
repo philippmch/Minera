@@ -4412,6 +4412,42 @@ Release build, all 154 native suites, 8,459 prior reference comparisons, and
 independent review passed. These finite checks leave inferred-count overflow,
 arbitrary-size inputs, and full object/adapter and structural parity incomplete.
 
+The inferred-occurrence checkpoint addresses that remaining count overflow.
+Classic DFG inference accumulates incoming and outgoing counts exactly and
+matches the public conversion of a two-sided total through binary64 division
+by two and integer truncation. A one-sided total remains an exact integer.
+Direction presence, including zero-count entries, determines whether averaging
+applies. Explicit occurrence maps retain their supplied values.
+
+`HeuristicActivityStatistics::occurrences` and the mapped values in
+`HeuristicNetMetadata::activities_occurrences` now use `HeuristicOccurrenceCount`.
+The public type retains integer construction and comparison, provides exact
+decimal output, and requires checked `to_uint64()` conversion when narrowing.
+Code that names the former `map<string, uint64_t>` metadata type must adopt the
+wider mapped type. Input DFG counts, explicit occurrence inputs, and boundary
+counts keep their existing uint64 types. JSON emits exact decimal integers in
+the existing fields; JavaScript consumers still use their native number model.
+
+For a DFG with N unique pairs, each activity receives at most N+1 contributions
+because only its one possible self-loop is counted twice. The unsigned 128-bit
+accumulator therefore holds every total obtainable from uint64 DFG entries on
+the supported 64-bit platform. The rounded two-sided average also fits.
+`docs/heuristic-inferred-counts-reference.json.gz` captures 2,690 public cases;
+the baseline matches 1,146 and differs in 1,544. The cases cover zero counts,
+rounding boundaries, large seeded counts, fanout, cycles, self-loops, and
+activity thresholds. `docs/heuristic-occurrence-arithmetic-reference.json.gz`
+separately records 10,061 arithmetic goldens for exact decimal conversion,
+rounded averaging, checked addition, and checked narrowing.
+
+All 2,690 public cases and their activity-statistic projections now match;
+all 10,061 arithmetic goldens pass. The isolated Release build, 154 native
+suites, 10,287 prior reference comparisons, and independent review passed.
+`docs/heuristic-inferred-counts-native-checks.json.gz` and
+`docs/heuristic-inferred-counts-validation.json` preserve the checks, probe
+sources, source-tree and binary hashes, and review evidence. Structural
+coverage remains partial; arbitrary-size raw inputs and full object/adapter
+parity remain unproven.
+
 Discovery uses the first non-overlapping following interval, inclusive overlap
 counts (so touching intervals can be both eventual-follow and concurrent),
 activity/path occurrence filtering, direct-adjacency mean waits, mean sojourn

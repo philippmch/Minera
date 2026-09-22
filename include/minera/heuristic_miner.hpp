@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "minera/event_log.hpp"
+#include "minera/heuristic_count.hpp"
 #include "minera/temporal_profile.hpp"
 
 namespace minera {
@@ -102,7 +103,9 @@ using HeuristicDecoratedDfg =
 
 struct HeuristicActivityStatistics {
   std::size_t activity = 0;
-  std::uint64_t occurrences = 0;
+  // Widened to preserve exact aggregate counts beyond uint64_t.  Convert with
+  // to_uint64() only when a checked native-width value is required.
+  HeuristicOccurrenceCount occurrences = 0;
   std::uint64_t start_occurrences = 0;
   std::uint64_t end_occurrences = 0;
   double mean_sojourn_seconds = 0.0;
@@ -182,7 +185,9 @@ using HeuristicBoundaryActivities =
 // data without changing the ids used by graph consumers.
 struct HeuristicNetMetadata {
   std::vector<std::string> activities;
-  std::map<std::string, std::uint64_t> activities_occurrences;
+  // Metadata retains the same widened occurrence totals as activity
+  // statistics; conversion back to uint64_t is explicitly checked.
+  std::map<std::string, HeuristicOccurrenceCount> activities_occurrences;
   HeuristicBoundaryActivities start_activities;
   HeuristicBoundaryActivities end_activities;
 };

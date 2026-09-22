@@ -1224,7 +1224,7 @@ void write_heuristics_net(std::ostream& out,
   for (std::size_t i = 0; i < net.activity_statistics.size(); ++i) {
     const auto& stat = net.activity_statistics[i];
     out << "{\"activity\": " << resolve(stat.activity)
-        << ", \"occurrences\": " << stat.occurrences
+        << ", \"occurrences\": " << stat.occurrences.to_string()
         << ", \"start_occurrences\": " << stat.start_occurrences
         << ", \"end_occurrences\": " << stat.end_occurrences
         << ", \"mean_sojourn_seconds\": " << stat.mean_sojourn_seconds << '}'
@@ -1385,7 +1385,7 @@ void write_heuristics_net(std::ostream& out,
     std::size_t occurrence_index = 0;
     for (const auto& [name, count] : net.metadata->activities_occurrences) {
       write_json_string(out, name);
-      out << ": " << count;
+      out << ": " << count.to_string();
       if (++occurrence_index < net.metadata->activities_occurrences.size())
         out << ", ";
     }
