@@ -1,0 +1,22 @@
+{
+  "status": "observed_public_contract",
+  "scope": "Public BOSE DataFrame selectors, standard-column dependencies and signed boundary mapping",
+  "public_calls": 107,
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "parent_commit": "c4bf54601df87d48bb1206662835f10eca7add04",
+  "artifacts": {
+    "docs/bose-frame-selector-contract-reference.json.gz": "50c112c880076d5e03edc74ee9eb1d552cc7137bfd47f0c6945e9b3f561a9314"
+  },
+  "findings": [
+    "Activity projection still depends on standard case and timestamp columns when custom selectors are supplied.",
+    "Custom activity values control the projected labels; selected case and timestamp columns separately control change-timestamp lookup.",
+    "A selected case column yielding fewer groups can cause a post-permutation index error even though standard-case projection succeeds.",
+    "Boundary zero does not generate an empty returned frame; out-of-range timestamp boundaries can reject after RNG consumption.",
+    "Negative group sizes can return no frames while still returning change timestamps for accepted signed detector boundaries."
+  ],
+  "limits": [
+    "Finite public contract evidence, not native DataFrame adapter parity.",
+    "Dtype/null and non-string scalar behavior remain under investigation.",
+    "No module or dispatcher coverage status promotion."
+  ]
+}
