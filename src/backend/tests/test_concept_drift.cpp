@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <limits>
 #include <locale>
+#include <random>
 #include <set>
 #include <stdexcept>
 #include <vector>
@@ -10,6 +11,7 @@
 #include "minera/concept_drift.hpp"
 #include "minera/json_export.hpp"
 #include "minera/timestamp.hpp"
+#include "bose_permutation_numeric_fixture.hpp"
 
 namespace {
 
@@ -361,6 +363,79 @@ int main() {
   assert(minera::split_concept_drift_sublogs(
              split_source, (std::numeric_limits<std::int64_t>::max)(), false)
              .empty());
+
+  const std::vector<std::vector<double>> permutation_first{{1.0, 0.0},
+                                                            {1.0, 0.0}};
+  const std::vector<std::vector<double>> permutation_second{{0.0, 1.0},
+                                                             {0.0, 1.0}};
+  const auto known_permutation = minera::concept_drift_permutation_test(
+      permutation_first, permutation_second, 256, 0);
+  assert(known_permutation == 0.30078125);
+  std::mt19937 state_rng(0);
+  const auto state_permutation = minera::concept_drift_permutation_test(
+      permutation_first, permutation_second, 256, state_rng);
+  assert(state_permutation == known_permutation);
+  assert(minera::concept_drift_permutation_test(
+             bose_numeric_fixture::first, bose_numeric_fixture::second, 256, 0) ==
+         bose_numeric_fixture::expected);
+  std::mt19937 continuation_rng(0);
+  const std::vector<std::vector<double>> two_rows_first{{1.0}};
+  const std::vector<std::vector<double>> two_rows_second{{2.0}};
+  assert(minera::concept_drift_permutation_test(
+             two_rows_first, two_rows_second, 1, continuation_rng) == 1.0);
+  assert(continuation_rng() == 2'546'248'239u);
+
+  const std::vector<std::vector<double>> empty_matrix;
+  const std::vector<std::vector<double>> zero_column_matrix{{}};
+  assert(minera::concept_drift_permutation_test(empty_matrix, empty_matrix, 1,
+                                                 0) == 0.0);
+  assert(minera::concept_drift_permutation_test(empty_matrix,
+                                                 zero_column_matrix, 1, 0) ==
+         1.0);
+  assert(minera::concept_drift_permutation_test(zero_column_matrix,
+                                                 empty_matrix, 1, 0) ==
+         1.0);
+  assert(minera::concept_drift_permutation_test(zero_column_matrix,
+                                                 zero_column_matrix, 1, 0) ==
+         1.0);
+  std::mt19937 negative_rng(0);
+  const auto negative_zero = minera::concept_drift_permutation_test(
+      empty_matrix, empty_matrix, -3, negative_rng);
+  assert(negative_zero == 0.0 && std::signbit(negative_zero));
+  assert(negative_rng() == 2'357'136'044u);
+  const std::vector<std::vector<double>> ragged_matrix{{0.0}, {1.0, 2.0}};
+  assert(throws_invalid([&] {
+    (void)minera::concept_drift_permutation_test(
+        ragged_matrix, permutation_second, -3);
+  }));
+  assert(throws_invalid([&] {
+    (void)minera::concept_drift_permutation_test(
+        permutation_first, std::vector<std::vector<double>>{{1.0}}, 1);
+  }));
+  assert(throws_invalid([&] {
+    (void)minera::concept_drift_permutation_test(empty_matrix, empty_matrix, 0);
+  }));
+  const std::vector<double> work_row(101, 1.0);
+  std::vector<std::vector<double>> cancellation_matrix;
+  for (std::size_t i = 0; i < 85; ++i) {
+    cancellation_matrix.push_back({1e16});
+    cancellation_matrix.push_back({1.0});
+    cancellation_matrix.push_back({-1e16});
+  }
+  cancellation_matrix.push_back({1.0});
+  cancellation_matrix.push_back({1.0});
+  assert(minera::concept_drift_permutation_test(
+             cancellation_matrix, {{0.0}, {0.0}, {0.0}}, 17, 0) ==
+         16.0 / 17.0);
+  assert(throws_invalid([&] {
+    (void)minera::concept_drift_permutation_test(
+        std::vector<std::vector<double>>(201), zero_column_matrix, 1'000'000);
+  }));
+  assert(throws_invalid([&] {
+    (void)minera::concept_drift_permutation_test(
+        std::vector<std::vector<double>>{work_row},
+        std::vector<std::vector<double>>{work_row}, 1'000'000);
+  }));
 
   minera::EventLog projected = log;
   for (auto& current : projected.traces) {
