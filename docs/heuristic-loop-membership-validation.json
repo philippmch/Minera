@@ -1,0 +1,27 @@
+{
+  "scope": "Classic length-two loop rescue distinguishes absent occurrence keys from explicit zero counts; fallback validation remains strict.",
+  "before": {
+    "cases": 384,
+    "matches": 370
+  },
+  "after": {
+    "cases": 384,
+    "matches": 384
+  },
+  "prior_reference_comparisons": 4293,
+  "native_suites": 154,
+  "native_build": "passed",
+  "parent_commit": "a5f7e8ec11e68cc450fae756e47c6896aa275618",
+  "staged_source_tree": "93f17d307fb428b7da3f6b8eb642d098317e20a0",
+  "core_library_sha256": "78b56e79d9cb4bb267b0d820b6fb24250dbc4102cba3603578f203d9d338e54d",
+  "probe_executable_sha256": "91d2de155006157baaae52c8e8ce730ea8e2f5483cd68da964cc3191682b7a84",
+  "artifacts": {
+    "docs/heuristic-loop-membership-native-checks.json.gz": "26de9faecb270feba61bc6469e94ff4e8a347efdae387ba5d18c51e29005d74e",
+    "docs/heuristic-loop-membership-reference.json.gz": "e81fa3ed458561c5bed97fd730ae9dede4b592a407b2abc992c3fa03a5058621"
+  },
+  "limits": [
+    "Finite DFG count membership and fallback cases only.",
+    "Rejection outcome, not exception identity.",
+    "Full parity remains unproven."
+  ]
+}

@@ -937,6 +937,62 @@ void classic_length_two_rescue_and_reference_quirk() {
   assert(fallback.active_activities.size() == 2);
 }
 
+void classic_length_two_rescue_requires_occurrence_membership() {
+  const auto check_case = [](bool has_b_count, std::uint64_t b_count,
+                             std::uint64_t min_activity_count, bool rescued) {
+    auto input = classic_input(
+        {{{"A", "B"}, 1}, {{"A", "C"}, 10}});
+    input.window_two_dfg[{"A", "A"}] = 2;
+    input.frequency_triples[{"A", "B", "A"}] = 2;
+    input.activity_counts =
+        std::map<std::string, std::uint64_t>{{"A", 12}, {"C", 10}};
+    if (has_b_count) input.activity_counts->emplace("B", b_count);
+
+    HeuristicMinerOptions options;
+    options.dependency_threshold = 0.8;
+    options.dfg_pre_cleaning_noise_threshold = 0.0;
+    options.min_activity_count = min_activity_count;
+    const auto net = discover_heuristics_net(input, options);
+
+    // Loop metadata is emitted before occurrence membership can reject
+    // rescue, so it remains visible in every case.
+    const auto* metadata = loop_length_two(net, "A", "B");
+    assert(metadata != nullptr);
+    assert(metadata->frequency == 1);
+    assert(edge(net, "A", "C") != nullptr);
+
+    const auto b_id = activity(net, "B");
+    const bool b_active =
+        std::find(net.active_activities.begin(), net.active_activities.end(),
+                  b_id) != net.active_activities.end();
+    assert(b_active == rescued);
+    if (rescued) {
+      assert(edge(net, "A", "B") != nullptr);
+      assert(edge(net, "B", "A") != nullptr);
+      assert(edge(net, "A", "B")->frequency == 1);
+      assert(edge(net, "B", "A")->frequency == 0);
+    } else {
+      assert(edge(net, "A", "B") == nullptr);
+      assert(edge(net, "B", "A") == nullptr);
+    }
+  };
+
+  // A missing B count skips rescue for every threshold, even at zero.
+  check_case(false, 0, 0, false);
+  check_case(false, 0, 1, false);
+  check_case(false, 0, 2, false);
+
+  // Explicit zero is a real count: it rescues at threshold zero only.
+  check_case(true, 0, 0, true);
+  check_case(true, 0, 1, false);
+  check_case(true, 0, 2, false);
+
+  // A count of one rescues at thresholds zero and one, but not two.
+  check_case(true, 1, 0, true);
+  check_case(true, 1, 1, true);
+  check_case(true, 1, 2, false);
+}
+
 void classic_active_nodes_conversion_and_dfg_inference() {
   auto input = classic_input({{{"B", "C"}, 2}, {{"A", "B"}, 4}});
   auto inferred = discover_heuristics_net(input);
@@ -1431,6 +1487,7 @@ int main() {
   classic_noise_cleaning_and_keep_once();
   classic_and_maximal_cliques_at_equality();
   classic_length_two_rescue_and_reference_quirk();
+  classic_length_two_rescue_requires_occurrence_membership();
   classic_active_nodes_conversion_and_dfg_inference();
   classic_performance_aggregations_and_validation();
   classic_decorated_dfg_values_preserve_typed_payloads();

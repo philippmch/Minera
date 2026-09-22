@@ -1040,6 +1040,11 @@ HeuristicsNet discover_classic_dfg(
   const auto required_activity_count = [&](const std::string& name) {
     return occurrences.at(name);
   };
+  const auto meets_required_activity_count = [&](const std::string& name) {
+    const auto it = occurrences.find(name);
+    return it != occurrences.end() &&
+           it->second >= options.min_activity_count;
+  };
   const auto accepted_by_threshold = [&](const NamePair& pair) {
     const auto dep = dependencies.find(pair);
     // Keep the public short-circuit order: rejected dependencies and
@@ -1208,9 +1213,12 @@ HeuristicsNet discover_classic_dfg(
       if (!net.cleaned_dfg.contains(forward) ||
           pair_count(net.cleaned_dfg, first, second) < options.min_frequency)
         continue;
-      const auto first_count = required_activity_count(first);
-      if (first_count < options.min_activity_count) continue;
-      if (required_activity_count(second) < options.min_activity_count)
+      // Loop rescue treats occurrence membership as a graph gate: a missing
+      // source or target count skips rescue, while an explicitly supplied
+      // zero count is valid when the threshold is zero.  The strict lookup
+      // remains reserved for the declared-node fallback below.
+      if (!meets_required_activity_count(first) ||
+          !meets_required_activity_count(second))
         continue;
       const bool forward_dep =
           dependencies.contains(forward) &&
