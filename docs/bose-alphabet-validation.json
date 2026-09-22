@@ -1,0 +1,24 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Explicit BOSE alphabet order, multiplicity, and missing-label rejection",
+  "public_cases": 3159,
+  "accepted": 1578,
+  "rejected": 1581,
+  "baseline_matches": 220,
+  "final_matches": 3159,
+  "regression_comparisons": 8622,
+  "cli_checks": 14,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "parent_commit": "7c2690ef9262dd4bb63ed242db0f65c36d4d8209",
+  "verified_code_tree": "c44318b8574c90fe5a4f3a0ac2b743c63f1bcb0d",
+  "core_library_sha256": "91685945ef9551e2e5382f135558924fdce8cff7ff0e3047d547db924404e5ee",
+  "artifacts": {
+    "docs/bose-alphabet-reference.json.gz": "9cbb423a0cbad075f03a23b22cf79da5848a2fc4dac967889a7e897ec049e862",
+    "docs/bose-alphabet-native-checks.json.gz": "3f704e7b5e3ae791e76b5e561ab41cd807aec41a9f324124c2a13aa9aceae813"
+  },
+  "limits": [
+    "No module or dispatcher status promotion.",
+    "Finite feature corpus does not establish arbitrary cell type, dataframe adapter, or complete BOSE behavior."
+  ]
+}

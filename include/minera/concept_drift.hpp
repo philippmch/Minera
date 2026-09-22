@@ -73,13 +73,16 @@ struct ConceptDriftResult {
 // Extract the Bose relation-type-count feature vector for a set of traces.
 // For every target b and source a, traces containing a are classified by
 // whether b eventually follows a in all, some, or no such traces.
+// The supplied alphabet is preserved exactly, including its order and
+// duplicate entries. A selected event label absent from the alphabet is
+// invalid.
 [[nodiscard]] std::vector<double> extract_concept_drift_features(
     const std::vector<Trace>& traces,
-    const std::vector<std::string>& sorted_activities);
+    const std::vector<std::string>& activities);
 
 [[nodiscard]] std::vector<double> extract_concept_drift_features(
     const std::vector<Trace>& traces,
-    const std::vector<std::string>& sorted_activities,
+    const std::vector<std::string>& alphabet,
     std::string_view activity_attribute);
 
 [[nodiscard]] std::vector<double> extract_concept_drift_features(
