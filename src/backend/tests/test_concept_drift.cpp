@@ -33,6 +33,28 @@ bool throws_invalid(const auto& fn) {
 }  // namespace
 
 int main() {
+  // Empty strings are labels, not absent activity attributes. Preserve them
+  // in the alphabet used by both standalone extraction and drift detection.
+  minera::EventLog empty_label_log;
+  empty_label_log.traces = {trace({"", "a"}, "empty-label")};
+  assert((minera::extract_concept_drift_activities(empty_label_log) ==
+          std::vector<std::string>{"", "a"}));
+  const std::vector<double> empty_label_features{0, 0, 2, 1, 0, 1};
+  assert(minera::extract_concept_drift_features(empty_label_log) ==
+         empty_label_features);
+  const auto empty_label_result = minera::detect_concept_drift(empty_label_log);
+  assert(empty_label_result.feature_vectors.front() == empty_label_features);
+  for (auto& event : empty_label_log.traces.front().events) {
+    event.attributes.push_back({"selected", event.activity});
+    event.activity = "unused";
+  }
+  minera::ConceptDriftOptions empty_label_options;
+  empty_label_options.activity_attribute = "selected";
+  const auto selected_empty_result =
+      minera::detect_concept_drift(empty_label_log, empty_label_options);
+  assert(selected_empty_result.activities == empty_label_result.activities);
+  assert(selected_empty_result.feature_vectors == empty_label_result.feature_vectors);
+
   minera::EventLog log;
   log.traces = {trace({"a", "b"}, "c1"), trace({"a", "b"}, "c2"),
                 trace({"a", "c"}, "c3"), trace({"a", "c"}, "c4")};
