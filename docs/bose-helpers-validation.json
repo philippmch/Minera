@@ -1,0 +1,25 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Standalone eventual-follow relation and signed-size trace splitting helpers",
+  "public_cases": 1166,
+  "accepted": 1140,
+  "rejected": 26,
+  "final_matches": 1166,
+  "regression_comparisons": 11781,
+  "cli_checks": 14,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "parent_commit": "2849b669a745228c99657fdeb94a1de53042229c",
+  "verified_code_tree": "be1a7ff1622a901c41d6f480ef2a3933ae1e6458",
+  "core_library_sha256": "d2dfe9ce721d2e5c620e458cced506fb6e898a681b076af316a97540232cbfa8",
+  "artifacts": {
+    "docs/bose-helpers-reference.json.gz": "74e3a5f18f5d0bf2865e4848f16bc2625607a33e84ec045fee6a50db8943355d",
+    "docs/bose-helpers-native-checks.json.gz": "b1efa297dbd27ea0ccbb31179d353540d6ec304c4ee6269a89e1507c248e2120"
+  },
+  "limits": [
+    "No module or dispatcher status promotion.",
+    "Native value ownership and metadata copying are extensions; reference object aliasing is not reproduced.",
+    "Rejection acceptance is compared, not language-specific exception classes.",
+    "Standalone permutation test and DataFrame adapters remain outside this checkpoint."
+  ]
+}

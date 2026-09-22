@@ -469,6 +469,71 @@ std::vector<double> extract_concept_drift_features(const EventLog& log) {
                                         "concept:name");
 }
 
+std::set<std::pair<std::string, std::string>>
+compute_concept_drift_follows_relation(
+    const Trace& trace, const std::vector<std::string>& alphabet,
+    std::string_view activity_attribute) {
+  if (activity_attribute.empty()) {
+    throw std::invalid_argument(
+        "concept drift: activity_attribute must not be empty");
+  }
+  std::unordered_set<std::string> allowed_targets;
+  allowed_targets.reserve(alphabet.size());
+  for (const auto& activity : alphabet) allowed_targets.insert(activity);
+
+  std::set<std::pair<std::string, std::string>> relations;
+  std::unordered_set<std::string> seen_labels;
+  seen_labels.reserve(trace.events.size());
+  for (const auto& event : trace.events) {
+    const auto* activity = event_value(event, activity_attribute);
+    if (!activity) continue;
+    if (allowed_targets.contains(*activity)) {
+      for (const auto& source : seen_labels)
+        relations.emplace(source, *activity);
+    }
+    seen_labels.insert(*activity);
+  }
+  return relations;
+}
+
+std::vector<EventLog> split_concept_drift_sublogs(
+    const EventLog& log, std::int64_t sub_log_size, bool keep_leftover) {
+  if (sub_log_size < 0) return {};
+  if (sub_log_size == 0) {
+    throw std::invalid_argument(
+        "concept drift: sub_log_size must be non-zero");
+  }
+  if (log.traces.empty()) return {};
+
+  const auto requested_size = static_cast<std::uint64_t>(sub_log_size);
+  if (requested_size > log.traces.size()) {
+    if (!keep_leftover) return {};
+    EventLog only;
+    copy_event_log_context(log, only);
+    only.traces = log.traces;
+    std::vector<EventLog> result;
+    result.reserve(1);
+    result.push_back(std::move(only));
+    return result;
+  }
+
+  const auto chunk_size = static_cast<std::size_t>(requested_size);
+  std::vector<EventLog> result;
+  result.reserve((log.traces.size() - 1) / chunk_size + 1);
+  for (std::size_t start = 0; start < log.traces.size();) {
+    const std::size_t remaining = log.traces.size() - start;
+    if (remaining < chunk_size && !keep_leftover) break;
+    const std::size_t count = std::min(remaining, chunk_size);
+    EventLog sublog;
+    copy_event_log_context(log, sublog);
+    sublog.traces.insert(sublog.traces.end(), log.traces.begin() + start,
+                         log.traces.begin() + start + count);
+    result.push_back(std::move(sublog));
+    start += count;
+  }
+  return result;
+}
+
 ConceptDriftResult detect_concept_drift(const EventLog& log,
                                         ConceptDriftOptions options) {
   if (options.activity_attribute.empty()) {

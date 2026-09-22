@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <limits>
 #include <locale>
+#include <set>
 #include <stdexcept>
 #include <vector>
 
@@ -296,6 +297,69 @@ int main() {
   }));
   assert(minera::extract_concept_drift_features(
              std::vector<minera::Trace>{}, std::vector<std::string>{})
+             .empty());
+
+  const auto follows_trace = trace({"A", "B", "A"}, "follows");
+  const auto follows = minera::compute_concept_drift_follows_relation(
+      follows_trace, {"A", "A"});
+  assert((follows == std::set<std::pair<std::string, std::string>>{
+                         {"A", "A"}, {"B", "A"}}));
+  assert(minera::compute_concept_drift_follows_relation(follows_trace, {})
+             .empty());
+  assert(throws_invalid([&] {
+    (void)minera::compute_concept_drift_follows_relation(follows_trace, {}, "");
+  }));
+
+  minera::EventLog split_source;
+  split_source.attributes.push_back({"fixture", "concept-drift-split"});
+  split_source.metadata.properties.push_back({"purpose", "split-test"});
+  split_source.traces = {trace({"a"}, "split-0"), trace({"b"}, "split-1"),
+                         trace({"c"}, "split-2"), trace({"d"}, "split-3"),
+                         trace({"e"}, "split-4")};
+  split_source.traces[0].attributes.push_back({"case:group", "first"});
+  split_source.traces[0].events[0].attributes.push_back({"event:detail", "kept"});
+  const auto split_with_leftover =
+      minera::split_concept_drift_sublogs(split_source, 2, true);
+  assert(split_with_leftover.size() == 3);
+  assert(split_with_leftover[0].traces.size() == 2);
+  assert(split_with_leftover[1].traces.size() == 2);
+  assert(split_with_leftover[2].traces.size() == 1);
+  for (const auto& sublog : split_with_leftover) {
+    assert(sublog.attributes == split_source.attributes);
+    assert(sublog.metadata == split_source.metadata);
+  }
+  assert(split_with_leftover[0].traces[0].case_id == "split-0");
+  assert(split_with_leftover[0].traces[0].attributes ==
+         split_source.traces[0].attributes);
+  assert(split_with_leftover[0].traces[0].events[0].attributes ==
+         split_source.traces[0].events[0].attributes);
+  const auto split_without_leftover =
+      minera::split_concept_drift_sublogs(split_source, 2, false);
+  assert(split_without_leftover.size() == 2);
+  assert(split_without_leftover[0].traces.size() == 2);
+  assert(split_without_leftover[1].traces.size() == 2);
+  assert(minera::split_concept_drift_sublogs(split_source, -1).empty());
+  assert(minera::split_concept_drift_sublogs(
+             split_source, (std::numeric_limits<std::int64_t>::min)())
+             .empty());
+  assert(minera::split_concept_drift_sublogs(minera::EventLog{}, -1).empty());
+  assert(minera::split_concept_drift_sublogs(minera::EventLog{}).empty());
+  assert(throws_invalid([&] {
+    (void)minera::split_concept_drift_sublogs(minera::EventLog{}, 0);
+  }));
+  assert(minera::split_concept_drift_sublogs(split_source, 5, true).size() ==
+         1);
+  assert(minera::split_concept_drift_sublogs(split_source, 5, false).size() ==
+         1);
+  assert(minera::split_concept_drift_sublogs(split_source, 6, true).size() ==
+         1);
+  assert(minera::split_concept_drift_sublogs(split_source, 6, false).empty());
+  const auto huge_split = minera::split_concept_drift_sublogs(
+      split_source, (std::numeric_limits<std::int64_t>::max)(), true);
+  assert(huge_split.size() == 1);
+  assert(huge_split.front().traces.size() == split_source.traces.size());
+  assert(minera::split_concept_drift_sublogs(
+             split_source, (std::numeric_limits<std::int64_t>::max)(), false)
              .empty());
 
   minera::EventLog projected = log;
