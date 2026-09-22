@@ -699,6 +699,110 @@ double concept_drift_permutation_test(
   return concept_drift_permutation_test(first, second, num_permutations, rng);
 }
 
+ConceptDriftTraceResult detect_concept_drift_traces(
+    const std::vector<std::vector<std::string>>& traces,
+    ConceptDriftTraceOptions options, std::mt19937& rng) {
+  if (options.sub_log_size == 0)
+    throw std::invalid_argument("concept drift: sub_log_size must not be zero");
+  if (traces.size() > kMaxMaterializedTraceCopies)
+    throw std::invalid_argument("concept drift: trace materialization exceeds safe bound");
+  std::size_t events = 0;
+  std::set<std::string> alphabet;
+  for (const auto& trace : traces) {
+    if (trace.size() > kMaxCumulativeEventCopies - events)
+      throw std::invalid_argument("concept drift: event materialization exceeds safe bound");
+    events += trace.size();
+    alphabet.insert(trace.begin(), trace.end());
+  }
+  ConceptDriftTraceResult result;
+  if (options.sub_log_size > 0) {
+    const auto size = static_cast<std::uint64_t>(options.sub_log_size);
+    for (std::size_t begin = 0; begin < traces.size();) {
+      const auto count = static_cast<std::size_t>(
+          std::min<std::uint64_t>(size, traces.size() - begin));
+      result.sublogs.emplace_back(traces.begin() + begin,
+                                 traces.begin() + begin + count);
+      begin += count;
+    }
+  }
+  const auto n = static_cast<std::int64_t>(result.sublogs.size());
+  const auto window = options.window_size;
+  // With a positive window larger than half the group count, Python's range
+  // is empty. Avoid doubling an arbitrarily large signed option in that case.
+  if (window > n / 2) return result;
+  // Negative windows can create work even for an empty input. Bound that work
+  // before arithmetic, including the INT64_MIN case, and before allocations.
+  if (window < -static_cast<std::int64_t>(kMaxMaterializedTraceCopies))
+    throw std::invalid_argument("concept drift: window count exceeds safe bound");
+  const auto windows = n - 2 * window + 1;
+  if (windows > kMaxMaterializedTraceCopies)
+    throw std::invalid_argument("concept drift: window count exceeds safe bound");
+  if (static_cast<long double>(alphabet.size()) * 3 * n >
+      kMaxCumulativeEventCopies)
+    throw std::invalid_argument("concept drift: feature materialization exceeds safe bound");
+  const std::vector<std::string> activities(alphabet.begin(), alphabet.end());
+  std::vector<std::vector<double>> features;
+  features.reserve(result.sublogs.size());
+  for (const auto& group : result.sublogs) {
+    std::vector<Trace> native;
+    native.reserve(group.size());
+    for (const auto& labels : group) {
+      Trace trace;
+      trace.events.reserve(labels.size());
+      for (const auto& label : labels) {
+        Event event;
+        event.activity = label;
+        trace.events.push_back(std::move(event));
+      }
+      native.push_back(std::move(trace));
+    }
+    features.push_back(extract_concept_drift_features(native, activities));
+  }
+  const auto endpoint = [n](std::int64_t index) {
+    if (index < 0) index += n;
+    return std::clamp<std::int64_t>(index, 0, n);
+  };
+  long double total_work = 0;
+  for (std::int64_t i = 0; i < windows; ++i) {
+    const auto a = endpoint(i), b = std::max(a, endpoint(i + window));
+    const auto c = endpoint(i + window), d = std::max(c, endpoint(i + 2 * window));
+    const long double rows = std::max<std::int64_t>(1, b - a) +
+                             std::max<std::int64_t>(1, d - c);
+    total_work += rows * std::max<std::size_t>(1, activities.size() * 3) *
+                  std::max<std::int64_t>(1, options.num_permutations);
+    if (total_work > kMaxPermutationWork)
+      throw std::invalid_argument("concept drift: requested permutation work exceeds safe bound");
+    std::vector<std::vector<double>> first(features.begin() + a, features.begin() + b);
+    std::vector<std::vector<double>> second(features.begin() + c, features.begin() + d);
+    const double probability = concept_drift_permutation_test(
+        first, second, options.num_permutations, rng);
+    if (probability < options.threshold)
+      result.change_points.push_back({i + window, probability});
+  }
+  std::sort(result.change_points.begin(), result.change_points.end(),
+            [](const auto& left, const auto& right) {
+              if (left.p_value != right.p_value) return left.p_value < right.p_value;
+              return left.sublog_index < right.sublog_index;
+            });
+  const auto cap = options.max_no_change_points;
+  const auto count = result.change_points.size();
+  if (cap >= 0) {
+    if (static_cast<std::uint64_t>(cap) < count)
+      result.change_points.resize(static_cast<std::size_t>(cap));
+  } else {
+    const auto removed = static_cast<std::uint64_t>(-(cap + 1)) + 1;
+    result.change_points.resize(removed >= count ? 0 : count - removed);
+  }
+  return result;
+}
+
+ConceptDriftTraceResult detect_concept_drift_traces(
+    const std::vector<std::vector<std::string>>& traces,
+    ConceptDriftTraceOptions options) {
+  auto rng = make_bose_rng(options.seed);
+  return detect_concept_drift_traces(traces, options, rng);
+}
+
 ConceptDriftResult detect_concept_drift(const EventLog& log,
                                         ConceptDriftOptions options) {
   if (options.activity_attribute.empty()) {

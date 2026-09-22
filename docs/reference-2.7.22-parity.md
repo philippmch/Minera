@@ -1791,6 +1791,30 @@ These helper contracts do not establish
 standalone permutation-test or DataFrame adapter parity, and do not promote the
 BOSE module or dispatcher to complete.
 
+### BOSE direct activity-trace detector checkpoint
+
+The native `detect_concept_drift_traces` API accepts string activity traces
+without timestamps, including empty traces. It returns every raw trace group
+and the ranked change points, matching the direct public helper rather than
+the higher-level adapter's returned partitions. A separate options type and
+signed change-point index preserve zero/negative window behavior, negative
+permutation signed zero, Python-style negative cap slicing, and unrestricted
+threshold comparisons. Seeded and caller-owned MT19937 overloads share the
+existing feature and permutation implementation.
+
+The pinned public corpus contains 3,240 cases, including 2,220 accepted calls.
+Native comparisons verify raw groups, ranked indices, exact probabilities,
+signed zero, and the next RNG word after successful and rejected calls. All
+13,704 prior BOSE comparisons, 14 CLI checks, and the focused native test suite
+also pass. Independent review reports no actionable findings.
+
+Evidence is retained in `docs/bose-direct-reference.json.gz`,
+`docs/bose-direct-native-checks.json.gz`, and
+`docs/bose-direct-validation.json`. Resource bounds and explicit seeding remain
+native extensions. This typed surface does not establish Python non-string
+label or container-identity behavior, DataFrame adaptation, or complete BOSE
+module parity. No coverage status is promoted.
+
 ### BOSE standalone permutation-test checkpoint
 
 `concept_drift_permutation_test` exposes permutation probabilities for numeric

@@ -437,6 +437,123 @@ int main() {
         std::vector<std::vector<double>>{work_row}, 1'000'000);
   }));
 
+  const std::vector<std::vector<std::string>> direct_traces = {
+      {"A", "B"}, {"A", "C"}, {"B", "C"}, {"A", "B"}};
+  minera::ConceptDriftTraceOptions direct_options;
+  direct_options.sub_log_size = 2;
+  direct_options.window_size = 1;
+  direct_options.num_permutations = 1;
+  direct_options.threshold = 0.5;
+  direct_options.max_no_change_points = 5;
+  const auto direct_result =
+      minera::detect_concept_drift_traces(direct_traces, direct_options);
+  assert(direct_result.sublogs.size() == 2);
+  assert(direct_result.sublogs[0].size() == 2);
+  assert(direct_result.sublogs[1].size() == 2);
+  assert(direct_result.sublogs[0][0] == direct_traces[0]);
+  assert(direct_result.sublogs[1][1] == direct_traces[3]);
+
+  const auto empty_direct = minera::detect_concept_drift_traces(
+      std::vector<std::vector<std::string>>{}, direct_options);
+  assert(empty_direct.sublogs.empty());
+  assert(empty_direct.change_points.empty());
+  const auto empty_trace_direct = minera::detect_concept_drift_traces(
+      std::vector<std::vector<std::string>>{{}, {}},
+      [&] {
+        auto options = direct_options;
+        options.sub_log_size = 1;
+        return options;
+      }());
+  assert(empty_trace_direct.sublogs.size() == 2);
+  assert(empty_trace_direct.sublogs[0].size() == 1);
+  assert(empty_trace_direct.sublogs[0][0].empty());
+
+  // A zero-sized window produces n + 1 empty comparisons. Empty matrices
+  // still consume the same placeholder-row shuffle stream.
+  auto zero_window_options = direct_options;
+  zero_window_options.sub_log_size = 1;
+  zero_window_options.window_size = 0;
+  zero_window_options.threshold = 0.5;
+  const auto zero_window_direct = minera::detect_concept_drift_traces(
+      direct_traces, zero_window_options);
+  assert(zero_window_direct.sublogs.size() == direct_traces.size());
+  assert(zero_window_direct.change_points.size() == 5);
+  for (std::size_t i = 0; i < zero_window_direct.change_points.size(); ++i) {
+    assert(zero_window_direct.change_points[i].sublog_index ==
+           static_cast<std::int64_t>(i));
+    assert(zero_window_direct.change_points[i].p_value == 0.0);
+  }
+
+  auto negative_options = direct_options;
+  negative_options.num_permutations = -1;
+  negative_options.max_no_change_points = -1;
+  const auto negative_direct =
+      minera::detect_concept_drift_traces(direct_traces, negative_options);
+  assert(negative_direct.change_points.size() == 0);
+
+  // Four raw groups yield three candidate points; a negative cap keeps all
+  // but the final ranked candidate, and negative permutations produce -0.0.
+  auto negative_cap_options = negative_options;
+  negative_cap_options.max_no_change_points = -1;
+  const auto negative_cap_direct = minera::detect_concept_drift_traces(
+      std::vector<std::vector<std::string>>{{"A"}, {"B"}, {"C"}, {"A"},
+                                             {"B"}, {"C"}, {"A"}, {"B"}},
+      negative_cap_options);
+  assert(negative_cap_direct.change_points.size() == 2);
+  assert(negative_cap_direct.change_points[0].sublog_index == 1);
+  assert(negative_cap_direct.change_points[1].sublog_index == 2);
+  assert(std::signbit(negative_cap_direct.change_points[0].p_value));
+  assert(std::signbit(negative_cap_direct.change_points[1].p_value));
+
+  // Zero permutations fail only when at least one comparison is evaluated.
+  auto zero_permutation_options = direct_options;
+  zero_permutation_options.num_permutations = 0;
+  assert(throws_invalid([&] {
+    (void)minera::detect_concept_drift_traces(direct_traces,
+                                               zero_permutation_options);
+  }));
+  zero_permutation_options.sub_log_size = 50;
+  const auto zero_permutation_no_window = minera::detect_concept_drift_traces(
+      direct_traces, zero_permutation_options);
+  assert(zero_permutation_no_window.sublogs.size() == 1);
+  assert(zero_permutation_no_window.change_points.empty());
+
+  // The state overload must consume exactly three empty-matrix shuffles for
+  // two one-trace groups and a zero-sized window.
+  auto state_options = direct_options;
+  state_options.sub_log_size = 1;
+  state_options.window_size = 0;
+  state_options.seed = 0;
+  std::mt19937 direct_state_rng(0);
+  const auto state_direct = minera::detect_concept_drift_traces(
+      {{"A"}, {"B"}}, state_options, direct_state_rng);
+  const auto seeded_direct = minera::detect_concept_drift_traces(
+      {{"A"}, {"B"}}, state_options);
+  assert(state_direct.sublogs == seeded_direct.sublogs);
+  assert(state_direct.change_points.size() ==
+         seeded_direct.change_points.size());
+  for (std::size_t i = 0; i < state_direct.change_points.size(); ++i) {
+    assert(state_direct.change_points[i].sublog_index ==
+           seeded_direct.change_points[i].sublog_index);
+    assert(state_direct.change_points[i].p_value ==
+           seeded_direct.change_points[i].p_value);
+  }
+  assert(direct_state_rng() == 3'626'093'760u);
+
+  auto oversized_window_options = direct_options;
+  oversized_window_options.window_size =
+      (std::numeric_limits<std::int64_t>::min)();
+  oversized_window_options.num_permutations = -1;
+  assert(throws_invalid([&] {
+    (void)minera::detect_concept_drift_traces(direct_traces,
+                                               oversized_window_options);
+  }));
+  oversized_window_options.window_size = -1'000'000'000'000LL;
+  assert(throws_invalid([&] {
+    (void)minera::detect_concept_drift_traces(direct_traces,
+                                               oversized_window_options);
+  }));
+
   minera::EventLog projected = log;
   for (auto& current : projected.traces) {
     current.attributes.push_back({"case:order", "batch-" + current.case_id});
