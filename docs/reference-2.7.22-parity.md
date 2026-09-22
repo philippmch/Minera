@@ -1679,6 +1679,30 @@ XES/CLI checks, and 6,198 passing prior feature/segment comparisons. The focused
 native concept-drift suite passes. Timestamp and case ordering,
 dataframe adapters, and complete BOSE behavior remain outside this checkpoint.
 
+### BOSE timestamp and JSON precision checkpoint
+
+Concept-drift JSON emits finite doubles with round-trip precision and a fixed
+decimal locale. Drift timestamps, raw sub-log start timestamps, feature values,
+and p-values no longer lose digits at the JSON boundary. For example, epoch
+`1577836820` previously appeared as `1577840000` through the CLI.
+
+Timestamp extraction parses integral seconds and nanoseconds, forms the signed
+epoch numerator exactly, and rounds its ratio to binary64 once. This also fixes
+the earlier parser's digit-by-digit fractional rounding. Native seven-to-nine-digit
+fractions remain supported; additional legacy forms, including longer fractions,
+retain the existing parser path. The shared timestamp parser is unchanged.
+
+`docs/bose-json-precision-reference.json.gz` retains 120 public EventLog timestamp
+cases spanning years 2 through 9998, negative epochs, microseconds, and timezone
+offsets, plus 1,040 finite-double serialization checks. All pass, along with 84
+independent exact-rational nanosecond cases retained separately. The initial
+reference artifact preserves the exact original 84-case public corpus (only
+three timestamp cases matched before the correction) and its serialization
+checks. Native checks retain the initial, intermediate, and final results.
+The focused native suite, 6,442 prior BOSE comparisons, and five CLI checks pass.
+These finite checks do not establish complete BOSE parity, pandas nanosecond
+timestamp semantics, or validation of manually constructed nonfinite results.
+
 ## Trace-variant query anonymization evidence
 
 The native trace-variant query surface supports both Laplace and SaCoFa

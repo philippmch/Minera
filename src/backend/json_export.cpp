@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <map>
 #include <limits>
+#include <locale>
 #include <numeric>
 #include <optional>
 #include <sstream>
@@ -5459,6 +5460,8 @@ std::string serialize_process_tree_playout_json(
 
 std::string concept_drift_json(const ConceptDriftResult& result) {
   std::ostringstream out;
+  out.imbue(std::locale::classic());
+  out << std::setprecision(std::numeric_limits<double>::max_digits10);
   const std::string_view variant =
       result.variant == ConceptDriftVariant::kBose ? "bose" : "unknown";
   out << "{\"family\":\"CONCEPT_DRIFT\",\"variant\":";

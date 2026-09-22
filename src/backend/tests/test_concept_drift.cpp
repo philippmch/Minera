@@ -1,10 +1,12 @@
 #include <cassert>
 #include <cmath>
+#include <locale>
 #include <stdexcept>
 #include <vector>
 
 #include "minera/concept_drift.hpp"
 #include "minera/json_export.hpp"
+#include "minera/timestamp.hpp"
 
 namespace {
 
@@ -33,6 +35,55 @@ bool throws_invalid(const auto& fn) {
 }  // namespace
 
 int main() {
+  // Epoch seconds and p-values must survive the JSON boundary exactly, even
+  // when the caller's global locale uses a comma as the decimal separator.
+  struct CommaDecimal : std::numpunct<char> {
+    char do_decimal_point() const override { return ','; }
+  };
+  minera::ConceptDriftResult precise_result;
+  const double precise_time = 1577836820.123456;
+  const double precise_probability = 1.0 / 3.0;
+  precise_result.sublog_start_timestamps = {precise_time};
+  precise_result.change_timestamps = {precise_time};
+  precise_result.change_points = {{0, precise_probability}};
+  precise_result.feature_vectors = {{precise_probability}};
+  const auto previous_locale = std::locale();
+  std::locale::global(std::locale(previous_locale, new CommaDecimal));
+  const auto precise_json = minera::concept_drift_json(precise_result);
+  std::locale::global(previous_locale);
+  const auto roundtrip_number = [&](const std::string& prefix) {
+    const auto position = precise_json.find(prefix);
+    assert(position != std::string::npos);
+    return std::stod(precise_json.substr(position + prefix.size()));
+  };
+  assert(roundtrip_number("\"sublog_start_timestamps\":[") == precise_time);
+  assert(roundtrip_number("\"change_timestamps\":[") == precise_time);
+  assert(roundtrip_number("\"p_value\":") == precise_probability);
+  assert(roundtrip_number("\"feature_vectors\":[[") == precise_probability);
+
+  minera::ConceptDriftOptions time_options;
+  time_options.include_timestamps = true;
+  for (const auto& [text, expected] :
+       std::vector<std::pair<std::string, double>>{
+           {"1970-01-01T00:00:00.000001Z", 0.000001},
+           {"1969-01-01T00:00:00.999999Z", -31535999.000001},
+           {"2000-01-01T00:00:00.123456Z", 946684800.123456},
+           {"1970-01-01T00:00:00.123456789Z", 0.123456789},
+           {"1969-12-31T23:59:59.999999999Z", -0.000000001}}) {
+    minera::EventLog timestamp_log;
+    timestamp_log.traces = {trace({"a"}, "time")};
+    timestamp_log.traces.front().events.front().timestamp = text;
+    assert(minera::detect_concept_drift(timestamp_log, time_options)
+               .sublog_start_timestamps.front() == expected);
+  }
+  minera::EventLog long_fraction_log;
+  long_fraction_log.traces = {trace({"a"}, "long-fraction")};
+  const std::string long_fraction = "1970-01-01T00:00:00.123456789123Z";
+  long_fraction_log.traces.front().events.front().timestamp = long_fraction;
+  assert(minera::detect_concept_drift(long_fraction_log, time_options)
+             .sublog_start_timestamps.front() ==
+         *minera::parse_timestamp(long_fraction));
+
   // Empty strings are labels, not absent activity attributes. Preserve them
   // in the alphabet used by both standalone extraction and drift detection.
   minera::EventLog empty_label_log;

@@ -1,0 +1,34 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Exact ISO timestamp conversion through nanoseconds and locale-independent binary64 JSON round trips for BOSE results.",
+  "public_timestamp_cases": 120,
+  "finite_double_roundtrip_cases": 1040,
+  "nanosecond_arithmetic_cases": 84,
+  "prior_reference_comparisons": 6442,
+  "initial_before": {
+    "public_timestamp_matches": 3,
+    "public_timestamp_cases": 84,
+    "roundtrip_matches": 0,
+    "roundtrip_cases": 1040
+  },
+  "native_suites": 1,
+  "cli_checks": 5,
+  "build": "passed",
+  "independent_review": "clear",
+  "parent_commit": "7385f40b283df8e3f0447ec823559714b2f5afc2",
+  "verified_code_tree": "dae1aecb00ad93304eacf36a4fb2f92a4be2e215",
+  "core_library_sha256": "9e3825a2c84775cb4fc8c8ebef3125348eb19139d0a18858da98b65fa86a6b92",
+  "cli_executable_sha256": "b5e72b42796393bb9837610390185ee62a7ea1759d72f320682e1c4edc63927a",
+  "artifacts": {
+    "docs/bose-json-precision-initial-reference.json.gz": "602a4a482bb3ecefc808a3d000b329681d4ba4738bf2dccdb4e023e226dae663",
+    "docs/bose-json-precision-reference.json.gz": "148eb1f57e49d015b98b93510733621da2df78b3b3bb741736cba8df99e9b190",
+    "docs/bose-nanosecond-reference.json.gz": "308c00874ddfe5b0930d7a5601eea48a181459850db40c33748ff6ab521de189",
+    "docs/bose-json-precision-native-checks.json.gz": "0aacb97de8aa084d87823334c52eb12aebb27417929eb9462b9f820e701e795f"
+  },
+  "limits": [
+    "No BOSE module or dispatcher status promotion.",
+    "Public cases use aware Python datetime EventLog inputs, not pandas.Timestamp nanosecond semantics.",
+    "Longer fractions retain the legacy parser path; manually supplied nonfinite result validation is outside this checkpoint.",
+    "Exact randomized detection p-values remain outside cross-RNG comparison."
+  ]
+}
