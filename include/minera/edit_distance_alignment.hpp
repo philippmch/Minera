@@ -1,8 +1,12 @@
 #pragma once
 
+#include <any>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "minera/event_data.hpp"
@@ -66,6 +70,82 @@ struct EditDistanceAlignment {
   std::uint64_t bwc = 0;
   std::uint64_t denominator = 0;
 };
+
+// Result returned by the direct trace helper. Fresh results are stored in the
+// shared std::any and can be retrieved with
+// std::any_cast<EditDistanceTraceResult>.
+struct EditDistanceTraceResult {
+  std::vector<EditDistanceMove> alignment;
+  std::uint64_t cost = 0;
+};
+
+// A type-erased cache value. Cache hits return the exact shared handle held by
+// the cache, including when it contains a caller-defined opaque value. A null
+// handle is a valid cached value; callers distinguish it from a cache miss by
+// checking whether the encoded-trace key is present.
+using EditDistanceTraceHandle = std::shared_ptr<std::any>;
+
+// Ordered input forms mirror the public helper's dict/list/set arguments.
+// Mapping activity keys and cache encoded-trace keys must be unique. Mapping
+// order is significant when several activities share an encoded value: the
+// last mapping entry supplies the reverse-decoded activity.
+using EditDistanceTraceMapping =
+    std::vector<std::pair<std::string, std::string>>;
+using EditDistanceTraceCache =
+    std::vector<std::pair<std::string, EditDistanceTraceHandle>>;
+
+// Align one trace against encoded target variants. Activity values are
+// concatenated from mapping entries, with unmapped trace labels omitted.
+// Encoded strings are split into validated UTF-8 codepoint tokens for distance
+// and move generation. The supplied set is an independent exact-match
+// shortcut; it is not derived from list_encodings. Cache lookup takes
+// precedence over that shortcut and ignores later option/target changes for
+// an existing encoded trace key. A null cache disables external caching.
+// Ordinary equal-distance ties preserve first list occurrence regardless of
+// target length. Anti-alignment chooses maximum distance, then a longer target
+// on ties, then first list occurrence; it has no selectable target if all
+// candidates are exact.
+//
+// The direct helper reads activity_attribute, perform_anti_alignment, and
+// positive deviation_cost from options. The activity_attribute is the
+// effective selector; a caller adapting PM4Py parameter dictionaries must
+// preserve the distinct enum-key and string-key interpretation there. The
+// helper does not require timestamps or case fields.
+[[nodiscard]] EditDistanceTraceHandle apply_edit_distance_trace(
+    const Trace& trace, const std::vector<std::string>& list_encodings,
+    const std::set<std::string>& set_encodings,
+    const EditDistanceTraceMapping& mapping,
+    EditDistanceTraceCache* cache = nullptr,
+    EditDistanceOptions options = {});
+
+// Reference-named aliases for the direct helper.
+[[nodiscard]] inline EditDistanceTraceHandle apply_trace(
+    const Trace& trace, const std::vector<std::string>& list_encodings,
+    const std::set<std::string>& set_encodings,
+    const EditDistanceTraceMapping& mapping,
+    EditDistanceTraceCache* cache = nullptr,
+    EditDistanceOptions options = {}) {
+  return apply_edit_distance_trace(trace, list_encodings, set_encodings,
+                                  mapping, cache, std::move(options));
+}
+[[nodiscard]] inline EditDistanceTraceHandle align_trace(
+    const Trace& trace, const std::vector<std::string>& list_encodings,
+    const std::set<std::string>& set_encodings,
+    const EditDistanceTraceMapping& mapping,
+    EditDistanceTraceCache* cache = nullptr,
+    EditDistanceOptions options = {}) {
+  return apply_edit_distance_trace(trace, list_encodings, set_encodings,
+                                  mapping, cache, std::move(options));
+}
+[[nodiscard]] inline EditDistanceTraceHandle align_edit_distance_trace(
+    const Trace& trace, const std::vector<std::string>& list_encodings,
+    const std::set<std::string>& set_encodings,
+    const EditDistanceTraceMapping& mapping,
+    EditDistanceTraceCache* cache = nullptr,
+    EditDistanceOptions options = {}) {
+  return apply_edit_distance_trace(trace, list_encodings, set_encodings,
+                                  mapping, cache, std::move(options));
+}
 
 // Align every trace in source against the closest (or, for anti-alignment,
 // farthest) variant in target. Duplicate variants are grouped and results are

@@ -1,0 +1,26 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Direct edit-distance trace mapping, independent target list/set, UTF-8 decoding, typed activity selection, and shared caller cache",
+  "parent_commit": "eed909c2c976124c4d0c0c66e1be32bc1e15ab6e",
+  "verified_code_tree": "ca8ac632704ccd73811c1ea828d93d85f4c0c7ef",
+  "core_sha256": "efb9cac56c71084a1cd5107fa3f854c87d640c2234cb43d8c7e49663d12f0730",
+  "direct_public_calls": 66,
+  "direct_matches": 66,
+  "previously_reference_only_now_compared": 9,
+  "baseline": "No native direct API before this checkpoint; no fabricated baseline match count.",
+  "prior_whole_log_and_projection_comparisons": 212,
+  "prior_matches": 212,
+  "native_comparisons": 278,
+  "matched": 278,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "comparison": "Exact ordered moves and integer costs; exact typed inputs, ordered cache snapshots/mutations, shared return identity and unchanged arguments; mapped diagnostics, not Python exception-class identity.",
+  "artifacts": {
+    "docs/edit-distance-direct-reference.json.gz": "5a3b1aad98b2466f3add7c1327981519f170329050a8cae3e13932d3a73019d5",
+    "docs/edit-distance-direct-native-checks.json.gz": "ef1e1878dc3d4962074db0e3f60307fce9eba6667fa3c87e3b8db364aa604e4c"
+  },
+  "remaining": [
+    "Broader typed mapping keys, invalid parameter shapes, ordering, and larger input contracts require further audit.",
+    "Both edit-distance catalogue rows remain partial; project has 232 incomplete coverage units."
+  ]
+}

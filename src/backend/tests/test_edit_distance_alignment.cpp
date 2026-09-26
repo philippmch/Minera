@@ -1,7 +1,10 @@
 #include <algorithm>
+#include <any>
 #include <cassert>
 #include <cstdint>
 #include <limits>
+#include <memory>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -28,6 +31,279 @@ static EventLog log_of(std::initializer_list<std::initializer_list<const char*>>
 }
 
 int main() {
+  const auto trace_with_activity_attribute = [](EventAttribute attribute) {
+    Trace trace;
+    Event event;
+    event.attributes.push_back(std::move(attribute));
+    trace.events.push_back(std::move(event));
+    return trace;
+  };
+  const Trace direct_trace = log_of({{"A", "B"}}).traces.front();
+  const EditDistanceTraceMapping direct_mapping{{"A", "a"}, {"B", "b"},
+                                                 {"C", "c"}};
+  const std::vector<std::string> direct_exact_target{"ab"};
+  const std::set<std::string> direct_exact_set{"ab"};
+  EditDistanceTraceCache direct_cache;
+  const auto direct_exact = apply_edit_distance_trace(
+      direct_trace, direct_exact_target, direct_exact_set, direct_mapping,
+      &direct_cache);
+  assert(direct_exact && direct_cache.size() == 1 &&
+         direct_cache.front().first == "ab" &&
+         direct_cache.front().second == direct_exact);
+  const auto& direct_exact_result =
+      std::any_cast<const EditDistanceTraceResult&>(*direct_exact);
+  assert(direct_exact_result.cost == 0 &&
+         direct_exact_result.alignment.size() == 2 &&
+         direct_exact_result.alignment[0].type ==
+             EditDistanceMoveType::kSynchronous &&
+         direct_exact_result.alignment[0].log_activity == "A" &&
+         direct_exact_result.alignment[1].model_activity == "B");
+
+  // Public Trace lookup preserves scalar identity: numeric and null values
+  // are present keys but do not match string keys in the supplied mapping.
+  EventAttribute integer_activity{"concept:name", "1", AttributeKind::kInt};
+  integer_activity.typed_value = std::int64_t{1};
+  const auto integer_trace =
+      trace_with_activity_attribute(std::move(integer_activity));
+  const EditDistanceTraceMapping integer_mapping{{"1", "a"}};
+  const auto integer_as_activity = apply_edit_distance_trace(
+      integer_trace, std::vector<std::string>{"a"}, std::set<std::string>{},
+      integer_mapping);
+  const auto& integer_result =
+      std::any_cast<const EditDistanceTraceResult&>(*integer_as_activity);
+  assert(integer_result.cost == 10000 && integer_result.alignment.size() == 1 &&
+         integer_result.alignment.front().type == EditDistanceMoveType::kModel &&
+         integer_result.alignment.front().model_activity == "1");
+
+  const Trace string_trace = trace_with_activity_attribute(
+      EventAttribute{"concept:name", "1", AttributeKind::kString});
+  const auto string_as_activity = apply_edit_distance_trace(
+      string_trace, std::vector<std::string>{"a"}, std::set<std::string>{},
+      integer_mapping);
+  const auto& string_result =
+      std::any_cast<const EditDistanceTraceResult&>(*string_as_activity);
+  assert(string_result.cost == 0 && string_result.alignment.size() == 1 &&
+         string_result.alignment.front().type ==
+             EditDistanceMoveType::kSynchronous &&
+         string_result.alignment.front().log_activity == "1");
+
+  const Trace null_trace = trace_with_activity_attribute(
+      EventAttribute{"concept:name", "None", AttributeKind::kString, true});
+  const auto null_as_activity = apply_edit_distance_trace(
+      null_trace, std::vector<std::string>{"a"}, std::set<std::string>{},
+      EditDistanceTraceMapping{{"None", "a"}});
+  const auto& null_result =
+      std::any_cast<const EditDistanceTraceResult&>(*null_as_activity);
+  assert(null_result.cost == 10000 && null_result.alignment.size() == 1 &&
+         null_result.alignment.front().type == EditDistanceMoveType::kModel &&
+         null_result.alignment.front().model_activity == "None");
+
+  // The exact-match set is independent of the ordered target list.
+  const auto set_only_exact = apply_trace(
+      direct_trace, std::vector<std::string>{"ac"}, direct_exact_set,
+      direct_mapping);
+  assert(set_only_exact &&
+         std::any_cast<const EditDistanceTraceResult&>(*set_only_exact).cost ==
+             0);
+
+  // A present cache key wins before target selection and returns the same
+  // type-erased object, including when that value is not our result type.
+  const auto opaque = std::make_shared<std::any>(std::string("opaque"));
+  EditDistanceTraceCache opaque_cache{{"ab", opaque}};
+  EditDistanceOptions direct_anti;
+  direct_anti.perform_anti_alignment = true;
+  const auto opaque_hit = align_trace(
+      direct_trace, std::vector<std::string>{}, std::set<std::string>{},
+      direct_mapping, &opaque_cache, direct_anti);
+  assert(opaque_hit == opaque && opaque_cache.size() == 1 &&
+         std::any_cast<const std::string&>(*opaque_hit) == "opaque");
+  EditDistanceTraceCache cached_none{{"ab", nullptr}};
+  const auto null_hit = apply_trace(
+      direct_trace, std::vector<std::string>{}, std::set<std::string>{},
+      direct_mapping, &cached_none);
+  assert(!null_hit && cached_none.size() == 1);
+
+  // Mapping collisions reverse-decode to the last activity, and labels that
+  // have no encoding are omitted from the concatenated source key.
+  const Trace collision_trace =
+      log_of({{"A", "unmapped", "A"}}).traces.front();
+  const EditDistanceTraceMapping collision_mapping{{"A", "x"},
+                                                    {"B", "x"}};
+  const auto collision = apply_edit_distance_trace(
+      collision_trace, std::vector<std::string>{"xx"}, std::set<std::string>{},
+      collision_mapping);
+  const auto& collision_result =
+      std::any_cast<const EditDistanceTraceResult&>(*collision);
+  assert(collision_result.cost == 0 &&
+         collision_result.alignment.size() == 2 &&
+         collision_result.alignment[0].log_activity == "B" &&
+         collision_result.alignment[1].model_activity == "B");
+
+  // Unicode supplementary-plane mapping values are one edit token each.
+  const std::string face("\xF0\x9F\x98\x80");
+  const std::string rocket("\xF0\x9F\x9A\x80");
+  const std::string unicode_encoding = face + rocket;
+  const EditDistanceTraceMapping unicode_mapping{{"A", face}, {"B", rocket}};
+  const auto unicode_result_handle = apply_edit_distance_trace(
+      direct_trace, std::vector<std::string>{unicode_encoding},
+      std::set<std::string>{unicode_encoding}, unicode_mapping);
+  const auto& unicode_result =
+      std::any_cast<const EditDistanceTraceResult&>(*unicode_result_handle);
+  assert(unicode_result.cost == 0 && unicode_result.alignment.size() == 2 &&
+         unicode_result.alignment[0].log_activity == "A" &&
+         unicode_result.alignment[1].model_activity == "B");
+
+  // Equal-distance variants retain first list occurrence for both ordinary
+  // and anti alignment; reversing the list changes the selected activity.
+  const Trace one_activity = log_of({{"A"}}).traces.front();
+  const EditDistanceTraceMapping tie_mapping{{"A", "a"}, {"B", "b"},
+                                              {"C", "c"}};
+  auto tied = apply_edit_distance_trace(
+      one_activity, std::vector<std::string>{"b", "c"},
+      std::set<std::string>{}, tie_mapping);
+  auto tied_reversed = apply_edit_distance_trace(
+      one_activity, std::vector<std::string>{"c", "b"},
+      std::set<std::string>{}, tie_mapping);
+  assert(std::any_cast<const EditDistanceTraceResult&>(*tied)
+             .alignment.back().model_activity == "B" &&
+         std::any_cast<const EditDistanceTraceResult&>(*tied_reversed)
+                 .alignment.back().model_activity == "C");
+  direct_anti.perform_anti_alignment = true;
+  auto anti_tied = apply_edit_distance_trace(
+      one_activity, std::vector<std::string>{"b", "c"},
+      std::set<std::string>{}, tie_mapping, nullptr, direct_anti);
+  assert(std::any_cast<const EditDistanceTraceResult&>(*anti_tied)
+             .alignment.back().model_activity == "B");
+
+  const Trace three_activities = log_of({{"A", "B", "C"}}).traces.front();
+  const EditDistanceTraceMapping length_tie_mapping{
+      {"A", "a"}, {"B", "b"}, {"C", "c"}, {"D", "d"}};
+  const auto ordinary_short_first = apply_edit_distance_trace(
+      three_activities, std::vector<std::string>{"ab", "abcd"},
+      std::set<std::string>{}, length_tie_mapping);
+  const auto ordinary_long_first = apply_edit_distance_trace(
+      three_activities, std::vector<std::string>{"abcd", "ab"},
+      std::set<std::string>{}, length_tie_mapping);
+  assert(std::any_cast<const EditDistanceTraceResult&>(*ordinary_short_first)
+             .alignment.back().type == EditDistanceMoveType::kLog &&
+         std::any_cast<const EditDistanceTraceResult&>(*ordinary_long_first)
+                 .alignment.back().model_activity == "D");
+  const auto anti_length_tie_short_first = apply_edit_distance_trace(
+      three_activities, std::vector<std::string>{"ab", "abcd"},
+      std::set<std::string>{}, length_tie_mapping, nullptr, direct_anti);
+  const auto anti_length_tie_long_first = apply_edit_distance_trace(
+      three_activities, std::vector<std::string>{"abcd", "ab"},
+      std::set<std::string>{}, length_tie_mapping, nullptr, direct_anti);
+  assert(std::any_cast<const EditDistanceTraceResult&>(
+             *anti_length_tie_short_first).alignment.back().model_activity ==
+             "D" &&
+         std::any_cast<const EditDistanceTraceResult&>(
+             *anti_length_tie_long_first).alignment.back().model_activity ==
+             "D");
+
+  // Empty ordinary variants are valid; no candidate and anti alignment with
+  // no positive-distance candidate follow the captured failure contract.
+  const Trace direct_empty_trace = log_of({{}}).traces.front();
+  const auto empty_exact = apply_edit_distance_trace(
+      direct_empty_trace, std::vector<std::string>{""}, std::set<std::string>{""},
+      EditDistanceTraceMapping{{"A", "a"}});
+  assert(std::any_cast<const EditDistanceTraceResult&>(*empty_exact)
+             .alignment.empty() &&
+         std::any_cast<const EditDistanceTraceResult&>(*empty_exact).cost == 0);
+  bool direct_threw = false;
+  try {
+    (void)apply_edit_distance_trace(direct_empty_trace, std::vector<std::string>{},
+                                    std::set<std::string>{},
+                                    EditDistanceTraceMapping{});
+  } catch (const std::invalid_argument&) {
+    direct_threw = true;
+  }
+  assert(direct_threw);
+  direct_threw = false;
+  try {
+    (void)apply_edit_distance_trace(
+        one_activity, std::vector<std::string>{"?"}, std::set<std::string>{},
+        EditDistanceTraceMapping{{"A", "a"}});
+  } catch (const std::out_of_range&) {
+    direct_threw = true;
+  }
+  assert(direct_threw);
+  Trace missing_activity_trace;
+  Event custom_activity_event;
+  custom_activity_event.attributes.push_back(
+      {"task:name", "A", AttributeKind::kString});
+  missing_activity_trace.events.push_back(std::move(custom_activity_event));
+  direct_threw = false;
+  try {
+    (void)apply_edit_distance_trace(
+        missing_activity_trace, direct_exact_target, direct_exact_set,
+        direct_mapping);
+  } catch (const std::out_of_range&) {
+    direct_threw = true;
+  }
+  assert(direct_threw);
+  EditDistanceOptions custom_activity_options;
+  custom_activity_options.activity_attribute = "task:name";
+  const auto custom_attribute_value = apply_edit_distance_trace(
+      missing_activity_trace, std::vector<std::string>{"a"},
+      std::set<std::string>{}, EditDistanceTraceMapping{{"A", "a"}}, nullptr,
+      custom_activity_options);
+  assert(std::any_cast<const EditDistanceTraceResult&>(
+             *custom_attribute_value).cost == 0);
+
+  Trace source_key_trace;
+  Event source_key_event;
+  source_key_event.activity = "A";
+  source_key_event.activity_state = FirstClassAttributeState::kPresent;
+  source_key_event.activity_source_key = "task:name";
+  source_key_trace.events.push_back(std::move(source_key_event));
+  direct_threw = false;
+  try {
+    (void)apply_edit_distance_trace(
+        source_key_trace, std::vector<std::string>{"a"},
+        std::set<std::string>{}, EditDistanceTraceMapping{{"A", "a"}});
+  } catch (const std::out_of_range&) {
+    direct_threw = true;
+  }
+  assert(direct_threw);
+  const auto source_key_value = apply_edit_distance_trace(
+      source_key_trace, std::vector<std::string>{"a"}, std::set<std::string>{},
+      EditDistanceTraceMapping{{"A", "a"}}, nullptr,
+      custom_activity_options);
+  assert(std::any_cast<const EditDistanceTraceResult&>(*source_key_value).cost ==
+         0);
+  EditDistanceOptions empty_selector_options;
+  empty_selector_options.activity_attribute.clear();
+  direct_threw = false;
+  try {
+    (void)apply_edit_distance_trace(
+        one_activity, std::vector<std::string>{"a"}, std::set<std::string>{},
+        EditDistanceTraceMapping{{"A", "a"}}, nullptr, empty_selector_options);
+  } catch (const std::out_of_range&) {
+    direct_threw = true;
+  }
+  assert(direct_threw);
+  source_key_trace.events[0].activity.clear();
+  source_key_trace.events[0].activity_state = FirstClassAttributeState::kMissing;
+  direct_threw = false;
+  try {
+    (void)apply_edit_distance_trace(
+        source_key_trace, std::vector<std::string>{"a"}, std::set<std::string>{},
+        EditDistanceTraceMapping{{"", "a"}}, nullptr, custom_activity_options);
+  } catch (const std::out_of_range&) {
+    direct_threw = true;
+  }
+  assert(direct_threw);
+  direct_threw = false;
+  try {
+    (void)apply_edit_distance_trace(
+        one_activity, std::vector<std::string>{"a"}, std::set<std::string>{},
+        EditDistanceTraceMapping{{"A", "a"}}, nullptr, direct_anti);
+  } catch (const std::invalid_argument&) {
+    direct_threw = true;
+  }
+  assert(direct_threw);
+
   const EventLog source = log_of({{"a", "b"}, {"a", "x"}, {}});
   const EventLog target = log_of({{"a", "b"}, {"a", "c"}, {"a"}});
   const auto exact = align_edit_distance(log_of({{"a", "b"}}), target);
