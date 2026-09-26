@@ -826,6 +826,13 @@ ConceptDriftTraceResult detect_concept_drift_traces(
   return detect_concept_drift_traces(traces, options, rng);
 }
 
+ConceptDriftTypedTraceResult detect_concept_drift_typed_traces(
+    const std::vector<std::vector<EventAttribute>>& traces,
+    ConceptDriftTraceOptions options) {
+  auto rng = make_bose_rng(options.seed);
+  return detect_concept_drift_typed_traces(traces, options, rng);
+}
+
 ConceptDriftTableResult apply_concept_drift_log(
     const EventLog& log, ConceptDriftTableOptions options, std::mt19937& rng) {
   constexpr std::size_t kMaxApplyTraces = 2'000'000;

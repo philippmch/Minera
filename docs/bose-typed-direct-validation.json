@@ -1,0 +1,27 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Typed raw BOSE traces with original attribute values and shared NaN identity retained",
+  "raw_public_cases": 108,
+  "raw_native_comparisons": 100,
+  "typed_eventlog_public_cases": 120,
+  "typed_eventlog_native_comparisons": 112,
+  "prior_regression_comparisons": 19181,
+  "total_native_comparisons": 19393,
+  "cli_checks": 14,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "parent_commit": "7fb97b5f56f829c41ac83d3139fcabee3eacac4b",
+  "verified_code_tree": "bd2bddab3638b506571eb42b68fbdee19ef30379",
+  "core_library_sha256": "b266bb3baa2e441fe04cb1048b7662f39abac243291b9d641e14e97b814ad288",
+  "artifacts": {
+    "docs/bose-typed-direct-reference.json.gz": "439ce66032fac611a1a68188ba548bbfb536e4e9d6422777aedf9617dbe41f54",
+    "docs/bose-typed-direct-native-checks.json.gz": "c176534d262f84812caa75e0922eb03acc5fd817383a31487cbc749542c1f3a6"
+  },
+  "limits": [
+    "No coverage status promotion; full BOSE module/dispatcher parity remains unproven.",
+    "Eight raw and eight EventLog pandas.NA observations remain reference-only because NativeAttributeValue has no distinct pandas.NA sentinel.",
+    "Native copies preserve values and NaN scalar identity; Python container alias ownership is not reproduced.",
+    "Rejection acceptance and RNG timing are compared, not language-specific exception classes or text.",
+    "Explicit seeding and resource bounds remain native extensions."
+  ]
+}
