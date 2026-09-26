@@ -501,6 +501,12 @@ std::mt19937 make_bose_rng(std::uint64_t seed) {
   return std::mt19937(native_extension);
 }
 
+void validate_apply_variant(ConceptDriftVariant variant) {
+  if (variant != ConceptDriftVariant::kBose) {
+    throw std::invalid_argument("concept drift: unsupported variant");
+  }
+}
+
 }  // namespace
 
 std::vector<std::string> extract_concept_drift_activities(
@@ -947,6 +953,34 @@ ConceptDriftTableResult apply_concept_drift_log(
     const EventLog& log, ConceptDriftTableOptions options) {
   auto rng = make_bose_rng(options.seed);
   return apply_concept_drift_log(log, options, rng);
+}
+
+ConceptDriftTableResult apply_concept_drift(
+    const EventLog& log, ConceptDriftTableOptions options,
+    ConceptDriftVariant variant) {
+  validate_apply_variant(variant);
+  return apply_concept_drift_log(log, options);
+}
+
+ConceptDriftTableResult apply_concept_drift(
+    const EventLog& log, ConceptDriftTableOptions options, std::mt19937& rng,
+    ConceptDriftVariant variant) {
+  validate_apply_variant(variant);
+  return apply_concept_drift_log(log, options, rng);
+}
+
+ConceptDriftTableResult apply_concept_drift(
+    const EventTable& table, ConceptDriftTableOptions options,
+    ConceptDriftVariant variant) {
+  validate_apply_variant(variant);
+  return apply_concept_drift_table(table, options);
+}
+
+ConceptDriftTableResult apply_concept_drift(
+    const EventTable& table, ConceptDriftTableOptions options,
+    std::mt19937& rng, ConceptDriftVariant variant) {
+  validate_apply_variant(variant);
+  return apply_concept_drift_table(table, options, rng);
 }
 
 ConceptDriftResult detect_concept_drift(const EventLog& log,
