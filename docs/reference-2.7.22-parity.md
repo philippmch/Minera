@@ -5337,6 +5337,35 @@ and cost functions remain beyond the bounded matrices; cross-language error
 class/message equivalence is not asserted. The dispatcher and implementation
 module remain partial.
 
+### Edit-distance typed mapping checkpoint
+
+The typed direct-trace interface accepts native event values as mapping keys
+and retains those values in decoded moves. Numeric-equivalent keys share an
+entry while the first key's type is retained and the latest encoding wins.
+Null, tuple, frozen-set, and byte keys use the shared native key-comparison
+implementation. Gaps remain separate from present null activity labels.
+
+Cache lookup still uses the encoded source. A later mapping with a different
+key type can therefore return the same earlier result object. Missing activity
+fields and unhashable activity values are rejected before cache lookup.
+
+All 35 frozen typed-mapping calls match. The 278 prior whole-log, table,
+projection, and string-helper comparisons pass against the same library, for
+313 comparisons. The Release build, native alignment suite, catalogue check,
+and independent production/probe/checker reviews pass.
+
+Evidence is retained in `docs/edit-distance-typed-mapping-reference.json.gz`,
+`docs/edit-distance-typed-mapping-native-checks.json.gz`, and
+`docs/edit-distance-typed-mapping-validation.json`. It includes raw mapping
+constructors, the normalized mappings passed to Python, capture and native
+probe/checker sources, exact typed outputs, cache identity observations, and
+before/after input and binary hashes. The prior header had no typed direct
+API, so this checkpoint does not invent a native before-match count.
+
+This extends the direct-helper surface. Whole-log typed activities, broader
+parameter adapters, and larger-input matching-block contracts remain open;
+both edit-distance catalogue rows remain partial.
+
 ### Edit-distance direct trace and caller-cache checkpoint
 
 The additive `apply_edit_distance_trace`, `apply_trace`, and `align_trace`
@@ -5374,9 +5403,10 @@ generated probe/checker sources, exact inputs, and before/after binary hashes.
 The prior header did not expose a direct API, so no native before-baseline
 match count is invented.
 
-Both edit-distance catalogue rows remain partial. Broader typed mapping keys,
-invalid parameter shapes, ordering, and larger input contracts still need
-proof; the project retains 232 incomplete coverage units.
+Both edit-distance catalogue rows remain partial. Typed mapping keys are
+extended by the checkpoint above. Invalid parameter shapes, ordering, and
+larger input contracts still need proof; the project retains 232 incomplete
+coverage units.
 
 ### Edit-distance table, projection, and target-selection checkpoint
 

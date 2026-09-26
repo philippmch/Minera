@@ -1,0 +1,27 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Typed direct edit-distance mapping keys, decoded values, mapping collisions, and shared caller cache",
+  "parent_commit": "e54426ab78fe648f00321cac11212f6dc67e40d1",
+  "verified_code_tree": "3a36a2ee7b54714e20296e0090b72c2ecc386cae",
+  "core_sha256": "f4bede9cb8a61474b1cc0f3e11f5e207b7436e63fb94837478d727e590bcbbbd",
+  "typed_mapping_public_calls": 35,
+  "typed_mapping_matches": 35,
+  "prior_direct_public_calls": 66,
+  "prior_direct_matches": 66,
+  "baseline": "No native typed direct API before this checkpoint; no fabricated baseline match count.",
+  "prior_whole_log_and_projection_comparisons": 212,
+  "prior_matches": 212,
+  "native_comparisons": 313,
+  "matched": 313,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "comparison": "Exact ordered moves and integer costs; exact typed inputs, ordered cache snapshots/mutations, shared return identity and unchanged arguments; mapped diagnostics, not Python exception-class identity.",
+  "artifacts": {
+    "docs/edit-distance-typed-mapping-reference.json.gz": "743c82b9af767bfff66733c06aa348090e6e35b1e67896fe0a62ef1a5b092745",
+    "docs/edit-distance-typed-mapping-native-checks.json.gz": "85db81f090eb0c4673e22c89d7d81f9482646655ccd46fa7c588a77528b6991f"
+  },
+  "remaining": [
+    "Whole-log typed activities, broader parameter adapters, and larger-input matching-block contracts require further audit.",
+    "Both edit-distance catalogue rows remain partial; project has 232 incomplete coverage units."
+  ]
+}

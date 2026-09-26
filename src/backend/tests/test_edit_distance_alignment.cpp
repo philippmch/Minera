@@ -98,6 +98,251 @@ int main() {
          null_result.alignment.front().type == EditDistanceMoveType::kModel &&
          null_result.alignment.front().model_activity == "None");
 
+  // Typed direct mapping keys use Python-compatible hash/equality while
+  // preserving the original mapping key in decoded moves.
+  EventAttribute typed_int_key{"mapping-key", "1", AttributeKind::kInt};
+  typed_int_key.typed_value = std::int64_t{1};
+  EventAttribute typed_float_activity{"concept:name", "1.0",
+                                      AttributeKind::kFloat};
+  typed_float_activity.typed_value = 1.0;
+  const auto typed_float_trace =
+      trace_with_activity_attribute(typed_float_activity);
+  const auto typed_numeric = apply_typed_trace(
+      typed_float_trace, std::vector<std::string>{"a"},
+      std::set<std::string>{"a"},
+      EditDistanceTypedTraceMapping{{typed_int_key, "a"}});
+  const auto& typed_numeric_result =
+      std::any_cast<const EditDistanceTypedTraceResult&>(*typed_numeric);
+  assert(typed_numeric_result.cost == 0 &&
+         typed_numeric_result.alignment.size() == 1 &&
+         typed_numeric_result.alignment.front().type ==
+             EditDistanceMoveType::kSynchronous &&
+         typed_numeric_result.alignment.front().log_activity &&
+         typed_numeric_result.alignment.front().model_activity &&
+         typed_numeric_result.alignment.front().log_activity->kind ==
+             AttributeKind::kInt &&
+         std::get<std::int64_t>(typed_numeric_result.alignment.front()
+                                    .log_activity->typed_value) == 1);
+
+  EventAttribute typed_bool_key{"mapping-key", "True",
+                                AttributeKind::kBoolean};
+  typed_bool_key.typed_value = true;
+  const auto typed_integer_bool_alias = apply_typed_edit_distance_trace(
+      integer_trace, std::vector<std::string>{"a"},
+      std::set<std::string>{"a"},
+      EditDistanceTypedTraceMapping{{typed_bool_key, "a"}});
+  const auto& typed_bool_result = std::any_cast<const EditDistanceTypedTraceResult&>(
+      *typed_integer_bool_alias);
+  assert(typed_bool_result.cost == 0 &&
+         typed_bool_result.alignment.front().log_activity &&
+         typed_bool_result.alignment.front().log_activity->kind ==
+             AttributeKind::kBoolean &&
+         std::get<bool>(typed_bool_result.alignment.front()
+                            .log_activity->typed_value));
+
+  EventAttribute typed_null_key{"mapping-key", "", AttributeKind::kString,
+                                true};
+  const Trace typed_null_trace = trace_with_activity_attribute(
+      EventAttribute{"concept:name", "None", AttributeKind::kString, true});
+  const auto typed_null = apply_typed_trace(
+      typed_null_trace, std::vector<std::string>{"a"},
+      std::set<std::string>{"a"},
+      EditDistanceTypedTraceMapping{{typed_null_key, "a"}});
+  const auto& typed_null_result =
+      std::any_cast<const EditDistanceTypedTraceResult&>(*typed_null);
+  assert(typed_null_result.cost == 0 &&
+         typed_null_result.alignment.front().log_activity &&
+         typed_null_result.alignment.front().log_activity->is_null);
+
+  // Building the mapping follows dict key replacement: equal numeric keys
+  // retain the first key object, replace its value, and keep its position.
+  EventAttribute typed_bool_alias{"mapping-key", "True",
+                                  AttributeKind::kBoolean};
+  typed_bool_alias.typed_value = true;
+  const auto typed_mapping_collision = apply_typed_trace(
+      integer_trace, std::vector<std::string>{"a", "b"},
+      std::set<std::string>{"b"},
+      EditDistanceTypedTraceMapping{{typed_int_key, "a"},
+                                    {typed_bool_alias, "b"}});
+  const auto& typed_mapping_collision_result =
+      std::any_cast<const EditDistanceTypedTraceResult&>(
+          *typed_mapping_collision);
+  assert(typed_mapping_collision_result.cost == 0 &&
+         typed_mapping_collision_result.alignment.front().log_activity &&
+         typed_mapping_collision_result.alignment.front().log_activity->kind ==
+             AttributeKind::kInt &&
+         std::get<std::int64_t>(typed_mapping_collision_result.alignment.front()
+                                    .log_activity->typed_value) == 1);
+
+  // Reverse collisions keep the last normalized mapping entry.
+  EventAttribute typed_string_key{"mapping-key", "one",
+                                  AttributeKind::kString};
+  EventAttribute typed_cache_key{"mapping-key", "A",
+                                 AttributeKind::kString};
+  EventAttribute typed_string_activity{"concept:name", "1",
+                                       AttributeKind::kInt};
+  typed_string_activity.typed_value = std::int64_t{1};
+  const auto typed_reverse_collision = apply_typed_trace(
+      trace_with_activity_attribute(typed_string_activity),
+      std::vector<std::string>{"x"}, std::set<std::string>{"x"},
+      EditDistanceTypedTraceMapping{{typed_int_key, "x"},
+                                    {typed_string_key, "x"}});
+  const auto& typed_reverse_collision_result =
+      std::any_cast<const EditDistanceTypedTraceResult&>(
+          *typed_reverse_collision);
+  assert(typed_reverse_collision_result.cost == 0 &&
+         typed_reverse_collision_result.alignment.front().log_activity &&
+         typed_reverse_collision_result.alignment.front().log_activity->kind ==
+             AttributeKind::kString &&
+         typed_reverse_collision_result.alignment.front().log_activity->value ==
+             "one");
+
+  EventAttribute tuple_int_key{"mapping-key", "", AttributeKind::kString};
+  tuple_int_key.container = AttributeContainerKind::kTuple;
+  tuple_int_key.children = {
+      EventAttribute{"0", "A", AttributeKind::kString},
+      EventAttribute{"1", "1", AttributeKind::kInt}};
+  tuple_int_key.children[1].typed_value = std::int64_t{1};
+  EventAttribute tuple_float_activity = tuple_int_key;
+  tuple_float_activity.key = "concept:name";
+  tuple_float_activity.children[1].kind = AttributeKind::kFloat;
+  tuple_float_activity.children[1].value = "1.0";
+  tuple_float_activity.children[1].typed_value = 1.0;
+  const auto typed_tuple_alias = apply_typed_trace(
+      trace_with_activity_attribute(tuple_float_activity),
+      std::vector<std::string>{"t"}, std::set<std::string>{"t"},
+      EditDistanceTypedTraceMapping{{tuple_int_key, "t"}});
+  const auto& typed_tuple_result =
+      std::any_cast<const EditDistanceTypedTraceResult&>(*typed_tuple_alias);
+  assert(typed_tuple_result.cost == 0 &&
+         typed_tuple_result.alignment.front().log_activity &&
+         typed_tuple_result.alignment.front().log_activity->container ==
+             AttributeContainerKind::kTuple &&
+         typed_tuple_result.alignment.front().log_activity->children[1].kind ==
+             AttributeKind::kInt);
+
+  EventAttribute frozen_set_key{"mapping-key", "", AttributeKind::kString};
+  frozen_set_key.container = AttributeContainerKind::kFrozenSet;
+  frozen_set_key.children = {
+      EventAttribute{"", "A", AttributeKind::kString},
+      EventAttribute{"", "B", AttributeKind::kString}};
+  EventAttribute frozen_set_activity = frozen_set_key;
+  frozen_set_activity.key = "concept:name";
+  std::reverse(frozen_set_activity.children.begin(),
+               frozen_set_activity.children.end());
+  const auto typed_frozen_set = apply_typed_trace(
+      trace_with_activity_attribute(frozen_set_activity),
+      std::vector<std::string>{"f"}, std::set<std::string>{"f"},
+      EditDistanceTypedTraceMapping{{frozen_set_key, "f"}});
+  const auto& typed_frozen_set_result =
+      std::any_cast<const EditDistanceTypedTraceResult&>(*typed_frozen_set);
+  assert(typed_frozen_set_result.cost == 0 &&
+         typed_frozen_set_result.alignment.front().log_activity &&
+         typed_frozen_set_result.alignment.front().log_activity->container ==
+             AttributeContainerKind::kFrozenSet);
+
+  const auto typed_bytes_key = make_bytes_attribute("mapping-key", "A");
+  const auto typed_bytes_activity = make_bytes_attribute("concept:name", "A");
+  const auto typed_bytes = apply_typed_trace(
+      trace_with_activity_attribute(typed_bytes_activity),
+      std::vector<std::string>{"y"}, std::set<std::string>{"y"},
+      EditDistanceTypedTraceMapping{{typed_bytes_key, "y"}});
+  const auto& typed_bytes_result =
+      std::any_cast<const EditDistanceTypedTraceResult&>(*typed_bytes);
+  assert(typed_bytes_result.cost == 0 &&
+         typed_bytes_result.alignment.front().log_activity &&
+         typed_bytes_result.alignment.front().log_activity->kind ==
+             AttributeKind::kBytes);
+
+  // Typed moves distinguish a present null activity from either gap.
+  const auto typed_null_log_move = apply_typed_trace(
+      typed_null_trace, std::vector<std::string>{""}, std::set<std::string>{},
+      EditDistanceTypedTraceMapping{{typed_null_key, "a"}});
+  const auto& typed_null_log_result = std::any_cast<const EditDistanceTypedTraceResult&>(
+      *typed_null_log_move);
+  assert(typed_null_log_result.cost == 10000 &&
+         typed_null_log_result.alignment.size() == 1 &&
+         typed_null_log_result.alignment.front().type ==
+             EditDistanceMoveType::kLog &&
+         typed_null_log_result.alignment.front().log_activity &&
+         typed_null_log_result.alignment.front().log_activity->is_null &&
+         !typed_null_log_result.alignment.front().model_activity);
+  const Trace typed_empty_trace;
+  const auto typed_model_gap = apply_typed_trace(
+      typed_empty_trace, std::vector<std::string>{"a"},
+      std::set<std::string>{}, EditDistanceTypedTraceMapping{{typed_int_key, "a"}});
+  const auto& typed_model_gap_result =
+      std::any_cast<const EditDistanceTypedTraceResult&>(*typed_model_gap);
+  assert(typed_model_gap_result.cost == 10000 &&
+         typed_model_gap_result.alignment.size() == 1 &&
+         typed_model_gap_result.alignment.front().type ==
+             EditDistanceMoveType::kModel &&
+         !typed_model_gap_result.alignment.front().log_activity &&
+         typed_model_gap_result.alignment.front().model_activity &&
+         typed_model_gap_result.alignment.front().model_activity->kind ==
+             AttributeKind::kInt);
+
+  // Cache hits retain the exact handle, even across typed/string label
+  // representations, and cached null remains distinct from a miss.
+  EditDistanceTraceCache typed_cache;
+  const Trace typed_string_cache_trace = trace_with_activity_attribute(
+      EventAttribute{"concept:name", "A", AttributeKind::kString});
+  const auto typed_cache_first = apply_typed_trace(
+      trace_with_activity_attribute(EventAttribute{"concept:name", "A",
+                                                    AttributeKind::kString}),
+      std::vector<std::string>{"a"}, std::set<std::string>{},
+      EditDistanceTypedTraceMapping{{typed_cache_key, "a"}}, &typed_cache);
+  const auto typed_cache_hit = apply_typed_trace(
+      typed_string_cache_trace, std::vector<std::string>{},
+      std::set<std::string>{},
+      EditDistanceTypedTraceMapping{{typed_cache_key, "a"}}, &typed_cache);
+  assert(typed_cache.size() == 1 && typed_cache_hit == typed_cache_first);
+  const auto typed_opaque = std::make_shared<std::any>(std::string("typed opaque"));
+  EditDistanceTraceCache typed_opaque_cache{{"a", typed_opaque}};
+  const auto typed_opaque_hit = apply_typed_trace(
+      typed_string_cache_trace, std::vector<std::string>{},
+      std::set<std::string>{},
+      EditDistanceTypedTraceMapping{{typed_cache_key, "a"}},
+      &typed_opaque_cache);
+  assert(typed_opaque_hit == typed_opaque &&
+         std::any_cast<const std::string&>(*typed_opaque_hit) == "typed opaque");
+  EditDistanceTraceCache typed_cached_none{{"a", nullptr}};
+  const auto typed_null_hit = apply_typed_trace(
+      typed_string_cache_trace, std::vector<std::string>{},
+      std::set<std::string>{},
+      EditDistanceTypedTraceMapping{{typed_cache_key, "a"}},
+      &typed_cached_none);
+  assert(!typed_null_hit && typed_cached_none.size() == 1);
+
+  // Hashing occurs before cache lookup for both helpers, so present lists
+  // cannot masquerade as string activities or bypass the failure in cache.
+  EventAttribute unhashable_activity{"concept:name", "", AttributeKind::kString};
+  unhashable_activity.container = AttributeContainerKind::kList;
+  unhashable_activity.children.push_back(
+      EventAttribute{"0", "A", AttributeKind::kString});
+  const Trace unhashable_trace =
+      trace_with_activity_attribute(unhashable_activity);
+  EditDistanceTraceCache unhashable_cache{{"", typed_opaque}};
+  bool unhashable_threw = false;
+  try {
+    (void)apply_typed_trace(
+        unhashable_trace, std::vector<std::string>{}, std::set<std::string>{},
+        EditDistanceTypedTraceMapping{{typed_string_key, "a"}},
+        &unhashable_cache);
+  } catch (const std::invalid_argument& error) {
+    unhashable_threw = std::string(error.what()) == "unhashable type: 'list'";
+  }
+  assert(unhashable_threw && unhashable_cache.size() == 1);
+  unhashable_threw = false;
+  try {
+    (void)apply_edit_distance_trace(
+        unhashable_trace, std::vector<std::string>{}, std::set<std::string>{},
+        EditDistanceTraceMapping{{"A", "a"}}, &unhashable_cache);
+  } catch (const std::invalid_argument& error) {
+    unhashable_threw = std::string(error.what()) == "unhashable type: 'list'";
+  }
+  assert(unhashable_threw && unhashable_cache.size() == 1);
+
   // The exact-match set is independent of the ordered target list.
   const auto set_only_exact = apply_trace(
       direct_trace, std::vector<std::string>{"ac"}, direct_exact_set,
