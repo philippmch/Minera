@@ -1811,6 +1811,33 @@ Evidence and reproducible capture source are in
 `docs/bose-missing-sentinel-contract-checks.json.gz`, and
 `docs/bose-missing-sentinel-contract-validation.json`.
 
+### Native nullable-missing scalar and BOSE checkpoint
+
+The native attribute model now represents pandas.NA as a distinct present
+`NativeNA` scalar (`AttributeKind::kNA`). It remains separate from null/None,
+floating NaN, and literal strings. Existing variant and kind indices remain
+stable. Lossless JSON uses `kind: "na"`, `value: "<NA>"`, and
+`typed_value: "NA"`; generic adapters preserve the marker and XES export
+rejects it because XES has no equivalent scalar.
+
+BOSE activity handling preserves repeated NA identity, tuple comparisons,
+and the reference's ambiguous membership failures. Selected table case and
+timestamp grouping handles missing markers in context, preserving standard
+case validation and the timing of errors relative to RNG consumption.
+
+The checkpoint replays 68 nullable-missing helper contracts, an 864-call
+ordered membership matrix, and 44 table cases. It also brings 19 formerly
+reference-only NA cases into the existing native replay. Combined validation
+has 20,608 exact matches out of 20,609 comparisons, plus 14 CLI checks and
+14 native suites. The one documented allocation-dependent NaN tuple order
+difference remains visible and is not counted as an exact match.
+
+Evidence and review are retained in `docs/bose-na-reference.json.gz`,
+`docs/bose-na-native-checks.json.gz`, and `docs/bose-na-validation.json`.
+This is a verified finite checkpoint. The BOSE module and dispatcher rows
+remain partial pending a fresh completion audit; no coverage promotion is
+made by this change.
+
 ### BOSE change-timestamp microsecond rounding checkpoint
 
 The public table and EventLog adapters round returned change timestamps to six

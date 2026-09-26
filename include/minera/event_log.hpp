@@ -16,11 +16,12 @@
 
 namespace minera {
 
-// The XES scalar attribute type an event attribute round-trips as.  The text
+// The scalar attribute type an event attribute round-trips as. Most kinds map
+// to XES values; kNA is a native-only scalar extension for pandas.NA. The text
 // projection remains available in value for compatibility with existing
 // consumers; typed_value carries a validated native representation when one
 // is available.
-enum class AttributeKind { kString, kDate, kInt, kFloat, kBoolean, kId, kBytes };
+enum class AttributeKind { kString, kDate, kInt, kFloat, kBoolean, kId, kBytes, kNA };
 
 enum class AttributeContainerKind { kScalar, kList, kContainer, kTuple, kSet, kFrozenSet };
 
@@ -57,6 +58,12 @@ struct NativeDate {
   bool operator==(const NativeDate& other) const { return value == other.value; }
 };
 
+// pandas.NA is a present scalar missing marker. It is distinct from None,
+// floating NaN, and every string value, including "NA" and "<NA>".
+struct NativeNA {
+  bool operator==(const NativeNA&) const = default;
+};
+
 // Scalar identity follows copies independently of value equality. This is
 // needed for alias-sensitive NaN comparisons without sharing heap storage.
 // Replace scalars through assignment or emplace to renew that identity.
@@ -64,14 +71,13 @@ struct NativeDate {
 // renew identity and therefore does not preserve replacement alias semantics.
 class NativeAttributeValue
     : public std::variant<std::monostate, std::int64_t, double, bool, NativeDate,
-                          std::uint64_t> {
+                          std::uint64_t, NativeNA> {
  public:
-  // Keep the existing alternative indexes stable.  A uint64 value is appended
-  // so code that uses the public variant-compatible interface for int64,
-  // double, bool, or NativeDate keeps its alternative indexes and source
-  // meaning.
+  // Keep the existing alternative indexes stable. uint64 and NativeNA were
+  // appended after the original monostate/int64/double/bool/NativeDate
+  // alternatives so existing variant-compatible clients retain their indexes.
   using Base = std::variant<std::monostate, std::int64_t, double, bool, NativeDate,
-                            std::uint64_t>;
+                            std::uint64_t, NativeNA>;
   using Base::Base;
 
   NativeAttributeValue() = default;
@@ -222,6 +228,50 @@ struct EventAttribute {
     return typed_value == other.typed_value;
   }
 };
+
+// True when the attribute's kind or native payload marks the pandas.NA
+// extension value. Transport writers validate that these two markers agree.
+inline bool is_native_na_attribute(const EventAttribute& attribute) noexcept {
+  return attribute.kind == AttributeKind::kNA ||
+         std::holds_alternative<NativeNA>(attribute.typed_value);
+}
+
+inline std::string_view event_attribute_lexical_value(
+    const EventAttribute& attribute) noexcept {
+  return is_native_na_attribute(attribute) ? std::string_view("<NA>")
+                                           : std::string_view(attribute.value);
+}
+
+inline void validate_native_na_attribute(const EventAttribute& attribute,
+                                         std::string_view context) {
+  const bool kind_na = attribute.kind == AttributeKind::kNA;
+  const bool typed_na =
+      std::holds_alternative<NativeNA>(attribute.typed_value);
+  if (kind_na != typed_na ||
+      (kind_na &&
+       (attribute.is_null ||
+        attribute.first_class_state == FirstClassAttributeState::kNull ||
+        attribute.container != AttributeContainerKind::kScalar ||
+        attribute.scalar_wrapper || attribute.scalar_children_list ||
+        !attribute.children.empty() ||
+        (!attribute.value.empty() && attribute.value != "<NA>")))) {
+    throw std::invalid_argument(std::string(context) +
+                                ": inconsistent native NA attribute");
+  }
+}
+
+inline bool contains_native_na_attribute(const EventAttribute& attribute) {
+  if (is_native_na_attribute(attribute)) return true;
+  for (const auto& child : attribute.children)
+    if (contains_native_na_attribute(child)) return true;
+  return false;
+}
+
+inline EventAttribute make_native_na_attribute(std::string key) {
+  EventAttribute result{std::move(key), "<NA>", AttributeKind::kNA};
+  result.typed_value = NativeNA{};
+  return result;
+}
 
 // Byte cells store hexadecimal octets in value so all JSON transports remain
 // UTF-8 safe. These helpers accept/return the original binary byte sequence.
@@ -436,7 +486,8 @@ inline void set_trace_case_id(Trace& trace, std::string value) {
         selected.kind == AttributeKind::kInt ||
         selected.kind == AttributeKind::kFloat ||
         selected.kind == AttributeKind::kBoolean ||
-        selected.kind == AttributeKind::kBytes) {
+        selected.kind == AttributeKind::kBytes ||
+        selected.kind == AttributeKind::kNA) {
       selected.kind = AttributeKind::kString;
     }
     selected.typed_value = std::monostate{};

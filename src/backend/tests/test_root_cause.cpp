@@ -8,12 +8,13 @@
 #include <limits>
 #include <stdexcept>
 
-static_assert(std::variant_size_v<minera::NativeAttributeValue> == 6);
-static_assert(std::variant_size_v<const minera::NativeAttributeValue> == 6);
+static_assert(std::variant_size_v<minera::NativeAttributeValue> == 7);
+static_assert(std::variant_size_v<const minera::NativeAttributeValue> == 7);
 static_assert(std::is_same_v<std::variant_alternative_t<0, minera::NativeAttributeValue>, std::monostate>);
 static_assert(std::is_same_v<std::variant_alternative_t<2, minera::NativeAttributeValue>, double>);
 static_assert(std::is_same_v<std::variant_alternative_t<4, minera::NativeAttributeValue>, minera::NativeDate>);
 static_assert(std::is_same_v<std::variant_alternative_t<5, minera::NativeAttributeValue>, std::uint64_t>);
+static_assert(std::is_same_v<std::variant_alternative_t<6, minera::NativeAttributeValue>, minera::NativeNA>);
 static_assert(std::is_same_v<std::variant_alternative_t<2, const minera::NativeAttributeValue>, const double>);
 
 namespace {

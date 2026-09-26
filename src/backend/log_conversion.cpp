@@ -745,6 +745,7 @@ std::string_view kind_name(AttributeKind kind) {
     case AttributeKind::kBoolean: return "boolean";
     case AttributeKind::kId: return "id";
     case AttributeKind::kBytes: return "bytes";
+    case AttributeKind::kNA: return "na";
   }
   throw std::invalid_argument("log conversion: invalid attribute kind");
 }
@@ -878,13 +879,15 @@ void write_event_table_metadata(std::ostream& output,
 }
 
 void write_attribute(std::ostream& output, const EventAttribute& attribute) {
+  validate_native_na_attribute(attribute, "log conversion JSON");
   output << "{\"key\":\"" << json_escape(attribute.key)
-         << "\",\"value\":\"" << json_escape(attribute.value)
+         << "\",\"value\":\"" << json_escape(event_attribute_lexical_value(attribute))
          << "\",\"kind\":\"" << kind_name(attribute.kind)
          << "\",\"container\":\"" << container_name(attribute.container)
          << "\"";
   if (attribute.is_null) output << ",\"null\":true";
-  if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+  if (!std::holds_alternative<std::monostate>(attribute.typed_value) ||
+      attribute.kind == AttributeKind::kNA) {
     output << ",\"typed_value\":";
     if (const auto* integer_value =
             std::get_if<std::int64_t>(&attribute.typed_value))
@@ -906,6 +909,9 @@ void write_attribute(std::ostream& output, const EventAttribute& attribute) {
     else if (const auto* date_value =
                   std::get_if<NativeDate>(&attribute.typed_value))
       output << '"' << json_escape(date_value->value) << '"';
+    else if (std::holds_alternative<NativeNA>(attribute.typed_value) ||
+             attribute.kind == AttributeKind::kNA)
+      output << "\"NA\"";
   }
   write_date_metadata(output, attribute);
   if (attribute.scalar_wrapper) output << ",\"scalar_wrapper\":true";
@@ -941,12 +947,14 @@ void write_attributes(std::ostream& output,
 // EventLog-shaped JSON boundary.
 void write_attribute_detail(std::ostream& output,
                             const EventAttribute& attribute) {
+  validate_native_na_attribute(attribute, "log conversion JSON");
   output << "{\"key\":\"" << json_escape(attribute.key)
-         << "\",\"value\":\"" << json_escape(attribute.value)
+         << "\",\"value\":\"" << json_escape(event_attribute_lexical_value(attribute))
          << "\",\"kind\":\"" << kind_name(attribute.kind)
          << "\",\"container\":\"" << container_name(attribute.container)
          << "\",\"null\":" << (attribute.is_null ? "true" : "false");
-  if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+  if (!std::holds_alternative<std::monostate>(attribute.typed_value) ||
+      attribute.kind == AttributeKind::kNA) {
     output << ",\"typed_value\":";
     if (const auto* integer_value =
             std::get_if<std::int64_t>(&attribute.typed_value))
@@ -968,6 +976,9 @@ void write_attribute_detail(std::ostream& output,
     else if (const auto* date_value =
                  std::get_if<NativeDate>(&attribute.typed_value))
       output << '"' << json_escape(date_value->value) << '"';
+    else if (std::holds_alternative<NativeNA>(attribute.typed_value) ||
+             attribute.kind == AttributeKind::kNA)
+      output << "\"NA\"";
   }
   write_date_metadata(output, attribute);
   if (attribute.scalar_wrapper) output << ",\"scalar_wrapper\":true";

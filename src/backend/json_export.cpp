@@ -1888,12 +1888,13 @@ void write_attribute_object(std::ostream& out,
                             const std::vector<EventAttribute>& attributes) {
   out << '{';
   for (std::size_t i = 0; i < attributes.size(); ++i) {
+    validate_native_na_attribute(attributes[i], "log export JSON");
     write_json_string(out, attributes[i].key);
     out << ": ";
     if (attributes[i].is_null)
       out << "null";
     else
-      write_json_string(out, attributes[i].value);
+      write_json_string(out, event_attribute_lexical_value(attributes[i]));
     out << (i + 1 < attributes.size() ? ", " : "");
   }
   out << '}';
@@ -4430,6 +4431,7 @@ const char* attribute_kind_name(AttributeKind kind) {
     case AttributeKind::kBoolean: return "boolean";
     case AttributeKind::kId: return "id";
     case AttributeKind::kBytes: return "bytes";
+    case AttributeKind::kNA: return "na";
   }
   throw std::invalid_argument("projected log contains an invalid attribute kind");
 }
@@ -4494,6 +4496,8 @@ void write_typed_attribute_value(std::ostream& out,
     out << (*boolean ? "true" : "false");
   } else if (const auto* date = std::get_if<NativeDate>(&value)) {
     write_json_string(out, date->value);
+  } else if (std::holds_alternative<NativeNA>(value)) {
+    write_json_string(out, "NA");
   } else {
     out << "null";
   }
@@ -4504,18 +4508,24 @@ void write_attribute_details(std::ostream& out,
 
 void write_attribute_detail(std::ostream& out,
                             const EventAttribute& attribute) {
+  validate_native_na_attribute(attribute, "log export JSON");
   out << "{\"key\":";
   write_json_string(out, attribute.key);
   out << ",\"value\":";
-  write_json_string(out, attribute.value);
+  write_json_string(out, event_attribute_lexical_value(attribute));
   out << ",\"kind\":";
   write_json_string(out, attribute_kind_name(attribute.kind));
   out << ",\"container\":";
   write_json_string(out, attribute_container_name(attribute.container));
   out << ",\"null\":" << (attribute.is_null ? "true" : "false");
-  if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+  if (!std::holds_alternative<std::monostate>(attribute.typed_value) ||
+      attribute.kind == AttributeKind::kNA) {
     out << ",\"typed_value\":";
-    write_typed_attribute_value(out, attribute.typed_value);
+    if (attribute.kind == AttributeKind::kNA &&
+        std::holds_alternative<std::monostate>(attribute.typed_value))
+      write_json_string(out, "NA");
+    else
+      write_typed_attribute_value(out, attribute.typed_value);
   }
   if (attribute.scalar_wrapper) out << ",\"scalar_wrapper\":true";
   if (attribute.scalar_children_list) out << ",\"scalar_children_list\":true";
@@ -4728,18 +4738,24 @@ void write_case_relations_table_attributes(
 
 void write_case_relations_table_attribute(
     std::ostream& out, const EventAttribute& attribute) {
+  validate_native_na_attribute(attribute, "case relations JSON");
   out << "{\"key\":";
   write_json_string(out, attribute.key);
   out << ",\"value\":";
-  write_json_string(out, attribute.value);
+  write_json_string(out, event_attribute_lexical_value(attribute));
   out << ",\"kind\":";
   write_json_string(out, attribute_kind_name(attribute.kind));
   out << ",\"container\":";
   write_json_string(out, attribute_container_name(attribute.container));
   out << ",\"null\":" << (attribute.is_null ? "true" : "false");
-  if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+  if (!std::holds_alternative<std::monostate>(attribute.typed_value) ||
+      attribute.kind == AttributeKind::kNA) {
     out << ",\"typed_value\":";
-    write_typed_attribute_value(out, attribute.typed_value);
+    if (attribute.kind == AttributeKind::kNA &&
+        std::holds_alternative<std::monostate>(attribute.typed_value))
+      write_json_string(out, "NA");
+    else
+      write_typed_attribute_value(out, attribute.typed_value);
   }
   if (attribute.scalar_wrapper) out << ",\"scalar_wrapper\":true";
   if (attribute.scalar_children_list)
@@ -5652,6 +5668,11 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
     for (auto& child : attribute.children) self(self, child);
   };
   const auto write_identifier = [&](const EventAttribute& attribute) {
+    if (is_native_na_attribute(attribute)) {
+      validate_native_na_attribute(attribute, "log_to_features");
+      write_attribute_detail(out, attribute);
+      return;
+    }
     if (attribute.is_null) { out << "null"; return; }
     if (attribute.container != AttributeContainerKind::kScalar ||
         attribute.kind == AttributeKind::kBytes || !attribute.children.empty()) {

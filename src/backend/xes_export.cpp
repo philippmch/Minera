@@ -60,6 +60,9 @@ std::string_view element_name(AttributeKind kind) {
     case AttributeKind::kBoolean: return "boolean";
     case AttributeKind::kId: return "id";
     case AttributeKind::kBytes: return "string";
+    case AttributeKind::kNA:
+      throw std::invalid_argument(
+          "XES cannot represent a native NA attribute");
   }
   return "string";
 }
@@ -230,6 +233,9 @@ std::string scalar_lexical_value(const EventAttribute& attribute) {
       scalar.container = AttributeContainerKind::kScalar;
       return root_cause_attribute_category(scalar);
     }
+    case AttributeKind::kNA:
+      throw std::invalid_argument(
+          "XES cannot represent a native NA attribute");
   }
   throw std::invalid_argument("XES attribute has an unsupported kind");
 }
@@ -276,6 +282,10 @@ std::pair<std::string_view, std::string_view> mapping_key_entry(std::string_view
 
 void write_typed_attribute(std::ostream& out, std::string_view indent,
                            const EventAttribute& attribute, XesExportVariant variant, bool preserve_nulls) {
+  validate_native_na_attribute(attribute, "XES export");
+  if (contains_native_na_attribute(attribute))
+    throw std::invalid_argument(
+        "XES cannot represent a native NA attribute");
   if (attribute.container == AttributeContainerKind::kTuple ||
       attribute.container == AttributeContainerKind::kSet ||
       attribute.container == AttributeContainerKind::kFrozenSet) {
