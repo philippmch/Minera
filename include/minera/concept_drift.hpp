@@ -144,6 +144,16 @@ struct ConceptDriftTableResult {
 [[nodiscard]] std::vector<std::string> extract_concept_drift_activities(
     const EventLog& log, std::string_view activity_attribute);
 
+// Return unique typed raw activities in native ascending order. The first
+// original representative of each equal label is retained, including its
+// nested values and scalar identity. Incompatible label types reject because
+// the result is sorted. For dates, canonical `YYYY-MM-DD` values remain
+// distinct from datetime values that contain a time, including midnight.
+// Distinct NaNs use native scalar-identity order, also inside tuples. This can
+// differ from allocation-dependent ordering in the reference runtime.
+[[nodiscard]] std::vector<EventAttribute> extract_concept_drift_typed_activities(
+    const std::vector<std::vector<EventAttribute>>& traces);
+
 // Extract the Bose relation-type-count feature vector for a set of traces.
 // For every target b and source a, traces containing a are classified by
 // whether b eventually follows a in all, some, or no such traces.
@@ -162,6 +172,15 @@ struct ConceptDriftTableResult {
 [[nodiscard]] std::vector<double> extract_concept_drift_features(
     const EventLog& log);
 
+// Extract relation-count features for typed raw traces. The supplied alphabet
+// order and duplicate entries are preserved; activities outside it reject.
+// Unlike the sorted typed-activity helper, this explicit-alphabet operation
+// accepts mixed label families. Canonical calendar dates and datetimes remain
+// distinct even when both denote midnight on the same day.
+[[nodiscard]] std::vector<double> extract_concept_drift_typed_features(
+    const std::vector<std::vector<EventAttribute>>& traces,
+    const std::vector<EventAttribute>& alphabet);
+
 // Return ordered eventual-follow pairs from one trace. The alphabet filters
 // target labels only; source labels may be any selected event label. Missing
 // generic selector values are skipped, and repeated labels produce one set
@@ -170,6 +189,16 @@ struct ConceptDriftTableResult {
 compute_concept_drift_follows_relation(
     const Trace& trace, const std::vector<std::string>& alphabet,
     std::string_view activity_attribute = "concept:name");
+
+// Return eventual-follow pairs for typed activities. The alphabet filters
+// targets only; source labels may be any trace value. Pairs are emitted in
+// first-generated order, retaining the first typed representative of each
+// semantic pair. Canonical calendar dates and datetimes remain distinct even
+// when both denote midnight on the same day.
+[[nodiscard]] std::vector<std::pair<EventAttribute, EventAttribute>>
+compute_concept_drift_typed_follows_relation(
+    const std::vector<EventAttribute>& trace,
+    const std::vector<EventAttribute>& alphabet);
 
 // Split a log into consecutive trace groups. Negative sizes return no groups,
 // zero is invalid, and a final partial group is retained only when requested.

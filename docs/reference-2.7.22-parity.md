@@ -1791,6 +1791,42 @@ These helper contracts do not establish
 standalone permutation-test or DataFrame adapter parity, and do not promote the
 BOSE module or dispatcher to complete.
 
+### BOSE typed activity helpers and calendar-date checkpoint
+
+Three native helpers now expose typed unique activities, relation-count
+features, and eventual-follow pairs. Unique extraction retains original typed
+representatives and sorts compatible labels. Explicit feature alphabets retain
+order and duplicate entries, allow extras, and reject omitted logged labels.
+Follows filters targets only and retains the first generated representative of
+each semantic pair, including numeric/boolean aliases. Recursive tuple, NaN
+identity, and resource checks apply to these helpers.
+
+BOSE activity identity now distinguishes a canonical `YYYY-MM-DD` calendar
+date from a datetime containing a time, even at midnight. Explicit alphabets
+keep both labels; sorted extraction rejects their mixture before consuming
+RNG state. Case grouping and timestamp interpretation retain their existing
+behavior. All 24 captured raw/EventLog/table counterexamples now match the
+pinned public runtime; all 24 failed before this fix.
+
+Of 100 public helper observations, 97 have native representations and 96 match
+exactly. Three pandas.NA observations remain reference-only. The one exact
+mismatch is unique-activity list order for tuples containing distinct NaNs:
+all typed labels and their identities are preserved, but the native comparator
+orders distinct NaNs by scalar identity. Repeated public calls demonstrate
+that the reference order varies with object allocation. This is a documented
+ordering difference, not an exact passing comparison; the evidence retains
+the original expected and actual lists. General NaN ordering parity remains
+unproven.
+
+All 19,393 prior comparisons, 14 CLI checks, and the native suite pass.
+This checkpoint therefore records 19,513 exact matches out of 19,514 native
+comparisons, with the single documented ordering difference. Independent
+review found no other defect. Captures, replay sources, before/after results,
+and review are in `docs/bose-typed-helpers-reference.json.gz`,
+`docs/bose-typed-helpers-native-checks.json.gz`, and
+`docs/bose-typed-helpers-validation.json`. This finite checkpoint makes no
+coverage status promotion or full BOSE parity claim.
+
 ### BOSE typed raw-trace detector checkpoint
 
 The public raw BOSE detector accepts non-string labels and returns their

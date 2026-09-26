@@ -1,0 +1,31 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Typed BOSE unique activities, features, follows and calendar-date activity identity",
+  "helper_public_cases": 100,
+  "helper_native_comparisons": 97,
+  "date_regression_comparisons": 24,
+  "prior_regression_comparisons": 19393,
+  "total_native_comparisons": 19514,
+  "cli_checks": 14,
+  "native_suites": 1,
+  "independent_review": "clear with documented ordering difference",
+  "parent_commit": "598172ce49c031c025c3174a24357bdb381f95ff",
+  "verified_code_tree": "7ed67adeadf4d4a9ffba02dd0b84ca057cc13ab4",
+  "core_library_sha256": "f1b5c732285c499b7cb100a43de4023e56ef3279dbcad69732e21230db6a2cbe",
+  "artifacts": {
+    "docs/bose-typed-helpers-reference.json.gz": "9057b8f69d8a64de9c6c4f053db08b2253184858ce9a7dc323ffa1a8a71c35fd",
+    "docs/bose-typed-helpers-native-checks.json.gz": "d91ab6440bec501efa1d0fbf0a962b6cb9afbd720a51ee2f45048d57b02a7ac6"
+  },
+  "limits": [
+    "No coverage status promotion; full BOSE module/dispatcher parity remains unproven.",
+    "Three pandas.NA helper observations remain reference-only because the native value model has no distinct pandas.NA sentinel.",
+    "Canonical YYYY-MM-DD denotes a calendar-date activity; ISO values containing time denote datetime activities. Case grouping and timestamp interpretation are unchanged.",
+    "Observed NaN list order is verified for the finite captured cases, not asserted for all Python hash layouts.",
+    "Native resource bounds remain extensions; rejection acceptance is compared, not language-specific exception classes or messages.",
+    "Unique-activity tuple/NaN order is not an exact pass: 96/97 helper comparisons match exactly. The native comparator orders distinct NaNs by scalar identity."
+  ],
+  "exact_native_matches": 19513,
+  "documented_ordering_differences": [
+    "unique-tuple-distinct-nan-prefix: expected and actual preserve the same typed labels but have different list order; repeated public calls produced all six permutations."
+  ]
+}

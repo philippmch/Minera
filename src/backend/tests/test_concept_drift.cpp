@@ -18,6 +18,7 @@
 #include "bose_log_apply_tests.hpp"
 #include "bose_dispatch_tests.hpp"
 #include "bose_typed_direct_tests.hpp"
+#include "bose_typed_helpers_tests.hpp"
 
 namespace {
 
@@ -52,6 +53,7 @@ int main() {
   test_bose_log_apply();
   test_bose_dispatch();
   test_bose_typed_direct();
+  test_bose_typed_helpers();
   // Epoch seconds and p-values must survive the JSON boundary exactly, even
   // when the caller's global locale uses a comma as the decimal separator.
   struct CommaDecimal : std::numpunct<char> {
