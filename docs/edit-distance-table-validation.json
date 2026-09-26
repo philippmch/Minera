@@ -1,0 +1,27 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Edit-distance table adapters, public projection, selected timestamps, and target distance ties",
+  "parent_commit": "db351ad57fc8d65a65d91b0efe0f1348d4ea693b",
+  "verified_code_tree": "f0351e8bfbb495e3d702f3d3981f820248b26c34",
+  "core_sha256": "86d1c5c97d6fb36ecd7ba3f6f13c7e873e0f807ea79de94095c15dfa9b39ad8e",
+  "new_public_calls": 104,
+  "new_matches": 104,
+  "new_baseline_matches": 41,
+  "prior_whole_log_comparisons": 108,
+  "prior_whole_log_matches": 108,
+  "native_comparisons": 212,
+  "matched": 212,
+  "direct_helper_reference_only": 9,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "comparison": "Exact ordered moves, integer costs/bwc, numeric fitness, typed projection fields and mapped diagnostics. Attribute map order is canonicalized; trace/event/move order is preserved. Python exception class identity is not claimed.",
+  "artifacts": {
+    "docs/edit-distance-table-reference.json.gz": "815d7dce27ef479d12b07dd36f8f4f9bd3c6b0238d82ac940b3cbb321e09b35a",
+    "docs/edit-distance-table-native-checks.json.gz": "c3c52679b6e9271b5b6e5291aab10f262ce679709831af1d08bcaaf8aa1558b0"
+  },
+  "remaining": [
+    "Direct apply_trace/align_trace mapping, list/set, and caller-cache interfaces remain open.",
+    "Broader typed activity, invalid parameter, and ordering contracts require further audit.",
+    "Both edit-distance catalogue rows remain partial; project has 232 incomplete coverage units."
+  ]
+}

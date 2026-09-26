@@ -5337,16 +5337,55 @@ and cost functions remain beyond the bounded matrices; cross-language error
 class/message equivalence is not asserted. The dispatcher and implementation
 module remain partial.
 
+### Edit-distance table, projection, and target-selection checkpoint
+
+The native EventDataView overloads now accept table and mixed log/table inputs,
+including a configurable case-ID selector and first-seen case grouping. Public
+`project_log_on_variant` returns fresh log/trace metadata and only the selected
+activity, timestamp, and conformance event fields. Empty source traces are
+omitted. Timestamp reads follow the captured synchronous-move cursor: skipped
+log moves do not advance it. Missing fields at a read point are rejected;
+present null and typed NaT timestamps are preserved.
+
+Equal-distance normal alignments prefer shorter targets; anti-alignments prefer
+longer targets. Equal-length ties select the last distinct target in
+first-occurrence order. Anti-alignment rejects a trace whose target candidates
+all have zero distance. Selection distance and reconstructed alignment cost
+remain separate, including substitution as two emitted deviation moves.
+
+All 104 new pinned public calls match, compared with 41 before this checkpoint.
+The 108 prior whole-log comparisons also pass, for 212 comparisons in this
+validation. The native alignment suite, catalogue check, and independent code
+and probe reviews pass. Reference inputs and binary/source hashes are retained.
+Comparisons preserve trace/event/move order, typed values, exact integer costs,
+exact numeric fitness, and mapped diagnostics; attribute-map order alone is
+canonicalized. Python exception-class identity is not claimed.
+
+Evidence is in `docs/edit-distance-table-reference.json.gz`,
+`docs/edit-distance-table-native-checks.json.gz`, and
+`docs/edit-distance-table-validation.json`. The baseline report is retained
+unchanged. A separate audit corrects its probe's Boolean wire encoding in a
+copy of the saved values and confirms that every original match result, and
+the 41/104 count, is unchanged. The final probe exercises the new table adapter
+and calls the public projector directly.
+
+Direct helper mapping/cache interfaces and broader typed-activity and parameter
+contracts remain open. Nine direct-helper observations remain reference-only;
+both edit-distance catalogue rows remain partial, with 232 incomplete project
+coverage units. The following checkpoint is historical evidence for the prior
+empty-target and equal-length anti-tie fixes.
+
 ### Edit-distance empty-target and anti-tie checkpoint
 
-A pinned public corpus now covers 36 whole-log scenarios through three reference
+The earlier pinned public corpus covers 36 whole-log scenarios through three reference
 entry points: variant `apply_log`, variant `apply`, and dispatcher `apply`.
 All 108 native comparisons match, up from 90 before the fixes. The native helper
-now rejects an empty target even when the source is also empty. Equal-distance
-anti-alignments select the last distinct target in first-occurrence order;
-duplicate targets do not move their first occurrence. Ordinary lexical ties
-and the shortest-target fitness denominator are unchanged, including negative
-anti-alignment fitness.
+rejects an empty target even when the source is also empty. Its equal-length
+anti-alignment cases select the last distinct target in first-occurrence order;
+duplicate targets do not move their first occurrence. At that checkpoint the
+ordinary lexical tie rule was unchanged; the later target-selection evidence
+above supersedes it. The shortest-target fitness denominator is unchanged,
+including negative anti-alignment fitness.
 
 Comparisons retain exact ordered moves, integer costs and `bwc`, numeric fitness,
 and the mapped empty-target diagnostic. Empty-string activity labels remain
@@ -5357,15 +5396,15 @@ edit-distance suite passes and independent review is clear.
 Evidence is in `docs/edit-distance-core-reference.json.gz`,
 `docs/edit-distance-core-native-checks.json.gz`, and
 `docs/edit-distance-core-validation.json`. Nine captured direct-helper calls
-remain explicitly reference-only. Direct helper mapping/cache behavior,
-DataFrame/projection comparison, and broader typed activity behavior remain
-unfinished; both edit-distance coverage rows remain partial.
+remain explicitly reference-only. DataFrame/projection comparisons were still
+open at that checkpoint and are extended above; direct helper mapping/cache
+and broader typed activity behavior remain unfinished.
 
 `EDIT_DISTANCE` computes Levenshtein distance for every source variant and picks
 the minimum (or maximum when `perform_anti_alignment` is enabled); duplicate
-target variants retain their first occurrence. Ordinary ties use deterministic
-lexical ordering; anti-alignment ties choose the last distinct target in
-first-occurrence order. Reconstruction follows `difflib.SequenceMatcher` matching-block
+target variants retain their first occurrence. Equal-distance ties prefer the
+shorter target for normal alignment and longer target for anti-alignment, then
+the last distinct first occurrence when lengths are equal. Reconstruction follows `difflib.SequenceMatcher` matching-block
 semantics, including the default autojunk suppression for popular symbols in
 large targets, but uses ordered maps for deterministic clean-room behavior (the
 pinned hash-order implementation could choose a different tied path). A
@@ -5373,9 +5412,10 @@ substitution is represented as two moves (one log-only and one model-only), so
 deviation cost, fitness, and the reference best/worst-cost denominator (`bwc`) are
 explicit and auditable. Empty source logs return no alignments when the target
 is nonempty; an empty target log and non-positive deviation cost are rejected.
+Anti-alignment also rejects all-zero-distance target candidates.
 
-Edit-distance log projection uses each trace's independently selected target
-variant, including heterogeneous selections. It preserves source trace
+The native `project_log_on_alignments` extension uses each trace's independently
+selected target variant, including heterogeneous selections. It preserves source trace
 metadata, records `@@original_trace` and `@@aligned_variant`, keeps timestamps
 from synchronous source events, timestamps inserted model events at the current
 source time, omits source-only moves, and marks each projected event's
