@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -79,6 +80,19 @@ struct EditDistanceTraceResult {
   std::uint64_t cost = 0;
 };
 
+// Typed direct-trace result. An empty optional is a gap; an engaged attribute
+// whose is_null flag is set is the public None activity value.
+struct EditDistanceTypedMove {
+  EditDistanceMoveType type = EditDistanceMoveType::kSynchronous;
+  std::optional<EventAttribute> log_activity;
+  std::optional<EventAttribute> model_activity;
+};
+
+struct EditDistanceTypedTraceResult {
+  std::vector<EditDistanceTypedMove> alignment;
+  std::uint64_t cost = 0;
+};
+
 // A type-erased cache value. Cache hits return the exact shared handle held by
 // the cache, including when it contains a caller-defined opaque value. A null
 // handle is a valid cached value; callers distinguish it from a cache miss by
@@ -91,6 +105,11 @@ using EditDistanceTraceHandle = std::shared_ptr<std::any>;
 // last mapping entry supplies the reverse-decoded activity.
 using EditDistanceTraceMapping =
     std::vector<std::pair<std::string, std::string>>;
+// Mapping entries are normalized with Python-dict semantics by the typed
+// helper: equal keys retain the first key object and insertion position while
+// the last value replaces its encoding.
+using EditDistanceTypedTraceMapping =
+    std::vector<std::pair<EventAttribute, std::string>>;
 using EditDistanceTraceCache =
     std::vector<std::pair<std::string, EditDistanceTraceHandle>>;
 
@@ -117,6 +136,36 @@ using EditDistanceTraceCache =
     const EditDistanceTraceMapping& mapping,
     EditDistanceTraceCache* cache = nullptr,
     EditDistanceOptions options = {});
+
+// Typed-key counterpart to the string-key direct helper. Activity lookup uses
+// native scalar/tuple/frozen-set equality and hashability; mapping-key type is
+// retained in emitted moves. It shares the same UTF-8 encodings, target
+// selection, costs, cache key, and type-erased cache as the string helper.
+[[nodiscard]] EditDistanceTraceHandle apply_typed_edit_distance_trace(
+    const Trace& trace, const std::vector<std::string>& list_encodings,
+    const std::set<std::string>& set_encodings,
+    const EditDistanceTypedTraceMapping& mapping,
+    EditDistanceTraceCache* cache = nullptr,
+    EditDistanceOptions options = {});
+
+[[nodiscard]] inline EditDistanceTraceHandle apply_typed_trace(
+    const Trace& trace, const std::vector<std::string>& list_encodings,
+    const std::set<std::string>& set_encodings,
+    const EditDistanceTypedTraceMapping& mapping,
+    EditDistanceTraceCache* cache = nullptr,
+    EditDistanceOptions options = {}) {
+  return apply_typed_edit_distance_trace(trace, list_encodings, set_encodings,
+                                         mapping, cache, std::move(options));
+}
+[[nodiscard]] inline EditDistanceTraceHandle align_typed_trace(
+    const Trace& trace, const std::vector<std::string>& list_encodings,
+    const std::set<std::string>& set_encodings,
+    const EditDistanceTypedTraceMapping& mapping,
+    EditDistanceTraceCache* cache = nullptr,
+    EditDistanceOptions options = {}) {
+  return apply_typed_edit_distance_trace(trace, list_encodings, set_encodings,
+                                         mapping, cache, std::move(options));
+}
 
 // Reference-named aliases for the direct helper.
 [[nodiscard]] inline EditDistanceTraceHandle apply_trace(
