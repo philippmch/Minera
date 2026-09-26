@@ -1,0 +1,22 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Signed BOSE EventLog apply adapter with regenerated DataFrame results",
+  "public_cases": 268,
+  "regression_comparisons": 18841,
+  "cli_checks": 14,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "parent_commit": "50300768b50484e9e4690db97a2fb40d9d01ad1c",
+  "verified_code_tree": "4a1fcbad0f7b9b6fb153fd5de3f3929fe688ce36",
+  "core_library_sha256": "7d8827f9c473b5742fec2d82cf74f5d73d138c0d562a783ec4933c5a3df5321f",
+  "artifacts": {
+    "docs/bose-log-apply-reference.json.gz": "345aa426f8f96b8b49bb2e0727e8c7da84ddb1b20e05546080bb2556d7102868",
+    "docs/bose-log-apply-native-checks.json.gz": "685e4a89170cafd23c443d76d7c2d2e9915bc1356fa277edf260f5bc1a7c9b2b"
+  },
+  "limits": [
+    "No coverage status promotion.",
+    "Finite EventLog adapter corpus does not prove all Python scalar/container and parameter types.",
+    "Explicit seeding and resource bounds remain native extensions.",
+    "Compares exception acceptance and RNG advancement, not language-specific exception classes."
+  ]
+}
