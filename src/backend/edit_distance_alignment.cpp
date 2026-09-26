@@ -439,10 +439,10 @@ std::vector<EditDistanceAlignment> align_edit_distance(
   if (options.deviation_cost == 0) {
     throw std::invalid_argument("edit-distance deviation_cost must be positive");
   }
-  if (source.traces.empty()) return {};
   if (target.traces.empty()) {
     throw std::invalid_argument("edit-distance target log must not be empty");
   }
+  if (source.traces.empty()) return {};
 
   std::vector<TargetVariant> targets;
   std::map<Variant, std::size_t> target_seen;
@@ -465,10 +465,19 @@ std::vector<EditDistanceAlignment> align_edit_distance(
         const std::size_t distance = levenshtein(source_variant, targets[ti].activities);
         bool better = options.perform_anti_alignment ? distance > selected_distance
                                                        : distance < selected_distance;
-        if (!better && distance == selected_distance &&
-            (variant_less(targets[ti].activities, targets[selected].activities) ||
-             (targets[ti].activities == targets[selected].activities &&
-              targets[ti].first_index < targets[selected].first_index))) better = true;
+        if (!better && distance == selected_distance) {
+          if (options.perform_anti_alignment) {
+            // Targets are deduplicated in first-occurrence order above, so a
+            // tied anti-alignment chooses the last distinct target variant.
+            better = targets[ti].first_index > targets[selected].first_index;
+          } else {
+            // Ordinary alignment keeps its deterministic lexical tie break.
+            better = variant_less(targets[ti].activities,
+                                  targets[selected].activities) ||
+                     (targets[ti].activities == targets[selected].activities &&
+                      targets[ti].first_index < targets[selected].first_index);
+          }
+        }
         if (better) { selected = ti; selected_distance = distance; }
       }
       const auto moves = make_moves(source_variant, targets[selected].activities);

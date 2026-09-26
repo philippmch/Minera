@@ -5337,17 +5337,42 @@ and cost functions remain beyond the bounded matrices; cross-language error
 class/message equivalence is not asserted. The dispatcher and implementation
 module remain partial.
 
+### Edit-distance empty-target and anti-tie checkpoint
+
+A pinned public corpus now covers 36 whole-log scenarios through three reference
+entry points: variant `apply_log`, variant `apply`, and dispatcher `apply`.
+All 108 native comparisons match, up from 90 before the fixes. The native helper
+now rejects an empty target even when the source is also empty. Equal-distance
+anti-alignments select the last distinct target in first-occurrence order;
+duplicate targets do not move their first occurrence. Ordinary lexical ties
+and the shortest-target fitness denominator are unchanged, including negative
+anti-alignment fitness.
+
+Comparisons retain exact ordered moves, integer costs and `bwc`, numeric fitness,
+and the mapped empty-target diagnostic. Empty-string activity labels remain
+distinct from gap markers in the probe. Saved baseline values were rechecked
+under these exact comparisons after tightening the checker. The native
+edit-distance suite passes and independent review is clear.
+
+Evidence is in `docs/edit-distance-core-reference.json.gz`,
+`docs/edit-distance-core-native-checks.json.gz`, and
+`docs/edit-distance-core-validation.json`. Nine captured direct-helper calls
+remain explicitly reference-only. Direct helper mapping/cache behavior,
+DataFrame/projection comparison, and broader typed activity behavior remain
+unfinished; both edit-distance coverage rows remain partial.
+
 `EDIT_DISTANCE` computes Levenshtein distance for every source variant and picks
 the minimum (or maximum when `perform_anti_alignment` is enabled); duplicate
-target variants retain their first occurrence, with deterministic lexical
-tie-breaking. Reconstruction follows `difflib.SequenceMatcher` matching-block
+target variants retain their first occurrence. Ordinary ties use deterministic
+lexical ordering; anti-alignment ties choose the last distinct target in
+first-occurrence order. Reconstruction follows `difflib.SequenceMatcher` matching-block
 semantics, including the default autojunk suppression for popular symbols in
 large targets, but uses ordered maps for deterministic clean-room behavior (the
 pinned hash-order implementation could choose a different tied path). A
 substitution is represented as two moves (one log-only and one model-only), so
 deviation cost, fitness, and the reference best/worst-cost denominator (`bwc`) are
-explicit and auditable. Empty source logs return no alignments; an empty target
-log and non-positive deviation cost are rejected.
+explicit and auditable. Empty source logs return no alignments when the target
+is nonempty; an empty target log and non-positive deviation cost are rejected.
 
 Edit-distance log projection uses each trace's independently selected target
 variant, including heterogeneous selections. It preserves source trace
