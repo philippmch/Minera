@@ -1258,6 +1258,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_concept_drift_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_concept_drift_tests COMMAND minera_concept_drift_tests)
 
+  add_executable(minera_bose_parity_contract_tests
+    src/backend/tests/test_bose_parity_contracts.cpp
+  )
+  target_link_libraries(minera_bose_parity_contract_tests PRIVATE minera::core)
+  target_compile_features(minera_bose_parity_contract_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_bose_parity_contract_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_bose_parity_contract_tests COMMAND minera_bose_parity_contract_tests)
+
   add_executable(minera_browser_history_tests
     src/backend/tests/test_browser_history.cpp
   )
