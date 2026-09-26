@@ -104,7 +104,15 @@ struct ScalarLess {
   }
 };
 
-enum class ActivityFamily { kString, kNumeric, kBytes, kDate, kNull, kTuple };
+enum class ActivityFamily {
+  kString,
+  kNumeric,
+  kBytes,
+  kDate,
+  kNull,
+  kTuple,
+  kNativeNA
+};
 
 constexpr std::size_t kMaxActivityTupleDepth = 128;
 constexpr std::size_t kMaxActivityTupleNodes = 1'000'000;
@@ -130,6 +138,10 @@ bool activity_calendar_date(const EventAttribute& value) {
 }
 
 ActivityFamily activity_family_shallow(const EventAttribute& value) {
+  if (is_native_na_attribute(value)) {
+    validate_native_na_attribute(value, "concept drift activity");
+    return ActivityFamily::kNativeNA;
+  }
   if (value.is_null || value.first_class_state == FirstClassAttributeState::kNull)
     return ActivityFamily::kNull;
   if (value.container == AttributeContainerKind::kTuple)
@@ -173,6 +185,24 @@ ActivityFamily activity_family(const EventAttribute& value) {
   return validate_activity_tree(value, 0, traversal);
 }
 
+bool activity_contains_native_na_impl(const EventAttribute& value,
+                                      std::size_t depth) {
+  if (depth > kMaxActivityTupleDepth)
+    throw std::invalid_argument(
+        "concept drift table: activity tuple nesting exceeds safe bound");
+  if (is_native_na_attribute(value)) return true;
+  if (value.container != AttributeContainerKind::kTuple) return false;
+  for (const auto& child : value.children)
+    if (activity_contains_native_na_impl(child, depth + 1)) return true;
+  return false;
+}
+
+bool activity_contains_native_na(const EventAttribute& value) {
+  // Callers have already obtained an activity identity for this value, which
+  // validates the complete immutable tuple tree and its materialization bound.
+  return activity_contains_native_na_impl(value, 0);
+}
+
 std::string activity_identity_impl(const EventAttribute& value,
                                    std::size_t depth) {
   if (depth > kMaxActivityTupleDepth)
@@ -181,6 +211,8 @@ std::string activity_identity_impl(const EventAttribute& value,
   switch (const auto family = activity_family_shallow(value)) {
     case ActivityFamily::kNull:
       return "null";
+    case ActivityFamily::kNativeNA:
+      return "native-na";
     case ActivityFamily::kNumeric:
       return activity_nan(value)
                  ? "numeric:nan:" +
@@ -231,6 +263,8 @@ int compare_activity_values_impl(const EventAttribute& left,
   switch (left_family) {
     case ActivityFamily::kNull:
       return 0;
+    case ActivityFamily::kNativeNA:
+      return 0;
     case ActivityFamily::kNumeric: {
       const bool left_nan = activity_nan(left), right_nan = activity_nan(right);
       if (left_nan || right_nan) {
@@ -275,6 +309,83 @@ int compare_activity_values(const EventAttribute& left,
   (void)validate_activity_tree(left, 0, traversal);
   (void)validate_activity_tree(right, 0, traversal);
   return compare_activity_values_impl(left, right, 0);
+}
+
+enum class ActivityEquality { kEqual, kNotEqual, kAmbiguous };
+
+void consume_activity_membership_work(std::size_t& work) {
+  if (work >= kTypedRelationWorkLimit)
+    throw std::invalid_argument(
+        "concept drift: activity membership work exceeds safe bound");
+  ++work;
+}
+
+ActivityEquality activity_equality_for_membership_impl(
+    const EventAttribute& candidate, const EventAttribute& target,
+    std::size_t depth, std::size_t& work) {
+  consume_activity_membership_work(work);
+  if (depth > kMaxActivityTupleDepth)
+    throw std::invalid_argument(
+        "concept drift table: activity tuple nesting exceeds safe bound");
+
+  const auto candidate_family = activity_family_shallow(candidate);
+  const auto target_family = activity_family_shallow(target);
+  if (candidate_family == ActivityFamily::kTuple &&
+      target_family == ActivityFamily::kTuple) {
+    const auto common = std::min(candidate.children.size(), target.children.size());
+    for (std::size_t index = 0; index < common; ++index) {
+      const auto child_equality = activity_equality_for_membership_impl(
+          candidate.children[index], target.children[index], depth + 1, work);
+      if (child_equality != ActivityEquality::kEqual) return child_equality;
+    }
+    return candidate.children.size() == target.children.size()
+               ? ActivityEquality::kEqual
+               : ActivityEquality::kNotEqual;
+  }
+  if ((candidate_family == ActivityFamily::kTuple) !=
+      (target_family == ActivityFamily::kTuple))
+    return ActivityEquality::kNotEqual;
+
+  // Python tuple equality treats the same pandas.NA singleton as equal while
+  // advancing to the next tuple member. Direct pandas.NA comparisons with
+  // ordinary non-null scalars yield an NA boolean whose truth value is
+  // ambiguous; None is a deterministic non-match, and a tuple is a different
+  // equality type.
+  if (candidate_family == ActivityFamily::kNativeNA ||
+      target_family == ActivityFamily::kNativeNA) {
+    if (candidate_family == target_family) return ActivityEquality::kEqual;
+    if (candidate_family == ActivityFamily::kNull ||
+        target_family == ActivityFamily::kNull ||
+        candidate_family == ActivityFamily::kTuple ||
+        target_family == ActivityFamily::kTuple)
+      return ActivityEquality::kNotEqual;
+    return ActivityEquality::kAmbiguous;
+  }
+
+  return activity_identity(candidate) == activity_identity(target)
+             ? ActivityEquality::kEqual
+             : ActivityEquality::kNotEqual;
+}
+
+ActivityEquality activity_equality_for_membership(
+    const EventAttribute& candidate, const EventAttribute& target,
+    std::size_t& work) {
+  return activity_equality_for_membership_impl(candidate, target, 0, work);
+}
+
+bool activity_sequence_contains(
+    const EventAttribute& target,
+    const std::vector<EventAttribute>& sequence,
+    std::size_t& work) {
+  for (const auto& candidate : sequence) {
+    const auto equality =
+        activity_equality_for_membership(candidate, target, work);
+    if (equality == ActivityEquality::kAmbiguous)
+      throw std::invalid_argument(
+          "concept drift: boolean value of NA is ambiguous");
+    if (equality == ActivityEquality::kEqual) return true;
+  }
+  return false;
 }
 
 struct OrderedActivityEncoding {
@@ -457,7 +568,11 @@ std::vector<SelectedGroup> collect_selected_groups(
   std::unordered_map<std::string, std::size_t> positions;
   positions.reserve(std::min(table.rows.size(), trace_limit));
   for (const auto& row : table.rows) {
-    if (missing_table_cell(row[case_column])) continue;
+    // pandas groupby drops its nullable-missing case key even though pandas.NA
+    // remains a present activity scalar everywhere else in the adapter.
+    if (missing_table_cell(row[case_column]) ||
+        (row[case_column] && is_native_na_attribute(*row[case_column])))
+      continue;
     const auto& key = ordered_cell(row[case_column]);
     const auto identity = table_key_identity(key);
     const auto [entry, inserted] = positions.emplace(identity, groups.size());
@@ -468,7 +583,9 @@ std::vector<SelectedGroup> collect_selected_groups(
       groups.push_back(SelectedGroup{key, nullptr});
     }
     auto& group = groups[entry->second];
-    if (!group.first_time && !missing_table_cell(row[timestamp_column]))
+    if (!group.first_time && !missing_table_cell(row[timestamp_column]) &&
+        !(row[timestamp_column] &&
+          is_native_na_attribute(*row[timestamp_column])))
       group.first_time = &*row[timestamp_column];
   }
   const auto ranks = category_ranks(category_descriptor(table, case_column));
@@ -555,6 +672,10 @@ std::vector<double> extract_concept_drift_typed_features(
     (void)inserted;
     ordered_ids.push_back(entry->second);
   }
+  bool alphabet_contains_native_na = false;
+  for (const auto& activity : alphabet)
+    alphabet_contains_native_na =
+        activity_contains_native_na(activity) || alphabet_contains_native_na;
   const std::size_t unique_size = ids.size();
   if (unique_size != 0 &&
       unique_size > kTypedFeatureCellLimit / unique_size)
@@ -573,6 +694,7 @@ std::vector<double> extract_concept_drift_typed_features(
   std::vector<std::size_t> trace_counts(unique_size, 0);
   std::vector<std::size_t> follows(unique_size * unique_size, 0);
   std::size_t relation_work = 0;
+  std::size_t membership_work = 0;
   for (const auto& trace : traces) {
     std::unordered_set<std::size_t> present;
     present.reserve(std::min(trace.size(), unique_size));
@@ -582,6 +704,19 @@ std::vector<double> extract_concept_drift_typed_features(
     seen.reserve(std::min(trace.size(), unique_size));
     for (const auto& activity : trace) {
       const auto target = ids.at(activity_identity(activity));
+      if (!seen.empty() &&
+          (alphabet_contains_native_na ||
+           activity_contains_native_na(activity))) {
+        // Compute the feature relation with the same ordered sequence
+        // membership semantics as the standalone follows helper. A pandas.NA
+        // comparison may be ambiguous before a later equal alphabet entry;
+        // duplicate and reordered alphabet members therefore remain
+        // observable here.
+        if (!activity_sequence_contains(activity, alphabet,
+                                        membership_work))
+          throw std::invalid_argument(
+              "concept drift: event activity is absent from the supplied alphabet");
+      }
       const bool first_occurrence = present.insert(target).second;
       for (const auto source : seen) {
         if (relation_work >= kTypedRelationWorkLimit)
@@ -639,15 +774,29 @@ compute_concept_drift_typed_follows_relation(
 
   std::unordered_set<std::string> allowed_targets;
   allowed_targets.reserve(alphabet.size());
-  for (const auto& activity : alphabet)
+  bool alphabet_contains_native_na = false;
+  for (const auto& activity : alphabet) {
     allowed_targets.insert(activity_identity(activity));
+    alphabet_contains_native_na =
+        activity_contains_native_na(activity) || alphabet_contains_native_na;
+  }
 
-  // Validate all source values before relation/output materialization.
+  bool trace_contains_native_na = false;
+  for (const auto& activity : trace) {
+    (void)activity_identity(activity);
+    trace_contains_native_na =
+        activity_contains_native_na(activity) || trace_contains_native_na;
+  }
+
+  // Preserve the existing set-membership fast path and its early return for
+  // inputs without pandas.NA.
   bool has_allowed_target = false;
-  for (const auto& activity : trace)
-    if (allowed_targets.contains(activity_identity(activity)))
-      has_allowed_target = true;
-  if (!has_allowed_target) return {};
+  if (!alphabet_contains_native_na && !trace_contains_native_na) {
+    for (const auto& activity : trace)
+      if (allowed_targets.contains(activity_identity(activity)))
+        has_allowed_target = true;
+    if (!has_allowed_target) return {};
+  }
 
   struct SeenValue {
     const EventAttribute* value = nullptr;
@@ -662,9 +811,20 @@ compute_concept_drift_typed_follows_relation(
   std::vector<std::pair<EventAttribute, EventAttribute>> relations;
   std::unordered_set<std::string> relation_identities;
   std::size_t relation_work = 0;
+  std::size_t membership_work = 0;
   for (const auto& activity : trace) {
     const auto target_identity = activity_identity(activity);
-    if (allowed_targets.contains(target_identity)) {
+    bool target_is_allowed = false;
+    if (!seen_values.empty()) {
+      if (alphabet_contains_native_na ||
+          activity_contains_native_na(activity)) {
+        target_is_allowed = activity_sequence_contains(
+            activity, alphabet, membership_work);
+      } else {
+        target_is_allowed = allowed_targets.contains(target_identity);
+      }
+    }
+    if (target_is_allowed) {
       for (const auto& source : seen_values) {
         if (relation_work >= kTypedRelationWorkLimit)
           throw std::invalid_argument(

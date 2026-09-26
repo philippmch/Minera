@@ -2462,6 +2462,28 @@ static void explicit_trace_numeric_attributes_retain_native_values() {
   native.kind = AttributeKind::kBoolean;
   native.typed_value = true;
   check(native, 1);
+  log.traces[0].events[0].attributes = {make_native_na_attribute("value")};
+  log.traces[0].attributes = {{"case_value", "0", AttributeKind::kInt}};
+  bool native_na_event_rejected = false;
+  try { (void)log_to_features(log, options); }
+  catch (const std::invalid_argument&) { native_na_event_rejected = true; }
+  assert(native_na_event_rejected);
+  log.traces[0].events[0].attributes = {native};
+  log.traces[0].attributes = {make_native_na_attribute("case_value")};
+  bool native_na_case_rejected = false;
+  try { (void)log_to_features(log, options); }
+  catch (const std::invalid_argument&) { native_na_case_rejected = true; }
+  assert(native_na_case_rejected);
+  log.traces[0].attributes = {{"case_value", "0", AttributeKind::kInt}};
+
+  LogToFeaturesResult native_na_identifier;
+  native_na_identifier.variant = LogToFeaturesVariant::TRACE_BASED;
+  native_na_identifier.feature_names = {"@@case_id_column"};
+  native_na_identifier.trace_rows = {{make_native_na_attribute("case_id")}};
+  const auto native_na_json = log_to_features_json(native_na_identifier);
+  assert(native_na_json.find("\"kind\":\"na\"") != std::string::npos);
+  assert(native_na_json.find("\"typed_value\":\"NA\"") != std::string::npos);
+
   const auto rejects = [&](EventAttribute attribute) {
     attribute.key = "value";
     log.traces[0].events[0].attributes = {attribute};
@@ -2677,6 +2699,14 @@ static void numeric_features_resolve_first_class_cells_and_inference() {
   const auto inferred = log_to_features(inferred_log);
   assert(std::find(inferred.feature_names.begin(), inferred.feature_names.end(), "event:number") != inferred.feature_names.end());
   assert(std::find(inferred.feature_names.begin(), inferred.feature_names.end(), "trace:number") != inferred.feature_names.end());
+  const auto native_na = make_native_na_attribute("number");
+  for (auto& entry : inferred_log.traces[0].events) entry.attributes = {native_na};
+  inferred_log.traces[0].attributes = {native_na};
+  const auto native_na_inferred = log_to_features(inferred_log);
+  assert(std::find(native_na_inferred.feature_names.begin(), native_na_inferred.feature_names.end(), "event:number") ==
+         native_na_inferred.feature_names.end());
+  assert(std::find(native_na_inferred.feature_names.begin(), native_na_inferred.feature_names.end(), "trace:number") ==
+         native_na_inferred.feature_names.end());
   typed.kind = AttributeKind::kInt;
   for (const auto kind : {AttributeContainerKind::kList, AttributeContainerKind::kTuple,
                           AttributeContainerKind::kSet, AttributeContainerKind::kFrozenSet}) {

@@ -125,7 +125,7 @@ bool absent_attribute(const EventAttribute& attribute) {
 }
 
 bool native_numeric_cell(const EventAttribute& attribute) {
-  if (absent_attribute(attribute) ||
+  if (is_native_na_attribute(attribute) || absent_attribute(attribute) ||
       attribute.container != AttributeContainerKind::kScalar ||
       !attribute.children.empty() || attribute.kind == AttributeKind::kBytes ||
       attribute.kind == AttributeKind::kDate ||

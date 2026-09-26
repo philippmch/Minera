@@ -1,0 +1,22 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Distinct native pandas.NA scalar and BOSE activity, helper, and table behavior",
+  "parent_commit": "0492605789b15993ec03ba8e34dc309862e006c2",
+  "verified_code_tree": "3061eefa0b8a53450157b2b6dfe4a83f8c0652ad",
+  "core_library_sha256": "90037310e9c30a9121eb1f4de660ff6a5723f0afaad78911c1d55d2fecd8d376",
+  "total_native_comparisons": 20609,
+  "exact_native_matches": 20608,
+  "documented_ordering_differences": 1,
+  "cli_checks": 14,
+  "native_suites": 14,
+  "independent_review": "clear",
+  "artifacts": {
+    "docs/bose-na-reference.json.gz": "530c586d13d40a564004fee6c3df88da44ec51c5552889ab66212e245e7556fd",
+    "docs/bose-na-native-checks.json.gz": "4d4d6541f0a59b88a59b5fbbfd83dbb03a6fea2c3f62eea02301299695713825"
+  },
+  "remaining": [
+    "BOSE module and dispatcher await a fresh completion audit; no coverage promotion in this checkpoint.",
+    "Allocation-dependent NaN tuple ordering remains visible and is not an exact match.",
+    "Resource bounds and the pinned float64 runtime remain documented boundaries."
+  ]
+}

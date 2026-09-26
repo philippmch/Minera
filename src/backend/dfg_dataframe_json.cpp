@@ -69,6 +69,7 @@ const char* kind_name(AttributeKind kind) {
     case AttributeKind::kBoolean: return "boolean";
     case AttributeKind::kId: return "id";
     case AttributeKind::kBytes: return "bytes";
+    case AttributeKind::kNA: return "na";
   }
   throw std::invalid_argument("DFG dataframe JSON: invalid attribute kind");
 }
@@ -125,6 +126,8 @@ void write_typed_value(std::ostream& out, const NativeAttributeValue& value) {
           out << (item ? "true" : "false");
         } else if constexpr (std::is_same_v<T, NativeDate>) {
           write_string(out, item.value);
+        } else if constexpr (std::is_same_v<T, NativeNA>) {
+          write_string(out, "NA");
         }
       },
       value);
@@ -143,18 +146,24 @@ void write_attributes(std::ostream& out,
 }
 
 void write_attribute(std::ostream& out, const EventAttribute& attribute) {
+  validate_native_na_attribute(attribute, "DFG dataframe JSON");
   out << "{\"key\":";
   write_string(out, attribute.key);
   out << ",\"value\":";
-  write_string(out, attribute.value);
+  write_string(out, event_attribute_lexical_value(attribute));
   out << ",\"kind\":";
   write_string(out, kind_name(attribute.kind));
   out << ",\"container\":";
   write_string(out, container_name(attribute.container));
   out << ",\"null\":" << (attribute.is_null ? "true" : "false");
-  if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+  if (!std::holds_alternative<std::monostate>(attribute.typed_value) ||
+      attribute.kind == AttributeKind::kNA) {
     out << ",\"typed_value\":";
-    write_typed_value(out, attribute.typed_value);
+    if (attribute.kind == AttributeKind::kNA &&
+        std::holds_alternative<std::monostate>(attribute.typed_value))
+      write_string(out, "NA");
+    else
+      write_typed_value(out, attribute.typed_value);
   }
   if (attribute.first_class_role != FirstClassAttributeRole::kNone) {
     out << ",\"first_class_role\":";

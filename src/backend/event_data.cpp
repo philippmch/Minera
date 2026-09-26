@@ -71,6 +71,12 @@ bool category_attribute_is_nan(const EventAttribute& attribute) {
 void validate_category_attribute(const EventAttribute& attribute,
                                  std::string_view path,
                                  bool top_level = true) {
+  if (is_native_na_attribute(attribute)) {
+    if (top_level)
+      throw std::invalid_argument("event table: categorical " + std::string(path) +
+                                  " must not be NA");
+    validate_native_na_attribute(attribute, "event table categorical value");
+  }
   if (top_level && (attribute.is_null ||
       attribute.first_class_state == FirstClassAttributeState::kNull))
     throw std::invalid_argument("event table: categorical " + std::string(path) +
@@ -256,6 +262,8 @@ void append_typed_category_key(std::string& key,
     append_category_key_part(key, *item ? "bool:true" : "bool:false");
   } else if (const auto* item = std::get_if<NativeDate>(&value)) {
     append_category_key_part(key, "date:" + item->value);
+  } else if (std::holds_alternative<NativeNA>(value)) {
+    append_category_key_part(key, "pandas-na");
   }
 }
 

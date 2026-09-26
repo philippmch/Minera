@@ -64,9 +64,10 @@ Attributes trace_attributes(const Trace& trace) {
   return result;
 }
 
-enum class Scalar { kNull, kString, kInteger, kReal, kDate, kBytes };
+enum class Scalar { kNull, kNativeNA, kString, kInteger, kReal, kDate, kBytes };
 Scalar scalar_kind(const EventAttribute& value) {
   if (value.is_null) return Scalar::kNull;
+  if (is_native_na_attribute(value)) return Scalar::kNativeNA;
   if (value.kind == AttributeKind::kBytes) return Scalar::kBytes;
   if (std::holds_alternative<NativeDate>(value.typed_value)) return Scalar::kDate;
   if (std::holds_alternative<double>(value.typed_value)) return Scalar::kReal;
@@ -133,6 +134,8 @@ DateValue date_value(const EventAttribute& value) {
 bool scalar_equal(const EventAttribute& left, const EventAttribute& right) {
   const auto a = scalar_kind(left), b = scalar_kind(right);
   if (a == Scalar::kNull || b == Scalar::kNull) return a == b;
+  if (a == Scalar::kNativeNA || b == Scalar::kNativeNA)
+    return a == Scalar::kNativeNA && b == Scalar::kNativeNA;
   if (a == Scalar::kBytes || b == Scalar::kBytes)
     return a == b && decode_bytes_attribute(left) == decode_bytes_attribute(right);
   if (a == Scalar::kDate || b == Scalar::kDate)
@@ -268,6 +271,7 @@ void append_part(std::string& result, const std::string& part) {
 std::string scalar_fingerprint(const EventAttribute& value) {
   switch (scalar_kind(value)) {
     case Scalar::kNull: return "N";
+    case Scalar::kNativeNA: return "PNA";
     case Scalar::kBytes: return "B" + decode_bytes_attribute(value);
     case Scalar::kString: return "S" + value.value;
     case Scalar::kInteger: return "I" + integer_text(value);
@@ -342,6 +346,14 @@ std::string attribute_fingerprint(const EventAttribute& value) {
   return result;
 }
 
+bool contains_native_na(const EventAttribute& value) {
+  if (is_native_na_attribute(value)) return true;
+  return std::any_of(value.children.begin(), value.children.end(),
+                     [](const auto& child) {
+                       return contains_native_na(child);
+                     });
+}
+
 }  // namespace
 
 bool root_cause_traces_equal(const Trace& left, const Trace& right) {
@@ -351,8 +363,15 @@ bool root_cause_traces_equal(const Trace& left, const Trace& right) {
     const auto a = event_attributes(left.events[i]), b = event_attributes(right.events[i]);
     if (a.size() != b.size()) return false;
     auto x = a.begin(), y = b.begin();
-    for (; x != a.end(); ++x, ++y)
-      if (x->first != y->first || root_cause_attribute_category(x->second) != root_cause_attribute_category(y->second)) return false;
+    for (; x != a.end(); ++x, ++y) {
+      if (x->first != y->first) return false;
+      if (contains_native_na(x->second) || contains_native_na(y->second)) {
+        if (!attribute_equal(x->second, y->second)) return false;
+      } else if (root_cause_attribute_category(x->second) !=
+                 root_cause_attribute_category(y->second)) {
+        return false;
+      }
+    }
   }
   return true;
 }
@@ -393,6 +412,7 @@ NativeScalarOrderKind native_scalar_order_kind(const EventAttribute& value) {
     case Scalar::kBytes: return NativeScalarOrderKind::kBytes;
     case Scalar::kDate: return NativeScalarOrderKind::kDate;
     case Scalar::kNull: return NativeScalarOrderKind::kUnsupported;
+    case Scalar::kNativeNA: return NativeScalarOrderKind::kUnsupported;
   }
   return NativeScalarOrderKind::kUnsupported;
 }
@@ -450,7 +470,9 @@ std::string root_cause_trace_fingerprint(const Trace& trace) {
     std::string values;
     for (const auto& [key, value] : event_attributes(event)) {
       append_part(values, key);
-      append_part(values, root_cause_attribute_category(value));
+      append_part(values, contains_native_na(value)
+                              ? attribute_fingerprint(value)
+                              : root_cause_attribute_category(value));
     }
     append_part(result, values);
   }

@@ -257,6 +257,7 @@ EventAttribute attribute(const Json& value, std::string default_key) {
   else if (kind == "date") result.kind = AttributeKind::kDate;
   else if (kind == "id") result.kind = AttributeKind::kId;
   else if (kind == "bytes") result.kind = AttributeKind::kBytes;
+  else if (kind == "na") result.kind = AttributeKind::kNA;
   else invalid("unknown attribute kind " + kind);
   const auto container = text(object, "container", "scalar");
   if (container == "scalar") result.container = AttributeContainerKind::kScalar;
@@ -270,7 +271,23 @@ EventAttribute attribute(const Json& value, std::string default_key) {
   result.scalar_wrapper = flag(object, "scalar_wrapper");
   result.scalar_children_list = flag(object, "scalar_children_list");
   if (const auto* children = optional(object, "children")) result.children = attributes(*children);
-  if (const auto* typed = optional(object, "typed_value")) {
+  if (result.kind == AttributeKind::kNA) {
+    if (result.is_null) invalid("native NA cannot be null");
+    if (result.container != AttributeContainerKind::kScalar ||
+        result.scalar_wrapper || result.scalar_children_list ||
+        optional(object, "children") != nullptr || !result.children.empty())
+      invalid("native NA must be a scalar without children");
+    if (const auto* lexical = optional(object, "value")) {
+      if (lexical->string() != "<NA>")
+        invalid("native NA value must be <NA>");
+    }
+    if (const auto* typed = optional(object, "typed_value")) {
+      if (typed->string() != "NA")
+        invalid("native NA typed_value must be NA");
+    }
+    result.value = "<NA>";
+    result.typed_value = NativeNA{};
+  } else if (const auto* typed = optional(object, "typed_value")) {
     if (result.is_null && !typed->null()) invalid("null cell cannot have a typed value");
     if (!typed->null()) {
       if (result.kind == AttributeKind::kInt) {
@@ -341,6 +358,9 @@ EventAttribute attribute(const Json& value, std::string default_key) {
   else if (state == "null") result.first_class_state = FirstClassAttributeState::kNull;
   else invalid("unknown first-class state");
   result.first_class_source_key = text(object, "first_class_source_key");
+  if (result.kind == AttributeKind::kNA &&
+      result.first_class_state == FirstClassAttributeState::kNull)
+    invalid("native NA cannot have null first-class state");
   if (role == "none" && (state != "missing" || !result.first_class_source_key.empty())) invalid("first-class state/source requires a role");
   return result;
 }

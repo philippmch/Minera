@@ -40,6 +40,7 @@ const char* attribute_kind_name(AttributeKind kind) {
     case AttributeKind::kBoolean: return "boolean";
     case AttributeKind::kId: return "id";
     case AttributeKind::kBytes: return "bytes";
+    case AttributeKind::kNA: return "na";
   }
   return "string";
 }
@@ -78,16 +79,18 @@ void write_attributes(std::ostream& out,
   for (std::size_t i = 0; i < attributes.size(); ++i) {
     if (i != 0) out << ',';
     const auto& attribute = attributes[i];
+    validate_native_na_attribute(attribute, "log utility JSON");
     out << "{\"key\":";
     write_json_string(out, attribute.key);
     out << ",\"value\":";
-    write_json_string(out, attribute.value);
+    write_json_string(out, event_attribute_lexical_value(attribute));
     out << ",\"kind\":";
     write_json_string(out, attribute_kind_name(attribute.kind));
     out << ",\"container\":";
     write_json_string(out, attribute_container_name(attribute.container));
     if (attribute.is_null) out << ",\"null\":true";
-    if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+    if (!std::holds_alternative<std::monostate>(attribute.typed_value) ||
+        attribute.kind == AttributeKind::kNA) {
       out << ",\"typed_value\":";
       if (const auto* integer_value =
               std::get_if<std::int64_t>(&attribute.typed_value))
@@ -110,6 +113,9 @@ void write_attributes(std::ostream& out,
       else if (const auto* date_value =
                    std::get_if<NativeDate>(&attribute.typed_value))
         write_json_string(out, date_value->value);
+      else if (std::holds_alternative<NativeNA>(attribute.typed_value) ||
+               attribute.kind == AttributeKind::kNA)
+        write_json_string(out, "NA");
     }
     if (attribute.scalar_wrapper) out << ",\"scalar_wrapper\":true";
     if (attribute.scalar_children_list) out << ",\"scalar_children_list\":true";
@@ -127,16 +133,18 @@ void write_attributes(std::ostream& out,
 // nested children available to consumers of log-utility results.
 void write_attribute_detail(std::ostream& out,
                             const EventAttribute& attribute) {
+  validate_native_na_attribute(attribute, "log utility JSON");
   out << "{\"key\":";
   write_json_string(out, attribute.key);
   out << ",\"value\":";
-  write_json_string(out, attribute.value);
+  write_json_string(out, event_attribute_lexical_value(attribute));
   out << ",\"kind\":";
   write_json_string(out, attribute_kind_name(attribute.kind));
   out << ",\"container\":";
   write_json_string(out, attribute_container_name(attribute.container));
   out << ",\"null\":" << (attribute.is_null ? "true" : "false");
-  if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+  if (!std::holds_alternative<std::monostate>(attribute.typed_value) ||
+      attribute.kind == AttributeKind::kNA) {
     out << ",\"typed_value\":";
     if (const auto* integer_value =
             std::get_if<std::int64_t>(&attribute.typed_value))
@@ -158,6 +166,9 @@ void write_attribute_detail(std::ostream& out,
     else if (const auto* date_value =
                  std::get_if<NativeDate>(&attribute.typed_value))
       write_json_string(out, date_value->value);
+    else if (std::holds_alternative<NativeNA>(attribute.typed_value) ||
+             attribute.kind == AttributeKind::kNA)
+      write_json_string(out, "NA");
   }
   if (attribute.scalar_wrapper) out << ",\"scalar_wrapper\":true";
   if (attribute.scalar_children_list) out << ",\"scalar_children_list\":true";
