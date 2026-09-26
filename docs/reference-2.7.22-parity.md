@@ -47,8 +47,8 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 44
-complete and 42 partial dispatcher rows, plus 195 complete and 192 partial
+adapter, integration, or missing are complete. The current manifest records 45
+complete and 41 partial dispatcher rows, plus 196 complete and 191 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
 DFG, causal and correlation discovery, 26-module Inductive discovery, 31-module
@@ -56,7 +56,7 @@ POWL discovery, 13-module footprints discovery/conformance, and the 19-module
 temporal/behavioral adapter stack, plus discounted anti-/multi-alignment and
 classic Declare/log-skeleton discovery and conformance, with distinct
 registered tests, plus the replay-duration diagnostic support module;
-234 coverage units still require exact proof.
+232 coverage units still require exact proof.
 A release may
 additionally run the strict gate:
 
@@ -121,7 +121,7 @@ are reconciled.
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; deterministic seeded mode and opt-in OS-backed secure randomness are available, while differential edge-contract review remains |
 | Clustering | `SKLEARN_PROFILES` profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — the explicit `SKLEARN_PROFILES` selector and deterministic seeded profile clustering have bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering, independently match DMM activity and succession components, omit missing grouping attributes, and preserve linkage child order across the same adapters; broader differential review remains |
 | Comparison | Petri-net element-usage comparison | **Partial (remaining replay proof)** — native place/transition/arc usage deltas, supplied-PNML CLI input, explicit markings including zero-valued key metadata, selectors, weighted/extended arcs, color helpers, and token-flood cleaning have registered coverage; partial hidden routes and replay limits have public evidence, while resource-unresolved models remain outside the comparison proof |
-| Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Partial (implemented core; proof pending)** — the explicit `BOSE` selector covers relation-count features, seeded permutation windows, ranked/capped drift boundaries, boundary-partitioned result logs, optional timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters |
+| Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Complete** — module and dispatcher contracts cover all seven public functions, eight apply parameters, typed labels, signed controls, EventLog/EventTable adapters, diagnostics and RNG continuation; exact proofs and reviewed ordering distinctions are recorded in `docs/bose-parity-contract.md` |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Partial (implemented core; proof pending)** — all six variants are explicitly selectable; less-memory Dijkstra with legacy unit costs is the generic default, with named event activity fields available at replay time |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors |
 | Conformance: replay | forward token replay and backwards token replay | **Partial (duration support complete; replay proof pending)** — forward replay remains the default; grouped/stream/eager/lazy replay preserves null activities, typed case identity, selector precedence, adapter-specific case ordering, and event caps; both variations expose per-case counters, ordered silent/visible firings, event-level problems, unknown-event positions, reached markings, and enabled-transition IDs; duration cohorts have independent support proofs and native/JSON/CLI/server/frontend adapters, while exact routing/flood-cleaning and root-cause support remain pending |
@@ -1618,6 +1618,32 @@ adapters. Strict variant/request parsing, standalone JSON, CLI, cached-session
 server, complete frontend controls and response validation, and positive/no-drift
 native regression fixtures are included.
 
+### BOSE semantic completion
+
+The BOSE module and its dispatcher now satisfy the semantic completion criteria.
+The fresh requirement audit maps all seven public functions and eight apply
+parameters to native implementations and committed behavioral evidence.
+Independent scope review confirms that the earlier NA, timestamp, frozen-set,
+and mutable-alphabet gaps are resolved. Exact registered module/selector proof
+cases are `bose_module_contract` and `bose_dispatch_contract`.
+
+The current core has 20,886 exact matches across 20,899 comparisons, with 13
+documented unique-list ordering differences retained as differences. The
+member, strict-subset, drift and RNG invariants supporting those alternative
+orders are preserved. Two native suites and 14 CLI checks pass. Typed EventLog
+evidence directly exercises default dispatch, explicit BOSE and the adapter,
+including the eight tuple/NaN cases formerly absent from dispatcher evidence.
+
+`docs/bose-parity-contract.md` defines the reviewed contract;
+`docs/bose-parity-completion-audit.json.gz` preserves the requirement and scope
+audits; `docs/bose-parity-validation.json` links current-core evidence and
+catalogue gates. These two complete records leave 232 incomplete coverage units.
+Project-wide full parity is not achieved.
+
+The checkpoint sections below preserve the development history. Their statements
+that BOSE remained partial describe those earlier checkpoints and are superseded
+by this completion audit and the current coverage records.
+
 ### BOSE empty-label relation-feature checkpoint
 
 Automatic activity extraction now retains empty-string labels, including labels
@@ -1868,10 +1894,10 @@ checks. Independent review is clear.
 
 Evidence is in `docs/bose-frozenset-reference.json.gz`,
 `docs/bose-frozenset-native-checks.json.gz`, and
-`docs/bose-frozenset-validation.json`. Both BOSE rows remain partial: the
-standalone follows helper accepts mutable alphabet entries that the native
-helper still eagerly rejects. That distinct input contract remains to be
-captured and implemented before a fresh completion audit.
+`docs/bose-frozenset-validation.json`. At that checkpoint both BOSE rows
+remained partial because the native standalone follows helper still rejected
+mutable alphabet entries. The later mutable follows-alphabet checkpoint resolves
+that gap; the semantic completion audit above records the current status.
 
 ### Native nullable-missing scalar and BOSE checkpoint
 

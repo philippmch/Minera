@@ -461,8 +461,41 @@
           "symbol": "BOSE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/bose-parity-contract.md",
+      "artifacts": [
+        "include/minera/concept_drift.hpp",
+        "src/backend/concept_drift.cpp",
+        "src/backend/concept_drift_table.cpp",
+        "src/backend/tests/test_bose_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "BOSE": {
+          "selector": "BOSE",
+          "binding": {
+            "selector": "BOSE",
+            "modules": [
+              "algo.concept_drift.variants.bose"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "BOSE"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/concept_drift.cpp",
+              "symbol": "apply_concept_drift"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_bose_parity_contracts.cpp",
+              "executable": "minera_bose_parity_contract_tests",
+              "case": "bose_dispatch_contract"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.conformance.alignments.decomposed",
@@ -6322,8 +6355,62 @@
           "selector": "BOSE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/bose-parity-contract.md",
+      "artifacts": [
+        "include/minera/concept_drift.hpp",
+        "src/backend/concept_drift.cpp",
+        "src/backend/concept_drift_table.cpp",
+        "src/backend/tests/test_bose_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.concept_drift.variants.bose",
+        "implementation": [
+          {
+            "path": "src/backend/concept_drift.cpp",
+            "symbol": "split_concept_drift_sublogs"
+          },
+          {
+            "path": "src/backend/concept_drift.cpp",
+            "symbol": "concept_drift_permutation_test"
+          },
+          {
+            "path": "src/backend/concept_drift.cpp",
+            "symbol": "detect_concept_drift_traces"
+          },
+          {
+            "path": "src/backend/concept_drift.cpp",
+            "symbol": "apply_concept_drift_log"
+          },
+          {
+            "path": "src/backend/concept_drift_table.cpp",
+            "symbol": "extract_concept_drift_typed_activities"
+          },
+          {
+            "path": "src/backend/concept_drift_table.cpp",
+            "symbol": "extract_concept_drift_typed_features"
+          },
+          {
+            "path": "src/backend/concept_drift_table.cpp",
+            "symbol": "compute_concept_drift_typed_follows_relation"
+          },
+          {
+            "path": "src/backend/concept_drift_table.cpp",
+            "symbol": "detect_concept_drift_typed_traces"
+          },
+          {
+            "path": "src/backend/concept_drift_table.cpp",
+            "symbol": "apply_concept_drift_table"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_bose_parity_contracts.cpp",
+            "executable": "minera_bose_parity_contract_tests",
+            "case": "bose_module_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.decomposed.variants.recompos_maximal",
@@ -6961,10 +7048,17 @@
       "proofs": {
         "module": "algo.conformance.tokenreplay.diagnostics.duration_diagnostics",
         "implementation": [
-          { "path": "src/backend/token_replay_duration.cpp", "symbol": "compute_token_replay_duration_diagnostics" }
+          {
+            "path": "src/backend/token_replay_duration.cpp",
+            "symbol": "compute_token_replay_duration_diagnostics"
+          }
         ],
         "tests": [
-          { "path": "src/backend/tests/test_token_replay_duration.cpp", "executable": "minera_token_replay_duration_tests", "case": "integration_contracts" }
+          {
+            "path": "src/backend/tests/test_token_replay_duration.cpp",
+            "executable": "minera_token_replay_duration_tests",
+            "case": "integration_contracts"
+          }
         ]
       }
     },

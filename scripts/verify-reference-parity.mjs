@@ -382,6 +382,29 @@ function codeDeclaresEnumMember(code, owner, member) {
     .some((body) => bodyDeclaresEnumMember(code, body, member));
 }
 
+function looksLikeFunctionDeclarationPrefix(prefix) {
+  const normalized = prefix.trim();
+  if (!normalized || normalized.includes("=") ||
+    /[(){};.'"+\-%!?|^]/u.test(normalized) || normalized.includes("/") ||
+    /\b(?:return|co_return|throw|new|delete|if|else|for|while|switch|case|goto|do|try|catch|sizeof|co_await|co_yield|not|compl|bitand|and|or|xor|bitor|not_eq|and_eq|or_eq|xor_eq)\b/u.test(normalized) ||
+    normalized.replaceAll("::", "").includes(":")) return false;
+  if (!/^[A-Za-z0-9_\s:<>*&,\[\]]+$/u.test(normalized)) return false;
+  return /(?:\]\]|\b[A-Za-z_]\w*|[*&>])(?:\s+[A-Za-z_]\w*::)*$/u.test(normalized);
+}
+
+function functionDeclarationPrefix(code, position) {
+  // Newlines are legal between a C++ return type and its declarator name.
+  // Use actual statement/type-body boundaries so multiline template return
+  // types stay together, while assignments, calls, and control flow remain in
+  // the prefix and fail the type-shape check above.
+  const boundary = Math.max(
+    code.lastIndexOf(";", position - 1),
+    code.lastIndexOf("{", position - 1),
+    code.lastIndexOf("}", position - 1),
+  );
+  return code.slice(boundary + 1, position).trim();
+}
+
 function codeDeclaresFunction(code, token) {
   const matcher = new RegExp("\\b" + escapeRegExp(token) + "\\s*\\(", "gu");
   for (const match of code.matchAll(matcher)) {
@@ -392,18 +415,9 @@ function codeDeclaresFunction(code, token) {
     while (cursor < code.length && /\s/u.test(code[cursor])) ++cursor;
     while (cursor < code.length && code[cursor] !== ";" && code[cursor] !== "{") ++cursor;
     if (cursor >= code.length) continue;
-    const boundary = Math.max(
-      code.lastIndexOf("\n", match.index - 1),
-      code.lastIndexOf(";", match.index - 1),
-      code.lastIndexOf("{", match.index - 1),
-      code.lastIndexOf("}", match.index - 1),
-    );
-    const prefix = code.slice(boundary + 1, match.index).trim();
-    if (prefix && !prefix.includes("=") &&
-      !/\b(?:return|co_return|throw|new|delete)\s+(?:[A-Za-z_]\w*::)*$/u.test(prefix) &&
-      /(?:\]\]|\b[A-Za-z_]\w*|[*&>])(?:\s+[A-Za-z_]\w*::)*$/u.test(prefix)) {
-      return true;
-    }
+    if (looksLikeFunctionDeclarationPrefix(
+      functionDeclarationPrefix(code, match.index),
+    )) return true;
   }
   return false;
 }
@@ -445,6 +459,29 @@ function codeDeclaresNestedType(code, owner, member) {
     .some((body) => bodyDeclaresNestedType(code, body, member));
 }
 
+function codeDeclaresEnumMemberWithoutOwner(code, member) {
+  const matcher = /\benum\b[^{};]*\{/gu;
+  for (const match of code.matchAll(matcher)) {
+    const open = code.indexOf("{", match.index);
+    const close = matchingDelimiter(code, open, "{", "}");
+    if (close >= 0 && bodyDeclaresEnumMember(
+      code, { begin: open + 1, end: close }, member,
+    )) return true;
+  }
+  return false;
+}
+
+function codeDeclaresVariable(code, member) {
+  const matcher = new RegExp(
+    `\\b${escapeRegExp(member)}\\b(?=\\s*(?:=|,|;|\\[|\\{))`, "gu",
+  );
+  for (const match of code.matchAll(matcher)) {
+    const prefix = functionDeclarationPrefix(code, match.index);
+    if (looksLikeFunctionDeclarationPrefix(prefix)) return true;
+  }
+  return false;
+}
+
 function codeDeclaresSymbol(source, symbol) {
   const parts = symbolParts(symbol);
   if (!parts || typeof source !== "string") return false;
@@ -461,32 +498,11 @@ function codeDeclaresSymbol(source, symbol) {
   }
   const patterns = [
     new RegExp(`\\b(?:class|struct|union|enum(?:\\s+class)?|using)\\s+${token}\\b`, "u"),
-    new RegExp(`(?:^|[,;{}]|\\n)\\s*${token}\\s*(?:=|,|;)`, "mu"),
   ];
   if (patterns.some((pattern) => pattern.test(code))) return true;
-  const matcher = new RegExp(`\\b${token}\\s*\\(`, "gu");
-  for (const match of code.matchAll(matcher)) {
-    const openParen = code.indexOf("(", match.index);
-    const closeParen = matchingDelimiter(code, openParen, "(", ")");
-    if (closeParen < 0) continue;
-    let cursor = closeParen + 1;
-    while (cursor < code.length && /\s/u.test(code[cursor])) ++cursor;
-    while (cursor < code.length && code[cursor] !== ";" && code[cursor] !== "{") ++cursor;
-    if (cursor >= code.length) continue;
-    const boundary = Math.max(
-      code.lastIndexOf("\n", match.index - 1),
-      code.lastIndexOf(";", match.index - 1),
-      code.lastIndexOf("{", match.index - 1),
-      code.lastIndexOf("}", match.index - 1),
-    );
-    const prefix = code.slice(boundary + 1, match.index).trim();
-    if (prefix && !prefix.includes("=") &&
-      !/\b(?:return|co_return|throw|new|delete)\s+(?:[A-Za-z_]\w*::)*$/u.test(prefix) &&
-      /(?:\]\]|\b[A-Za-z_]\w*|[*&>])(?:\s+[A-Za-z_]\w*::)*$/u.test(prefix)) {
-      return true;
-    }
-  }
-  return false;
+  if (codeDeclaresEnumMemberWithoutOwner(code, parts.at(-1)) ||
+    codeDeclaresVariable(code, parts.at(-1))) return true;
+  return codeDeclaresFunction(code, parts.at(-1));
 }
 
 function matchingDelimiter(code, open, left, right) {

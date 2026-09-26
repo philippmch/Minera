@@ -222,13 +222,55 @@ function makeProject(directory) {
     "struct FakeOptions { bool fake_member = true; };",
     "bool enabled() { return true; }",
     "void fake_local() { bool local_only = false; (void)local_only; }",
+    "int global_fixture_value = 1;",
+    "enum GlobalFixtureEnum { global_fixture_enumerator };",
+    "std::vector<std::pair<EventAttribute, EventAttribute>>",
+    "compute_concept_drift_typed_follows_relation() { return {}; }",
     "// wrong_symbol exists only in a comment.",
     "const char* string_anchor = \"string_only\";",
     "",
   ].join("\n"));
+  write(join(directory, "src", "multiline_call.cpp"), [
+    "void multiline_calls() {",
+    "  auto assigned =",
+    "      compute_concept_drift_typed_follows_relation({}, {});",
+    "  if (true)",
+    "    compute_concept_drift_typed_follows_relation({}, {});",
+    "  compute_concept_drift_typed_follows_relation",
+    "      ({}, {});",
+    "  (void)assigned;",
+    "}",
+    "",
+  ].join("\n"));
+  write(join(directory, "src", "bare_assignment.cpp"), [
+    "void bare_assignment() {",
+    "  compute_concept_drift_typed_follows_relation = nullptr;",
+    "}",
+    "",
+  ].join("\n"));
+  write(join(directory, "src", "comma_expression.cpp"), [
+    "void comma_expression() {",
+    "  int other = 0;",
+    "  int value = 1;",
+    "  other, fake_value = value;",
+    "}",
+    "",
+  ].join("\n"));
+  write(join(directory, "src", "keyword_expressions.cpp"), [
+    "void keyword_expressions() {",
+    ...["sizeof", "co_await", "co_yield", "not", "compl", "bitand"]
+      .map((operation) => `  ${operation} fake_value;`),
+    ...["and", "or", "xor", "bitor", "not_eq", "and_eq", "or_eq", "xor_eq"]
+      .map((operation) => `  other ${operation} fake_value;`),
+    "}",
+    "",
+  ].join("\n"));
   write(join(directory, "tests", "test_demo.cpp"), [
     "int run_first(); int run_conditional(); int run_member(); int run_distance();",
-    "void first_case() { (void)run_first(); }",
+    "std::vector<std::pair<EventAttribute, EventAttribute>> compute_concept_drift_typed_follows_relation();",
+    "extern int global_fixture_value;",
+    "extern int global_fixture_enumerator;",
+    "void first_case() { (void)run_first(); (void)compute_concept_drift_typed_follows_relation(); (void)global_fixture_value; (void)global_fixture_enumerator; }",
     "void conditional_case() { (void)run_conditional(); }",
     "struct MemberOptions {",
     "  static inline bool enabled = true;",
@@ -401,6 +443,62 @@ try {
   ];
   expectSuccess(args());
   expectSuccess([...args(), "--require-complete"]);
+
+  const splitReturnDeclaration = clone(manifest);
+  demoEntry(splitReturnDeclaration).proofs.FIRST.implementation.push({
+    path: "src/demo.cpp",
+    symbol: "compute_concept_drift_typed_follows_relation",
+  });
+  demoEntry(splitReturnDeclaration).proofs.FIRST.implementation.push(
+    { path: "src/demo.cpp", symbol: "global_fixture_value" },
+    { path: "src/demo.cpp", symbol: "global_fixture_enumerator" },
+  );
+  writeJson(join(project, "split-return-declaration.json"), splitReturnDeclaration);
+  expectSuccess(args(join(project, "split-return-declaration.json")));
+  expectSuccess([
+    ...args(join(project, "split-return-declaration.json")),
+    "--require-complete",
+  ]);
+
+  const multilineCallOnly = clone(manifest);
+  demoEntry(multilineCallOnly).artifacts.push("src/multiline_call.cpp");
+  demoEntry(multilineCallOnly).proofs.FIRST.implementation[0] = {
+    path: "src/multiline_call.cpp",
+    symbol: "compute_concept_drift_typed_follows_relation",
+  };
+  writeJson(join(project, "multiline-call-only.json"), multilineCallOnly);
+  expectFailure(args(join(project, "multiline-call-only.json")),
+    "is not a code declaration");
+
+  const bareAssignmentOnly = clone(manifest);
+  demoEntry(bareAssignmentOnly).artifacts.push("src/bare_assignment.cpp");
+  demoEntry(bareAssignmentOnly).proofs.FIRST.implementation[0] = {
+    path: "src/bare_assignment.cpp",
+    symbol: "compute_concept_drift_typed_follows_relation",
+  };
+  writeJson(join(project, "bare-assignment-only.json"), bareAssignmentOnly);
+  expectFailure(args(join(project, "bare-assignment-only.json")),
+    "is not a code declaration");
+
+  const commaExpressionOnly = clone(manifest);
+  demoEntry(commaExpressionOnly).artifacts.push("src/comma_expression.cpp");
+  demoEntry(commaExpressionOnly).proofs.FIRST.implementation[0] = {
+    path: "src/comma_expression.cpp",
+    symbol: "fake_value",
+  };
+  writeJson(join(project, "comma-expression-only.json"), commaExpressionOnly);
+  expectFailure(args(join(project, "comma-expression-only.json")),
+    "is not a code declaration");
+
+  const keywordExpressionsOnly = clone(manifest);
+  demoEntry(keywordExpressionsOnly).artifacts.push("src/keyword_expressions.cpp");
+  demoEntry(keywordExpressionsOnly).proofs.FIRST.implementation[0] = {
+    path: "src/keyword_expressions.cpp",
+    symbol: "fake_value",
+  };
+  writeJson(join(project, "keyword-expressions-only.json"), keywordExpressionsOnly);
+  expectFailure(args(join(project, "keyword-expressions-only.json")),
+    "is not a code declaration");
 
   const memberFields = clone(manifest);
   memberEntry(memberFields).proofs.MEMBER.implementation = [
