@@ -1791,6 +1791,26 @@ These helper contracts do not establish
 standalone permutation-test or DataFrame adapter parity, and do not promote the
 BOSE module or dispatcher to complete.
 
+### BOSE nullable-missing scalar contract audit
+
+A pinned public audit adds 68 unique-activity, feature, and follows calls
+covering pandas.NA alone, repeated values, explicit/omitted/duplicate alphabets,
+mixed scalar families, empty contexts, and tuple members. It records 32 accepted
+calls and 36 errors: unique activities accept 5/20, features 13/24, and follows
+14/24. Successful homogeneous and tuple contexts rule out blanket rejection;
+other contexts expose ambiguous boolean comparisons or missing alphabet keys.
+Inputs preserve PNA as a distinct tag and retain exact typed results/errors.
+
+Six sentinel-free controls match the existing native helper probe. The other
+62 observations remain reference-only because the native value model lacks
+the distinct scalar. The required next work is that representation and its
+behavior, including the eight raw and eight EventLog PNA observations already
+captured. This audit makes no coverage promotion or native PNA parity claim.
+Evidence and reproducible capture source are in
+`docs/bose-missing-sentinel-contract-reference.json.gz`,
+`docs/bose-missing-sentinel-contract-checks.json.gz`, and
+`docs/bose-missing-sentinel-contract-validation.json`.
+
 ### BOSE change-timestamp microsecond rounding checkpoint
 
 The public table and EventLog adapters round returned change timestamps to six
