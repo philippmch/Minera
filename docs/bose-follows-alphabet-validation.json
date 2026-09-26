@@ -1,0 +1,24 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "BOSE standalone follows mutable alphabet entries",
+  "parent_commit": "bc6158d3f6ed9e0e975bdab2819850dbb6c2f503",
+  "verified_code_tree": "936d2a119bce174f992e155ed3900a696246d145",
+  "core_library_sha256": "6114330fa513547f359b2e3ce1488b547e08052c739e95c8da5672df52e41e88",
+  "total_native_comparisons": 20899,
+  "exact_native_matches": 20886,
+  "documented_ordering_differences": 13,
+  "new_comparisons": 110,
+  "new_exact_matches": 110,
+  "baseline_matches": 39,
+  "cli_checks": 14,
+  "native_suites": 2,
+  "independent_review": "clear",
+  "artifacts": {
+    "docs/bose-follows-alphabet-reference.json.gz": "8baee13da3b93f74af1271a2141c4af34ee40a5f805a9a3f0b8dd71cf6282d40",
+    "docs/bose-follows-alphabet-native-checks.json.gz": "593b3b77e49b56563bc99c06837e27db2fb23abc1fb0a77fc6fbf9b9e4e8db7b"
+  },
+  "remaining": [
+    "BOSE module and dispatcher remain partial pending a fresh completion audit.",
+    "Twelve incomparable-frozenset list orders and the prior NaN tuple order remain visible rather than exact matches."
+  ]
+}

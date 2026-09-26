@@ -1811,6 +1811,29 @@ Evidence and reproducible capture source are in
 `docs/bose-missing-sentinel-contract-checks.json.gz`, and
 `docs/bose-missing-sentinel-contract-validation.json`.
 
+### BOSE mutable follows-alphabet checkpoint
+
+The standalone typed follows helper now accepts mutable list, set, and
+dictionary entries in its alphabet while retaining strict hashability of
+trace activities. A mutable set can match a frozen-set target, including
+inside tuples. Ordered comparisons preserve tuple-prefix and alphabet
+short-circuit behavior and NA ambiguity rules. Returned pairs retain their
+original typed trace values. The unique-activity and global-feature helpers
+retain their stricter alphabet/activity validation.
+
+The new pinned public corpus improves from 39 to
+110 exact matches across 110 calls, with no skipped cases.
+Before and after runs use the same frozen reference bytes and wire inputs.
+Prior BOSE results are retained: 20,886 exact matches across
+20,899 comparisons, with the same 13 documented ordering differences.
+Two native suites and 14 CLI checks pass; independent review is clear.
+
+Evidence is in `docs/bose-follows-alphabet-reference.json.gz`,
+`docs/bose-follows-alphabet-native-checks.json.gz`, and
+`docs/bose-follows-alphabet-validation.json`. This resolves the mutable-alphabet
+gap recorded in the preceding immutable-set checkpoint. Both BOSE coverage
+rows remain partial pending a fresh completion audit.
+
 ### BOSE immutable-set activity checkpoint
 
 BOSE typed activities now accept immutable frozen sets, including nested

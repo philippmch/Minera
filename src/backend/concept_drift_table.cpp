@@ -490,6 +490,252 @@ bool activity_sequence_contains(
   return false;
 }
 
+enum class FollowsActivityFamily {
+  kScalar,
+  kNull,
+  kNativeNA,
+  kTuple,
+  kFrozenSet,
+  kList,
+  kSet,
+  kDictionary
+};
+
+FollowsActivityFamily follows_activity_family(
+    const EventAttribute& value) {
+  if (is_native_na_attribute(value)) {
+    validate_native_na_attribute(value, "concept drift follows alphabet");
+    return FollowsActivityFamily::kNativeNA;
+  }
+  if (value.is_null ||
+      value.first_class_state == FirstClassAttributeState::kNull)
+    return FollowsActivityFamily::kNull;
+  switch (value.container) {
+    case AttributeContainerKind::kTuple:
+      return FollowsActivityFamily::kTuple;
+    case AttributeContainerKind::kFrozenSet:
+      return FollowsActivityFamily::kFrozenSet;
+    case AttributeContainerKind::kList:
+      return FollowsActivityFamily::kList;
+    case AttributeContainerKind::kSet:
+      return FollowsActivityFamily::kSet;
+    case AttributeContainerKind::kContainer:
+      return FollowsActivityFamily::kDictionary;
+    case AttributeContainerKind::kScalar:
+      (void)activity_family_shallow(value);
+      return FollowsActivityFamily::kScalar;
+  }
+  throw std::invalid_argument("concept drift follows: invalid activity value");
+}
+
+bool follows_alphabet_has_mutable_value_impl(
+    const EventAttribute& value, std::size_t depth,
+    ActivityTraversal& traversal) {
+  if (depth > kMaxActivityTupleDepth ||
+      traversal.nodes++ >= kMaxActivityTupleNodes)
+    throw std::invalid_argument(
+        "concept drift follows: alphabet materialization exceeds safe bound");
+  if (is_native_na_attribute(value) || value.is_null ||
+      value.first_class_state == FirstClassAttributeState::kNull)
+    return false;
+  switch (value.container) {
+    case AttributeContainerKind::kList:
+    case AttributeContainerKind::kSet:
+    case AttributeContainerKind::kContainer:
+      return true;
+    case AttributeContainerKind::kTuple:
+      for (const auto& child : value.children)
+        if (follows_alphabet_has_mutable_value_impl(child, depth + 1,
+                                                    traversal))
+          return true;
+      return false;
+    case AttributeContainerKind::kFrozenSet:
+    case AttributeContainerKind::kScalar:
+      // Frozen-set members and scalars are validated by the existing strict
+      // activity identity path. A mutable child inside a frozenset therefore
+      // remains invalid rather than becoming an allowed alphabet value.
+      return false;
+  }
+  throw std::invalid_argument("concept drift follows: invalid activity value");
+}
+
+bool follows_alphabet_has_mutable_value(const EventAttribute& value) {
+  ActivityTraversal traversal;
+  return follows_alphabet_has_mutable_value_impl(value, 0, traversal);
+}
+
+void validate_follows_alphabet_tree(
+    const EventAttribute& value, std::size_t depth,
+    ActivityTraversal& traversal, bool must_be_hashable,
+    bool& contains_native_na) {
+  if (depth > kMaxActivityTupleDepth ||
+      traversal.nodes++ >= kMaxActivityTupleNodes)
+    throw std::invalid_argument(
+        "concept drift follows: alphabet materialization exceeds safe bound");
+
+  if (is_native_na_attribute(value)) {
+    validate_native_na_attribute(value, "concept drift follows alphabet");
+    contains_native_na = true;
+    return;
+  }
+  if (value.is_null ||
+      value.first_class_state == FirstClassAttributeState::kNull)
+    return;
+
+  const auto require_plain_container_metadata = [&] {
+    if (value.scalar_wrapper || value.scalar_children_list)
+      throw std::invalid_argument(
+          "concept drift follows: malformed alphabet container metadata");
+  };
+  switch (value.container) {
+    case AttributeContainerKind::kScalar:
+      (void)activity_family_shallow(value);
+      return;
+    case AttributeContainerKind::kTuple:
+      require_plain_container_metadata();
+      for (const auto& child : value.children)
+        validate_follows_alphabet_tree(child, depth + 1, traversal,
+                                       must_be_hashable, contains_native_na);
+      return;
+    case AttributeContainerKind::kFrozenSet:
+      require_plain_container_metadata();
+      for (const auto& child : value.children)
+        validate_follows_alphabet_tree(child, depth + 1, traversal, true,
+                                       contains_native_na);
+      return;
+    case AttributeContainerKind::kList:
+      if (must_be_hashable)
+        throw std::invalid_argument("unhashable type: 'list'");
+      require_plain_container_metadata();
+      for (const auto& child : value.children)
+        validate_follows_alphabet_tree(child, depth + 1, traversal, false,
+                                       contains_native_na);
+      return;
+    case AttributeContainerKind::kSet:
+      if (must_be_hashable)
+        throw std::invalid_argument("unhashable type: 'set'");
+      require_plain_container_metadata();
+      for (const auto& child : value.children)
+        validate_follows_alphabet_tree(child, depth + 1, traversal, true,
+                                       contains_native_na);
+      return;
+    case AttributeContainerKind::kContainer: {
+      if (must_be_hashable)
+        throw std::invalid_argument("unhashable type: 'dict'");
+      require_plain_container_metadata();
+      std::unordered_set<std::string> keys;
+      keys.reserve(value.children.size());
+      for (const auto& child : value.children) {
+        if (!keys.insert(child.key).second)
+          throw std::invalid_argument(
+              "concept drift follows: dictionary alphabet has duplicate keys");
+        validate_follows_alphabet_tree(child, depth + 1, traversal, false,
+                                       contains_native_na);
+      }
+      return;
+    }
+  }
+  throw std::invalid_argument("concept drift follows: invalid activity value");
+}
+
+std::vector<std::string> follows_set_member_identities(
+    const EventAttribute& value, std::size_t& work) {
+  std::vector<std::string> members;
+  members.reserve(value.children.size());
+  for (const auto& child : value.children)
+    members.push_back(activity_identity(child, work));
+  std::sort(members.begin(), members.end(), [&](const auto& left,
+                                                 const auto& right) {
+    consume_activity_membership_work(work);
+    return left < right;
+  });
+  std::size_t unique_count = 0;
+  for (const auto& member : members) {
+    if (unique_count != 0) consume_activity_membership_work(work);
+    if (unique_count == 0 || members[unique_count - 1] != member)
+      members[unique_count++] = member;
+  }
+  members.resize(unique_count);
+  return members;
+}
+
+ActivityEquality follows_activity_equality_impl(
+    const EventAttribute& candidate, const EventAttribute& target,
+    std::size_t depth, std::size_t& work) {
+  if (depth > kMaxActivityTupleDepth)
+    throw std::invalid_argument(
+        "concept drift: activity membership nesting exceeds safe bound");
+  const auto candidate_family = follows_activity_family(candidate);
+  const auto target_family = follows_activity_family(target);
+
+  if (candidate_family == FollowsActivityFamily::kTuple &&
+      target_family == FollowsActivityFamily::kTuple) {
+    consume_activity_membership_work(work);
+    const auto common =
+        std::min(candidate.children.size(), target.children.size());
+    for (std::size_t index = 0; index < common; ++index) {
+      const auto child_equal = follows_activity_equality_impl(
+          candidate.children[index], target.children[index], depth + 1, work);
+      if (child_equal != ActivityEquality::kEqual) return child_equal;
+    }
+    return candidate.children.size() == target.children.size()
+               ? ActivityEquality::kEqual
+               : ActivityEquality::kNotEqual;
+  }
+
+  const auto is_set = [](FollowsActivityFamily family) {
+    return family == FollowsActivityFamily::kSet ||
+           family == FollowsActivityFamily::kFrozenSet;
+  };
+  if (is_set(candidate_family) && is_set(target_family)) {
+    consume_activity_membership_work(work);
+    const auto candidate_members =
+        follows_set_member_identities(candidate, work);
+    const auto target_members = follows_set_member_identities(target, work);
+    if (candidate_members.size() != target_members.size())
+      return ActivityEquality::kNotEqual;
+    for (std::size_t index = 0; index < candidate_members.size(); ++index) {
+      consume_activity_membership_work(work);
+      if (candidate_members[index] != target_members[index])
+        return ActivityEquality::kNotEqual;
+    }
+    return ActivityEquality::kEqual;
+  }
+
+  const auto is_mutable = [](FollowsActivityFamily family) {
+    return family == FollowsActivityFamily::kList ||
+           family == FollowsActivityFamily::kSet ||
+           family == FollowsActivityFamily::kDictionary;
+  };
+  if (is_mutable(candidate_family) || is_mutable(target_family)) {
+    // The trace-side value is strictly hashable. Mutable list/dict values
+    // therefore cannot match it; a mutable set only matched above against a
+    // set or frozenset with the same canonical members.
+    consume_activity_membership_work(work);
+    return ActivityEquality::kNotEqual;
+  }
+
+  // Keep the established scalar and pandas.NA equality rules for the ordinary
+  // path. In particular tuple recursion above preserves Python's left-to-right
+  // short-circuit behavior when a mutable alphabet child occurs later.
+  return activity_equality_for_membership(candidate, target, work);
+}
+
+bool follows_activity_sequence_contains(
+    const EventAttribute& target,
+    const std::vector<EventAttribute>& sequence,
+    std::size_t& work) {
+  for (const auto& candidate : sequence) {
+    const auto equality =
+        follows_activity_equality_impl(candidate, target, 0, work);
+    if (equality == ActivityEquality::kAmbiguous)
+      throw std::invalid_argument(
+          "concept drift: boolean value of NA is ambiguous");
+    if (equality == ActivityEquality::kEqual) return true;
+  }
+  return false;
+}
+
 struct OrderedActivityEncoding {
   std::unordered_map<std::string, std::string> labels;
   bool nonstring = false;
@@ -887,12 +1133,34 @@ compute_concept_drift_typed_follows_relation(
         "concept drift: activity relation materialization exceeds safe bound");
 
   std::unordered_set<std::string> allowed_targets;
-  allowed_targets.reserve(alphabet.size());
-  bool alphabet_contains_native_na = false;
+  std::vector<bool> mutable_alphabet_entries;
+  mutable_alphabet_entries.reserve(alphabet.size());
+  bool has_mutable_alphabet = false;
   for (const auto& activity : alphabet) {
-    allowed_targets.insert(activity_identity(activity));
-    alphabet_contains_native_na =
-        activity_contains_native_na(activity) || alphabet_contains_native_na;
+    const bool has_mutable = follows_alphabet_has_mutable_value(activity);
+    mutable_alphabet_entries.push_back(has_mutable);
+    has_mutable_alphabet = has_mutable_alphabet || has_mutable;
+  }
+
+  if (!has_mutable_alphabet) allowed_targets.reserve(alphabet.size());
+  bool alphabet_contains_native_na = false;
+  for (std::size_t index = 0; index < alphabet.size(); ++index) {
+    const auto& activity = alphabet[index];
+    if (mutable_alphabet_entries[index]) {
+      ActivityTraversal traversal;
+      bool contains_native_na = false;
+      validate_follows_alphabet_tree(activity, 0, traversal, false,
+                                     contains_native_na);
+      alphabet_contains_native_na =
+          contains_native_na || alphabet_contains_native_na;
+    } else {
+      if (!has_mutable_alphabet)
+        allowed_targets.insert(activity_identity(activity));
+      else
+        (void)activity_identity(activity);
+      alphabet_contains_native_na =
+          activity_contains_native_na(activity) || alphabet_contains_native_na;
+    }
   }
 
   bool trace_contains_native_na = false;
@@ -905,7 +1173,8 @@ compute_concept_drift_typed_follows_relation(
   // Preserve the existing set-membership fast path and its early return for
   // inputs without pandas.NA.
   bool has_allowed_target = false;
-  if (!alphabet_contains_native_na && !trace_contains_native_na) {
+  if (!has_mutable_alphabet && !alphabet_contains_native_na &&
+      !trace_contains_native_na) {
     for (const auto& activity : trace)
       if (allowed_targets.contains(activity_identity(activity)))
         has_allowed_target = true;
@@ -930,9 +1199,9 @@ compute_concept_drift_typed_follows_relation(
     const auto target_identity = activity_identity(activity);
     bool target_is_allowed = false;
     if (!seen_values.empty()) {
-      if (alphabet_contains_native_na ||
+      if (has_mutable_alphabet || alphabet_contains_native_na ||
           activity_contains_native_na(activity)) {
-        target_is_allowed = activity_sequence_contains(
+        target_is_allowed = follows_activity_sequence_contains(
             activity, alphabet, membership_work);
       } else {
         target_is_allowed = allowed_targets.contains(target_identity);
