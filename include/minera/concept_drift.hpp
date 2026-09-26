@@ -199,6 +199,8 @@ compute_concept_drift_follows_relation(
 // first-generated order, retaining the first typed representative of each
 // semantic pair. Canonical calendar dates and datetimes remain distinct even
 // when both denote midnight on the same day.
+// Trace activities must be hashable. Alphabet entries may also be mutable
+// containers and are compared in order when equality requires it.
 [[nodiscard]] std::vector<std::pair<EventAttribute, EventAttribute>>
 compute_concept_drift_typed_follows_relation(
     const std::vector<EventAttribute>& trace,

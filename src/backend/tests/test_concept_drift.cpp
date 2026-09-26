@@ -22,6 +22,7 @@
 #include "bose_table_timestamp_tests.hpp"
 #include "bose_na_tests.hpp"
 #include "bose_frozenset_tests.hpp"
+#include "bose_follows_alphabet_tests.hpp"
 
 namespace {
 
@@ -60,6 +61,7 @@ int main() {
   test_bose_table_timestamps();
   test_bose_na();
   test_bose_frozenset();
+  test_bose_follows_alphabet();
   // Epoch seconds and p-values must survive the JSON boundary exactly, even
   // when the caller's global locale uses a comma as the decimal separator.
   struct CommaDecimal : std::numpunct<char> {
