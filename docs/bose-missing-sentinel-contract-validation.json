@@ -1,0 +1,22 @@
+{
+  "status": "observed_public_contract",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "module_sha256": "93be9fa9b11b6efac69bc4817a22a7343c4ca424b249d17f5efb9e8b8cd902ef",
+  "parent_commit": "1ec47514a24e7f9520aae1c7e414391f4bcc7b83",
+  "public_calls": 68,
+  "accepted": 32,
+  "rejected": 36,
+  "native_control_comparisons": 6,
+  "native_control_matches": 6,
+  "sentinel_reference_only": 62,
+  "artifacts": {
+    "docs/bose-missing-sentinel-contract-reference.json.gz": "ccfbf18754e9388023c068689a70c6e579f8629c9b1ca3604d23c31d471cd692",
+    "docs/bose-missing-sentinel-contract-checks.json.gz": "08176656d88a0e845860e3adc99260b3863b659c5c8ef8bab82968a94a0d4507"
+  },
+  "remaining": [
+    "Add a distinct present nullable-missing scalar to the native value model; do not alias it to None/null or NaN.",
+    "Reproduce the observed helper acceptance, identity, ambiguity and omitted-alphabet behavior, including tuple contexts.",
+    "Enable the existing eight raw and eight EventLog pandas.NA observations as native comparisons, preserving values, rejection timing and RNG state.",
+    "Both BOSE coverage rows remain partial until implementation, native verification, and a fresh completion audit succeed."
+  ]
+}
