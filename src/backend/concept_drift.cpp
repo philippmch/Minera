@@ -12,7 +12,9 @@
 #include <unordered_set>
 
 #include "minera/timestamp.hpp"
+#include "concept_drift_table_output.hpp"
 #include "exact_count_ratio.hpp"
+#include "root_cause_trace_key.hpp"
 
 namespace minera {
 namespace {
@@ -259,6 +261,21 @@ const std::string* selected_timestamp_value(const Event& event,
     return nullptr;
   }
   return &attribute->value;
+}
+
+bool can_promote_implicit_timestamp(const Event& event,
+                                    std::string_view selector) {
+  const bool timestamp_slot =
+      selector == "timestamp" || selector == "time:timestamp" ||
+      (!event.timestamp_source_key.empty() &&
+       event.timestamp_source_key == selector);
+  if (!timestamp_slot || event.timestamp_attribute) return false;
+  return std::none_of(event.attributes.begin(), event.attributes.end(),
+                      [&](const EventAttribute& value) {
+                        return value.key == selector ||
+                               (!value.first_class_source_key.empty() &&
+                                value.first_class_source_key == selector);
+                      });
 }
 
 std::vector<std::string> sorted_activities_from_traces(
@@ -801,6 +818,135 @@ ConceptDriftTraceResult detect_concept_drift_traces(
     ConceptDriftTraceOptions options) {
   auto rng = make_bose_rng(options.seed);
   return detect_concept_drift_traces(traces, options, rng);
+}
+
+ConceptDriftTableResult apply_concept_drift_log(
+    const EventLog& log, ConceptDriftTableOptions options, std::mt19937& rng) {
+  constexpr std::size_t kMaxApplyTraces = 2'000'000;
+  constexpr std::size_t kMaxApplyEvents = 20'000'000;
+  if (log.traces.size() > kMaxApplyTraces) {
+    throw std::invalid_argument(
+        "concept drift: trace materialization exceeds safe bound");
+  }
+  std::size_t event_count = 0;
+  for (const auto& trace : log.traces) {
+    if (trace.events.empty()) {
+      throw std::invalid_argument(
+          "concept drift: every trace must contain at least one event");
+    }
+    if (trace.events.size() > kMaxApplyEvents - event_count) {
+      throw std::invalid_argument(
+          "concept drift: event materialization exceeds safe bound");
+    }
+    event_count += trace.events.size();
+  }
+
+  EventTable normalized;
+  normalized.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  // Object counts as a string-like dtype for the adapter's generic schema
+  // check, while retaining the selected activity cells' native scalar types.
+  normalized.dtypes = {"str", "object", "datetime64[ns, UTC]"};
+  normalized.rows.reserve(event_count);
+
+  // Validate one selected start time for every input trace before detector
+  // work. The table adapter then applies the same sorted scalar grouping and
+  // signed timestamp-index rules used for DataFrame inputs.
+  std::vector<EventAttribute> first_timestamps;
+  first_timestamps.reserve(log.traces.size());
+  for (const auto& trace : log.traces) {
+    const auto& first_event = trace.events.front();
+    const auto* selected_text = selected_timestamp_value(
+        first_event, options.timestamp_attribute);
+    auto selected = native_event_attribute(first_event,
+                                           options.timestamp_attribute);
+    if (!selected || selected->is_null ||
+        selected->first_class_state == FirstClassAttributeState::kNull) {
+      throw std::invalid_argument(
+          "concept drift: selected case-start timestamp is missing");
+    }
+    const auto* selected_native_date =
+        std::get_if<NativeDate>(&selected->typed_value);
+    std::string timestamp_source = selected->value;
+    if (selected_native_date)
+      timestamp_source = selected_native_date->value;
+    else if (selected_text)
+      timestamp_source = *selected_text;
+    if (timestamp_source.empty()) {
+      throw std::invalid_argument(
+          "concept drift: selected case-start timestamp is missing");
+    }
+    const bool has_date_type =
+        selected->kind == AttributeKind::kDate ||
+        std::holds_alternative<NativeDate>(selected->typed_value);
+    const bool promote_implicit = can_promote_implicit_timestamp(
+        first_event, options.timestamp_attribute);
+    if (!has_date_type && !promote_implicit) {
+      throw std::invalid_argument(
+          "concept drift: selected case-start timestamp must be a date");
+    }
+    if (promote_implicit && !has_date_type) {
+      selected->kind = AttributeKind::kDate;
+      selected->typed_value = NativeDate{timestamp_source,
+                                         NativeDateResolution::kMicrosecond,
+                                         std::nullopt};
+      selected->value = timestamp_source;
+    }
+    const auto* native_date = std::get_if<NativeDate>(&selected->typed_value);
+    const std::string& timestamp_text = native_date ? native_date->value
+                                                     : selected->value;
+    const auto parsed = precise_epoch_seconds(timestamp_text);
+    if (!parsed || !std::isfinite(*parsed)) {
+      throw std::invalid_argument(
+          "concept drift: case-start timestamp is not finite");
+    }
+    first_timestamps.push_back(std::move(*selected));
+  }
+
+  for (std::size_t trace_index = 0; trace_index < log.traces.size();
+       ++trace_index) {
+    const auto& trace = log.traces[trace_index];
+    const auto case_key = std::to_string(10'000'000 + trace_index);
+    for (std::size_t event_index = 0; event_index < trace.events.size();
+         ++event_index) {
+      const auto& event = trace.events[event_index];
+      auto activity = native_event_attribute(event, options.activity_attribute);
+      if (!activity) {
+        throw std::invalid_argument(
+            "concept drift: selected activity is missing");
+      }
+      activity->key = "concept:name";
+
+      EventAttribute timestamp;
+      if (event_index == 0) {
+        timestamp = first_timestamps[trace_index];
+        timestamp.key = "time:timestamp";
+      } else {
+        timestamp = EventAttribute{"time:timestamp", "",
+                                   AttributeKind::kDate, true};
+        timestamp.first_class_state = FirstClassAttributeState::kNull;
+      }
+
+      EventTable::Row row;
+      row.reserve(3);
+      row.emplace_back(EventAttribute{"case:concept:name", case_key,
+                                      AttributeKind::kString});
+      row.emplace_back(std::move(activity));
+      row.emplace_back(std::move(timestamp));
+      normalized.rows.push_back(std::move(row));
+    }
+  }
+
+  auto table_options = options;
+  table_options.activity_attribute = "concept:name";
+  table_options.timestamp_attribute = "time:timestamp";
+  table_options.case_id_attribute = "case:concept:name";
+  return apply_concept_drift_table(normalized, table_options, rng);
+}
+
+ConceptDriftTableResult apply_concept_drift_log(
+    const EventLog& log, ConceptDriftTableOptions options) {
+  auto rng = make_bose_rng(options.seed);
+  return apply_concept_drift_log(log, options, rng);
 }
 
 ConceptDriftResult detect_concept_drift(const EventLog& log,

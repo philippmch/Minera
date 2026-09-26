@@ -178,6 +178,15 @@ compute_concept_drift_follows_relation(
     const std::vector<std::vector<std::string>>& traces,
     ConceptDriftTraceOptions options, std::mt19937& rng);
 
+// Apply signed BOSE options to an EventLog and return regenerated event tables.
+// The selected activity and timestamp fields are honored; case_id_attribute is
+// retained for API symmetry but does not regroup an already grouped EventLog.
+[[nodiscard]] ConceptDriftTableResult apply_concept_drift_log(
+    const EventLog& log, ConceptDriftTableOptions options = {});
+
+[[nodiscard]] ConceptDriftTableResult apply_concept_drift_log(
+    const EventLog& log, ConceptDriftTableOptions options, std::mt19937& rng);
+
 [[nodiscard]] ConceptDriftResult detect_concept_drift(
     const EventLog& log, ConceptDriftOptions options = {});
 

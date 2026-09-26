@@ -1791,6 +1791,30 @@ These helper contracts do not establish
 standalone permutation-test or DataFrame adapter parity, and do not promote the
 BOSE module or dispatcher to complete.
 
+### BOSE signed EventLog apply adapter checkpoint
+
+`apply_concept_drift_log` exposes the signed EventLog apply contract and returns
+regenerated DataFrames, ranked change timestamps, and probabilities. It keeps
+input trace order, uses the selected first-event timestamp for each trace,
+respects the activity/timestamp selectors, and ignores the grouped-log case-ID
+selector. Its seeded and caller-owned MT19937 overloads share the same path.
+
+The adapter reuses the verified table activity and output behavior through
+ordinal case keys. Original case identifiers and log/trace/event metadata do
+not survive the generated output frames. Missing selected activities and
+invalid first timestamps reject before stochastic work; numeric output labels
+retain the reference's later frame-construction failure. The existing strict
+EventLog diagnostic API keeps its contract.
+
+All 268 public comparisons pass, covering signed options, empty
+inputs, varied trace shapes, selectors, invalid fields, output regeneration,
+signed zero, and RNG continuation. All 18,841 prior BOSE comparisons, 14 CLI
+checks, and the native suite pass; independent review is clear.
+Evidence is in `docs/bose-log-apply-reference.json.gz`,
+`docs/bose-log-apply-native-checks.json.gz`, and
+`docs/bose-log-apply-validation.json`. This finite checkpoint does not promote
+the BOSE module or dispatcher to complete.
+
 ### BOSE signed EventLog apply contract
 
 A 110-call public EventLog audit captures signed option handling, empty inputs,
