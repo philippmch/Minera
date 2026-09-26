@@ -9,6 +9,7 @@
 #include <limits>
 #include <map>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 
 namespace minera {
@@ -626,7 +627,221 @@ std::uint64_t checked_cost(std::size_t deviations, std::uint64_t unit) {
   return static_cast<std::uint64_t>(deviations) * unit;
 }
 
+Variant utf8_codepoint_tokens(std::string_view value) {
+  Variant tokens;
+  for (std::size_t i = 0; i < value.size();) {
+    const auto lead = static_cast<unsigned char>(value[i]);
+    std::size_t width = 0;
+    if (lead <= 0x7f) {
+      width = 1;
+    } else if (lead >= 0xc2 && lead <= 0xdf) {
+      width = 2;
+    } else if (lead >= 0xe0 && lead <= 0xef) {
+      width = 3;
+    } else if (lead >= 0xf0 && lead <= 0xf4) {
+      width = 4;
+    } else {
+      throw std::invalid_argument(
+          "edit-distance direct alignment contains invalid UTF-8");
+    }
+    if (width > value.size() - i) {
+      throw std::invalid_argument(
+          "edit-distance direct alignment contains invalid UTF-8");
+    }
+    for (std::size_t j = 1; j < width; ++j) {
+      const auto continuation = static_cast<unsigned char>(value[i + j]);
+      if (continuation < 0x80 || continuation > 0xbf) {
+        throw std::invalid_argument(
+            "edit-distance direct alignment contains invalid UTF-8");
+      }
+    }
+    if ((lead == 0xe0 && static_cast<unsigned char>(value[i + 1]) < 0xa0) ||
+        (lead == 0xed && static_cast<unsigned char>(value[i + 1]) > 0x9f) ||
+        (lead == 0xf0 && static_cast<unsigned char>(value[i + 1]) < 0x90) ||
+        (lead == 0xf4 && static_cast<unsigned char>(value[i + 1]) > 0x8f)) {
+      throw std::invalid_argument(
+          "edit-distance direct alignment contains invalid UTF-8");
+    }
+    tokens.emplace_back(value.substr(i, width));
+    i += width;
+  }
+  return tokens;
+}
+
+struct DirectTraceActivity {
+  const std::string* value = nullptr;
+  bool is_string = false;
+};
+
+bool is_direct_string_attribute(const EventAttribute& attribute) {
+  return !attribute.is_null &&
+         attribute.first_class_state != FirstClassAttributeState::kNull &&
+         attribute.kind == AttributeKind::kString &&
+         std::holds_alternative<std::monostate>(attribute.typed_value);
+}
+
+DirectTraceActivity direct_trace_activity(const Event& event,
+                                          std::string_view selector) {
+  // Public Trace events are mappings: a present non-string value is distinct
+  // from a missing key, and only an actual string can match a string mapping
+  // key. Inspect exact-key attributes before the native first-class view.
+  const auto exact = std::find_if(
+      event.attributes.begin(), event.attributes.end(),
+      [&](const EventAttribute& attribute) { return attribute.key == selector; });
+  if (exact != event.attributes.end()) {
+    return {&exact->value, is_direct_string_attribute(*exact)};
+  }
+
+  if (event.activity_attribute &&
+      (event.activity_attribute->key == selector ||
+       (!event.activity_source_key.empty() &&
+        event.activity_source_key == selector))) {
+    return {&event.activity_attribute->value,
+            is_direct_string_attribute(*event.activity_attribute)};
+  }
+
+  if (!event.activity_source_key.empty() &&
+      event.activity_source_key == selector &&
+      (event.activity_state != FirstClassAttributeState::kMissing ||
+       !event.activity.empty())) {
+    return {&event.activity,
+            event.activity_state != FirstClassAttributeState::kNull};
+  }
+
+  // Events created through the legacy native constructor have no explicit
+  // source-key metadata; their activity member represents concept:name only.
+  if (selector == "concept:name" && event.activity_source_key.empty() &&
+      !event.activity_attribute &&
+      (event.activity_state != FirstClassAttributeState::kMissing ||
+       !event.activity.empty())) {
+    return {&event.activity,
+            event.activity_state != FirstClassAttributeState::kNull};
+  }
+
+  throw std::out_of_range(
+      "edit-distance direct alignment has no selected activity: " +
+      std::string(selector));
+}
+
+std::string decode_direct_codepoint(
+    const std::string& token,
+    const std::map<std::string, std::string>& reverse_mapping) {
+  const auto found = reverse_mapping.find(token);
+  if (found == reverse_mapping.end()) {
+    throw std::out_of_range(
+        "edit-distance direct alignment has no reverse mapping for UTF-8 "
+        "codepoint: " + token);
+  }
+  return found->second;
+}
+
+EditDistanceMove decode_direct_move(
+    const EditDistanceMove& encoded,
+    const std::map<std::string, std::string>& reverse_mapping) {
+  EditDistanceMove result;
+  result.type = encoded.type;
+  if (encoded.type == EditDistanceMoveType::kSynchronous) {
+    result.log_activity =
+        decode_direct_codepoint(encoded.log_activity, reverse_mapping);
+    result.model_activity =
+        decode_direct_codepoint(encoded.model_activity, reverse_mapping);
+    result.activity = result.log_activity;
+    result.log = result.log_activity;
+    result.model = result.model_activity;
+  } else if (encoded.type == EditDistanceMoveType::kLog) {
+    result.log_activity =
+        decode_direct_codepoint(encoded.log_activity, reverse_mapping);
+    result.activity = result.log_activity;
+    result.log = result.log_activity;
+  } else {
+    result.model_activity =
+        decode_direct_codepoint(encoded.model_activity, reverse_mapping);
+    result.activity = result.model_activity;
+    result.model = result.model_activity;
+  }
+  return result;
+}
+
 }  // namespace
+
+EditDistanceTraceHandle apply_edit_distance_trace(
+    const Trace& trace, const std::vector<std::string>& list_encodings,
+    const std::set<std::string>& set_encodings,
+    const EditDistanceTraceMapping& mapping, EditDistanceTraceCache* cache,
+    EditDistanceOptions options) {
+  std::string encoded_source;
+  for (const auto& event : trace.events) {
+    const auto activity =
+        direct_trace_activity(event, options.activity_attribute);
+    if (!activity.is_string) continue;
+    const auto mapped = std::find_if(
+        mapping.begin(), mapping.end(), [&](const auto& entry) {
+          return entry.first == *activity.value;
+        });
+    if (mapped != mapping.end()) encoded_source += mapped->second;
+  }
+
+  if (cache != nullptr) {
+    const auto cached = std::find_if(
+        cache->begin(), cache->end(), [&](const auto& entry) {
+          return entry.first == encoded_source;
+        });
+    if (cached != cache->end()) return cached->second;
+  }
+
+  if (options.deviation_cost == 0) {
+    throw std::invalid_argument(
+        "edit-distance deviation_cost must be positive");
+  }
+
+  Variant source_tokens = utf8_codepoint_tokens(encoded_source);
+  Variant selected_target;
+  if (!options.perform_anti_alignment &&
+      set_encodings.find(encoded_source) != set_encodings.end()) {
+    // The exact-match set is an independent shortcut and is deliberately
+    // consulted before the ordered candidate list.
+    selected_target = source_tokens;
+  } else {
+    bool selected = false;
+    std::size_t best_distance = 0;
+    for (const auto& encoding : list_encodings) {
+      Variant target_tokens = utf8_codepoint_tokens(encoding);
+      const std::size_t distance = levenshtein(source_tokens, target_tokens);
+      const bool better = !selected ||
+          (options.perform_anti_alignment ? distance > best_distance
+                                          : distance < best_distance) ||
+          (options.perform_anti_alignment && distance == best_distance &&
+           target_tokens.size() > selected_target.size());
+      if (better) {
+        selected = true;
+        best_distance = distance;
+        selected_target = std::move(target_tokens);
+      }
+    }
+    if (!selected || (options.perform_anti_alignment && best_distance == 0)) {
+      throw std::invalid_argument(
+          "edit-distance direct alignment has no selectable target");
+    }
+  }
+
+  std::map<std::string, std::string> reverse_mapping;
+  for (const auto& [activity, encoding] : mapping)
+    reverse_mapping[encoding] = activity;
+
+  const auto encoded_moves = make_moves(source_tokens, selected_target);
+  EditDistanceTraceResult result;
+  result.alignment.reserve(encoded_moves.size());
+  std::size_t deviations = 0;
+  for (const auto& move : encoded_moves) {
+    if (move.type != EditDistanceMoveType::kSynchronous) ++deviations;
+    result.alignment.push_back(decode_direct_move(move, reverse_mapping));
+  }
+  result.cost = checked_cost(deviations, options.deviation_cost);
+
+  auto handle = std::make_shared<std::any>(std::move(result));
+  if (cache != nullptr) cache->emplace_back(encoded_source, handle);
+  return handle;
+}
 
 std::vector<EditDistanceAlignment> align_edit_distance(
     const EventLog& source, const EventLog& target, EditDistanceOptions options) {

@@ -5337,6 +5337,47 @@ and cost functions remain beyond the bounded matrices; cross-language error
 class/message equivalence is not asserted. The dispatcher and implementation
 module remain partial.
 
+### Edit-distance direct trace and caller-cache checkpoint
+
+The additive `apply_edit_distance_trace`, `apply_trace`, and `align_trace`
+interfaces accept an ordered activity mapping, an ordered target list, an
+independent exact-match set, and an optional caller-owned cache. Fresh results
+contain alignment and cost; cache hits return the identical shared handle,
+including opaque caller payloads and cached null values. Cache keys use the
+encoded source, and a hit takes precedence over later target or option changes.
+
+Direct ordinary ties retain the first list entry without a length preference.
+Anti-alignment prefers maximum distance, then a longer target, then first list
+occurrence. Unicode encodings are decoded by code point; reverse-map collisions
+use the last mapping entry. Unmapped activities are omitted. For the native
+string-key mapping, present numeric, Boolean, and null activities do not match
+string labels. Missing selected fields are rejected, and a differently named
+first-class activity field cannot satisfy the selector.
+
+The probe retains the reference's distinction between enum and string activity
+parameter keys. Native options hold the resulting effective selector. Cache
+sequences execute against live shared handles without restoring expected cache
+snapshots between calls. Comparisons preserve ordered moves, exact integer
+costs, typed inputs, cache insertions, returned-object identity, and unchanged
+arguments; expected failures compare mapped diagnostics rather than Python
+exception-class identity.
+
+All 66 direct public calls match, including the nine previously reference-only
+calls. The 212 prior whole-log, table, and projection comparisons pass against
+the same library, for 278 native comparisons. The alignment suite, Release CLI
+build, catalogue check, and independent code/probe/checker reviews pass.
+
+Evidence is retained in `docs/edit-distance-direct-reference.json.gz`,
+`docs/edit-distance-direct-native-checks.json.gz`, and
+`docs/edit-distance-direct-validation.json`, including frozen capture sources,
+generated probe/checker sources, exact inputs, and before/after binary hashes.
+The prior header did not expose a direct API, so no native before-baseline
+match count is invented.
+
+Both edit-distance catalogue rows remain partial. Broader typed mapping keys,
+invalid parameter shapes, ordering, and larger input contracts still need
+proof; the project retains 232 incomplete coverage units.
+
 ### Edit-distance table, projection, and target-selection checkpoint
 
 The native EventDataView overloads now accept table and mixed log/table inputs,
@@ -5369,9 +5410,10 @@ copy of the saved values and confirms that every original match result, and
 the 41/104 count, is unchanged. The final probe exercises the new table adapter
 and calls the public projector directly.
 
-Direct helper mapping/cache interfaces and broader typed-activity and parameter
-contracts remain open. Nine direct-helper observations remain reference-only;
-both edit-distance catalogue rows remain partial, with 232 incomplete project
+At this table checkpoint, direct helper mapping/cache interfaces and broader
+typed-activity and parameter contracts remained open. Its nine direct-helper
+observations were reference-only; the direct checkpoint above compares them.
+Both edit-distance catalogue rows remain partial, with 232 incomplete project
 coverage units. The following checkpoint is historical evidence for the prior
 empty-target and equal-length anti-tie fixes.
 
@@ -5396,9 +5438,10 @@ edit-distance suite passes and independent review is clear.
 Evidence is in `docs/edit-distance-core-reference.json.gz`,
 `docs/edit-distance-core-native-checks.json.gz`, and
 `docs/edit-distance-core-validation.json`. Nine captured direct-helper calls
-remain explicitly reference-only. DataFrame/projection comparisons were still
-open at that checkpoint and are extended above; direct helper mapping/cache
-and broader typed activity behavior remain unfinished.
+were explicitly reference-only at that checkpoint and are now compared above.
+DataFrame/projection comparisons and direct helper mapping/cache support were
+still open at that checkpoint and are extended above; broader typed activity
+behavior remains unfinished.
 
 `EDIT_DISTANCE` computes Levenshtein distance for every source variant and picks
 the minimum (or maximum when `perform_anti_alignment` is enabled); duplicate
