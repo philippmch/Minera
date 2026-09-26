@@ -8,6 +8,7 @@
 
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/json_export.hpp"
+#include "minera/log_conversion.hpp"
 #include "minera/xes_export.hpp"
 
 using namespace minera;
@@ -54,9 +55,24 @@ int main() {
   const auto long_deviation = align_edit_distance(log_of({{"repeat"}}), long_target);
   assert(long_deviation[0].cost == 239 * 10000);
 
-  // Equal distances use lexical target ordering, independent of target order.
+  bool threw = false;
+  // Equal distances prefer the shorter target, then the last distinct target
+  // in first-seen order when lengths match.
   const auto tie = align_edit_distance(log_of({{"a"}}), log_of({{"b"}, {"c"}}));
-  assert(tie[0].target_variant == std::vector<std::string>{"b"});
+  assert(tie[0].target_variant == std::vector<std::string>{"c"});
+  const auto tie_reversed =
+      align_edit_distance(log_of({{"a"}}), log_of({{"c"}, {"b"}}));
+  const auto tie_shorter =
+      align_edit_distance(log_of({{"a"}}), log_of({{"a", "b"}, {"b"}}));
+  const auto tie_shorter_reversed =
+      align_edit_distance(log_of({{"a"}}), log_of({{"b"}, {"a", "b"}}));
+  const auto tie_duplicate =
+      align_edit_distance(log_of({{"a"}}), log_of({{"b"}, {"c"}, {"b"}}));
+  assert(tie_reversed[0].target_variant == std::vector<std::string>{"b"});
+  assert(tie_shorter[0].target_variant == std::vector<std::string>{"b"});
+  assert(tie_shorter_reversed[0].target_variant ==
+         std::vector<std::string>{"b"});
+  assert(tie_duplicate[0].target_variant == std::vector<std::string>{"c"});
   EditDistanceOptions anti;
   anti.perform_anti_alignment = true;
   const auto far = align_edit_distance(log_of({{"a"}}), log_of({{"a"}, {"b", "c"}}), anti);
@@ -69,6 +85,44 @@ int main() {
          anti_tie_bc[0].target_index == 1);
   assert(anti_tie_cb[0].target_variant == std::vector<std::string>{"b"} &&
          anti_tie_cb[0].target_index == 1);
+  const auto anti_tie_long_first = align_edit_distance(
+      log_of({{"a"}}), log_of({{"a", "b"}, {"b"}}), anti);
+  const auto anti_tie_short_first = align_edit_distance(
+      log_of({{"a"}}), log_of({{"b"}, {"a", "b"}}), anti);
+  const auto anti_tie_empty_first =
+      align_edit_distance(log_of({{"a"}}), log_of({{}, {"a", "b"}}), anti);
+  const auto anti_tie_empty_last =
+      align_edit_distance(log_of({{"a"}}), log_of({{"a", "b"}, {}}), anti);
+  const auto anti_tie_long_suffix_first = align_edit_distance(
+      log_of({{"a", "b"}}), log_of({{"a"}, {"a", "b", "c"}}), anti);
+  const auto anti_tie_long_suffix_last = align_edit_distance(
+      log_of({{"a", "b"}}), log_of({{"a", "b", "c"}, {"a"}}), anti);
+  assert(anti_tie_long_first[0].target_variant ==
+             std::vector<std::string>({"a", "b"}) &&
+         anti_tie_short_first[0].target_variant ==
+             std::vector<std::string>({"a", "b"}) &&
+         anti_tie_empty_first[0].target_variant ==
+             std::vector<std::string>({"a", "b"}) &&
+         anti_tie_empty_last[0].target_variant ==
+             std::vector<std::string>({"a", "b"}) &&
+         anti_tie_long_suffix_first[0].target_variant ==
+             std::vector<std::string>({"a", "b", "c"}) &&
+         anti_tie_long_suffix_last[0].target_variant ==
+             std::vector<std::string>({"a", "b", "c"}));
+  threw = false;
+  try {
+    (void)align_edit_distance(log_of({{"a"}}), log_of({{"a"}}), anti);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)align_edit_distance(log_of({{}}), log_of({{}, {}}), anti);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 
   const auto duplicate = align_edit_distance(log_of({{"a"}, {"a"}, {"b"}}),
                                              log_of({{"a"}, {"a"}}));
@@ -76,7 +130,7 @@ int main() {
   assert(duplicate[2].target_variant == std::vector<std::string>{"a"});
 
   assert(align_edit_distance(EventLog{}, target).empty());
-  bool threw = false;
+  threw = false;
   try { (void)align_edit_distance(EventLog{}, EventLog{}); } catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
   threw = false;
@@ -90,7 +144,7 @@ int main() {
       "business.when";
   const auto projected =
       project_log_on_variant(projection_source, {"a", "b"});
-  assert(projected.traces.size() == 2);
+  assert(projected.traces.size() == 1);
   assert(projected.attribute("@@aligned_variant") != nullptr);
   assert(projected.traces[0].attribute("@@original_trace") != nullptr);
   assert(projected.traces[0].events.size() == 2);
@@ -99,11 +153,22 @@ int main() {
   assert(projected.traces[0].events[0].timestamp == "t0");
   assert(projected.traces[0].events[1].timestamp == "t0");
   assert(projected.traces[0].events[1].timestamp_source_key ==
-         "business.when");
+         "time:timestamp");
   assert(projected.traces[0].events[0].input_order == 0 &&
          projected.traces[0].events[1].input_order == 1);
-  assert(projected.traces[1].events.size() == 2);  // empty source trace retained
-  assert(projected.traces[1].events[0].timestamp.empty());
+  assert(projected.traces[0].attributes.size() == 1);
+  assert(projected.traces[0].events[0].attributes.size() == 3);
+  assert(projected.traces[0].events[1].attributes.size() == 3);
+
+  const auto empty_variant_projection =
+      project_log_on_variant(log_of({{"a"}}), {});
+  assert(empty_variant_projection.attribute("@@aligned_variant") != nullptr &&
+         *empty_variant_projection.attribute("@@aligned_variant") == "");
+  assert(empty_variant_projection.traces.size() == 1 &&
+         empty_variant_projection.traces[0].events.empty());
+  const auto empty_log_projection = project_log_on_variant(EventLog{}, {"a"});
+  assert(empty_log_projection.traces.empty() &&
+         empty_log_projection.attribute("@@aligned_variant") != nullptr);
 
   EventLog marked = log_of({{"a"}});
   marked.attributes.push_back({"owner", "kept", AttributeKind::kString});
@@ -111,13 +176,23 @@ int main() {
   marked.attributes.push_back({"@@aligned_variant", "older"});
   marked.traces[0].attributes.push_back({"@@original_trace", "old"});
   marked.traces[0].attributes.push_back({"@@original_trace", "older"});
+  marked.traces[0].properties.push_back({"source", "trace", AttributeKind::kString});
   marked.traces[0].events[0].attributes.push_back({"@@is_conforming", "old"});
   marked.traces[0].events[0].attributes.push_back({"@@is_conforming", "older"});
+  marked.traces[0].events[0].attributes.push_back({"amount", "7", AttributeKind::kInt});
+  marked.metadata.properties.push_back({"source", "table", AttributeKind::kString});
   const auto marked_projection = project_log_on_variant(marked, {"a"});
-  assert(marked_projection.attribute("owner")->compare("kept") == 0);
+  assert(marked_projection.attribute("owner") == nullptr);
   assert(marked_projection.attribute("@@aligned_variant")->compare("a") == 0);
+  assert(marked_projection.attributes.size() == 1);
+  assert(marked_projection.metadata == EventDataMetadata{});
   assert(marked_projection.traces[0].attribute("@@original_trace")->compare("a") == 0);
+  assert(marked_projection.traces[0].attributes.size() == 1 &&
+         marked_projection.traces[0].properties.empty() &&
+         marked_projection.traces[0].case_id.empty());
   assert(marked_projection.traces[0].events[0].attribute("@@is_conforming")->compare("true") == 0);
+  assert(marked_projection.traces[0].events[0].attribute("amount") == nullptr);
+  assert(marked_projection.traces[0].events[0].attributes.size() == 3);
   assert(std::count_if(marked_projection.attributes.begin(), marked_projection.attributes.end(),
                        [](const auto& a) { return a.key == "@@aligned_variant"; }) == 1);
   assert(std::count_if(marked_projection.traces[0].attributes.begin(), marked_projection.traces[0].attributes.end(),
@@ -240,8 +315,10 @@ int main() {
   typed_trace.events.push_back(std::move(typed_event));
   typed_source.traces.push_back(std::move(typed_trace));
 
+  const auto typed_target = log_of({{"x", "a"}});
+  const auto typed_alignments = align_edit_distance(typed_source, typed_target);
   const auto typed_projection =
-      project_log_on_variant(typed_source, {"x", "a"});
+      project_log_on_alignments(typed_source, typed_alignments);
   const auto& projected_typed_trace = typed_projection.traces.front();
   assert(projected_typed_trace.case_id_attribute &&
          projected_typed_trace.case_id_attribute->kind == AttributeKind::kInt &&
@@ -273,6 +350,24 @@ int main() {
   assert(typed_xes.find(
              "<date key=\"when.value\" value=\"2026-01-01T00:00:00+00:00\"/>") !=
          std::string::npos);
+
+  const auto fresh_typed_projection =
+      project_log_on_variant(typed_source, {"x", "a"});
+  assert(fresh_typed_projection.metadata == EventDataMetadata{} &&
+         fresh_typed_projection.attributes.size() == 1);
+  assert(fresh_typed_projection.traces.front().case_id.empty() &&
+         !fresh_typed_projection.traces.front().case_id_attribute &&
+         fresh_typed_projection.traces.front().attributes.size() == 1);
+  const auto& fresh_inserted =
+      fresh_typed_projection.traces.front().events.front();
+  assert(fresh_inserted.attributes.size() == 3 &&
+         fresh_inserted.attribute("case.number") == nullptr &&
+         fresh_inserted.attribute("activity.code") == nullptr &&
+         fresh_inserted.attribute("@@is_conforming") != nullptr &&
+         fresh_inserted.timestamp_attribute &&
+         fresh_inserted.timestamp_attribute->kind == AttributeKind::kDate &&
+         std::get<NativeDate>(fresh_inserted.timestamp_attribute->typed_value)
+                 .value == "2026-01-01T00:00:00.000Z");
 
   // A non-default activity key drives source/target variants, and the same
   // selected generic cells are materialized on inserted model events.
@@ -396,5 +491,218 @@ int main() {
     threw = true;
   }
   assert(threw);
+
+  // EventDataView adapts interleaved rows in first-seen case order and uses
+  // the configured case selector instead of requiring case:concept:name.
+  EventTable flat_source;
+  flat_source.columns = {"cid", "act", "when", "noise"};
+  flat_source.attributes.push_back({"origin", "table", AttributeKind::kString});
+  flat_source.metadata.properties.push_back(
+      {"source", "dataframe", AttributeKind::kString});
+  auto flat_row = [](std::string case_id, std::string activity,
+                     std::string timestamp) {
+    EventAttribute when{"when", timestamp, AttributeKind::kDate};
+    when.typed_value = NativeDate{timestamp};
+    EventTable::Row row;
+    row.emplace_back(EventAttribute{"cid", std::move(case_id)});
+    row.emplace_back(EventAttribute{"act", std::move(activity)});
+    row.emplace_back(std::move(when));
+    row.emplace_back(EventAttribute{"noise", "discard"});
+    return row;
+  };
+  flat_source.rows.push_back(
+      flat_row("case-z", "A", "2022-01-01T00:00:01Z"));
+  flat_source.rows.push_back(
+      flat_row("case-a", "B", "2022-01-02T00:00:01Z"));
+  flat_source.rows.push_back(
+      flat_row("case-z", "X", "2022-01-01T00:00:02Z"));
+  flat_source.rows.push_back(
+      flat_row("case-z", "B", "2022-01-01T00:00:03Z"));
+  EventTable flat_target;
+  flat_target.columns = {"cid", "act"};
+  EventTable::Row target_a;
+  target_a.emplace_back(EventAttribute{"cid", "model"});
+  target_a.emplace_back(EventAttribute{"act", "A"});
+  flat_target.rows.push_back(target_a);
+  EventTable::Row target_b;
+  target_b.emplace_back(EventAttribute{"cid", "model"});
+  target_b.emplace_back(EventAttribute{"act", "B"});
+  flat_target.rows.push_back(target_b);
+  EditDistanceOptions flat_options;
+  flat_options.case_id_attribute = "cid";
+  flat_options.activity_attribute = "act";
+  flat_options.timestamp_attribute = "when";
+  const auto flat_alignments = apply(EventDataView(flat_source),
+                                     EventDataView(flat_target), flat_options);
+  assert(flat_alignments.size() == 2 &&
+         flat_alignments[0].source_variant ==
+             std::vector<std::string>({"A", "X", "B"}) &&
+         flat_alignments[1].source_variant == std::vector<std::string>{"B"});
+  const auto flat_projection = project_log_on_variant(
+      EventDataView(flat_source), {"A", "B"}, flat_options);
+  assert(flat_projection.traces.size() == 2 &&
+         flat_projection.attributes.size() == 1 &&
+         flat_projection.metadata == EventDataMetadata{});
+  assert(flat_projection.traces[0].attribute("@@original_trace") &&
+         *flat_projection.traces[0].attribute("@@original_trace") == "A,X,B" &&
+         flat_projection.traces[1].attribute("@@original_trace") &&
+         *flat_projection.traces[1].attribute("@@original_trace") == "B");
+  const auto& flat_z = flat_projection.traces[0];
+  assert(flat_z.attributes.size() == 1 && flat_z.events.size() == 2 &&
+         flat_z.events[1].activity == "B" &&
+         flat_z.events[1].timestamp == "2022-01-01T00:00:02Z" &&
+         flat_z.events[1].attributes.size() == 3 &&
+         flat_z.events[1].attribute("noise") == nullptr);
+
+  EventTable empty_flat_table;
+  const auto empty_flat_projection = project_log_on_variant(
+      EventDataView(empty_flat_table), {"A", "B"}, flat_options);
+  assert(empty_flat_projection.traces.empty() &&
+         empty_flat_projection.attribute("@@aligned_variant") != nullptr);
+
+  EventTable no_activity_column;
+  no_activity_column.columns = {"cid", "when"};
+  no_activity_column.rows.push_back(
+      {EventAttribute{"cid", "case-z"},
+       EventAttribute{"when", "2022-01-01T00:00:01Z"}});
+  threw = false;
+  try {
+    (void)apply(EventDataView(no_activity_column),
+                EventDataView(flat_target), flat_options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  EventTable no_timestamp_column;
+  no_timestamp_column.columns = {"cid", "act"};
+  EventTable::Row no_timestamp_row;
+  no_timestamp_row.emplace_back(EventAttribute{"cid", "case-z"});
+  no_timestamp_row.emplace_back(EventAttribute{"act", "A"});
+  no_timestamp_column.rows.push_back(std::move(no_timestamp_row));
+  threw = false;
+  try {
+    (void)project_log_on_variant(EventDataView(no_timestamp_column), {"A"},
+                                 flat_options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  EventLog missing_first_time = log_of({{"A"}});
+  auto& missing_first_event = missing_first_time.traces.front().events.front();
+  missing_first_event.timestamp.clear();
+  missing_first_event.timestamp_state = FirstClassAttributeState::kMissing;
+  missing_first_event.timestamp_source_key.clear();
+  missing_first_event.timestamp_attribute.reset();
+  threw = false;
+  try {
+    (void)project_log_on_variant(missing_first_time, {"A"});
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)project_log_on_variant(missing_first_time, {});
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  EventLog missing_unused_logmove = log_of({{"A", "X"}});
+  auto& unused_logmove = missing_unused_logmove.traces.front().events[1];
+  unused_logmove.timestamp.clear();
+  unused_logmove.timestamp_state = FirstClassAttributeState::kMissing;
+  unused_logmove.timestamp_source_key.clear();
+  unused_logmove.timestamp_attribute.reset();
+  const auto missing_unused_projection =
+      project_log_on_variant(missing_unused_logmove, {"A"});
+  assert(missing_unused_projection.traces.front().events.size() == 1);
+
+  EventLog missing_sync_after_logmove = log_of({{"A", "X", "B"}});
+  auto& missing_cursor_event =
+      missing_sync_after_logmove.traces.front().events[1];
+  missing_cursor_event.timestamp.clear();
+  missing_cursor_event.timestamp_state = FirstClassAttributeState::kMissing;
+  missing_cursor_event.timestamp_source_key.clear();
+  missing_cursor_event.timestamp_attribute.reset();
+  threw = false;
+  try {
+    (void)project_log_on_variant(missing_sync_after_logmove, {"A", "B"});
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  EventLog null_first_timestamp = log_of({{"A"}});
+  auto& null_first_event = null_first_timestamp.traces.front().events.front();
+  null_first_event.timestamp.clear();
+  null_first_event.timestamp_state = FirstClassAttributeState::kNull;
+  null_first_event.timestamp_source_key = "time:timestamp";
+  EventAttribute null_timestamp{"time:timestamp", "", AttributeKind::kDate,
+                                true};
+  null_first_event.timestamp_attribute = null_timestamp;
+  null_first_event.attributes.push_back(null_timestamp);
+  const auto null_first_projection =
+      project_log_on_variant(null_first_timestamp, {"A"});
+  assert(null_first_projection.traces.front().events.front()
+             .timestamp_attribute->is_null);
+  const auto null_first_field = std::find_if(
+      null_first_projection.traces.front().events.front().attributes.begin(),
+      null_first_projection.traces.front().events.front().attributes.end(),
+      [](const EventAttribute& attribute) {
+        return attribute.key == "time:timestamp";
+      });
+  assert(null_first_field !=
+             null_first_projection.traces.front().events.front().attributes.end() &&
+         null_first_field->is_null);
+
+  EventLog null_second_timestamp = log_of({{"A", "B"}});
+  auto& null_second_event = null_second_timestamp.traces.front().events[1];
+  null_second_event.timestamp.clear();
+  null_second_event.timestamp_state = FirstClassAttributeState::kNull;
+  null_second_event.timestamp_source_key = "time:timestamp";
+  null_second_event.timestamp_attribute = null_timestamp;
+  null_second_event.attributes.push_back(null_timestamp);
+  const auto null_second_projection =
+      project_log_on_variant(null_second_timestamp, {"A", "B"});
+  assert(null_second_projection.traces.front().events[1]
+             .timestamp_attribute->is_null);
+
+  EditDistanceOptions null_custom_options;
+  null_custom_options.timestamp_attribute = "custom";
+  EventLog null_custom_timestamp = log_of({{"A"}});
+  null_custom_timestamp.traces.front().events.front().attributes.push_back(
+      {"custom", "", AttributeKind::kDate, true});
+  const auto null_custom_projection = project_log_on_variant(
+      null_custom_timestamp, {"A"}, null_custom_options);
+  const auto null_custom_field = std::find_if(
+      null_custom_projection.traces.front().events.front().attributes.begin(),
+      null_custom_projection.traces.front().events.front().attributes.end(),
+      [](const EventAttribute& attribute) {
+        return attribute.key == "custom";
+      });
+  assert(null_custom_field !=
+             null_custom_projection.traces.front().events.front().attributes.end() &&
+         null_custom_field->is_null);
+
+  EventTable nat_table;
+  nat_table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  EventAttribute nat_timestamp{"time:timestamp", "", AttributeKind::kDate};
+  nat_timestamp.typed_value = NativeDate{"NaT"};
+  nat_table.rows.push_back(
+      {EventAttribute{"case:concept:name", "case1"},
+       EventAttribute{"concept:name", "A"}, nat_timestamp});
+  const auto nat_projection =
+      project_log_on_variant(EventDataView(nat_table), {"A"});
+  assert(nat_projection.traces.front().events.front().timestamp_attribute &&
+         std::holds_alternative<NativeDate>(
+             nat_projection.traces.front().events.front()
+                 .timestamp_attribute->typed_value) &&
+         std::get<NativeDate>(nat_projection.traces.front().events.front()
+                                  .timestamp_attribute->typed_value)
+                 .value == "NaT");
+
   return 0;
 }

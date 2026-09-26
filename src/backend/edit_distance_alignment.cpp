@@ -1,6 +1,7 @@
 #include "minera/edit_distance_alignment.hpp"
 
 #include "minera/dfg_variants.hpp"
+#include "minera/log_conversion.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -74,10 +75,6 @@ std::vector<std::string> activities_of(const Trace& trace,
   for (const auto& event : trace.events)
     result.push_back(required_activity(event, selector));
   return result;
-}
-
-bool variant_less(const Variant& a, const Variant& b) {
-  return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
 }
 
 std::size_t levenshtein(const Variant& a, const Variant& b) {
@@ -232,8 +229,8 @@ struct SelectedTimestamp {
 };
 
 SelectedTimestamp timestamp_value(const Event& event,
-                                  std::string_view selector,
-                                  bool allow_conventional_missing = false) {
+                                 std::string_view selector,
+                                 bool allow_conventional_missing = false) {
   const auto* value = dfg_event_field_value(event, selector);
   if (value == nullptr) {
     if (allow_conventional_missing &&
@@ -263,6 +260,70 @@ SelectedTimestamp timestamp_value(const Event& event,
                        : event.timestamp_state;
   }
   return result;
+}
+
+SelectedTimestamp public_timestamp_value(const Event& event,
+                                         std::string_view selector) {
+  const bool conventional_timestamp =
+      selector == "time:timestamp" || selector == "timestamp";
+  const bool first_class_timestamp =
+      conventional_timestamp || event.timestamp_source_key == selector ||
+      (event.timestamp_attribute &&
+       event.timestamp_attribute->key == selector);
+
+  const EventAttribute* selected = nullptr;
+  if (first_class_timestamp && event.timestamp_attribute &&
+      (conventional_timestamp ||
+       event.timestamp_attribute->key == selector ||
+       event.timestamp_source_key == selector)) {
+    selected = &*event.timestamp_attribute;
+  }
+  if (selected == nullptr) {
+    const auto found = std::find_if(
+        event.attributes.begin(), event.attributes.end(),
+        [&](const EventAttribute& attribute) {
+          return attribute.key == selector;
+        });
+    if (found != event.attributes.end()) selected = &*found;
+  }
+
+  if (selected != nullptr) {
+    SelectedTimestamp result;
+    result.value = selected->value;
+    result.source_key = selector;
+    result.state = (selected->is_null ||
+                    selected->first_class_state ==
+                        FirstClassAttributeState::kNull ||
+                    (first_class_timestamp &&
+                     event.timestamp_state ==
+                         FirstClassAttributeState::kNull))
+                       ? FirstClassAttributeState::kNull
+                       : FirstClassAttributeState::kPresent;
+    result.attribute = *selected;
+    result.attribute->key = selector;
+    if (result.state == FirstClassAttributeState::kNull)
+      result.attribute->is_null = true;
+    return result;
+  }
+
+  if (first_class_timestamp &&
+      (event.timestamp_state != FirstClassAttributeState::kMissing ||
+       !event.timestamp.empty())) {
+    SelectedTimestamp result;
+    result.value = event.timestamp;
+    result.state = event.timestamp_state == FirstClassAttributeState::kMissing
+                       ? FirstClassAttributeState::kPresent
+                       : event.timestamp_state;
+    result.source_key = std::string(selector);
+    if (result.state == FirstClassAttributeState::kNull) {
+      result.attribute = EventAttribute{
+          std::string(selector), "", AttributeKind::kDate, true};
+    }
+    return result;
+  }
+
+  throw std::invalid_argument("edit-distance: missing timestamp " +
+                              std::string(selector));
 }
 
 EventAttribute projected_activity_attribute(const EventAttribute& source,
@@ -424,6 +485,141 @@ void erase_attr(std::vector<EventAttribute>& attrs, std::string_view key) {
               attrs.end());
 }
 
+EventLog event_data_as_log(const EventDataView& data,
+                           const EditDistanceOptions& options) {
+  validate_selector(options.case_id_attribute, "case id");
+  LogConversionOptions conversion;
+  conversion.case_id_key = options.case_id_attribute;
+  return event_data_to_event_log(data, conversion);
+}
+
+const std::vector<std::string>* table_columns(const EventDataView& data) {
+  if (data.kind() == EventDataKind::kEventTable)
+    return &data.table()->columns;
+  if (data.kind() == EventDataKind::kLazyEventTable)
+    return &data.lazy_table()->columns();
+  return nullptr;
+}
+
+void require_table_column(const EventDataView& data, const EventLog& log,
+                          std::string_view selector,
+                          std::string_view role) {
+  if (log.event_count() == 0) return;
+  const auto* columns = table_columns(data);
+  if (columns == nullptr ||
+      std::find(columns->begin(), columns->end(), selector) != columns->end())
+    return;
+  throw std::invalid_argument("edit-distance: missing " +
+                              std::string(role) + " column " +
+                              std::string(selector));
+}
+
+void require_flat_alignment_columns(const EventDataView& data,
+                                    const EventLog& log,
+                                    const EditDistanceOptions& options) {
+  if (data.kind() == EventDataKind::kEventLog || log.event_count() == 0)
+    return;
+  require_table_column(data, log, options.case_id_attribute, "case id");
+  require_table_column(data, log, options.activity_attribute, "activity");
+}
+
+void require_flat_projection_fields(const EventDataView& data,
+                                    const EventLog& log,
+                                    const EditDistanceOptions& options) {
+  if (data.kind() == EventDataKind::kEventLog || log.event_count() == 0)
+    return;
+  require_table_column(data, log, options.case_id_attribute, "case id");
+  require_table_column(data, log, options.activity_attribute, "activity");
+  require_table_column(data, log, options.timestamp_attribute, "timestamp");
+}
+
+EventLog project_public_variant(
+    const EventLog& source,
+    const std::vector<EditDistanceAlignment>& alignments,
+    const std::vector<std::string>& variant,
+    const EditDistanceOptions& options) {
+  if (alignments.size() != source.traces.size()) {
+    throw std::invalid_argument(
+        "edit-distance projection requires one alignment per source trace");
+  }
+
+  EventLog projected;
+  set_attr(projected.attributes, "@@aligned_variant", join_variant(variant));
+  for (std::size_t trace_index = 0; trace_index < source.traces.size();
+       ++trace_index) {
+    const auto& original = source.traces[trace_index];
+    // The public implementation drops empty traces while it constructs the
+    // projected event records.
+    if (original.events.empty()) continue;
+
+    const auto& alignment = alignments[trace_index];
+    Trace projected_trace;
+    set_attr(projected_trace.attributes, "@@original_trace",
+             join_variant(alignment.source_variant));
+
+    SelectedTimestamp current_timestamp = public_timestamp_value(
+        original.events.front(), options.timestamp_attribute);
+    std::size_t source_pos = 0;
+    for (const auto& move : alignment.alignment) {
+      if (move.type == EditDistanceMoveType::kLog) {
+        // The public projection cursor advances only on synchronous moves.
+        continue;
+      }
+
+      if (move.type == EditDistanceMoveType::kSynchronous) {
+        if (source_pos >= original.events.size()) {
+          throw std::invalid_argument(
+              "edit-distance projection alignment consumes too many source events");
+        }
+        const auto& activity_source = original.events[source_pos++];
+        current_timestamp = public_timestamp_value(
+            activity_source, options.timestamp_attribute);
+      }
+
+      Event event;
+      event.activity = move.model_activity;
+      event.activity_state = FirstClassAttributeState::kPresent;
+      event.activity_source_key = options.activity_attribute;
+      EventAttribute selected_activity{options.activity_attribute,
+                                       move.model_activity,
+                                       AttributeKind::kString};
+      event.activity_attribute = selected_activity;
+      event.attributes.push_back(std::move(selected_activity));
+
+      auto projected_timestamp = current_timestamp;
+      if (projected_timestamp.attribute) {
+        projected_timestamp.attribute->key = options.timestamp_attribute;
+        projected_timestamp.attribute->first_class_role =
+            FirstClassAttributeRole::kNone;
+        projected_timestamp.attribute->first_class_state =
+            FirstClassAttributeState::kMissing;
+        projected_timestamp.attribute->first_class_source_key.clear();
+        projected_timestamp.source_key = options.timestamp_attribute;
+      }
+      set_projected_timestamp(event, projected_timestamp);
+      if (event.timestamp_attribute) {
+        event.timestamp_source_key = options.timestamp_attribute;
+      } else if (current_timestamp.state != FirstClassAttributeState::kMissing ||
+                 !current_timestamp.value.empty()) {
+        EventAttribute selected{options.timestamp_attribute,
+                                current_timestamp.value,
+                                AttributeKind::kString};
+        event.timestamp_attribute = selected;
+        event.timestamp_source_key = options.timestamp_attribute;
+        event.attributes.push_back(std::move(selected));
+      }
+
+      set_attr(event.attributes, "@@is_conforming",
+               move.type == EditDistanceMoveType::kSynchronous ? "true" : "false",
+               AttributeKind::kBoolean);
+      event.input_order = projected_trace.events.size();
+      projected_trace.events.push_back(std::move(event));
+    }
+    projected.traces.push_back(std::move(projected_trace));
+  }
+  return projected;
+}
+
 std::uint64_t checked_cost(std::size_t deviations, std::uint64_t unit) {
   if (deviations > std::numeric_limits<std::uint64_t>::max() / unit)
     throw std::invalid_argument("edit-distance cost overflows uint64_t");
@@ -467,18 +663,31 @@ std::vector<EditDistanceAlignment> align_edit_distance(
                                                        : distance < selected_distance;
         if (!better && distance == selected_distance) {
           if (options.perform_anti_alignment) {
-            // Targets are deduplicated in first-occurrence order above, so a
-            // tied anti-alignment chooses the last distinct target variant.
-            better = targets[ti].first_index > targets[selected].first_index;
+            // Anti-alignment first prefers a longer target. Equal-length
+            // ties choose the last distinct target in first-seen order.
+            better = targets[ti].activities.size() >
+                         targets[selected].activities.size() ||
+                     (targets[ti].activities.size() ==
+                          targets[selected].activities.size() &&
+                      targets[ti].first_index > targets[selected].first_index);
           } else {
-            // Ordinary alignment keeps its deterministic lexical tie break.
-            better = variant_less(targets[ti].activities,
-                                  targets[selected].activities) ||
-                     (targets[ti].activities == targets[selected].activities &&
-                      targets[ti].first_index < targets[selected].first_index);
+            // Ordinary alignment first prefers a shorter target. Equal-length
+            // ties then choose the last distinct target in first-seen order.
+            better = targets[ti].activities.size() <
+                         targets[selected].activities.size() ||
+                     (targets[ti].activities.size() ==
+                          targets[selected].activities.size() &&
+                      targets[ti].first_index > targets[selected].first_index);
           }
         }
         if (better) { selected = ti; selected_distance = distance; }
+      }
+      if (options.perform_anti_alignment && selected_distance == 0) {
+        // The public anti-alignment path cannot construct a result when all
+        // target candidates are exact. Preserve that rejection as a clear
+        // native validation error, including duplicate and empty variants.
+        throw std::invalid_argument(
+            "edit-distance anti-alignment has no positive-distance target");
       }
       const auto moves = make_moves(source_variant, targets[selected].activities);
       std::uint64_t deviations = 0;
@@ -508,6 +717,16 @@ std::vector<EditDistanceAlignment> align_edit_distance(
     result.push_back(cached->second);
   }
   return result;
+}
+
+std::vector<EditDistanceAlignment> align_edit_distance(
+  const EventDataView& source, const EventDataView& target,
+    EditDistanceOptions options) {
+  const auto source_log = event_data_as_log(source, options);
+  require_flat_alignment_columns(source, source_log, options);
+  const auto target_log = event_data_as_log(target, options);
+  require_flat_alignment_columns(target, target_log, options);
+  return align_edit_distance(source_log, target_log, std::move(options));
 }
 
 EventLog project_log_on_alignments(
@@ -621,12 +840,16 @@ EventLog project_log_on_variant(const EventLog& source,
     target_trace.events.push_back(std::move(event));
   }
   target.traces.push_back(std::move(target_trace));
-  auto projected = project_log_on_alignments(
-      source, align_edit_distance(source, target, options), options);
-  // Preserve the historical marker even when the source log has no traces.
-  set_attr(projected.attributes, "@@aligned_variant", join_variant(variant));
-  erase_attr(projected.attributes, "@@aligned_variants");
-  return projected;
+  const auto alignments = align_edit_distance(source, target, options);
+  return project_public_variant(source, alignments, variant, options);
+}
+
+EventLog project_log_on_variant(const EventDataView& source,
+                                const std::vector<std::string>& variant,
+                                EditDistanceOptions options) {
+  const auto converted = event_data_as_log(source, options);
+  require_flat_projection_fields(source, converted, options);
+  return project_log_on_variant(converted, variant, std::move(options));
 }
 
 }  // namespace minera

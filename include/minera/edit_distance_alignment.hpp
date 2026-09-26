@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
 
 namespace minera {
@@ -48,6 +49,9 @@ struct EditDistanceOptions {
   // Event fields used for source/target variants and projected timestamps.
   std::string activity_attribute = "concept:name";
   std::string timestamp_attribute = "time:timestamp";
+  // Case field used when an EventDataView table or stream is converted to an
+  // EventLog. It does not affect an EventLog whose traces are already grouped.
+  std::string case_id_attribute = "case:concept:name";
 };
 
 struct EditDistanceAlignment {
@@ -66,10 +70,18 @@ struct EditDistanceAlignment {
 // Align every trace in source against the closest (or, for anti-alignment,
 // farthest) variant in target. Duplicate variants are grouped and results are
 // restored to source-trace order. Ordinary equal-distance ties choose the
-// lexicographically smallest activity sequence and then its first occurrence;
-// anti-alignment ties choose the last distinct target in first-occurrence order.
+// shortest target and then the last distinct target in first-occurrence order;
+// anti-alignment ties choose the longest target and then the last distinct
+// target in first-occurrence order.
 [[nodiscard]] std::vector<EditDistanceAlignment> align_edit_distance(
     const EventLog& source, const EventLog& target,
+    EditDistanceOptions options = {});
+
+// Adapts flat event data using the configured case-id selector before
+// alignment. Table rows are grouped in first-seen case order by the shared
+// event-data conversion layer.
+[[nodiscard]] std::vector<EditDistanceAlignment> align_edit_distance(
+    const EventDataView& source, const EventDataView& target,
     EditDistanceOptions options = {});
 
 // Convenience aliases.
@@ -78,24 +90,44 @@ struct EditDistanceAlignment {
     EditDistanceOptions options = {}) {
   return align_edit_distance(source, target, options);
 }
+[[nodiscard]] inline std::vector<EditDistanceAlignment> apply_edit_distance(
+    const EventDataView& source, const EventDataView& target,
+    EditDistanceOptions options = {}) {
+  return align_edit_distance(source, target, options);
+}
 [[nodiscard]] inline std::vector<EditDistanceAlignment> apply(
     const EventLog& source, const EventLog& target,
     EditDistanceOptions options = {}) {
   return align_edit_distance(source, target, options);
 }
+[[nodiscard]] inline std::vector<EditDistanceAlignment> apply(
+    const EventDataView& source, const EventDataView& target,
+    EditDistanceOptions options = {}) {
+  return align_edit_distance(source, target, options);
+}
 
-// Keep target activities, retaining timestamps from synchronous source events
-// and marking projected events with @@is_conforming. Source-only moves are
-// omitted. Trace metadata records @@original_trace; the resulting log records
-// @@aligned_variant. Empty source traces are retained.
+// Keep target activities, retaining selected timestamps from synchronous
+// source events and marking projected events with @@is_conforming. Source-only
+// moves are omitted. The output is a fresh projection containing only the
+// @@aligned_variant log marker, @@original_trace trace marker, and selected
+// activity/timestamp plus conformance fields on events. Empty input traces are
+// omitted, matching the public project_log_on_variant contract.
 [[nodiscard]] EventLog project_log_on_variant(
     const EventLog& source, const std::vector<std::string>& variant,
+    EditDistanceOptions options = {});
+
+// Event-data adapter for public variant projection. Dataframe/event-stream
+// case grouping uses EditDistanceOptions::case_id_attribute.
+[[nodiscard]] EventLog project_log_on_variant(
+    const EventDataView& source, const std::vector<std::string>& variant,
     EditDistanceOptions options = {});
 
 // Projects each source trace using its own selected alignment.  The
 // alignments must be in source-trace order (as returned by
 // align_edit_distance), allowing a heterogeneous source log to select a
-// different target variant for each trace.
+// different target variant for each trace. This native extension preserves
+// source log/trace/event context; project_log_on_variant implements the
+// public fresh-output projection contract.
 [[nodiscard]] EventLog project_log_on_alignments(
     const EventLog& source,
     const std::vector<EditDistanceAlignment>& alignments);
