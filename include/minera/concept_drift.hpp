@@ -151,6 +151,10 @@ struct ConceptDriftTableResult {
 // distinct from datetime values that contain a time, including midnight.
 // Distinct NaNs use native scalar-identity order, also inside tuples. This can
 // differ from allocation-dependent ordering in the reference runtime.
+// Frozen sets use unordered, deduplicated member identity. Their native order
+// compares unique member counts, then canonical member identities; strict
+// subsets precede supersets, while incomparable sets can differ from reference
+// hash iteration order. Equal frozen-set tuple prefixes advance to later fields.
 [[nodiscard]] std::vector<EventAttribute> extract_concept_drift_typed_activities(
     const std::vector<std::vector<EventAttribute>>& traces);
 
@@ -235,7 +239,7 @@ compute_concept_drift_typed_follows_relation(
     ConceptDriftTraceOptions options, std::mt19937& rng);
 
 // Detect BOSE drift directly from typed activity traces. Immutable tuples,
-// scalar aliases, nulls, and NaN identity use the same ordering rules as the
+// frozen sets, scalar aliases, nulls, and NaN identity share ordering with the
 // DataFrame adapter; mutable containers and incompatible mixed types reject
 // before any random draws. Original typed values are retained in returned
 // sublogs.

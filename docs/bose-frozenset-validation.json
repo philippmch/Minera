@@ -1,0 +1,25 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "BOSE immutable frozenset activity labels",
+  "parent_commit": "66f190a6c2017e847d8b28964cef4af9b0f8e813",
+  "verified_code_tree": "b6d401996e1e88ba732f0c79a9f17ef0135ed01d",
+  "core_library_sha256": "a2db0ead448ccb7f0b1b063b99f0268113fc72bc681b1288dc673884ee411f41",
+  "total_native_comparisons": 20789,
+  "exact_native_matches": 20776,
+  "documented_ordering_differences": 13,
+  "new_frozenset_comparisons": 180,
+  "new_frozenset_exact_matches": 168,
+  "helper_baseline_matches": 8,
+  "cli_checks": 14,
+  "native_suites": 2,
+  "independent_review": "clear",
+  "artifacts": {
+    "docs/bose-frozenset-reference.json.gz": "1d06e847def16ce29081715919456c55fcc9a0ba78d2358b5adcfd57b0d02886",
+    "docs/bose-frozenset-native-checks.json.gz": "df43a3fc9cd88439579c3960f8dd1f7bfc572f915ab4f1b8dac8e5df406fd20b"
+  },
+  "remaining": [
+    "Standalone follows accepts mutable alphabet entries that the native helper still eagerly rejects; capture and implementation remain required.",
+    "BOSE module and dispatcher remain partial; no coverage promotion.",
+    "Twelve incomparable-frozenset list orders and the prior NaN tuple order remain visible rather than exact matches."
+  ]
+}

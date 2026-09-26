@@ -1811,6 +1811,45 @@ Evidence and reproducible capture source are in
 `docs/bose-missing-sentinel-contract-checks.json.gz`, and
 `docs/bose-missing-sentinel-contract-validation.json`.
 
+### BOSE immutable-set activity checkpoint
+
+BOSE typed activities now accept immutable frozen sets, including nested
+sets and tuple members. Activity identity ignores member order and collapses
+equal members while preserving numeric aliases, calendar-date distinctions,
+NaN identity, and the separate NA singleton. Returned raw sublogs retain the
+original native values and child order. Mutable trace activity containers
+continue to reject.
+
+Strict subset is a partial order, so it cannot safely serve as a C++ sorting
+comparator. The native extension compares unique member counts, then canonical
+member identities. Every strict subset precedes its superset. Equal frozen-set
+tuple prefixes advance to later fields; incomparable prefixes use the native
+extension. Cached keys avoid rebuilding and sorting member identities for
+each outer comparison.
+
+The 84-helper corpus improves from eight matching rejection cases to 72 exact
+matches and 12 visible unique-list ordering differences. For example, the
+pinned reference returns incomparable singleton sets in A,C,B order while the
+native result is A,B,C. All 12 retain the same typed members and preserve strict
+comparisons. This documented alternative ordering follows the existing semantic
+parity criterion and native set-order boundary; it is not counted as an exact
+match. All feature and follows comparisons match exactly.
+
+All 80 raw-trace and 16 EventLog comparisons match, including a 64-case raw
+cohort with nonuniform traces, several incomparable labels, multiple windows,
+two thresholds, and two seeds. These check change points and RNG continuation
+as well as acceptance and preserved raw values. The prior 20,609 comparisons
+retain their results. Combined validation has 20,776 exact matches from 20,789
+comparisons, 13 documented ordering differences, two native suites, and 14 CLI
+checks. Independent review is clear.
+
+Evidence is in `docs/bose-frozenset-reference.json.gz`,
+`docs/bose-frozenset-native-checks.json.gz`, and
+`docs/bose-frozenset-validation.json`. Both BOSE rows remain partial: the
+standalone follows helper accepts mutable alphabet entries that the native
+helper still eagerly rejects. That distinct input contract remains to be
+captured and implemented before a fresh completion audit.
+
 ### Native nullable-missing scalar and BOSE checkpoint
 
 The native attribute model now represents pandas.NA as a distinct present

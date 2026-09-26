@@ -111,6 +111,7 @@ enum class ActivityFamily {
   kDate,
   kNull,
   kTuple,
+  kFrozenSet,
   kNativeNA
 };
 
@@ -146,6 +147,8 @@ ActivityFamily activity_family_shallow(const EventAttribute& value) {
     return ActivityFamily::kNull;
   if (value.container == AttributeContainerKind::kTuple)
     return ActivityFamily::kTuple;
+  if (value.container == AttributeContainerKind::kFrozenSet)
+    return ActivityFamily::kFrozenSet;
   if (value.container != AttributeContainerKind::kScalar ||
       value.scalar_wrapper || value.scalar_children_list ||
       !value.children.empty())
@@ -174,7 +177,8 @@ ActivityFamily validate_activity_tree(const EventAttribute& value,
     throw std::invalid_argument(
         "concept drift table: activity tuple nesting exceeds safe bound");
   const auto family = activity_family_shallow(value);
-  if (family == ActivityFamily::kTuple)
+  if (family == ActivityFamily::kTuple ||
+      family == ActivityFamily::kFrozenSet)
     for (const auto& child : value.children)
       (void)validate_activity_tree(child, depth + 1, traversal);
   return family;
@@ -191,7 +195,9 @@ bool activity_contains_native_na_impl(const EventAttribute& value,
     throw std::invalid_argument(
         "concept drift table: activity tuple nesting exceeds safe bound");
   if (is_native_na_attribute(value)) return true;
-  if (value.container != AttributeContainerKind::kTuple) return false;
+  if (value.container != AttributeContainerKind::kTuple &&
+      value.container != AttributeContainerKind::kFrozenSet)
+    return false;
   for (const auto& child : value.children)
     if (activity_contains_native_na_impl(child, depth + 1)) return true;
   return false;
@@ -203,11 +209,43 @@ bool activity_contains_native_na(const EventAttribute& value) {
   return activity_contains_native_na_impl(value, 0);
 }
 
+void consume_activity_membership_work(std::size_t& work) {
+  if (work >= kTypedRelationWorkLimit)
+    throw std::invalid_argument(
+        "concept drift: activity membership work exceeds safe bound");
+  ++work;
+}
+
 std::string activity_identity_impl(const EventAttribute& value,
-                                   std::size_t depth) {
+                                   std::size_t depth,
+                                   std::size_t* membership_work,
+                                   std::unordered_map<
+                                       const EventAttribute*,
+                                       std::vector<std::string>>* order_cache);
+
+std::vector<std::string> activity_frozen_member_identities(
+    const EventAttribute& value, std::size_t depth,
+    std::size_t* membership_work) {
+  std::vector<std::string> members;
+  members.reserve(value.children.size());
+  for (const auto& child : value.children)
+    members.push_back(activity_identity_impl(child, depth + 1,
+                                             membership_work, nullptr));
+  std::sort(members.begin(), members.end());
+  members.erase(std::unique(members.begin(), members.end()), members.end());
+  return members;
+}
+
+std::string activity_identity_impl(const EventAttribute& value,
+                                   std::size_t depth,
+                                   std::size_t* membership_work,
+                                   std::unordered_map<
+                                       const EventAttribute*,
+                                       std::vector<std::string>>* order_cache) {
   if (depth > kMaxActivityTupleDepth)
     throw std::invalid_argument(
         "concept drift table: activity tuple nesting exceeds safe bound");
+  if (membership_work) consume_activity_membership_work(*membership_work);
   switch (const auto family = activity_family_shallow(value)) {
     case ActivityFamily::kNull:
       return "null";
@@ -233,10 +271,28 @@ std::string activity_identity_impl(const EventAttribute& value,
     case ActivityFamily::kTuple: {
       std::string result = "tuple:" + std::to_string(value.children.size());
       for (const auto& child : value.children) {
-        const auto child_identity = activity_identity_impl(child, depth + 1);
+        const auto child_identity =
+            activity_identity_impl(child, depth + 1, membership_work,
+                                   order_cache);
         result += ":" + std::to_string(child_identity.size()) + ":" +
                   child_identity;
       }
+      return result;
+    }
+    case ActivityFamily::kFrozenSet: {
+      auto members = activity_frozen_member_identities(
+          value, depth, membership_work);
+      const std::vector<std::string>* canonical_members = &members;
+      if (order_cache) {
+        const auto [it, inserted] =
+            order_cache->emplace(&value, std::move(members));
+        (void)inserted;
+        canonical_members = &it->second;
+      }
+      std::string result =
+          "frozenset:" + std::to_string(canonical_members->size());
+      for (const auto& member : *canonical_members)
+        result += ":" + std::to_string(member.size()) + ":" + member;
       return result;
     }
   }
@@ -246,12 +302,30 @@ std::string activity_identity_impl(const EventAttribute& value,
 std::string activity_identity(const EventAttribute& value) {
   ActivityTraversal traversal;
   (void)validate_activity_tree(value, 0, traversal);
-  return activity_identity_impl(value, 0);
+  return activity_identity_impl(value, 0, nullptr, nullptr);
+}
+
+std::string activity_identity(const EventAttribute& value,
+                              std::size_t& membership_work) {
+  ActivityTraversal traversal;
+  (void)validate_activity_tree(value, 0, traversal);
+  return activity_identity_impl(value, 0, &membership_work, nullptr);
+}
+
+std::string activity_identity_for_order(
+    const EventAttribute& value,
+    std::unordered_map<const EventAttribute*, std::vector<std::string>>& cache) {
+  ActivityTraversal traversal;
+  (void)validate_activity_tree(value, 0, traversal);
+  return activity_identity_impl(value, 0, nullptr, &cache);
 }
 
 int compare_activity_values_impl(const EventAttribute& left,
                                  const EventAttribute& right,
-                                 std::size_t depth) {
+                                 std::size_t depth,
+                                 const std::unordered_map<
+                                     const EventAttribute*,
+                                     std::vector<std::string>>* order_cache) {
   if (depth > kMaxActivityTupleDepth)
     throw std::invalid_argument(
         "concept drift table: activity tuple nesting exceeds safe bound");
@@ -293,11 +367,44 @@ int compare_activity_values_impl(const EventAttribute& left,
       for (std::size_t index = 0; index < common; ++index) {
         const auto order =
             compare_activity_values_impl(left.children[index],
-                                         right.children[index], depth + 1);
+                                         right.children[index], depth + 1,
+                                         order_cache);
         if (order != 0) return order;
       }
       if (left.children.size() == right.children.size()) return 0;
       return left.children.size() < right.children.size() ? -1 : 1;
+    }
+    case ActivityFamily::kFrozenSet: {
+      // Native ordering extends the set subset order with a safe total order:
+      // fewer unique members first, then lexicographic canonical BOSE member
+      // identities. Incomparable sets are ordered by this extension; they are
+      // never treated as equal for tuple-prefix comparison.
+      std::vector<std::string> left_owned_members, right_owned_members;
+      const auto members_for = [&](const EventAttribute& value,
+                                   std::vector<std::string>& owned_members)
+          -> const std::vector<std::string>& {
+        if (order_cache) {
+          const auto found = order_cache->find(&value);
+          if (found == order_cache->end())
+            throw std::invalid_argument(
+                "concept drift table: missing cached frozenset ordering key");
+          return found->second;
+        }
+        owned_members = activity_frozen_member_identities(
+            value, depth, nullptr);
+        return owned_members;
+      };
+      const auto& left_members = members_for(left, left_owned_members);
+      const auto& right_members = members_for(right, right_owned_members);
+      if (left_members.size() != right_members.size())
+        return left_members.size() < right_members.size() ? -1 : 1;
+      if (std::lexicographical_compare(left_members.begin(), left_members.end(),
+                                       right_members.begin(), right_members.end()))
+        return -1;
+      if (std::lexicographical_compare(right_members.begin(), right_members.end(),
+                                       left_members.begin(), left_members.end()))
+        return 1;
+      return 0;
     }
   }
   throw std::invalid_argument("concept drift table: invalid activity key");
@@ -308,17 +415,10 @@ int compare_activity_values(const EventAttribute& left,
   ActivityTraversal traversal;
   (void)validate_activity_tree(left, 0, traversal);
   (void)validate_activity_tree(right, 0, traversal);
-  return compare_activity_values_impl(left, right, 0);
+  return compare_activity_values_impl(left, right, 0, nullptr);
 }
 
 enum class ActivityEquality { kEqual, kNotEqual, kAmbiguous };
-
-void consume_activity_membership_work(std::size_t& work) {
-  if (work >= kTypedRelationWorkLimit)
-    throw std::invalid_argument(
-        "concept drift: activity membership work exceeds safe bound");
-  ++work;
-}
 
 ActivityEquality activity_equality_for_membership_impl(
     const EventAttribute& candidate, const EventAttribute& target,
@@ -357,12 +457,14 @@ ActivityEquality activity_equality_for_membership_impl(
     if (candidate_family == ActivityFamily::kNull ||
         target_family == ActivityFamily::kNull ||
         candidate_family == ActivityFamily::kTuple ||
-        target_family == ActivityFamily::kTuple)
+        target_family == ActivityFamily::kTuple ||
+        candidate_family == ActivityFamily::kFrozenSet ||
+        target_family == ActivityFamily::kFrozenSet)
       return ActivityEquality::kNotEqual;
     return ActivityEquality::kAmbiguous;
   }
 
-  return activity_identity(candidate) == activity_identity(target)
+  return activity_identity(candidate, work) == activity_identity(target, work)
              ? ActivityEquality::kEqual
              : ActivityEquality::kNotEqual;
 }
@@ -402,16 +504,28 @@ template <class VisitValues>
 std::vector<OrderedActivityValue> ordered_unique_activity_values(
     VisitValues&& visit_values) {
   std::vector<OrderedActivityValue> activity_values;
+  std::unordered_map<const EventAttribute*, std::vector<std::string>>
+      frozen_set_order_cache;
   std::unordered_map<std::string, std::size_t> activity_positions;
   const auto collect = [&](const EventAttribute& value) {
-    const auto identity = activity_identity(value);
-    if (activity_positions.emplace(identity, activity_values.size()).second)
+    std::unordered_map<const EventAttribute*, std::vector<std::string>>
+        value_order_cache;
+    const auto identity =
+        activity_identity_for_order(value, value_order_cache);
+    if (activity_positions.emplace(identity, activity_values.size()).second) {
+      // Keep order keys only for representatives retained by the sort.
+      frozen_set_order_cache.merge(value_order_cache);
       activity_values.push_back(OrderedActivityValue{&value, identity});
+    }
   };
   visit_values(collect);
   std::sort(activity_values.begin(), activity_values.end(),
-            [](const OrderedActivityValue& left,
-               const OrderedActivityValue& right) {
+            [&frozen_set_order_cache](const OrderedActivityValue& left,
+                                      const OrderedActivityValue& right) {
+              if (!frozen_set_order_cache.empty())
+                return compare_activity_values_impl(
+                           *left.value, *right.value, 0,
+                           &frozen_set_order_cache) < 0;
               return compare_activity_values(*left.value, *right.value) < 0;
             });
   return activity_values;
