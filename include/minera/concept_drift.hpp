@@ -90,6 +90,14 @@ struct ConceptDriftTraceResult {
   std::vector<ConceptDriftTraceChangePoint> change_points;
 };
 
+// BOSE detection over typed raw activity values. Returned sublogs copy the
+// original EventAttribute values, including container structure and native
+// scalar identity, while drift computation uses ordered surrogate labels.
+struct ConceptDriftTypedTraceResult {
+  std::vector<std::vector<std::vector<EventAttribute>>> sublogs;
+  std::vector<ConceptDriftTraceChangePoint> change_points;
+};
+
 struct ConceptDriftTableOptions : ConceptDriftTraceOptions {
   std::string activity_attribute = "concept:name";
   std::string timestamp_attribute = "time:timestamp";
@@ -195,6 +203,19 @@ compute_concept_drift_follows_relation(
 // overload constructs the same engine and delegates to this overload.
 [[nodiscard]] ConceptDriftTraceResult detect_concept_drift_traces(
     const std::vector<std::vector<std::string>>& traces,
+    ConceptDriftTraceOptions options, std::mt19937& rng);
+
+// Detect BOSE drift directly from typed activity traces. Immutable tuples,
+// scalar aliases, nulls, and NaN identity use the same ordering rules as the
+// DataFrame adapter; mutable containers and incompatible mixed types reject
+// before any random draws. Original typed values are retained in returned
+// sublogs.
+[[nodiscard]] ConceptDriftTypedTraceResult detect_concept_drift_typed_traces(
+    const std::vector<std::vector<EventAttribute>>& traces,
+    ConceptDriftTraceOptions options = {});
+
+[[nodiscard]] ConceptDriftTypedTraceResult detect_concept_drift_typed_traces(
+    const std::vector<std::vector<EventAttribute>>& traces,
     ConceptDriftTraceOptions options, std::mt19937& rng);
 
 // Apply signed BOSE options to an EventLog and return regenerated event tables.

@@ -242,6 +242,45 @@ int compare_activity_values(const EventAttribute& left,
   return compare_activity_values_impl(left, right, 0);
 }
 
+struct OrderedActivityEncoding {
+  std::unordered_map<std::string, std::string> labels;
+  bool nonstring = false;
+};
+
+// Assign surrogate string labels in the shared typed activity order. Both the
+// table adapter and the typed direct detector use this path so aliases,
+// tuples, nulls, and NaN identity retain one consistent ordering contract.
+template <class VisitValues>
+OrderedActivityEncoding ordered_activity_encoding(VisitValues&& visit_values) {
+  struct ActivityEntry {
+    const EventAttribute* value = nullptr;
+    std::string identity;
+  };
+  std::vector<ActivityEntry> activity_values;
+  std::unordered_map<std::string, std::size_t> activity_positions;
+  const auto collect = [&](const EventAttribute& value) {
+    const auto identity = activity_identity(value);
+    if (activity_positions.emplace(identity, activity_values.size()).second)
+      activity_values.push_back(ActivityEntry{&value, identity});
+  };
+  visit_values(collect);
+  std::sort(activity_values.begin(), activity_values.end(),
+            [](const ActivityEntry& left, const ActivityEntry& right) {
+              return compare_activity_values(*left.value, *right.value) < 0;
+            });
+
+  OrderedActivityEncoding result;
+  result.nonstring =
+      !activity_values.empty() &&
+      activity_family(*activity_values.front().value) != ActivityFamily::kString;
+  result.labels.reserve(activity_values.size());
+  std::size_t label_index = 0;
+  for (const auto& entry : activity_values)
+    result.labels.emplace(entry.identity,
+                          std::to_string(1'000'000'000ULL + label_index++));
+  return result;
+}
+
 std::string table_key_identity(const EventAttribute& value) {
   const auto kind = native_scalar_order_kind(value);
   if (kind == NativeScalarOrderKind::kDate) {
@@ -378,6 +417,61 @@ std::vector<SelectedGroup> collect_selected_groups(
 }
 }  // namespace
 
+ConceptDriftTypedTraceResult detect_concept_drift_typed_traces(
+    const std::vector<std::vector<EventAttribute>>& traces,
+    ConceptDriftTraceOptions options, std::mt19937& rng) {
+  constexpr std::size_t kTypedTraceLimit = 2'000'000;
+  constexpr std::size_t kTypedEventLimit = 20'000'000;
+  if (options.sub_log_size == 0)
+    throw std::invalid_argument("concept drift: sub_log_size must not be zero");
+  if (traces.size() > kTypedTraceLimit)
+    throw std::invalid_argument(
+        "concept drift: trace materialization exceeds safe bound");
+  std::size_t event_count = 0;
+  for (const auto& trace : traces) {
+    if (trace.size() > kTypedEventLimit - event_count)
+      throw std::invalid_argument(
+          "concept drift: event materialization exceeds safe bound");
+    event_count += trace.size();
+  }
+
+  const auto encoding = ordered_activity_encoding([&](const auto& collect) {
+    for (const auto& trace : traces)
+      for (const auto& activity : trace) collect(activity);
+  });
+  std::vector<std::vector<std::string>> encoded;
+  encoded.reserve(traces.size());
+  for (const auto& trace : traces) {
+    auto& labels = encoded.emplace_back();
+    labels.reserve(trace.size());
+    for (const auto& activity : trace) {
+      const auto found = encoding.labels.find(activity_identity(activity));
+      if (found == encoding.labels.end())
+        throw std::invalid_argument(
+            "concept drift: typed activity key encoding failed");
+      labels.push_back(found->second);
+    }
+  }
+
+  const auto detected = detect_concept_drift_traces(encoded, options, rng);
+  ConceptDriftTypedTraceResult result;
+  result.change_points = detected.change_points;
+  result.sublogs.reserve(detected.sublogs.size());
+  std::size_t trace_index = 0;
+  for (const auto& detected_group : detected.sublogs) {
+    auto& group = result.sublogs.emplace_back();
+    group.reserve(detected_group.size());
+    for (const auto& ignored_trace : detected_group) {
+      (void)ignored_trace;
+      if (trace_index >= traces.size())
+        throw std::logic_error(
+            "concept drift: typed sublog reconstruction exceeded input");
+      group.push_back(traces[trace_index++]);
+    }
+  }
+  return result;
+}
+
 ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
     const EventTable& table, ConceptDriftTableOptions options, std::mt19937& rng,
     std::size_t trace_limit) {
@@ -434,12 +528,6 @@ ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
                                AttributeKind::kString, true};
   null_activity.first_class_state = FirstClassAttributeState::kNull;
   std::vector<std::vector<const EventAttribute*>> activity_cells;
-  struct ActivityEntry {
-    const EventAttribute* value = nullptr;
-    std::string identity;
-  };
-  std::vector<ActivityEntry> activity_values;
-  std::unordered_map<std::string, std::size_t> activity_positions;
   activity_cells.reserve(projection.size());
   for (const auto& group : projection) {
     auto& cells = activity_cells.emplace_back();
@@ -449,24 +537,12 @@ ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
                               ? &*table.rows[i][activity]
                               : &null_activity;
       cells.push_back(value);
-      const auto identity = activity_identity(*value);
-      if (activity_positions.emplace(identity, activity_values.size()).second)
-        activity_values.push_back(ActivityEntry{value, identity});
     }
   }
-  std::sort(activity_values.begin(), activity_values.end(),
-            [](const ActivityEntry& left, const ActivityEntry& right) {
-              return compare_activity_values(*left.value, *right.value) < 0;
-            });
-  const bool nonstring_activity =
-      !activity_values.empty() &&
-      activity_family(*activity_values.front().value) != ActivityFamily::kString;
-  std::unordered_map<std::string, std::string> alphabet;
-  alphabet.reserve(activity_values.size());
-  std::size_t label_index = 0;
-  for (const auto& entry : activity_values)
-    alphabet.emplace(entry.identity,
-                     std::to_string(1'000'000'000ULL + label_index++));
+  const auto encoding = ordered_activity_encoding([&](const auto& collect) {
+    for (const auto& cells : activity_cells)
+      for (const auto* value : cells) collect(*value);
+  });
   std::vector<std::vector<std::string>> encoded, displayed;
   encoded.reserve(projection.size());
   displayed.reserve(projection.size());
@@ -474,13 +550,13 @@ ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
     encoded.emplace_back(); displayed.emplace_back();
     encoded.back().reserve(cells.size()); displayed.back().reserve(cells.size());
     for (const auto* value : cells) {
-      const auto found = alphabet.find(activity_identity(*value));
-      if (found == alphabet.end())
+      const auto found = encoding.labels.find(activity_identity(*value));
+      if (found == encoding.labels.end())
         throw std::invalid_argument(
             "concept drift table: activity key encoding failed");
       encoded.back().push_back(found->second);
       displayed.back().push_back(
-          nonstring_activity ? std::string{}
+          encoding.nonstring ? std::string{}
                              : root_cause_attribute_category(*value));
     }
   }
@@ -500,7 +576,7 @@ ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
   }
   // The public adapter joins activity strings only when emitting frames;
   // numeric labels therefore reject after the detector has advanced RNG.
-  if (nonstring_activity && !detected.sublogs.empty())
+  if (encoding.nonstring && !detected.sublogs.empty())
     throw std::invalid_argument("concept drift table: output activities must be strings");
   std::set<std::int64_t> boundaries;
   for (const auto& point : detected.change_points) boundaries.insert(point.sublog_index);

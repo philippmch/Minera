@@ -1791,6 +1791,35 @@ These helper contracts do not establish
 standalone permutation-test or DataFrame adapter parity, and do not promote the
 BOSE module or dispatcher to complete.
 
+### BOSE typed raw-trace detector checkpoint
+
+The public raw BOSE detector accepts non-string labels and returns their
+original values in raw sublogs. The native `detect_concept_drift_typed_traces`
+entry point now accepts ordered traces of `EventAttribute` values and returns
+typed sublogs with ranked change points. It shares activity equality and
+ordering with the table adapter, runs the existing detector on ordered surrogate
+labels, and restores original values, metadata, trace order, and NaN scalar
+identities in its results. Numeric/boolean aliases, nulls, bytes, dates, nested
+tuples, and shared/distinct NaNs follow that common activity path. The raw API
+has no timestamp requirement or output-frame string-join step.
+
+The pinned public corpus contains 108 raw calls; all 100 representable calls
+match sublog membership and preserved values, ranked points, signed zeros, and
+RNG continuation. The recursive EventLog probe also verifies 112 representable
+calls, including the eight tuple/NaN cases left unverified by the preceding
+dispatcher checkpoint. Eight pandas.NA calls in each new corpus remain
+reference-only because the native value model has no distinct pandas.NA
+sentinel; they are not counted as passing native comparisons.
+
+All 19,181 prior comparisons, 14 CLI checks, and the native suite pass after the
+shared encoding refactor, for 19,393 native comparisons in this checkpoint.
+Independent review is clear. Evidence and reproducible captures/probes are in
+`docs/bose-typed-direct-reference.json.gz`,
+`docs/bose-typed-direct-native-checks.json.gz`, and
+`docs/bose-typed-direct-validation.json`. Native resource limits and explicit
+seeding remain extensions. This finite checkpoint does not promote the BOSE
+module or dispatcher coverage status.
+
 ### BOSE signed public dispatcher checkpoint
 
 The native `apply_concept_drift` dispatcher now accepts EventLog and EventTable
