@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -24,6 +25,23 @@ namespace minera {
 namespace {
 constexpr std::size_t kTableEventLimit = 20'000'000;
 constexpr std::size_t kTableTraceLimit = 2'000'000;
+constexpr std::size_t kTypedFeatureCellLimit = 20'000'000;
+constexpr std::size_t kTypedRelationPairLimit = 2'000'000;
+constexpr std::size_t kTypedRelationWorkLimit = 200'000'000;
+
+void validate_typed_trace_materialization(
+    const std::vector<std::vector<EventAttribute>>& traces) {
+  if (traces.size() > kTableTraceLimit)
+    throw std::invalid_argument(
+        "concept drift: trace materialization exceeds safe bound");
+  std::size_t event_count = 0;
+  for (const auto& trace : traces) {
+    if (trace.size() > kTableEventLimit - event_count)
+      throw std::invalid_argument(
+          "concept drift: event materialization exceeds safe bound");
+    event_count += trace.size();
+  }
+}
 
 bool missing_table_cell(const std::optional<EventAttribute>& cell) {
   if (!cell || cell->is_null || cell->first_class_state == FirstClassAttributeState::kNull)
@@ -102,6 +120,14 @@ bool activity_nan(const EventAttribute& value) {
           value.value == "NAN");
 }
 
+bool activity_calendar_date(const EventAttribute& value) {
+  const auto* native = std::get_if<NativeDate>(&value.typed_value);
+  const std::string_view text = native ? native->value : value.value;
+  // The pinned Python behavior keeps date(YYYY-MM-DD) distinct from a
+  // datetime at midnight. NativeDate retains the canonical ISO spelling.
+  return text.size() == 10 && text[4] == '-' && text[7] == '-';
+}
+
 ActivityFamily activity_family_shallow(const EventAttribute& value) {
   if (value.is_null || value.first_class_state == FirstClassAttributeState::kNull)
     return ActivityFamily::kNull;
@@ -165,7 +191,9 @@ std::string activity_identity_impl(const EventAttribute& value,
       return "bytes:" + root_cause_scalar_key_fingerprint(value);
     case ActivityFamily::kDate: {
       const auto date = exact_date_key(value);
-      return "date:" + std::to_string(date.timezone_aware) + ":" +
+      return std::string(activity_calendar_date(value) ? "date:calendar:" :
+                                                          "date:datetime:") +
+             std::to_string(date.timezone_aware) + ":" +
              std::to_string(date.seconds) + ":" +
              std::to_string(date.nanoseconds);
     }
@@ -217,8 +245,14 @@ int compare_activity_values_impl(const EventAttribute& left,
     }
     case ActivityFamily::kString:
     case ActivityFamily::kBytes:
-    case ActivityFamily::kDate:
       return compare_same_kind(left, right);
+    case ActivityFamily::kDate:
+      if (activity_calendar_date(left) != activity_calendar_date(right))
+        throw std::invalid_argument(
+            "concept drift table: incompatible calendar date and datetime activities");
+      return activity_calendar_date(left)
+                 ? compare_exact_dates(left, right)
+                 : compare_same_kind(left, right);
     case ActivityFamily::kTuple: {
       const auto common = std::min(left.children.size(), right.children.size());
       for (std::size_t index = 0; index < common; ++index) {
@@ -247,27 +281,37 @@ struct OrderedActivityEncoding {
   bool nonstring = false;
 };
 
+struct OrderedActivityValue {
+  const EventAttribute* value = nullptr;
+  std::string identity;
+};
+
+template <class VisitValues>
+std::vector<OrderedActivityValue> ordered_unique_activity_values(
+    VisitValues&& visit_values) {
+  std::vector<OrderedActivityValue> activity_values;
+  std::unordered_map<std::string, std::size_t> activity_positions;
+  const auto collect = [&](const EventAttribute& value) {
+    const auto identity = activity_identity(value);
+    if (activity_positions.emplace(identity, activity_values.size()).second)
+      activity_values.push_back(OrderedActivityValue{&value, identity});
+  };
+  visit_values(collect);
+  std::sort(activity_values.begin(), activity_values.end(),
+            [](const OrderedActivityValue& left,
+               const OrderedActivityValue& right) {
+              return compare_activity_values(*left.value, *right.value) < 0;
+            });
+  return activity_values;
+}
+
 // Assign surrogate string labels in the shared typed activity order. Both the
 // table adapter and the typed direct detector use this path so aliases,
 // tuples, nulls, and NaN identity retain one consistent ordering contract.
 template <class VisitValues>
 OrderedActivityEncoding ordered_activity_encoding(VisitValues&& visit_values) {
-  struct ActivityEntry {
-    const EventAttribute* value = nullptr;
-    std::string identity;
-  };
-  std::vector<ActivityEntry> activity_values;
-  std::unordered_map<std::string, std::size_t> activity_positions;
-  const auto collect = [&](const EventAttribute& value) {
-    const auto identity = activity_identity(value);
-    if (activity_positions.emplace(identity, activity_values.size()).second)
-      activity_values.push_back(ActivityEntry{&value, identity});
-  };
-  visit_values(collect);
-  std::sort(activity_values.begin(), activity_values.end(),
-            [](const ActivityEntry& left, const ActivityEntry& right) {
-              return compare_activity_values(*left.value, *right.value) < 0;
-            });
+  const auto activity_values =
+      ordered_unique_activity_values(std::forward<VisitValues>(visit_values));
 
   OrderedActivityEncoding result;
   result.nonstring =
@@ -420,20 +464,9 @@ std::vector<SelectedGroup> collect_selected_groups(
 ConceptDriftTypedTraceResult detect_concept_drift_typed_traces(
     const std::vector<std::vector<EventAttribute>>& traces,
     ConceptDriftTraceOptions options, std::mt19937& rng) {
-  constexpr std::size_t kTypedTraceLimit = 2'000'000;
-  constexpr std::size_t kTypedEventLimit = 20'000'000;
   if (options.sub_log_size == 0)
     throw std::invalid_argument("concept drift: sub_log_size must not be zero");
-  if (traces.size() > kTypedTraceLimit)
-    throw std::invalid_argument(
-        "concept drift: trace materialization exceeds safe bound");
-  std::size_t event_count = 0;
-  for (const auto& trace : traces) {
-    if (trace.size() > kTypedEventLimit - event_count)
-      throw std::invalid_argument(
-          "concept drift: event materialization exceeds safe bound");
-    event_count += trace.size();
-  }
+  validate_typed_trace_materialization(traces);
 
   const auto encoding = ordered_activity_encoding([&](const auto& collect) {
     for (const auto& trace : traces)
@@ -470,6 +503,170 @@ ConceptDriftTypedTraceResult detect_concept_drift_typed_traces(
     }
   }
   return result;
+}
+
+std::vector<EventAttribute> extract_concept_drift_typed_activities(
+    const std::vector<std::vector<EventAttribute>>& traces) {
+  validate_typed_trace_materialization(traces);
+  const auto values = ordered_unique_activity_values([&](const auto& collect) {
+    for (const auto& trace : traces)
+      for (const auto& activity : trace) collect(activity);
+  });
+  std::vector<EventAttribute> result;
+  result.reserve(values.size());
+  for (const auto& value : values) result.push_back(*value.value);
+  return result;
+}
+
+std::vector<double> extract_concept_drift_typed_features(
+    const std::vector<std::vector<EventAttribute>>& traces,
+    const std::vector<EventAttribute>& alphabet) {
+  validate_typed_trace_materialization(traces);
+  if (alphabet.size() > kTypedFeatureCellLimit / 3)
+    throw std::invalid_argument(
+        "concept drift: activity feature vector is too large");
+
+  std::unordered_map<std::string, std::size_t> ids;
+  ids.reserve(alphabet.size());
+  std::vector<std::size_t> ordered_ids;
+  ordered_ids.reserve(alphabet.size());
+  for (const auto& activity : alphabet) {
+    const auto identity = activity_identity(activity);
+    auto [entry, inserted] = ids.emplace(identity, ids.size());
+    (void)inserted;
+    ordered_ids.push_back(entry->second);
+  }
+  const std::size_t unique_size = ids.size();
+  if (unique_size != 0 &&
+      unique_size > kTypedFeatureCellLimit / unique_size)
+    throw std::invalid_argument(
+        "concept drift: activity relation matrix is too large");
+
+  // Validate every trace label before allocating the relation matrix. Explicit
+  // alphabets preserve mixed types and order, so this path hashes identity but
+  // never invokes the sorting comparator.
+  for (const auto& trace : traces)
+    for (const auto& activity : trace)
+      if (!ids.contains(activity_identity(activity)))
+        throw std::invalid_argument(
+            "concept drift: event activity is absent from the supplied alphabet");
+
+  std::vector<std::size_t> trace_counts(unique_size, 0);
+  std::vector<std::size_t> follows(unique_size * unique_size, 0);
+  std::size_t relation_work = 0;
+  for (const auto& trace : traces) {
+    std::unordered_set<std::size_t> present;
+    present.reserve(std::min(trace.size(), unique_size));
+    std::unordered_set<std::size_t> relation;
+    relation.reserve(std::min(trace.size() * 2, unique_size * unique_size));
+    std::vector<std::size_t> seen;
+    seen.reserve(std::min(trace.size(), unique_size));
+    for (const auto& activity : trace) {
+      const auto target = ids.at(activity_identity(activity));
+      const bool first_occurrence = present.insert(target).second;
+      for (const auto source : seen) {
+        if (relation_work >= kTypedRelationWorkLimit)
+          throw std::invalid_argument(
+              "concept drift: activity relation work exceeds safe bound");
+        ++relation_work;
+        relation.insert(source * unique_size + target);
+      }
+      if (first_occurrence) seen.push_back(target);
+    }
+    for (const auto source : present) ++trace_counts[source];
+    for (const auto key : relation) ++follows[key];
+  }
+
+  std::vector<std::size_t> multiplicities(unique_size, 0);
+  for (const auto id : ordered_ids) ++multiplicities[id];
+  std::vector<std::size_t> always_by_target(unique_size, 0);
+  std::vector<std::size_t> sometimes_by_target(unique_size, 0);
+  std::vector<std::size_t> never_by_target(unique_size, 0);
+  for (std::size_t target = 0; target < unique_size; ++target) {
+    std::size_t always = 0, sometimes = 0, never = 0;
+    for (std::size_t source = 0; source < unique_size; ++source) {
+      if (trace_counts[source] == 0 ||
+          follows[source * unique_size + target] == 0) {
+        never += multiplicities[source];
+      } else if (follows[source * unique_size + target] ==
+                 trace_counts[source]) {
+        always += multiplicities[source];
+      } else {
+        sometimes += multiplicities[source];
+      }
+    }
+    always_by_target[target] = always;
+    sometimes_by_target[target] = sometimes;
+    never_by_target[target] = never;
+  }
+
+  std::vector<double> features;
+  features.reserve(alphabet.size() * 3);
+  for (const auto target : ordered_ids) {
+    features.push_back(static_cast<double>(always_by_target[target]));
+    features.push_back(static_cast<double>(sometimes_by_target[target]));
+    features.push_back(static_cast<double>(never_by_target[target]));
+  }
+  return features;
+}
+
+std::vector<std::pair<EventAttribute, EventAttribute>>
+compute_concept_drift_typed_follows_relation(
+    const std::vector<EventAttribute>& trace,
+    const std::vector<EventAttribute>& alphabet) {
+  if (trace.size() > kTableEventLimit || alphabet.size() > kTableEventLimit)
+    throw std::invalid_argument(
+        "concept drift: activity relation materialization exceeds safe bound");
+
+  std::unordered_set<std::string> allowed_targets;
+  allowed_targets.reserve(alphabet.size());
+  for (const auto& activity : alphabet)
+    allowed_targets.insert(activity_identity(activity));
+
+  // Validate all source values before relation/output materialization.
+  bool has_allowed_target = false;
+  for (const auto& activity : trace)
+    if (allowed_targets.contains(activity_identity(activity)))
+      has_allowed_target = true;
+  if (!has_allowed_target) return {};
+
+  struct SeenValue {
+    const EventAttribute* value = nullptr;
+    std::string identity;
+  };
+  std::vector<SeenValue> seen_values;
+  std::unordered_set<std::string> seen_identities;
+  const auto initial_capacity =
+      std::min(trace.size(), kTypedRelationPairLimit);
+  seen_values.reserve(initial_capacity);
+  seen_identities.reserve(initial_capacity);
+  std::vector<std::pair<EventAttribute, EventAttribute>> relations;
+  std::unordered_set<std::string> relation_identities;
+  std::size_t relation_work = 0;
+  for (const auto& activity : trace) {
+    const auto target_identity = activity_identity(activity);
+    if (allowed_targets.contains(target_identity)) {
+      for (const auto& source : seen_values) {
+        if (relation_work >= kTypedRelationWorkLimit)
+          throw std::invalid_argument(
+              "concept drift: activity relation work exceeds safe bound");
+        ++relation_work;
+        std::string identity = std::to_string(source.identity.size()) + ":" +
+                               source.identity +
+                               std::to_string(target_identity.size()) + ":" +
+                               target_identity;
+        if (relation_identities.contains(identity)) continue;
+        if (relations.size() >= kTypedRelationPairLimit)
+          throw std::invalid_argument(
+              "concept drift: activity relation result exceeds safe bound");
+        relation_identities.insert(std::move(identity));
+        relations.emplace_back(*source.value, activity);
+      }
+    }
+    if (seen_identities.insert(target_identity).second)
+      seen_values.push_back(SeenValue{&activity, target_identity});
+  }
+  return relations;
 }
 
 ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
