@@ -1,0 +1,25 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Signed BOSE dispatcher for EventLog and EventTable",
+  "public_dispatcher_observations": 168,
+  "new_native_dispatcher_comparisons": 72,
+  "existing_cases_replayed_through_dispatcher": 1923,
+  "additional_scalar_comparisons": 12,
+  "total_native_comparisons": 2007,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "parent_commit": "57305f5c5acdf8dd5e3ab57c79c7641be4fa2c70",
+  "verified_code_tree": "73f4ad2c8594f4f4b61a2bcf568712cacfae32ea",
+  "core_library_sha256": "7e962a56d6982f80c7f4fb51334411e4b27f326ef4255807e406ffda7185b01d",
+  "artifacts": {
+    "docs/bose-dispatch-reference.json.gz": "c8c5ddab9fd5e969305079c7776196a03fb284be4756d5ca58174e67596a009d",
+    "docs/bose-dispatch-native-checks.json.gz": "05a7a9d6930192834e577bfe4355845e1f0643ff66808e229a12c34b2852dbc8"
+  },
+  "limits": [
+    "No coverage status promotion; full BOSE module and dispatcher parity remain unproven.",
+    "Public EventStream and explicit None observations are reference-only; native overloads advertise EventLog and EventTable.",
+    "Eight tuple/shared-NaN EventLog observations require richer native probe input before claiming comparison.",
+    "Native exception classes and wording are not claimed equal to Python exceptions.",
+    "Prior full BOSE regression evidence is retained in the parent checkpoint; this forwarding-only change reruns adapter corpora and native tests."
+  ]
+}

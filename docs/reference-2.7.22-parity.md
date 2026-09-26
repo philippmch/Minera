@@ -1791,6 +1791,33 @@ These helper contracts do not establish
 standalone permutation-test or DataFrame adapter parity, and do not promote the
 BOSE module or dispatcher to complete.
 
+### BOSE signed public dispatcher checkpoint
+
+The native `apply_concept_drift` dispatcher now accepts EventLog and EventTable
+inputs with signed options, default or explicit BOSE selection, and either
+seeded or caller-owned RNG state. Each overload validates the variant before
+calling the corresponding adapter. EventLog input order and DataFrame case
+projection remain distinct, as observed through the pinned public dispatcher.
+
+A 168-call reference audit compares default dispatch, explicit BOSE, direct
+variant calls, and explicit `None` across logs, DataFrames, and event streams.
+The three BOSE routes agree for each fixture and seed. Explicit `None` rejects
+before RNG; tested nonempty event streams raise `KeyError(0)` before RNG, while
+empty streams return empty results. The native overloads implement the two
+advertised input types, EventLog and DataFrame; they do not convert event streams.
+
+All 72 new advertised-input replays and 1,923 existing adapter cases pass through
+the dispatcher. A separate typed-activity audit adds 12 passing scalar EventLog
+comparisons, for 2,007 native comparisons in this checkpoint. The native suite
+passes and independent review is clear. Eight additional public tuple/NaN cases
+are captured but require a richer native probe before agreement can be claimed.
+
+Evidence is retained in `docs/bose-dispatch-reference.json.gz`,
+`docs/bose-dispatch-native-checks.json.gz`, and
+`docs/bose-dispatch-validation.json`. The strict diagnostic CLI/server contract
+is unchanged. Full BOSE module and dispatcher parity remain unproven; coverage
+statuses are not promoted by this finite checkpoint.
+
 ### BOSE signed EventLog apply adapter checkpoint
 
 `apply_concept_drift_log` exposes the signed EventLog apply contract and returns

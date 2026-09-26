@@ -111,6 +111,25 @@ struct ConceptDriftTableResult {
 [[nodiscard]] ConceptDriftTableResult apply_concept_drift_table(
     const EventTable& table, ConceptDriftTableOptions options, std::mt19937& rng);
 
+// Dispatch signed BOSE apply for EventLog or EventTable inputs. Unknown
+// variants reject before adapter validation or RNG consumption.
+[[nodiscard]] ConceptDriftTableResult apply_concept_drift(
+    const EventLog& log, ConceptDriftTableOptions options = {},
+    ConceptDriftVariant variant = ConceptDriftVariant::kBose);
+
+[[nodiscard]] ConceptDriftTableResult apply_concept_drift(
+    const EventLog& log, ConceptDriftTableOptions options, std::mt19937& rng,
+    ConceptDriftVariant variant = ConceptDriftVariant::kBose);
+
+[[nodiscard]] ConceptDriftTableResult apply_concept_drift(
+    const EventTable& table, ConceptDriftTableOptions options = {},
+    ConceptDriftVariant variant = ConceptDriftVariant::kBose);
+
+[[nodiscard]] ConceptDriftTableResult apply_concept_drift(
+    const EventTable& table, ConceptDriftTableOptions options,
+    std::mt19937& rng,
+    ConceptDriftVariant variant = ConceptDriftVariant::kBose);
+
 [[nodiscard]] std::vector<std::string> extract_concept_drift_activities(
     const EventLog& log);
 
