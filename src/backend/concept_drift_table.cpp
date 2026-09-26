@@ -1,6 +1,7 @@
 #include "minera/concept_drift.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <map>
 #include <limits>
@@ -423,7 +424,25 @@ double table_epoch(const EventAttribute* cell) {
                                detail::CountUint128{high >> 32, high << 32});
   const auto fraction = detail::CountUint128::from_uint64(parsed->nanoseconds);
   numerator = negative ? detail::subtract(numerator, fraction) : detail::add(numerator, fraction);
-  return detail::exact_ratio(numerator, detail::CountUint128::from_uint64(scale), negative);
+  const double epoch = detail::exact_ratio(
+      numerator, detail::CountUint128::from_uint64(scale), negative);
+
+  // The public BOSE adapter exposes timestamp values rounded to six decimal
+  // places. Round the binary64 epoch value through decimal formatting so
+  // halfway cases follow the same behavior as Python's rounded float path.
+  char rounded[64];
+  const auto formatted = std::to_chars(
+      rounded, rounded + sizeof(rounded), epoch, std::chars_format::fixed, 6);
+  if (formatted.ec != std::errc{})
+    throw std::invalid_argument(
+        "concept drift table: case-start date is out of range");
+  double result = 0.0;
+  const auto parsed_rounded =
+      std::from_chars(rounded, formatted.ptr, result);
+  if (parsed_rounded.ec != std::errc{})
+    throw std::invalid_argument(
+        "concept drift table: case-start date is out of range");
+  return result;
 }
 
 struct SelectedGroup {

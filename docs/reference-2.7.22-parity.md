@@ -1791,6 +1791,41 @@ These helper contracts do not establish
 standalone permutation-test or DataFrame adapter parity, and do not promote the
 BOSE module or dispatcher to complete.
 
+### BOSE change-timestamp microsecond rounding checkpoint
+
+The public table and EventLog adapters round returned change timestamps to six
+decimal places after converting the exact instant to a floating-point epoch.
+The native shared adapter previously retained nanoseconds. It now uses decimal
+formatting and parsing to reproduce that rounding, including negative zero.
+Integer microsecond rounding is insufficient: captured 500 ns returns zero,
+while 2,500 ns returns 3 microseconds because the binary epoch value matters.
+Case/activity equality and ordering retain exact timestamp precision.
+
+The new corpus contains 32 table cases covering nanosecond second/day
+boundaries, timezones, a custom selected timestamp column, and first-row NaT,
+plus 34 precision controls for each of EventTable and EventLog. All 100 now
+match, up from 24 before the fix. The controls check positive and negative
+submicrosecond/halfway instants, modern epochs, timestamp zero signs, returned
+frames, probabilities, and RNG continuation. All 19,514 prior comparisons
+retain their results: 19,513 exact matches and the documented variable NaN
+tuple ordering difference. The combined result is 19,613 exact matches out of
+19,614 comparisons, with two native suites and 14 CLI checks passing.
+
+The registered `minera_bose_parity_contract_tests` target adds named
+`bose_module_contract` and `bose_dispatch_contract` cases that directly
+exercise the public native entry points with captured expected outputs.
+Independent review is clear for the timestamp fix. Captures, before/after
+reports, signed-zero comparisons, and review are in
+`docs/bose-timestamp-resolution-reference.json.gz`,
+`docs/bose-timestamp-resolution-native-checks.json.gz`, and
+`docs/bose-timestamp-resolution-validation.json`.
+
+The completion audit identified a remaining semantic gap: the reference
+accepts pandas.NA as a unique activity label, while native null represents
+None and cannot reproduce the sentinel's distinct comparison behavior.
+Those observations remain reference-only. Neither BOSE coverage row is
+promoted; a distinct representation and behavioral verification are required.
+
 ### BOSE typed activity helpers and calendar-date checkpoint
 
 Three native helpers now expose typed unique activities, relation-count
