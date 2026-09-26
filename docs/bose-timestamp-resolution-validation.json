@@ -1,0 +1,24 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "BOSE table and EventLog change timestamp rounding to six decimal places",
+  "parent_commit": "94d2e9f38ce27111695fe338c65984e1344f777b",
+  "verified_code_tree": "d9f19b9f3b1b9aa813ec10fe082436c1e655c51b",
+  "core_library_sha256": "ba7a5c8da13764226f1e915c5b22a9b82b1fb2b4856575106f85274b5d4e65b2",
+  "timestamp_comparisons": 100,
+  "timestamp_baseline_matches": 24,
+  "total_native_comparisons": 19614,
+  "exact_native_matches": 19613,
+  "documented_ordering_differences": 1,
+  "cli_checks": 14,
+  "native_suites": 2,
+  "independent_review": "clear",
+  "artifacts": {
+    "docs/bose-timestamp-resolution-reference.json.gz": "c6662358548eaaf4c428c94ad4ebf8b543e4d7c47bcde9dde3bb420f4c1f8a39",
+    "docs/bose-timestamp-resolution-native-checks.json.gz": "72023fd3693beb4df7cd1e458ae4bb7ec80dcf9d5e3befe20116cb95fa496960"
+  },
+  "remaining": [
+    "BOSE module and dispatcher remain partial: pandas.NA requires a distinct native value representation and behavioral verification.",
+    "The existing allocation-dependent NaN tuple list-order difference remains visible and is not counted as an exact match.",
+    "Resource bounds and the pinned float64 runtime remain documented boundaries."
+  ]
+}
