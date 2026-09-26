@@ -1,0 +1,25 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Edit-distance empty-target validation and anti-alignment tie order",
+  "parent_commit": "f648de0f7b946875325e331c5f01750cb61fcc36",
+  "verified_code_tree": "5d9d56f966bead71e85a5b3bc0b7784e9a5ff6e5",
+  "core_sha256": "1ab19ef2d9e879fc27bd2f3229a89e2b8350d3dabec8c7b8394ffeb3671f3d1e",
+  "whole_log_scenarios": 36,
+  "public_whole_log_routes": 3,
+  "native_comparisons": 108,
+  "matched": 108,
+  "baseline_matches": 90,
+  "direct_helper_reference_only": 9,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "comparison": "Exact ordered moves, integer costs/bwc, numeric fitness and mapped empty-target diagnostic; not Python exception class identity.",
+  "artifacts": {
+    "docs/edit-distance-core-reference.json.gz": "0d5eec43c7a8da2e84fedfb8a43e851906592cea5fc49cbfbd5b6ee373381dbf",
+    "docs/edit-distance-core-native-checks.json.gz": "ee7c904a077495ca7f611926dfb865d3b888283c9979bc8d9aa40b7a44c76fad"
+  },
+  "remaining": [
+    "Direct helper mapping/cache API has reference observations but no native comparison.",
+    "Advertised DataFrame and projection behavior still needs native comparison.",
+    "Broader typed activity and tie behavior remains to be audited; both edit-distance coverage rows remain partial."
+  ]
+}

@@ -65,8 +65,9 @@ struct EditDistanceAlignment {
 
 // Align every trace in source against the closest (or, for anti-alignment,
 // farthest) variant in target. Duplicate variants are grouped and results are
-// restored to source-trace order; equal-distance ties choose the
-// lexicographically smallest activity sequence and then its first occurrence.
+// restored to source-trace order. Ordinary equal-distance ties choose the
+// lexicographically smallest activity sequence and then its first occurrence;
+// anti-alignment ties choose the last distinct target in first-occurrence order.
 [[nodiscard]] std::vector<EditDistanceAlignment> align_edit_distance(
     const EventLog& source, const EventLog& target,
     EditDistanceOptions options = {});

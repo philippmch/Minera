@@ -61,6 +61,14 @@ int main() {
   anti.perform_anti_alignment = true;
   const auto far = align_edit_distance(log_of({{"a"}}), log_of({{"a"}, {"b", "c"}}), anti);
   assert(far[0].target_variant == std::vector<std::string>({"b", "c"}));
+  const auto anti_tie_bc =
+      align_edit_distance(log_of({{"a"}}), log_of({{"b"}, {"c"}}), anti);
+  const auto anti_tie_cb =
+      align_edit_distance(log_of({{"a"}}), log_of({{"c"}, {"b"}}), anti);
+  assert(anti_tie_bc[0].target_variant == std::vector<std::string>{"c"} &&
+         anti_tie_bc[0].target_index == 1);
+  assert(anti_tie_cb[0].target_variant == std::vector<std::string>{"b"} &&
+         anti_tie_cb[0].target_index == 1);
 
   const auto duplicate = align_edit_distance(log_of({{"a"}, {"a"}, {"b"}}),
                                              log_of({{"a"}, {"a"}}));
@@ -69,6 +77,9 @@ int main() {
 
   assert(align_edit_distance(EventLog{}, target).empty());
   bool threw = false;
+  try { (void)align_edit_distance(EventLog{}, EventLog{}); } catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
   try { (void)align_edit_distance(source, EventLog{}); } catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
   const auto empty_trace = align_edit_distance(log_of({{}}), log_of({{"a"}}));
