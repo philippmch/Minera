@@ -1,0 +1,80 @@
+{
+  "status": "semantic_contract_verified",
+  "coverage_units": [
+    "algo.concept_drift",
+    "algo.concept_drift.variants.bose"
+  ],
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "implementation_commit": "c223660ac33da47a919eb7095e29bd645ba6b856",
+  "verified_code_tree": "936d2a119bce174f992e155ed3900a696246d145",
+  "core_library_sha256": "6114330fa513547f359b2e3ce1488b547e08052c739e95c8da5672df52e41e88",
+  "total_native_comparisons": 20899,
+  "exact_native_matches": 20886,
+  "documented_ordering_differences": 13,
+  "native_suites": 2,
+  "cli_checks": 14,
+  "source_files": {
+    "include/minera/concept_drift.hpp": "d504eacc7dad920c94b239a15c72611d558f8b247deec284d9f7726c8e0669f0",
+    "src/backend/concept_drift.cpp": "a0b0d3a07406bcd2e08563a020f76a2bd31e8a83b18c5fec676d77e63cac9f62",
+    "src/backend/concept_drift_table.cpp": "ed409c3a5a997bc52a4fa60e693773d696544aed191ead2e8a396afc9653f927",
+    "src/backend/tests/test_bose_parity_contracts.cpp": "61068e9d8247bd555d8d2ca9cc652ed9c81113f5e2cb1298964a56c2c5229f15",
+    "src/backend/tests/test_concept_drift.cpp": "6a3bf994f6d981a63db5acad55e96e8b3c83b8d77566787241a05a0adcde1238",
+    "src/backend/tests/bose_follows_alphabet_tests.hpp": "56bcc85015d12dea204eccea878082ebda9b691bc1f42226a2c0c726599143f4",
+    "CMakeLists.txt": "4df9373eabc01db80c176efa34d598233dd61d60e7328d7dd742ed22fe708b49",
+    "scripts/verify-reference-parity.mjs": "e08a023bb86725ffd24078b25147404d7bd60cd16b1715ffc2f2bb651d6f61d5",
+    "scripts/test-reference-parity-verifier.mjs": "f7ffb33518b3a9433c040f3a96b3f80423c9c7d9b848f865164c05a9138220f3"
+  },
+  "artifacts": {
+    "docs/bose-follows-alphabet-validation.json": "05cfd2cba4965fab949c0bd7d2909d8aea806bb8bd15ab0785cbd661a54fa057",
+    "docs/bose-follows-alphabet-native-checks.json.gz": "593b3b77e49b56563bc99c06837e27db2fb23abc1fb0a77fc6fbf9b9e4e8db7b",
+    "docs/bose-parity-contract.md": "3c03ecd05ca6291be67df40d3e3934881ef938e1e9a0a8a35ff51720bf17cf0e",
+    "docs/bose-parity-completion-audit.json.gz": "948b747f6924c68434178b6b8bbbf6d02309e04a293e81b9e0376073b16fa8a5",
+    "docs/bose-dispatch-reference.json.gz": "c8c5ddab9fd5e969305079c7776196a03fb284be4756d5ca58174e67596a009d",
+    "docs/bose-na-reference.json.gz": "530c586d13d40a564004fee6c3df88da44ec51c5552889ab66212e245e7556fd",
+    "docs/bose-frozenset-reference.json.gz": "1d06e847def16ce29081715919456c55fcc9a0ba78d2358b5adcfd57b0d02886",
+    "docs/bose-follows-alphabet-reference.json.gz": "8baee13da3b93f74af1271a2141c4af34ee40a5f805a9a3f0b8dd71cf6282d40"
+  },
+  "named_contracts": [
+    "bose_module_contract",
+    "bose_dispatch_contract"
+  ],
+  "independent_scope_review": "clear",
+  "requirement_audit": "verified",
+  "structural_gate": "passed exact catalogue, module and selector proofs",
+  "project_wide_completion": false,
+  "catalogue_gates": {
+    "normal": {
+      "command": [
+        "node",
+        "scripts/verify-reference-parity.mjs",
+        "C:/Users/pmoch/AppData/Local/Temp/pm4py-2.7.22-ref",
+        "--project-root",
+        "build/petri-comparison-checkpoint-source",
+        "--manifest",
+        "build/petri-comparison-checkpoint-source/docs/reference-2.7.22-coverage.json"
+      ],
+      "exit_code": 0,
+      "output": "verified 86 dispatcher packages (45 complete, 41 partial) and 387 non-dispatcher modules (196 complete, 191 partial)\n"
+    },
+    "strict": {
+      "command": [
+        "node",
+        "scripts/verify-reference-parity.mjs",
+        "C:/Users/pmoch/AppData/Local/Temp/pm4py-2.7.22-ref",
+        "--project-root",
+        "build/petri-comparison-checkpoint-source",
+        "--manifest",
+        "build/petri-comparison-checkpoint-source/docs/reference-2.7.22-coverage.json",
+        "--require-complete"
+      ],
+      "exit_code": 1,
+      "output": "parity verification failed: --require-complete gate rejected 232 incomplete coverage units: algo.anonymization.pripel, algo.anonymization.trace_variant_query, algo.clustering.profiles, algo.clustering.trace_attribute_driven, algo.conformance.alignments.decomposed, algo.conformance.alignments.dfg, algo.conformance.alignments.edit_distance, algo.conformance.alignments.petri_net, algo.conformance.alignments.process_tree, algo.conformance.ocel.etot, algo.conformance.ocel.ocdfg, algo.conformance.ocel.otg, algo.conformance.tokenreplay, algo.connectors, algo.decision_mining, algo.discovery.alpha, algo.discovery.genetic, algo.discovery.heuristics, algo.discovery.ilp, algo.discovery.ocel.etot, algo.discovery.ocel.interleavings, algo.discovery.ocel.link_analysis, algo.discovery.ocel.ocdfg, algo.discovery.ocel.ocpn, algo.discovery.ocel.otg, algo.discovery.ocel.saw_nets, algo.evaluation, algo.evaluation.generalization, algo.evaluation.precision, algo.evaluation.replay_fitness, algo.evaluation.simplicity, algo.label_splitting, algo.merging.case_relations, algo.querying.llm.injection, algo.querying.llm.injection.db_knowledge, algo.querying.llm.injection.pm_knowledge, algo.simulation.montecarlo, algo.simulation.playout.oc_causal_net, algo.simulation.playout.ocpn, algo.transformation.log_to_features, algo.transformation.to_embeddings, algo.anonymization.pripel.util.AttributeAnonymizer, algo.anonymization.pripel.util.trace_levenshtein, algo.anonymization.pripel.util.TraceMatcher, algo.anonymization.pripel.variants.pripel, algo.anonymization.trace_variant_query.util.behavioralAppropriateness, algo.anonymization.trace_variant_query.util.exp_mech, algo.anonymization.trace_variant_query.util.util, algo.anonymization.trace_variant_query.variants.laplace, algo.anonymization.trace_variant_query.variants.sacofa, algo.clustering.profiles.variants.sklearn_profiles, algo.clustering.trace_attribute_driven.dfg.dfg_dist, algo.clustering.trace_attribute_driven.leven_dist.leven_dist_calc, algo.clustering.trace_attribute_driven.linkage_method.linkage_avg, algo.clustering.trace_attribute_driven.merge_log.merge_log, algo.clustering.trace_attribute_driven.util.evaluation, algo.clustering.trace_attribute_driven.util.filter_subsets, algo.clustering.trace_attribute_driven.variants.act_dist_calc, algo.clustering.trace_attribute_driven.variants.logslice_dist, algo.clustering.trace_attribute_driven.variants.sim_calc, algo.clustering.trace_attribute_driven.variants.suc_dist_calc, algo.comparison.petrinet.element_usage_comparison, algo.conformance.alignments.decomposed.variants.recompos_maximal, algo.conformance.alignments.dfg.variants.classic, algo.conformance.alignments.edit_distance.variants.edit_distance, algo.conformance.alignments.petri_net.utils.log_enrichment, algo.conformance.alignments.petri_net.variants.dijkstra_less_memory, algo.conformance.alignments.petri_net.variants.dijkstra_no_heuristics, algo.conformance.alignments.petri_net.variants.discounted_a_star, algo.conformance.alignments.petri_net.variants.generator_dijkstra_less_memory, algo.conformance.alignments.petri_net.variants.generator_dijkstra_no_heuristics, algo.conformance.alignments.petri_net.variants.state_equation_a_star, algo.conformance.alignments.process_tree.util.search_graph_pt_frequency_annotation, algo.conformance.alignments.process_tree.util.search_graph_pt_replay_semantics, algo.conformance.alignments.process_tree.variants.approximated.calculate_a_sa_ea_sets, algo.conformance.alignments.process_tree.variants.approximated.original, algo.conformance.alignments.process_tree.variants.approximated.utilities, algo.conformance.alignments.process_tree.variants.dynamic_programming, algo.conformance.alignments.process_tree.variants.milp, algo.conformance.alignments.process_tree.variants.search_graph_pt, algo.conformance.ocel.etot.variants.graph_comparison, algo.conformance.ocel.ocdfg.variants.graph_comparison, algo.conformance.ocel.otg.variants.graph_comparison, algo.conformance.tokenreplay.diagnostics.root_cause_analysis, algo.conformance.tokenreplay.variants.backwards, algo.conformance.tokenreplay.variants.token_replay, algo.connectors.util.mail, algo.connectors.variants.camunda_workflow, algo.connectors.variants.chrome_history, algo.connectors.variants.firefox_history, algo.connectors.variants.github_repo, algo.connectors.variants.outlook_calendar, algo.connectors.variants.outlook_mail_extractor, algo.connectors.variants.sap_accounting, algo.connectors.variants.sap_o2c, algo.connectors.variants.windows_events, algo.discovery.alpha.variants.plus, algo.discovery.genetic.util, algo.discovery.genetic.variants.classic, algo.discovery.heuristics.variants.classic, algo.discovery.heuristics.variants.plusplus, algo.discovery.ilp.variants.classic, algo.discovery.ocel.etot.variants.classic, algo.discovery.ocel.interleavings.utils.merge_dataframe_rel_cases, algo.discovery.ocel.interleavings.variants.timestamp_interleavings, algo.discovery.ocel.link_analysis.variants.classic, algo.discovery.ocel.ocdfg.variants.classic, algo.discovery.ocel.ocpn.variants.classic, algo.discovery.ocel.ocpn.variants.wo_annotation, algo.discovery.ocel.otg.variants.classic, algo.discovery.ocel.saw_nets.variants.classic, algo.evaluation.generalization.variants.token_based, algo.evaluation.precision.utils, algo.evaluation.precision.variants.align_etconformance, algo.evaluation.precision.variants.automaton_after_align, algo.evaluation.precision.variants.etconformance_token, algo.evaluation.replay_fitness.variants.alignment_based, algo.evaluation.replay_fitness.variants.token_replay, algo.evaluation.simplicity.variants.arc_degree, algo.evaluation.simplicity.variants.extended_cardoso, algo.evaluation.simplicity.variants.extended_cyclomatic, algo.filtering.common.attributes.attributes_common, algo.filtering.common.end_activities.end_activities_common, algo.filtering.common.filtering_constants, algo.filtering.common.start_activities.start_activities_common, algo.filtering.common.timestamp.timestamp_common, algo.filtering.common.traces.infix_to_regex, algo.filtering.dfg.dfg_filtering, algo.filtering.log.attr_value_repetition.filter, algo.filtering.log.attributes.attributes_filter, algo.filtering.log.between.between_filter, algo.filtering.log.cases.case_filter, algo.filtering.log.end_activities.end_activities_filter, algo.filtering.log.ltl.ltl_checker, algo.filtering.log.paths.paths_filter, algo.filtering.log.prefixes.prefix_filter, algo.filtering.log.rework.rework_filter, algo.filtering.log.start_activities.start_activities_filter, algo.filtering.log.suffixes.suffix_filter, algo.filtering.log.timestamp.timestamp_filter, algo.filtering.log.traces.trace_filter, algo.filtering.log.variants.variants_filter, algo.filtering.ocel.activity_type_matching, algo.filtering.ocel.event_attributes, algo.filtering.ocel.object_attributes, algo.filtering.ocel.objects_ot_count, algo.filtering.ocel.ot_endpoints, algo.filtering.pandas.activity_split.activity_split_filter, algo.filtering.pandas.attr_value_repetition.filter, algo.filtering.pandas.attributes.attributes_filter, algo.filtering.pandas.between.between_filter, algo.filtering.pandas.cases.case_filter, algo.filtering.pandas.consecutive_act_case_grouping.consecutive_act_case_grouping_filter, algo.filtering.pandas.end_activities.end_activities_filter, algo.filtering.pandas.ends_with.ends_with_filter, algo.filtering.pandas.ltl.ltl_checker, algo.filtering.pandas.paths.paths_filter, algo.filtering.pandas.pd_filtering_constants, algo.filtering.pandas.prefixes.prefix_filter, algo.filtering.pandas.rework.rework_filter, algo.filtering.pandas.start_activities.start_activities_filter, algo.filtering.pandas.starts_with.starts_with_filter, algo.filtering.pandas.suffixes.suffix_filter, algo.filtering.pandas.timestamp_case_grouping.timestamp_case_grouping_filter, algo.filtering.pandas.timestamp.timestamp_filter, algo.filtering.pandas.traces.trace_filter, algo.filtering.pandas.variants.variants_filter, algo.filtering.polars.activity_split.activity_split_filter, algo.filtering.polars.attr_value_repetition.filter, algo.filtering.polars.attributes.attributes_filter, algo.filtering.polars.between.between_filter, algo.filtering.polars.cases.case_filter, algo.filtering.polars.consecutive_act_case_grouping.consecutive_act_case_grouping_filter, algo.filtering.polars.end_activities.end_activities_filter, algo.filtering.polars.ends_with.ends_with_filter, algo.filtering.polars.ltl.ltl_checker, algo.filtering.polars.paths.paths_filter, algo.filtering.polars.polars_filtering_constants, algo.filtering.polars.prefixes.prefix_filter, algo.filtering.polars.rework.rework_filter, algo.filtering.polars.start_activities.start_activities_filter, algo.filtering.polars.starts_with.starts_with_filter, algo.filtering.polars.suffixes.suffix_filter, algo.filtering.polars.timestamp_case_grouping.timestamp_case_grouping_filter, algo.filtering.polars.timestamp.timestamp_filter, algo.filtering.polars.traces.trace_filter, algo.filtering.polars.variants.variants_filter, algo.label_splitting.variants.contextual, algo.merging.case_relations.variants.pandas, algo.organizational_mining.util, algo.querying.llm.abstractions.case_to_descr, algo.querying.llm.abstractions.declare_to_descr, algo.querying.llm.abstractions.log_to_cols_descr, algo.querying.llm.abstractions.log_to_dfg_descr, algo.querying.llm.abstractions.log_to_fea_descr, algo.querying.llm.abstractions.log_to_variants_descr, algo.querying.llm.abstractions.logske_to_descr, algo.querying.llm.abstractions.net_to_descr, algo.querying.llm.abstractions.ocel_fea_descr, algo.querying.llm.abstractions.ocel_ocdfg_descr, algo.querying.llm.abstractions.stream_to_descr, algo.querying.llm.abstractions.tempprofile_to_descr, algo.querying.llm.connectors.anthropic, algo.querying.llm.connectors.google, algo.querying.llm.connectors.openai, algo.querying.llm.injection.db_knowledge.variants.pandas_duckdb, algo.querying.llm.injection.db_knowledge.variants.sqlite3_traditional, algo.querying.llm.injection.pm_knowledge.variants.ocel20, algo.querying.llm.injection.pm_knowledge.variants.traditional, algo.querying.llm.utils.sql_utils, algo.reduction.process_tree.reducer, algo.reduction.process_tree.variants.tree_tr_based, algo.simulation.montecarlo.utils.replay, algo.simulation.montecarlo.variants.petri_semaph_fifo, algo.simulation.playout.oc_causal_net.variants.extensive, algo.simulation.playout.ocpn.variants.extensive, algo.simulation.playout.ocpn.variants.utils, algo.transformation.log_to_features.util.locally_linear_embedding, algo.transformation.log_to_features.variants.event_based, algo.transformation.log_to_features.variants.temporal, algo.transformation.log_to_features.variants.temporal_lazy, algo.transformation.log_to_features.variants.trace_based, algo.transformation.ocel.graphs.object_cobirth_graph, algo.transformation.ocel.graphs.object_codeath_graph, algo.transformation.ocel.graphs.object_descendants_graph, algo.transformation.ocel.graphs.object_inheritance_graph, algo.transformation.ocel.graphs.object_interaction_graph, algo.transformation.ocel.graphs.ocel20_computation, algo.transformation.to_embeddings.util.embed_sentence, algo.transformation.to_embeddings.util.similarity, algo.transformation.to_embeddings.variants.cases_transformers, algo.transformation.to_embeddings.variants.events_transformers\n"
+    }
+  },
+  "incomplete_project_coverage_units": 232,
+  "verifier_source_sha256": "e08a023bb86725ffd24078b25147404d7bd60cd16b1715ffc2f2bb651d6f61d5",
+  "verified_manifest_sha256": "19439656179c7de65a0f3a536039287a40ce5a1f3a96219549e7842aec5b558c",
+  "verified_manifest_git_blob": "55265d6d0f2ff6824a10a60592a50ad78049d33d",
+  "verifier_regression_suite": "passed",
+  "independent_verifier_review": "clear"
+}
