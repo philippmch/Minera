@@ -53,6 +53,51 @@ PetriNet sequential(bool hidden = false) {
   return net;
 }
 
+EventAttribute selected_activity(std::string value,
+                                 AttributeKind kind = AttributeKind::kString,
+                                 bool is_null = false) {
+  EventAttribute attribute;
+  attribute.key = "user:activity";
+  attribute.value = std::move(value);
+  attribute.kind = kind;
+  attribute.is_null = is_null;
+  if (kind == AttributeKind::kInt && !is_null)
+    attribute.typed_value = std::int64_t{1};
+  if (is_null)
+    attribute.first_class_state = FirstClassAttributeState::kNull;
+  return attribute;
+}
+
+EventLog typed_activity_fixture() {
+  EventLog log;
+  const auto string_a = selected_activity("A");
+  auto string_a_with_child_metadata = string_a;
+  string_a_with_child_metadata.children = {{"detail", "retained"}};
+  const auto integer_one = selected_activity("1", AttributeKind::kInt);
+  const auto string_one = selected_activity("1");
+  const auto null_activity = selected_activity("", AttributeKind::kString, true);
+  const auto empty_activity = selected_activity("");
+  const auto add_trace = [&](std::initializer_list<EventAttribute> attributes) {
+    Trace trace;
+    trace.case_id = "typed-" + std::to_string(log.traces.size());
+    for (const auto& attribute : attributes) {
+      Event event;
+      event.attributes.push_back(attribute);
+      trace.events.push_back(std::move(event));
+    }
+    log.traces.push_back(std::move(trace));
+  };
+  add_trace({string_a, null_activity, integer_one});
+  add_trace({string_a, integer_one});
+  add_trace({string_a, string_one});
+  add_trace({string_a, empty_activity});
+  // A scalar string's selected activity identity is its value. Retained
+  // child metadata must not split an otherwise equal replay variant.
+  add_trace({string_a_with_child_metadata, null_activity, integer_one});
+  add_trace({string_a, integer_one});
+  return log;
+}
+
 void consistent(const EventLog& log, const PetriNet& net, TokenReplayOptions options) {
   const auto rows = replay_token_traces(log, net, options);
   const auto aggregate = check_conformance(log, net, options);
@@ -772,6 +817,176 @@ void null_activity_is_unknown_not_an_empty_label() {
   try { (void)replay_token_traces(custom, net, options); }
   catch (const std::invalid_argument&) { rejected = true; }
   assert(rejected);
+}
+
+void typed_activity_values_do_not_alias_string_labels() {
+  auto net = sequential();
+  net.set_activities({"A", "1"});
+  const auto log = typed_activity_fixture();
+  TokenReplayOptions options;
+  options.activity_attribute = "user:activity";
+
+  const auto rows = replay_token_traces(log, net, options);
+  assert(rows.size() == 6);
+  assert((rows[0].activated_transitions == std::vector<std::size_t>{0}));
+  assert((rows[0].unknown_event_indices == std::vector<std::size_t>{1, 2}));
+  assert((rows[0].unknown_activities == std::vector<std::string>{"", "1"}));
+  assert((rows[0].unknown_activity_is_null == std::vector<bool>{true, false}));
+  assert((rows[1].activated_transitions == std::vector<std::size_t>{0}));
+  assert((rows[1].unknown_event_indices == std::vector<std::size_t>{1}));
+  assert((rows[1].unknown_activities == std::vector<std::string>{"1"}));
+  assert((rows[1].unknown_activity_is_null == std::vector<bool>{false}));
+  assert((rows[2].activated_transitions == std::vector<std::size_t>{0, 1}));
+  assert(rows[2].unknown_event_indices.empty() && rows[2].trace_is_fit);
+  assert((rows[3].activated_transitions == std::vector<std::size_t>{0}));
+  assert((rows[3].unknown_event_indices == std::vector<std::size_t>{1}));
+  assert((rows[3].unknown_activities == std::vector<std::string>{""}));
+  assert((rows[3].unknown_activity_is_null == std::vector<bool>{false}));
+
+  const auto aggregate = check_conformance(log, net, options);
+  assert(aggregate.variants.size() == 4);
+  std::uint64_t int_one_count = 0;
+  std::uint64_t string_one_count = 0;
+  std::uint64_t null_count = 0;
+  std::uint64_t empty_count = 0;
+  for (const auto& variant : aggregate.variants) {
+    if (variant.activities == std::vector<std::string>{"A", "1"}) {
+      if (variant.count == 2) int_one_count += variant.count;
+      if (variant.count == 1) string_one_count += variant.count;
+    } else if (variant.activities == std::vector<std::string>{"A", "", "1"}) {
+      if (variant.count == 2 &&
+          variant.null_activity_indices == std::vector<std::size_t>{1})
+        null_count += variant.count;
+    } else if (variant.activities == std::vector<std::string>{"A", ""}) {
+      if (variant.count == 1 && variant.null_activity_indices.empty())
+        empty_count += variant.count;
+    }
+  }
+  assert(int_one_count == 2 && string_one_count == 1);
+  assert(null_count == 2 && empty_count == 1);
+  assert((aggregate.transition_frequencies == std::vector<std::uint64_t>{6, 1}));
+
+  // Standard selectors use the retained first-class scalar metadata instead
+  // of the lossy string projection in Event::activity.
+  Event typed_metadata_event;
+  typed_metadata_event.activity = "1";
+  typed_metadata_event.activity_state = FirstClassAttributeState::kPresent;
+  EventAttribute typed_metadata;
+  typed_metadata.key = "concept:name";
+  typed_metadata.value = "1";
+  typed_metadata.kind = AttributeKind::kInt;
+  typed_metadata.typed_value = std::int64_t{1};
+  typed_metadata.first_class_role = FirstClassAttributeRole::kActivity;
+  typed_metadata.first_class_state = FirstClassAttributeState::kPresent;
+  typed_metadata_event.activity_attribute = typed_metadata;
+  EventLog metadata_log;
+  Trace metadata_trace;
+  metadata_trace.case_id = "metadata";
+  metadata_trace.events.push_back(std::move(typed_metadata_event));
+  metadata_log.traces.push_back(std::move(metadata_trace));
+  const auto metadata_row = replay_token_traces(metadata_log, net).front();
+  assert(metadata_row.activated_transitions.empty());
+  assert((metadata_row.unknown_event_indices == std::vector<std::size_t>{0}));
+  assert((metadata_row.unknown_activities == std::vector<std::string>{"1"}));
+  assert((metadata_row.unknown_activity_is_null == std::vector<bool>{false}));
+}
+
+void backwards_module_acceptance() {
+  auto net = sequential();
+  net.set_activities({"A", "1"});
+  const auto log = typed_activity_fixture();
+  TokenReplayOptions options;
+  options.variant = TokenReplayVariant::kBackwards;
+  options.activity_attribute = "user:activity";
+
+  const auto rows = replay_token_traces(log, net, options);
+  assert(rows.size() == 6);
+  struct ExpectedTrace {
+    bool fit;
+    double fitness;
+    std::uint64_t produced;
+    std::uint64_t consumed;
+    std::uint64_t missing;
+    std::uint64_t remaining;
+    std::vector<std::size_t> activated;
+    std::vector<std::size_t> unknown_indices;
+    std::vector<std::string> unknown_activities;
+    std::vector<bool> unknown_is_null;
+    std::vector<int> marking;
+    std::vector<std::size_t> enabled;
+    std::vector<std::vector<std::size_t>> event_activations;
+  };
+  const std::vector<ExpectedTrace> expected{
+      {false, 0.25, 2, 1, 1, 1, {0}, {1, 2}, {"", "1"}, {true, false},
+       {0, 1, 0}, {1}, {{0}, {}, {}}},
+      {false, 0.25, 2, 1, 1, 1, {0}, {1}, {"1"}, {false},
+       {0, 1, 0}, {1}, {{0}, {}}},
+      {true, 1.0, 3, 3, 0, 0, {0, 1}, {}, {}, {},
+       {0, 0, 1}, {}, {{0}, {1}}},
+      {false, 0.25, 2, 1, 1, 1, {0}, {1}, {""}, {false},
+       {0, 1, 0}, {1}, {{0}, {}}},
+      {false, 0.25, 2, 1, 1, 1, {0}, {1, 2}, {"", "1"}, {true, false},
+       {0, 1, 0}, {1}, {{0}, {}, {}}},
+      {false, 0.25, 2, 1, 1, 1, {0}, {1}, {"1"}, {false},
+       {0, 1, 0}, {1}, {{0}, {}}},
+  };
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    const auto& row = rows[i];
+    const auto& want = expected[i];
+    assert(row.trace_index == i && row.case_id == "typed-" + std::to_string(i));
+    assert(row.trace_is_fit == want.fit && row.trace_fitness == want.fitness);
+    assert(row.produced == want.produced && row.consumed == want.consumed);
+    assert(row.missing == want.missing && row.remaining == want.remaining);
+    assert(row.activated_transitions == want.activated);
+    assert(row.transitions_with_problems.empty() && !row.replay_stopped);
+    assert(row.unknown_event_indices == want.unknown_indices);
+    assert(row.unknown_activities == want.unknown_activities);
+    assert(row.unknown_activity_is_null == want.unknown_is_null);
+    assert(row.reached_marking == want.marking);
+    assert(row.enabled_transitions == want.enabled);
+    assert(row.replayed_events == want.event_activations.size());
+    assert(row.event_diagnostics.size() == want.event_activations.size());
+    for (std::size_t event = 0; event < want.event_activations.size(); ++event) {
+      assert(row.event_diagnostics[event].event_index == event);
+      assert(row.event_diagnostics[event].activated_transitions ==
+             want.event_activations[event]);
+      assert(row.event_diagnostics[event].transitions_with_problems.empty());
+    }
+    assert(row.places.size() == 3);
+    if (want.fit) {
+      for (const auto& place : row.places)
+        assert(place.produced == 1 && place.consumed == 1 &&
+               place.missing == 0 && place.remaining == 0);
+    } else {
+      assert(row.places[0].produced == 1 && row.places[0].consumed == 1 &&
+             row.places[0].missing == 0 && row.places[0].remaining == 0);
+      assert(row.places[1].produced == 1 && row.places[1].consumed == 0 &&
+             row.places[1].missing == 0 && row.places[1].remaining == 1);
+      assert(row.places[2].produced == 0 && row.places[2].consumed == 0 &&
+             row.places[2].missing == 1 && row.places[2].remaining == 0);
+    }
+  }
+
+  const auto aggregate = check_conformance(log, net, options);
+  assert(aggregate.trace_count == 6 && aggregate.fitting_traces == 1);
+  assert(aggregate.produced == 13 && aggregate.consumed == 8);
+  assert(aggregate.missing == 5 && aggregate.remaining == 5);
+  assert((aggregate.transition_frequencies == std::vector<std::uint64_t>{6, 1}));
+  assert(aggregate.variants.size() == 4);
+  std::uint64_t typed_integer_count = 0;
+  std::uint64_t string_label_count = 0;
+  std::uint64_t nullable_count = 0;
+  for (const auto& variant : aggregate.variants) {
+    if (variant.activities == std::vector<std::string>{"A", "1"}) {
+      if (variant.count == 2) typed_integer_count += variant.count;
+      if (variant.count == 1) string_label_count += variant.count;
+    } else if (variant.activities == std::vector<std::string>{"A", "", "1"} &&
+               variant.null_activity_indices == std::vector<std::size_t>{1}) {
+      nullable_count += variant.count;
+    }
+  }
+  assert(typed_integer_count == 2 && string_label_count == 1);
+  assert(nullable_count == 2);
 }
 
 void replay_selector_priority_and_missing_state() {
@@ -1875,6 +2090,8 @@ int main() {
   backwards_zero_denominator_fitness_is_undefined();
   activation_sequence_replay_skips_fitness_only();
   null_activity_is_unknown_not_an_empty_label();
+  typed_activity_values_do_not_alias_string_labels();
+  backwards_module_acceptance();
   replay_variant_keys_are_unambiguous();
   replay_selector_priority_and_missing_state();
   event_records_preserve_routing_and_source_positions();
