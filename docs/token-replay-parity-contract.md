@@ -77,3 +77,14 @@ are retained in `docs/token-backwards-controls-capture-evidence.json.gz`; the
 summary is `docs/token-backwards-controls-reference-validation.json`. This is
 reference-only evidence. Native comparison and broader backwards completion
 requirements remain open; no catalogue row is promoted.
+
+The native baseline is retained in `docs/token-backwards-controls-baseline.json.gz`
+and summarized by `docs/token-backwards-controls-baseline-validation.json`.
+Thirteen CLI invocations compare all 26 public route observations: 24 match;
+both unknown-only observations differ. The reference raises `ZeroDivisionError`
+while native replay succeeds with fitness 0.5, produced 1, consumed 0, missing 1
+and remaining 1. Every public result field is compared, with native-only
+diagnostics retained separately. The hidden-walk-false case uses an explicitly
+documented effective-control mapping limited to its paired public fixture.
+Independent review verified the input translation and frozen source/binary/raw
+bindings. This is a confirmed baseline discrepancy, not a completion claim.

@@ -1,0 +1,21 @@
+{
+  "status": "verified_baseline_with_mismatches",
+  "compared_public_observations": 26,
+  "native_invocations": 13,
+  "matched": 24,
+  "mismatched": 2,
+  "mismatch_cases": [
+    "unknown_only"
+  ],
+  "native_behavior": "successful result with fitness0.5, produced1, consumed0, missing1, remaining1",
+  "reference_behavior": "ZeroDivisionError: float division by zero",
+  "comparison_limits": [
+    "This finite set compares the captured public BACKWARDS controls and does not alone prove full token-replay parity.",
+    "Native-only fields such as reached_marking and per-event diagnostics are preserved in raw output; public BACKWARDS exposes no reached_marking field to compare.",
+    "The walk-through-hidden false mapping is limited to the captured otherwise-identical public observation and does not establish a universal public parameter rule."
+  ],
+  "independent_review": "clear",
+  "archive": "docs/token-backwards-controls-baseline.json.gz",
+  "archive_sha256": "6f93a63ee9f682454d42e0a376d820473e443394e1fbf42c61383325519c41c6",
+  "coverage_promotion": false
+}
