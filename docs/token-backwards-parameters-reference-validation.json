@@ -1,0 +1,35 @@
+{
+  "status": "verified_reference_only",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "counts": {
+    "fixtures": 31,
+    "routes_per_fixture": 2,
+    "calls": 62,
+    "returned_results": 60,
+    "errors": 2,
+    "inputs_unchanged": 62,
+    "inputs_mutated": 0,
+    "same_output_across_public_routes": 31,
+    "parameter_contrasts": 17
+  },
+  "parameter_members_exercised": 15,
+  "source_sha256": "41568b1c5b38dbd7d6f3208097d80615dbda082ec4d3215f3089d2daee140b7a",
+  "raw_sha256": "70c533eff5117e7184f961809e75f55978aa5ebb1e73d51afb54e18553edda28",
+  "independent_review": "clear",
+  "coverage_promotion": false,
+  "artifacts": [
+    {
+      "path": "docs/token-backwards-parameters-reference.json.gz",
+      "sha256": "6605fd51bd8d176dd9250dd74e64a01409c2081c5fb9db9c564063a9c14582e2"
+    },
+    {
+      "path": "docs/token-backwards-parameters-capture-evidence.json.gz",
+      "sha256": "62ecc5e416c886103e8744687857cc8fb0d3e0f48206f0ca6357cdd727f4b88c"
+    }
+  ],
+  "limits": [
+    "Reference capture only; native comparison is a separate gate.",
+    "No observed effect in a fixture is not a universal ignored-parameter claim.",
+    "The two captured errors are KeyError for a missing selected activity key."
+  ]
+}
