@@ -5337,6 +5337,31 @@ and cost functions remain beyond the bounded matrices; cross-language error
 class/message equivalence is not asserted. The dispatcher and implementation
 module remain partial.
 
+The current edit-distance acceptance matrix is maintained in
+`docs/edit-distance-parity-contract.md`. The pinned public surface is archived
+in `docs/edit-distance-public-surface.json.gz`; both catalogue rows remain partial.
+
+### Edit-distance exhaustive short-sequence checkpoint
+
+All 1,922 singleton source/target pairs over the two-symbol alphabet A/B,
+with each sequence length from zero through four, match the pinned public
+variant through native typed whole-log alignment. Both ordinary and anti
+modes are included. The comparison retains ordered moves, cost, fitness,
+best-worst cost, source/target variants, and full input/option snapshots.
+It compares 1,891 accepted results and the rejection meaning of 31 all-exact
+anti cases; it does not claim Python exception-class identity.
+
+The reference archive is `docs/edit-distance-exhaustive-reference.json.gz`.
+Native outputs, generator/checker/probe sources, build provenance, and reviews
+are in `docs/edit-distance-exhaustive-native-checks.json.gz`, with the summary
+in `docs/edit-distance-exhaustive-validation.json`. The capture, harness, and artifact saver passed independent review.
+
+This is exhaustive only for the stated singleton-log domain. Existing cohorts
+provide multi-candidate ordering and long-input threshold evidence. Both
+catalogue rows remain partial: the selector-domain audit has identified empty
+and whitespace field names as a remaining difference, and distinct registered
+completion proofs and the final semantic audit remain open.
+
 ### Edit-distance fresh-projection activity-type checkpoint
 
 The fresh public variant projector enforces the reference activity-type
