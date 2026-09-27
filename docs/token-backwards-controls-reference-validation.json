@@ -1,0 +1,32 @@
+{
+  "status": "verified_reference_only_checkpoint",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "counts": {
+    "fixtures": 13,
+    "routes_per_fixture": 2,
+    "calls": 26,
+    "returned_results": 24,
+    "errors": 2,
+    "inputs_unchanged": 26,
+    "inputs_mutated": 0,
+    "same_output_across_public_routes": 13
+  },
+  "source_sha256": "5334b27c3ad9e41a5e8ddd6247e55f510c34d16a709fef416e9afbf579a4ae0f",
+  "raw_sha256": "af3ee55e9f0bc956fd358e6b9dcd45c9aa7b7179ef2eb369628d5b6589cb8c7f",
+  "independent_review": "clear",
+  "artifacts": [
+    {
+      "path": "docs/token-backwards-controls-reference.json.gz",
+      "sha256": "0d1c12575ef8d5d138a450eddc50f3e73621e4a5672eb9efa1ff619dc29038c9"
+    },
+    {
+      "path": "docs/token-backwards-controls-capture-evidence.json.gz",
+      "sha256": "281fe7f6851232ac41f5346d03eef3a24a78b6ae4a3419601be8a3c310c697e0"
+    }
+  ],
+  "limits": [
+    "No native comparisons or coverage promotions are claimed.",
+    "The hidden-walk-false fixture records a supplied parameter and its observed output; it does not establish whether the pinned reference honors that parameter generally.",
+    "Finite fixtures do not establish complete backwards replay parity."
+  ]
+}

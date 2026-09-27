@@ -56,3 +56,24 @@ The oracle's scope and assumptions must be reviewed against the public
 observations. This bounded evidence must then be reconciled with the broader
 forward controls, backwards behavior, supported input adapters, root-cause
 diagnostics and distinct registered catalogue proofs before any completion claim.
+
+## Explicit backwards reference checkpoint
+
+`docs/token-backwards-controls-reference.json.gz` records 13 fixtures through
+both the explicit `BACKWARDS` dispatcher selector and the public backwards
+module: 26 calls, 24 returned results and two `ZeroDivisionError` outcomes for
+the unknown-only fixture. Both routes agree for all 13 pairs. All actual
+log/net/marking/parameter snapshots are unchanged after the calls.
+
+The cases cover a silent prefix, unknown and repeated activities, stopping,
+weighted silent arcs, duplicate labels, final-marking multiplicity, empty
+traces/logs and a supplied hidden-walk-false parameter. That last fixture records
+an observed result; it does not prove general parameter behavior. The separately
+documented native hidden-walk extension remains distinct from this comparison.
+
+Independent review verified the fixture inputs, complete results/errors and
+opaque runtime-module equality with pinned Git blobs. Capture source and review
+are retained in `docs/token-backwards-controls-capture-evidence.json.gz`; the
+summary is `docs/token-backwards-controls-reference-validation.json`. This is
+reference-only evidence. Native comparison and broader backwards completion
+requirements remain open; no catalogue row is promoted.
