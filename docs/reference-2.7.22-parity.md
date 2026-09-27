@@ -48,15 +48,15 @@ test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
 adapter, integration, or missing are complete. The current manifest records 46
-complete and 40 partial dispatcher rows, plus 197 complete and 190 partial
+complete and 40 partial dispatcher rows, plus 198 complete and 189 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
 DFG, causal and correlation discovery, 26-module Inductive discovery, 31-module
 POWL discovery, 13-module footprints discovery/conformance, and the 19-module
 temporal/behavioral adapter stack, plus discounted anti-/multi-alignment and
 classic Declare/log-skeleton discovery and conformance, with distinct
-registered tests, plus the replay-duration diagnostic support module;
-230 coverage units still require exact proof.
+registered tests, plus the replay-duration diagnostic support module and the
+backwards token-replay variation; 229 coverage units still require exact proof.
 A release may
 additionally run the strict gate:
 
@@ -6299,3 +6299,20 @@ manifests, reported capture errors, invalid provenance, and zero comparisons;
 native comparisons hash their executable before and after running. The complete
 script suite passes 47 tests, with the 24 focused Rust gate tests also passing
 under Python optimization. Structural coverage remains partial and unchanged.
+
+
+## Backwards token-replay module acceptance
+
+The backwards variation now has a distinct catalogue proof for
+`replay_token_traces` and the registered `backwards_module_acceptance` case.
+The completion audit and direct EventLog scope are recorded in
+`docs/token-replay-parity-contract.md`. Reviewed controls, denominator and
+weighted-routing comparisons are supplemented by all 62 passing parameter/input
+observations and 11 affected native suites after the typed-activity correction
+in `7b6fd7e`. The post-fix evidence is preserved in
+`docs/token-backwards-parameters-after-checks.json.gz`.
+
+The structural verifier accepts 198 complete and 189 partial module rows. Only
+`algo.conformance.tokenreplay.variants.backwards` is promoted by this checkpoint;
+its dispatcher and the forward variation remain partial. Overall, 229 coverage
+units remain open.
