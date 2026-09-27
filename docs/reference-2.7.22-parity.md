@@ -5341,6 +5341,25 @@ The current edit-distance acceptance matrix is maintained in
 `docs/edit-distance-parity-contract.md`. The pinned public surface is archived
 in `docs/edit-distance-public-surface.json.gz`; both catalogue rows remain partial.
 
+### Edit-distance flat-selector reference checkpoint
+
+The public DataFrame delta capture in
+`docs/edit-distance-flat-selectors-reference.json.gz` records 22 calls:
+12 successes and 10 errors. Matching literal empty and one-space column names
+are accepted for activity selection, case grouping and projection timestamps.
+Missing selected columns raise `KeyError` for the exact key, including when
+canonical decoy columns exist. Empty target DataFrames still reject through
+alignment; zero-row fresh projection returns an empty log with either declared
+columns or no columns.
+
+Full DataFrame schema, dtypes, index, attrs and cells are captured before and
+after each call, together with independent parameter and projection-variant
+snapshots. All checks report unchanged inputs. The corrected capture and its
+public-call provenance passed independent review; its summary is in
+`docs/edit-distance-flat-selectors-reference-validation.json`. This checkpoint
+establishes reference behavior only. Native table support and comparison remain
+in progress, and neither edit-distance row is promoted.
+
 ### Edit-distance explicit-dispatch and named-acceptance checkpoint
 
 Nine paired public EventLog fixtures compare omitted dispatcher selection with

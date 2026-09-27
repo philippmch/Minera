@@ -1,0 +1,34 @@
+{
+  "status": "verified_public_reference_capture",
+  "parent_commit": "b143d92d1e81af62c49e24491c795ea52e7d8ff8",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "artifact": {
+    "path": "docs/edit-distance-flat-selectors-reference.json.gz",
+    "sha256": "aef16c8eed8a9dc811cb84c47eab5f11fce6185d267daa2bfce4e968ef356d70",
+    "uncompressed_sha256": "23b4b07ac07d41fef6f8d050893342f8bbc4659d101976ff860b9bd0452eb08c"
+  },
+  "capture_source_sha256": "185800ab06dea90436a49848826f7ccf208f76f7498c64b9019e9d2d9d429c91",
+  "counts": {
+    "calls": 22,
+    "successes": 12,
+    "errors": 10,
+    "input_mutations": 0,
+    "by_route": {
+      "dispatcher.apply": 10,
+      "variant.project_log_on_variant": 12
+    }
+  },
+  "additional_parameter_and_variant_mutation_checks": 34,
+  "independent_review": "clear \u2014 Independent capture review and rereview. Pinned runtime/module byte hashes, import origins, embedded source and public-only calls verified. Full DataFrame schema/dtypes/cells/index/attrs snapshots and independent copied parameter/projection-variant before/after snapshots cover all22calls and34additionalargument checks. No mutations. Corrected capture closes omitted-argument/live-list alias gap; all22names/inputs/outcomes match superseded frame-only capture:12success10error. No upstream source inspection. Finite DataFrame selector scope, not full parity.\n",
+  "scope": "DataFrame activity selectors '' and ' ' with matching and absent columns through dispatcher.apply; timestamp selectors '' and ' ' with matching and missing columns through fresh projection using normal activity; case_id_key selectors '' and ' ' with matching and missing columns through both routes; and zero-row declared-schema/no-column DataFrames with blank selectors through both routes. String parameter keys are used throughout.",
+  "findings": [
+    "Matching literal empty and one-space activity/case/timestamp column keys are accepted.",
+    "Missing selected columns raise KeyError for the exact key despite canonical decoys.",
+    "Zero-row alignment with empty target rejects; zero-row fresh projection returns an empty log."
+  ],
+  "limits": [
+    "This checkpoint records public reference behavior only; native comparison and implementation are pending.",
+    "Both edit-distance catalogue rows remain partial.",
+    "The superseded frame-only capture is not used as final evidence."
+  ]
+}
