@@ -23,7 +23,7 @@ separate semantic requirement under the project parity contract.
 | Matching blocks and costs | Ordered move, cost, fitness and best-worst-cost comparisons; 19 long-input threshold cases | 1,922 short singleton comparisons pass; reconcile these with remaining selector-domain and completion evidence |
 | Direct trace helpers | Ordered typed mappings, independent list/set inputs, cache identity and reuse; direct and typed-mapping captures | Reconcile helper aliases and effective selector/anti controls |
 | Fresh variant projection | String-only activity domain, typed rejection, ordered validation, timestamps and fresh metadata; 53 typed and 24 legacy comparisons | Reconcile selector/anti behavior with whole-log and adapter controls |
-| Input representations | EventLog and EventDataView adapters; table grouping, typed labels, missing/null distinctions | Confirm each advertised representation and applicable control has evidence; audit empty and whitespace field names against native selector validation |
+| Input representations | EventLog and EventDataView adapters; table grouping, typed labels, missing/null distinctions; literal empty and whitespace selectors in grouped logs and direct traces | Confirm each advertised representation and applicable control has evidence; flat-data selector validation requires separate reconciliation |
 | Product entry points | Native APIs, typed JSON, CLI and local server routes; two combined anti/custom-activity/custom-timestamp integration cases in `docs/edit-distance-parameter-integration-validation.json` | Reconcile the verified fixture with the final semantic scope; it is not an exhaustive product-input audit |
 | Completion proofs | Existing registered alignment tests and frozen comparison artifacts | Distinct module/dispatcher proof cases and independent requirement-by-requirement completion review |
 
@@ -41,6 +41,15 @@ inputs, not a proof of all inputs. The 1,922-case short-sequence matrix in
 `docs/edit-distance-exhaustive-validation.json` checks
 singleton targets only; existing focused cohorts carry the multi-candidate
 ordering evidence. Long-input autojunk thresholds remain separately covered.
+
+The literal-selector checkpoint in
+`docs/edit-distance-selector-domain-validation.json` adds 45 comparable grouped-log
+and direct-trace calls, improving the prior library's 22 matches to 45. One
+additional Python projector enum-key call applies different activity selectors
+in its outer and inner phases; it is retained as reference-only because a single
+native activity option cannot express that call. All 2,403 earlier comparisons
+and the two product-route fixtures pass against the changed library. This does
+not complete the flat-data selector audit or either catalogue row.
 
 A completion decision must reconcile this contract, the frozen public surface,
 the existing cohorts, applicable product adapters, registered proofs, and an

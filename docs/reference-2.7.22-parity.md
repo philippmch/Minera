@@ -5341,6 +5341,33 @@ The current edit-distance acceptance matrix is maintained in
 `docs/edit-distance-parity-contract.md`. The pinned public surface is archived
 in `docs/edit-distance-public-surface.json.gz`; both catalogue rows remain partial.
 
+### Edit-distance literal-selector checkpoint
+
+Grouped-log alignment, direct trace helpers, and fresh variant projection now
+accept literal empty and whitespace activity/timestamp keys when present.
+Unused timestamp selectors no longer reject whole-log alignment. Exact generic
+empty-key attributes take precedence over stored first-class slots, including
+null values; absent source-key sentinels do not alias a literal empty key.
+Missing selected fields still fail when read, and empty-target validation keeps
+its existing order.
+
+The frozen public capture contains 46 calls. Of these, 45 express a single
+effective native selector: the prior library matched 22, and the changed
+library matches all 45. Seven errors use narrowly checked semantic mappings
+with raw diagnostics retained; Python exception-class identity is not claimed.
+One projector enum-key case uses different outer and inner activity selectors
+in Python and cannot be represented by one native activity option. It remains
+an explicit reference-only observation, including its differing native result.
+
+`docs/edit-distance-selector-domain-reference.json.gz` retains the capture;
+`docs/edit-distance-selector-domain-native-checks.json.gz` retains baseline and
+changed-library evidence, source/binary bindings, reviews, and raw outputs.
+`docs/edit-distance-selector-domain-validation.json` summarizes the checkpoint.
+All 2,403 earlier comparisons, the native alignment suite, and both rebuilt
+CLI/HTTP parameter cases pass against the changed library. Catalogue validation
+passes without promoting either edit-distance row. Flat-data selector rules
+and requirement-by-requirement completion proofs remain to be reconciled.
+
 ### Edit-distance product parameter checkpoint
 
 One CLI and one local HTTP case combine anti-alignment, a custom activity key,
