@@ -187,3 +187,20 @@ captures do not satisfy these backwards requirements. Arbitrary wrong Python
 carrier or Marking object types are not inferred to be promised contracts from
 type annotations; any error claim must identify the supported input constraint
 and its actual public observation.
+
+## Backwards parameter reference checkpoint
+
+`docs/token-backwards-parameters-reference.json.gz` preserves 31 grouped EventLog
+fixtures through both explicit backwards public routes: 62 calls, 60 returned
+results and two missing-activity-key errors. All inputs remain unchanged and
+each route pair agrees. The fixtures exercise all 15 public parameter members
+and 17 paired contrasts, including typed null/integer activities, enum/string
+activity selectors, duplicate traces and case IDs, hidden routing, stopping,
+fitness controls, supplied variants, caches and timeout. Observed no-effects
+are fixture-local evidence, not universal ignored-parameter claims.
+
+`docs/token-backwards-parameters-capture-evidence.json.gz` retains the reviewed
+capture sources and typed-input validator; the summary is
+`docs/token-backwards-parameters-reference-validation.json`. This is reference
+evidence only. Native parameter comparison and correction of discrepancies
+remain separate completion gates; no coverage row is promoted here.
