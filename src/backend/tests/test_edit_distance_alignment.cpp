@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdio>
 #include <any>
 #include <cassert>
 #include <cstdint>
@@ -31,7 +32,7 @@ static EventLog log_of(std::initializer_list<std::initializer_list<const char*>>
   return log;
 }
 
-int main() {
+int test_main() {
   const auto trace_with_activity_attribute = [](EventAttribute attribute) {
     Trace trace;
     Event event;
@@ -903,8 +904,28 @@ int main() {
              "<date key=\"when.value\" value=\"2026-01-01T00:00:00+00:00\"/>") !=
          std::string::npos);
 
-  const auto fresh_typed_projection =
-      project_log_on_variant(typed_source, {"x", "a"});
+  bool fresh_typed_missing_selector = false;
+  try {
+    (void)project_log_on_variant(typed_source, {"x", "a"});
+  } catch (const std::out_of_range& error) {
+    fresh_typed_missing_selector =
+        std::string_view(error.what()) == "'concept:name'";
+  }
+  assert(fresh_typed_missing_selector);
+
+  // Exercise the public fresh-output shape with a real string-valued selected
+  // activity and the source's actual custom selectors. The native supplied-
+  // alignment projection above deliberately retains its typed activity case.
+  EventLog fresh_typed_source = typed_source;
+  auto& fresh_typed_event = fresh_typed_source.traces.front().events.front();
+  fresh_typed_event.activity = "a";
+  fresh_typed_event.activity_attribute =
+      EventAttribute{"activity.code", "a", AttributeKind::kString};
+  EditDistanceOptions fresh_typed_options;
+  fresh_typed_options.activity_attribute = "activity.code";
+  fresh_typed_options.timestamp_attribute = "when.value";
+  const auto fresh_typed_projection = project_log_on_variant(
+      fresh_typed_source, {"x", "a"}, fresh_typed_options);
   assert(fresh_typed_projection.metadata == EventDataMetadata{} &&
          fresh_typed_projection.attributes.size() == 1);
   assert(fresh_typed_projection.traces.front().case_id.empty() &&
@@ -914,7 +935,8 @@ int main() {
       fresh_typed_projection.traces.front().events.front();
   assert(fresh_inserted.attributes.size() == 3 &&
          fresh_inserted.attribute("case.number") == nullptr &&
-         fresh_inserted.attribute("activity.code") == nullptr &&
+         fresh_inserted.attribute("activity.code") != nullptr &&
+         *fresh_inserted.attribute("activity.code") == "x" &&
          fresh_inserted.attribute("@@is_conforming") != nullptr &&
          fresh_inserted.timestamp_attribute &&
          fresh_inserted.timestamp_attribute->kind == AttributeKind::kDate &&
@@ -986,8 +1008,25 @@ int main() {
   assert(selected_inserted.timestamp_source_key == "when" &&
          selected_inserted.timestamp_attribute &&
          selected_inserted.timestamp_attribute->kind == AttributeKind::kDate);
+  bool selected_fresh_typed_activity_rejected = false;
+  try {
+    (void)project_log_on_variant(selected_source, {"a", "b"},
+                                 selected_options);
+  } catch (const std::invalid_argument& error) {
+    selected_fresh_typed_activity_rejected =
+        std::string_view(error.what()) ==
+        "sequence item 0: expected str instance, int found";
+  }
+  assert(selected_fresh_typed_activity_rejected);
+
+  EventLog selected_fresh_source = selected_source;
+  auto& selected_fresh_activity =
+      selected_fresh_source.traces.front().events.front().attributes.front();
+  selected_fresh_activity.value = "a";
+  selected_fresh_activity.kind = AttributeKind::kString;
+  selected_fresh_activity.typed_value = std::monostate{};
   const auto selected_variant_projection = project_log_on_variant(
-      selected_source, {"a", "b"}, selected_options);
+      selected_fresh_source, {"a", "b"}, selected_options);
   assert(selected_variant_projection.traces.front().events.size() == 2 &&
          selected_variant_projection.traces.front().events[1].attribute("phase") &&
          *selected_variant_projection.traces.front().events[1].attribute("phase") ==
@@ -1595,5 +1634,214 @@ int main() {
   assert(empty_legacy_edit_distance_json.find("\"alignments\": []") !=
          std::string::npos);
 
+  // Fresh public projection shares the strict Python string-join behavior
+  // while typed input variants use the native typed alignment identity.
+  const auto assert_projection_invalid_argument =
+      [](const auto& operation, std::string_view expected) {
+        bool threw = false;
+        try {
+          operation();
+        } catch (const std::invalid_argument& error) {
+          threw = std::string_view(error.what()) == expected;
+        }
+        assert(threw);
+      };
+  const auto assert_projection_missing_key =
+      [](const auto& operation, std::string_view expected) {
+        bool threw = false;
+        try {
+          operation();
+        } catch (const std::out_of_range& error) {
+          threw = std::string_view(error.what()) == expected;
+        }
+        assert(threw);
+      };
+
+  EventAttribute public_activity{"concept:name", "A", AttributeKind::kString};
+  EventAttribute public_time{"time:timestamp", "2022-01-01T00:00:01Z",
+                            AttributeKind::kDate};
+  EventLog public_string_source = typed_log({public_activity});
+  public_string_source.traces.front().events.front().attributes.push_back(
+      public_time);
+  const auto typed_string_projection = project_log_on_typed_variant(
+      public_string_source,
+      std::vector<EventAttribute>{EventAttribute{"ignored", "A",
+                                                AttributeKind::kString}});
+  assert(typed_string_projection.attributes.size() == 1 &&
+         typed_string_projection.attribute("@@aligned_variant") &&
+         *typed_string_projection.attribute("@@aligned_variant") == "A" &&
+         typed_string_projection.traces.front().attribute("@@original_trace") &&
+         *typed_string_projection.traces.front().attribute("@@original_trace") ==
+             "A" &&
+         typed_string_projection.traces.front().events.front().attribute(
+             "@@is_conforming") &&
+         *typed_string_projection.traces.front().events.front().attribute(
+             "@@is_conforming") == "true");
+
+  const auto typed_variant_int = typed_int("ignored", 1);
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_typed_variant(
+            public_string_source,
+            std::vector<EventAttribute>{typed_variant_int});
+      },
+      "sequence item 0: expected str instance, int found");
+  EventAttribute state_only_null_variant{"ignored", "",
+                                         AttributeKind::kString};
+  state_only_null_variant.first_class_state =
+      FirstClassAttributeState::kNull;
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_typed_variant(
+            EventLog{},
+            std::vector<EventAttribute>{state_only_null_variant});
+      },
+      "sequence item 0: expected str instance, NoneType found");
+
+  // Source activities and model variants are hashed before their strict
+  // joins. Present source values win over invalid model values; missing
+  // source keys are deferred until after the model hashability pass.
+  EventAttribute public_source_int = typed_int("concept:name", 1);
+  EventLog public_int_source = typed_log({public_source_int});
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_variant(public_int_source,
+                                     std::vector<std::string>{"1"});
+      },
+      "sequence item 0: expected str instance, int found");
+  EventLog public_source_later_int =
+      typed_log({public_activity, public_source_int});
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_variant(public_source_later_int,
+                                     std::vector<std::string>{"A"});
+      },
+      "sequence item 1: expected str instance, int found");
+
+  EventAttribute public_source_list{"concept:name", "", AttributeKind::kString};
+  public_source_list.container = AttributeContainerKind::kList;
+  public_source_list.children = {EventAttribute{"", "A", AttributeKind::kString}};
+  EventAttribute public_variant_dict{"ignored", "", AttributeKind::kString};
+  public_variant_dict.container = AttributeContainerKind::kContainer;
+  public_variant_dict.children = {EventAttribute{"key", "value",
+                                                AttributeKind::kString}};
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_typed_variant(
+            typed_log({public_source_list}),
+            std::vector<EventAttribute>{public_variant_dict});
+      },
+      "unhashable type: 'list'");
+
+  EventAttribute public_source_dict{"concept:name", "", AttributeKind::kString};
+  public_source_dict.container = AttributeContainerKind::kContainer;
+  public_source_dict.children = {EventAttribute{"key", "value",
+                                                AttributeKind::kString}};
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_typed_variant(
+            typed_log({public_source_dict}),
+            std::vector<EventAttribute>{public_source_list});
+      },
+      "unhashable type: 'dict'");
+
+  Event event_without_activity_or_time;
+  EventLog missing_public_activity;
+  Trace missing_public_trace;
+  missing_public_trace.events.push_back(event_without_activity_or_time);
+  missing_public_activity.traces.push_back(std::move(missing_public_trace));
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_typed_variant(
+            missing_public_activity,
+            std::vector<EventAttribute>{public_source_list});
+      },
+      "unhashable type: 'list'");
+  assert_projection_missing_key(
+      [&] {
+        (void)project_log_on_typed_variant(
+            missing_public_activity,
+            std::vector<EventAttribute>{typed_variant_int});
+      },
+      "'concept:name'");
+
+  EventLog source_int_and_empty_variant = typed_log({public_source_int});
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_typed_variant(source_int_and_empty_variant, {});
+      },
+      "sequence item 0: expected str instance, int found");
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_typed_variant(EventLog{},
+                                           std::vector<EventAttribute>{
+                                               typed_variant_int});
+      },
+      "sequence item 0: expected str instance, int found");
+
+  EventLog missing_time_with_typed_target = typed_log({public_activity});
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_typed_variant(
+            missing_time_with_typed_target,
+            std::vector<EventAttribute>{typed_variant_int});
+      },
+      "sequence item 0: expected str instance, int found");
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_typed_variant(
+            missing_time_with_typed_target,
+            std::vector<EventAttribute>{public_activity, typed_variant_int});
+      },
+      "sequence item 1: expected str instance, int found");
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_typed_variant(
+            missing_time_with_typed_target,
+            std::vector<EventAttribute>{});
+      },
+      "edit-distance: missing timestamp time:timestamp");
+
+  EventLog ordered_public_source;
+  Trace ordered_public_first;
+  ordered_public_first.events.push_back(
+      Event{{}, "A"});
+  ordered_public_source.traces.push_back(std::move(ordered_public_first));
+  ordered_public_source.traces.push_back(
+      typed_log({public_source_int}).traces.front());
+  assert_projection_invalid_argument(
+      [&] {
+        (void)project_log_on_variant(ordered_public_source,
+                                     std::vector<std::string>{"A"});
+      },
+      "edit-distance: missing timestamp time:timestamp");
+
+  // Flat input uses the same typed-variant entry point after normal adapter
+  // conversion and retains the public projection's required-field checks.
+  EventTable typed_variant_table;
+  typed_variant_table.columns = {"case:concept:name", "concept:name",
+                                 "time:timestamp"};
+  typed_variant_table.rows.push_back(
+      {EventAttribute{"case:concept:name", "case-a", AttributeKind::kString},
+       public_activity, public_time});
+  const auto flat_typed_variant_projection = project_log_on_typed_variant(
+      EventDataView(typed_variant_table),
+      std::vector<EventAttribute>{public_activity});
+  assert(flat_typed_variant_projection.traces.size() == 1 &&
+         flat_typed_variant_projection.traces.front().events.size() == 1 &&
+         flat_typed_variant_projection.traces.front().events.front().attribute(
+             "@@is_conforming") &&
+         *flat_typed_variant_projection.traces.front().events.front().attribute(
+             "@@is_conforming") == "true");
+
   return 0;
+}
+
+int main() {
+  try {
+    return test_main();
+  } catch (const std::exception& error) {
+    std::fprintf(stderr, "Test exception: %s\n", error.what());
+    return 1;
+  }
 }

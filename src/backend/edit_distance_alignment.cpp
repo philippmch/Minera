@@ -761,10 +761,92 @@ void require_flat_projection_fields(const EventDataView& data,
   require_table_column(data, log, options.timestamp_attribute, "timestamp");
 }
 
+std::string public_join_type_name(const EventAttribute& value) {
+  if (value.is_null ||
+      value.first_class_state == FirstClassAttributeState::kNull)
+    return "NoneType";
+  if (value.container == AttributeContainerKind::kList ||
+      value.scalar_children_list)
+    return "list";
+  if (value.container == AttributeContainerKind::kContainer ||
+      value.scalar_wrapper ||
+      (value.container == AttributeContainerKind::kScalar &&
+       !value.children.empty()))
+    return "dict";
+  if (value.container == AttributeContainerKind::kSet) return "set";
+  if (value.container == AttributeContainerKind::kTuple) return "tuple";
+  if (value.container == AttributeContainerKind::kFrozenSet)
+    return "frozenset";
+
+  if (std::holds_alternative<bool>(value.typed_value)) return "bool";
+  if (std::holds_alternative<std::int64_t>(value.typed_value) ||
+      std::holds_alternative<std::uint64_t>(value.typed_value))
+    return "int";
+  if (std::holds_alternative<double>(value.typed_value)) return "float";
+  if (std::holds_alternative<NativeDate>(value.typed_value)) return "datetime";
+  if (std::holds_alternative<NativeNA>(value.typed_value)) return "NAType";
+
+  switch (value.kind) {
+    case AttributeKind::kString:
+    case AttributeKind::kId: return "str";
+    case AttributeKind::kDate: return "datetime";
+    case AttributeKind::kInt: return "int";
+    case AttributeKind::kFloat: return "float";
+    case AttributeKind::kBoolean: return "bool";
+    case AttributeKind::kBytes: return "bytes";
+    case AttributeKind::kNA: return "NAType";
+  }
+  return "object";
+}
+
+std::string strict_join_public_variant(
+    const std::vector<EventAttribute>& variant) {
+  std::string joined;
+  for (std::size_t i = 0; i < variant.size(); ++i) {
+    const auto& activity = variant[i];
+    const bool string_value =
+        !activity.is_null &&
+        activity.first_class_state != FirstClassAttributeState::kNull &&
+        activity.container == AttributeContainerKind::kScalar &&
+        activity.children.empty() && !activity.scalar_wrapper &&
+        !activity.scalar_children_list &&
+        std::holds_alternative<std::monostate>(activity.typed_value) &&
+        (activity.kind == AttributeKind::kString ||
+         activity.kind == AttributeKind::kId);
+    if (!string_value) {
+      throw std::invalid_argument(
+          "sequence item " + std::to_string(i) +
+          ": expected str instance, " + public_join_type_name(activity) +
+          " found");
+    }
+    if (i != 0) joined.push_back(',');
+    joined += activity.value;
+  }
+  return joined;
+}
+
+void require_public_variant_hashable(
+    const EventLog& source, const std::vector<EventAttribute>& variant,
+    const EditDistanceOptions& options) {
+  // The public path builds the source variants before its model-variant set.
+  // Hash present source activities first, but defer missing-key failures until
+  // after model values have been checked, matching the captured validation
+  // order when both sides contain invalid values.
+  for (const auto& trace : source.traces) {
+    for (const auto& event : trace.events) {
+      if (const auto selected =
+              selected_typed_activity(event, options.activity_attribute))
+        require_direct_hashable_activity(*selected);
+    }
+  }
+  for (const auto& activity : variant)
+    require_direct_hashable_activity(activity);
+}
+
 EventLog project_public_variant(
     const EventLog& source,
-    const std::vector<EditDistanceAlignment>& alignments,
-    const std::vector<std::string>& variant,
+    const std::vector<EditDistanceTypedAlignment>& alignments,
+    const std::vector<EventAttribute>& variant,
     const EditDistanceOptions& options) {
   if (alignments.size() != source.traces.size()) {
     throw std::invalid_argument(
@@ -772,7 +854,8 @@ EventLog project_public_variant(
   }
 
   EventLog projected;
-  set_attr(projected.attributes, "@@aligned_variant", join_variant(variant));
+  set_attr(projected.attributes, "@@aligned_variant",
+           strict_join_public_variant(variant));
   for (std::size_t trace_index = 0; trace_index < source.traces.size();
        ++trace_index) {
     const auto& original = source.traces[trace_index];
@@ -783,7 +866,7 @@ EventLog project_public_variant(
     const auto& alignment = alignments[trace_index];
     Trace projected_trace;
     set_attr(projected_trace.attributes, "@@original_trace",
-             join_variant(alignment.source_variant));
+             strict_join_public_variant(alignment.source_variant));
 
     SelectedTimestamp current_timestamp = public_timestamp_value(
         original.events.front(), options.timestamp_attribute);
@@ -792,6 +875,11 @@ EventLog project_public_variant(
       if (move.type == EditDistanceMoveType::kLog) {
         // The public projection cursor advances only on synchronous moves.
         continue;
+      }
+
+      if (!move.model_activity) {
+        throw std::invalid_argument(
+            "edit-distance projection move has no model activity");
       }
 
       if (move.type == EditDistanceMoveType::kSynchronous) {
@@ -805,11 +893,11 @@ EventLog project_public_variant(
       }
 
       Event event;
-      event.activity = move.model_activity;
+      event.activity = move.model_activity->value;
       event.activity_state = FirstClassAttributeState::kPresent;
       event.activity_source_key = options.activity_attribute;
       EventAttribute selected_activity{options.activity_attribute,
-                                       move.model_activity,
+                                       move.model_activity->value,
                                        AttributeKind::kString};
       event.activity_attribute = selected_activity;
       event.attributes.push_back(std::move(selected_activity));
@@ -1785,16 +1873,47 @@ EventLog project_log_on_alignments(
 EventLog project_log_on_variant(const EventLog& source,
                                 const std::vector<std::string>& variant,
                                 EditDistanceOptions options) {
+  std::vector<EventAttribute> typed_variant;
+  typed_variant.reserve(variant.size());
+  for (const auto& activity : variant)
+    typed_variant.emplace_back(options.activity_attribute, activity,
+                               AttributeKind::kString);
+  return project_log_on_typed_variant(source, typed_variant,
+                                      std::move(options));
+}
+
+EventLog project_log_on_typed_variant(
+    const EventLog& source, const std::vector<EventAttribute>& variant,
+    EditDistanceOptions options) {
+  validate_selector(options.activity_attribute, "activity");
+  validate_selector(options.timestamp_attribute, "timestamp");
+  if (options.deviation_cost == 0) {
+    throw std::invalid_argument(
+        "edit-distance deviation_cost must be positive");
+  }
+
+  require_public_variant_hashable(source, variant, options);
+
   EventLog target;
   Trace target_trace;
   target_trace.events.reserve(variant.size());
-  for (const auto& activity : variant) {
-    Event event{"", activity};
-    set_synthetic_activity(event, options.activity_attribute, activity);
+  for (const auto& value : variant) {
+    Event event;
+    EventAttribute activity = value;
+    activity.key = options.activity_attribute;
+    if (activity.first_class_state == FirstClassAttributeState::kNull)
+      activity.is_null = true;
+    // A variant member is a value, not a transported first-class event cell.
+    // Ignore adapter role metadata so every supplied value participates in
+    // the selected generic key exactly once.
+    activity.first_class_role = FirstClassAttributeRole::kNone;
+    activity.first_class_state = FirstClassAttributeState::kMissing;
+    activity.first_class_source_key.clear();
+    event.attributes.push_back(std::move(activity));
     target_trace.events.push_back(std::move(event));
   }
   target.traces.push_back(std::move(target_trace));
-  const auto alignments = align_edit_distance(source, target, options);
+  const auto alignments = align_typed_edit_distance(source, target, options);
   return project_public_variant(source, alignments, variant, options);
 }
 
@@ -1804,6 +1923,15 @@ EventLog project_log_on_variant(const EventDataView& source,
   const auto converted = event_data_as_log(source, options);
   require_flat_projection_fields(source, converted, options);
   return project_log_on_variant(converted, variant, std::move(options));
+}
+
+EventLog project_log_on_typed_variant(
+    const EventDataView& source, const std::vector<EventAttribute>& variant,
+    EditDistanceOptions options) {
+  const auto converted = event_data_as_log(source, options);
+  require_flat_projection_fields(source, converted, options);
+  return project_log_on_typed_variant(converted, variant,
+                                      std::move(options));
 }
 
 }  // namespace minera

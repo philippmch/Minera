@@ -5337,6 +5337,41 @@ and cost functions remain beyond the bounded matrices; cross-language error
 class/message equivalence is not asserted. The dispatcher and implementation
 module remain partial.
 
+### Edit-distance fresh-projection activity-type checkpoint
+
+The fresh public variant projector enforces the reference activity-type
+contract. Typed whole-log alignment and the metadata-preserving native
+projector remain separate APIs; their accepted activity domain does not imply
+that the fresh public projector accepts those values.
+
+The new `project_log_on_typed_variant` accepts typed argument values for
+validation; successful projection retains the reference string-only activity
+contract. The existing string-variant API shares that path. Present source
+activities are checked for hashability before variant values, with missing
+source keys deferred until after those checks. Target joining precedes
+projection, and each nonempty source trace is joined before its timestamp
+is read. Selected keys are exact; custom first-class fields do not silently
+satisfy the default activity selector.
+
+All 53 frozen public calls match through the typed-argument API, and all 24
+representable legacy calls match through the string API. The preserved old
+library matched 13 of those 24 legacy calls, with 11 observed differences;
+it had no typed-variant API. All 404 earlier comparisons pass against the
+same final library, for 481 native comparisons, along with the native
+alignment suite and catalogue check.
+
+Evidence is retained in `docs/edit-distance-typed-variant-reference.json.gz`,
+`docs/edit-distance-typed-variant-native-checks.json.gz`, and
+`docs/edit-distance-typed-variant-validation.json`. It includes frozen public
+captures, before/after route outputs, probe/checker sources, input-mutation
+checks, and library/input hashes. Independent production, capture, and harness reviews passed.
+
+The comparisons retain ordered fresh-output attributes and distinguish missing
+fields, unhashable activity keys, string-join failures, and timestamp reads.
+Both edit-distance catalogue rows remain partial; broader parameter adapters
+and semantic completion proofs remain open.
+
+
 ### Edit-distance typed whole-log and long-input checkpoint
 
 Typed whole-log alignment interns semantic activity keys in source-then-target
