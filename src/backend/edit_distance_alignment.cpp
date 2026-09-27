@@ -18,6 +18,8 @@ namespace {
 
 using Variant = std::vector<std::string>;
 
+void require_direct_hashable_activity(const EventAttribute& value);
+
 struct TargetVariant {
   Variant activities;
   std::size_t first_index = 0;
@@ -447,6 +449,230 @@ void set_synthetic_activity(Event& event, std::string_view selector,
     event.attributes.push_back(
         {std::string(selector), std::string(value), AttributeKind::kString});
   }
+}
+
+std::optional<EventAttribute> normalized_selected_activity(
+    const EventAttribute& value) {
+  if (value.first_class_role != FirstClassAttributeRole::kNone &&
+      value.first_class_state == FirstClassAttributeState::kMissing)
+    return std::nullopt;
+  EventAttribute result = value;
+  if (result.first_class_state == FirstClassAttributeState::kNull)
+    result.is_null = true;
+  return result;
+}
+
+std::optional<EventAttribute> first_class_activity_value(
+    const std::optional<EventAttribute>& stored, std::string_view source_key,
+    FirstClassAttributeState state, const std::string& text,
+    FirstClassAttributeRole role, std::string_view canonical_key,
+    std::string_view selector) {
+  const bool source_match = !source_key.empty() && source_key == selector;
+  const bool stored_match = stored &&
+      (stored->key == selector || stored->first_class_source_key == selector);
+  const bool implicit_canonical = !stored && source_key.empty() &&
+                                  selector == canonical_key;
+  if (!source_match && !stored_match && !implicit_canonical)
+    return std::nullopt;
+
+  if (stored) {
+    if (auto selected = normalized_selected_activity(*stored)) {
+      // The slot that owns this attribute is authoritative when adapters
+      // omitted the transport role metadata. Enrich the copy so typed moves
+      // retain that first-class identity without changing the input log.
+      if (selected->first_class_role == FirstClassAttributeRole::kNone) {
+        selected->first_class_role = role;
+        const bool is_null = selected->is_null ||
+            selected->first_class_state == FirstClassAttributeState::kNull ||
+            state == FirstClassAttributeState::kNull;
+        selected->is_null = is_null;
+        selected->first_class_state =
+            is_null ? FirstClassAttributeState::kNull
+                    : (state == FirstClassAttributeState::kMissing
+                           ? FirstClassAttributeState::kPresent
+                           : state);
+        selected->first_class_source_key = source_key.empty()
+                                               ? std::string(selector)
+                                               : std::string(source_key);
+      }
+      return selected;
+    }
+    return std::nullopt;
+  }
+  if (state == FirstClassAttributeState::kMissing && text.empty())
+    return std::nullopt;
+
+  EventAttribute value{std::string(selector), text, AttributeKind::kString};
+  value.first_class_role = role;
+  value.first_class_state = state == FirstClassAttributeState::kMissing
+                                ? FirstClassAttributeState::kPresent
+                                : state;
+  value.first_class_source_key = std::string(source_key);
+  value.is_null = state == FirstClassAttributeState::kNull;
+  return value;
+}
+
+std::optional<EventAttribute> selected_typed_activity(
+    const Event& event, std::string_view selector) {
+  const auto decorate_generic_selection = [&](EventAttribute selected) {
+    if (selected.first_class_role != FirstClassAttributeRole::kNone)
+      return selected;
+
+    FirstClassAttributeRole role = FirstClassAttributeRole::kNone;
+    std::string source_key;
+    const auto matches_slot = [&](
+        const std::optional<EventAttribute>& stored,
+        const std::string& stored_source_key, std::string_view canonical,
+        std::string_view alias) {
+      return selector == canonical || selector == alias ||
+             stored_source_key == selector ||
+             (stored && (stored->key == selector ||
+                         stored->first_class_source_key == selector));
+    };
+    if (matches_slot(event.activity_attribute, event.activity_source_key,
+                     "concept:name", "activity")) {
+      role = FirstClassAttributeRole::kActivity;
+      source_key = event.activity_source_key;
+    } else if (matches_slot(event.timestamp_attribute,
+                            event.timestamp_source_key, "time:timestamp",
+                            "timestamp")) {
+      role = FirstClassAttributeRole::kTimestamp;
+      source_key = event.timestamp_source_key;
+    } else if (matches_slot(event.resource_attribute,
+                            event.resource_source_key, "org:resource",
+                            "resource")) {
+      role = FirstClassAttributeRole::kResource;
+      source_key = event.resource_source_key;
+    } else if (matches_slot(event.lifecycle_attribute,
+                            event.lifecycle_source_key,
+                            "lifecycle:transition", "lifecycle")) {
+      role = FirstClassAttributeRole::kLifecycle;
+      source_key = event.lifecycle_source_key;
+    }
+    if (role != FirstClassAttributeRole::kNone) {
+      selected.first_class_role = role;
+      selected.first_class_state =
+          selected.is_null || selected.first_class_state ==
+                                  FirstClassAttributeState::kNull
+              ? FirstClassAttributeState::kNull
+              : FirstClassAttributeState::kPresent;
+      selected.first_class_source_key = source_key.empty()
+                                            ? std::string(selector)
+                                            : std::move(source_key);
+    }
+    return selected;
+  };
+
+  // Generic attributes are exact mapping keys and take precedence over the
+  // native first-class projections. Present nulls remain values here.
+  for (const auto& attribute : event.attributes) {
+    if (attribute.key != selector) continue;
+    if (auto selected = normalized_selected_activity(attribute))
+      return decorate_generic_selection(std::move(*selected));
+  }
+
+  if (auto selected = first_class_activity_value(
+          event.activity_attribute, event.activity_source_key,
+          event.activity_state, event.activity, FirstClassAttributeRole::kActivity,
+          "concept:name", selector))
+    return selected;
+  if (auto selected = first_class_activity_value(
+          event.timestamp_attribute, event.timestamp_source_key,
+          event.timestamp_state, event.timestamp,
+          FirstClassAttributeRole::kTimestamp, "time:timestamp", selector))
+    return selected;
+  if (auto selected = first_class_activity_value(
+          event.resource_attribute, event.resource_source_key,
+          event.resource_state, event.resource, FirstClassAttributeRole::kResource,
+          "org:resource", selector))
+    return selected;
+  if (auto selected = first_class_activity_value(
+          event.lifecycle_attribute, event.lifecycle_source_key,
+          event.lifecycle_state, event.lifecycle,
+          FirstClassAttributeRole::kLifecycle, "lifecycle:transition", selector))
+    return selected;
+  return std::nullopt;
+}
+
+class TypedActivityInterner {
+ public:
+  std::string intern(const EventAttribute& activity) {
+    require_direct_hashable_activity(activity);
+    const std::string fingerprint =
+        root_cause_scalar_key_fingerprint(activity);
+    auto& bucket = buckets_[fingerprint];
+    for (const std::size_t index : bucket) {
+      if (root_cause_scalar_keys_equal(values_[index], activity))
+        return label(index);
+    }
+    const std::size_t index = values_.size();
+    values_.push_back(activity);
+    bucket.push_back(index);
+    labels_.emplace(label(index), index);
+    return label(index);
+  }
+
+  const EventAttribute& value(std::string_view label_value) const {
+    const auto found = labels_.find(std::string(label_value));
+    if (found == labels_.end())
+      throw std::logic_error("edit-distance typed activity token is unknown");
+    return values_[found->second];
+  }
+
+ private:
+  static std::string label(std::size_t index) {
+    return "__minera_typed_activity_" + std::to_string(index);
+  }
+
+  std::vector<EventAttribute> values_;
+  std::map<std::string, std::vector<std::size_t>> buckets_;
+  std::map<std::string, std::size_t> labels_;
+};
+
+EventLog intern_typed_activities(const EventLog& source,
+                                std::string_view selector,
+                                TypedActivityInterner& interner) {
+  EventLog encoded;
+  encoded.traces.reserve(source.traces.size());
+  for (const auto& trace : source.traces) {
+    Trace encoded_trace;
+    encoded_trace.case_id = trace.case_id;
+    encoded_trace.events.reserve(trace.events.size());
+    for (const auto& source_event : trace.events) {
+      const auto activity = selected_typed_activity(source_event, selector);
+      if (!activity)
+        throw std::out_of_range("'" + std::string(selector) + "'");
+      const std::string id = interner.intern(*activity);
+      Event encoded_event;
+      set_synthetic_activity(encoded_event, selector, id);
+      encoded_trace.events.push_back(std::move(encoded_event));
+    }
+    encoded.traces.push_back(std::move(encoded_trace));
+  }
+  return encoded;
+}
+
+std::vector<EventAttribute> decode_typed_variant(
+    const Variant& encoded, const TypedActivityInterner& interner) {
+  std::vector<EventAttribute> result;
+  result.reserve(encoded.size());
+  for (const auto& label : encoded) result.push_back(interner.value(label));
+  return result;
+}
+
+EditDistanceTypedMove decode_typed_alignment_move(
+    const EditDistanceMove& encoded, const TypedActivityInterner& interner) {
+  EditDistanceTypedMove result;
+  result.type = encoded.type;
+  if (encoded.type == EditDistanceMoveType::kSynchronous) {
+    result.log_activity = interner.value(encoded.log_activity);
+    result.model_activity = interner.value(encoded.model_activity);
+  } else if (encoded.type == EditDistanceMoveType::kLog) {
+    result.log_activity = interner.value(encoded.log_activity);
+  } else {
+    result.model_activity = interner.value(encoded.model_activity);
+  }
+  return result;
 }
 
 std::string join_variant(const Variant& v) {
@@ -1166,6 +1392,295 @@ std::vector<EditDistanceAlignment> align_edit_distance(
   const auto target_log = event_data_as_log(target, options);
   require_flat_alignment_columns(target, target_log, options);
   return align_edit_distance(source_log, target_log, std::move(options));
+}
+
+std::vector<EditDistanceTypedAlignment> align_typed_edit_distance(
+    const EventLog& source, const EventLog& target,
+    EditDistanceOptions options) {
+  validate_selector(options.activity_attribute, "activity");
+  validate_selector(options.timestamp_attribute, "timestamp");
+  if (options.deviation_cost == 0) {
+    throw std::invalid_argument("edit-distance deviation_cost must be positive");
+  }
+
+  // Public trace values are hash keys. Extract and intern every source value
+  // first, then every target value, before the legacy engine's empty-log
+  // shortcuts or target validation can run.
+  TypedActivityInterner interner;
+  const EventLog encoded_source = intern_typed_activities(
+      source, options.activity_attribute, interner);
+  const EventLog encoded_target = intern_typed_activities(
+      target, options.activity_attribute, interner);
+  const auto encoded_alignments = align_edit_distance(
+      encoded_source, encoded_target, options);
+
+  std::vector<EditDistanceTypedAlignment> result;
+  result.reserve(encoded_alignments.size());
+  for (const auto& encoded : encoded_alignments) {
+    EditDistanceTypedAlignment alignment;
+    alignment.alignment.reserve(encoded.alignment.size());
+    for (const auto& move : encoded.alignment)
+      alignment.alignment.push_back(
+          decode_typed_alignment_move(move, interner));
+    alignment.moves = alignment.alignment;
+    alignment.source_variant =
+        decode_typed_variant(encoded.source_variant, interner);
+    alignment.target_variant =
+        decode_typed_variant(encoded.target_variant, interner);
+    alignment.target_index = encoded.target_index;
+    alignment.cost = encoded.cost;
+    alignment.fitness = encoded.fitness;
+    alignment.best_worst_cost = encoded.best_worst_cost;
+    alignment.bwc = encoded.bwc;
+    alignment.denominator = encoded.denominator;
+    result.push_back(std::move(alignment));
+  }
+  return result;
+}
+
+std::vector<EditDistanceTypedAlignment> align_typed_edit_distance(
+    const EventDataView& source, const EventDataView& target,
+    EditDistanceOptions options) {
+  const auto source_log = event_data_as_log(source, options);
+  require_flat_alignment_columns(source, source_log, options);
+  const auto target_log = event_data_as_log(target, options);
+  require_flat_alignment_columns(target, target_log, options);
+  return align_typed_edit_distance(source_log, target_log, std::move(options));
+}
+
+namespace {
+
+bool typed_variants_equal(const std::vector<EventAttribute>& left,
+                          const std::vector<EventAttribute>& right) {
+  if (left.size() != right.size()) return false;
+  for (std::size_t i = 0; i < left.size(); ++i) {
+    if (!root_cause_scalar_keys_equal(left[i], right[i])) return false;
+  }
+  return true;
+}
+
+std::string join_typed_variant(const std::vector<EventAttribute>& variant) {
+  std::string result;
+  for (std::size_t i = 0; i < variant.size(); ++i) {
+    if (i != 0) result += ',';
+    result += root_cause_attribute_category(variant[i]);
+  }
+  return result;
+}
+
+void set_typed_projected_activity(Event& target, const Event* source,
+                                  std::string_view selector,
+                                  const EventAttribute& selected) {
+  const auto source_selection = source == nullptr
+                                    ? std::optional<EventAttribute>{}
+                                    : selected_typed_activity(*source, selector);
+  // The configured selector is the projected identity even when either log
+  // stores the selected first-class value under a canonical XES key.
+  const std::string key(selector);
+
+  EventAttribute activity = selected;
+  activity.key = key;
+  if (activity.first_class_role == FirstClassAttributeRole::kNone &&
+      source_selection) {
+    activity.first_class_role = source_selection->first_class_role;
+  }
+  if (activity.first_class_role == FirstClassAttributeRole::kNone &&
+      source != nullptr) {
+    const auto matches_source_slot = [&](
+        const std::optional<EventAttribute>& stored,
+        const std::string& source_key) {
+      return source_key == selector ||
+             (stored && (stored->key == selector ||
+                         stored->first_class_source_key == selector));
+    };
+    if (matches_source_slot(source->activity_attribute,
+                            source->activity_source_key)) {
+      activity.first_class_role = FirstClassAttributeRole::kActivity;
+    } else if (matches_source_slot(source->timestamp_attribute,
+                                   source->timestamp_source_key)) {
+      activity.first_class_role = FirstClassAttributeRole::kTimestamp;
+    } else if (matches_source_slot(source->resource_attribute,
+                                   source->resource_source_key)) {
+      activity.first_class_role = FirstClassAttributeRole::kResource;
+    } else if (matches_source_slot(source->lifecycle_attribute,
+                                   source->lifecycle_source_key)) {
+      activity.first_class_role = FirstClassAttributeRole::kLifecycle;
+    }
+  }
+  if (activity.first_class_role == FirstClassAttributeRole::kNone) {
+    const auto role_from_key = [](std::string_view candidate) {
+      if (candidate == "concept:name" || candidate == "activity")
+        return FirstClassAttributeRole::kActivity;
+      if (candidate == "time:timestamp" || candidate == "timestamp")
+        return FirstClassAttributeRole::kTimestamp;
+      if (candidate == "org:resource" || candidate == "resource")
+        return FirstClassAttributeRole::kResource;
+      if (candidate == "lifecycle:transition" || candidate == "lifecycle")
+        return FirstClassAttributeRole::kLifecycle;
+      return FirstClassAttributeRole::kNone;
+    };
+    activity.first_class_role = role_from_key(selector);
+    if (activity.first_class_role == FirstClassAttributeRole::kNone)
+      activity.first_class_role = role_from_key(selected.key);
+    if (activity.first_class_role == FirstClassAttributeRole::kNone &&
+        source_selection)
+      activity.first_class_role = role_from_key(source_selection->key);
+  }
+  const bool is_null = activity.is_null ||
+      activity.first_class_state == FirstClassAttributeState::kNull;
+  activity.is_null = is_null;
+  if (activity.first_class_role != FirstClassAttributeRole::kNone) {
+    activity.first_class_state = is_null ? FirstClassAttributeState::kNull
+                                         : FirstClassAttributeState::kPresent;
+    activity.first_class_source_key = key;
+  }
+
+  target.activity = activity.value;
+  target.activity_state = is_null ? FirstClassAttributeState::kNull
+                                  : FirstClassAttributeState::kPresent;
+  target.activity_source_key = key;
+  target.activity_attribute = activity;
+  const auto existing = std::find_if(
+      target.attributes.begin(), target.attributes.end(),
+      [&](const EventAttribute& attribute) { return attribute.key == key; });
+  if (existing == target.attributes.end())
+    target.attributes.push_back(activity);
+  else
+    *existing = activity;
+
+  const auto state = is_null ? FirstClassAttributeState::kNull
+                             : FirstClassAttributeState::kPresent;
+  switch (activity.first_class_role) {
+    case FirstClassAttributeRole::kTimestamp:
+      target.timestamp = activity.value;
+      target.timestamp_state = state;
+      target.timestamp_source_key = key;
+      target.timestamp_attribute = activity;
+      break;
+    case FirstClassAttributeRole::kResource:
+      target.resource = activity.value;
+      target.resource_state = state;
+      target.resource_source_key = key;
+      target.resource_attribute = activity;
+      break;
+    case FirstClassAttributeRole::kLifecycle:
+      target.lifecycle = activity.value;
+      target.lifecycle_state = state;
+      target.lifecycle_source_key = key;
+      target.lifecycle_attribute = activity;
+      break;
+    case FirstClassAttributeRole::kNone:
+    case FirstClassAttributeRole::kCaseId:
+    case FirstClassAttributeRole::kActivity:
+      break;
+  }
+}
+
+}  // namespace
+
+EventLog project_log_on_typed_alignments(
+    const EventLog& source,
+    const std::vector<EditDistanceTypedAlignment>& alignments,
+    EditDistanceOptions options) {
+  validate_selector(options.activity_attribute, "activity");
+  validate_selector(options.timestamp_attribute, "timestamp");
+  if (alignments.size() != source.traces.size()) {
+    throw std::invalid_argument(
+        "edit-distance projection requires one alignment per source trace");
+  }
+
+  EventLog projected;
+  copy_event_log_context(source, projected);
+  erase_attr(projected.attributes, "@@aligned_variant");
+  erase_attr(projected.attributes, "@@aligned_variants");
+  bool uniform_target = true;
+  for (std::size_t i = 1; i < alignments.size(); ++i) {
+    if (!typed_variants_equal(alignments[i].target_variant,
+                              alignments.front().target_variant)) {
+      uniform_target = false;
+      break;
+    }
+  }
+  if (uniform_target && !alignments.empty()) {
+    set_attr(projected.attributes, "@@aligned_variant",
+             join_typed_variant(alignments.front().target_variant));
+  } else if (!alignments.empty()) {
+    set_attr(projected.attributes, "@@aligned_variants", "multiple");
+  }
+
+  for (std::size_t trace_index = 0; trace_index < source.traces.size();
+       ++trace_index) {
+    const auto& original = source.traces[trace_index];
+    const auto& alignment = alignments[trace_index];
+    Trace projected_trace;
+    copy_trace_context(original, projected_trace);
+    set_attr(projected_trace.attributes, "@@original_trace",
+             join_typed_variant(alignment.source_variant));
+    set_attr(projected_trace.attributes, "@@aligned_variant",
+             join_typed_variant(alignment.target_variant));
+
+    const Event* activity_template =
+        original.events.empty() ? nullptr : &original.events.front();
+    SelectedTimestamp current_timestamp;
+    if (!original.events.empty()) {
+      current_timestamp = timestamp_value(
+          original.events.front(), options.timestamp_attribute, true);
+    }
+    std::size_t source_pos = 0;
+    for (const auto& move : alignment.alignment) {
+      if (move.type == EditDistanceMoveType::kLog) {
+        if (source_pos >= original.events.size()) {
+          throw std::invalid_argument(
+              "edit-distance projection alignment consumes too many source events");
+        }
+        ++source_pos;
+        continue;
+      }
+      if (!move.model_activity) {
+        throw std::invalid_argument(
+            "edit-distance typed projection move has no model activity");
+      }
+
+      Event event;
+      if (move.type == EditDistanceMoveType::kSynchronous) {
+        if (source_pos >= original.events.size()) {
+          throw std::invalid_argument(
+              "edit-distance projection alignment consumes too many source events");
+        }
+        const auto& source_event = original.events[source_pos++];
+        event = source_event;
+        bind_selected_activity(event, source_event, options.activity_attribute,
+                               move.model_activity->value);
+        current_timestamp = timestamp_value(
+            source_event, options.timestamp_attribute, true);
+        bind_selected_timestamp(event, current_timestamp);
+        set_typed_projected_activity(event, &source_event,
+                                     options.activity_attribute,
+                                     *move.model_activity);
+      } else {
+        copy_event_case_context(original, event);
+        if (activity_template != nullptr) {
+          set_projected_activity(event, activity_template,
+                                 options.activity_attribute,
+                                 move.model_activity->value);
+        } else {
+          set_projected_activity(event, nullptr, options.activity_attribute,
+                                 move.model_activity->value);
+        }
+        set_projected_timestamp(event, current_timestamp);
+        set_typed_projected_activity(event, activity_template,
+                                     options.activity_attribute,
+                                     *move.model_activity);
+      }
+      event.input_order = projected_trace.events.size();
+      set_attr(event.attributes, "@@is_conforming",
+               move.type == EditDistanceMoveType::kSynchronous ? "true" : "false",
+               AttributeKind::kBoolean);
+      projected_trace.events.push_back(std::move(event));
+    }
+    projected.traces.push_back(std::move(projected_trace));
+  }
+  return projected;
 }
 
 EventLog project_log_on_alignments(

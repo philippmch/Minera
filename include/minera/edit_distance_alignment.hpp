@@ -93,6 +93,23 @@ struct EditDistanceTypedTraceResult {
   std::uint64_t cost = 0;
 };
 
+// Whole-log typed alignment. Canonical activity values are selected in
+// source-first order and retained in variants and decoded moves. The remaining
+// fields mirror EditDistanceAlignment so callers can switch APIs without
+// losing target selection or fitness metadata.
+struct EditDistanceTypedAlignment {
+  std::vector<EditDistanceTypedMove> alignment;
+  std::vector<EditDistanceTypedMove> moves;
+  std::vector<EventAttribute> source_variant;
+  std::vector<EventAttribute> target_variant;
+  std::size_t target_index = 0;
+  std::uint64_t cost = 0;
+  double fitness = 1.0;
+  std::uint64_t best_worst_cost = 0;
+  std::uint64_t bwc = 0;
+  std::uint64_t denominator = 0;
+};
+
 // A type-erased cache value. Cache hits return the exact shared handle held by
 // the cache, including when it contains a caller-defined opaque value. A null
 // handle is a valid cached value; callers distinguish it from a cache miss by
@@ -213,6 +230,17 @@ using EditDistanceTraceCache =
     const EventDataView& source, const EventDataView& target,
     EditDistanceOptions options = {});
 
+// Typed-key whole-log alignment. Source activity values define canonical
+// representatives before target values are interned. Numeric aliases use
+// Python-compatible equality, while different hashable types remain distinct.
+[[nodiscard]] std::vector<EditDistanceTypedAlignment>
+align_typed_edit_distance(const EventLog& source, const EventLog& target,
+                          EditDistanceOptions options = {});
+[[nodiscard]] std::vector<EditDistanceTypedAlignment>
+align_typed_edit_distance(const EventDataView& source,
+                          const EventDataView& target,
+                          EditDistanceOptions options = {});
+
 // Convenience aliases.
 [[nodiscard]] inline std::vector<EditDistanceAlignment> apply_edit_distance(
     const EventLog& source, const EventLog& target,
@@ -233,6 +261,17 @@ using EditDistanceTraceCache =
     const EventDataView& source, const EventDataView& target,
     EditDistanceOptions options = {}) {
   return align_edit_distance(source, target, options);
+}
+[[nodiscard]] inline std::vector<EditDistanceTypedAlignment>
+apply_typed_edit_distance(const EventLog& source, const EventLog& target,
+                          EditDistanceOptions options = {}) {
+  return align_typed_edit_distance(source, target, std::move(options));
+}
+[[nodiscard]] inline std::vector<EditDistanceTypedAlignment>
+apply_typed_edit_distance(const EventDataView& source,
+                          const EventDataView& target,
+                          EditDistanceOptions options = {}) {
+  return align_typed_edit_distance(source, target, std::move(options));
 }
 
 // Keep target activities, retaining selected timestamps from synchronous
@@ -267,5 +306,13 @@ using EditDistanceTraceCache =
     const EventLog& source,
     const std::vector<EditDistanceAlignment>& alignments,
     EditDistanceOptions options);
+
+// Metadata-preserving typed counterpart. Typed selected activities in
+// synchronous/model moves remain typed in projected events; log moves are
+// omitted and null activities stay distinct from gaps.
+[[nodiscard]] EventLog project_log_on_typed_alignments(
+    const EventLog& source,
+    const std::vector<EditDistanceTypedAlignment>& alignments,
+    EditDistanceOptions options = {});
 
 }  // namespace minera

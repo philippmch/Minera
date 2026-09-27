@@ -5337,6 +5337,43 @@ and cost functions remain beyond the bounded matrices; cross-language error
 class/message equivalence is not asserted. The dispatcher and implementation
 module remain partial.
 
+### Edit-distance typed whole-log and long-input checkpoint
+
+Typed whole-log alignment interns semantic activity keys in source-then-target
+order, retains the first representative, and delegates target selection and
+scoring to the existing whole-log engine. Decoded variants and moves preserve
+numeric, Boolean, null, byte, tuple, and frozen-set values. Activity validation
+is eager, including when one log is empty; missing fields and unhashable values
+are rejected before the empty-input result or target check.
+
+Typed JSON export and the CLI/server edit-distance routes use these results.
+Projection through supplied alignments retains typed activity values. This
+metadata-preserving native projection remains separate from the fresh public
+variant projector. Gap serialization uses the move kind, so empty-string and
+null activity values are not mistaken for gaps.
+
+All 72 frozen typed whole-log calls and 19 long direct calls match. The 313
+prior comparisons also pass against the same final library: 404 comparisons
+in total. Twelve CLI cases and four live HTTP cases pass, including typed
+projected values, event counts, and projection markers. The Release build,
+native alignment suite, catalogue check, and independent production and
+evidence reviews pass. Projection regressions also cover ordered attributes
+and custom first-class field identities without mutating inputs.
+
+Evidence is retained in `docs/edit-distance-typed-log-reference.json.gz`,
+`docs/edit-distance-typed-log-native-checks.json.gz`, and
+`docs/edit-distance-typed-log-validation.json`. The bundle includes frozen
+reference inputs and outputs, probe/checker sources, exact result comparisons,
+and before/after binary and input hashes. The prior header had no typed
+whole-log API, so no native before-match count is invented.
+
+The long direct-call corpus covers 199/200/201-element boundaries, popular
+symbol counts around the cutoff, and equal-long-block candidate ordering.
+These finite comparisons extend the tested domain; broader raw parameter
+adapters, typed fresh-variant projection, and semantic completion proofs
+remain open. Both edit-distance catalogue rows remain partial.
+
+
 ### Edit-distance typed mapping checkpoint
 
 The typed direct-trace interface accepts native event values as mapping keys
