@@ -7152,8 +7152,29 @@
           "selector": "BACKWARDS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/conformance.hpp",
+        "src/backend/conformance.cpp",
+        "src/backend/tests/test_token_replay_diagnostics.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.tokenreplay.variants.backwards",
+        "implementation": [
+          {
+            "path": "src/backend/conformance.cpp",
+            "symbol": "replay_token_traces"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_token_replay_diagnostics.cpp",
+            "executable": "minera_token_replay_diagnostics_tests",
+            "case": "backwards_module_acceptance"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.tokenreplay.variants.token_replay",

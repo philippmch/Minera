@@ -231,3 +231,21 @@ existing event-data suite caught. The new `backwards_module_acceptance` case
 checks ordered trace results and aggregate diagnostics alongside targeted typed
 activity regressions. Independent review cleared the corrected change. Catalogue
 registration and module promotion remain a separate gate.
+
+## Backwards module acceptance
+
+The separate catalogue gate is now linked to `replay_token_traces` and the
+registered `backwards_module_acceptance` case in
+`minera_token_replay_diagnostics_tests`. Independent completion review checked
+all six gates above against the preserved controls (26 matched observations),
+denominator boundaries (52), weighted routing (16), and post-fix parameter/input
+matrix (62). These cohorts overlap and are not a count of unique inputs.
+
+The module `algo.conformance.tokenreplay.variants.backwards` is complete under
+the declared direct EventLog contract. Its proof combines the behavioral evidence
+with the native acceptance case and passing affected suites; fixture-local
+parameter no-effects are not generalized into universal ignored-parameter
+claims. The token-replay dispatcher, forward variation and root-cause module
+remain partial. Stream/table grouping remains a native extension. The overall
+catalogue now has 198 complete and 189 partial modules, with 46 complete and 40
+partial dispatcher packages: 229 coverage units remain open.
