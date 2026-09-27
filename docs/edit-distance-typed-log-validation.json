@@ -1,0 +1,31 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Typed whole-log edit-distance alignment, JSON/CLI/server wiring, and long-input matching-block boundaries",
+  "parent_commit": "5824a8f34fdf641167936cce160e0a1319d03fca",
+  "verified_code_tree": "a33bde6a0a183707f089414a8df640a173ed86ff",
+  "core_sha256": "801b4011e46db4f3c2c5cf010652a19ab0afb5aff8c63fecc5b73fdbbedbe089",
+  "typed_log_public_calls": 72,
+  "typed_log_matches": 72,
+  "long_public_calls": 19,
+  "long_matches": 19,
+  "prior_direct_public_calls": 101,
+  "prior_direct_matches": 101,
+  "baseline": "No native typed whole-log API before this checkpoint; no fabricated baseline match count.",
+  "prior_whole_log_and_projection_comparisons": 212,
+  "prior_matches": 212,
+  "native_comparisons": 404,
+  "matched": 404,
+  "cli_comparisons": 12,
+  "server_comparisons": 4,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "comparison": "All cohorts compare ordered moves and integer costs. Typed whole-log calls additionally compare typed inputs/outputs, unchanged arguments, move synonyms and JSON output. Direct-helper cohorts also compare ordered cache snapshots/mutations and shared return identity. Errors compare mapped diagnostics, not Python exception-class identity. HTTP checks compare typed projected activity fields, event counts and projection markers.",
+  "artifacts": {
+    "docs/edit-distance-typed-log-reference.json.gz": "8d6755c90cdfc2e7bf9a4ff3cee35e2b95401686297826ccde03ae7c5528dae9",
+    "docs/edit-distance-typed-log-native-checks.json.gz": "1004cc17c65b10c1c2d3e0f4ebcdb7532d32493af17facbfed4e37ec767a8467"
+  },
+  "remaining": [
+    "Broader parameter adapters, typed fresh-variant projection, and semantic completion proofs remain open.",
+    "Both edit-distance catalogue rows remain partial; project has 232 incomplete coverage units."
+  ]
+}

@@ -7,6 +7,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <variant>
 
 #include "minera/edit_distance_alignment.hpp"
@@ -37,6 +38,36 @@ int main() {
     event.attributes.push_back(std::move(attribute));
     trace.events.push_back(std::move(event));
     return trace;
+  };
+  const auto typed_log = [](std::vector<EventAttribute> activities) {
+    EventLog log;
+    Trace trace;
+    trace.case_id = "typed-case";
+    for (auto& activity : activities) {
+      Event event;
+      event.attributes.push_back(std::move(activity));
+      trace.events.push_back(std::move(event));
+    }
+    log.traces.push_back(std::move(trace));
+    return log;
+  };
+  const auto typed_int = [](std::string key, std::int64_t value) {
+    EventAttribute attribute{std::move(key), std::to_string(value),
+                             AttributeKind::kInt};
+    attribute.typed_value = value;
+    return attribute;
+  };
+  const auto typed_float = [](std::string key, double value) {
+    EventAttribute attribute{std::move(key), std::to_string(value),
+                             AttributeKind::kFloat};
+    attribute.typed_value = value;
+    return attribute;
+  };
+  const auto typed_bool = [](std::string key, bool value) {
+    EventAttribute attribute{std::move(key), value ? "True" : "False",
+                             AttributeKind::kBoolean};
+    attribute.typed_value = value;
+    return attribute;
   };
   const Trace direct_trace = log_of({{"A", "B"}}).traces.front();
   const EditDistanceTraceMapping direct_mapping{{"A", "a"}, {"B", "b"},
@@ -1224,6 +1255,345 @@ int main() {
          std::get<NativeDate>(nat_projection.traces.front().events.front()
                                   .timestamp_attribute->typed_value)
                  .value == "NaT");
+
+  // Whole-log typed alignment interns source values first using the shared
+  // Python-compatible typed-key equality, then decodes native typed labels.
+  const auto typed_integer_log = typed_log({typed_int("concept:name", 1)});
+  const auto typed_boolean_log = typed_log({typed_bool("concept:name", true)});
+  const auto integer_boolean_alignment = align_typed_edit_distance(
+      typed_integer_log, typed_boolean_log);
+  assert(integer_boolean_alignment.size() == 1 &&
+         integer_boolean_alignment.front().cost == 0 &&
+         integer_boolean_alignment.front().source_variant.front().kind ==
+             AttributeKind::kInt &&
+         integer_boolean_alignment.front().target_variant.front().kind ==
+             AttributeKind::kInt &&
+         integer_boolean_alignment.front().alignment.front().type ==
+             EditDistanceMoveType::kSynchronous &&
+         integer_boolean_alignment.front().alignment.front().log_activity &&
+         integer_boolean_alignment.front().alignment.front().model_activity &&
+         integer_boolean_alignment.front().alignment.front().log_activity->kind ==
+             AttributeKind::kInt &&
+         integer_boolean_alignment.front().alignment.front().model_activity->kind ==
+             AttributeKind::kInt);
+  const auto boolean_integer_alignment = align_typed_edit_distance(
+      typed_boolean_log, typed_integer_log);
+  assert(boolean_integer_alignment.front().cost == 0 &&
+         boolean_integer_alignment.front().target_variant.front().kind ==
+             AttributeKind::kBoolean &&
+         std::get<bool>(boolean_integer_alignment.front()
+                            .target_variant.front().typed_value));
+
+  const auto typed_string_one = typed_log(
+      {EventAttribute{"concept:name", "1", AttributeKind::kString}});
+  const auto mixed_alignment = align_typed_edit_distance(
+      typed_log({typed_int("concept:name", 1),
+                 EventAttribute{"concept:name", "1", AttributeKind::kString}}),
+      typed_log({typed_int("concept:name", 1),
+                 EventAttribute{"concept:name", "1", AttributeKind::kString}}));
+  assert(mixed_alignment.front().cost == 0 &&
+         mixed_alignment.front().source_variant.size() == 2 &&
+         mixed_alignment.front().source_variant[0].kind == AttributeKind::kInt &&
+         mixed_alignment.front().source_variant[1].kind == AttributeKind::kString);
+  assert(align_typed_edit_distance(typed_integer_log, typed_string_one)
+             .front().cost == 20000);
+
+  EventAttribute typed_none{"concept:name", "", AttributeKind::kString, true};
+  const auto none_log = typed_log({typed_none});
+  const auto none_alignment = align_typed_edit_distance(none_log, none_log);
+  assert(none_alignment.front().cost == 0 &&
+         none_alignment.front().alignment.front().type ==
+             EditDistanceMoveType::kSynchronous &&
+         none_alignment.front().alignment.front().log_activity &&
+         none_alignment.front().alignment.front().log_activity->is_null &&
+         none_alignment.front().alignment.front().model_activity &&
+         none_alignment.front().alignment.front().model_activity->is_null);
+  const auto none_gap_alignment =
+      align_typed_edit_distance(none_log, typed_string_one);
+  assert(none_gap_alignment.front().alignment.size() == 2 &&
+         none_gap_alignment.front().alignment[0].type ==
+             EditDistanceMoveType::kLog &&
+         none_gap_alignment.front().alignment[0].log_activity &&
+         none_gap_alignment.front().alignment[0].log_activity->is_null &&
+         !none_gap_alignment.front().alignment[0].model_activity &&
+         none_gap_alignment.front().alignment[1].type ==
+             EditDistanceMoveType::kModel &&
+         !none_gap_alignment.front().alignment[1].log_activity &&
+         none_gap_alignment.front().alignment[1].model_activity);
+
+  EventAttribute int_tuple{"concept:name", "", AttributeKind::kString};
+  int_tuple.container = AttributeContainerKind::kTuple;
+  int_tuple.children.push_back(typed_int("0", 1));
+  EventAttribute float_tuple{"concept:name", "", AttributeKind::kString};
+  float_tuple.container = AttributeContainerKind::kTuple;
+  float_tuple.children.push_back(typed_float("0", 1.0));
+  assert(align_typed_edit_distance(typed_log({int_tuple}),
+                                   typed_log({float_tuple}))
+             .front().cost == 0);
+
+  EventAttribute frozen_left{"concept:name", "", AttributeKind::kString};
+  frozen_left.container = AttributeContainerKind::kFrozenSet;
+  frozen_left.children = {typed_int("", 1),
+                          EventAttribute{"", "x", AttributeKind::kString}};
+  EventAttribute frozen_right{"concept:name", "", AttributeKind::kString};
+  frozen_right.container = AttributeContainerKind::kFrozenSet;
+  frozen_right.children = {EventAttribute{"", "x", AttributeKind::kString},
+                           typed_float("", 1.0)};
+  assert(align_typed_edit_distance(typed_log({frozen_left}),
+                                   typed_log({frozen_right}))
+             .front().cost == 0);
+  assert(align_typed_edit_distance(
+             typed_log({make_bytes_attribute("concept:name", "a\0b")}),
+             typed_log({make_bytes_attribute("concept:name", "a\0b")}))
+             .front().cost == 0);
+
+  // The source-first canonical representative is shared across source traces.
+  EventLog multi_source;
+  multi_source.traces = typed_log({typed_int("concept:name", 1)}).traces;
+  auto float_source_trace = typed_log({typed_float("concept:name", 1.0)});
+  multi_source.traces.push_back(float_source_trace.traces.front());
+  const auto shared_canonical =
+      align_typed_edit_distance(multi_source, typed_boolean_log);
+  assert(shared_canonical.size() == 2 &&
+         shared_canonical[0].source_variant.front().kind ==
+             AttributeKind::kInt &&
+         shared_canonical[1].source_variant.front().kind ==
+             AttributeKind::kInt &&
+         shared_canonical[1].target_variant.front().kind ==
+             AttributeKind::kInt);
+
+  // Exact custom selection does not alias concept:name, and typed activity
+  // validation happens before empty-log alignment shortcuts.
+  EditDistanceOptions activity_alias;
+  activity_alias.activity_attribute = "activity";
+  bool typed_threw = false;
+  try {
+    (void)align_typed_edit_distance(typed_integer_log, typed_boolean_log,
+                                    activity_alias);
+  } catch (const std::out_of_range& error) {
+    typed_threw = std::string(error.what()) == "'activity'";
+  }
+  assert(typed_threw);
+  EventAttribute unhashable_list{"concept:name", "", AttributeKind::kString};
+  unhashable_list.container = AttributeContainerKind::kList;
+  EventLog empty_typed_source;
+  typed_threw = false;
+  try {
+    (void)align_typed_edit_distance(
+        empty_typed_source, typed_log({unhashable_list}));
+  } catch (const std::invalid_argument& error) {
+    typed_threw = std::string(error.what()) == "unhashable type: 'list'";
+  }
+  assert(typed_threw);
+  typed_threw = false;
+  try {
+    (void)align_typed_edit_distance(typed_log({unhashable_list}),
+                                    empty_typed_source);
+  } catch (const std::invalid_argument& error) {
+    typed_threw = std::string(error.what()) == "unhashable type: 'list'";
+  }
+  assert(typed_threw);
+
+  // Flat adapters retain typed event cells and use the configured case id.
+  EventTable typed_flat_source;
+  typed_flat_source.columns = {"cid", "act"};
+  typed_flat_source.rows.push_back(
+      {EventAttribute{"cid", "src"}, typed_int("act", 1)});
+  EventTable typed_flat_target;
+  typed_flat_target.columns = {"cid", "act"};
+  typed_flat_target.rows.push_back(
+      {EventAttribute{"cid", "model"}, typed_bool("act", true)});
+  EditDistanceOptions typed_flat_options;
+  typed_flat_options.case_id_attribute = "cid";
+  typed_flat_options.activity_attribute = "act";
+  const auto typed_flat_alignment = align_typed_edit_distance(
+      EventDataView(typed_flat_source), EventDataView(typed_flat_target),
+      typed_flat_options);
+  assert(typed_flat_alignment.size() == 1 &&
+         typed_flat_alignment.front().cost == 0 &&
+         typed_flat_alignment.front().source_variant.front().kind ==
+             AttributeKind::kInt &&
+         typed_flat_alignment.front().target_variant.front().kind ==
+             AttributeKind::kInt);
+
+  // Projection keeps source metadata and typed values, including the typed
+  // model insertion and its following synchronous event. Opaque intern IDs
+  // are only an implementation detail and never appear in output metadata.
+  EventLog typed_projection_source =
+      typed_log({typed_int("concept:name", 1)});
+  typed_projection_source.attributes.push_back(
+      {"owner", "source-log", AttributeKind::kString});
+  typed_projection_source.metadata.globals.push_back(
+      {"custom", {{"origin", "typed-log"}}});
+  typed_projection_source.traces.front().attributes.push_back(
+      {"case-note", "retained", AttributeKind::kString});
+  typed_projection_source.traces.front().events.front().attributes.push_back(
+      {"payload", "kept-on-sync", AttributeKind::kString});
+  const auto typed_projection_target =
+      typed_log({typed_int("concept:name", 2), typed_int("concept:name", 1)});
+  const auto typed_projection_alignment = align_typed_edit_distance(
+      typed_projection_source, typed_projection_target);
+  const auto typed_whole_projection = project_log_on_typed_alignments(
+      typed_projection_source, typed_projection_alignment);
+  assert(typed_whole_projection.metadata == typed_projection_source.metadata &&
+         typed_whole_projection.attribute("owner") &&
+         *typed_whole_projection.attribute("owner") == "source-log" &&
+         typed_whole_projection.traces.front().attribute("case-note") &&
+         *typed_whole_projection.traces.front().attribute("case-note") == "retained" &&
+         typed_whole_projection.traces.front().attribute("@@original_trace") &&
+         *typed_whole_projection.traces.front().attribute("@@original_trace") == "1" &&
+         typed_whole_projection.traces.front().attribute("@@aligned_variant") &&
+         *typed_whole_projection.traces.front().attribute("@@aligned_variant") == "2,1" &&
+         typed_whole_projection.traces.front().events.size() == 2);
+  const auto& typed_insert = typed_whole_projection.traces.front().events[0];
+  const auto& typed_sync = typed_whole_projection.traces.front().events[1];
+  assert(typed_insert.activity_attribute &&
+         typed_insert.activity_attribute->kind == AttributeKind::kInt &&
+         std::get<std::int64_t>(typed_insert.activity_attribute->typed_value) == 2 &&
+         typed_insert.attribute("concept:name") &&
+         typed_insert.attribute("@@is_conforming") &&
+         *typed_insert.attribute("@@is_conforming") == "false" &&
+         typed_sync.activity_attribute &&
+         typed_sync.activity_attribute->kind == AttributeKind::kInt &&
+         std::get<std::int64_t>(typed_sync.activity_attribute->typed_value) == 1 &&
+         typed_sync.attribute("payload") &&
+         *typed_sync.attribute("payload") == "kept-on-sync" &&
+         typed_sync.attributes.size() == 3 &&
+         typed_sync.attributes[0].key == "concept:name" &&
+         typed_sync.attributes[0].kind == AttributeKind::kInt &&
+         typed_sync.attributes[1].key == "payload" &&
+         typed_sync.attributes[2].key == "@@is_conforming" &&
+         typed_sync.attribute("@@is_conforming") &&
+         *typed_sync.attribute("@@is_conforming") == "true");
+  for (const auto& event : typed_whole_projection.traces.front().events) {
+    assert(event.activity.find("__minera_typed_activity_") ==
+           std::string::npos);
+    for (const auto& attribute : event.attributes) {
+      assert(attribute.value.find("__minera_typed_activity_") ==
+             std::string::npos);
+    }
+  }
+
+  // A model-only move selected through a custom resource key keeps that key
+  // as its identity even when the model's stored first-class attribute uses
+  // the canonical XES key. The resource projection retains its typed value
+  // and first-class state as well as the selected-activity projection.
+  EventLog empty_resource_source;
+  Trace empty_resource_trace;
+  empty_resource_trace.case_id = "empty-resource-source";
+  empty_resource_source.traces.push_back(std::move(empty_resource_trace));
+  EventLog resource_model;
+  Trace resource_model_trace;
+  Event resource_model_event;
+  resource_model_event.resource = "17";
+  resource_model_event.resource_state = FirstClassAttributeState::kPresent;
+  resource_model_event.resource_source_key = "owner_id";
+  EventAttribute typed_resource = typed_int("org:resource", 17);
+  // Older adapters may retain the value in the resource slot without adding
+  // role metadata to the EventAttribute itself.
+  typed_resource.first_class_state = FirstClassAttributeState::kPresent;
+  typed_resource.first_class_source_key = "owner_id";
+  resource_model_event.resource_attribute = typed_resource;
+  resource_model_trace.events.push_back(std::move(resource_model_event));
+  resource_model.traces.push_back(std::move(resource_model_trace));
+  EditDistanceOptions resource_options;
+  resource_options.activity_attribute = "owner_id";
+  const auto resource_alignments = align_typed_edit_distance(
+      empty_resource_source, resource_model, resource_options);
+  assert(resource_alignments.size() == 1 &&
+         resource_alignments.front().alignment.size() == 1 &&
+         resource_alignments.front().alignment.front().type ==
+             EditDistanceMoveType::kModel);
+  const auto resource_projection = project_log_on_typed_alignments(
+      empty_resource_source, resource_alignments, resource_options);
+  const auto& projected_resource =
+      resource_projection.traces.front().events.front();
+  assert(projected_resource.activity == "17" &&
+         projected_resource.activity_source_key == "owner_id" &&
+         projected_resource.activity_attribute &&
+         projected_resource.activity_attribute->key == "owner_id" &&
+         projected_resource.activity_attribute->kind == AttributeKind::kInt &&
+         projected_resource.resource == "17" &&
+         projected_resource.resource_state == FirstClassAttributeState::kPresent &&
+         projected_resource.resource_source_key == "owner_id" &&
+         projected_resource.resource_attribute &&
+         projected_resource.resource_attribute->key == "owner_id" &&
+         projected_resource.resource_attribute->kind == AttributeKind::kInt &&
+         projected_resource.resource_attribute->first_class_role ==
+             FirstClassAttributeRole::kResource &&
+         projected_resource.resource_attribute->first_class_state ==
+             FirstClassAttributeState::kPresent &&
+         projected_resource.resource_attribute->first_class_source_key ==
+             "owner_id" &&
+         std::get<std::int64_t>(
+             projected_resource.resource_attribute->typed_value) == 17 &&
+         projected_resource.attribute("owner_id") &&
+         projected_resource.attributes.front().kind ==
+             AttributeKind::kInt &&
+         projected_resource.attributes.front().key == "owner_id");
+
+  // Generic selected cells can be role-less too. The matching native slot
+  // supplies role/state/source identity on a copy, while the input stays
+  // untouched. Also cover a custom stored key rather than the canonical XES
+  // spelling above.
+  EventLog custom_resource_model = resource_model;
+  auto& custom_resource_event =
+      custom_resource_model.traces.front().events.front();
+  custom_resource_event.resource_attribute->key = "owner_id";
+  custom_resource_event.attributes.push_back(typed_int("owner_id", 17));
+  const auto custom_resource_alignments = align_typed_edit_distance(
+      empty_resource_source, custom_resource_model, resource_options);
+  const auto custom_resource_projection = project_log_on_typed_alignments(
+      empty_resource_source, custom_resource_alignments, resource_options);
+  const auto& projected_custom_resource =
+      custom_resource_projection.traces.front().events.front();
+  assert(projected_custom_resource.resource == "17" &&
+         projected_custom_resource.resource_state ==
+             FirstClassAttributeState::kPresent &&
+         projected_custom_resource.resource_source_key == "owner_id" &&
+         projected_custom_resource.resource_attribute &&
+         projected_custom_resource.resource_attribute->key == "owner_id" &&
+         projected_custom_resource.resource_attribute->first_class_role ==
+             FirstClassAttributeRole::kResource &&
+         projected_custom_resource.resource_attribute->first_class_source_key ==
+             "owner_id" &&
+         std::get<std::int64_t>(
+             projected_custom_resource.resource_attribute->typed_value) == 17 &&
+         custom_resource_event.attributes.front().first_class_role ==
+             FirstClassAttributeRole::kNone);
+
+  const auto assert_typed_boolean_json = [&](EventAttribute value,
+                                              std::string_view expected) {
+    EditDistanceTypedAlignment alignment;
+    alignment.source_variant = {value};
+    alignment.target_variant = {value};
+    alignment.alignment.push_back(
+        {EditDistanceMoveType::kSynchronous, value, value});
+    const auto boolean_json = typed_edit_distance_json({alignment});
+    assert(boolean_json.find("\"source_variant\":[" +
+                             std::string(expected) + "]") !=
+           std::string::npos);
+    assert(boolean_json.find("\"target_variant\":[" +
+                             std::string(expected) + "]") !=
+           std::string::npos);
+    assert(boolean_json.find("\"log\":" + std::string(expected) +
+                             ",\"model\":" + std::string(expected)) !=
+           std::string::npos);
+  };
+  assert_typed_boolean_json(typed_bool("concept:name", true), "true");
+  assert_typed_boolean_json(typed_bool("concept:name", false), "false");
+  assert_typed_boolean_json(
+      EventAttribute{"concept:name", "True", AttributeKind::kBoolean},
+      "true");
+  assert_typed_boolean_json(
+      EventAttribute{"concept:name", "False", AttributeKind::kBoolean},
+      "false");
+
+  // Keep legacy brace-initialized calls unambiguous now that typed alignment
+  // serialization has its own explicitly named entry point.
+  const auto empty_legacy_edit_distance_json = edit_distance_json({});
+  assert(empty_legacy_edit_distance_json.find("\"alignments\": []") !=
+         std::string::npos);
 
   return 0;
 }

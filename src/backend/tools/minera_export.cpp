@@ -7070,16 +7070,18 @@ int main(int argc, char** argv) {
             log, dfg, starts, ends, *dfg_alignment_result,
             dfg_alignment_options);
     }
-    std::optional<std::vector<minera::EditDistanceAlignment>> edit_result;
+    std::optional<std::vector<minera::EditDistanceTypedAlignment>>
+        typed_edit_result;
     std::optional<minera::EventLog> edit_projected_log;
     if (!edit_reference.empty()) {
       const auto reference = is_xes_path(edit_reference)
           ? minera::import_xes_event_log(edit_reference)
           : minera::import_csv_event_log(edit_reference, options);
-      edit_result = minera::align_edit_distance(log, reference, edit_options);
+      typed_edit_result =
+          minera::align_typed_edit_distance(log, reference, edit_options);
       if (edit_projection == "log") {
-        edit_projected_log = minera::project_log_on_alignments(
-            log, *edit_result, edit_options);
+        edit_projected_log = minera::project_log_on_typed_alignments(
+            log, *typed_edit_result, edit_options);
       }
     }
     std::optional<minera::EmdResult> emd_result;
@@ -7855,7 +7857,7 @@ int main(int argc, char** argv) {
                                         : nullptr,
           batch_ptr,
           dfg_alignment_result ? &*dfg_alignment_result : nullptr,
-          edit_result ? &*edit_result : nullptr, edit_anti,
+          nullptr, edit_anti,
           dfg_projection_result ? &*dfg_projection_result : nullptr,
           dfg_projected_log ? &*dfg_projected_log : nullptr,
           edit_projected_log ? &*edit_projected_log : nullptr,
@@ -7871,7 +7873,8 @@ int main(int argc, char** argv) {
           overlap_cases ? &*overlap_cases : nullptr,
           overlap_concurrent_activities ? &*overlap_concurrent_activities
                                         : nullptr,
-          decision_tables_ptr, minimum_self_distance_options.variant);
+          decision_tables_ptr, minimum_self_distance_options.variant,
+          typed_edit_result ? &*typed_edit_result : nullptr);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -7892,7 +7895,7 @@ int main(int argc, char** argv) {
                                         : nullptr,
           batch_ptr,
           dfg_alignment_result ? &*dfg_alignment_result : nullptr,
-          edit_result ? &*edit_result : nullptr, edit_anti,
+          nullptr, edit_anti,
           dfg_projection_result ? &*dfg_projection_result : nullptr,
           dfg_projected_log ? &*dfg_projected_log : nullptr,
           edit_projected_log ? &*edit_projected_log : nullptr,
@@ -7908,7 +7911,8 @@ int main(int argc, char** argv) {
           overlap_cases ? &*overlap_cases : nullptr,
           overlap_concurrent_activities ? &*overlap_concurrent_activities
                                         : nullptr,
-          decision_tables_ptr, minimum_self_distance_options.variant);
+          decision_tables_ptr, minimum_self_distance_options.variant,
+          typed_edit_result ? &*typed_edit_result : nullptr);
     }
 
     // Optionally emit one discovered model as standard PNML.

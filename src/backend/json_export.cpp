@@ -4,6 +4,7 @@
 #include "root_cause_trace_key.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -3850,7 +3851,9 @@ void write_analysis_json(std::ostream& out,
                          const ConcurrentActivityOverlapResult*
                              concurrent_activity_overlap,
                          const DecisionTablesResult* decision_tables,
-                         MinimumSelfDistanceVariant minimum_self_distance_variant) {
+                         MinimumSelfDistanceVariant minimum_self_distance_variant,
+                         const std::vector<EditDistanceTypedAlignment>*
+                             typed_edit_distance) {
   // Resolve and validate the optional profile before writing any document
   // bytes, so a bad manually assembled profile cannot leave partial JSON in
   // the caller's stream.
@@ -4203,7 +4206,11 @@ void write_analysis_json(std::ostream& out,
     // The embedded shape intentionally matches the standalone writer.
     out << dfg_alignment_json(*dfg_alignment, dfg_projection, dfg_projected_log);
   }
-  if (edit_distance != nullptr) {
+  if (typed_edit_distance != nullptr) {
+    out << ",\n  \"edit_distance\": ";
+    out << typed_edit_distance_json(*typed_edit_distance, edit_anti,
+                              edit_projected_log);
+  } else if (edit_distance != nullptr) {
     out << ",\n  \"edit_distance\": ";
     out << edit_distance_json(*edit_distance, edit_anti, edit_projected_log);
   }
@@ -4308,7 +4315,9 @@ std::string analysis_json(std::string_view dataset,
                           const ConcurrentActivityOverlapResult*
                               concurrent_activity_overlap,
                           const DecisionTablesResult* decision_tables,
-                          MinimumSelfDistanceVariant minimum_self_distance_variant) {
+                          MinimumSelfDistanceVariant minimum_self_distance_variant,
+                          const std::vector<EditDistanceTypedAlignment>*
+                              typed_edit_distance) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
@@ -4326,7 +4335,8 @@ std::string analysis_json(std::string_view dataset,
                       reduced_process_tree, reduced_trace_index, evaluation,
                       earth_movers_distance, interval_event_overlap_counts,
                       case_overlap_counts, concurrent_activity_overlap,
-                      decision_tables, minimum_self_distance_variant);
+                      decision_tables, minimum_self_distance_variant,
+                      typed_edit_distance);
   return out.str();
 }
 
@@ -5110,14 +5120,281 @@ std::string edit_distance_json(const std::vector<EditDistanceAlignment>& result,
         << ", \"bwc\": " << a.bwc << ", \"denominator\": " << a.denominator << ", \"moves\": [";
     for (std::size_t j=0;j<a.alignment.size();++j) { const auto& m=a.alignment[j]; if(j)out<<','; out<<"{\"type\": ";
       const char* type = m.type==EditDistanceMoveType::kSynchronous?"sync":(m.type==EditDistanceMoveType::kLog?"log":"model"); write_json_string(out,type);
-      out << ", \"log\": "; write_json_string(out, m.log.empty()?">>":m.log);
-      out << ", \"model\": "; write_json_string(out, m.model.empty()?">>":m.model); out << '}'; }
+      out << ", \"log\": ";
+      if (m.type == EditDistanceMoveType::kModel) write_json_string(out, ">>");
+      else write_json_string(out, m.log);
+      out << ", \"model\": ";
+      if (m.type == EditDistanceMoveType::kLog) write_json_string(out, ">>");
+      else write_json_string(out, m.model);
+      out << '}'; }
     out << "]}";
   }
   out << "], \"source_event_count\": " << source_events
       << ", \"target_event_count\": " << target_events;
   if (projected_log) { out << ", \"projected_log\": "; write_projected_log(out,*projected_log); }
   out << '}'; return out.str();
+}
+
+namespace {
+
+void write_edit_distance_double(std::ostream& out, double value) {
+  if (std::isnan(value)) {
+    out << "{\"kind\":\"float\",\"value\":\"nan\"}";
+  } else if (std::isinf(value)) {
+    out << "{\"kind\":\"float\",\"value\":\""
+        << (value < 0 ? "-inf" : "inf") << "\"}";
+  } else {
+    const auto flags = out.flags();
+    const auto precision = out.precision();
+    out << std::setprecision(std::numeric_limits<double>::max_digits10)
+        << std::showpoint << value;
+    out.flags(flags);
+    out.precision(precision);
+  }
+}
+
+void write_edit_distance_typed_activity(std::ostream& out,
+                                        const EventAttribute& attribute);
+
+void write_edit_distance_typed_items(
+    std::ostream& out, std::string_view kind,
+    const std::vector<EventAttribute>& children, bool sort_values) {
+  std::vector<std::string> items;
+  items.reserve(children.size());
+  for (const auto& child : children) {
+    std::ostringstream item;
+    write_edit_distance_typed_activity(item, child);
+    items.push_back(item.str());
+  }
+  if (sort_values) std::sort(items.begin(), items.end());
+  out << "{\"kind\":";
+  write_json_string(out, kind);
+  out << ",\"items\":[";
+  for (std::size_t i = 0; i < items.size(); ++i) {
+    if (i) out << ',';
+    out << items[i];
+  }
+  out << "]}";
+}
+
+void write_edit_distance_typed_activity(std::ostream& out,
+                                        const EventAttribute& attribute) {
+  validate_native_na_attribute(attribute, "edit-distance JSON");
+  if (is_native_na_attribute(attribute)) {
+    out << "{\"kind\":\"na\"}";
+    return;
+  }
+  if (attribute.is_null ||
+      attribute.first_class_state == FirstClassAttributeState::kNull) {
+    out << "null";
+    return;
+  }
+
+  if (attribute.kind == AttributeKind::kBytes) {
+    const auto bytes = decode_bytes_attribute(attribute);
+    const auto canonical = make_bytes_attribute("", bytes);
+    out << "{\"kind\":\"bytes\",\"hex\":";
+    write_json_string(out, canonical.value);
+    out << '}';
+    return;
+  }
+
+  if (attribute.container != AttributeContainerKind::kScalar ||
+      !attribute.children.empty() || attribute.scalar_wrapper ||
+      attribute.scalar_children_list) {
+    switch (attribute.container) {
+      case AttributeContainerKind::kList:
+        write_edit_distance_typed_items(out, "list", attribute.children, false);
+        return;
+      case AttributeContainerKind::kTuple:
+        write_edit_distance_typed_items(out, "tuple", attribute.children, false);
+        return;
+      case AttributeContainerKind::kSet:
+        write_edit_distance_typed_items(out, "set", attribute.children, true);
+        return;
+      case AttributeContainerKind::kFrozenSet:
+        write_edit_distance_typed_items(out, "frozenset", attribute.children, true);
+        return;
+      case AttributeContainerKind::kContainer:
+        out << "{\"kind\":\"mapping\",\"entries\":[";
+        for (std::size_t i = 0; i < attribute.children.size(); ++i) {
+          if (i) out << ',';
+          out << '[';
+          write_json_string(out, attribute.children[i].key);
+          out << ',';
+          write_edit_distance_typed_activity(out, attribute.children[i]);
+          out << ']';
+        }
+        out << "]}";
+        return;
+      case AttributeContainerKind::kScalar:
+        if (attribute.scalar_children_list) {
+          write_edit_distance_typed_items(out, "list", attribute.children, false);
+        } else if (!attribute.children.empty()) {
+          out << "{\"kind\":\"scalar_wrapper\",\"value\":";
+          EventAttribute scalar = attribute;
+          scalar.children.clear();
+          scalar.scalar_wrapper = false;
+          scalar.scalar_children_list = false;
+          write_edit_distance_typed_activity(out, scalar);
+          out << ",\"children\":";
+          write_edit_distance_typed_items(out, "list", attribute.children, false);
+          out << '}';
+        } else {
+          // An empty wrapper still carries its scalar value; it falls through
+          // to the scalar representation below.
+        }
+        if (attribute.scalar_children_list) return;
+        if (!attribute.children.empty()) return;
+        break;
+    }
+  }
+
+  if (const auto* integer = std::get_if<std::int64_t>(&attribute.typed_value)) {
+    out << *integer;
+    return;
+  }
+  if (const auto* unsigned_integer =
+          std::get_if<std::uint64_t>(&attribute.typed_value)) {
+    out << *unsigned_integer;
+    return;
+  }
+  if (const auto* number = std::get_if<double>(&attribute.typed_value)) {
+    write_edit_distance_double(out, *number);
+    return;
+  }
+  if (const auto* boolean = std::get_if<bool>(&attribute.typed_value)) {
+    out << (*boolean ? "true" : "false");
+    return;
+  }
+  if (const auto* date = std::get_if<NativeDate>(&attribute.typed_value)) {
+    write_json_string(out, date->value);
+    return;
+  }
+
+  const auto lexical = event_attribute_lexical_value(attribute);
+  switch (attribute.kind) {
+    case AttributeKind::kInt: {
+      std::int64_t signed_value = 0;
+      const auto signed_result = std::from_chars(
+          lexical.data(), lexical.data() + lexical.size(), signed_value);
+      if (signed_result.ec == std::errc{} &&
+          signed_result.ptr == lexical.data() + lexical.size()) {
+        out << signed_value;
+        return;
+      }
+      if (!lexical.empty() && lexical.front() != '-') {
+        std::uint64_t unsigned_value = 0;
+        const auto unsigned_result = std::from_chars(
+            lexical.data(), lexical.data() + lexical.size(), unsigned_value);
+        if (unsigned_result.ec == std::errc{} &&
+            unsigned_result.ptr == lexical.data() + lexical.size()) {
+          out << unsigned_value;
+          return;
+        }
+      }
+      throw std::invalid_argument("edit-distance JSON: invalid integer activity");
+    }
+    case AttributeKind::kFloat: {
+      std::istringstream input{std::string(lexical)};
+      input.imbue(std::locale::classic());
+      double value = 0.0;
+      input >> value;
+      input >> std::ws;
+      if (!input || !input.eof())
+        throw std::invalid_argument("edit-distance JSON: invalid float activity");
+      write_edit_distance_double(out, value);
+      return;
+    }
+    case AttributeKind::kBoolean:
+      if (lexical == "true" || lexical == "True" || lexical == "1") out << "true";
+      else if (lexical == "false" || lexical == "False" || lexical == "0") out << "false";
+      else throw std::invalid_argument("edit-distance JSON: invalid boolean activity");
+      return;
+    case AttributeKind::kNA:
+      out << "{\"kind\":\"na\"}";
+      return;
+    case AttributeKind::kString:
+    case AttributeKind::kDate:
+    case AttributeKind::kId:
+      write_json_string(out, lexical);
+      return;
+    case AttributeKind::kBytes:
+      break;
+  }
+  throw std::invalid_argument("edit-distance JSON: invalid typed activity kind");
+}
+
+void write_edit_distance_optional_activity(
+    std::ostream& out, const std::optional<EventAttribute>& activity) {
+  if (!activity) {
+    write_json_string(out, ">>");
+    return;
+  }
+  write_edit_distance_typed_activity(out, *activity);
+}
+
+}  // namespace
+
+std::string typed_edit_distance_json(
+    const std::vector<EditDistanceTypedAlignment>& result,
+    bool anti_alignment, const EventLog* projected_log) {
+  std::ostringstream out;
+  out << std::setprecision(std::numeric_limits<double>::max_digits10);
+  std::size_t source_events = 0;
+  std::size_t target_events = 0;
+  out << "{\"family\": \"EDIT_DISTANCE\", \"variant\": \"EDIT_DISTANCE\", \"anti\": "
+      << (anti_alignment ? "true" : "false")
+      << ", \"source_count\": " << result.size() << ", \"alignments\": [";
+  for (std::size_t i = 0; i < result.size(); ++i) {
+    const auto& alignment = result[i];
+    source_events += alignment.source_variant.size();
+    target_events += alignment.target_variant.size();
+    if (i) out << ',';
+    out << "{\"source_variant\":[";
+    for (std::size_t j = 0; j < alignment.source_variant.size(); ++j) {
+      if (j) out << ',';
+      write_edit_distance_typed_activity(out, alignment.source_variant[j]);
+    }
+    out << "],\"target_variant\":[";
+    for (std::size_t j = 0; j < alignment.target_variant.size(); ++j) {
+      if (j) out << ',';
+      write_edit_distance_typed_activity(out, alignment.target_variant[j]);
+    }
+    out << "],\"target_index\":" << alignment.target_index
+        << ",\"cost\":" << alignment.cost << ",\"fitness\":";
+    write_edit_distance_double(out, alignment.fitness);
+    out << ",\"best_worst_cost\":" << alignment.best_worst_cost
+        << ",\"bwc\":" << alignment.bwc
+        << ",\"denominator\":" << alignment.denominator
+        << ",\"moves\":[";
+    for (std::size_t j = 0; j < alignment.alignment.size(); ++j) {
+      const auto& move = alignment.alignment[j];
+      if (j) out << ',';
+      out << "{\"type\":";
+      const char* type = "sync";
+      switch (move.type) {
+        case EditDistanceMoveType::kSynchronous: type = "sync"; break;
+        case EditDistanceMoveType::kLog: type = "log"; break;
+        case EditDistanceMoveType::kModel: type = "model"; break;
+      }
+      write_json_string(out, type);
+      out << ",\"log\":";
+      write_edit_distance_optional_activity(out, move.log_activity);
+      out << ",\"model\":";
+      write_edit_distance_optional_activity(out, move.model_activity);
+      out << '}';
+    }
+    out << "]}";
+  }
+  out << "],\"source_event_count\":" << source_events
+      << ",\"target_event_count\":" << target_events;
+  if (projected_log) {
+    out << ",\"projected_log\":";
+    write_projected_log(out, *projected_log);
+  }
+  out << '}';
+  return out.str();
 }
 
 std::string imported_model_json(const ModelConformance& model,

@@ -174,7 +174,9 @@ void write_analysis_json(std::ostream& out,
                              concurrent_activity_overlap = nullptr,
                          const DecisionTablesResult* decision_tables = nullptr,
                          MinimumSelfDistanceVariant minimum_self_distance_variant =
-                             MinimumSelfDistanceVariant::kLog);
+                             MinimumSelfDistanceVariant::kLog,
+                         const std::vector<EditDistanceTypedAlignment>*
+                             typed_edit_distance = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -229,7 +231,8 @@ void write_analysis_json(std::ostream& out,
     const ConcurrentActivityOverlapResult* concurrent_activity_overlap = nullptr,
     const DecisionTablesResult* decision_tables = nullptr,
     MinimumSelfDistanceVariant minimum_self_distance_variant =
-        MinimumSelfDistanceVariant::kLog);
+        MinimumSelfDistanceVariant::kLog,
+    const std::vector<EditDistanceTypedAlignment>* typed_edit_distance = nullptr);
 
 [[nodiscard]] std::string replay_fitness_json(
     const ReplayFitnessResult& result,
@@ -270,6 +273,10 @@ void write_analysis_json(std::ostream& out,
 
 [[nodiscard]] std::string edit_distance_json(
     const std::vector<EditDistanceAlignment>& result,
+    bool anti_alignment = false,
+    const EventLog* projected_log = nullptr);
+[[nodiscard]] std::string typed_edit_distance_json(
+    const std::vector<EditDistanceTypedAlignment>& result,
     bool anti_alignment = false,
     const EventLog* projected_log = nullptr);
 

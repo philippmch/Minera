@@ -5759,9 +5759,10 @@ void handle_align_edit_distance(const httplib::Request& request, httplib::Respon
     const auto options = minera::parse_edit_distance_params(lookup, present);
     const auto projection = present("projection") ? lookup("projection") : std::string("none");
     if (projection != "none" && projection != "log") throw std::invalid_argument("projection expects none or log");
-    const auto result = minera::align_edit_distance(session->log, reference, options);
-    if (projection == "log") { const auto projected = minera::project_log_on_alignments(session->log, result, options); response.set_content(minera::edit_distance_json(result, options.perform_anti_alignment, &projected), "application/json"); }
-    else response.set_content(minera::edit_distance_json(result, options.perform_anti_alignment), "application/json");
+    const auto result =
+        minera::align_typed_edit_distance(session->log, reference, options);
+    if (projection == "log") { const auto projected = minera::project_log_on_typed_alignments(session->log, result, options); response.set_content(minera::typed_edit_distance_json(result, options.perform_anti_alignment, &projected), "application/json"); }
+    else response.set_content(minera::typed_edit_distance_json(result, options.perform_anti_alignment), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
