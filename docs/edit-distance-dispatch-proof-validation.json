@@ -1,0 +1,30 @@
+{
+  "status": "verified_finite_checkpoint",
+  "parent_commit": "d536d793d933bcadf4ae826b0c4b8729e989f203",
+  "verified_code_tree": "4e4b2d7f1367de12f0c47d6c65c3febf4e01f5e7",
+  "public_calls": 18,
+  "equivalent_default_explicit_pairs": 9,
+  "public_input_mutations": 0,
+  "native_named_cases": [
+    "edit_distance_dispatcher_acceptance",
+    "edit_distance_variant_module_acceptance"
+  ],
+  "native_suite": "passed",
+  "core_sha256": "61aaa3f87f99e66581946880dfac89d79aeebf768d4cb7e1b15b1bc978e1ce07",
+  "independent_reviews": "clear",
+  "artifacts": [
+    {
+      "path": "docs/edit-distance-explicit-dispatch-reference.json.gz",
+      "sha256": "98f1cb10426e6f2929759621d03d114db053354498122570086c8e2edca7de19"
+    },
+    {
+      "path": "docs/edit-distance-dispatch-proof-checks.json.gz",
+      "sha256": "94c5e2fd0af3e1d792fc41ae1444c319831d3f7d41beb6da51ef3c189d8cc5f8"
+    }
+  ],
+  "limits": [
+    "Public paired-call equivalence and native acceptance tests are separate evidence; no claim of 18 native differential comparisons.",
+    "Flat DataFrame selector audit and distinct catalogue proof bundles remain open.",
+    "Neither edit-distance catalogue row is promoted."
+  ]
+}

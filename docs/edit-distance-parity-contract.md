@@ -18,14 +18,14 @@ separate semantic requirement under the project parity contract.
 
 | Requirement | Current implementation and evidence | Remaining audit |
 | --- | --- | --- |
-| Whole-log alignment and dispatch | String and typed native alignment APIs; core, table, typed-log captures | Reconcile default/explicit dispatcher routes and parameter coverage |
+| Whole-log alignment and dispatch | String and typed native alignment APIs; core, table, typed-log captures; nine public default/explicit dispatcher pairs and a named native dispatcher acceptance case | Reconcile flat-data parameter coverage and bind the distinct catalogue proof |
 | Target choice and output order | Ordinary shortest/last-distinct ties; anti longer/last-distinct ties; duplicate and empty-target captures | Include these contracts in distinct registered module/dispatcher proofs |
 | Matching blocks and costs | Ordered move, cost, fitness and best-worst-cost comparisons; 19 long-input threshold cases | 1,922 short singleton comparisons pass; reconcile these with remaining selector-domain and completion evidence |
-| Direct trace helpers | Ordered typed mappings, independent list/set inputs, cache identity and reuse; direct and typed-mapping captures | Reconcile helper aliases and effective selector/anti controls |
+| Direct trace helpers | Ordered typed mappings, independent list/set inputs, cache identity and reuse; direct and typed-mapping captures; named module acceptance exercises helper aliases, selected activity, anti mode and cache reuse | Bind the distinct module proof and include the existing cohorts in completion review |
 | Fresh variant projection | String-only activity domain, typed rejection, ordered validation, timestamps and fresh metadata; 53 typed and 24 legacy comparisons | Reconcile selector/anti behavior with whole-log and adapter controls |
 | Input representations | EventLog and EventDataView adapters; table grouping, typed labels, missing/null distinctions; literal empty and whitespace selectors in grouped logs and direct traces | Confirm each advertised representation and applicable control has evidence; flat-data selector validation requires separate reconciliation |
 | Product entry points | Native APIs, typed JSON, CLI and local server routes; two combined anti/custom-activity/custom-timestamp integration cases in `docs/edit-distance-parameter-integration-validation.json` | Reconcile the verified fixture with the final semantic scope; it is not an exhaustive product-input audit |
-| Completion proofs | Existing registered alignment tests and frozen comparison artifacts | Distinct module/dispatcher proof cases and independent requirement-by-requirement completion review |
+| Completion proofs | Existing registered alignment tests and frozen comparison artifacts; distinct dispatcher/module acceptance functions called by the registered executable | Distinct catalogue proof bundles and independent requirement-by-requirement completion review |
 
 `case_id_attribute` governs native flat-data grouping; it does not change an
 already grouped EventLog. `deviation_cost` is a native extension rather than a

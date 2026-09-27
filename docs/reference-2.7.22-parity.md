@@ -5341,6 +5341,31 @@ The current edit-distance acceptance matrix is maintained in
 `docs/edit-distance-parity-contract.md`. The pinned public surface is archived
 in `docs/edit-distance-public-surface.json.gz`; both catalogue rows remain partial.
 
+### Edit-distance explicit-dispatch and named-acceptance checkpoint
+
+Nine paired public EventLog fixtures compare omitted dispatcher selection with
+explicit `Variants.EDIT_DISTANCE`. All 18 calls agree within their pairs,
+including empty-source behavior, two empty-target errors per route, anti mode,
+literal empty activity keys, and effective string-keyed custom controls.
+Full input snapshots remain unchanged. An enum-keyed custom-parameter fixture
+retains the reference's default-field behavior; it is not evidence that those
+enum keys select the custom fields.
+
+The native alignment executable now calls separate named dispatcher and module
+acceptance functions directly from `main`. They exercise default and explicit
+`apply` calls, selected-field anti behavior, exact alignment metrics, direct
+helper aliases and cache identity, and fresh projection markers. The suite
+passes against the unchanged verified library. These native acceptance tests
+and the public paired calls are complementary evidence, not an 18-call native
+differential comparison.
+
+The capture is in `docs/edit-distance-explicit-dispatch-reference.json.gz`;
+source, build/test evidence and independent reviews are in
+`docs/edit-distance-dispatch-proof-checks.json.gz`, with a summary in
+`docs/edit-distance-dispatch-proof-validation.json`. Both coverage rows remain
+partial pending flat-data selector reconciliation, distinct catalogue proof
+bundles and independent completion review.
+
 ### Edit-distance literal-selector checkpoint
 
 Grouped-log alignment, direct trace helpers, and fresh variant projection now
