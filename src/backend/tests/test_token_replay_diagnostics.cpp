@@ -10,6 +10,7 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 using namespace minera;
@@ -116,6 +117,41 @@ void consistent(const EventLog& log, const PetriNet& net, TokenReplayOptions opt
       assert(events[e].transitions_with_problems == rows[i].event_diagnostics[e].transitions_with_problems);
     }
   }
+}
+
+void expect_backwards_fitness_undefined(const EventLog& log, const PetriNet& net,
+                                       TokenReplayOptions options = {}) {
+  options.variant = TokenReplayVariant::kBackwards;
+  constexpr const char* diagnostic =
+      "backwards token-replay fitness is undefined when consumed or "
+      "produced tokens are zero";
+  const auto rejects_fitness = [&](auto&& call) {
+    bool rejected = false;
+    try {
+      call();
+    } catch (const std::domain_error& error) {
+      rejected = true;
+      assert(std::string(error.what()) == diagnostic);
+    }
+    assert(rejected);
+  };
+  rejects_fitness([&] { (void)replay_token_traces(log, net, options); });
+  rejects_fitness([&] { (void)check_conformance(log, net, options); });
+
+  // This diagnostics API exposes token counts but requests no fitness value.
+  const auto counts = replay_token_diagnostics(log, net, options);
+  assert(counts.trace_count == log.traces.size());
+}
+
+void assert_forward_fitness_remains_finite(const EventLog& log, const PetriNet& net,
+                                           TokenReplayOptions options = {}) {
+  options.variant = TokenReplayVariant::kForward;
+  const auto rows = replay_token_traces(log, net, options);
+  for (const auto& row : rows) assert(std::isfinite(row.trace_fitness));
+  const auto aggregate = check_conformance(log, net, options);
+  assert(std::isfinite(aggregate.fitness));
+  for (const auto& variant : aggregate.variants)
+    assert(std::isfinite(variant.fitness));
 }
 
 void ordered_trace_rows_and_markings() {
@@ -353,14 +389,16 @@ void backward_contract_and_duplicate_labels() {
   assert(row.unknown_event_indices.size() == 1);
   row = replay_token_traces(log_of({{"a", "a"}}), net, options).front();
   assert(row.replay_stopped && !row.trace_is_fit && row.replayed_events == 2);
-  consistent(log_of({{"a"}, {"a", "a"}, {"unknown"}, {}}), net, options);
+  const auto invalid_rows = log_of({{"a"}, {"a", "a"}, {"unknown"}, {}});
+  expect_backwards_fitness_undefined(invalid_rows, net, options);
+  consistent(log_of({{"a"}, {"a", "a"}}), net, options);
   const auto hidden = sequential(true);
   options.walk_through_hidden_transitions = false;
   options.stop_immediately_unfit = true;
   row = replay_token_traces(log_of({{"a", "b"}}), hidden, options).front();
   assert((row.activated_transitions == std::vector<std::size_t>{1}));
   assert(row.replay_stopped && row.replayed_events == 1);
-  consistent(log_of({{"a", "b"}, {}}), hidden, options);
+  consistent(log_of({{"a", "b"}}), hidden, options);
 }
 
 void explicit_markings_and_remaining_classification() {
@@ -378,7 +416,9 @@ void explicit_markings_and_remaining_classification() {
   consistent(log_of({{"a", "b"}, {}}), net, options);
   options.variant = TokenReplayVariant::kBackwards;
   assert(!replay_token_traces(log_of({{"a", "b"}}), net, options).front().trace_is_fit);
-  consistent(log_of({{"a", "b"}, {}}), net, options);
+  const auto invalid_rows = log_of({{"a", "b"}, {}});
+  expect_backwards_fitness_undefined(invalid_rows, net, options);
+  consistent(log_of({{"a", "b"}}), net, options);
 }
 
 void precision_uses_selected_hidden_routing_policy() {
@@ -457,7 +497,8 @@ void final_shortages_do_not_become_event_shortages() {
   options.variant = TokenReplayVariant::kBackwards;
   options.consider_remaining_in_fitness = false;
   assert(!replay_token_traces(log_of({{"a"}}), net, options).front().trace_is_fit);
-  consistent(log, net, options);
+  expect_backwards_fitness_undefined(log, net, options);
+  consistent(log_of({{"a"}, {"b"}, {"a", "b"}}), net, options);
 }
 
 void input_event_caps_apply_before_replay() {
@@ -478,9 +519,15 @@ void input_event_caps_apply_before_replay() {
       rejects([&] { (void)check_conformance(log, net, options); });
       rejects([&] { (void)replay_token_traces(log, net, options); });
       rejects([&] { (void)replay_token_diagnostics(log, net, options); });
+      rejects([&] { (void)replay_token_activation_sequences(log, net, options); });
     }
     options.max_rows_to_materialize = 0;
-    consistent(log_of({{}, {}}), net, options);
+    const auto empty_traces = log_of({{}, {}});
+    if (variant == TokenReplayVariant::kBackwards)
+      expect_backwards_fitness_undefined(empty_traces, net, options);
+    else
+      consistent(empty_traces, net, options);
+    consistent(EventLog{}, net, options);
   }
 }
 
@@ -496,21 +543,42 @@ void unknown_policy_is_classification_only_even_when_stopping() {
         options.variant = variant;
         options.consider_activities_not_in_model_in_fitness = penalize;
         options.stop_immediately_unfit = stop;
-        const auto rows = replay_token_traces(log, net, options);
-        for (const auto index : {0, 2}) {
-          const auto& row = rows[index];
-          assert(row.trace_is_fit == (!penalize || variant == TokenReplayVariant::kBackwards));
-          assert(!row.replay_stopped && row.replayed_events == log.traces[index].events.size());
-          assert(row.trace_fitness == 1.0 && row.produced == 3 && row.consumed == 3);
-          assert(row.missing == 0 && row.remaining == 0);
-          assert((row.activated_transitions == std::vector<std::size_t>{0, 1}));
+        if (variant == TokenReplayVariant::kBackwards) {
+          expect_backwards_fitness_undefined(log, net, options);
+          const auto valid_log = log_of({{"unknown", "a", "b"},
+                                         {"a", "unknown", "b", "unknown"},
+                                         {"unknown", "b", "a"}});
+          const auto rows = replay_token_traces(valid_log, net, options);
+          for (const auto index : {0, 1}) {
+            const auto& row = rows[index];
+            assert(row.trace_is_fit);
+            assert(!row.replay_stopped &&
+                   row.replayed_events == valid_log.traces[index].events.size());
+            assert(row.trace_fitness == 1.0 && row.produced == 3 && row.consumed == 3);
+            assert(row.missing == 0 && row.remaining == 0);
+            assert((row.activated_transitions == std::vector<std::size_t>{0, 1}));
+          }
+          assert(rows[2].unknown_activities.size() == 1);
+          assert(rows[2].replay_stopped == stop);
+          if (stop) assert(rows[2].replayed_events == 2);
+          consistent(valid_log, net, options);
+        } else {
+          const auto rows = replay_token_traces(log, net, options);
+          for (const auto index : {0, 2}) {
+            const auto& row = rows[index];
+            assert(row.trace_is_fit == !penalize);
+            assert(!row.replay_stopped && row.replayed_events == log.traces[index].events.size());
+            assert(row.trace_fitness == 1.0 && row.produced == 3 && row.consumed == 3);
+            assert(row.missing == 0 && row.remaining == 0);
+            assert((row.activated_transitions == std::vector<std::size_t>{0, 1}));
+          }
+          assert(rows[1].unknown_activities.size() == 1 && rows[1].replayed_events == 1);
+          assert(!rows[1].replay_stopped && rows[1].activated_transitions.empty());
+          assert(rows[1].missing == 1 && rows[1].produced == 1 && rows[1].remaining == 1);
+          assert(rows[3].replay_stopped == stop);
+          if (stop) assert(rows[3].replayed_events == 2);
+          consistent(log, net, options);
         }
-        assert(rows[1].unknown_activities.size() == 1 && rows[1].replayed_events == 1);
-        assert(!rows[1].replay_stopped && rows[1].activated_transitions.empty());
-        assert(rows[1].missing == 1 && rows[1].produced == 1 && rows[1].remaining == 1);
-        assert(rows[3].replay_stopped == stop);
-        if (stop) assert(rows[3].replayed_events == 2);
-        consistent(log, net, options);
       }
     }
   }
@@ -542,6 +610,115 @@ void final_demand_and_zero_denominator_trace_fitness() {
   consistent(log_of({{}}), net, options);
 }
 
+void backwards_zero_denominator_fitness_is_undefined() {
+  const auto linear = sequential();
+
+  // The captured empty-marking fixture has no tokens on either side of the
+  // backwards fitness equation. An unknown-only trace is ignored by replay
+  // and reaches the same undefined fitness result.
+  TokenReplayOptions options;
+  options.initial_marking = {0, 0, 0};
+  options.final_marking = {0, 0, 0};
+  const auto empty_trace = log_of({{}});
+  expect_backwards_fitness_undefined(empty_trace, linear, options);
+  assert_forward_fitness_remains_finite(empty_trace, linear, options);
+  expect_backwards_fitness_undefined(log_of({{"unknown"}}), linear, options);
+  assert_forward_fitness_remains_finite(log_of({{"unknown"}}), linear, options);
+
+  // A supplied initial token with an empty final marking gives a positive
+  // produced denominator and a zero consumed denominator.
+  options.initial_marking = {1, 0, 0};
+  options.final_marking = {0, 0, 0};
+  expect_backwards_fitness_undefined(empty_trace, linear, options);
+  assert_forward_fitness_remains_finite(empty_trace, linear, options);
+
+  // This output-free transition consumes an input when weak-fired from the
+  // empty marking, but contributes no produced token.
+  PetriNet output_free;
+  output_free.set_activities({"A"});
+  output_free.add_place();
+  output_free.add_transition(0, {0}, {});
+  options.initial_marking = {0};
+  options.final_marking = {0};
+  const auto output_free_trace = log_of({{"A"}});
+  expect_backwards_fitness_undefined(output_free_trace, output_free, options);
+  assert_forward_fitness_remains_finite(output_free_trace, output_free, options);
+
+  // Both denominators are positive on an ordinary blocked transition, so its
+  // backwards numeric fitness remains available.
+  options.initial_marking = {0, 0, 0};
+  options.final_marking = {0, 1, 0};
+  options.variant = TokenReplayVariant::kBackwards;
+  const auto blocked = replay_token_traces(log_of({{"a"}}), linear, options).front();
+  assert(blocked.produced == 1 && blocked.consumed == 2);
+  assert(blocked.missing == 1 && blocked.remaining == 0);
+  assert(blocked.trace_fitness == 0.75);
+  const auto aggregate = check_conformance(log_of({{"a"}}), linear, options);
+  assert(aggregate.variants.size() == 1 && aggregate.variants.front().fitness == 0.75);
+
+  // An empty log has no per-trace fitness values to compute.
+  const EventLog no_traces;
+  assert(replay_token_traces(no_traces, linear, options).empty());
+  assert(check_conformance(no_traces, linear, options).trace_count == 0);
+  assert(replay_token_diagnostics(no_traces, linear, options).trace_count == 0);
+}
+
+void activation_sequence_replay_skips_fitness_only() {
+  const auto net = sequential();
+  const auto log = log_of({{"a", "b"}, {"unknown", "a", "b"}});
+  for (const auto variant : {TokenReplayVariant::kForward,
+                             TokenReplayVariant::kBackwards}) {
+    TokenReplayOptions options;
+    options.variant = variant;
+    const auto rows = replay_token_traces(log, net, options);
+    const auto sequences = replay_token_activation_sequences(log, net, options);
+    assert(sequences.size() == rows.size());
+    for (std::size_t index = 0; index < rows.size(); ++index)
+      assert(sequences[index] == rows[index].activated_transitions);
+  }
+
+  // Fitness remains undefined on the empty-token backwards replay, while the
+  // count-only API still returns one (empty) sequence per source trace.
+  TokenReplayOptions options;
+  options.variant = TokenReplayVariant::kBackwards;
+  options.initial_marking = {0, 0, 0};
+  options.final_marking = {0, 0, 0};
+  const auto empty_tokens = log_of({{"unknown"}, {}});
+  const auto sequences = replay_token_activation_sequences(empty_tokens, net, options);
+  assert(sequences.size() == 2 && sequences[0].empty() && sequences[1].empty());
+  expect_backwards_fitness_undefined(empty_tokens, net, options);
+
+  // An ambiguous duplicate label interrupts backwards routing before any
+  // activation. Consumers that only need activation weights can still use it.
+  PetriNet duplicate;
+  const auto source = duplicate.add_place();
+  const auto gate = duplicate.add_place();
+  const auto sink = duplicate.add_place();
+  duplicate.set_source(source);
+  duplicate.set_sink(sink);
+  duplicate.set_activities({"A"});
+  duplicate.add_transition(std::nullopt, {source}, {gate});
+  duplicate.add_transition(0, {gate}, {sink});
+  duplicate.add_transition(0, {gate}, {sink});
+  const auto ambiguous = log_of({{"A"}});
+  options = {};
+  options.variant = TokenReplayVariant::kBackwards;
+  const auto ambiguous_sequences =
+      replay_token_activation_sequences(ambiguous, duplicate, options);
+  assert(ambiguous_sequences.size() == 1 && ambiguous_sequences[0].empty());
+  expect_backwards_fitness_undefined(ambiguous, duplicate, options);
+
+  // The count-only entry point retains the same replay-context validation.
+  options.initial_marking = {1};
+  bool rejected = false;
+  try {
+    (void)replay_token_activation_sequences(log_of({{"a"}}), net, options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void null_activity_is_unknown_not_an_empty_label() {
   PetriNet net;
   net.set_activities({""});
@@ -554,29 +731,35 @@ void null_activity_is_unknown_not_an_empty_label() {
   log.traces[0].events[0].activity_state = FirstClassAttributeState::kNull;
   log.traces[1].events[0].activity_state = FirstClassAttributeState::kPresent;
   log.traces[2].events[0].activity_state = FirstClassAttributeState::kNull;
-  for (const auto variant : {TokenReplayVariant::kForward, TokenReplayVariant::kBackwards}) {
-    TokenReplayOptions options;
-    options.variant = variant;
-    const auto rows = replay_token_traces(log, net, options);
-    assert(rows[0].activated_transitions.empty() && rows[0].replayed_events == 1);
-    assert((rows[0].unknown_activities == std::vector<std::string>{""}));
-    assert((rows[0].unknown_activity_is_null == std::vector<bool>{true}));
-    assert((rows[1].activated_transitions == std::vector<std::size_t>{0}));
-    assert(rows[1].unknown_activities.empty() && rows[1].trace_is_fit);
-    const auto aggregate = check_conformance(log, net, options);
-    assert(aggregate.variants.size() == 2);
-    assert(aggregate.variants[0].count == 2 &&
-           aggregate.variants[0].null_activity_indices == std::vector<std::size_t>{0});
-    assert(aggregate.variants[1].count == 1 && aggregate.variants[1].null_activity_indices.empty());
-    consistent(log, net, options);
-  }
+  TokenReplayOptions options;
+  const auto rows = replay_token_traces(log, net, options);
+  assert(rows[0].activated_transitions.empty() && rows[0].replayed_events == 1);
+  assert((rows[0].unknown_activities == std::vector<std::string>{""}));
+  assert((rows[0].unknown_activity_is_null == std::vector<bool>{true}));
+  assert((rows[1].activated_transitions == std::vector<std::size_t>{0}));
+  assert(rows[1].unknown_activities.empty() && rows[1].trace_is_fit);
+  const auto aggregate = check_conformance(log, net, options);
+  assert(aggregate.variants.size() == 2);
+  assert(aggregate.variants[0].count == 2 &&
+         aggregate.variants[0].null_activity_indices == std::vector<std::size_t>{0});
+  assert(aggregate.variants[1].count == 1 && aggregate.variants[1].null_activity_indices.empty());
+  consistent(log, net, options);
+
+  options.variant = TokenReplayVariant::kBackwards;
+  expect_backwards_fitness_undefined(log, net, options);
+  EventLog present_only;
+  present_only.traces.push_back(log.traces[1]);
+  const auto backwards = replay_token_traces(present_only, net, options).front();
+  assert((backwards.activated_transitions == std::vector<std::size_t>{0}));
+  assert(backwards.unknown_activities.empty() && backwards.trace_is_fit);
+  consistent(present_only, net, options);
   // An exact nullable selector wins over a non-null canonical projection.
   auto custom = log_of({{"not-selected"}});
   EventAttribute selected;
   selected.key = "chosen";
   selected.is_null = true;
   custom.traces[0].events[0].attributes.push_back(selected);
-  TokenReplayOptions options;
+  options = {};
   options.activity_attribute = "chosen";
   assert(replay_token_traces(custom, net, options)[0].unknown_activity_is_null[0]);
   // Provenance-only selection preserves the same explicit-null semantics.
@@ -639,7 +822,12 @@ void event_records_preserve_routing_and_source_positions() {
   for (const auto variant : {TokenReplayVariant::kForward, TokenReplayVariant::kBackwards}) {
     TokenReplayOptions options;
     options.variant = variant;
-    const auto rows = replay_token_traces(log, net, options);
+    EventLog route_log = log;
+    if (variant == TokenReplayVariant::kBackwards) {
+      expect_backwards_fitness_undefined(log, net, options);
+      route_log.traces.resize(1);
+    }
+    const auto rows = replay_token_traces(route_log, net, options);
     const auto& events = rows[0].event_diagnostics;
     assert(events.size() == 4);
     assert(events[0].activated_transitions.empty() && events[0].transitions_with_problems.empty());
@@ -648,8 +836,9 @@ void event_records_preserve_routing_and_source_positions() {
     assert((events[3].activated_transitions == std::vector<std::size_t>{2}));
     assert(rows[0].activated_transitions.size() ==
            (variant == TokenReplayVariant::kForward ? 4 : 3));
-    assert(rows[1].event_diagnostics.empty());
-    consistent(log, net, options);
+    if (variant == TokenReplayVariant::kForward)
+      assert(rows[1].event_diagnostics.empty());
+    consistent(route_log, net, options);
   }
   // A silent-only completion has no source event to which it can be assigned.
   PetriNet silent;
@@ -1683,6 +1872,8 @@ int main() {
   input_event_caps_apply_before_replay();
   unknown_policy_is_classification_only_even_when_stopping();
   final_demand_and_zero_denominator_trace_fitness();
+  backwards_zero_denominator_fitness_is_undefined();
+  activation_sequence_replay_skips_fitness_only();
   null_activity_is_unknown_not_an_empty_label();
   replay_variant_keys_are_unambiguous();
   replay_selector_priority_and_missing_state();

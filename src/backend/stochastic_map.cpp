@@ -463,7 +463,8 @@ StochasticMapFitResult fit_stochastic_map_with_report(
   validate_options(options);
   // Replay owns routing, duplicate-label selection and context validation. Unfit
   // traces still supply the activated path used by the public statistics.
-  const auto rows = replay_token_traces(log, net, options.replay);
+  const auto activation_sequences =
+      replay_token_activation_sequences(log, net, options.replay);
   StochasticMapFitResult result;
   std::vector<StochasticMapTransitionStatistics> statistics(net.transitions().size());
   for (std::size_t index = 0; index < statistics.size(); ++index)
@@ -510,7 +511,7 @@ StochasticMapFitResult fit_stochastic_map_with_report(
         key == event.activity_source_key) return event.activity;
     return std::nullopt;
   };
-  for (std::size_t trace_index = 0; trace_index < rows.size(); ++trace_index) {
+  for (std::size_t trace_index = 0; trace_index < activation_sequences.size(); ++trace_index) {
     ++result.replayed_traces;
     const auto& trace = log.traces[trace_index];
     std::vector<std::uint64_t> marking(net.place_count(), 0);
@@ -525,7 +526,7 @@ StochasticMapFitResult fit_stochastic_map_with_report(
     const auto first_time = trace.events.empty() ? std::nullopt
                                                  : selected_time(trace.events.front());
     std::size_t event_index = 0;
-    for (const auto transition_index : rows[trace_index].activated_transitions) {
+    for (const auto transition_index : activation_sequences[trace_index]) {
       for (std::size_t index = 0; index < statistics.size(); ++index)
         if (index == transition_index ||
             petri_transition_enabled(net.transitions()[index], marking))

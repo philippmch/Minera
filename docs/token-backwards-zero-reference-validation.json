@@ -1,0 +1,31 @@
+{
+  "status": "verified_reference_only",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "counts": {
+    "fixtures": 13,
+    "routes_per_fixture": 4,
+    "calls": 52,
+    "returned_results": 38,
+    "errors": 14,
+    "inputs_unchanged": 52,
+    "inputs_mutated": 0
+  },
+  "source_sha256": "91abfa62cfebe6bfa4ea84c30291ace4ed07a7ba749e0967227b921bb1ea0aab",
+  "raw_sha256": "897f2e46980fc5887931c36d12eb7826cda64ea58764a53ed80c5bca6b6a15b9",
+  "independent_review": "clear",
+  "artifacts": [
+    {
+      "path": "docs/token-backwards-zero-reference.json.gz",
+      "sha256": "7079cdaa2f18ad865145cf987d9205eceb485250fa735b8765c2eb9443abf765"
+    },
+    {
+      "path": "docs/token-backwards-zero-capture-evidence.json.gz",
+      "sha256": "71e775dd1c1453fc14bff1f2b4cc67290ae744aaf4c6d569d48366f22a3f92c9"
+    }
+  ],
+  "limits": [
+    "Errors expose no token counters; the capture does not establish a universal internal formula.",
+    "Native error type identity is not claimed.",
+    "No coverage promotion."
+  ]
+}

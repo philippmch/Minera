@@ -3942,6 +3942,14 @@ nonnegative initial/final vectors; forward replay consumes the requested final
 token multiplicities, while the legacy variation preserves its distinct final
 accounting.
 
+The backwards undefined-fitness correction is recorded in
+`docs/token-replay-parity-contract.md`. Native fitness APIs now raise a domain
+error for a zero consumed or produced denominator; the public reference raises
+`ZeroDivisionError` on the captured controls. Count-only activation sequences
+remain available for stochastic-map fitting through the same replay path.
+The bounded reference and native evidence does not complete either replay
+variation or promote a catalogue row.
+
 The variation and immediate-stop setting are exposed through the native API,
 strict request parsing, CLI, local server, and frontend controls. Focused
 regressions cover perfect replay, multi-step silent routing, forced missing

@@ -1,0 +1,54 @@
+{
+  "status": "verified_zero_denominator_native_fix",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "native_parent_commit": "59c281d29fbc42856da8154c5ae10ebf58e1ea1f",
+  "native_code_tree": "486a86e3f50d311813b9a4e1e5757bcc00624b06",
+  "native_core_sha256": "5b1d5fbbb78abef6805377f00c18247e06dddcb049e8fb0e1cf4bd10eb07e9a1",
+  "native_cli_sha256": "bfb54bc38538629f11ef4519d9d6a40bdb04bee20d5b3155235a9fddea61c8ca",
+  "release_suites_passed": 11,
+  "cohorts": [
+    {
+      "name": "zero_denominator_routes",
+      "fixtures": 13,
+      "public_observations": 52,
+      "native_invocations": 26,
+      "baseline": {
+        "matched": 38,
+        "mismatched": 14
+      },
+      "after": {
+        "matched": 52,
+        "mismatched": 0
+      },
+      "mapped_zero_division_errors": 14
+    },
+    {
+      "name": "backwards_controls",
+      "fixtures": 13,
+      "public_observations": 26,
+      "native_invocations": 13,
+      "baseline": {
+        "matched": 24,
+        "mismatched": 2
+      },
+      "after": {
+        "matched": 26,
+        "mismatched": 0
+      },
+      "mapped_zero_division_errors": 2
+    }
+  ],
+  "public_observations_across_cohorts": 78,
+  "unique_input_claim": false,
+  "independent_reviews": "clear",
+  "coverage_promotion": false,
+  "archive": "docs/token-backwards-zero-native-checks.json.gz",
+  "archive_sha256": "c0f3b1d51d0297f658d11615e9b4c78a8104e4bd464330a497f30f2b10fa13a8",
+  "archive_size_bytes": 1589377,
+  "comparison_limits": [
+    "Two public API routes share each native variant invocation; observations are not unique inputs.",
+    "ZeroDivisionError is matched only to the exact native BACKWARDS diagnostic with a nonzero exit.",
+    "These finite cohorts do not establish complete token-replay parity or a universal fitness formula.",
+    "No parity coverage row is promoted by this evidence bundle."
+  ]
+}

@@ -1450,9 +1450,22 @@ void backwards_replay_ignores_unknown_and_interrupts_duplicate_labels() {
   duplicate.add_transition(std::nullopt, {source}, {gate});
   duplicate.add_transition(0, {gate}, {sink});
   duplicate.add_transition(0, {gate}, {sink});
-  const auto interrupted = minera::check_conformance(
-      log_from_variants({{"a"}}), duplicate, options);
-  assert(interrupted.fitting_traces == 0);
+  const auto interrupted_log = log_from_variants({{"a"}});
+  bool fitness_undefined = false;
+  try {
+    (void)minera::check_conformance(interrupted_log, duplicate, options);
+  } catch (const std::domain_error& error) {
+    fitness_undefined = true;
+    assert(std::string(error.what()) ==
+           "backwards token-replay fitness is undefined when consumed or "
+           "produced tokens are zero");
+  }
+  assert(fitness_undefined);
+  // Count-only diagnostics still expose the interruption and lack of fit.
+  const auto interrupted_counts =
+      minera::replay_token_diagnostics(interrupted_log, duplicate, options);
+  assert(interrupted_counts.trace_count == 1 &&
+         interrupted_counts.fitting_traces == 0);
 
   // Duplicate labels are visited in transition order against the evolving
   // marking, so a first firing may enable the next same-label transition.

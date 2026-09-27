@@ -17,6 +17,19 @@ void rejects(Action action, const char* message) {
   try { action(); } catch (const Exception&) { return; }
   throw std::runtime_error(message);
 }
+template <typename Action>
+void rejects_undefined_backwards_fitness(Action action, const char* message) {
+  try {
+    action();
+  } catch (const std::domain_error& error) {
+    require(std::string(error.what()) ==
+                "backwards token-replay fitness is undefined when consumed or "
+                "produced tokens are zero",
+            message);
+    return;
+  }
+  throw std::runtime_error(message);
+}
 EventRecord row(std::string case_id, std::string activity) {
   return {{{"case:concept:name", std::move(case_id)},
            {"concept:name", std::move(activity)}}};
@@ -115,21 +128,72 @@ void replay_flat_inputs_preserve_source_order() {
                             log.traces[z].events[1].attributes.end(),
                             [](const auto& field) { return field.key == "extra"; }),
               "unselected missing cells stay absent");
-      same_conformance(check_conformance(view, net, options),
-                        check_conformance(expected, net, options));
-      same_conformance(check_conformance(view, tree, options),
-                        check_conformance(expected, tree, options));
-      same_traces(replay_token_traces(view, net, options),
-                   replay_token_traces(expected, net, options));
+      if (variant == TokenReplayVariant::kForward) {
+        same_conformance(check_conformance(view, net, options),
+                          check_conformance(expected, net, options));
+        same_conformance(check_conformance(view, tree, options),
+                          check_conformance(expected, tree, options));
+        same_traces(replay_token_traces(view, net, options),
+                     replay_token_traces(expected, net, options));
+      } else {
+        rejects_undefined_backwards_fitness(
+            [&] { (void)check_conformance(view, net, options); },
+            "undefined backwards fitness rejected for flat inputs");
+        rejects_undefined_backwards_fitness(
+            [&] { (void)check_conformance(view, tree, options); },
+            "undefined backwards fitness rejected for tree inputs");
+        rejects_undefined_backwards_fitness(
+            [&] { (void)replay_token_traces(view, net, options); },
+            "undefined backwards trace fitness rejected for flat inputs");
+      }
       const auto a = replay_token_diagnostics(view, net, options);
       const auto b = replay_token_diagnostics(expected, net, options);
       require(a.trace_count == b.trace_count && a.fitting_traces == b.fitting_traces &&
               a.transition_activations == b.transition_activations, "diagnostic totals");
       same_places(a.places, b.places);
     }
-    same_conformance(check_conformance(table, net, options),
-                      check_conformance(lazy, net, options));
-    same_traces(replay_token_traces(lazy, net, options), replay_token_traces(table, net, options));
+    if (variant == TokenReplayVariant::kForward) {
+      same_conformance(check_conformance(table, net, options),
+                        check_conformance(lazy, net, options));
+      same_traces(replay_token_traces(lazy, net, options),
+                  replay_token_traces(table, net, options));
+    } else {
+      rejects_undefined_backwards_fitness(
+          [&] { (void)check_conformance(table, net, options); },
+          "undefined backwards table fitness rejected");
+      rejects_undefined_backwards_fitness(
+          [&] { (void)check_conformance(lazy, net, options); },
+          "undefined backwards lazy fitness rejected");
+      const auto table_counts = replay_token_diagnostics(table, net, options);
+      const auto lazy_counts = replay_token_diagnostics(lazy, net, options);
+      require(table_counts.trace_count == lazy_counts.trace_count &&
+              table_counts.fitting_traces == lazy_counts.fitting_traces &&
+              table_counts.transition_activations == lazy_counts.transition_activations,
+              "count-only table and lazy diagnostics equivalent");
+      same_places(table_counts.places, lazy_counts.places);
+
+      // Excluding the zero-denominator X-only case preserves adapter parity
+      // checks for valid backwards fitness results.
+      auto valid_stream = stream;
+      valid_stream.events.pop_back();
+      const auto valid_table = event_stream_to_table(valid_stream);
+      const auto valid_lazy = LazyEventTable::from_table(valid_table);
+      const auto valid_grouped = event_stream_to_event_log(valid_stream);
+      for (const auto valid_view : {EventDataView(valid_stream),
+                                    EventDataView(valid_table),
+                                    EventDataView(valid_lazy),
+                                    EventDataView(valid_grouped)}) {
+        const auto valid_log = normalize_token_replay_event_log(valid_view, options);
+        same_conformance(check_conformance(valid_view, net, options),
+                          check_conformance(valid_log, net, options));
+        same_conformance(check_conformance(valid_view, tree, options),
+                          check_conformance(valid_log, tree, options));
+        same_traces(replay_token_traces(valid_view, net, options),
+                    replay_token_traces(valid_log, net, options));
+      }
+      same_traces(replay_token_traces(valid_lazy, net, options),
+                  replay_token_traces(valid_table, net, options));
+    }
   }
 }
 
@@ -196,8 +260,32 @@ void custom_selectors_and_typed_identity() {
           normalized.traces[0].events[0].activity == "A", "grouped metadata and projection");
   for (auto variant : {TokenReplayVariant::kForward, TokenReplayVariant::kBackwards}) {
     options.variant = variant;
-    same_traces(replay_token_traces(EventDataView(grouped), net, options),
+    if (variant == TokenReplayVariant::kForward) {
+      same_traces(replay_token_traces(EventDataView(grouped), net, options),
                   replay_token_traces(grouped, net, options));
+    } else {
+      rejects_undefined_backwards_fitness(
+          [&] { (void)replay_token_traces(EventDataView(grouped), net, options); },
+          "incomplete grouped trace has undefined backwards fitness");
+      rejects_undefined_backwards_fitness(
+          [&] { (void)replay_token_traces(grouped, net, options); },
+          "incomplete grouped trace has undefined backwards fitness");
+      const auto grouped_counts = replay_token_diagnostics(EventDataView(grouped), net, options);
+      const auto direct_counts = replay_token_diagnostics(grouped, net, options);
+      require(grouped_counts.trace_count == direct_counts.trace_count &&
+              grouped_counts.fitting_traces == direct_counts.fitting_traces &&
+              grouped_counts.transition_activations == direct_counts.transition_activations,
+              "empty grouped count-only replay equivalent");
+      same_places(grouped_counts.places, direct_counts.places);
+      EventLog valid_grouped;
+      auto complete_trace = trace;
+      Event second_event;
+      second_event.attributes = {{"selected-label", "B"}};
+      complete_trace.events.push_back(std::move(second_event));
+      valid_grouped.traces.push_back(std::move(complete_trace));
+      same_traces(replay_token_traces(EventDataView(valid_grouped), net, options),
+                  replay_token_traces(valid_grouped, net, options));
+    }
   }
   grouped.traces.resize(1);
   grouped.traces[0].events[0].activity.clear();
