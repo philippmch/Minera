@@ -5415,7 +5415,8 @@ snapshots. All checks report unchanged inputs. The corrected capture and its
 public-call provenance passed independent review; its summary is in
 `docs/edit-distance-flat-selectors-reference-validation.json`. This checkpoint
 establishes reference behavior only; the subsequent native checkpoint above
-records its implementation and comparison. Neither edit-distance row is promoted.
+records its implementation and comparison. Neither edit-distance row was promoted
+at that reference-only checkpoint.
 
 ### Edit-distance explicit-dispatch and named-acceptance checkpoint
 
