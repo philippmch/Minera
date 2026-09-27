@@ -5342,6 +5342,17 @@ The current edit-distance acceptance matrix is maintained in
 `docs/edit-distance-parity-contract.md`. The pinned public surface is archived
 in `docs/edit-distance-public-surface.json.gz`; both catalogue rows remain partial.
 
+### Edit-distance proof registration and completion audit
+
+The dispatcher and variant module now have distinct catalogue proof objects,
+binding `edit_distance_dispatcher_acceptance` and
+`edit_distance_variant_module_acceptance` to the registered native suite.
+Structural validation passes with both rows still partial. The independent
+semantic audit reconciled the six public functions and existing cohorts, but
+identified missing direct tests of the advertised event-stream and lazy-table
+alignment/projector adapters. Those carrier routes must be verified against
+the established eager fixtures before completion can be claimed.
+
 ### Edit-distance flat-selector native checkpoint
 
 Native tables now accept a unique literal empty column name. Flat conversion

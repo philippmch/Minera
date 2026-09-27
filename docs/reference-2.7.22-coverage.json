@@ -552,7 +552,39 @@
         }
       ],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "EDIT_DISTANCE": {
+          "selector": "EDIT_DISTANCE",
+          "binding": {
+            "selector": "EDIT_DISTANCE",
+            "modules": [
+              "algo.conformance.alignments.edit_distance.variants.edit_distance"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "EDIT_DISTANCE"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/edit_distance_alignment.hpp",
+              "symbol": "apply"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_edit_distance_alignment.cpp",
+              "executable": "minera_edit_distance_alignment_tests",
+              "case": "edit_distance_dispatcher_acceptance"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/edit_distance_alignment.hpp",
+        "src/backend/edit_distance_alignment.cpp",
+        "src/backend/tests/test_edit_distance_alignment.cpp"
+      ]
     },
     {
       "package": "algo.conformance.alignments.petri_net",
@@ -6452,7 +6484,36 @@
         }
       ],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/edit_distance_alignment.hpp",
+        "src/backend/edit_distance_alignment.cpp",
+        "src/backend/tests/test_edit_distance_alignment.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.edit_distance.variants.edit_distance",
+        "implementation": [
+          {
+            "path": "include/minera/edit_distance_alignment.hpp",
+            "symbol": "apply_trace"
+          },
+          {
+            "path": "include/minera/edit_distance_alignment.hpp",
+            "symbol": "align_trace"
+          },
+          {
+            "path": "include/minera/edit_distance_alignment.hpp",
+            "symbol": "project_log_on_variant"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_edit_distance_alignment.cpp",
+            "executable": "minera_edit_distance_alignment_tests",
+            "case": "edit_distance_variant_module_acceptance"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.petri_net.utils.log_enrichment",
