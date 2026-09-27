@@ -2,6 +2,7 @@
 #include "petri_replay_internal.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -15,6 +16,7 @@
 #include <string>
 #include <string_view>
 #include <stdexcept>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -1192,6 +1194,106 @@ struct Variant {
   std::vector<std::size_t> null_activity_indices;
 };
 
+struct ReplayActivity {
+  // display_name is absent only for an explicit null.  A present empty string
+  // remains distinguishable from null, even when it has no model transition.
+  std::optional<std::string> display_name;
+  // Only a scalar string attribute can identify a transition label.
+  std::optional<std::string> model_label;
+  std::string variant_key;
+};
+
+void append_identity_field(std::string& key, char tag, std::string_view value) {
+  key.push_back(tag);
+  key += std::to_string(value.size());
+  key.push_back(':');
+  key.append(value);
+}
+
+template <typename Number>
+void append_identity_number(std::string& key, char tag, Number value) {
+  append_identity_field(key, tag, std::to_string(value));
+}
+
+void append_native_value_identity(std::string& key,
+                                  const NativeAttributeValue& value) {
+  const auto& native = static_cast<const NativeAttributeValue::Base&>(value);
+  append_identity_number(key, 'v', native.index());
+  std::visit(
+      [&](const auto& scalar) {
+        using Scalar = std::remove_cvref_t<decltype(scalar)>;
+        if constexpr (std::is_same_v<Scalar, std::int64_t> ||
+                      std::is_same_v<Scalar, std::uint64_t>) {
+          append_identity_number(key, 'n', scalar);
+        } else if constexpr (std::is_same_v<Scalar, double>) {
+          append_identity_number(key, 'n', std::bit_cast<std::uint64_t>(scalar));
+        } else if constexpr (std::is_same_v<Scalar, bool>) {
+          append_identity_number(key, 'n', scalar ? 1 : 0);
+        } else if constexpr (std::is_same_v<Scalar, NativeDate>) {
+          append_identity_field(key, 'd', scalar.value);
+          append_identity_number(key, 'r',
+                                static_cast<int>(scalar.resolution));
+          append_identity_number(key, 'z', scalar.timezone.has_value() ? 1 : 0);
+          if (scalar.timezone)
+            append_identity_field(key, 't', *scalar.timezone);
+        }
+      },
+      native);
+}
+
+void append_attribute_identity(std::string& key,
+                               const EventAttribute& attribute) {
+  key.push_back('A');
+  append_identity_number(key, 'k', static_cast<int>(attribute.kind));
+  append_identity_number(key, 'c', static_cast<int>(attribute.container));
+  append_identity_number(key, 'w', attribute.scalar_wrapper ? 1 : 0);
+  append_identity_number(key, 'l', attribute.scalar_children_list ? 1 : 0);
+  append_identity_number(
+      key, '0', attribute.is_null ||
+                   attribute.first_class_state == FirstClassAttributeState::kNull);
+  append_identity_field(key, 's', event_attribute_lexical_value(attribute));
+  append_native_value_identity(key, attribute.typed_value);
+  append_identity_number(key, 'q', attribute.children.size());
+  for (const auto& child : attribute.children) {
+    append_identity_field(key, 'e', child.key);
+    append_attribute_identity(key, child);
+  }
+}
+
+ReplayActivity replay_activity_from_attribute(const EventAttribute& attribute) {
+  if (attribute.first_class_role != FirstClassAttributeRole::kNone &&
+      attribute.first_class_state == FirstClassAttributeState::kMissing)
+    throw std::invalid_argument(
+        "conformance: selected activity attribute is missing");
+  if (attribute.is_null ||
+      attribute.first_class_state == FirstClassAttributeState::kNull) {
+    return {std::nullopt, std::nullopt, "null"};
+  }
+
+  ReplayActivity result;
+  result.display_name = std::string(event_attribute_lexical_value(attribute));
+  if (attribute.kind == AttributeKind::kString &&
+      attribute.container == AttributeContainerKind::kScalar &&
+      std::holds_alternative<std::monostate>(
+          static_cast<const NativeAttributeValue::Base&>(
+              attribute.typed_value))) {
+    // Wrapper/list metadata belongs to the selected scalar's retained XES
+    // detail. It does not change the scalar string that names an activity.
+    result.model_label = *result.display_name;
+    result.variant_key = "string";
+    append_identity_field(result.variant_key, 's', *result.display_name);
+    return result;
+  }
+  append_attribute_identity(result.variant_key, attribute);
+  return result;
+}
+
+ReplayActivity replay_activity_from_legacy_string(std::string_view activity) {
+  EventAttribute attribute;
+  attribute.value = std::string(activity);
+  return replay_activity_from_attribute(attribute);
+}
+
 bool standard_activity_attribute(std::string_view key) {
   return key.empty() || key == "concept:name" || key == "activity";
 }
@@ -1205,7 +1307,7 @@ std::string selected_activity(const Event& event,
       std::string(activity_attribute) + "'");
 }
 
-std::optional<std::string> selected_replay_activity(
+ReplayActivity selected_replay_activity(
     const Event& event, std::string_view selector) {
   if (selector.empty()) selector = "concept:name";
   const EventAttribute* selected = nullptr;
@@ -1227,18 +1329,22 @@ std::optional<std::string> selected_replay_activity(
   if (matches > 1)
     throw std::invalid_argument("conformance: duplicate selected activity attribute");
   if (selected) {
-    if (selected->first_class_role != FirstClassAttributeRole::kNone &&
-        selected->first_class_state == FirstClassAttributeState::kMissing)
-      throw std::invalid_argument("conformance: selected activity attribute is missing");
-    if (selected->is_null ||
-        selected->first_class_state == FirstClassAttributeState::kNull)
-      return std::nullopt;
-    return selected->value;
+    return replay_activity_from_attribute(*selected);
   }
-  if (standard_activity_attribute(selector) ||
-      (!event.activity_source_key.empty() && event.activity_source_key == selector)) {
-    if (event.activity_state == FirstClassAttributeState::kNull) return std::nullopt;
-    if (event.has_activity()) return event.activity;
+  const bool selected_first_class_activity =
+      standard_activity_attribute(selector) ||
+      (!event.activity_source_key.empty() &&
+       event.activity_source_key == selector) ||
+      (event.activity_attribute &&
+       (event.activity_attribute->key == selector ||
+        event.activity_attribute->first_class_source_key == selector));
+  if (selected_first_class_activity) {
+    if (event.activity_state == FirstClassAttributeState::kNull)
+      return {std::nullopt, std::nullopt, "null"};
+    if (event.activity_attribute)
+      return replay_activity_from_attribute(*event.activity_attribute);
+    if (event.has_activity())
+      return replay_activity_from_legacy_string(event.activity);
   }
   throw std::invalid_argument("conformance: event is missing activity attribute '" +
                               std::string(selector) + "'");
@@ -1247,16 +1353,19 @@ std::optional<std::string> selected_replay_activity(
 std::vector<Variant> collect_replay_variants(
     const EventLog& log, const Replayer& resolver, std::string_view selector) {
   std::vector<Variant> variants;
-  std::map<std::vector<std::optional<std::string>>, std::size_t> index;
+  std::map<std::vector<std::string>, std::size_t> index;
   for (const auto& trace : log.traces) {
-    std::vector<std::optional<std::string>> key;
+    std::vector<std::string> key;
     Variant variant;
     for (const auto& event : trace.events) {
       auto activity = selected_replay_activity(event, selector);
-      if (!activity) variant.null_activity_indices.push_back(variant.names.size());
-      variant.ids.push_back(activity ? resolver.activity_id(*activity) : std::nullopt);
-      variant.names.push_back(activity.value_or(""));
-      key.push_back(std::move(activity));
+      if (!activity.display_name)
+        variant.null_activity_indices.push_back(variant.names.size());
+      variant.ids.push_back(activity.model_label
+                                ? resolver.activity_id(*activity.model_label)
+                                : std::nullopt);
+      variant.names.push_back(activity.display_name.value_or(""));
+      key.push_back(std::move(activity.variant_key));
     }
     const auto [it, inserted] = index.emplace(std::move(key), variants.size());
     if (inserted) {
@@ -3061,7 +3170,9 @@ TokenReplayDiagnostics replay_token_diagnostics(
     ids.reserve(trace.events.size());
     for (const auto& event : trace.events) {
       const auto activity = selected_replay_activity(event, activity_attribute);
-      ids.push_back(activity ? replayer.activity_id(*activity) : std::nullopt);
+      ids.push_back(activity.model_label
+                        ? replayer.activity_id(*activity.model_label)
+                        : std::nullopt);
     }
 
     std::vector<std::uint64_t> executions(net.transitions().size(), 0);
@@ -3114,8 +3225,11 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
     std::vector<std::optional<std::size_t>> ids;
     std::vector<std::optional<std::string>> names;
     for (const auto& event : trace.events) {
-      names.push_back(selected_replay_activity(event, activity_attribute));
-      ids.push_back(names.back() ? replayer.activity_id(*names.back()) : std::nullopt);
+      const auto activity = selected_replay_activity(event, activity_attribute);
+      names.push_back(activity.display_name);
+      ids.push_back(activity.model_label
+                        ? replayer.activity_id(*activity.model_label)
+                        : std::nullopt);
     }
     Replayer::Counts counts;
     if (options.variant == TokenReplayVariant::kBackwards) {

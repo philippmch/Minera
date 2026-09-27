@@ -214,3 +214,20 @@ matches integer activity `1` to model label string `"1"`. Public replay activate
 only `a` with fitness 0.25; native additionally activates `one` with fitness 1.
 The archive preserves typed XES inputs, complete results, comparator sources
 and the original tested-build identity before any correction.
+
+The correction and verification are retained in
+`docs/token-backwards-parameters-after-checks.json.gz`, summarized by
+`docs/token-backwards-parameters-after-validation.json`. The corrected build
+matches all 62 public observations through 31 native invocations and passes all
+11 affected native suites. Replay resolves only scalar string activities to
+model labels; numeric activities remain unknown and non-null. Trace results and
+aggregate variants use the same typed selection. Equal scalar strings retain
+their shared identity when ancillary child metadata differs, and standard
+activity selection honors retained first-class type metadata.
+
+The archive also preserves the first failed test run and its correction: an
+overly restrictive scalar-string guard rejected child metadata, which the
+existing event-data suite caught. The new `backwards_module_acceptance` case
+checks ordered trace results and aggregate diagnostics alongside targeted typed
+activity regressions. Independent review cleared the corrected change. Catalogue
+registration and module promotion remain a separate gate.
