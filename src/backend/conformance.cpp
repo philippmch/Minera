@@ -196,6 +196,11 @@ class Replayer {
 
     [[nodiscard]] double fitness() const {
       if (forward_replay && (consumed == 0 || produced == 0)) return 1.0;
+      if (!forward_replay && (consumed == 0 || produced == 0)) {
+        throw std::domain_error(
+            "backwards token-replay fitness is undefined when consumed or "
+            "produced tokens are zero");
+      }
       const double consume_term = consumed == 0 ? 0.0 : double(missing) / double(consumed);
       const double produce_term = produced == 0 ? 0.0 : double(remaining) / double(produced);
       return 0.5 * (1.0 - consume_term) + 0.5 * (1.0 - produce_term);
@@ -3088,8 +3093,11 @@ TokenReplayDiagnostics replay_token_diagnostics(
   return result;
 }
 
-std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
-    const EventLog& event_log, const PetriNet& net, TokenReplayOptions options) {
+namespace {
+
+std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
+    const EventLog& event_log, const PetriNet& net, TokenReplayOptions options,
+    bool calculate_fitness) {
   validate_token_replay_event_limit(event_log, options);
   if (!valid_token_replay_variant(options.variant))
     throw std::invalid_argument("unsupported token replay variant");
@@ -3120,7 +3128,7 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
       counts = replayer.replay(ids, nullptr, options, &row);
       row.trace_is_fit = counts.forward_fitting(options);
     }
-    row.trace_fitness = counts.fitness();
+    if (calculate_fitness) row.trace_fitness = counts.fitness();
     row.produced = counts.produced;
     row.consumed = counts.consumed;
     row.missing = counts.missing;
@@ -3134,6 +3142,22 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
     }
     result.push_back(std::move(row));
   }
+  return result;
+}
+
+}  // namespace
+
+std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
+    const EventLog& event_log, const PetriNet& net, TokenReplayOptions options) {
+  return replay_token_trace_rows(event_log, net, std::move(options), true);
+}
+
+std::vector<std::vector<std::size_t>> replay_token_activation_sequences(
+    const EventLog& event_log, const PetriNet& net, TokenReplayOptions options) {
+  const auto rows = replay_token_trace_rows(event_log, net, std::move(options), false);
+  std::vector<std::vector<std::size_t>> result;
+  result.reserve(rows.size());
+  for (const auto& row : rows) result.push_back(row.activated_transitions);
   return result;
 }
 

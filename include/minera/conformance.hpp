@@ -297,7 +297,8 @@ struct TokenReplayDiagnostics {
 
 // Token replay against any workflow net (the Alpha Miner produces one directly;
 // a process tree or heuristics net is translated with to_petri_net). Replay is
-// robust on unsound nets, so unlike alignments it always yields a result.
+// robust on unsound nets; the legacy backwards variation throws
+// std::domain_error when a per-trace fitness denominator is zero.
 [[nodiscard]] ConformanceResult check_conformance(const EventLog& event_log,
                                                   const PetriNet& net,
                                                   TokenReplayOptions options = {});
@@ -316,6 +317,14 @@ struct TokenReplayDiagnostics {
 [[nodiscard]] std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
     const EventLog& event_log, const PetriNet& net,
     TokenReplayOptions options = {});
+
+// Returns one ordered transition-activation sequence per source trace, including
+// empty sequences. This count-only replay helper shares replay_token_traces'
+// validation and routing without requesting fitness, so backwards activation
+// counts remain available when a trace's fitness denominator is zero.
+[[nodiscard]] std::vector<std::vector<std::size_t>>
+replay_token_activation_sequences(const EventLog& event_log, const PetriNet& net,
+                                  TokenReplayOptions options = {});
 
 // Validated dataframe entry point: checks declared schema and required
 // case/activity/timestamp columns before applying dataframe replay semantics.

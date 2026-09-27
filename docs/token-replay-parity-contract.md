@@ -88,3 +88,39 @@ diagnostics retained separately. The hidden-walk-false case uses an explicitly
 documented effective-control mapping limited to its paired public fixture.
 Independent review verified the input translation and frozen source/binary/raw
 bindings. This is a confirmed baseline discrepancy, not a completion claim.
+
+## Backwards undefined-fitness correction
+
+`docs/token-backwards-zero-reference.json.gz` expands the denominator controls
+to 13 fixtures through four explicit routes: forward and backwards dispatcher
+selectors and their public variant modules. All 52 calls preserve their inputs.
+The 26 forward calls return results; backwards returns 12 results and raises
+`ZeroDivisionError` in 14 calls across seven fixtures. The errors themselves do
+not expose token counters or establish a universal internal formula.
+
+Backwards native fitness now throws `std::domain_error` when either consumed or
+produced tokens are zero. Full trace results and aggregate conformance retain
+this error; forward fitness and empty-log behavior remain covered separately.
+The CLI comparison maps only the exact diagnostic together with a nonzero exit
+to the public exception. It does not claim language-level exception identity.
+
+Count-only replay remains available. The native
+`replay_token_activation_sequences` helper uses the same validation and replay
+path as full trace diagnostics, returning one ordered transition sequence per
+source trace without calculating fitness. Stochastic-map fitting consumes these
+sequences, preserving activation counts even when backwards fitness is undefined.
+This helper is a native API contract, not an additional reference parity claim.
+
+The corrected build matches all 52 denominator observations and all 26 original
+backwards controls, using 26 and 13 native invocations respectively. These are
+two overlapping cohorts, not 78 unique input fixtures. The frozen denominator
+baseline retains its 38 matches and 14 mismatches; the original baseline retains
+24 matches and two mismatches. All result fields and the strictly mapped errors
+are retained in `docs/token-backwards-zero-native-checks.json.gz`, with the
+summary in `docs/token-backwards-zero-native-validation.json`.
+
+Eleven affected Release suites pass, including replay diagnostics, input
+adapters, stochastic maps, Monte Carlo and downstream evaluation. Source,
+binary, test and comparison bindings accompany the evidence. The dispatcher,
+forward and backwards rows remain partial; broader behavior and distinct
+catalogue proof requirements remain open.
