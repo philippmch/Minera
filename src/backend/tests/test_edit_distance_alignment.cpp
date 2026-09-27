@@ -173,6 +173,429 @@ void edit_distance_variant_module_acceptance() {
              "false");
 }
 
+void edit_distance_native_carrier_acceptance() {
+  auto make_log = [](const std::vector<std::vector<std::string>>& variants,
+                     std::string prefix) {
+    EventLog log;
+    for (std::size_t trace_index = 0; trace_index < variants.size();
+         ++trace_index) {
+      Trace trace;
+      trace.case_id = prefix + std::to_string(trace_index);
+      for (std::size_t event_index = 0;
+           event_index < variants[trace_index].size(); ++event_index) {
+        Event event;
+        event.case_id = trace.case_id;
+        event.activity = "activity-decoy-" + std::to_string(event_index);
+        event.timestamp = "timestamp-decoy-" + std::to_string(event_index);
+        event.input_order = event_index;
+        event.attributes.push_back(
+            {"phase", variants[trace_index][event_index]});
+        event.attributes.push_back(
+            {"concept:name", "activity-decoy-" + std::to_string(event_index)});
+        const std::string timestamp = event_index == 0
+            ? "2024-02-03T04:05:06Z" : "2024-02-03T04:05:07Z";
+        EventAttribute selected_time{"ts_custom", timestamp,
+                                     AttributeKind::kDate};
+        selected_time.typed_value = NativeDate{timestamp};
+        event.attributes.push_back(std::move(selected_time));
+        event.attributes.push_back(
+            {"time:timestamp", "timestamp-decoy-" +
+                                    std::to_string(event_index)});
+        trace.events.push_back(std::move(event));
+      }
+      log.traces.push_back(std::move(trace));
+    }
+    return log;
+  };
+  const EventLog source = make_log({{"A", "B"}}, "source-");
+  const EventLog targets = make_log({{"A", "B"}, {"X", "Y"}}, "target-");
+  LogConversionOptions conversion;
+  conversion.case_id_key = "cid";
+  EditDistanceOptions ordinary;
+  ordinary.activity_attribute = "phase";
+  ordinary.timestamp_attribute = "ts_custom";
+  ordinary.case_id_attribute = "cid";
+  EditDistanceOptions anti = ordinary;
+  anti.perform_anti_alignment = true;
+
+  const auto expected_ordinary = align_edit_distance(source, targets, ordinary);
+  const auto expected_anti = align_edit_distance(source, targets, anti);
+  assert(expected_ordinary.size() == 1 &&
+         expected_ordinary.front().source_variant ==
+             (std::vector<std::string>{"A", "B"}) &&
+         expected_ordinary.front().target_variant ==
+             (std::vector<std::string>{"A", "B"}) &&
+         expected_ordinary.front().target_index == 0 &&
+         expected_ordinary.front().cost == 0 &&
+         expected_ordinary.front().fitness == 1.0 &&
+         expected_ordinary.front().best_worst_cost == 40000 &&
+         expected_ordinary.front().alignment.size() == 2 &&
+         expected_ordinary.front().alignment[0].type ==
+             EditDistanceMoveType::kSynchronous &&
+         expected_ordinary.front().alignment[1].type ==
+             EditDistanceMoveType::kSynchronous);
+  assert(expected_anti.size() == 1 &&
+         expected_anti.front().source_variant ==
+             (std::vector<std::string>{"A", "B"}) &&
+         expected_anti.front().target_variant ==
+             (std::vector<std::string>{"X", "Y"}) &&
+         expected_anti.front().target_index == 1 &&
+         expected_anti.front().cost == 40000 &&
+         expected_anti.front().fitness == 0.0 &&
+         expected_anti.front().bwc == 40000 &&
+         expected_anti.front().alignment.size() == 4 &&
+         expected_anti.front().alignment[0].type == EditDistanceMoveType::kLog &&
+         expected_anti.front().alignment[0].log_activity == "A" &&
+         expected_anti.front().alignment[1].type == EditDistanceMoveType::kLog &&
+         expected_anti.front().alignment[1].log_activity == "B" &&
+         expected_anti.front().alignment[2].type == EditDistanceMoveType::kModel &&
+         expected_anti.front().alignment[2].model_activity == "X" &&
+         expected_anti.front().alignment[3].type == EditDistanceMoveType::kModel &&
+         expected_anti.front().alignment[3].model_activity == "Y");
+
+  const auto source_table = event_log_to_table(source, conversion);
+  const auto target_table = event_log_to_table(targets, conversion);
+  const auto source_stream = event_log_to_event_stream(source, conversion);
+  const auto target_stream = event_log_to_event_stream(targets, conversion);
+  std::size_t source_scans = 0, source_rows_scanned = 0;
+  std::size_t target_scans = 0, target_rows_scanned = 0;
+  const auto make_counted_lazy = [](const EventTable& table,
+                                    std::size_t& scans,
+                                    std::size_t& rows_scanned) {
+    const auto rows = table.rows;
+    const auto row_count = rows.size();
+    return LazyEventTable(
+        table.columns,
+        [rows, &scans, &rows_scanned](
+            const LazyEventTable::RowConsumer& consume) {
+          ++scans;
+          for (const auto& row : rows) {
+            ++rows_scanned;
+            consume(row);
+          }
+        },
+        table.attributes, table.metadata, row_count, table.dtypes, table.index,
+        table.categorical_dtypes);
+  };
+  const auto source_lazy = make_counted_lazy(
+      source_table, source_scans, source_rows_scanned);
+  const auto target_lazy = make_counted_lazy(
+      target_table, target_scans, target_rows_scanned);
+
+  const auto same_table = [](const EventTable& left, const EventTable& right) {
+    return left.columns == right.columns && left.rows == right.rows &&
+           left.attributes == right.attributes && left.metadata == right.metadata &&
+           left.dtypes == right.dtypes && left.index == right.index &&
+           left.categorical_dtypes == right.categorical_dtypes;
+  };
+  const auto same_alignment = [](const auto& actual, const auto& expected) {
+    assert(actual.size() == expected.size());
+    for (std::size_t i = 0; i < actual.size(); ++i) {
+      const auto& left = actual[i];
+      const auto& right = expected[i];
+      assert(left.source_variant == right.source_variant &&
+             left.target_variant == right.target_variant &&
+             left.target_index == right.target_index && left.cost == right.cost &&
+             left.fitness == right.fitness &&
+             left.best_worst_cost == right.best_worst_cost &&
+             left.bwc == right.bwc && left.denominator == right.denominator &&
+             left.alignment.size() == right.alignment.size());
+      for (std::size_t move = 0; move < left.alignment.size(); ++move) {
+        const auto& a = left.alignment[move];
+        const auto& b = right.alignment[move];
+        assert(a.type == b.type && a.log_activity == b.log_activity &&
+               a.model_activity == b.model_activity && a.activity == b.activity &&
+               a.log == b.log && a.model == b.model);
+      }
+    }
+  };
+  const auto check_pair = [&](EventDataView source_view,
+                              EventDataView target_view,
+                              const EditDistanceOptions& options,
+                              const std::vector<EditDistanceAlignment>& expected,
+                              std::size_t* source_scan_count,
+                              std::size_t* source_row_count,
+                              std::size_t* target_scan_count,
+                              std::size_t* target_row_count) {
+    const auto source_before = event_data_to_table(source_view, conversion);
+    const auto target_before = event_data_to_table(target_view, conversion);
+    if (source_scan_count) *source_scan_count = *source_row_count = 0;
+    if (target_scan_count) *target_scan_count = *target_row_count = 0;
+    const auto actual = align_edit_distance(source_view, target_view, options);
+    same_alignment(actual, expected);
+    if (source_scan_count)
+      assert(*source_scan_count == 1 &&
+             *source_row_count == source_before.rows.size());
+    if (target_scan_count)
+      assert(*target_scan_count == 1 &&
+             *target_row_count == target_before.rows.size());
+    const auto source_after = event_data_to_table(source_view, conversion);
+    const auto target_after = event_data_to_table(target_view, conversion);
+    assert(same_table(source_before, source_after) &&
+           same_table(target_before, target_after));
+    if (source_scan_count) *source_scan_count = *source_row_count = 0;
+    if (target_scan_count) *target_scan_count = *target_row_count = 0;
+  };
+  const auto check_both = [&](EventDataView source_view,
+                              EventDataView target_view,
+                              std::size_t* source_scan_count,
+                              std::size_t* source_row_count,
+                              std::size_t* target_scan_count,
+                              std::size_t* target_row_count) {
+    check_pair(source_view, target_view, ordinary, expected_ordinary,
+               source_scan_count, source_row_count,
+               target_scan_count, target_row_count);
+    check_pair(source_view, target_view, anti, expected_anti,
+               source_scan_count, source_row_count,
+               target_scan_count, target_row_count);
+  };
+  check_both(EventDataView(source), EventDataView(targets), nullptr, nullptr,
+             nullptr, nullptr);
+  check_both(EventDataView(source_table), EventDataView(target_table),
+             nullptr, nullptr, nullptr, nullptr);
+  check_both(EventDataView(source_stream), EventDataView(target_stream),
+             nullptr, nullptr, nullptr, nullptr);
+  check_both(EventDataView(source_lazy), EventDataView(target_lazy),
+             &source_scans, &source_rows_scanned,
+             &target_scans, &target_rows_scanned);
+  // Mixed carriers take the same generic adapter path, with a lazy scan on
+  // just one side of the pair.
+  check_pair(EventDataView(source_stream), EventDataView(target_lazy), ordinary,
+             expected_ordinary, nullptr, nullptr,
+             &target_scans, &target_rows_scanned);
+  check_pair(EventDataView(source_table), EventDataView(target_stream), anti,
+             expected_anti, nullptr, nullptr, nullptr, nullptr);
+
+  const auto assert_projection = [](const EventLog& projected) {
+    assert(projected.metadata == EventDataMetadata{} &&
+           projected.attributes.size() == 1 &&
+           projected.attribute("@@aligned_variant") &&
+           *projected.attribute("@@aligned_variant") == "A,C" &&
+           projected.traces.size() == 1);
+    const auto& trace = projected.traces.front();
+    assert(trace.attributes.size() == 1 &&
+           trace.attribute("@@original_trace") &&
+           *trace.attribute("@@original_trace") == "A,B" &&
+           trace.events.size() == 2);
+    const std::vector<std::string> activities{"A", "C"};
+    for (std::size_t i = 0; i < trace.events.size(); ++i) {
+      const auto& event = trace.events[i];
+      assert(event.activity == activities[i] &&
+             event.timestamp == "2024-02-03T04:05:06Z" &&
+             event.attributes.size() == 3 && event.attribute("phase") &&
+             *event.attribute("phase") == activities[i] &&
+             event.attribute("ts_custom") &&
+             *event.attribute("ts_custom") == "2024-02-03T04:05:06Z" &&
+             event.attribute("@@is_conforming") &&
+             *event.attribute("@@is_conforming") ==
+                 (i == 0 ? "true" : "false") &&
+             event.timestamp_attribute &&
+             event.timestamp_attribute->kind == AttributeKind::kDate &&
+             std::holds_alternative<NativeDate>(
+                 event.timestamp_attribute->typed_value) &&
+             std::get<NativeDate>(event.timestamp_attribute->typed_value).value ==
+                 "2024-02-03T04:05:06Z");
+    }
+  };
+  EventLog projection_source = source;
+  projection_source.traces.emplace_back();
+  const auto check_projection = [&](EventDataView source_view,
+                                    std::size_t* scan_count,
+                                    std::size_t* row_count) {
+    const auto before = event_data_to_table(source_view, conversion);
+    if (scan_count) *scan_count = *row_count = 0;
+    const auto projected = project_log_on_variant(
+        source_view, std::vector<std::string>{"A", "C"}, ordinary);
+    if (scan_count)
+      assert(*scan_count == 1 && *row_count == before.rows.size());
+    assert_projection(projected);
+    const auto after = event_data_to_table(source_view, conversion);
+    assert(same_table(before, after));
+    if (scan_count) *scan_count = *row_count = 0;
+  };
+  check_projection(EventDataView(projection_source), nullptr, nullptr);
+  assert(projection_source.traces.size() == 2 &&
+         projection_source.traces.back().events.empty());
+  check_projection(EventDataView(source_table), nullptr, nullptr);
+  check_projection(EventDataView(source_stream), nullptr, nullptr);
+  check_projection(EventDataView(source_lazy), &source_scans,
+                   &source_rows_scanned);
+  const auto typed_projection = project_log_on_typed_variant(
+      EventDataView(source_stream),
+      std::vector<EventAttribute>{{"ignored", "A"}, {"ignored", "C"}},
+      ordinary);
+  assert_projection(typed_projection);
+  EventTable no_rows;
+  no_rows.columns = {"cid", "phase", "ts_custom"};
+  const auto empty_projection = project_log_on_variant(
+      EventDataView(no_rows), std::vector<std::string>{"A"}, ordinary);
+  assert(empty_projection.traces.empty() &&
+         empty_projection.attribute("@@aligned_variant") &&
+         *empty_projection.attribute("@@aligned_variant") == "A");
+
+  EventTable empty_target;
+  empty_target.columns = {"cid", "phase"};
+  bool empty_target_rejected = false;
+  try {
+    (void)align_edit_distance(EventDataView(source_table),
+                              EventDataView(empty_target), ordinary);
+  } catch (const std::invalid_argument& error) {
+    empty_target_rejected = std::string(error.what()) ==
+                            "edit-distance target log must not be empty";
+  }
+  assert(empty_target_rejected);
+  EventTable missing_case;
+  missing_case.columns = {"phase", "ts_custom"};
+  missing_case.rows.push_back({EventAttribute{"phase", "A"},
+                               EventAttribute{"ts_custom", "time"}});
+  bool missing_case_rejected = false;
+  try {
+    (void)align_edit_distance(EventDataView(missing_case),
+                              EventDataView(target_table), ordinary);
+  } catch (const std::invalid_argument& error) {
+    missing_case_rejected = std::string(error.what()) ==
+        "log conversion: event stream record has no case id field";
+  }
+  assert(missing_case_rejected);
+  EventTable missing_activity;
+  missing_activity.columns = {"cid", "concept:name"};
+  missing_activity.rows.push_back({EventAttribute{"cid", "missing-activity"},
+                                   EventAttribute{"concept:name", "decoy"}});
+  bool missing_activity_rejected = false;
+  try {
+    (void)align_edit_distance(EventDataView(missing_activity),
+                              EventDataView(target_table), ordinary);
+  } catch (const std::invalid_argument& error) {
+    missing_activity_rejected = std::string(error.what()) ==
+                                "edit-distance: missing activity column phase";
+  }
+  assert(missing_activity_rejected);
+  EventTable missing_timestamp;
+  missing_timestamp.columns = {"cid", "phase"};
+  missing_timestamp.rows.push_back({EventAttribute{"cid", "missing-time"},
+                                    EventAttribute{"phase", "A"}});
+  bool missing_timestamp_rejected = false;
+  try {
+    (void)project_log_on_variant(EventDataView(missing_timestamp),
+                                 std::vector<std::string>{"A"}, ordinary);
+  } catch (const std::invalid_argument& error) {
+    missing_timestamp_rejected = std::string(error.what()) ==
+        "edit-distance: missing timestamp column ts_custom";
+  }
+  assert(missing_timestamp_rejected);
+
+  const auto expect_error = [](const std::string& expected,
+                               const auto& operation) {
+    bool matched = false;
+    try {
+      operation();
+    } catch (const std::invalid_argument& error) {
+      matched = std::string(error.what()) == expected;
+    }
+    assert(matched);
+  };
+  const EventStream missing_case_stream =
+      event_table_to_event_stream(missing_case, conversion);
+  const auto missing_case_lazy = LazyEventTable::from_table(missing_case);
+  expect_error("log conversion: event stream record has no case id field", [&] {
+    (void)align_edit_distance(EventDataView(missing_case_stream),
+                              EventDataView(target_stream), ordinary);
+  });
+  expect_error("log conversion: event stream record has no case id field", [&] {
+    (void)align_edit_distance(EventDataView(missing_case_lazy),
+                              EventDataView(target_table), ordinary);
+  });
+
+  const EventStream missing_activity_stream =
+      event_table_to_event_stream(missing_activity, conversion);
+  const auto missing_activity_lazy =
+      LazyEventTable::from_table(missing_activity);
+  expect_error("edit-distance: missing or null activity phase", [&] {
+    (void)align_edit_distance(EventDataView(missing_activity_stream),
+                              EventDataView(target_stream), ordinary);
+  });
+  expect_error("edit-distance: missing activity column phase", [&] {
+    (void)align_edit_distance(EventDataView(missing_activity_lazy),
+                              EventDataView(target_table), ordinary);
+  });
+
+  const EventStream missing_timestamp_stream =
+      event_table_to_event_stream(missing_timestamp, conversion);
+  const auto missing_timestamp_lazy =
+      LazyEventTable::from_table(missing_timestamp);
+  expect_error("edit-distance: missing timestamp ts_custom", [&] {
+    (void)project_log_on_variant(EventDataView(missing_timestamp_stream),
+                                 std::vector<std::string>{"A"}, ordinary);
+  });
+  expect_error("edit-distance: missing timestamp column ts_custom", [&] {
+    (void)project_log_on_variant(EventDataView(missing_timestamp_lazy),
+                                 std::vector<std::string>{"A"}, ordinary);
+  });
+
+  const EventStream empty_stream;
+  const auto empty_lazy = LazyEventTable::from_table(empty_target);
+  expect_error("edit-distance target log must not be empty", [&] {
+    (void)align_edit_distance(EventDataView(source_stream),
+                              EventDataView(empty_stream), ordinary);
+  });
+  expect_error("edit-distance target log must not be empty", [&] {
+    (void)align_edit_distance(EventDataView(source_table),
+                              EventDataView(empty_lazy), ordinary);
+  });
+
+  EventLog typed_source;
+  EventLog typed_target;
+  const auto typed_log = [](EventAttribute selected, std::string case_id) {
+    EventLog log;
+    Trace trace;
+    trace.case_id = case_id;
+    Event event;
+    event.case_id = case_id;
+    event.attributes.push_back(std::move(selected));
+    event.attributes.push_back({"concept:name", "typed-decoy"});
+    event.attributes.push_back({"ts_custom", "2024-02-03T04:05:06Z"});
+    trace.events.push_back(std::move(event));
+    log.traces.push_back(std::move(trace));
+    return log;
+  };
+  EventAttribute integer_activity{"phase", "1", AttributeKind::kInt};
+  integer_activity.typed_value = std::int64_t{1};
+  EventAttribute boolean_activity{"phase", "True", AttributeKind::kBoolean};
+  boolean_activity.typed_value = true;
+  typed_source = typed_log(integer_activity, "typed-source");
+  typed_target = typed_log(boolean_activity, "typed-target");
+  const auto typed_source_table = event_log_to_table(typed_source, conversion);
+  const auto typed_target_table = event_log_to_table(typed_target, conversion);
+  const auto typed_source_stream =
+      event_log_to_event_stream(typed_source, conversion);
+  const auto typed_target_stream =
+      event_log_to_event_stream(typed_target, conversion);
+  std::size_t typed_lazy_scans = 0, typed_lazy_rows = 0;
+  const auto typed_target_lazy = make_counted_lazy(
+      typed_target_table, typed_lazy_scans, typed_lazy_rows);
+  const auto typed_alignment = align_typed_edit_distance(
+      EventDataView(typed_source_stream), EventDataView(typed_target_lazy),
+      ordinary);
+  assert(typed_alignment.size() == 1 && typed_alignment.front().cost == 0 &&
+         typed_alignment.front().source_variant.size() == 1 &&
+         typed_alignment.front().target_variant.size() == 1 &&
+         typed_alignment.front().source_variant.front().kind ==
+             AttributeKind::kInt &&
+         typed_alignment.front().target_variant.front().kind ==
+             AttributeKind::kInt &&
+         std::get<std::int64_t>(
+             typed_alignment.front().target_variant.front().typed_value) == 1 &&
+         typed_lazy_scans == 1 &&
+         typed_lazy_rows == typed_target_table.rows.size());
+  const auto typed_table_alignment = align_typed_edit_distance(
+      EventDataView(typed_source_table), EventDataView(typed_target_stream),
+      ordinary);
+  assert(typed_table_alignment.size() == 1 &&
+         typed_table_alignment.front().cost == 0 &&
+         typed_table_alignment.front().target_variant.front().kind ==
+             AttributeKind::kInt);
+}
+
 void flat_event_data_selectors_use_literal_empty_and_space_keys() {
   const auto activity_table = [](std::string selector, bool target) {
     EventTable table;
@@ -2558,6 +2981,7 @@ int main() {
     if (existing_result != 0) return existing_result;
     edit_distance_dispatcher_acceptance();
     edit_distance_variant_module_acceptance();
+    edit_distance_native_carrier_acceptance();
     flat_event_data_selectors_use_literal_empty_and_space_keys();
     return 0;
   } catch (const std::exception& error) {

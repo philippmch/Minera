@@ -47,8 +47,8 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 45
-complete and 41 partial dispatcher rows, plus 196 complete and 191 partial
+adapter, integration, or missing are complete. The current manifest records 46
+complete and 40 partial dispatcher rows, plus 197 complete and 190 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
 DFG, causal and correlation discovery, 26-module Inductive discovery, 31-module
@@ -56,7 +56,7 @@ POWL discovery, 13-module footprints discovery/conformance, and the 19-module
 temporal/behavioral adapter stack, plus discounted anti-/multi-alignment and
 classic Declare/log-skeleton discovery and conformance, with distinct
 registered tests, plus the replay-duration diagnostic support module;
-232 coverage units still require exact proof.
+230 coverage units still require exact proof.
 A release may
 additionally run the strict gate:
 
@@ -5340,7 +5340,28 @@ module remain partial.
 
 The current edit-distance acceptance matrix is maintained in
 `docs/edit-distance-parity-contract.md`. The pinned public surface is archived
-in `docs/edit-distance-public-surface.json.gz`; both catalogue rows remain partial.
+in `docs/edit-distance-public-surface.json.gz`; both catalogue rows are complete.
+
+### Edit-distance carrier acceptance and completion
+
+The registered `edit_distance_native_carrier_acceptance` verifies string
+alignment on log, table, stream and lazy carriers, typed alignment on mixed
+stream/lazy and table/stream inputs, and fresh projection adapters. It checks
+exact eager outputs, custom selectors, anti mode, projection markers and
+timestamps, unchanged normalized table views, and counted lazy scans.
+Stream/lazy empty-target and missing case/activity/timestamp errors
+are checked directly. Flat rows cannot retain empty traces; projection omission
+is tested separately.
+
+The focused Release suite passes with assertions enabled. The final source,
+executable, unchanged core library and logs are bound in
+`docs/edit-distance-carrier-native-checks.json.gz`, with a summary in
+`docs/edit-distance-carrier-validation.json`. Independent review closed the
+adapter finding and found no remaining semantic issue in the two scoped rows.
+The earlier 2,470 differential comparisons and CLI/HTTP fixtures apply to the
+unchanged production code. Distinct registered catalogue proofs and the
+requirement reconciliation in `docs/edit-distance-parity-contract.md` complete
+the dispatcher and variant module rows. Project-wide parity remains incomplete.
 
 ### Edit-distance proof registration and completion audit
 
