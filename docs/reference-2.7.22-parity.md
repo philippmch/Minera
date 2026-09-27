@@ -248,6 +248,9 @@ its separately tested zero-denominator contract. These corrected behaviors are
 shared by compact, detailed, per-place, and token-evaluation entry points.
 Forward duplicate-label tie selection and replay flood-cleaning/exhaustive-
 exploration controls still require reconciliation.
+The acceptance criteria for incidental choice order and complete replay-path
+diagnostics are recorded in `docs/token-replay-parity-contract.md`; sampled
+support alone does not close the remaining choice/cleanup evidence gap.
 The backwards hidden-walk toggle is a native extension; the pinned legacy
 variation ignores that parameter. Remaining root-cause encoding contracts and
 trace/event identity-map compatibility remain separate work. Duration support is
