@@ -1,0 +1,43 @@
+{
+  "status": "verified_finite_checkpoint",
+  "parent_commit": "55bdeeff51c462eee17bbf0c08a35c2f8c464a81",
+  "verified_code_tree": "9edeef657dfd5947a50fd4c4fb68bf4ce4582f43",
+  "core_sha256": "61aaa3f87f99e66581946880dfac89d79aeebf768d4cb7e1b15b1bc978e1ce07",
+  "reference_calls": 46,
+  "comparable_calls": 45,
+  "baseline_matches": 22,
+  "after_matches": 45,
+  "reference_only_non_equivalent": 1,
+  "mapped_errors": 7,
+  "regressions": {
+    "core": 96,
+    "anti-duplicates": 12,
+    "table": 104,
+    "typed-mapping": 35,
+    "direct": 85,
+    "typed-log": 72,
+    "typed-variant": 77,
+    "exhaustive": 1922
+  },
+  "regression_matches": 2403,
+  "native_suite": "passed",
+  "cli_cases": 1,
+  "http_cases": 1,
+  "catalogue": "passed; no row promotion",
+  "independent_reviews": "clear",
+  "artifacts": [
+    {
+      "path": "docs/edit-distance-selector-domain-reference.json.gz",
+      "sha256": "47391e6f7b1ea79ca25ddba9da6ed39ac5776963eb0f41f850e422d22c870d83"
+    },
+    {
+      "path": "docs/edit-distance-selector-domain-native-checks.json.gz",
+      "sha256": "028dec8b84118da327f999b278efa911df8c758e2407bf10d3458f9456fb21ba"
+    }
+  ],
+  "remaining": [
+    "Flat-data selector scope reconciliation",
+    "Distinct module and dispatcher completion proofs",
+    "Independent requirement-by-requirement completion review"
+  ]
+}

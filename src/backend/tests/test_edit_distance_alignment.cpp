@@ -1064,14 +1064,406 @@ int test_main() {
   assert(threw);
   EditDistanceOptions blank_selector = selected_options;
   blank_selector.activity_attribute = " ";
-  threw = false;
+  bool blank_selector_missing_field_rejected = false;
   try {
     (void)align_edit_distance(selected_source, selected_target,
                               blank_selector);
-  } catch (const std::invalid_argument&) {
-    threw = true;
+  } catch (const std::invalid_argument& error) {
+    blank_selector_missing_field_rejected =
+        std::string_view(error.what()) ==
+        "edit-distance: missing or null activity  ";
   }
-  assert(threw);
+  assert(blank_selector_missing_field_rejected);
+
+  // Empty and whitespace selectors are literal Event mapping keys. Canonical
+  // first-class values act as decoys so an empty source-key sentinel cannot
+  // accidentally satisfy the selected key.
+  const auto selector_event = [](std::string key, std::string value) {
+    Event event;
+    event.activity = "canonical-activity-decoy";
+    event.activity_state = FirstClassAttributeState::kPresent;
+    event.activity_attribute =
+        EventAttribute{"concept:name", event.activity, AttributeKind::kString};
+    event.attributes.push_back(*event.activity_attribute);
+    event.attributes.emplace_back(std::move(key), std::move(value),
+                                   AttributeKind::kString);
+    event.timestamp = "1999-01-01T00:00:00Z";
+    event.timestamp_state = FirstClassAttributeState::kPresent;
+    event.timestamp_attribute = EventAttribute{
+        "time:timestamp", event.timestamp, AttributeKind::kDate};
+    event.timestamp_attribute->typed_value =
+        NativeDate{"1999-01-01T00:00:00.000Z"};
+    event.attributes.push_back(*event.timestamp_attribute);
+    return event;
+  };
+  const auto selector_log = [&](std::string key, std::string value) {
+    EventLog log;
+    Trace trace;
+    trace.events.push_back(
+        selector_event(std::move(key), std::move(value)));
+    log.traces.push_back(std::move(trace));
+    return log;
+  };
+  EventLog empty_key_source = selector_log("", "A");
+  EventLog empty_key_target = selector_log("", "A");
+  EditDistanceOptions empty_key_options;
+  empty_key_options.activity_attribute.clear();
+  // Timestamps are unused by whole-log alignment, even when the selector is
+  // blank and no literal blank timestamp field exists.
+  empty_key_options.timestamp_attribute.clear();
+  const auto empty_key_alignment = align_edit_distance(
+      empty_key_source, empty_key_target, empty_key_options);
+  assert(empty_key_alignment.size() == 1 &&
+         empty_key_alignment.front().source_variant ==
+             std::vector<std::string>{"A"} &&
+         empty_key_alignment.front().target_variant ==
+             std::vector<std::string>{"A"} &&
+         empty_key_alignment.front().cost == 0);
+  const auto empty_key_typed_alignment = align_typed_edit_distance(
+      empty_key_source, empty_key_target, empty_key_options);
+  assert(empty_key_typed_alignment.size() == 1 &&
+         empty_key_typed_alignment.front().source_variant.size() == 1 &&
+         empty_key_typed_alignment.front().source_variant.front().key.empty() &&
+         empty_key_typed_alignment.front().source_variant.front().value == "A" &&
+         empty_key_typed_alignment.front().source_variant.front().first_class_role ==
+             FirstClassAttributeRole::kNone);
+  const Trace direct_empty_key_trace = trace_with_activity_attribute(
+      EventAttribute{"", "A", AttributeKind::kString});
+  const auto direct_empty_key_result = apply_edit_distance_trace(
+      direct_empty_key_trace, std::vector<std::string>{"a"},
+      std::set<std::string>{"a"}, EditDistanceTraceMapping{{"A", "a"}},
+      nullptr, empty_key_options);
+  const auto& direct_empty_key_alignment =
+      std::any_cast<const EditDistanceTraceResult&>(*direct_empty_key_result);
+  assert(direct_empty_key_alignment.cost == 0 &&
+         direct_empty_key_alignment.alignment.size() == 1 &&
+         direct_empty_key_alignment.alignment.front().type ==
+             EditDistanceMoveType::kSynchronous &&
+         direct_empty_key_alignment.alignment.front().log_activity == "A");
+
+  EditDistanceOptions whitespace_key_options = empty_key_options;
+  whitespace_key_options.activity_attribute = " ";
+  EventLog whitespace_key_source = selector_log(" ", "B");
+  EventLog whitespace_key_target = selector_log(" ", "B");
+  const auto whitespace_key_alignment = align_edit_distance(
+      whitespace_key_source, whitespace_key_target, whitespace_key_options);
+  assert(whitespace_key_alignment.size() == 1 &&
+         whitespace_key_alignment.front().source_variant ==
+             std::vector<std::string>{"B"} &&
+         whitespace_key_alignment.front().cost == 0);
+
+  EventLog missing_empty_key = selector_log("phase", "A");
+  bool missing_empty_activity_rejected = false;
+  try {
+    (void)align_edit_distance(missing_empty_key, empty_key_target,
+                              empty_key_options);
+  } catch (const std::invalid_argument& error) {
+    missing_empty_activity_rejected =
+        std::string_view(error.what()) ==
+        "edit-distance: missing or null activity ";
+  }
+  assert(missing_empty_activity_rejected);
+  EventLog missing_empty_metadata;
+  Trace missing_empty_metadata_trace;
+  Event missing_empty_metadata_event;
+  missing_empty_metadata_event.activity = "metadata-decoy";
+  missing_empty_metadata_event.activity_state =
+      FirstClassAttributeState::kPresent;
+  missing_empty_metadata_event.activity_attribute =
+      EventAttribute{"", "metadata-decoy", AttributeKind::kString};
+  missing_empty_metadata_event.activity_attribute->first_class_role =
+      FirstClassAttributeRole::kActivity;
+  missing_empty_metadata_event.activity_attribute->first_class_state =
+      FirstClassAttributeState::kMissing;
+  missing_empty_metadata_trace.events.push_back(
+      std::move(missing_empty_metadata_event));
+  missing_empty_metadata.traces.push_back(
+      std::move(missing_empty_metadata_trace));
+  bool missing_empty_metadata_rejected = false;
+  try {
+    (void)align_edit_distance(missing_empty_metadata, empty_key_target,
+                              empty_key_options);
+  } catch (const std::invalid_argument& error) {
+    missing_empty_metadata_rejected =
+        std::string_view(error.what()) ==
+        "edit-distance: missing or null activity ";
+  }
+  assert(missing_empty_metadata_rejected);
+  bool fresh_missing_empty_activity_rejected = false;
+  try {
+    (void)project_log_on_variant(missing_empty_key, {"A"},
+                                 empty_key_options);
+  } catch (const std::out_of_range& error) {
+    fresh_missing_empty_activity_rejected =
+        std::string_view(error.what()) == "''";
+  }
+  assert(fresh_missing_empty_activity_rejected);
+
+  EditDistanceOptions empty_key_projection_options = empty_key_options;
+  empty_key_projection_options.timestamp_attribute = "time:timestamp";
+  const auto empty_key_projection = project_log_on_variant(
+      empty_key_source, {"A"}, empty_key_projection_options);
+  const auto* projected_empty_activity =
+      empty_key_projection.traces.front().events.front().attribute("");
+  assert(projected_empty_activity && *projected_empty_activity == "A" &&
+         empty_key_projection.traces.front().events.front().activity_attribute &&
+         empty_key_projection.traces.front().events.front()
+                 .activity_attribute->first_class_role ==
+             FirstClassAttributeRole::kNone &&
+         empty_key_projection.traces.front().events.front().attribute(
+             "concept:name") == nullptr);
+  EditDistanceOptions whitespace_projection_options = whitespace_key_options;
+  whitespace_projection_options.timestamp_attribute = "time:timestamp";
+  const auto whitespace_projection = project_log_on_variant(
+      whitespace_key_source, {"B"}, whitespace_projection_options);
+  const auto* projected_whitespace_activity =
+      whitespace_projection.traces.front().events.front().attribute(" ");
+  assert(projected_whitespace_activity &&
+         *projected_whitespace_activity == "B");
+
+  const auto timestamp_selector_log = [&](std::string timestamp_key) {
+    EventLog log;
+    Trace trace;
+    Event event;
+    event.attributes.emplace_back("phase", "A", AttributeKind::kString);
+    event.timestamp = "1999-01-01T00:00:00Z";
+    event.timestamp_state = FirstClassAttributeState::kPresent;
+    event.timestamp_attribute = EventAttribute{
+        "time:timestamp", event.timestamp, AttributeKind::kDate};
+    event.timestamp_attribute->typed_value =
+        NativeDate{"1999-01-01T00:00:00.000Z"};
+    event.attributes.push_back(*event.timestamp_attribute);
+    EventAttribute selected_time{std::move(timestamp_key),
+                                 "2026-03-01T00:00:00Z",
+                                 AttributeKind::kDate};
+    selected_time.typed_value = NativeDate{"2026-03-01T00:00:00.000Z"};
+    event.attributes.push_back(std::move(selected_time));
+    trace.events.push_back(std::move(event));
+    log.traces.push_back(std::move(trace));
+    return log;
+  };
+  for (const std::string timestamp_key : {std::string{}, std::string{" "}}) {
+    EventLog timestamp_source = timestamp_selector_log(timestamp_key);
+    EditDistanceOptions timestamp_options;
+    timestamp_options.activity_attribute = "phase";
+    timestamp_options.timestamp_attribute = timestamp_key;
+    const auto timestamp_projection = project_log_on_variant(
+        timestamp_source, {"A", "B"}, timestamp_options);
+    const auto& projected_event =
+        timestamp_projection.traces.front().events.front();
+    const auto& inserted_timestamp_event =
+        timestamp_projection.traces.front().events.back();
+    assert(timestamp_projection.traces.front().events.size() == 2 &&
+           projected_event.timestamp_source_key == timestamp_key &&
+           projected_event.timestamp_attribute &&
+           projected_event.timestamp_attribute->key == timestamp_key &&
+           projected_event.timestamp_attribute->kind == AttributeKind::kDate &&
+           std::get<NativeDate>(projected_event.timestamp_attribute->typed_value)
+                   .value == "2026-03-01T00:00:00.000Z" &&
+           projected_event.attribute(timestamp_key) &&
+           *projected_event.attribute(timestamp_key) ==
+               "2026-03-01T00:00:00Z");
+    assert(inserted_timestamp_event.timestamp_source_key == timestamp_key &&
+           inserted_timestamp_event.timestamp_attribute &&
+           inserted_timestamp_event.timestamp_attribute->key == timestamp_key &&
+           inserted_timestamp_event.timestamp_attribute->kind ==
+               AttributeKind::kDate &&
+           std::get<NativeDate>(
+               inserted_timestamp_event.timestamp_attribute->typed_value)
+                   .value == "2026-03-01T00:00:00.000Z");
+    if (timestamp_key.empty()) {
+      const auto alignments = align_edit_distance(
+          timestamp_source, timestamp_source, timestamp_options);
+      const auto native_projection = project_log_on_alignments(
+          timestamp_source, alignments, timestamp_options);
+      const auto& native_event = native_projection.traces.front().events.front();
+      assert(native_event.timestamp_source_key.empty() &&
+             native_event.timestamp_attribute &&
+             native_event.timestamp_attribute->key.empty() &&
+             std::get<NativeDate>(native_event.timestamp_attribute->typed_value)
+                     .value == "2026-03-01T00:00:00.000Z");
+    }
+  }
+
+  // If a literal empty key is present in the generic Event mapping, it wins
+  // over a conflicting first-class slot with the same stored key.
+  EventLog conflicting_activity_source = selector_log("", "generic-value");
+  auto& conflicting_activity_event =
+      conflicting_activity_source.traces.front().events.front();
+  conflicting_activity_event.activity = "stored-slot-decoy";
+  conflicting_activity_event.activity_state =
+      FirstClassAttributeState::kPresent;
+  conflicting_activity_event.activity_attribute =
+      EventAttribute{"", "stored-slot-decoy", AttributeKind::kString};
+  const auto conflicting_activity_alignment = align_edit_distance(
+      conflicting_activity_source, empty_key_target, empty_key_options);
+  assert(conflicting_activity_alignment.size() == 1 &&
+         conflicting_activity_alignment.front().source_variant ==
+             std::vector<std::string>{"generic-value"} &&
+         conflicting_activity_alignment.front().cost ==
+             2 * empty_key_options.deviation_cost);
+  EventLog conflicting_activity_target = selector_log("", "generic-value");
+  const auto matching_conflicting_activity_alignment = align_edit_distance(
+      conflicting_activity_source, conflicting_activity_target,
+      empty_key_options);
+  assert(matching_conflicting_activity_alignment.size() == 1 &&
+         matching_conflicting_activity_alignment.front().cost == 0);
+  const auto conflicting_activity_typed_alignment =
+      align_typed_edit_distance(conflicting_activity_source,
+                                conflicting_activity_target,
+                                empty_key_options);
+  assert(conflicting_activity_typed_alignment.size() == 1 &&
+         conflicting_activity_typed_alignment.front().cost == 0 &&
+         conflicting_activity_typed_alignment.front()
+                 .source_variant.front().value == "generic-value");
+  EditDistanceOptions conflicting_activity_projection_options =
+      empty_key_options;
+  conflicting_activity_projection_options.timestamp_attribute =
+      "time:timestamp";
+  const auto conflicting_activity_projection = project_log_on_variant(
+      conflicting_activity_source, {"generic-value"},
+      conflicting_activity_projection_options);
+  const auto* projected_conflicting_activity =
+      conflicting_activity_projection.traces.front().events.front().attribute("");
+  assert(projected_conflicting_activity &&
+         *projected_conflicting_activity == "generic-value");
+
+  EventLog null_generic_activity_source = conflicting_activity_source;
+  auto& null_generic_activity =
+      null_generic_activity_source.traces.front().events.front().attributes[1];
+  null_generic_activity.value = "generic-null";
+  null_generic_activity.is_null = true;
+  null_generic_activity.first_class_state = FirstClassAttributeState::kNull;
+  bool null_generic_activity_rejected = false;
+  try {
+    (void)align_edit_distance(null_generic_activity_source,
+                              conflicting_activity_target, empty_key_options);
+  } catch (const std::invalid_argument& error) {
+    null_generic_activity_rejected =
+        std::string_view(error.what()) ==
+        "edit-distance: missing or null activity ";
+  }
+  assert(null_generic_activity_rejected);
+  const auto null_generic_activity_typed_alignment = align_typed_edit_distance(
+      null_generic_activity_source, conflicting_activity_target,
+      empty_key_options);
+  assert(null_generic_activity_typed_alignment.size() == 1 &&
+         null_generic_activity_typed_alignment.front()
+             .source_variant.front().is_null &&
+         null_generic_activity_typed_alignment.front()
+                 .source_variant.front().value == "generic-null");
+  bool null_generic_activity_projection_rejected = false;
+  try {
+    (void)project_log_on_variant(null_generic_activity_source,
+                                 {"generic-value"},
+                                 conflicting_activity_projection_options);
+  } catch (const std::invalid_argument& error) {
+    null_generic_activity_projection_rejected =
+        std::string_view(error.what()) ==
+        "sequence item 0: expected str instance, NoneType found";
+  }
+  assert(null_generic_activity_projection_rejected);
+
+  EventLog conflicting_timestamp_source = timestamp_selector_log("");
+  auto& conflicting_timestamp_event =
+      conflicting_timestamp_source.traces.front().events.front();
+  conflicting_timestamp_event.timestamp = "2040-01-01T00:00:00Z";
+  conflicting_timestamp_event.timestamp_state =
+      FirstClassAttributeState::kPresent;
+  conflicting_timestamp_event.timestamp_attribute = EventAttribute{
+      "", conflicting_timestamp_event.timestamp, AttributeKind::kDate};
+  conflicting_timestamp_event.timestamp_attribute->typed_value =
+      NativeDate{"2040-01-01T00:00:00.000Z"};
+  EditDistanceOptions conflicting_timestamp_options;
+  conflicting_timestamp_options.activity_attribute = "phase";
+  conflicting_timestamp_options.timestamp_attribute.clear();
+  const auto conflicting_timestamp_projection = project_log_on_variant(
+      conflicting_timestamp_source, {"A", "B"},
+      conflicting_timestamp_options);
+  const auto& generic_timestamp_projected_event =
+      conflicting_timestamp_projection.traces.front().events.front();
+  assert(generic_timestamp_projected_event.timestamp_attribute &&
+         generic_timestamp_projected_event.timestamp_attribute->key.empty() &&
+         generic_timestamp_projected_event.timestamp_attribute->value ==
+             "2026-03-01T00:00:00Z" &&
+         std::get<NativeDate>(generic_timestamp_projected_event
+                                  .timestamp_attribute->typed_value)
+                 .value == "2026-03-01T00:00:00.000Z");
+  const auto conflicting_timestamp_alignments = align_edit_distance(
+      conflicting_timestamp_source, conflicting_timestamp_source,
+      conflicting_timestamp_options);
+  const auto conflicting_timestamp_native_projection = project_log_on_alignments(
+      conflicting_timestamp_source, conflicting_timestamp_alignments,
+      conflicting_timestamp_options);
+  const auto& native_generic_timestamp_event =
+      conflicting_timestamp_native_projection.traces.front().events.front();
+  assert(native_generic_timestamp_event.timestamp_attribute &&
+         native_generic_timestamp_event.timestamp_attribute->value ==
+             "2026-03-01T00:00:00Z");
+
+  EventLog null_generic_timestamp_source = conflicting_timestamp_source;
+  auto& null_generic_timestamp =
+      null_generic_timestamp_source.traces.front().events.front().attributes.back();
+  null_generic_timestamp.is_null = true;
+  null_generic_timestamp.first_class_state = FirstClassAttributeState::kNull;
+  const auto null_generic_timestamp_projection = project_log_on_variant(
+      null_generic_timestamp_source, {"A", "B"},
+      conflicting_timestamp_options);
+  const auto& null_generic_timestamp_projected_event =
+      null_generic_timestamp_projection.traces.front().events.front();
+  assert(null_generic_timestamp_projected_event.timestamp_attribute &&
+         null_generic_timestamp_projected_event.timestamp_attribute->is_null &&
+         null_generic_timestamp_projected_event.timestamp_state ==
+             FirstClassAttributeState::kNull);
+  const auto null_generic_timestamp_alignments = align_edit_distance(
+      null_generic_timestamp_source, null_generic_timestamp_source,
+      conflicting_timestamp_options);
+  bool native_null_generic_timestamp_rejected = false;
+  try {
+    (void)project_log_on_alignments(null_generic_timestamp_source,
+                                    null_generic_timestamp_alignments,
+                                    conflicting_timestamp_options);
+  } catch (const std::invalid_argument& error) {
+    native_null_generic_timestamp_rejected =
+        std::string_view(error.what()) ==
+        "edit-distance: missing or null timestamp ";
+  }
+  assert(native_null_generic_timestamp_rejected);
+
+  const auto empty_source_alignment = align_edit_distance(
+      EventLog{}, empty_key_target, empty_key_options);
+  assert(empty_source_alignment.empty());
+  bool both_empty_logs_rejected = false;
+  try {
+    (void)align_edit_distance(EventLog{}, EventLog{}, empty_key_options);
+  } catch (const std::invalid_argument& error) {
+    both_empty_logs_rejected = std::string_view(error.what()) ==
+        "edit-distance target log must not be empty";
+  }
+  assert(both_empty_logs_rejected);
+  EventLog empty_trace_source;
+  empty_trace_source.traces.emplace_back();
+  EventLog empty_trace_target;
+  empty_trace_target.traces.emplace_back();
+  const auto empty_trace_alignment = align_edit_distance(
+      empty_trace_source, empty_trace_target, empty_key_options);
+  assert(empty_trace_alignment.size() == 1 &&
+         empty_trace_alignment.front().source_variant.empty() &&
+         empty_trace_alignment.front().target_variant.empty() &&
+         empty_trace_alignment.front().cost == 0);
+  const auto blank_selector_empty_log_projection = project_log_on_variant(
+      EventLog{}, {"A"}, empty_key_options);
+  assert(blank_selector_empty_log_projection.traces.empty() &&
+         blank_selector_empty_log_projection.attribute("@@aligned_variant") &&
+         *blank_selector_empty_log_projection.attribute("@@aligned_variant") ==
+             "A");
+  const auto blank_selector_empty_trace_projection = project_log_on_variant(
+      empty_trace_source, {"A"}, empty_key_options);
+  assert(blank_selector_empty_trace_projection.traces.empty() &&
+         blank_selector_empty_trace_projection.attribute("@@aligned_variant") &&
+         *blank_selector_empty_trace_projection.attribute("@@aligned_variant") ==
+             "A");
+
   EventLog null_activity = selected_source;
   null_activity.traces.front().events.front().attributes.front().is_null = true;
   threw = false;

@@ -35,9 +35,24 @@ void validate_selector(std::string_view selector, std::string_view role) {
   }
 }
 
+const EventAttribute* selected_attribute(const Event& event,
+                                         std::string_view selector);
+
 const std::string& required_activity(const Event& event,
                                      std::string_view selector) {
-  const auto* value = dfg_event_field_value(event, selector);
+  const std::string* value = nullptr;
+  if (selector.empty()) {
+    // Empty activity keys are ordinary Event mapping keys. The shared DFG
+    // accessor treats an empty selector as its legacy default activity slot,
+    // so use the exact selected attribute here instead.
+    if (const auto* attribute = selected_attribute(event, selector);
+        attribute && !attribute->is_null &&
+        attribute->first_class_state != FirstClassAttributeState::kNull) {
+      value = &attribute->value;
+    }
+  } else {
+    value = dfg_event_field_value(event, selector);
+  }
   if (value == nullptr) {
     throw std::invalid_argument(
         "edit-distance: missing or null activity " + std::string(selector));
@@ -45,26 +60,53 @@ const std::string& required_activity(const Event& event,
   return *value;
 }
 
+bool is_missing_first_class_cell(const EventAttribute& attribute) {
+  return attribute.first_class_role != FirstClassAttributeRole::kNone &&
+         attribute.first_class_state == FirstClassAttributeState::kMissing;
+}
+
 const EventAttribute* selected_attribute(const Event& event,
                                          std::string_view selector) {
+  if (selector.empty()) {
+    const auto is_selected_empty_key = [](const EventAttribute& attribute) {
+      return attribute.key.empty() &&
+             !is_missing_first_class_cell(attribute);
+    };
+    // Event mappings take precedence; first-class cells are eligible only
+    // when their stored key is literally empty and their state is present.
+    for (const auto& attribute : event.attributes)
+      if (is_selected_empty_key(attribute)) return &attribute;
+    for (const auto* stored : {&event.activity_attribute,
+                               &event.timestamp_attribute,
+                               &event.resource_attribute,
+                               &event.lifecycle_attribute}) {
+      if (*stored && is_selected_empty_key(**stored)) return &**stored;
+    }
+    return nullptr;
+  }
+
   if (event.activity_attribute && !event.activity_attribute->is_null &&
       (selector == "concept:name" || selector == "activity" ||
-       selector == event.activity_source_key ||
+       (!event.activity_source_key.empty() &&
+        selector == event.activity_source_key) ||
        selector == event.activity_attribute->key))
     return &*event.activity_attribute;
   if (event.timestamp_attribute && !event.timestamp_attribute->is_null &&
       (selector == "time:timestamp" || selector == "timestamp" ||
-       selector == event.timestamp_source_key ||
+       (!event.timestamp_source_key.empty() &&
+        selector == event.timestamp_source_key) ||
        selector == event.timestamp_attribute->key))
     return &*event.timestamp_attribute;
   if (event.resource_attribute && !event.resource_attribute->is_null &&
       (selector == "org:resource" || selector == "resource" ||
-       selector == event.resource_source_key ||
+       (!event.resource_source_key.empty() &&
+        selector == event.resource_source_key) ||
        selector == event.resource_attribute->key))
     return &*event.resource_attribute;
   if (event.lifecycle_attribute && !event.lifecycle_attribute->is_null &&
       (selector == "lifecycle:transition" || selector == "lifecycle" ||
-       selector == event.lifecycle_source_key ||
+       (!event.lifecycle_source_key.empty() &&
+        selector == event.lifecycle_source_key) ||
        selector == event.lifecycle_attribute->key))
     return &*event.lifecycle_attribute;
   for (const auto& attribute : event.attributes)
@@ -235,7 +277,18 @@ struct SelectedTimestamp {
 SelectedTimestamp timestamp_value(const Event& event,
                                  std::string_view selector,
                                  bool allow_conventional_missing = false) {
-  const auto* value = dfg_event_field_value(event, selector);
+  const EventAttribute* selected_attribute_value = nullptr;
+  const std::string* value = nullptr;
+  if (selector.empty()) {
+    selected_attribute_value = selected_attribute(event, selector);
+    if (selected_attribute_value && !selected_attribute_value->is_null &&
+        selected_attribute_value->first_class_state !=
+            FirstClassAttributeState::kNull) {
+      value = &selected_attribute_value->value;
+    }
+  } else {
+    value = dfg_event_field_value(event, selector);
+  }
   if (value == nullptr) {
     if (allow_conventional_missing &&
         (selector == "time:timestamp" || selector == "timestamp") &&
@@ -251,7 +304,9 @@ SelectedTimestamp timestamp_value(const Event& event,
   }
   SelectedTimestamp result;
   result.value = *value;
-  if (const auto* attribute = selected_attribute(event, selector)) {
+  if (const auto* attribute = selected_attribute_value
+                                  ? selected_attribute_value
+                                  : selected_attribute(event, selector)) {
     result.attribute = *attribute;
     result.source_key = attribute->key;
     result.state = FirstClassAttributeState::kPresent;
@@ -271,25 +326,37 @@ SelectedTimestamp public_timestamp_value(const Event& event,
   const bool conventional_timestamp =
       selector == "time:timestamp" || selector == "timestamp";
   const bool first_class_timestamp =
-      conventional_timestamp || event.timestamp_source_key == selector ||
+      conventional_timestamp ||
+      (!event.timestamp_source_key.empty() &&
+       event.timestamp_source_key == selector) ||
       (event.timestamp_attribute &&
        event.timestamp_attribute->key == selector);
+  const auto usable_for_empty_selector = [&](const EventAttribute& attribute) {
+    return !selector.empty() || !is_missing_first_class_cell(attribute);
+  };
 
   const EventAttribute* selected = nullptr;
-  if (first_class_timestamp && event.timestamp_attribute &&
+  // The generic Event mapping is authoritative when it contains this exact
+  // key, including when its value is null. Only consult the projected native
+  // timestamp slot when the mapping has no selected key.
+  const auto found = std::find_if(
+      event.attributes.begin(), event.attributes.end(),
+      [&](const EventAttribute& attribute) {
+        return attribute.key == selector &&
+               usable_for_empty_selector(attribute);
+      });
+  if (selector.empty() && found != event.attributes.end()) selected = &*found;
+
+  if (selected == nullptr && first_class_timestamp && event.timestamp_attribute &&
       (conventional_timestamp ||
        event.timestamp_attribute->key == selector ||
-       event.timestamp_source_key == selector)) {
+       (!event.timestamp_source_key.empty() &&
+        event.timestamp_source_key == selector)) &&
+      usable_for_empty_selector(*event.timestamp_attribute)) {
     selected = &*event.timestamp_attribute;
   }
-  if (selected == nullptr) {
-    const auto found = std::find_if(
-        event.attributes.begin(), event.attributes.end(),
-        [&](const EventAttribute& attribute) {
-          return attribute.key == selector;
-        });
-    if (found != event.attributes.end()) selected = &*found;
-  }
+  if (selected == nullptr && found != event.attributes.end())
+    selected = &*found;
 
   if (selected != nullptr) {
     SelectedTimestamp result;
@@ -299,6 +366,10 @@ SelectedTimestamp public_timestamp_value(const Event& event,
                     selected->first_class_state ==
                         FirstClassAttributeState::kNull ||
                     (first_class_timestamp &&
+                     (!selector.empty() ||
+                      selected == (event.timestamp_attribute
+                                       ? &*event.timestamp_attribute
+                                       : nullptr)) &&
                      event.timestamp_state ==
                          FirstClassAttributeState::kNull))
                        ? FirstClassAttributeState::kNull
@@ -469,7 +540,9 @@ std::optional<EventAttribute> first_class_activity_value(
     std::string_view selector) {
   const bool source_match = !source_key.empty() && source_key == selector;
   const bool stored_match = stored &&
-      (stored->key == selector || stored->first_class_source_key == selector);
+      (stored->key == selector ||
+       (!stored->first_class_source_key.empty() &&
+        stored->first_class_source_key == selector));
   const bool implicit_canonical = !stored && source_key.empty() &&
                                   selector == canonical_key;
   if (!source_match && !stored_match && !implicit_canonical)
@@ -525,9 +598,10 @@ std::optional<EventAttribute> selected_typed_activity(
         const std::string& stored_source_key, std::string_view canonical,
         std::string_view alias) {
       return selector == canonical || selector == alias ||
-             stored_source_key == selector ||
+             (!stored_source_key.empty() && stored_source_key == selector) ||
              (stored && (stored->key == selector ||
-                         stored->first_class_source_key == selector));
+                         (!stored->first_class_source_key.empty() &&
+                          stored->first_class_source_key == selector)));
     };
     if (matches_slot(event.activity_attribute, event.activity_source_key,
                      "concept:name", "activity")) {
@@ -1383,8 +1457,6 @@ EditDistanceTraceHandle apply_typed_edit_distance_trace(
 
 std::vector<EditDistanceAlignment> align_edit_distance(
     const EventLog& source, const EventLog& target, EditDistanceOptions options) {
-  validate_selector(options.activity_attribute, "activity");
-  validate_selector(options.timestamp_attribute, "timestamp");
   if (options.deviation_cost == 0) {
     throw std::invalid_argument("edit-distance deviation_cost must be positive");
   }
@@ -1485,8 +1557,6 @@ std::vector<EditDistanceAlignment> align_edit_distance(
 std::vector<EditDistanceTypedAlignment> align_typed_edit_distance(
     const EventLog& source, const EventLog& target,
     EditDistanceOptions options) {
-  validate_selector(options.activity_attribute, "activity");
-  validate_selector(options.timestamp_attribute, "timestamp");
   if (options.deviation_cost == 0) {
     throw std::invalid_argument("edit-distance deviation_cost must be positive");
   }
@@ -1577,9 +1647,10 @@ void set_typed_projected_activity(Event& target, const Event* source,
     const auto matches_source_slot = [&](
         const std::optional<EventAttribute>& stored,
         const std::string& source_key) {
-      return source_key == selector ||
+      return (!source_key.empty() && source_key == selector) ||
              (stored && (stored->key == selector ||
-                         stored->first_class_source_key == selector));
+                         (!stored->first_class_source_key.empty() &&
+                          stored->first_class_source_key == selector)));
     };
     if (matches_source_slot(source->activity_attribute,
                             source->activity_source_key)) {
@@ -1670,8 +1741,6 @@ EventLog project_log_on_typed_alignments(
     const EventLog& source,
     const std::vector<EditDistanceTypedAlignment>& alignments,
     EditDistanceOptions options) {
-  validate_selector(options.activity_attribute, "activity");
-  validate_selector(options.timestamp_attribute, "timestamp");
   if (alignments.size() != source.traces.size()) {
     throw std::invalid_argument(
         "edit-distance projection requires one alignment per source trace");
@@ -1775,8 +1844,6 @@ EventLog project_log_on_alignments(
     const EventLog& source,
     const std::vector<EditDistanceAlignment>& alignments,
     EditDistanceOptions options) {
-  validate_selector(options.activity_attribute, "activity");
-  validate_selector(options.timestamp_attribute, "timestamp");
   if (alignments.size() != source.traces.size()) {
     throw std::invalid_argument(
         "edit-distance projection requires one alignment per source trace");
@@ -1885,8 +1952,6 @@ EventLog project_log_on_variant(const EventLog& source,
 EventLog project_log_on_typed_variant(
     const EventLog& source, const std::vector<EventAttribute>& variant,
     EditDistanceOptions options) {
-  validate_selector(options.activity_attribute, "activity");
-  validate_selector(options.timestamp_attribute, "timestamp");
   if (options.deviation_cost == 0) {
     throw std::invalid_argument(
         "edit-distance deviation_cost must be positive");

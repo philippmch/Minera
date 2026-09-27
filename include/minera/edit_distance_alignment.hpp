@@ -51,7 +51,9 @@ struct EditDistanceOptions {
   // Standard move cost. It is deliberately configurable for callers
   // that need a different scale, but must remain finite and positive.
   std::uint64_t deviation_cost = 10000;
-  // Event fields used for source/target variants and projected timestamps.
+  // Literal Event fields used for source/target variants and projected
+  // timestamps. Empty and whitespace keys are valid; a selected field is
+  // required only when an operation reads it.
   std::string activity_attribute = "concept:name";
   std::string timestamp_attribute = "time:timestamp";
   // Case field used when an EventDataView table or stream is converted to an
