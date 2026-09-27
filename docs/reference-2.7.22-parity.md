@@ -5363,6 +5363,9 @@ unchanged production code. Distinct registered catalogue proofs and the
 requirement reconciliation in `docs/edit-distance-parity-contract.md` complete
 the dispatcher and variant module rows. Project-wide parity remains incomplete.
 
+The checkpoint sections below record historical states. Their open items were
+resolved by subsequent checkpoints and the completion audit above.
+
 ### Edit-distance proof registration and completion audit
 
 The dispatcher and variant module now have distinct catalogue proof objects,
@@ -5392,7 +5395,7 @@ The capture, implementation and comparison harness passed independent review.
 `docs/edit-distance-flat-selectors-native-checks.json.gz` preserves the evidence;
 `docs/edit-distance-flat-selectors-validation.json` summarizes its bindings and
 results. These finite cases do not establish universal DataFrame metadata
-equivalence. Both coverage rows remain partial pending distinct catalogue proof
+equivalence. At that checkpoint, both coverage rows remained partial pending distinct catalogue proof
 bundles and an independent requirement-by-requirement completion audit.
 
 ### Edit-distance flat-selector reference checkpoint
@@ -5435,8 +5438,8 @@ differential comparison.
 The capture is in `docs/edit-distance-explicit-dispatch-reference.json.gz`;
 source, build/test evidence and independent reviews are in
 `docs/edit-distance-dispatch-proof-checks.json.gz`, with a summary in
-`docs/edit-distance-dispatch-proof-validation.json`. Both coverage rows remain
-partial pending flat-data selector reconciliation, distinct catalogue proof
+`docs/edit-distance-dispatch-proof-validation.json`. Both coverage rows remained
+partial at that checkpoint, pending flat-data selector reconciliation, distinct catalogue proof
 bundles and independent completion review.
 
 ### Edit-distance literal-selector checkpoint
@@ -5464,7 +5467,8 @@ changed-library evidence, source/binary bindings, reviews, and raw outputs.
 All 2,403 earlier comparisons, the native alignment suite, and both rebuilt
 CLI/HTTP parameter cases pass against the changed library. Catalogue validation
 passes without promoting either edit-distance row. Flat-data selector rules
-and requirement-by-requirement completion proofs remain to be reconciled.
+and requirement-by-requirement completion proofs still required reconciliation
+at that checkpoint.
 
 ### Edit-distance product parameter checkpoint
 
@@ -5501,9 +5505,9 @@ in `docs/edit-distance-exhaustive-validation.json`. The capture, harness, and ar
 
 This is exhaustive only for the stated singleton-log domain. Existing cohorts
 provide multi-candidate ordering and long-input threshold evidence. Both
-catalogue rows remain partial: the selector-domain audit has identified empty
-and whitespace field names as a remaining difference, and distinct registered
-completion proofs and the final semantic audit remain open.
+catalogue rows remained partial: the selector-domain audit had identified empty
+and whitespace field names as a difference, and distinct registered
+completion proofs and the final semantic audit remained open.
 
 ### Edit-distance fresh-projection activity-type checkpoint
 
@@ -5536,8 +5540,8 @@ checks, and library/input hashes. Independent production, capture, and harness r
 
 The comparisons retain ordered fresh-output attributes and distinguish missing
 fields, unhashable activity keys, string-join failures, and timestamp reads.
-Both edit-distance catalogue rows remain partial; broader parameter adapters
-and semantic completion proofs remain open.
+At that checkpoint, both edit-distance catalogue rows remained partial; broader parameter adapters
+and semantic completion proofs remained open.
 
 
 ### Edit-distance typed whole-log and long-input checkpoint
@@ -5574,7 +5578,7 @@ The long direct-call corpus covers 199/200/201-element boundaries, popular
 symbol counts around the cutoff, and equal-long-block candidate ordering.
 These finite comparisons extend the tested domain; broader raw parameter
 adapters, typed fresh-variant projection, and semantic completion proofs
-remain open. Both edit-distance catalogue rows remain partial.
+remained open. At that checkpoint, both edit-distance catalogue rows remained partial.
 
 
 ### Edit-distance typed mapping checkpoint
@@ -5603,8 +5607,8 @@ before/after input and binary hashes. The prior header had no typed direct
 API, so this checkpoint does not invent a native before-match count.
 
 This extends the direct-helper surface. Whole-log typed activities, broader
-parameter adapters, and larger-input matching-block contracts remain open;
-both edit-distance catalogue rows remain partial.
+parameter adapters, and larger-input matching-block contracts remained open;
+both edit-distance catalogue rows remained partial.
 
 ### Edit-distance direct trace and caller-cache checkpoint
 
@@ -5643,9 +5647,9 @@ generated probe/checker sources, exact inputs, and before/after binary hashes.
 The prior header did not expose a direct API, so no native before-baseline
 match count is invented.
 
-Both edit-distance catalogue rows remain partial. Typed mapping keys are
+At that checkpoint, both edit-distance catalogue rows remained partial. Typed mapping keys are
 extended by the checkpoint above. Invalid parameter shapes, ordering, and
-larger input contracts still need proof; the project retains 232 incomplete
+larger input contracts still needed proof; the project then retained 232 incomplete
 coverage units.
 
 ### Edit-distance table, projection, and target-selection checkpoint
@@ -5683,7 +5687,7 @@ and calls the public projector directly.
 At this table checkpoint, direct helper mapping/cache interfaces and broader
 typed-activity and parameter contracts remained open. Its nine direct-helper
 observations were reference-only; the direct checkpoint above compares them.
-Both edit-distance catalogue rows remain partial, with 232 incomplete project
+At that checkpoint, both edit-distance catalogue rows remained partial, with 232 incomplete project
 coverage units. The following checkpoint is historical evidence for the prior
 empty-target and equal-length anti-tie fixes.
 
@@ -5711,7 +5715,7 @@ Evidence is in `docs/edit-distance-core-reference.json.gz`,
 were explicitly reference-only at that checkpoint and are now compared above.
 DataFrame/projection comparisons and direct helper mapping/cache support were
 still open at that checkpoint and are extended above; broader typed activity
-behavior remains unfinished.
+behavior was still unfinished at that checkpoint.
 
 `EDIT_DISTANCE` computes Levenshtein distance for every source variant and picks
 the minimum (or maximum when `perform_anti_alignment` is enabled); duplicate
