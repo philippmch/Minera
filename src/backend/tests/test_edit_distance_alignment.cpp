@@ -173,6 +173,188 @@ void edit_distance_variant_module_acceptance() {
              "false");
 }
 
+void flat_event_data_selectors_use_literal_empty_and_space_keys() {
+  const auto activity_table = [](std::string selector, bool target) {
+    EventTable table;
+    table.columns = {"case:concept:name", selector, "concept:name"};
+    const auto row = [&](std::string activity, std::string decoy) {
+      return EventTable::Row{
+          EventAttribute{"case:concept:name", target ? "target" : "source"},
+          EventAttribute{selector, std::move(activity)},
+          EventAttribute{"concept:name", std::move(decoy)}};
+    };
+    table.rows = {row("A", target ? "target-decoy-0" : "source-decoy-0"),
+                  row(target ? "C" : "B",
+                      target ? "target-decoy-1" : "source-decoy-1")};
+    return table;
+  };
+
+  for (const auto& selector : {std::string{}, std::string{" "}}) {
+    EditDistanceOptions options;
+    options.activity_attribute = selector;
+    const auto source = activity_table(selector, false);
+    const auto target = activity_table(selector, true);
+    const auto aligned = align_edit_distance(EventDataView(source),
+                                             EventDataView(target), options);
+    assert(aligned.size() == 1);
+    assert(aligned.front().source_variant ==
+           std::vector<std::string>({"A", "B"}));
+    assert(aligned.front().target_variant ==
+           std::vector<std::string>({"A", "C"}));
+
+    EventTable absent_activity;
+    absent_activity.columns = {"case:concept:name", "concept:name"};
+    absent_activity.rows = {{EventAttribute{"case:concept:name", "source"},
+                             EventAttribute{"concept:name", "decoy"}}};
+    bool missing_activity_rejected = false;
+    try {
+      (void)align_edit_distance(EventDataView(absent_activity),
+                                EventDataView(target), options);
+    } catch (const std::invalid_argument& error) {
+      missing_activity_rejected =
+          std::string(error.what()) ==
+          "edit-distance: missing activity column " + selector;
+    }
+    assert(missing_activity_rejected);
+  }
+
+  const auto case_table = [](std::string selector, std::string group,
+                             bool target) {
+    EventTable table;
+    table.columns = {selector, "case:concept:name", "concept:name"};
+    const auto row = [&](std::string activity, std::string decoy) {
+      return EventTable::Row{
+          EventAttribute{selector, group},
+          EventAttribute{"case:concept:name", std::move(decoy)},
+          EventAttribute{"concept:name", std::move(activity)}};
+    };
+    table.rows = {row("A", target ? "target-decoy-0" : "source-decoy-0"),
+                  row("B", target ? "target-decoy-1" : "source-decoy-1")};
+    return table;
+  };
+  for (const auto& selector : {std::string{}, std::string{" "}}) {
+    EditDistanceOptions options;
+    options.case_id_attribute = selector;
+    const auto source = case_table(selector, "source-selected", false);
+    const auto target = case_table(selector, "target-selected", true);
+    const auto aligned = align_edit_distance(EventDataView(source),
+                                             EventDataView(target), options);
+    // The selected key groups both rows even though every conventional case
+    // column is a changing decoy.
+    assert(aligned.size() == 1);
+    assert(aligned.front().source_variant ==
+           std::vector<std::string>({"A", "B"}));
+    assert(aligned.front().target_variant ==
+           std::vector<std::string>({"A", "B"}));
+  }
+
+  EventTable absent_case;
+  absent_case.columns = {"case:concept:name", "concept:name"};
+  absent_case.rows = {
+      {EventAttribute{"case:concept:name", "decoy-case"},
+       EventAttribute{"concept:name", "A"}}};
+  for (const auto& selector : {std::string{}, std::string{" "}}) {
+    EditDistanceOptions options;
+    options.case_id_attribute = selector;
+    bool missing_case_rejected = false;
+    try {
+      (void)align_edit_distance(EventDataView(absent_case),
+                                EventDataView(absent_case), options);
+    } catch (const std::invalid_argument& error) {
+      missing_case_rejected =
+          std::string(error.what()) ==
+          "log conversion: event stream record has no case id field";
+    }
+    assert(missing_case_rejected);
+  }
+
+  const auto grouped_source = log_of({{"A", "B"}});
+  const auto grouped_target = log_of({{"A", "C"}});
+  for (const auto& unused_case_selector : {std::string{}, std::string{" "}}) {
+    EditDistanceOptions options;
+    options.case_id_attribute = unused_case_selector;
+    const auto aligned = align_edit_distance(
+        EventDataView(grouped_source), EventDataView(grouped_target), options);
+    assert(aligned.size() == 1);
+    assert(aligned.front().source_variant ==
+           std::vector<std::string>({"A", "B"}));
+  }
+
+  const auto date_cell = [](std::string key, std::string value) {
+    EventAttribute result{std::move(key), std::move(value),
+                          AttributeKind::kDate};
+    result.typed_value = NativeDate{result.value};
+    return result;
+  };
+  EventTable timestamp_source;
+  timestamp_source.columns = {"cid", "act", "", "time:timestamp"};
+  timestamp_source.rows = {
+      {EventAttribute{"cid", "case"}, EventAttribute{"act", "A"},
+       date_cell("", "2023-06-01T00:00:01+00:00"),
+       date_cell("time:timestamp", "2019-06-01T00:00:01+00:00")},
+      {EventAttribute{"cid", "case"}, EventAttribute{"act", "B"},
+       date_cell("", "2023-06-02T00:00:02+00:00"),
+       date_cell("time:timestamp", "2019-06-02T00:00:02+00:00")}};
+  EditDistanceOptions timestamp_options;
+  timestamp_options.case_id_attribute = "cid";
+  timestamp_options.activity_attribute = "act";
+  timestamp_options.timestamp_attribute.clear();
+  const auto projected = project_log_on_variant(
+      EventDataView(timestamp_source), {"A", "B"}, timestamp_options);
+  assert(projected.traces.size() == 1);
+  assert(projected.traces.front().events.size() == 2);
+  for (std::size_t index = 0; index < 2; ++index) {
+    const auto& event = projected.traces.front().events[index];
+    const auto* selected_timestamp = event.attribute("");
+    assert(selected_timestamp != nullptr);
+    assert(event.timestamp == *selected_timestamp);
+    assert(event.timestamp_attribute.has_value());
+    assert(event.timestamp_attribute->key.empty());
+    assert(event.timestamp.find("2023-06-0") == 0);
+  }
+
+  EventTable missing_timestamp;
+  missing_timestamp.columns = {"cid", "act", "time:timestamp"};
+  missing_timestamp.rows = {
+      {EventAttribute{"cid", "case"}, EventAttribute{"act", "A"},
+       date_cell("time:timestamp", "2019-06-01T00:00:01+00:00")}};
+  for (const auto& selector : {std::string{}, std::string{" "}}) {
+    EditDistanceOptions options;
+    options.case_id_attribute = "cid";
+    options.activity_attribute = "act";
+    options.timestamp_attribute = selector;
+    bool missing_timestamp_rejected = false;
+    try {
+      (void)project_log_on_variant(EventDataView(missing_timestamp), {"A"},
+                                   options);
+    } catch (const std::invalid_argument& error) {
+      missing_timestamp_rejected =
+          std::string(error.what()) ==
+          "edit-distance: missing timestamp column " + selector;
+    }
+    assert(missing_timestamp_rejected);
+  }
+
+  EventTable empty_table;
+  EditDistanceOptions empty_options;
+  empty_options.case_id_attribute.clear();
+  empty_options.activity_attribute = " ";
+  empty_options.timestamp_attribute.clear();
+  const auto empty_projection = project_log_on_variant(
+      EventDataView(empty_table), {"A"}, empty_options);
+  assert(empty_projection.traces.empty());
+  assert(empty_projection.attribute("@@aligned_variant") != nullptr);
+  bool empty_target_rejected = false;
+  try {
+    (void)align_edit_distance(EventDataView(empty_table),
+                              EventDataView(empty_table), empty_options);
+  } catch (const std::invalid_argument& error) {
+    empty_target_rejected = std::string(error.what()) ==
+                            "edit-distance target log must not be empty";
+  }
+  assert(empty_target_rejected);
+}
+
 int test_main() {
   const auto trace_with_activity_attribute = [](EventAttribute attribute) {
     Trace trace;
@@ -2376,6 +2558,7 @@ int main() {
     if (existing_result != 0) return existing_result;
     edit_distance_dispatcher_acceptance();
     edit_distance_variant_module_acceptance();
+    flat_event_data_selectors_use_literal_empty_and_space_keys();
     return 0;
   } catch (const std::exception& error) {
     std::fprintf(stderr, "Test exception: %s\n", error.what());

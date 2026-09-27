@@ -30,10 +30,25 @@ void date_metadata_round_trips_and_rejects_malformed_values() {
       R"({"table":{"columns":["x"],"rows":[[{"kind":"date","value":"2024-01-01","typed_value":"2024-01-01","date_timezone":1}]]}})"})
     assert(rejected(invalid));
 }
+
+void empty_and_space_selectors_use_json_input_columns() {
+  const std::string request =
+      R"({"table":{"columns":[""," ","when","case:concept:name","concept:name","time:timestamp"],"rows":[[{"value":"selected-case"},{"value":"A"},{"value":"2024-01-01"},{"value":"decoy-case"},{"value":"decoy-activity"},{"value":"2019-01-01"}]]},"options":{"case_id":"","activity_key":" ","timestamp_key":"when","start_timestamp_key":null}})";
+  const auto result = minera::format_dataframe_json(request);
+  assert(result.success);
+  assert(result.body.find("selected-case") != std::string::npos);
+  assert(result.body.find("decoy-case") == std::string::npos);
+  assert(result.body.find("decoy-activity") == std::string::npos);
+  assert(result.body.find("2024-01-01") != std::string::npos);
+  assert(result.body.find("2019-01-01") == std::string::npos);
+  assert(result.body.find("\"columns\":[\"\",\" ") !=
+         std::string::npos);
+}
 }
 
 int main() {
   date_metadata_round_trips_and_rejects_malformed_values();
+  empty_and_space_selectors_use_json_input_columns();
   const std::string valid = R"({"table":{"columns":["case:concept:name","concept:name","time:timestamp"],"dtypes":["uint64","str","str"],"rows":[[{"kind":"int","value":"18446744073709551615","typed_value":18446744073709551615},{"value":"A\uD83D\uDE00"},{"value":"2024-01-01"}]]}})";
   const auto result = minera::format_dataframe_json(valid);
   assert(result.success);

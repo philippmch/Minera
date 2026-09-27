@@ -23,7 +23,7 @@ separate semantic requirement under the project parity contract.
 | Matching blocks and costs | Ordered move, cost, fitness and best-worst-cost comparisons; 19 long-input threshold cases | 1,922 short singleton comparisons pass; reconcile these with remaining selector-domain and completion evidence |
 | Direct trace helpers | Ordered typed mappings, independent list/set inputs, cache identity and reuse; direct and typed-mapping captures; named module acceptance exercises helper aliases, selected activity, anti mode and cache reuse | Bind the distinct module proof and include the existing cohorts in completion review |
 | Fresh variant projection | String-only activity domain, typed rejection, ordered validation, timestamps and fresh metadata; 53 typed and 24 legacy comparisons | Reconcile selector/anti behavior with whole-log and adapter controls |
-| Input representations | EventLog and EventDataView adapters; table grouping, typed labels, missing/null distinctions; literal empty and whitespace selectors in grouped logs and direct traces | Confirm each advertised representation and applicable control has evidence; flat-data selector validation requires separate reconciliation |
+| Input representations | EventLog and EventDataView adapters; table grouping, typed labels, missing/null distinctions; literal empty and whitespace selectors in grouped logs, direct traces and 22 flat-data calls | Reconcile the captured representations and applicable controls in the independent completion review |
 | Product entry points | Native APIs, typed JSON, CLI and local server routes; two combined anti/custom-activity/custom-timestamp integration cases in `docs/edit-distance-parameter-integration-validation.json` | Reconcile the verified fixture with the final semantic scope; it is not an exhaustive product-input audit |
 | Completion proofs | Existing registered alignment tests and frozen comparison artifacts; distinct dispatcher/module acceptance functions called by the registered executable | Distinct catalogue proof bundles and independent requirement-by-requirement completion review |
 
@@ -49,7 +49,17 @@ additional Python projector enum-key call applies different activity selectors
 in its outer and inner phases; it is retained as reference-only because a single
 native activity option cannot express that call. All 2,403 earlier comparisons
 and the two product-route fixtures pass against the changed library. This does
-not complete the flat-data selector audit or either catalogue row.
+not complete either catalogue row.
+
+The subsequent flat-selector checkpoint in
+`docs/edit-distance-flat-selectors-validation.json` matches all 22 captured
+DataFrame calls, improving the frozen baseline from seven matches. Native tables
+accept a unique literal empty column name and preserve it through conversion.
+Actual mapped index, attributes and options are checked before and after calls.
+All 2,448 earlier comparable calls, five affected native suites and the two
+existing product-route fixtures pass against the changed library. The fixtures
+do not establish universal DataFrame metadata equivalence or product support
+for every blank selector. Distinct catalogue proofs and completion review remain.
 
 A completion decision must reconcile this contract, the frozen public surface,
 the existing cohorts, applicable product adapters, registered proofs, and an

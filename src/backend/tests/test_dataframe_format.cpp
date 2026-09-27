@@ -119,6 +119,39 @@ void missing_selector_does_not_mutate_input() {
   assert(table.dtypes == before.dtypes);
 }
 
+void literal_empty_and_space_selectors_are_formatted_from_their_columns() {
+  EventTable input;
+  input.columns = {"", " ", "when", "case:concept:name",
+                   "concept:name", "time:timestamp"};
+  input.rows = {{text_cell("", "selected-case"), text_cell(" ", "A"),
+                 text_cell("when", "2024-01-01"),
+                 text_cell("case:concept:name", "decoy-case"),
+                 text_cell("concept:name", "decoy-activity"),
+                 text_cell("time:timestamp", "2019-01-01")}};
+  DataFrameFormatOptions options;
+  options.case_id.clear();
+  options.activity_key = " ";
+  options.timestamp_key = "when";
+  options.start_timestamp_key = std::nullopt;
+
+  const auto result = format_dataframe(input, options);
+  assert(result.rows.size() == 1);
+  assert(result.rows[0][result.column_index("case:concept:name")]->value ==
+         "selected-case");
+  assert(result.rows[0][result.column_index("concept:name")]->value == "A");
+  assert(result.rows[0][result.column_index("time:timestamp")]->value ==
+         "2024-01-01T00:00:00+00:00");
+  assert(result.columns[result.column_index("")].empty());
+  assert(result.columns[result.column_index(" ")] == " ");
+  assert(input.rows[0][input.column_index("")]->value == "selected-case");
+  assert(input.rows[0][input.column_index(" ")]->value == "A");
+  assert(input.rows[0][input.column_index("case:concept:name")]->value ==
+         "selected-case");
+  assert(input.rows[0][input.column_index("concept:name")]->value == "A");
+  assert(input.rows[0][input.column_index("time:timestamp")]->value ==
+         "2024-01-01");
+}
+
 void native_date_resolution_is_preserved_for_object_columns() {
   struct Case {
     const char* value;
@@ -242,6 +275,7 @@ int main() try {
   null_timestamp_is_dropped_and_start_can_be_disabled();
   nan_required_values_are_missing();
   missing_selector_does_not_mutate_input();
+  literal_empty_and_space_selectors_are_formatted_from_their_columns();
   native_date_resolution_is_preserved_for_object_columns();
   mixed_native_date_resolution_promotes_to_nanoseconds();
   undeclared_native_nanosecond_dtype_is_inferred();

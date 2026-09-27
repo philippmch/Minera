@@ -531,6 +531,65 @@ void table_prefixes_infer_only_known_extensions() {
   assert(org->uri == "urn:declared");
 }
 
+void empty_column_name_is_a_literal_schema_key() {
+  minera::EventTable table;
+  table.columns = {"", "concept:name"};
+  table.rows = {{cell("", "case-1"), cell("concept:name", "A")},
+                {cell("", "case-2"), cell("concept:name", "B")}};
+  table.attributes = {cell("source", "empty-column")};
+  table.metadata.properties = {cell("format", "literal")};
+  table.dtypes = {"object", "string"};
+  minera::EventTableIndex index;
+  index.names = {std::string{"source-row"}};
+  index.labels = {index_scalar(cell("source-row", "0")),
+                  index_scalar(cell("source-row", "1"))};
+  table.index = index;
+
+  table.validate();
+  assert(table.column_index("") == 0);
+  const auto stream = minera::event_table_to_event_stream(table);
+  assert(stream.events.size() == 2);
+  assert(stream.events[0].field("") != nullptr);
+  assert(stream.events[0].field("")->key.empty());
+  assert(stream.events[0].field("")->value == "case-1");
+
+  const auto lazy = minera::LazyEventTable::from_table(table);
+  assert(lazy.columns() == table.columns);
+  const auto materialized = lazy.materialize();
+  assert(materialized.columns == table.columns);
+  assert(materialized.rows == table.rows);
+  assert(materialized.attributes == table.attributes);
+  assert(materialized.metadata == table.metadata);
+  assert(materialized.dtypes == table.dtypes);
+  assert(materialized.index == table.index);
+
+  const minera::EventDataView lazy_view(lazy);
+  const auto generic_materialized = minera::event_data_to_table(lazy_view);
+  assert(generic_materialized.columns == table.columns);
+  assert(generic_materialized.rows == table.rows);
+  assert(generic_materialized.dtypes == table.dtypes);
+  assert(generic_materialized.index == table.index);
+
+  auto duplicate = table;
+  duplicate.columns[1].clear();
+  bool rejected = false;
+  try {
+    duplicate.validate();
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+
+  rejected = false;
+  try {
+    (void)minera::LazyEventTable(
+        {"", ""}, [](const auto&) {});
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void lazy_scan_is_restartable_and_bounded() {
   auto table = sample_table();
   const auto lazy = minera::LazyEventTable::from_table(table);
@@ -692,6 +751,7 @@ int main() {
   categorical_metadata_is_validated_semantically();
   table_metadata_rejects_malformed_shapes();
   table_prefixes_infer_only_known_extensions();
+  empty_column_name_is_a_literal_schema_key();
   lazy_scan_is_restartable_and_bounded();
   invalid_default_lazy_table_is_rejected();
   lazy_inputs_apply_null_cleanup_across_generic_paths();

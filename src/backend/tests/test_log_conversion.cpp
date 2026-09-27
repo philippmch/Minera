@@ -290,6 +290,92 @@ void source_keys_and_missing_case_ids_survive_flat_adapters() {
          minera::FirstClassAttributeState::kMissing);
 }
 
+void literal_empty_and_whitespace_case_columns_group_and_round_trip() {
+  const auto make_table = [](std::string case_key) {
+    minera::EventTable table;
+    table.columns = {case_key, "case:concept:name", "concept:name"};
+    const auto row = [&](std::string selected_case, std::string decoy_case,
+                         std::string activity) {
+      return minera::EventTable::Row{
+          minera::EventAttribute{case_key, std::move(selected_case)},
+          minera::EventAttribute{"case:concept:name", std::move(decoy_case)},
+          minera::EventAttribute{"concept:name", std::move(activity)}};
+    };
+    table.rows = {row("", "decoy-0", "A"),
+                  row("", "decoy-1", "B"),
+                  row("case-2", "decoy-2", "C")};
+    return table;
+  };
+
+  for (const auto& case_key : {std::string{}, std::string{" "}}) {
+    auto table = make_table(case_key);
+    minera::LogConversionOptions options;
+    options.case_id_key = case_key;
+    // Keep the conventional case-prefixed decoy as an event attribute so the
+    // test observes grouping by the selected column alone.
+    options.case_attribute_prefix = "trace:";
+
+    const auto check_groups = [](const minera::EventLog& log) {
+      assert(log.traces.size() == 2);
+      assert(log.traces[0].case_id.empty());
+      assert(log.traces[0].case_id_state ==
+             minera::FirstClassAttributeState::kPresent);
+      assert(log.traces[0].events.size() == 2);
+      assert(log.traces[0].events[0].activity == "A");
+      assert(log.traces[0].events[1].activity == "B");
+      assert(log.traces[1].events.size() == 1);
+      assert(log.traces[1].events[0].activity == "C");
+    };
+
+    const auto eager_log = minera::event_table_to_event_log(table, options);
+    check_groups(eager_log);
+    assert(eager_log.traces[0].case_id_source_key == case_key);
+    assert(eager_log.traces[0].case_id_attribute.has_value());
+    assert(eager_log.traces[0].case_id_attribute->key == case_key);
+    const auto log_stream =
+        minera::event_log_to_event_stream(eager_log, options);
+    const auto log_stream_round_trip =
+        minera::event_stream_to_event_log(log_stream, options);
+    check_groups(log_stream_round_trip);
+    assert(log_stream_round_trip.traces[0].case_id_source_key == case_key);
+    assert(log_stream_round_trip.traces[0].case_id_attribute.has_value());
+    assert(log_stream_round_trip.traces[0].case_id_attribute->key == case_key);
+    const auto eager_stream =
+        minera::event_table_to_event_stream(table, options);
+    assert(eager_stream.events.size() == table.rows.size());
+    assert(eager_stream.events[0].field(case_key) != nullptr);
+    assert(eager_stream.events[0].field(case_key)->value.empty());
+    const auto stream_round_trip =
+        minera::event_stream_to_event_log(eager_stream, options);
+    check_groups(stream_round_trip);
+    assert(stream_round_trip.traces[0].case_id_source_key == case_key);
+    assert(stream_round_trip.traces[0].case_id_attribute.has_value());
+    assert(stream_round_trip.traces[0].case_id_attribute->key == case_key);
+
+    const auto lazy = minera::LazyEventTable::from_table(table);
+    const auto lazy_log =
+        minera::lazy_event_table_to_event_log(lazy, options);
+    check_groups(lazy_log);
+    const auto lazy_stream =
+        minera::lazy_event_table_to_event_stream(lazy, options);
+    assert(lazy_stream.events.size() == table.rows.size());
+    assert(lazy_stream.events[0].field(case_key) != nullptr);
+    assert(lazy_stream.events[0].field(case_key)->value.empty());
+
+    const auto round_trip = minera::event_log_to_table(eager_log, options);
+    const auto selected_column = round_trip.column_index(case_key);
+    assert(round_trip.rows.size() == table.rows.size());
+    assert(round_trip.rows[0][selected_column].has_value());
+    assert(round_trip.rows[0][selected_column]->value.empty());
+    const auto table_round_trip =
+        minera::event_table_to_event_log(round_trip, options);
+    check_groups(table_round_trip);
+    assert(table_round_trip.traces[0].case_id_source_key == case_key);
+    assert(table_round_trip.traces[0].case_id_attribute.has_value());
+    assert(table_round_trip.traces[0].case_id_attribute->key == case_key);
+  }
+}
+
 void table_json_keeps_recursive_cell_shape() {
   minera::EventLog source;
   minera::Trace trace;
@@ -1155,6 +1241,7 @@ int main() {
   stream_without_case_attributes_uses_stable_trace_indexes();
   custom_case_glue_and_prefix_round_trip();
   source_keys_and_missing_case_ids_survive_flat_adapters();
+  literal_empty_and_whitespace_case_columns_group_and_round_trip();
   table_json_keeps_recursive_cell_shape();
   null_prefixed_case_label_does_not_erase_glue();
   empty_prefix_preserves_untagged_canonical_event_fields();

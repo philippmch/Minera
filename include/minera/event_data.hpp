@@ -84,8 +84,9 @@ struct EventTable {
   [[nodiscard]] std::size_t size() const noexcept { return rows.size(); }
   [[nodiscard]] bool empty() const noexcept { return rows.empty(); }
 
-  // Validate that the table has unique, non-empty columns and rectangular
-  // rows.  Conversion functions call this before reading a table.
+  // Validate that the table has unique columns and rectangular rows.
+  // Empty string is a valid literal column label. Conversion functions call
+  // this before reading a table.
   void validate() const;
   [[nodiscard]] std::size_t column_index(std::string_view name) const;
 };

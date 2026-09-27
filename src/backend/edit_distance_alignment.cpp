@@ -5,7 +5,6 @@
 #include "root_cause_trace_key.hpp"
 
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -24,16 +23,6 @@ struct TargetVariant {
   Variant activities;
   std::size_t first_index = 0;
 };
-
-void validate_selector(std::string_view selector, std::string_view role) {
-  if (selector.empty() || std::all_of(selector.begin(), selector.end(),
-                                      [](unsigned char c) {
-                                        return std::isspace(c) != 0;
-                                      })) {
-    throw std::invalid_argument("edit-distance " + std::string(role) +
-                                " selector must not be blank");
-  }
-}
 
 const EventAttribute* selected_attribute(const Event& event,
                                          std::string_view selector);
@@ -789,7 +778,6 @@ void erase_attr(std::vector<EventAttribute>& attrs, std::string_view key) {
 
 EventLog event_data_as_log(const EventDataView& data,
                            const EditDistanceOptions& options) {
-  validate_selector(options.case_id_attribute, "case id");
   LogConversionOptions conversion;
   conversion.case_id_key = options.case_id_attribute;
   return event_data_to_event_log(data, conversion);
