@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <any>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -30,6 +31,146 @@ static EventLog log_of(std::initializer_list<std::initializer_list<const char*>>
     log.traces.push_back(std::move(trace));
   }
   return log;
+}
+
+void edit_distance_dispatcher_acceptance() {
+  const auto source = log_of({{"A"}});
+  const auto targets = log_of({{"A", "B"}, {"B", "C"}});
+
+  const auto default_result = apply(source, targets);
+  EditDistanceOptions explicit_variant;
+  explicit_variant.variant = EditDistanceVariant::EDIT_DISTANCE;
+  const auto explicit_result = apply(source, targets, explicit_variant);
+  assert(default_result.size() == 1 && explicit_result.size() == 1);
+  const auto& ordinary = default_result.front();
+  const auto& dispatched = explicit_result.front();
+  assert(ordinary.source_variant == std::vector<std::string>{"A"} &&
+         ordinary.target_variant == std::vector<std::string>({"A", "B"}) &&
+         ordinary.target_index == 0 && ordinary.cost == 10000 &&
+         ordinary.best_worst_cost == 30000 && ordinary.bwc == 30000 &&
+         std::abs(ordinary.fitness - (2.0 / 3.0)) < 1e-12 &&
+         ordinary.alignment.size() == 2 &&
+         ordinary.alignment[0].type == EditDistanceMoveType::kSynchronous &&
+         ordinary.alignment[0].log_activity == "A" &&
+         ordinary.alignment[1].type == EditDistanceMoveType::kModel &&
+         ordinary.alignment[1].model_activity == "B");
+  assert(dispatched.target_variant == ordinary.target_variant &&
+         dispatched.target_index == ordinary.target_index &&
+         dispatched.cost == ordinary.cost &&
+         dispatched.best_worst_cost == ordinary.best_worst_cost &&
+         dispatched.fitness == ordinary.fitness &&
+         dispatched.alignment.size() == ordinary.alignment.size() &&
+         dispatched.alignment[0].type == ordinary.alignment[0].type &&
+         dispatched.alignment[1].model_activity ==
+             ordinary.alignment[1].model_activity &&
+         explicit_variant.variant == EditDistanceVariant::EDIT_DISTANCE &&
+         !explicit_variant.perform_anti_alignment &&
+         explicit_variant.activity_attribute == "concept:name" &&
+         explicit_variant.timestamp_attribute == "time:timestamp" &&
+         explicit_variant.deviation_cost == 10000);
+
+  const auto keyed_log = [](const std::vector<std::vector<std::pair<std::string,
+                                                                    std::string>>>& traces) {
+    EventLog log;
+    std::size_t case_number = 0;
+    for (const auto& values : traces) {
+      Trace trace;
+      trace.case_id = "keyed-" + std::to_string(++case_number);
+      for (std::size_t i = 0; i < values.size(); ++i) {
+        Event event{trace.case_id, values[i].first, "t" + std::to_string(i), {}, i};
+        event.attributes.push_back(
+            EventAttribute{"phase", values[i].second, AttributeKind::kString});
+        trace.events.push_back(std::move(event));
+      }
+      log.traces.push_back(std::move(trace));
+    }
+    return log;
+  };
+  const auto keyed_source = keyed_log({{{"source", "X"}}});
+  const auto keyed_targets = keyed_log({
+      {{"near-a", "X"}, {"near-b", "Y"}},
+      {{"source", "Z"}, {"suffix", "W"}},
+  });
+  EditDistanceOptions custom_anti;
+  custom_anti.variant = EditDistanceVariant::EDIT_DISTANCE;
+  custom_anti.perform_anti_alignment = true;
+  custom_anti.activity_attribute = "phase";
+  const auto custom_result = apply(keyed_source, keyed_targets, custom_anti);
+  assert(custom_result.size() == 1 &&
+         custom_result.front().source_variant == std::vector<std::string>{"X"} &&
+         custom_result.front().target_variant ==
+             std::vector<std::string>({"Z", "W"}) &&
+         custom_result.front().target_index == 1 &&
+         custom_result.front().cost == 30000 &&
+         custom_result.front().best_worst_cost == 30000 &&
+         custom_result.front().bwc == 30000 &&
+         custom_result.front().fitness == 0.0 &&
+         custom_result.front().alignment.size() == 3 &&
+         custom_result.front().alignment[0].type == EditDistanceMoveType::kLog &&
+         custom_result.front().alignment[0].log_activity == "X" &&
+         custom_result.front().alignment[1].model_activity == "Z" &&
+         custom_result.front().alignment[2].model_activity == "W" &&
+         custom_anti.activity_attribute == "phase" &&
+         custom_anti.perform_anti_alignment);
+
+  auto default_key_anti = custom_anti;
+  default_key_anti.activity_attribute = "concept:name";
+  const auto default_key_result =
+      align_edit_distance(keyed_source, keyed_targets, default_key_anti);
+  assert(default_key_result.size() == 1 &&
+         default_key_result.front().target_variant ==
+             std::vector<std::string>({"near-a", "near-b"}) &&
+         default_key_result.front().target_index == 0);
+}
+
+void edit_distance_variant_module_acceptance() {
+  Trace trace;
+  trace.case_id = "direct-case";
+  Event event{trace.case_id, "default-decoy", "t0", {}, 0};
+  event.attributes.push_back(
+      EventAttribute{"phase", "X", AttributeKind::kString});
+  trace.events.push_back(std::move(event));
+
+  const EditDistanceTraceMapping mapping{{"X", "x"}, {"Y", "y"},
+                                         {"Z", "z"}, {"W", "w"}};
+  EditDistanceOptions anti;
+  anti.perform_anti_alignment = true;
+  anti.activity_attribute = "phase";
+  EditDistanceTraceCache cache;
+  const auto fresh = apply_trace(trace, {"xy", "zw"}, {"xy", "zw"},
+                                 mapping, &cache, anti);
+  assert(fresh && cache.size() == 1 && cache.front().first == "x" &&
+         cache.front().second == fresh);
+  const auto& far = std::any_cast<const EditDistanceTraceResult&>(*fresh);
+  assert(far.cost == 30000 && far.alignment.size() == 3 &&
+         far.alignment[0].type == EditDistanceMoveType::kLog &&
+         far.alignment[0].log_activity == "X" &&
+         far.alignment[1].type == EditDistanceMoveType::kModel &&
+         far.alignment[1].model_activity == "Z" &&
+         far.alignment[2].type == EditDistanceMoveType::kModel &&
+         far.alignment[2].model_activity == "W");
+
+  EditDistanceOptions ordinary;
+  ordinary.activity_attribute = "phase";
+  const auto cached = align_trace(trace, {}, {}, mapping, &cache, ordinary);
+  assert(cached == fresh && cache.size() == 1 && cache.front().second == fresh);
+
+  const auto projected = project_log_on_variant(log_of({{"A"}}), {"A", "B"});
+  assert(projected.attributes.size() == 1 &&
+         projected.attribute("@@aligned_variant") &&
+         *projected.attribute("@@aligned_variant") == "A,B" &&
+         projected.traces.size() == 1 &&
+         projected.traces.front().attributes.size() == 1 &&
+         projected.traces.front().attribute("@@original_trace") &&
+         projected.traces.front().events.size() == 2 &&
+         projected.traces.front().events[0].activity == "A" &&
+         projected.traces.front().events[0].attribute("@@is_conforming") &&
+         *projected.traces.front().events[0].attribute("@@is_conforming") ==
+             "true" &&
+         projected.traces.front().events[1].activity == "B" &&
+         projected.traces.front().events[1].attribute("@@is_conforming") &&
+         *projected.traces.front().events[1].attribute("@@is_conforming") ==
+             "false");
 }
 
 int test_main() {
@@ -2231,7 +2372,11 @@ int test_main() {
 
 int main() {
   try {
-    return test_main();
+    const int existing_result = test_main();
+    if (existing_result != 0) return existing_result;
+    edit_distance_dispatcher_acceptance();
+    edit_distance_variant_module_acceptance();
+    return 0;
   } catch (const std::exception& error) {
     std::fprintf(stderr, "Test exception: %s\n", error.what());
     return 1;
