@@ -1,0 +1,28 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "Fresh edit-distance projection strict activity types, ordered validation, and typed-argument API",
+  "parent_commit": "58a2d21812a9e4e74ac12a241bb1bd1edc0cf868",
+  "verified_code_tree": "5ac10aa2e577892780cae0eec15aa2915ad414a9",
+  "core_sha256": "1a0329db1603a1f1127fccdd0b3d56f59595c367a61ffcc1088ef14436d880ad",
+  "reference_calls": 53,
+  "typed_api_matches": 53,
+  "legacy_api_matches": 24,
+  "baseline_legacy_compared": 24,
+  "baseline_legacy_matches": 13,
+  "baseline_typed_api": "absent; no invented outcomes",
+  "prior_reference_comparisons": 404,
+  "prior_matches": 404,
+  "native_comparisons": 481,
+  "matched": 481,
+  "native_suites": 1,
+  "independent_review": "clear",
+  "comparison": "Exact typed ordered fresh EventLog outputs, mapped exception type/message/args, route equality, and unchanged source/variant/parameter snapshots. Baseline runs only the 24 representable legacy calls; after runs all53 typed calls plus24 legacy aliases. Earlier cohorts retain their own documented comparison contracts.",
+  "artifacts": {
+    "docs/edit-distance-typed-variant-reference.json.gz": "db51b6240868cb24ae82cc4192086a71abe9006047c3b196901bb8b57d04bfc7",
+    "docs/edit-distance-typed-variant-native-checks.json.gz": "7fc0084dfaf0302eba0613634b0eef667b4bbed2b8bc4181af582256f64647d2"
+  },
+  "remaining": [
+    "Broader parameter adapters and semantic completion proofs remain open.",
+    "Both edit-distance catalogue rows remain partial; 232 incomplete project coverage units remain."
+  ]
+}

@@ -290,6 +290,18 @@ apply_typed_edit_distance(const EventDataView& source,
     const EventDataView& source, const std::vector<std::string>& variant,
     EditDistanceOptions options = {});
 
+// Typed-value counterpart to the public fresh projection. The selected
+// values are aligned with Python-compatible typed identity, while the public
+// projection still enforces the strict string-join contract for its variant
+// metadata. A distinct name keeps brace-initialized string calls unambiguous.
+[[nodiscard]] EventLog project_log_on_typed_variant(
+    const EventLog& source, const std::vector<EventAttribute>& variant,
+    EditDistanceOptions options = {});
+
+[[nodiscard]] EventLog project_log_on_typed_variant(
+    const EventDataView& source, const std::vector<EventAttribute>& variant,
+    EditDistanceOptions options = {});
+
 // Projects each source trace using its own selected alignment.  The
 // alignments must be in source-trace order (as returned by
 // align_edit_distance), allowing a heterogeneous source log to select a
