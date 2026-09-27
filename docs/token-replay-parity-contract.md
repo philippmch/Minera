@@ -31,9 +31,15 @@ differences. Its 484 resampled calls contain 221 exact matches and 263 strict
 differences. Native outputs occurring in sampled public support are useful
 observations, but do not establish the complete set of legal outcomes.
 
+Inspection of the 17 retained differing fixtures found exactly one visible
+transition (label `A`) in each net, alongside silent transitions. Duplicate
+visible-label selection therefore cannot explain those particular differences.
+Multiple silent routing alternatives remain; their ordering and cleanup effects
+must be isolated before attributing the differing diagnostics to a rule.
+
 ## Required next evidence
 
-For minimized acyclic fixtures, isolate enabled duplicate choices from cleanup
+For minimized acyclic fixtures, isolate visible or silent choices from cleanup
 by varying cleaning and place/transition fitness reporting independently.
 Enumerate feasible transition orders that remain consistent across repeated
 events in a single net; independent per-event choices are not an adequate model.
