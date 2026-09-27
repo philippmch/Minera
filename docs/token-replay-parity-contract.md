@@ -124,3 +124,29 @@ adapters, stochastic maps, Monte Carlo and downstream evaluation. Source,
 binary, test and comparison bindings accompany the evidence. The dispatcher,
 forward and backwards rows remain partial; broader behavior and distinct
 catalogue proof requirements remain open.
+
+## Weighted backwards routing checkpoint
+
+`docs/token-backwards-weighted-routing-checks.json.gz` retains eight fixtures
+through the explicit backwards dispatcher and public variant module: sixteen
+calls, fourteen results and two exceptions, with unchanged input snapshots.
+Both routes agree for every fixture. Eight invocations of the already tested
+native build match all sixteen observations; no production change was needed.
+The summary is `docs/token-backwards-weighted-routing-validation.json`.
+
+In these deterministic nets, exact silent-output/visible-input weights of 1:1
+and 2:2 route through the silent transition and fit. Output oversupply at 2:1,
+3:1 and 3:2 instead leaves the silent transition unfired and weak-fires the
+visible transition with missing tokens. A two-output silent gate with matching
+visible requirements routes successfully. These observations support the
+existing weighted-bundle subtraction rule; they do not establish arbitrary
+weighted-net routing behavior.
+
+Two repeated-activity fixtures distinguish different paths. With one visible
+`A` transition, `A,A` returns two visible firings and unfit diagnostics. With
+two initially blocked same-label transitions, the captured public calls raise
+`ZeroDivisionError`; native replay emits the exact undefined-fitness diagnostic
+and exits nonzero. The comparison records that explicit exception mapping.
+The initial comparison without the mapping is preserved separately from the
+passing run. This checkpoint adds finite routing evidence and does not promote
+the dispatcher or either replay variation.

@@ -1,0 +1,21 @@
+{
+  "status": "verified_finite_weighted_backwards_comparison",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "native_commit_at_comparison": "2f9cd98af788ac09388f24b0f21cca6274997589",
+  "fixtures": 8,
+  "public_observations": 16,
+  "native_invocations": 8,
+  "matched": 16,
+  "mismatched": 0,
+  "reference_results": 14,
+  "reference_errors": 2,
+  "production_changes": false,
+  "coverage_promotion": false,
+  "scope": "Exact weights, output oversupply, two-output silent routing, repeated single-label firing and blocked duplicate labels; finite evidence only.",
+  "prior_tested_build_archive": {
+    "path": "docs/token-backwards-zero-native-checks.json.gz",
+    "sha256": "c0f3b1d51d0297f658d11615e9b4c78a8104e4bd464330a497f30f2b10fa13a8"
+  },
+  "archive": "docs/token-backwards-weighted-routing-checks.json.gz",
+  "archive_sha256": "aee458ffb4cb99f000fbe2497fd3b5212ac5b346e8f72dfe953e2a3c263353d4"
+}
