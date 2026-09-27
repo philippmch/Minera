@@ -85,10 +85,13 @@ void add_projection(std::vector<EventAttribute>& attributes,
                      const std::string& value, AttributeKind kind,
                      FirstClassAttributeState state,
                      FirstClassAttributeRole role,
-                     const EventAttribute* metadata = nullptr) {
+                     const EventAttribute* metadata = nullptr,
+                     bool empty_source_key_is_literal = false) {
   if (!first_class_present(state, value)) return;
   const auto resolved_key =
-      source_key.empty() ? std::string(canonical_key) : std::string(source_key);
+      source_key.empty() && !empty_source_key_is_literal
+          ? std::string(canonical_key)
+          : std::string(source_key);
   EventAttribute projection{resolved_key, value, kind,
                             state == FirstClassAttributeState::kNull};
   const auto effective_state = effective_first_class_state(state, value);
@@ -155,13 +158,23 @@ std::vector<EventAttribute> event_fields(const Event& event) {
   return fields;
 }
 
+std::string trace_case_source_key(const Trace& trace) {
+  if (!trace.case_id_source_key.empty()) return trace.case_id_source_key;
+  if (trace.case_id_attribute) return trace.case_id_attribute->key;
+  return std::string(kActivityKey);
+}
+
 std::vector<EventAttribute> trace_fields(const Trace& trace) {
   std::vector<EventAttribute> fields;
   fields.reserve(trace.attributes.size() + 1);
-  add_projection(fields, trace.case_id_source_key, kActivityKey, trace.case_id,
-                 AttributeKind::kString, trace.case_id_state,
+  const bool has_literal_empty_source_key =
+      trace.case_id_source_key.empty() && trace.case_id_attribute &&
+      trace.case_id_attribute->key.empty();
+  add_projection(fields, trace_case_source_key(trace), kActivityKey,
+                 trace.case_id, AttributeKind::kString, trace.case_id_state,
                  FirstClassAttributeRole::kCaseId,
-                 trace.case_id_attribute ? &*trace.case_id_attribute : nullptr);
+                 trace.case_id_attribute ? &*trace.case_id_attribute : nullptr,
+                 has_literal_empty_source_key);
   for (const auto& attribute : trace.attributes)
     append_or_merge_attribute(fields, attribute);
   return fields;
@@ -314,8 +327,6 @@ std::optional<EventAttribute> selected_event_attribute(
 }
 
 void validate_options(const LogConversionOptions& options) {
-  if (options.case_id_key.empty())
-    throw std::invalid_argument("log conversion: case_id_key must not be empty");
   if (options.graph_case_id_attribute.empty())
     throw std::invalid_argument(
         "log conversion: graph_case_id_attribute must not be empty");
@@ -621,10 +632,17 @@ Event record_to_event(const LogConversionRecord& record,
     if (field.key == options.case_id_key ||
         is_case_attribute_field(field, options))
       continue;
-    if (field.key == selected_activity_key ||
-        field.key == selected_timestamp_key ||
-        field.key == selected_resource_key ||
-        field.key == selected_lifecycle_key)
+    // Empty selected keys are valid literal mapping keys. They also remain
+    // empty when the corresponding first-class slot was not selected, so do
+    // not mistake the sentinel for a match with every empty-key field.
+    if ((!selected_activity_key.empty() &&
+         field.key == selected_activity_key) ||
+        (!selected_timestamp_key.empty() &&
+         field.key == selected_timestamp_key) ||
+        (!selected_resource_key.empty() &&
+         field.key == selected_resource_key) ||
+        (!selected_lifecycle_key.empty() &&
+         field.key == selected_lifecycle_key))
       continue;
     if ((field.key == kActivityKey || field.key == "activity") &&
         selected_activity_key.empty()) {
@@ -1205,10 +1223,7 @@ ConvertedEventStream event_log_to_event_stream(
     for (const auto& event : trace.events) {
       LogConversionRecord record;
       record.fields = event_fields(event);
-      const auto case_source_key =
-          trace.case_id_source_key.empty()
-              ? std::string(kActivityKey)
-              : trace.case_id_source_key;
+      const auto case_source_key = trace_case_source_key(trace);
       std::optional<EventAttribute> case_projection;
       if (options.include_case_attributes) {
         for (const auto& attribute : trace_fields(trace)) {

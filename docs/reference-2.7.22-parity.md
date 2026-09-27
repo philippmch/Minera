@@ -1308,7 +1308,8 @@ keep the original stream and table API source-compatible.
 
 Table cells distinguish a missing column value, a present null, and a present
 empty string. Optional stream post-processing removes only present nulls.
-Conversions validate unique non-empty columns, rectangular rows, non-null case
+Conversions validate unique column names (including a single literal empty
+name), rectangular rows, non-null case
 glue, custom case selectors and prefixes, and stable type-aware case identity.
 Extension, classifier, trace-global, event-global, log-property, and
 trace-property metadata is carried by the native log model and retained by
@@ -5341,6 +5342,27 @@ The current edit-distance acceptance matrix is maintained in
 `docs/edit-distance-parity-contract.md`. The pinned public surface is archived
 in `docs/edit-distance-public-surface.json.gz`; both catalogue rows remain partial.
 
+### Edit-distance flat-selector native checkpoint
+
+Native tables now accept a unique literal empty column name. Flat conversion
+uses the exact selected case key, preserves an empty case source key through
+roundtrips, and retains generic empty-key fields when no first-class key was
+selected. Already grouped EventLogs ignore the unused case selector.
+
+All 22 captured flat-data calls match, up from seven matches in the frozen
+baseline. The comparison checks actual native index, attribute and option state
+before and after each call; all inputs remain unchanged. The changed library
+also passes 2,448 earlier comparable calls, all five affected native suites,
+and the two existing CLI/HTTP parameter regression cases. The latter reuse the
+established fixture and do not claim product support for every blank selector.
+
+The capture, implementation and comparison harness passed independent review.
+`docs/edit-distance-flat-selectors-native-checks.json.gz` preserves the evidence;
+`docs/edit-distance-flat-selectors-validation.json` summarizes its bindings and
+results. These finite cases do not establish universal DataFrame metadata
+equivalence. Both coverage rows remain partial pending distinct catalogue proof
+bundles and an independent requirement-by-requirement completion audit.
+
 ### Edit-distance flat-selector reference checkpoint
 
 The public DataFrame delta capture in
@@ -5357,8 +5379,8 @@ after each call, together with independent parameter and projection-variant
 snapshots. All checks report unchanged inputs. The corrected capture and its
 public-call provenance passed independent review; its summary is in
 `docs/edit-distance-flat-selectors-reference-validation.json`. This checkpoint
-establishes reference behavior only. Native table support and comparison remain
-in progress, and neither edit-distance row is promoted.
+establishes reference behavior only; the subsequent native checkpoint above
+records its implementation and comparison. Neither edit-distance row is promoted.
 
 ### Edit-distance explicit-dispatch and named-acceptance checkpoint
 

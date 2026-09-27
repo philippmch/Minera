@@ -1,0 +1,40 @@
+{
+  "status": "verified_finite_checkpoint",
+  "parent_commit": "e24104ad5f45bcf8c5f87084b03701389e2abf9e",
+  "verified_code_tree": "3a48944ba3cf90bb476b8e9c36d942c3dabd894a",
+  "core_sha256": "c4981ed1601deac10c62f91b7bf7e4ba2d3490f89ea0387a0cc52edbbb464e4c",
+  "new_calls": 22,
+  "baseline_matches": 7,
+  "after_matches": 22,
+  "earlier_comparable_regressions": {
+    "core": 96,
+    "anti-duplicates": 12,
+    "table": 104,
+    "typed-mapping": 35,
+    "direct": 85,
+    "typed-log": 72,
+    "typed-variant": 77,
+    "exhaustive": 1922,
+    "literal-grouped-selectors": 45
+  },
+  "earlier_matches": 2448,
+  "combined_comparable_matches": 2470,
+  "native_suites_passed": 5,
+  "product_route_regressions": 2,
+  "independent_reviews": "clear",
+  "artifacts": [
+    {
+      "path": "docs/edit-distance-flat-selectors-reference.json.gz",
+      "sha256": "aef16c8eed8a9dc811cb84c47eab5f11fce6185d267daa2bfce4e968ef356d70"
+    },
+    {
+      "path": "docs/edit-distance-flat-selectors-native-checks.json.gz",
+      "sha256": "f8bf98442a9f5f183d33821b40d7036988ed4dca3edb7a011b5213c36a082797"
+    }
+  ],
+  "remaining": [
+    "Distinct module/dispatcher catalogue proofs",
+    "Independent requirement-by-requirement completion audit"
+  ],
+  "coverage_promotion": false
+}

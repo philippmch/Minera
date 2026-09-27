@@ -17,8 +17,6 @@ void validate_columns(const std::vector<std::string>& columns) {
   std::unordered_set<std::string> seen;
   seen.reserve(columns.size());
   for (const auto& column : columns) {
-    if (column.empty())
-      throw std::invalid_argument("event table: column names must not be empty");
     if (!seen.insert(column).second)
       throw std::invalid_argument("event table: duplicate column name: " +
                                   column);

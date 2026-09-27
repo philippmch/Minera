@@ -30,6 +30,8 @@ struct LogConversionOptions {
   LogConversionVariant variant = LogConversionVariant::kToEventLog;
   bool include_case_attributes = true;
   std::string case_attribute_prefix = "case:";
+  // Literal grouping field for flat inputs and outputs. An empty string is a
+  // valid column label, not a request to substitute the canonical case key.
   std::string case_id_key = "case:concept:name";
   // Null cells are retained in stream/table output.  Set this flag for the
   // optional post-processing pass that drops present-null event fields.
