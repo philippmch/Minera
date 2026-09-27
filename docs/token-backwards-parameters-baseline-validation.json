@@ -1,0 +1,20 @@
+{
+  "status": "reviewed_pre_fix_baseline_with_mismatches",
+  "fixtures": 31,
+  "public_observations": 62,
+  "native_invocations": 31,
+  "matched": 58,
+  "mismatched": 4,
+  "coverage_promotion": false,
+  "native_commit_at_comparison": "b905fcd846a8c2bc13c7d801e4490d12550a8319",
+  "build_parent_commit": "59c281d29fbc42856da8154c5ae10ebf58e1ea1f",
+  "build_code_tree": "486a86e3f50d311813b9a4e1e5757bcc00624b06",
+  "finding": "Integer selected activity 1 incorrectly resolves the model string label 1 in enum and string activity-key fixtures, on both public routes.",
+  "limits": "Finite fixture-local parameter mappings; this baseline does not establish native parity.",
+  "prior_tested_build_archive": {
+    "path": "docs/token-backwards-zero-native-checks.json.gz",
+    "sha256": "c0f3b1d51d0297f658d11615e9b4c78a8104e4bd464330a497f30f2b10fa13a8"
+  },
+  "archive": "docs/token-backwards-parameters-baseline-checks.json.gz",
+  "archive_sha256": "63f41507a43a86b97a2edf06e6661b7d2dc7fb52f6622364b7ae6b8fada357fe"
+}

@@ -204,3 +204,13 @@ capture sources and typed-input validator; the summary is
 `docs/token-backwards-parameters-reference-validation.json`. This is reference
 evidence only. Native parameter comparison and correction of discrepancies
 remain separate completion gates; no coverage row is promoted here.
+
+The reviewed pre-fix native baseline is retained in
+`docs/token-backwards-parameters-baseline-checks.json.gz`, with its summary in
+`docs/token-backwards-parameters-baseline-validation.json`. Thirty-one native
+invocations match 58 of the 62 public observations. The four discrepancies are
+the enum/string activity-key fixtures on both routes: native replay incorrectly
+matches integer activity `1` to model label string `"1"`. Public replay activates
+only `a` with fitness 0.25; native additionally activates `one` with fitness 1.
+The archive preserves typed XES inputs, complete results, comparator sources
+and the original tested-build identity before any correction.
