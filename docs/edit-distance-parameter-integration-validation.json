@@ -1,0 +1,24 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "One CLI and one HTTP case combine anti=true, a non-default activity selector, native projected-log output, and a non-default timestamp selector.",
+  "parent_commit": "bad91f825bf95301f78acc97cb209b88f98116c4",
+  "tested_commit": "bad91f825bf95301f78acc97cb209b88f98116c4",
+  "core_sha256": "1a0329db1603a1f1127fccdd0b3d56f59595c367a61ffcc1088ef14436d880ad",
+  "cli_cases": 1,
+  "http_cases": 1,
+  "matched": 2,
+  "controls": [
+    "anti alignment",
+    "custom activity selector",
+    "custom projected timestamp selector"
+  ],
+  "comparison": "Exact selected variant, ordered moves, cost, fitness, best-worst cost and projected selected fields; fixture matches pinned native candidate set.",
+  "independent_review": "clear",
+  "artifact": {
+    "path": "docs/edit-distance-parameter-integration.json.gz",
+    "sha256": "21721c04c76361a151ef4fe08d63e62ebd1532bfbb02be7c057357feb412e86e"
+  },
+  "remaining": [
+    "Literal blank/space selector domain fix and semantic completion proofs remain open."
+  ]
+}

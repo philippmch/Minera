@@ -24,7 +24,7 @@ separate semantic requirement under the project parity contract.
 | Direct trace helpers | Ordered typed mappings, independent list/set inputs, cache identity and reuse; direct and typed-mapping captures | Reconcile helper aliases and effective selector/anti controls |
 | Fresh variant projection | String-only activity domain, typed rejection, ordered validation, timestamps and fresh metadata; 53 typed and 24 legacy comparisons | Reconcile selector/anti behavior with whole-log and adapter controls |
 | Input representations | EventLog and EventDataView adapters; table grouping, typed labels, missing/null distinctions | Confirm each advertised representation and applicable control has evidence; audit empty and whitespace field names against native selector validation |
-| Product entry points | Native APIs, typed JSON, CLI and local server routes | Audit the three semantic controls at applicable CLI/HTTP entry points |
+| Product entry points | Native APIs, typed JSON, CLI and local server routes; two combined anti/custom-activity/custom-timestamp integration cases in `docs/edit-distance-parameter-integration-validation.json` | Reconcile the verified fixture with the final semantic scope; it is not an exhaustive product-input audit |
 | Completion proofs | Existing registered alignment tests and frozen comparison artifacts | Distinct module/dispatcher proof cases and independent requirement-by-requirement completion review |
 
 `case_id_attribute` governs native flat-data grouping; it does not change an

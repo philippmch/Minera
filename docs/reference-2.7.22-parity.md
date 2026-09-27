@@ -5341,6 +5341,24 @@ The current edit-distance acceptance matrix is maintained in
 `docs/edit-distance-parity-contract.md`. The pinned public surface is archived
 in `docs/edit-distance-public-surface.json.gz`; both catalogue rows remain partial.
 
+### Edit-distance product parameter checkpoint
+
+One CLI and one local HTTP case combine anti-alignment, a custom activity key,
+and native projected-log output using a custom timestamp key. Decoy default
+fields distinguish the selected fields from defaults. Both routes select ABCD
+rather than AB for source ABC and match ordered moves, cost 10,000, fitness
+0.8, best-worst cost 50,000, and projected custom activity/timestamp values.
+The inserted D retains the source's last selected timestamp.
+
+`docs/edit-distance-parameter-integration.json.gz` retains the fixture,
+checker, exact raw route outputs and build logs, hashes, and independent
+review. Both executables were explicitly recompiled and relinked against the
+unchanged verified core; source and binary bindings were checked across the
+runs, and the owned server was stopped. The summary is in
+`docs/edit-distance-parameter-integration-validation.json`. These two cases
+verify parameter propagation for this fixture; they do not complete either
+edit-distance catalogue row or the remaining selector-domain audit.
+
 ### Edit-distance exhaustive short-sequence checkpoint
 
 All 1,922 singleton source/target pairs over the two-symbol alphabet A/B,
