@@ -1,0 +1,22 @@
+{
+  "status": "verified_finite_checkpoint",
+  "scope": "All singleton source/target string sequences over A/B of lengths0..4 in ordinary and anti alignment modes",
+  "parent_commit": "d5782e1e53fd0504d5b33979fced6e65b87327fe",
+  "verified_production_commit": "16267aa6682d0fa2789f29e0c8d12ecfd21d42a5",
+  "core_sha256": "1a0329db1603a1f1127fccdd0b3d56f59595c367a61ffcc1088ef14436d880ad",
+  "reference_calls": 1922,
+  "native_comparisons": 1922,
+  "matched": 1922,
+  "accepted_outputs": 1891,
+  "mapped_errors": 31,
+  "independent_review": "clear",
+  "artifacts": {
+    "docs/edit-distance-exhaustive-reference.json.gz": "dd01cc34d43454839a1fd50f730c12309f87a80f9bc0c08407de9f7ee172b748",
+    "docs/edit-distance-exhaustive-native-checks.json.gz": "1f084e2287a4564226340126a769f037bea05feceb61af4c2061a7029f9e4d13"
+  },
+  "limits": [
+    "Singleton targets only; existing cohorts cover multi-candidate selection and long-input thresholds.",
+    "Native mapped rejection meaning is compared for31 all-exact anti cases; Python exception class identity is not claimed.",
+    "Both catalogue rows remain partial. Selector-domain differences and completion proofs remain open."
+  ]
+}
