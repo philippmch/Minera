@@ -551,7 +551,7 @@
           "symbol": "EDIT_DISTANCE"
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
       "proofs": {
         "EDIT_DISTANCE": {
@@ -6483,7 +6483,7 @@
           "selector": "EDIT_DISTANCE"
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
       "artifacts": [
         "include/minera/edit_distance_alignment.hpp",

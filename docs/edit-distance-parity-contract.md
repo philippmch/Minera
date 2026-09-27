@@ -2,8 +2,9 @@
 
 Target: PM4Py 2.7.22, commit `0715c31f3f1d85924107d6aa5329806db69df899`.
 Scope: `algo.conformance.alignments.edit_distance` and its
-`variants.edit_distance` module. Both coverage rows remain partial.
-This contract organizes the remaining audit; it is not a completion claim.
+`variants.edit_distance` module. Both coverage rows are complete under the
+project's behavioral parity contract following the independent completion audit
+and the native carrier acceptance checkpoint.
 
 ## Public behavior
 
@@ -16,16 +17,16 @@ key. Native `EditDistanceOptions` supplies the corresponding effective controls.
 Python enum-key syntax and arbitrary parameter-dictionary objects are not a
 separate semantic requirement under the project parity contract.
 
-| Requirement | Current implementation and evidence | Remaining audit |
+| Requirement | Current implementation and evidence | Completion reconciliation |
 | --- | --- | --- |
-| Whole-log alignment and dispatch | String and typed native alignment APIs; core, table, typed-log captures; nine public default/explicit dispatcher pairs and a named native dispatcher acceptance case | Reconcile flat-data parameter coverage and bind the distinct catalogue proof |
-| Target choice and output order | Ordinary shortest/last-distinct ties; anti longer/last-distinct ties; duplicate and empty-target captures | Include these contracts in distinct registered module/dispatcher proofs |
-| Matching blocks and costs | Ordered move, cost, fitness and best-worst-cost comparisons; 19 long-input threshold cases | 1,922 short singleton comparisons pass; reconcile these with remaining selector-domain and completion evidence |
-| Direct trace helpers | Ordered typed mappings, independent list/set inputs, cache identity and reuse; direct and typed-mapping captures; named module acceptance exercises helper aliases, selected activity, anti mode and cache reuse | Bind the distinct module proof and include the existing cohorts in completion review |
-| Fresh variant projection | String-only activity domain, typed rejection, ordered validation, timestamps and fresh metadata; 53 typed and 24 legacy comparisons | Reconcile selector/anti behavior with whole-log and adapter controls |
-| Input representations | EventLog and EventDataView adapters; table grouping, typed labels, missing/null distinctions; literal empty and whitespace selectors in grouped logs, direct traces and 22 flat-data calls | Reconcile the captured representations and applicable controls in the independent completion review |
-| Product entry points | Native APIs, typed JSON, CLI and local server routes; two combined anti/custom-activity/custom-timestamp integration cases in `docs/edit-distance-parameter-integration-validation.json` | Reconcile the verified fixture with the final semantic scope; it is not an exhaustive product-input audit |
-| Completion proofs | Distinct dispatcher/module catalogue proof objects bind the registered acceptance functions and implementation symbols; frozen comparison artifacts support the behavioral audit | Close the stream/lazy adapter evidence gap and finish independent completion review |
+| Whole-log alignment and dispatch | String and typed native alignment APIs; core, table, typed-log captures; nine public default/explicit dispatcher pairs and a named native dispatcher acceptance case | 22 flat-selector calls and the distinct dispatcher proof close the remaining checks |
+| Target choice and output order | Ordinary shortest/last-distinct ties; anti longer/last-distinct ties; duplicate and empty-target captures | Focused ordering cohorts complement the distinct registered proofs |
+| Matching blocks and costs | Ordered move, cost, fitness and best-worst-cost comparisons; 19 long-input threshold cases | 1,922 short singleton comparisons and focused multi-target/long-input cohorts are reconciled |
+| Direct trace helpers | Ordered typed mappings, independent list/set inputs, cache identity and reuse; direct and typed-mapping captures; named module acceptance exercises helper aliases, selected activity, anti mode and cache reuse | Distinct module proof and direct-helper cohorts reconciled in completion review |
+| Fresh variant projection | String-only activity domain, typed rejection, ordered validation, timestamps and fresh metadata; 53 typed and 24 legacy comparisons | Selector, anti and adapter controls reconciled by the public cohorts and native carrier acceptance |
+| Input representations | EventLog and EventDataView adapters; table grouping, typed labels, missing/null distinctions; literal empty and whitespace selectors in grouped logs, direct traces and 22 flat-data calls | EventLog/table public evidence plus stream/lazy native carrier acceptance close the advertised representation checks |
+| Product entry points | Native APIs, typed JSON, CLI and local server routes; two combined anti/custom-activity/custom-timestamp integration cases in `docs/edit-distance-parameter-integration-validation.json` | Fixtures verify parameter propagation for the scoped product routes; no exhaustive product-input claim |
+| Completion proofs | Distinct dispatcher/module catalogue proof objects bind the registered acceptance functions and implementation symbols; frozen comparison artifacts support the behavioral audit | Carrier gap closed; independent semantic review and distinct catalogue proofs complete |
 
 `case_id_attribute` governs native flat-data grouping; it does not change an
 already grouped EventLog. `deviation_cost` is a native extension rather than a
@@ -73,9 +74,22 @@ The independent audit reconciled the six captured public functions, effective
 controls, target ordering, costs, direct caches, typed values and fresh projection
 with the existing cohorts. It found no new demonstrated reference mismatch.
 The public native `EventDataView` overloads also accept event streams and lazy
-tables, but the edit-distance suite does not yet exercise those routes directly.
+tables, which the suite had not exercised directly at the time of that audit.
 Shared conversion tests alone do not prove their alignment/projector integration.
-Both rows therefore remain partial. Required follow-up is a registered carrier
-acceptance test comparing these routes with the established eager fixtures,
-including custom selectors, anti mode, mixed carriers, projection metadata,
-empty/missing boundaries and counted lazy materialization.
+That finding is closed by `edit_distance_native_carrier_acceptance`, called by
+the registered Release suite. It compares log, table, stream and lazy routes
+against eager results with explicit expected moves and metrics; checks custom
+selectors, anti mode, mixed carriers, typed activity identity, fresh projection
+metadata and timestamps; and exercises stream/lazy empty-target and missing-field
+errors. Counted scanners verify each lazy route consumes its rows once. Flat
+carriers cannot represent empty traces; projection omission is checked separately.
+
+The final focused Release build and CTest pass with assertions enabled. Source,
+executable, unchanged production library and build/test logs are bound in
+`docs/edit-distance-carrier-native-checks.json.gz`, summarized by
+`docs/edit-distance-carrier-validation.json`. Independent review found no remaining
+semantic issue in these two rows. The prior 2,470 differential comparisons and
+product-route fixtures remain applicable because production code is unchanged.
+The catalogue proofs are distinct and registered. This closes these rows, not
+the remaining project-wide parity work; the finite evidence and native-extension
+boundaries described above remain explicit.

@@ -1,0 +1,14 @@
+{
+  "status": "verified_native_adapter_checkpoint",
+  "parent_commit": "7dc630d46fb0c559e147722b7844569a3e9e0bc9",
+  "verified_tree": "76cf6cfbfe59709a106e8136c69c783510034157",
+  "core_sha256": "c4981ed1601deac10c62f91b7bf7e4ba2d3490f89ea0387a0cc52edbbb464e4c",
+  "registered_case": "edit_distance_native_carrier_acceptance",
+  "native_suite": "minera_edit_distance_alignment_tests",
+  "native_suite_passed": true,
+  "public_reference_comparisons_added": 0,
+  "independent_review": "clear",
+  "artifact": "docs/edit-distance-carrier-native-checks.json.gz",
+  "artifact_sha256": "f44f45f7f987c468716810b462ea672afbb91c81129744759f1933d38877d692",
+  "coverage_promotion": false
+}
