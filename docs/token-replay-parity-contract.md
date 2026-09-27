@@ -150,3 +150,40 @@ and exits nonzero. The comparison records that explicit exception mapping.
 The initial comparison without the mapping is preserved separately from the
 passing run. This checkpoint adds finite routing evidence and does not promote
 the dispatcher or either replay variation.
+
+## Backwards module completion gate
+
+The backwards variation can be proved separately from the still-open forward
+choice/cleanup behavior. Its declared direct-call input is a grouped EventLog
+with a Petri net, initial/final markings and a parameter dictionary. Native
+stream/table grouping is an extension, as documented in the main parity contract;
+it is not evidence for the direct backwards input domain.
+
+The existing controls, denominator and weighted-routing records cover returned
+fields, unknown/repeated activities, stopping, empty traces/logs, final marking
+multiplicity, silent routing and the observed undefined-fitness errors. The next
+required evidence is the public parameter and input boundary, not another
+undirected routing sample:
+
+- Pin custom activity selection through enum and string parameter keys, missing
+  selected fields, explicit nulls and non-string activity values inside EventLog.
+- Use duplicate traces and case IDs to test case selection, supplied variants,
+  variant delimiters and disabled variant caching. Check order and cardinality.
+- Contrast return-name and place/transition-fitness settings using complete
+  returned values, including their types and diagnostic order.
+- Exercise final silent routing, residual tokens and repeated-event token
+  accumulation when testing final-routing, remaining-fitness and cleaning flags.
+  Check hidden-path caches, timeout and reduction controls separately; classify
+  observed no-effects without inferring universal behavior from benign inputs.
+- Translate the captured inputs faithfully to native calls, compare every
+  result/error under explicit representation mappings, and resolve discrepancies.
+- Add a distinct registered backwards acceptance proof tied to the native entry
+  point and reviewed behavioral evidence, then pass its affected native checks
+  and the structural catalogue verifier before promoting the module row.
+
+The parameter inventory comes from the pinned public enum and signature already
+retained in `docs/token-backwards-controls-reference.json.gz`. Default forward
+captures do not satisfy these backwards requirements. Arbitrary wrong Python
+carrier or Marking object types are not inferred to be promised contracts from
+type annotations; any error claim must identify the supported input constraint
+and its actual public observation.
