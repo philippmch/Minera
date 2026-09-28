@@ -20,6 +20,7 @@ its scope to the already verified HeuristicsNet routes.
 | Omitted versus explicitly empty raw DFG auxiliary maps | `heuristic-classic-auxiliary-native-validation.json`; its archived checks and bound public controls | Three direct controls and 26 flat observations match. Native supplied/effective presence flags produce actual nullable public fields, preserving existing array fields. |
 | Petri-returning `classic.apply` / `classic.apply_dfg` | `heuristic-classic-petri-native-baseline-validation.json`; its archived checks and bound public references | Seventeen of 18 primary cases match. `metadata_3_0_0_0` remains a real topology mismatch: native conversion adds two private input places and arcs absent from the public result. |
 | Pure XOR/AND Petri construction | `heuristic-classic-petri-native-baseline-validation.json`; `heuristic-classic-petri-diamonds-reference.json.gz` | All four additive Petri/HeuristicsNet route checks match, including the XOR/AND structural distinction and AND measures of 0.8. |
+| Small-DFG Petri topology and thresholds | `heuristic-classic-petri-small-dfg-reference-validation.json`; its full public capture | 1,779 finite cases and 3,558 successful unchanged-input public calls cover two-/three-activity graphs, loops and three dependency thresholds. Native Petri comparison remains pending. |
 | Distinct catalogue proof | `reference-2.7.22-coverage.json` CLASSIC module row | Add an exact implementation and registered acceptance-test proof only after all module gates are verified. |
 
 ## Required returned-object checks
