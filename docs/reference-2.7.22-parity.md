@@ -6337,9 +6337,9 @@ DataFrame date cell is NaT and succeeds. The explicit NaT control succeeds on
 both routes with mean performance 2.5. Reversed completion timestamps preserve
 the supplied A-then-B sequence in both captured routes.
 
-This is reference evidence only. Native flat-input support, typed NaT handling
-and the corresponding comparison are pending; CLASSIC remains partial and
-coverage counts are unchanged.
+The native checkpoint below implements flat-input support and typed NaT
+handling, with a comparison of the represented fields. CLASSIC remains partial
+and coverage counts are unchanged.
 
 The direct module entry point is separately captured in
 `docs/heuristic-classic-direct-reference.json.gz`, with review and bindings in
@@ -6349,10 +6349,11 @@ matching the reviewed dispatcher EventLog inputs and outcomes. Inputs and
 parameters remain unchanged. This closes the direct-route reference gap without
 claiming native completion.
 
-CLASSIC promotion still requires the native flat/typed-NaT comparison, a concise
-reconciliation of its returned public fields with existing EventLog and direct
-DFG evidence, and its own registered implementation/test proof. Parent input
-adapters and PLUSPLUS obligations remain separate catalogue gates.
+CLASSIC promotion still requires resolution of the public node boundary flags
+and sojourn map, a concise reconciliation of its returned public fields with
+existing EventLog and direct DFG evidence, and its own catalogue
+implementation/test proof. Parent input adapters and PLUSPLUS obligations
+remain separate catalogue gates.
 
 A focused business-hours control is preserved in
 `docs/heuristic-classic-nat-business-reference.json.gz`, with runtime bindings and
@@ -6360,7 +6361,8 @@ review in `docs/heuristic-classic-nat-business-reference-validation.json`.
 With the same explicit NaT input and `business_hours=true`, both public carriers
 raise ValueError (`cannot convert float NaN to integer`) and leave inputs
 unchanged. Ordinary elapsed-time acceptance of NaT therefore does not imply
-business-hours acceptance. Native verification of this branch remains pending.
+business-hours acceptance. The native checkpoint below verifies both errors,
+mapping them to invalid_argument with the same message.
 
 Three existing direct-DFG boundary inputs are recaptured in
 `docs/heuristic-classic-dfg-boundaries-reference.json.gz`, with validation in
@@ -6370,3 +6372,34 @@ all returned node start/end flags are false and all sojourn maps are empty.
 All three calls preserve their inputs, and opaque CLASSIC module proofs match
 before and after the calls. This supplies missing public-object observations
 for those cases; it does not establish native object parity or change coverage.
+
+## CLASSIC native flat-input and typed-NaT checkpoint
+
+`docs/heuristic-classic-flat-native-checks.json.gz` preserves the actual native
+output, comparison scripts, source/binary bindings, build/test logs, and earlier
+failed attempts; the summary is
+`docs/heuristic-classic-flat-native-validation.json`. All 26 observations pass:
+the twelve paired fixtures plus the two business-hours errors. The comparison
+checks exact input fields, typed date/NaT payloads, row order, table dtypes/index,
+selectors, unchanged input snapshots, and represented result fields. Numeric
+values compare exactly; node occurrence counts come from actual native node
+statistics. The twelve direct CLASSIC EventLog observations have identical
+inputs and outputs to their paired dispatcher cases and add no unique inputs.
+
+The native API now accepts EventDataView, EventStream, EventTable and
+LazyEventTable, with a configurable case attribute. Flat grouping follows the
+selected key even when another field carries canonical case-role metadata;
+existing EventLog trace boundaries remain authoritative. The shared converter
+is unchanged. CLASSIC elapsed-time NaT contributes a zero sample, while
+business-hours NaT rejects and absent selected destination fields retain their
+missing-field diagnostic. Frequency discovery does not validate timestamps.
+
+The registered `classic_flat_timestamp_acceptance()` case also checks tagged
+table/stream/lazy grouping and a bounded PLUSPLUS grouping regression. Six
+affected native suites pass: core, heuristic_variants, log_conversion,
+event_data, dataframe_format and dataframe_format_json. Independent review
+cleared the repaired implementation and fixture changes. This checkpoint does
+not claim full PLUSPLUS parity or full public-object parity: node start/end
+flags and the sojourn map still lack native fields. Python class and exception
+identity are outside the native result/error mapping. Coverage remains
+198 complete / 189 partial modules and 46 complete / 40 partial packages.

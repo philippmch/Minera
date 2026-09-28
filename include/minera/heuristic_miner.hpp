@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "minera/event_log.hpp"
+#include "minera/event_data.hpp"
 #include "minera/heuristic_count.hpp"
 #include "minera/temporal_profile.hpp"
 
@@ -297,6 +298,9 @@ struct HeuristicMinerOptions {
   std::vector<BusinessHourSlot> business_hour_slots;
   // Distinguishes an omitted schedule from an explicitly empty schedule.
   bool business_hour_slots_explicit = false;
+  // Case field used to group flat EventStream/EventTable inputs. Existing
+  // EventLog trace boundaries remain authoritative.
+  std::string case_id_attribute = "case:concept:name";
 };
 
 struct HeuristicClassicDfgInput {
@@ -320,6 +324,18 @@ struct HeuristicClassicDfgInput {
 // (|a>b| - |b>a|) / (|a>b| + |b>a| + 1); self-loops use |a>a| / (|a>a| + 1).
 [[nodiscard]] HeuristicsNet discover_heuristics_net(
     const EventLog& event_log,
+    const HeuristicMinerOptions& options = {});
+[[nodiscard]] HeuristicsNet discover_heuristics_net(
+    const EventDataView& data,
+    const HeuristicMinerOptions& options = {});
+[[nodiscard]] HeuristicsNet discover_heuristics_net(
+    const EventStream& data,
+    const HeuristicMinerOptions& options = {});
+[[nodiscard]] HeuristicsNet discover_heuristics_net(
+    const EventTable& data,
+    const HeuristicMinerOptions& options = {});
+[[nodiscard]] HeuristicsNet discover_heuristics_net(
+    const LazyEventTable& data,
     const HeuristicMinerOptions& options = {});
 [[nodiscard]] HeuristicsNet discover_heuristics_net(
     const HeuristicClassicDfgInput& input,

@@ -4,6 +4,7 @@
 #include "exact_count_ratio.hpp"
 #include "exact_mean.hpp"
 #include "exact_stdev.hpp"
+#include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
@@ -213,6 +214,134 @@ const std::string* selected_start_timestamp(
   if (standard_timestamp_attribute(*options.start_timestamp_attribute))
     return &event.timestamp;
   return event.attribute(*options.start_timestamp_attribute);
+}
+
+enum class ClassicStartKind { kCompletion, kValue, kMissing, kNull, kNaT };
+
+struct ClassicStartTimestamp {
+  ClassicStartKind kind = ClassicStartKind::kCompletion;
+  const std::string* value = nullptr;
+};
+
+bool is_typed_nat(const EventAttribute& attribute) {
+  const auto* date = std::get_if<NativeDate>(&attribute.typed_value);
+  return !attribute.is_null && attribute.kind == AttributeKind::kDate &&
+         date != nullptr && date->value == "NaT";
+}
+
+const EventAttribute* selected_start_attribute(const Event& event,
+                                               std::string_view key) {
+  if (event.timestamp_attribute &&
+      (event.timestamp_source_key == key ||
+       event.timestamp_attribute->key == key))
+    return &*event.timestamp_attribute;
+  const auto found = std::find_if(
+      event.attributes.begin(), event.attributes.end(),
+      [&](const EventAttribute& attribute) { return attribute.key == key; });
+  return found == event.attributes.end() ? nullptr : &*found;
+}
+
+ClassicStartTimestamp classic_start_timestamp(
+    const Event& event, const HeuristicMinerOptions& options) {
+  if (!options.start_timestamp_attribute ||
+      options.start_timestamp_attribute->empty())
+    return {};
+
+  const auto& key = *options.start_timestamp_attribute;
+  if (standard_timestamp_attribute(key)) {
+    if (const auto* attribute = selected_start_attribute(event, key)) {
+      if (attribute->is_null)
+        return {ClassicStartKind::kNull, nullptr};
+      if (is_typed_nat(*attribute)) return {ClassicStartKind::kNaT, nullptr};
+    }
+    if (event.timestamp_state == FirstClassAttributeState::kNull)
+      return {ClassicStartKind::kNull, nullptr};
+    return {ClassicStartKind::kValue, &event.timestamp};
+  }
+
+  const auto* attribute = selected_start_attribute(event, key);
+  if (attribute == nullptr)
+    return {ClassicStartKind::kMissing, nullptr};
+  if (attribute->is_null)
+    return {ClassicStartKind::kNull, nullptr};
+  if (is_typed_nat(*attribute)) return {ClassicStartKind::kNaT, nullptr};
+  return {ClassicStartKind::kValue, &attribute->value};
+}
+
+EventAttribute typed_nat_attribute(std::string key,
+                                  std::string_view dtype) {
+  EventAttribute value;
+  value.key = std::move(key);
+  value.value = "NaT";
+  value.kind = AttributeKind::kDate;
+  NativeDate date{"NaT"};
+  if (dtype.find("datetime64[ns") == 0)
+    date.resolution = NativeDateResolution::kNanosecond;
+  const auto timezone_separator = dtype.find(", ");
+  if (timezone_separator != std::string_view::npos && !dtype.empty() &&
+      dtype.back() == ']') {
+    date.timezone = std::string(dtype.substr(
+        timezone_separator + 2, dtype.size() - timezone_separator - 3));
+  }
+  value.typed_value = std::move(date);
+  return value;
+}
+
+void preserve_datetime_missing_start_cells(EventTable& table,
+                                           const HeuristicMinerOptions& options) {
+  if (!options.start_timestamp_attribute ||
+      options.start_timestamp_attribute->empty() || table.dtypes.empty())
+    return;
+  const auto column = std::find(table.columns.begin(), table.columns.end(),
+                                *options.start_timestamp_attribute);
+  if (column == table.columns.end()) return;
+  const auto index = static_cast<std::size_t>(column - table.columns.begin());
+  if (index >= table.dtypes.size() ||
+      !std::string_view(table.dtypes[index]).starts_with("datetime64["))
+    return;
+  for (auto& row : table.rows) {
+    if (!row[index])
+      row[index] = typed_nat_attribute(*options.start_timestamp_attribute,
+                                       table.dtypes[index]);
+  }
+}
+
+void honor_flat_case_selector(EventStream& stream,
+                              std::string_view selected_key) {
+  for (auto& record : stream.events) {
+    for (auto& field : record.fields) {
+      if (field.first_class_role != FirstClassAttributeRole::kCaseId)
+        continue;
+      if (field.key == selected_key ||
+          field.first_class_source_key == selected_key)
+        continue;
+      field.first_class_role = FirstClassAttributeRole::kNone;
+      field.first_class_state = FirstClassAttributeState::kMissing;
+      field.first_class_source_key.clear();
+    }
+  }
+}
+
+EventLog classic_event_log(const EventDataView& data,
+                           const HeuristicMinerOptions& options) {
+  LogConversionOptions conversion;
+  conversion.case_id_key = options.case_id_attribute;
+  if (data.kind() == EventDataKind::kEventTable ||
+      data.kind() == EventDataKind::kLazyEventTable) {
+    auto table = event_data_to_table(data, conversion);
+    if (options.variant == HeuristicMinerVariant::kClassic &&
+        options.decoration == HeuristicNetDecoration::kPerformance)
+      preserve_datetime_missing_start_cells(table, options);
+    auto stream = event_table_to_event_stream(table, conversion);
+    honor_flat_case_selector(stream, options.case_id_attribute);
+    return event_stream_to_event_log(stream, conversion);
+  }
+  if (data.kind() == EventDataKind::kEventStream) {
+    auto stream = *data.stream();
+    honor_flat_case_selector(stream, options.case_id_attribute);
+    return event_stream_to_event_log(stream, conversion);
+  }
+  return event_data_to_event_log(data, conversion);
 }
 
 std::string canonical_activity_attribute(
@@ -621,18 +750,23 @@ HeuristicClassicDfgInput build_classic_input(
       if (options.decoration == HeuristicNetDecoration::kPerformance) {
         const auto complete_microseconds = required_timestamp_microseconds(
             selected_timestamp(trace.events[i - 1], options), "event");
-        const auto* start_value =
-            selected_start_timestamp(trace.events[i], options);
-        if (options.start_timestamp_attribute &&
-            !options.start_timestamp_attribute->empty() &&
-            start_value == nullptr)
+        const auto start =
+            classic_start_timestamp(trace.events[i], options);
+        if (start.kind == ClassicStartKind::kMissing ||
+            start.kind == ClassicStartKind::kNull)
           throw std::invalid_argument(
               "Heuristics Miner CLASSIC is missing the configured start "
               "timestamp attribute");
-        const auto& start_text =
-            start_value == nullptr
-                ? selected_timestamp(trace.events[i], options)
-                : *start_value;
+        if (start.kind == ClassicStartKind::kNaT) {
+          if (options.use_business_hours)
+            throw std::invalid_argument(
+                "cannot convert float NaN to integer");
+          (*input.performance_dfg)[pair].push_back(0.0);
+          continue;
+        }
+        const auto& start_text = start.kind == ClassicStartKind::kCompletion
+                                     ? selected_timestamp(trace.events[i], options)
+                                     : *start.value;
         const auto start_microseconds =
             required_timestamp_microseconds(start_text, "start");
         double elapsed = detail::epoch_seconds_from_microseconds(
@@ -1595,6 +1729,30 @@ HeuristicsNet discover_heuristics_net(
   net.activity_ids_are_local =
       !standard_activity_attribute(options.activity_attribute);
   return net;
+}
+
+HeuristicsNet discover_heuristics_net(
+    const EventDataView& data,
+    const HeuristicMinerOptions& options) {
+  return discover_heuristics_net(classic_event_log(data, options), options);
+}
+
+HeuristicsNet discover_heuristics_net(
+    const EventStream& data,
+    const HeuristicMinerOptions& options) {
+  return discover_heuristics_net(EventDataView(data), options);
+}
+
+HeuristicsNet discover_heuristics_net(
+    const EventTable& data,
+    const HeuristicMinerOptions& options) {
+  return discover_heuristics_net(EventDataView(data), options);
+}
+
+HeuristicsNet discover_heuristics_net(
+    const LazyEventTable& data,
+    const HeuristicMinerOptions& options) {
+  return discover_heuristics_net(EventDataView(data), options);
 }
 
 HeuristicsNet discover_heuristics_net(

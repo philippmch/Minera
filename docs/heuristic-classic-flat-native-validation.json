@@ -1,0 +1,27 @@
+{
+  "status": "verified_partial_field_checkpoint",
+  "parent_commit": "27550712fe4fc09858b301ecf57dc3897d0c1882",
+  "code_tree": "ee08ecff4b026b645dbdf705a0dc129a3e404bc7",
+  "observations": 26,
+  "passed": 26,
+  "affected_native_suites": 6,
+  "direct_module_linkage": {
+    "observations": 12,
+    "inputs_and_outputs_identical_to_paired_EventLog": true,
+    "additional_unique_native_inputs": 0
+  },
+  "unrepresented_fields": [
+    "public_result_type (Python class identity)",
+    "public_heuristics_net.sojourn_times",
+    "public_heuristics_net.nodes.*.is_start_activity",
+    "public_heuristics_net.nodes.*.is_end_activity"
+  ],
+  "exception_mapping": "Missing configured key maps Python KeyError to native invalid_argument diagnostic; NaT business-hours ValueError maps to invalid_argument with same message. Python exception class identity is not claimed.",
+  "scope": "24 paired observations plus2 NaT business-hours controls. Partial represented-field comparison; no full public-object/module completion claim.",
+  "archive": {
+    "path": "docs/heuristic-classic-flat-native-checks.json.gz",
+    "sha256": "fdf2098f293d0131e0a12d1c1cec5c1b50a7ffed492a24c69d687478be445371",
+    "raw_sha256": "1fdb87aa525017eca8e1e90907000ae72516ce059543bba9440660e6e6f712e1",
+    "members": 31
+  }
+}
