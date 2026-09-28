@@ -6361,3 +6361,12 @@ With the same explicit NaT input and `business_hours=true`, both public carriers
 raise ValueError (`cannot convert float NaN to integer`) and leave inputs
 unchanged. Ordinary elapsed-time acceptance of NaT therefore does not imply
 business-hours acceptance. Native verification of this branch remains pending.
+
+Three existing direct-DFG boundary inputs are recaptured in
+`docs/heuristic-classic-dfg-boundaries-reference.json.gz`, with validation in
+`docs/heuristic-classic-dfg-boundaries-reference-validation.json`. The inferred
+list boundaries and the supplied start/end maps retain their public shapes;
+all returned node start/end flags are false and all sojourn maps are empty.
+All three calls preserve their inputs, and opaque CLASSIC module proofs match
+before and after the calls. This supplies missing public-object observations
+for those cases; it does not establish native object parity or change coverage.

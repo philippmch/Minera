@@ -1,0 +1,25 @@
+{
+  "status": "reference_capture_only",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "artifact": {
+    "path": "docs/heuristic-classic-dfg-boundaries-reference.json.gz",
+    "sha256": "46af367d72808068c8be095949b9af428b756e739d032ac5abde54103a0a2819",
+    "raw_sha256": "d1066d8885801d6971144fe0e84a78bdf16efd2991d6848d95c1f14c9c7173f8"
+  },
+  "observations": 3,
+  "successful_results": 3,
+  "unchanged_inputs": 3,
+  "observed_node_boundary_flags": "false for every returned node in all three cases",
+  "observed_sojourn_times": "empty map in all three cases",
+  "runtime": {
+    "python": "3.11.9",
+    "python_executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+    "pm4py": "2.7.22",
+    "pandas": "3.0.6",
+    "PYTHONHASHSEED": "0",
+    "TZ": "UTC",
+    "PYTHONPATH": "C:/Users/pmoch/Documents/Minera/build/heuristic-subsecond-reference-runtime;C:/Users/pmoch/Documents/Minera/build/heuristic-subsecond-runtime-deps"
+  },
+  "capture_script_sha256": "dac5c851e5bc17776f7d908c73b5e98c34cac9ce77b86980fa7fa4cf9a08c5b1",
+  "scope": "Three saved direct CLASSIC DFG boundary cases; no native comparison or completion claim."
+}
