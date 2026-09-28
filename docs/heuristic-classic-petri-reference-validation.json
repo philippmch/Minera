@@ -1,0 +1,30 @@
+{
+  "status": "reference_only",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "public_signatures": {
+    "classic.apply": "(log: pm4py.objects.log.obj.EventLog, parameters: Optional[Dict[Union[str, pm4py.algo.discovery.heuristics.variants.classic.Parameters], Any]] = None) -> Tuple[pm4py.objects.petri_net.obj.PetriNet, pm4py.objects.petri_net.obj.Marking, pm4py.objects.petri_net.obj.Marking]",
+    "classic.apply_dfg": "(dfg: Dict[Tuple[str, str], int], activities=None, activities_occurrences=None, start_activities=None, end_activities=None, parameters: Optional[Dict[Any, Any]] = None) -> Tuple[pm4py.objects.petri_net.obj.PetriNet, pm4py.objects.petri_net.obj.Marking, pm4py.objects.petri_net.obj.Marking]"
+  },
+  "eventlog_observations": 12,
+  "eventlog_results": 10,
+  "dfg_observations": 6,
+  "dfg_results": 6,
+  "unchanged_inputs_and_parameters": 18,
+  "archive": {
+    "path": "docs/heuristic-classic-petri-reference.json.gz",
+    "sha256": "b35b717f20f2e006dcb6f0c6f8ec3cb2cc6fb1bc4f472f1a69d1b8c98c120d14",
+    "raw_reference_sha256": "c111c4bc4ecde94311ee58c24f5551b33a412aca4e5e14a2cba5cbab504a818c"
+  },
+  "limitations": [
+    "Only the public direct classic.apply EventLog and classic.apply_dfg DFG entry points are captured; dispatcher routing is not inferred.",
+    "Capture-local pN/tN identifiers stabilize references within the captured result. Public net/place/transition names and transition labels are retained verbatim.",
+    "Properties that are not finite JSON-compatible values are represented by typed repr snapshots and are called out per result.",
+    "No native Petri-net equivalence or topology parity claim is made.",
+    "No PM4Py implementation source, bytecode, or module globals were inspected; CLASSIC provenance uses opaque file/blob byte hashes only."
+  ],
+  "selection_notes": {
+    "eventlog": "The twelve reviewed EventLog fixtures and exact explicit parameter maps are reloaded through eventlog_from_spec from the paired capture helper. Each is passed directly to classic.apply.",
+    "dfg": "Six named inputs are selected without alteration from the finite saved DFG-input catalogue and passed to classic.apply_dfg using only its inspected public parameters. The selected source records preserve the exact saved input fields.",
+    "branching": "The available catalogue contains no pure diamond/AND-split DFG; the selected A\u2192A plus A\u2192B input records an actual multi-output self-looping branch."
+  }
+}
