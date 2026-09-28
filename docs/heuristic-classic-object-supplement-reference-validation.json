@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "status": "public_returned_object_controls_captured",
+  "nonfinite_and_string_controls": 5,
+  "dfg_insertion_order_controls": 4,
+  "input_mutations": 0,
+  "findings": [
+    "NaN, positive infinity, negative infinity, nested infinity and literal NaN string retain their distinct types and values in the returned performance map and edge representation.",
+    "Reversing disconnected DFG insertion order reverses inferred start/end lists; singleton fork boundaries remain unchanged."
+  ],
+  "native_gates": [
+    "Direct native returned-object comparison for nonfinite and string controls remains required; JSON exporter rejection is a separate transport policy.",
+    "Current native std::map DFG input lacks an insertion-order carrier; this represented-order gap remains open."
+  ],
+  "review": "Independent review found no actionable capture, input fidelity, runtime or binding defects in either authoritative capture.",
+  "prior_attempt": "The initial order script failed before producing an artifact because an unnecessary graph serializer expected a non-null performance map. Its script is retained; the corrected fresh run captures only the required actual activities and boundary lists.",
+  "limits": [
+    "Nine finite public calls; no native comparison or full module completion claim.",
+    "No reference source, bytecode or module globals inspected; module identity checked as opaque bytes only."
+  ],
+  "archive": {
+    "path": "docs/heuristic-classic-object-supplement-reference.json.gz",
+    "sha256": "8c4e89213442b1737a936e268429e8666f3ed1938b00ec1e1628c5ebd85cb4f6",
+    "raw_sha256": "480d70414a65561ad12d9c43e0dcddaae5119cd8991ed21960c1133a89e5f1d2",
+    "members": 8
+  }
+}

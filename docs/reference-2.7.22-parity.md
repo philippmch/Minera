@@ -6536,3 +6536,21 @@ core, test binaries, scripts, observations and private probe headers. Independen
 review found no actionable converter, test or comparator defects. The broader
 1,779-case native comparison remains a separate gate; full HeuristicsNet fields
 are outside this Petri comparison, and coverage counts remain unchanged.
+
+## Supplemental CLASSIC returned-object gates
+
+`docs/heuristic-classic-object-supplement-reference-validation.json` and its
+archive preserve nine pinned public calls with unchanged inputs. Five confirm
+that NaN, positive/negative infinity, nested infinity and the literal string
+`NaN` retain distinct values and types in returned performance maps and edges.
+Native discovery has a corresponding typed representation; a direct native
+object comparison remains required. JSON export rejection is a separate
+transport policy and does not prove or disprove object preservation.
+
+Four insertion-order controls expose a further supported-input gap. Reversing
+the disconnected DFG `A->B:1, Z->Y:1` reverses the inferred start and end lists;
+a fork with singleton boundaries stays unchanged. The current native map
+cannot carry this order. The earlier sorted-map cohort therefore cannot close
+the full boundary-order gate. Both public captures passed independent review,
+and the archive retains scripts, exact raw observations and bindings. No
+module promotion or coverage-count change is claimed.

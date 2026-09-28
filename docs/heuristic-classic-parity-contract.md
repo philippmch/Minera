@@ -13,6 +13,8 @@ its scope to the already verified HeuristicsNet routes.
 | Direct `classic.apply_heu(EventLog)` | `heuristic-classic-direct-reference.json.gz`; `heuristic-classic-flat-native-checks.json.gz` | Twelve direct public observations match the paired dispatcher inputs and outputs; the native comparison checks their represented fields without counting them as additional unique inputs. |
 | Direct `classic.apply_heu_dfg` discovery | `heuristic-dfg-input-reference.json.gz`; `heuristic-dfg-input-validation.json` | 1,350 finite cases cover declared/inferred activities, occurrences, boundaries, thresholds, noise, windows/triples and accepted graph behavior. |
 | DFG decorated values and loop membership | `heuristic-dfg-values-validation.json`; `heuristic-loop-membership-validation.json` | Specialized cohorts cover supplied performance maps and loop-membership behavior. |
+| Non-finite returned performance values | `heuristic-classic-object-supplement-reference-validation.json` | Five pinned public controls preserve NaN, signed infinities, nested infinity and a distinct literal string. Direct native object comparison remains required; JSON rejection is a separate transport policy. |
+| Direct DFG insertion order | `heuristic-classic-object-supplement-reference-validation.json` | Four public controls establish order-sensitive inferred boundary lists. The native map input has no insertion-order carrier; this gap must be closed rather than excluded from module completion. |
 | DFG count arithmetic and inference | `heuristic-count-ratios-validation.json`; `heuristic-inferred-counts-validation.json` | Specialized cohorts cover large ratios and inferred occurrence counts. |
 | EventLog graph, AND, matrices, aggregation and selectors | `reference-2.7.22-parity.md`; the `heuristic-*-validation.json` artifacts referenced there | Existing finite cohorts cover defaults, thresholds, loops, AND measures, duplicate handling, metadata, performance aggregation, timestamp selection, business hours and arithmetic. |
 | Missing selected start, typed NaT and input order | `heuristic-classic-flat-native-validation.json` and its archived checks | All 26 paired/control observations pass exact input, selector and represented-result checks. Missing-key exceptions use the documented native diagnostic mapping. |
@@ -100,6 +102,14 @@ Python object/class identity, exact Python exception classes, opaque Python
 workcalendar objects, arbitrary Python object labels and unsupported non-string
 DFG keys are outside the native representation. These limits must remain
 explicit; they do not excuse differences within supported native inputs.
+
+The older direct-DFG checkpoint's sorted-map input limitation does not settle
+insertion-order parity. Supplemental public controls show that reversing
+`A->B:1, Z->Y:1` reverses inferred starts from `[A,Z]` to `[Z,A]` and ends
+from `[B,Y]` to `[Y,B]`. The native input must be able to carry that order,
+with existing map callers retaining their established default behavior.
+Non-finite values likewise need direct returned-object comparison even though
+the JSON exporter separately rejects them as non-JSON numeric payloads.
 
 Before promotion, reconcile every route and returned-object gate above with
 saved public observations, actual native output, source/binary bindings and
