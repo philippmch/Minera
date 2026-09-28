@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "status": "reference_only",
+  "case_count": 1779,
+  "call_count": 3558,
+  "scope": "All two-activity directed pairs including self-loops with frequencies absent/1/2, and all three-activity directed pairs with frequencies absent/1, each at dependency thresholds 0,0.5,1. Direct CLASSIC Petri and HeuristicsNet routes.",
+  "call_summary": {
+    "case_count": 1779,
+    "route_count": 2,
+    "call_count": 3558,
+    "route_results": {
+      "classic.apply_dfg": {
+        "calls": 1779,
+        "successes": 1779,
+        "errors": 0,
+        "inputs_unchanged": true,
+        "parameters_unchanged": true
+      },
+      "classic.apply_heu_dfg": {
+        "calls": 1779,
+        "successes": 1779,
+        "errors": 0,
+        "inputs_unchanged": true,
+        "parameters_unchanged": true
+      }
+    },
+    "errors": {
+      "total": 0,
+      "by_route_and_type": {
+        "classic.apply_dfg": {},
+        "classic.apply_heu_dfg": {}
+      },
+      "records": []
+    },
+    "input_mutation_count": 0,
+    "parameter_mutation_count": 0
+  },
+  "fixture_manifest": {
+    "description": "Canonical JSON of the complete ordered finite input corpus.",
+    "sha256": "89e402ae4662e3f23fa3689408b287aeae10d76a6ce87b6a0c94719b872ddf1c",
+    "case_count": 1779
+  },
+  "limitations": [
+    "This finite corpus targets small two- and three-activity DFGs, including loops, cycles, splits, and threshold values; it is fault-finding evidence, not a universal semantic proof.",
+    "Every route receives only dfg and the single explicit dependency_thresh parameter; activities, occurrence counts, boundaries, second-window DFGs, triples, and performance maps are omitted.",
+    "Returned Petri and HeuristicsNet objects are serialized through reviewed public-field helpers; actual generated names and properties are preserved.",
+    "Raw output byte stability is not required; fixture identity is bound by the exact ordered manifest and opaque module proofs.",
+    "No PM4Py implementation source, bytecode, or module globals were inspected."
+  ],
+  "initial_attempt": "Initial HeuristicsNet snapshots recorded the serializer wrapper type. Review identified this; the corrected capture records the actual public result type. All remaining observations, manifest and opaque proofs match the original capture.",
+  "archive": {
+    "path": "docs/heuristic-classic-petri-small-dfg-reference.json.gz",
+    "sha256": "b14e192fb8a59f57b9fd0b65c7e4149da3e52a44d13f157784fc8c35cfb8e984",
+    "raw_sha256": "1ddd25320d9d9abfaf4d268fd8085625bfc930f819c261c97b9a4e016a9812a4"
+  }
+}

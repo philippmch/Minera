@@ -6496,3 +6496,26 @@ reject duplicate keys and executable hash changes. It still reports the same
 timezone identity are outside the native mapping; nonempty public properties
 are rejected as unsupported. Native repair and broader DFG verification remain
 open, and coverage counts are unchanged.
+
+## Small-DFG public Petri corpus
+
+`docs/heuristic-classic-petri-small-dfg-reference-validation.json` and its archive
+contain 1,779 ordered input cases, each called through direct CLASSIC Petri and
+HeuristicsNet routes. All 3,558 calls succeeded and preserved their DFG and
+parameter maps. The corpus enumerates the four directed pairs on two activities
+(including loops) with frequencies absent/1/2, and the nine pairs on three
+activities with frequencies absent/1, each at dependency thresholds 0, 0.5 and
+1. Only the DFG and threshold are supplied; declarations, occurrence counts,
+boundaries, auxiliary DFG/triple maps and performance maps are omitted.
+
+The archive retains actual object fields, names, properties and markings,
+the complete ordered fixture manifest, source/helper bindings and opaque
+before/after module proofs. This is a finite reference corpus for detecting
+additional topology differences. Native comparison is pending; neither this
+capture nor its successful calls establish full module parity.
+
+Review identified that the first HeuristicsNet serializer pass reported its
+wrapper type. The corrected capture records the actual returned public type;
+all other observation fields, the fixture manifest and module proofs match
+the first run. The rejected run is preserved as a nested archive with its
+original scripts and bindings.
