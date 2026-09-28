@@ -1,0 +1,21 @@
+{
+  "status": "reviewed_direct_reference_only",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "public_calls": 12,
+  "results": 10,
+  "errors": 2,
+  "same_input_as_dispatcher": 12,
+  "same_output_as_dispatcher": 12,
+  "unchanged_inputs_and_parameters": 12,
+  "review": "Independent code-reviewer /root/classic_flat_reference_review: clear; fresh EventLogs and copied parameters, direct classic.apply_heu calls, full reviewed serializer or exact errors, all12saved observations agree with dispatcher EventLog inputs and outcomes, unchanged inputs/parameters, source/helper/reference and opaque module hash bindings verified. Ten results and two errors. No recaptures or native completion claim.",
+  "coverage_promotion": false,
+  "native_comparison": "pending",
+  "archive": {
+    "path": "docs/heuristic-classic-direct-reference.json.gz",
+    "sha256": "5461e02892aa3e0157275ecece5ef7437653e60bc6ed44bdb74a0f3ebf0580e7"
+  },
+  "reviewed_dispatcher_reference": {
+    "path": "docs/heuristic-classic-flat-timestamps-reference.json.gz",
+    "sha256": "faf9ced2f9173c8b18265bcd2a57052227acc8fd7ea139e7ffbfc453e67a1e37"
+  }
+}

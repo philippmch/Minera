@@ -6340,3 +6340,16 @@ the supplied A-then-B sequence in both captured routes.
 This is reference evidence only. Native flat-input support, typed NaT handling
 and the corresponding comparison are pending; CLASSIC remains partial and
 coverage counts are unchanged.
+
+The direct module entry point is separately captured in
+`docs/heuristic-classic-direct-reference.json.gz`, with review and bindings in
+`docs/heuristic-classic-direct-reference-validation.json`. Twelve fresh
+`classic.apply_heu(EventLog)` calls produce ten results and two errors, exactly
+matching the reviewed dispatcher EventLog inputs and outcomes. Inputs and
+parameters remain unchanged. This closes the direct-route reference gap without
+claiming native completion.
+
+CLASSIC promotion still requires the native flat/typed-NaT comparison, a concise
+reconciliation of its returned public fields with existing EventLog and direct
+DFG evidence, and its own registered implementation/test proof. Parent input
+adapters and PLUSPLUS obligations remain separate catalogue gates.
