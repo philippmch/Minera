@@ -1,0 +1,26 @@
+{
+  "status": "reference_only",
+  "inputs": 2,
+  "public_calls": 4,
+  "unchanged_inputs": 4,
+  "petri_structures": [
+    {
+      "name": "xor-diamond",
+      "places": 4,
+      "transitions": 4,
+      "arcs": 8
+    },
+    {
+      "name": "and-diamond-with-cross-branch-edges",
+      "places": 6,
+      "transitions": 4,
+      "arcs": 10
+    }
+  ],
+  "archive": {
+    "path": "docs/heuristic-classic-petri-diamonds-reference.json.gz",
+    "sha256": "844b7f26a1043f680fa566847ecca4da66a1d01e55f2e74da2e9c44e14fc079f",
+    "raw_reference_sha256": "4a2eca6598776f1df7b422b917609c14b6c5903746a051f52bf26dacb1b9c41f"
+  },
+  "limits": "Finite direct CLASSIC XOR/AND controls; full public outputs retained, native comparison pending."
+}
