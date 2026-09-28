@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "status": "verified_partial_auxiliary_presence_checkpoint",
+  "parent_commit": "480135a4aec4e1c8e4fa5d4df4aee7911cdda22a",
+  "code_tree": "99d473fff0348cefc11739c8072d36cab1eaf459",
+  "flat_observations": 26,
+  "direct_dfg_observations": 3,
+  "passed": 29,
+  "affected_native_suites": 6,
+  "scope": "Actual nullable CLASSIC window-two and triple fields distinguish omitted from explicitly empty maps, with exact input values, actual supplied/effective presence flags, options and unchanged-input checks. Flat represented-field comparisons retained; PLUSPLUS shape unchanged.",
+  "remaining_gates": [
+    "Direct Petri native/reference route comparison",
+    "Distinct catalogue acceptance proof"
+  ],
+  "limitations": [
+    "Finite captured fixtures, not an exhaustive module proof",
+    "Python class and exception identity outside native mapping"
+  ],
+  "independent_implementation_review": "Review found a test JSON substring boundary bug; both assertions were repaired and the repair reviewed. No other actionable production or comparator findings.",
+  "archive": {
+    "path": "docs/heuristic-classic-auxiliary-native-checks.json.gz",
+    "sha256": "7fca9e9627658d12af3f9011a656802a531d07a6607cfa769152864401d52559",
+    "raw_sha256": "3629c85d995b501943702a2973a9bf51a6930b46eb718fd6aef04cd8c9e64ea7",
+    "members": 29
+  }
+}

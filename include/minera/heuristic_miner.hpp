@@ -252,6 +252,10 @@ struct HeuristicsNet {
   std::optional<HeuristicNetMetadata> metadata;
   // Retains an explicitly supplied already-aggregated performance DFG.
   std::optional<HeuristicDecoratedDfg> performance_values;
+  // Presence of the two optional public CLASSIC object fields. Defaults keep
+  // manually assembled legacy nets projecting their concrete maps as present.
+  bool classic_public_dfg_window_2_present = true;
+  bool classic_public_freq_triples_present = true;
 };
 
 struct HeuristicMinerOptions {
@@ -325,6 +329,10 @@ struct HeuristicClassicDfgInput {
   // Already-aggregated values, preserved verbatim. Takes precedence over the
   // legacy sample map and selects performance decoration when supplied.
   std::optional<HeuristicDecoratedDfg> performance_values;
+  // Appended to preserve existing positional aggregate initialization.
+  // Nonempty maps are considered supplied even when these flags are false.
+  bool dfg_window_2_supplied = false;
+  bool freq_triples_supplied = false;
 };
 
 // Discovers a heuristics net from an event log. The dependency of a over b is

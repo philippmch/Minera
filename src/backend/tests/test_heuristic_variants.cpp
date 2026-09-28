@@ -2430,8 +2430,6 @@ struct ClassicObjectEvidenceFixture {
   HeuristicClassicDfgInput input;
   HeuristicMinerOptions options;
   EventLog graph_log;
-  bool public_window_two_present = false;
-  bool public_frequency_triples_present = false;
   std::map<std::string, std::pair<std::uint64_t, std::uint64_t>>
       expected_boundary_counts;
 };
@@ -2452,6 +2450,20 @@ std::string classic_object_input_json(
                        classic_frequency_dfg_json(input.window_two_dfg) +
                        ",\"frequency_triples\":" +
                        classic_triples_json(input.frequency_triples) +
+                       ",\"dfg_window_2_supplied\":" +
+                       (input.dfg_window_2_supplied ? "true" : "false") +
+                       ",\"freq_triples_supplied\":" +
+                       (input.freq_triples_supplied ? "true" : "false") +
+                       ",\"effective_dfg_window_2_present\":" +
+                       ((input.dfg_window_2_supplied ||
+                         !input.window_two_dfg.empty())
+                            ? "true"
+                            : "false") +
+                       ",\"effective_freq_triples_present\":" +
+                       ((input.freq_triples_supplied ||
+                         !input.frequency_triples.empty())
+                            ? "true"
+                            : "false") +
                        ",\"performance_dfg\":" +
                        classic_optional_performance_json(
                            input.performance_values) +
@@ -2460,9 +2472,9 @@ std::string classic_object_input_json(
                            input.start_activities) +
                        ",\"end_activities\":" +
                        classic_optional_boundaries_json(input.end_activities);
-  // The public Python DFG API has optional window-two and triple arguments;
-  // this native input stores concrete maps, so retain the captured presence
-  // separately instead of conflating omitted with explicitly empty input.
+  // The public DFG API has optional window-two and triple arguments, while
+  // native input stores concrete maps. Keep caller-supplied flags and
+  // effective presence together so omitted and explicit-empty stay distinct.
   result += ",\"public_optional_input_presence\":{\"activities\":" +
             std::string(input.activities ? "true" : "false") +
             ",\"activities_occurrences\":" +
@@ -2472,9 +2484,13 @@ std::string classic_object_input_json(
             ",\"end_activities\":" +
             (input.end_activities ? "true" : "false") +
             ",\"dfg_window_2\":" +
-            (fixture.public_window_two_present ? "true" : "false") +
+            ((input.dfg_window_2_supplied || !input.window_two_dfg.empty())
+                 ? "true"
+                 : "false") +
             ",\"freq_triples\":" +
-            (fixture.public_frequency_triples_present ? "true" : "false") +
+            ((input.freq_triples_supplied || !input.frequency_triples.empty())
+                 ? "true"
+                 : "false") +
             ",\"performance_dfg\":" +
             (input.performance_values ? "true" : "false") + "}}";
   return result;
@@ -2525,7 +2541,8 @@ void assert_classic_object_fields(const HeuristicsNet& net,
 }
 
 void classic_object_fields_acceptance(
-    const std::optional<std::string>& evidence_path = std::nullopt) {
+    const std::optional<std::string>& evidence_path = std::nullopt,
+    const std::optional<std::string>& auxiliary_evidence_path = std::nullopt) {
   auto edge_log = log({trace({event("A", "2026-01-01T00:00:00Z"),
                               event("B", "2026-01-01T00:00:01Z")})});
   auto repeated_edge_log = log({
@@ -2569,27 +2586,46 @@ void classic_object_fields_acceptance(
       std::make_pair(std::string("A"), std::string("B")),
       HeuristicPerformanceValue{1.5});
 
+  auto explicit_empty_auxiliary = classic_input({{{"A", "B"}, 1}});
+  explicit_empty_auxiliary.activities = std::vector<std::string>{"A", "B"};
+  explicit_empty_auxiliary.activity_counts =
+      std::map<std::string, std::uint64_t>{{"A", 1}, {"B", 1}};
+  explicit_empty_auxiliary.start_activities =
+      HeuristicBoundaryActivities{std::vector<std::string>{"A"}};
+  explicit_empty_auxiliary.end_activities =
+      HeuristicBoundaryActivities{std::vector<std::string>{"B"}};
+  explicit_empty_auxiliary.dfg_window_2_supplied = true;
+  explicit_empty_auxiliary.freq_triples_supplied = true;
+
   const std::vector<ClassicObjectEvidenceFixture> fixtures{
-      {"boundary_0_0", inferred, inferred_options, edge_log, false, false,
+      {"boundary_0_0", inferred, inferred_options, edge_log,
        {{"A", {1, 0}}, {"B", {0, 1}}}},
-      {"boundary_0_5", end_mapping, inferred_options, edge_log, false, false,
+      {"boundary_0_5", end_mapping, inferred_options, edge_log,
        {{"A", {1, 4}}, {"B", {0, 0}}}},
-      {"boundary_5_0", start_mapping, inferred_options, edge_log, false, false,
+      {"boundary_5_0", start_mapping, inferred_options, edge_log,
        {{"A", {4, 0}}, {"B", {0, 1}}}},
       {"empty-dfg-declared-fallback-boundary", empty_fallback,
-       HeuristicMinerOptions{}, singleton_log, false, false,
+       HeuristicMinerOptions{}, singleton_log,
        {{"A", {1, 1}}}},
       {"explicit-list-boundaries-performance-dfg", explicit_performance,
-       HeuristicMinerOptions{}, repeated_edge_log, false, false,
+       HeuristicMinerOptions{}, repeated_edge_log,
        {{"A", {1, 0}}, {"B", {0, 1}}}},
   };
 
   std::vector<std::string> evidence_records;
-  for (const auto& fixture : fixtures) {
+  std::map<std::string, std::string> records_by_fixture;
+  const auto make_evidence_record = [&](const auto& fixture) {
     const auto input_before = classic_object_input_json(fixture);
     const auto graph = discover_directly_follows_graph(fixture.graph_log);
     const auto result_net =
         discover_heuristics_net(fixture.input, fixture.options);
+    const bool window_two_present = fixture.input.dfg_window_2_supplied ||
+                                    !fixture.input.window_two_dfg.empty();
+    const bool triples_present = fixture.input.freq_triples_supplied ||
+                                 !fixture.input.frequency_triples.empty();
+    assert(result_net.classic_public_dfg_window_2_present ==
+           window_two_present);
+    assert(result_net.classic_public_freq_triples_present == triples_present);
     for (const auto& [name, expected] : fixture.expected_boundary_counts) {
       const auto& statistic = activity_stat(result_net, name);
       assert(statistic.start_occurrences == expected.first);
@@ -2611,6 +2647,30 @@ void classic_object_fields_acceptance(
              1.5);
       assert(analysis.find("\"value\": 1.5") != std::string::npos);
     }
+    if (fixture.name == "explicit-empty-window-triples") {
+      assert(fixture.input.dfg_window_2_supplied);
+      assert(fixture.input.freq_triples_supplied);
+      const auto start = analysis.find("\"classic_public_fields\": {");
+      assert(start != std::string::npos);
+      const auto end = analysis.find('}', start);
+      assert(end != std::string::npos);
+      assert(analysis.substr(start, end - start + 1) ==
+             "\"classic_public_fields\": {\"dfg_window_2\": [], "
+             "\"freq_triples\": []}");
+    }
+    if (fixture.name == "boundary_0_0" ||
+        fixture.name == "boundary_0_5" ||
+        fixture.name == "boundary_5_0" ||
+        fixture.name == "empty-dfg-declared-fallback-boundary" ||
+        fixture.name == "explicit-list-boundaries-performance-dfg") {
+      const auto start = analysis.find("\"classic_public_fields\": {");
+      assert(start != std::string::npos);
+      const auto end = analysis.find('}', start);
+      assert(end != std::string::npos);
+      assert(analysis.substr(start, end - start + 1) ==
+             "\"classic_public_fields\": {\"dfg_window_2\": null, "
+             "\"freq_triples\": null}");
+    }
     assert(classic_object_input_json(fixture) == input_before);
     std::string record = "{\"fixture\":" + json_string(fixture.name) +
                          ",\"route\":\"direct_dfg\",\"outcome\":\"result\"" +
@@ -2623,8 +2683,18 @@ void classic_object_fields_acceptance(
                          activity_mapping_json(graph) +
                          ",\"analysis\":" + analysis +
                          ",\"error\":null}";
+    return record;
+  };
+  for (const auto& fixture : fixtures) {
+    auto record = make_evidence_record(fixture);
+    records_by_fixture.emplace(fixture.name, record);
     evidence_records.push_back(std::move(record));
   }
+  const ClassicObjectEvidenceFixture explicit_empty_fixture{
+      "explicit-empty-window-triples", explicit_empty_auxiliary,
+      HeuristicMinerOptions{}, edge_log, {{"A", {1, 0}}, {"B", {0, 1}}}};
+  records_by_fixture.emplace(explicit_empty_fixture.name,
+                             make_evidence_record(explicit_empty_fixture));
 
   // EventLog discovery shares the direct-DFG implementation path and returns
   // the same fields on its own model and serialized analysis object.
@@ -2635,6 +2705,36 @@ void classic_object_fields_acceptance(
                     nullptr, nullptr, &classic_log_net);
   assert_classic_object_fields(classic_log_net, classic_log_graph,
                                classic_log_analysis);
+  assert(classic_log_net.window_two_dfg.empty());
+  assert(classic_log_net.frequency_triples.empty());
+  assert(classic_log_net.classic_public_dfg_window_2_present);
+  assert(classic_log_net.classic_public_freq_triples_present);
+  assert(classic_log_analysis.find(
+             "\"classic_public_fields\": {\"dfg_window_2\": [], "
+             "\"freq_triples\": []}") != std::string::npos);
+
+  // Nonempty legacy collections make their public fields present even when
+  // callers do not set the newly added supplied-input flags.
+  auto legacy_nonempty = classic_input({{{"A", "B"}, 1}});
+  legacy_nonempty.window_two_dfg[{"A", "C"}] = 2;
+  legacy_nonempty.frequency_triples[{"A", "B", "C"}] = 3;
+  assert(!legacy_nonempty.dfg_window_2_supplied);
+  assert(!legacy_nonempty.freq_triples_supplied);
+  const auto legacy_graph_log =
+      log({trace({event("A", "2026-01-03T00:00:00Z"),
+                  event("B", "2026-01-03T00:00:01Z")})});
+  const auto legacy_graph = discover_directly_follows_graph(legacy_graph_log);
+  const auto legacy_net = discover_heuristics_net(legacy_nonempty);
+  assert(legacy_net.classic_public_dfg_window_2_present);
+  assert(legacy_net.classic_public_freq_triples_present);
+  const auto legacy_analysis = analysis_json(
+      "classic-object-legacy-nonempty-auxiliary", legacy_graph_log,
+      legacy_graph, nullptr, nullptr, &legacy_net);
+  assert(legacy_analysis.find(
+             "\"classic_public_fields\": {\"dfg_window_2\": [{\"key\": "
+             "[\"A\", \"C\"], \"value\": 2}], \"freq_triples\": "
+             "[{\"key\": [\"A\", \"B\", \"C\"], \"value\": 3}]}") !=
+         std::string::npos);
 
   // PLUSPLUS keeps its actual boundary occurrence counts while leaving the
   // CLASSIC return-object fields absent.
@@ -2655,6 +2755,8 @@ void classic_object_fields_acceptance(
   assert(plus_analysis.find("\"sojourn_times\"") == std::string::npos);
   assert(plus_analysis.find("\"is_start_activity\"") == std::string::npos);
   assert(plus_analysis.find("\"is_end_activity\"") == std::string::npos);
+  assert(plus_analysis.find("\"classic_public_fields\"") ==
+         std::string::npos);
 
   if (evidence_path) {
     std::ofstream output(*evidence_path, std::ios::binary);
@@ -2669,6 +2771,25 @@ void classic_object_fields_acceptance(
     if (!output)
       throw std::runtime_error("unable to write CLASSIC object evidence output");
   }
+  if (auxiliary_evidence_path) {
+    const std::vector<std::string> auxiliary_records{
+        records_by_fixture.at("empty-dfg-declared-fallback-boundary"),
+        records_by_fixture.at("explicit-list-boundaries-performance-dfg"),
+        records_by_fixture.at("explicit-empty-window-triples")};
+    std::ofstream output(*auxiliary_evidence_path, std::ios::binary);
+    if (!output)
+      throw std::runtime_error(
+          "unable to open CLASSIC auxiliary evidence output");
+    output << '[';
+    for (std::size_t index = 0; index < auxiliary_records.size(); ++index) {
+      if (index != 0) output << ',';
+      output << auxiliary_records[index];
+    }
+    output << "]\n";
+    if (!output)
+      throw std::runtime_error(
+          "unable to write CLASSIC auxiliary evidence output");
+  }
 }
 
 }  // namespace
@@ -2676,16 +2797,21 @@ void classic_object_fields_acceptance(
 int main(int argc, char** argv) {
   std::optional<std::string> classic_flat_evidence;
   std::optional<std::string> classic_object_evidence;
+  std::optional<std::string> classic_auxiliary_evidence;
   if (argc != 1) {
     if (argc == 3 && std::string_view(argv[1]) == "--classic-flat-evidence") {
       classic_flat_evidence = argv[2];
     } else if (argc == 3 &&
                std::string_view(argv[1]) == "--classic-object-evidence") {
       classic_object_evidence = argv[2];
+    } else if (argc == 3 &&
+               std::string_view(argv[1]) == "--classic-auxiliary-evidence") {
+      classic_auxiliary_evidence = argv[2];
     } else {
       throw std::invalid_argument(
           "usage: test_heuristic_variants "
-          "[--classic-flat-evidence PATH | --classic-object-evidence PATH]");
+          "[--classic-flat-evidence PATH | --classic-object-evidence PATH | "
+          "--classic-auxiliary-evidence PATH]");
     }
   }
   interval_abstraction_and_strict_threshold();
@@ -2713,6 +2839,7 @@ int main(int argc, char** argv) {
   subsecond_timestamps_preserve_exact_order_and_business_prefix();
   configurable_activity_and_timestamp_fields();
   classic_flat_timestamp_acceptance(classic_flat_evidence);
-  classic_object_fields_acceptance(classic_object_evidence);
+  classic_object_fields_acceptance(classic_object_evidence,
+                                   classic_auxiliary_evidence);
   std::cout << "heuristic variant tests passed\n";
 }
