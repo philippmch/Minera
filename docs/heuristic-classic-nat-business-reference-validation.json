@@ -1,0 +1,22 @@
+{
+  "status": "reviewed_reference_only",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "calls": 2,
+  "errors": 2,
+  "unchanged_inputs": 2,
+  "review": "Independent code-reviewer /root/classic_flat_reference_review cleared refreshed runtime/module provenance, input/parameter fidelity, source/helper/reference hashes, and exact error observations. No native completion claim.",
+  "runtime": {
+    "python": "3.11.9",
+    "pm4py": "2.7.22",
+    "pandas": "3.0.6",
+    "hash_seed": "0",
+    "timezone": "UTC"
+  },
+  "raw_sha256": "2eb68283ce53557f1d014a6b3cc368b57f845949a9574f08d67730791cdd404b",
+  "archive": {
+    "path": "docs/heuristic-classic-nat-business-reference.json.gz",
+    "sha256": "ec1dfd4b571604026fc55691940f30d177ea4b82f9c5b9a7185d4cc040c63279"
+  },
+  "native_comparison": "pending",
+  "coverage_promotion": false
+}

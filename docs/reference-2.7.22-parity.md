@@ -6353,3 +6353,11 @@ CLASSIC promotion still requires the native flat/typed-NaT comparison, a concise
 reconciliation of its returned public fields with existing EventLog and direct
 DFG evidence, and its own registered implementation/test proof. Parent input
 adapters and PLUSPLUS obligations remain separate catalogue gates.
+
+A focused business-hours control is preserved in
+`docs/heuristic-classic-nat-business-reference.json.gz`, with runtime bindings and
+review in `docs/heuristic-classic-nat-business-reference-validation.json`.
+With the same explicit NaT input and `business_hours=true`, both public carriers
+raise ValueError (`cannot convert float NaN to integer`) and leave inputs
+unchanged. Ordinary elapsed-time acceptance of NaT therefore does not imply
+business-hours acceptance. Native verification of this branch remains pending.
