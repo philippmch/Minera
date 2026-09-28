@@ -1,14 +1,23 @@
 #include "minera/heuristic_miner.hpp"
+#include "minera/directly_follows_graph.hpp"
+#include "minera/json_export.hpp"
+#include "minera/log_conversion.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/event_table_json.hpp"
 #include "../exact_count_ratio.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <limits>
+#include <numeric>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace minera;
@@ -45,6 +54,183 @@ Trace trace(std::vector<Event> events) {
 EventLog log(std::vector<Trace> traces) {
   EventLog result;
   result.traces = std::move(traces);
+  return result;
+}
+
+EventAttribute typed_date(
+    std::string key, std::string value,
+    std::optional<std::string> timezone = std::string{"UTC"}) {
+  EventAttribute result;
+  result.key = std::move(key);
+  result.value = value;
+  result.kind = AttributeKind::kDate;
+  NativeDate date{std::move(value)};
+  date.timezone = std::move(timezone);
+  result.typed_value = std::move(date);
+  return result;
+}
+
+Event classic_timestamp_event(std::string name, std::string completed,
+                              std::optional<std::string> conventional_start,
+                              std::optional<std::string> custom_start) {
+  auto result = event(std::move(name), std::move(completed));
+  if (conventional_start)
+    result.attributes.push_back(
+        typed_date("start_timestamp", std::move(*conventional_start)));
+  if (custom_start)
+    result.attributes.push_back(
+        typed_date("custom:start", std::move(*custom_start)));
+  return result;
+}
+
+EventLog classic_timestamp_log(std::vector<std::vector<Event>> cases) {
+  EventLog result;
+  result.traces.reserve(cases.size());
+  for (std::size_t index = 0; index < cases.size(); ++index) {
+    Trace current;
+    current.case_id = "case-" + std::to_string(index);
+    current.case_id_state = FirstClassAttributeState::kPresent;
+    current.case_id_source_key = "case:concept:name";
+    current.events = std::move(cases[index]);
+    for (auto& current_event : current.events) {
+      current_event.case_id = current.case_id;
+      current_event.case_id_state = FirstClassAttributeState::kPresent;
+      current_event.case_id_source_key = "case:concept:name";
+      if (!current_event.timestamp_attribute) {
+        current_event.timestamp_attribute =
+            typed_date("time:timestamp", current_event.timestamp);
+        current_event.timestamp_state = FirstClassAttributeState::kPresent;
+        current_event.timestamp_source_key = "time:timestamp";
+      }
+    }
+    result.traces.push_back(std::move(current));
+  }
+  return result;
+}
+
+void set_classic_timezone(EventLog& source, std::string timezone) {
+  for (auto& current_trace : source.traces) {
+    for (auto& current_event : current_trace.events) {
+      current_event.timestamp_attribute = typed_date(
+          "time:timestamp", current_event.timestamp, timezone);
+      current_event.timestamp_state = FirstClassAttributeState::kPresent;
+      current_event.timestamp_source_key = "time:timestamp";
+      for (auto& attribute : current_event.attributes) {
+        if (attribute.kind != AttributeKind::kDate) continue;
+        if (auto* date = std::get_if<NativeDate>(&attribute.typed_value))
+          date->timezone = timezone;
+      }
+    }
+  }
+}
+
+using ClassicFlatRow = std::pair<std::size_t, std::size_t>;
+
+EventTable classic_timestamp_table(
+    const EventLog& source,
+    const std::vector<std::string>& custom_case_ids = {},
+    std::vector<ClassicFlatRow> row_order = {},
+    std::vector<std::int64_t> index_labels = {}) {
+  EventTable result;
+  result.columns = {"case:concept:name", "concept:name"};
+  result.dtypes = {"str", "str"};
+  if (!custom_case_ids.empty()) {
+    result.columns.push_back("case:custom:id");
+    result.dtypes.push_back("str");
+  }
+  result.columns.insert(result.columns.end(),
+                        {"time:timestamp", "start_timestamp", "custom:start"});
+  result.dtypes.insert(result.dtypes.end(),
+                       {"datetime64[us, UTC]", "datetime64[us, UTC]",
+                        "datetime64[us, UTC]"});
+  if (source.traces.size() > 0 && !source.traces.front().events.empty()) {
+    const auto& first = source.traces.front().events.front();
+    if (first.timestamp_attribute) {
+      if (const auto* date =
+              std::get_if<NativeDate>(&first.timestamp_attribute->typed_value);
+          date != nullptr && date->timezone.has_value()) {
+        const auto dtype = "datetime64[us, " + *date->timezone + "]";
+        std::fill(result.dtypes.end() - 3, result.dtypes.end(), dtype);
+      }
+    }
+  }
+  if (row_order.empty()) {
+    for (std::size_t trace_index = 0; trace_index < source.traces.size();
+         ++trace_index) {
+      for (std::size_t event_index = 0;
+           event_index < source.traces[trace_index].events.size();
+           ++event_index)
+        row_order.emplace_back(trace_index, event_index);
+    }
+  }
+  std::size_t flat_index = 0;
+  for (const auto [trace_index, event_index] : row_order) {
+    const auto& current_trace = source.traces.at(trace_index);
+    const auto& current_event = current_trace.events.at(event_index);
+    EventTable::Row row(result.columns.size());
+    for (std::size_t column = 0; column < result.columns.size(); ++column) {
+      const auto& key = result.columns[column];
+      if (key == "case:concept:name") {
+        row[column] = EventAttribute{key, current_trace.case_id,
+                                     AttributeKind::kString};
+        continue;
+      }
+      if (key == "concept:name") {
+        row[column] = EventAttribute{key, current_event.activity,
+                                     AttributeKind::kString};
+        continue;
+      }
+      if (key == "case:custom:id") {
+        row[column] = EventAttribute{key, custom_case_ids.at(flat_index),
+                                     AttributeKind::kString};
+        continue;
+      }
+      if (key == "time:timestamp") {
+        row[column] = current_event.timestamp_attribute
+                          ? *current_event.timestamp_attribute
+                          : typed_date(key, current_event.timestamp);
+        row[column]->key = key;
+        continue;
+      }
+      const auto found = std::find_if(
+          current_event.attributes.begin(), current_event.attributes.end(),
+          [&](const EventAttribute& attribute) { return attribute.key == key; });
+      if (found != current_event.attributes.end()) {
+        auto value = *found;
+        value.key = key;
+        row[column] = std::move(value);
+      } else if (key == "custom:start") {
+        // The captured DataFrame has this datetime column in its schema;
+        // absent EventLog cells therefore enter it as typed pandas NaT.
+        row[column] = typed_date(key, "NaT");
+      }
+    }
+    result.rows.push_back(std::move(row));
+    ++flat_index;
+  }
+  const bool has_custom_index = !index_labels.empty();
+  if (index_labels.empty()) {
+    std::int64_t next = 0;
+    for (const auto& _ : result.rows) {
+      (void)_;
+      index_labels.push_back(next++);
+    }
+  }
+  if (!index_labels.empty()) {
+    EventTableIndex index;
+    index.kind = has_custom_index ? "Index" : "RangeIndex";
+    index.dtype = "int64";
+    index.names = {std::nullopt};
+    for (const auto label : index_labels) {
+      EventAttribute value;
+      value.value = std::to_string(label);
+      value.kind = AttributeKind::kInt;
+      value.typed_value = label;
+      index.labels.push_back(EventTableIndexLabel{std::move(value)});
+    }
+    result.index = std::move(index);
+  }
+  result.validate();
   return result;
 }
 
@@ -1571,9 +1757,600 @@ void configurable_activity_and_timestamp_fields() {
   assert(threw);
 }
 
+struct ClassicTimestampFixture {
+  std::string name;
+  EventLog source;
+  HeuristicMinerOptions options;
+  std::vector<std::string> custom_case_ids;
+  std::vector<ClassicFlatRow> row_order;
+  std::vector<std::int64_t> index_labels;
+  HeuristicFrequencyDfg event_log_dfg;
+  HeuristicFrequencyDfg flat_dfg;
+  std::vector<double> event_log_waits;
+  std::vector<double> flat_waits;
+  std::optional<std::string> event_log_error;
+  std::optional<std::string> flat_error;
+};
+
+ClassicTimestampFixture classic_fixture(
+    std::string name, EventLog source, HeuristicMinerOptions options,
+    HeuristicFrequencyDfg event_log_dfg,
+    HeuristicFrequencyDfg flat_dfg,
+    std::vector<double> event_log_waits,
+    std::vector<double> flat_waits,
+    std::optional<std::string> event_log_error = std::nullopt,
+    std::optional<std::string> flat_error = std::nullopt,
+    std::vector<std::string> custom_case_ids = {},
+    std::vector<ClassicFlatRow> row_order = {},
+    std::vector<std::int64_t> index_labels = {}) {
+  ClassicTimestampFixture result;
+  result.name = std::move(name);
+  result.source = std::move(source);
+  result.options = std::move(options);
+  result.custom_case_ids = std::move(custom_case_ids);
+  result.row_order = std::move(row_order);
+  result.index_labels = std::move(index_labels);
+  result.event_log_dfg = std::move(event_log_dfg);
+  result.flat_dfg = std::move(flat_dfg);
+  result.event_log_waits = std::move(event_log_waits);
+  result.flat_waits = std::move(flat_waits);
+  result.event_log_error = std::move(event_log_error);
+  result.flat_error = std::move(flat_error);
+  if (!result.custom_case_ids.empty()) {
+    assert(result.custom_case_ids.size() == result.row_order.size());
+    for (std::size_t row = 0; row < result.row_order.size(); ++row) {
+      const auto [trace_index, event_index] = result.row_order[row];
+      result.source.traces[trace_index].events[event_index].attributes.push_back(
+          EventAttribute{"case:custom:id", result.custom_case_ids[row],
+                         AttributeKind::kString});
+    }
+  }
+  return result;
+}
+
+HeuristicMinerOptions classic_performance_options() {
+  HeuristicMinerOptions options;
+  options.variant = HeuristicMinerVariant::kClassic;
+  options.decoration = HeuristicNetDecoration::kPerformance;
+  return options;
+}
+
+HeuristicFrequencyDfg classic_ab_frequency(std::uint64_t count = 2) {
+  return {{{"A", "B"}, count}};
+}
+
+HeuristicFrequencyDfg classic_custom_case_frequency() {
+  return {{{"A", "A"}, 1}, {{"B", "B"}, 1}};
+}
+
+std::string json_string(std::string_view value) {
+  constexpr char hex[] = "0123456789abcdef";
+  std::string result = "\"";
+  for (const unsigned char byte : value) {
+    switch (byte) {
+      case '\\': result += "\\\\"; break;
+      case '"': result += "\\\""; break;
+      case '\b': result += "\\b"; break;
+      case '\f': result += "\\f"; break;
+      case '\n': result += "\\n"; break;
+      case '\r': result += "\\r"; break;
+      case '\t': result += "\\t"; break;
+      default:
+        if (byte < 0x20) {
+          result += "\\u00";
+          result += hex[byte >> 4];
+          result += hex[byte & 0x0f];
+        } else {
+          result += static_cast<char>(byte);
+        }
+    }
+  }
+  result += '"';
+  return result;
+}
+
+std::string classic_options_json(const HeuristicMinerOptions& options) {
+  std::string result = "{\"variant\":\"CLASSIC\",\"decoration\":\"";
+  result += options.decoration == HeuristicNetDecoration::kPerformance
+                ? "PERFORMANCE"
+                : "FREQUENCY";
+  result += "\",\"activity_attribute\":" +
+            json_string(options.activity_attribute) +
+            ",\"timestamp_attribute\":" +
+            json_string(options.timestamp_attribute) +
+            ",\"start_timestamp_attribute\":";
+  result += options.start_timestamp_attribute
+                ? json_string(*options.start_timestamp_attribute)
+                : "null";
+  result += ",\"case_id_attribute\":" +
+            json_string(options.case_id_attribute) +
+            ",\"use_business_hours\":" +
+            (options.use_business_hours ? "true" : "false") + "}";
+  return result;
+}
+
+std::string activity_mapping_json(const DirectlyFollowsGraph& graph) {
+  std::string result = "{";
+  for (std::size_t id = 0; id < graph.activities().size(); ++id) {
+    if (id != 0) result += ',';
+    result += json_string(std::to_string(id)) + ":" +
+              json_string(graph.activities()[id]);
+  }
+  return result + "}";
+}
+
+void assert_classic_performance_result(
+    const HeuristicsNet& net, const HeuristicFrequencyDfg& expected_dfg,
+    const std::vector<double>& expected_waits) {
+  assert(net.variant == HeuristicMinerVariant::kClassic);
+  assert(net.decoration == HeuristicNetDecoration::kPerformance);
+  assert(net.performance_aggregation == HeuristicPerformanceAggregation::kMean);
+  assert(net.activity_attribute == "concept:name");
+  assert(net.timestamp_attribute == "time:timestamp");
+  assert(!net.activity_ids_are_local);
+  assert(net.raw_dfg == expected_dfg);
+  assert(net.cleaned_dfg == expected_dfg);
+  assert(net.window_two_dfg.empty());
+  assert(net.frequency_triples.empty());
+  assert(net.edges.size() == expected_dfg.size());
+  assert(net.relation_statistics.size() == expected_dfg.size());
+  for (const auto& [pair, frequency] : expected_dfg) {
+    const auto& stats = relation(net, pair.first, pair.second);
+    assert(stats.direct_adjacency_frequency == frequency);
+    assert(stats.raw_frequency == frequency);
+    assert(stats.cleaned_frequency == frequency);
+    assert(stats.wait_samples == expected_waits);
+    const double expected_mean = expected_waits.empty()
+                                     ? 0.0
+                                     : std::accumulate(expected_waits.begin(),
+                                                       expected_waits.end(), 0.0) /
+                                           expected_waits.size();
+    assert(std::abs(stats.mean_wait_seconds - expected_mean) < 1e-9);
+    assert(std::abs(stats.representation - expected_mean) < 1e-9);
+    const auto* result_edge = edge(net, pair.first, pair.second);
+    assert(result_edge != nullptr);
+    assert(result_edge->frequency == frequency);
+    assert(std::abs(result_edge->representation - expected_mean) < 1e-9);
+  }
+  assert(net.metadata.has_value());
+  assert(net.metadata->activities == net.activities);
+}
+
+void classic_flat_timestamp_acceptance(
+    const std::optional<std::string>& evidence_path = std::nullopt) {
+  const auto normal = classic_timestamp_log({
+      {classic_timestamp_event("A", "2026-01-01T00:00:01+00:00",
+                               "2026-01-01T00:00:00+00:00",
+                               "2026-01-01T00:00:00+00:00"),
+       classic_timestamp_event("B", "2026-01-01T00:00:20+00:00",
+                               "2026-01-01T00:00:03+00:00",
+                               "2026-01-01T00:00:04+00:00")},
+      {classic_timestamp_event("A", "2026-01-01T00:00:01+00:00",
+                               "2026-01-01T00:00:00+00:00",
+                               "2026-01-01T00:00:00+00:00"),
+       classic_timestamp_event("B", "2026-01-01T00:00:20+00:00",
+                               "2026-01-01T00:00:05+00:00",
+                               "2026-01-01T00:00:06+00:00")},
+  });
+  auto conventional = classic_performance_options();
+  conventional.start_timestamp_attribute = "start_timestamp";
+  auto custom = classic_performance_options();
+  custom.start_timestamp_attribute = "custom:start";
+  auto explicit_completion = classic_performance_options();
+  explicit_completion.start_timestamp_attribute = "time:timestamp";
+
+  const auto negative = classic_timestamp_log({
+      {classic_timestamp_event("A", "2026-01-01T00:00:01+00:00",
+                               "2026-01-01T00:00:00+00:00",
+                               "2026-01-01T00:00:00+00:00"),
+       classic_timestamp_event("B", "2026-01-01T00:00:20+00:00",
+                               "2025-12-31T23:59:58+00:00",
+                               "2026-01-01T00:00:04+00:00")},
+      {classic_timestamp_event("A", "2026-01-01T00:00:01+00:00",
+                               "2026-01-01T00:00:00+00:00",
+                               "2026-01-01T00:00:00+00:00"),
+       classic_timestamp_event("B", "2026-01-01T00:00:20+00:00",
+                               "2026-01-01T00:00:05+00:00",
+                               "2026-01-01T00:00:06+00:00")},
+  });
+  auto sparse_destination = classic_timestamp_log({
+      {classic_timestamp_event("A", "2026-01-01T00:00:01+00:00",
+                               "2026-01-01T00:00:00+00:00",
+                               "2026-01-01T00:00:00+00:00"),
+       classic_timestamp_event("B", "2026-01-01T00:00:20+00:00",
+                               "2026-01-01T00:00:03+00:00", std::nullopt)},
+      {classic_timestamp_event("A", "2026-01-01T00:00:01+00:00",
+                               "2026-01-01T00:00:00+00:00",
+                               "2026-01-01T00:00:00+00:00"),
+       classic_timestamp_event("B", "2026-01-01T00:00:20+00:00",
+                               "2026-01-01T00:00:05+00:00",
+                               "2026-01-01T00:00:06+00:00")},
+  });
+  auto sparse_source = classic_timestamp_log({
+      {classic_timestamp_event("A", "2026-01-01T00:00:01+00:00",
+                               "2026-01-01T00:00:00+00:00", std::nullopt),
+       classic_timestamp_event("B", "2026-01-01T00:00:20+00:00",
+                               "2026-01-01T00:00:03+00:00",
+                               "2026-01-01T00:00:04+00:00")},
+      {classic_timestamp_event("A", "2026-01-01T00:00:01+00:00",
+                               "2026-01-01T00:00:00+00:00", std::nullopt),
+       classic_timestamp_event("B", "2026-01-01T00:00:20+00:00",
+                               "2026-01-01T00:00:05+00:00",
+                               "2026-01-01T00:00:06+00:00")},
+  });
+  auto typed_nat = classic_timestamp_log({
+      {classic_timestamp_event("A", "2026-01-01T00:00:01+00:00",
+                               "2026-01-01T00:00:00+00:00",
+                               "2026-01-01T00:00:00+00:00"),
+       classic_timestamp_event("B", "2026-01-01T00:00:20+00:00",
+                               "2026-01-01T00:00:03+00:00", "NaT")},
+      {classic_timestamp_event("A", "2026-01-01T00:00:01+00:00",
+                               "2026-01-01T00:00:00+00:00",
+                               "2026-01-01T00:00:00+00:00"),
+       classic_timestamp_event("B", "2026-01-01T00:00:20+00:00",
+                               "2026-01-01T00:00:05+00:00",
+                               "2026-01-01T00:00:06+00:00")},
+  });
+  auto reverse_completion = classic_timestamp_log({
+      {classic_timestamp_event("A", "2026-01-01T00:00:20+00:00",
+                               "2026-01-01T00:00:10+00:00",
+                               "2026-01-01T00:00:10+00:00"),
+       classic_timestamp_event("B", "2026-01-01T00:00:01+00:00",
+                               "2026-01-01T00:00:00+00:00",
+                               "2026-01-01T00:00:00+00:00")},
+      {classic_timestamp_event("A", "2026-01-01T00:00:30+00:00",
+                               "2026-01-01T00:00:15+00:00",
+                               "2026-01-01T00:00:15+00:00"),
+       classic_timestamp_event("B", "2026-01-01T00:00:02+00:00",
+                               "2026-01-01T00:00:01+00:00",
+                               "2026-01-01T00:00:01+00:00")},
+  });
+
+  const std::vector<ClassicFlatRow> interleaved{{0, 0}, {1, 0}, {0, 1}, {1, 1}};
+  auto timezone_interleaved = classic_timestamp_log({
+      {classic_timestamp_event("A", "2024-02-01T00:00:01+01:00",
+                               "2024-02-01T00:00:00+01:00",
+                               "2024-02-01T00:00:00+01:00"),
+       classic_timestamp_event("B", "2024-02-01T00:00:20+01:00",
+                               "2024-02-01T00:00:03+01:00",
+                               "2024-02-01T00:00:04+01:00")},
+      {classic_timestamp_event("A", "2024-02-01T00:00:01+01:00",
+                               "2024-02-01T00:00:00+01:00",
+                               "2024-02-01T00:00:00+01:00"),
+       classic_timestamp_event("B", "2024-02-01T00:00:20+01:00",
+                               "2024-02-01T00:00:05+01:00",
+                               "2024-02-01T00:00:06+01:00")},
+  });
+  timezone_interleaved.traces[0].case_id = "z-case";
+  timezone_interleaved.traces[1].case_id = "a-case";
+  for (auto& current_trace : timezone_interleaved.traces)
+    for (auto& current_event : current_trace.events)
+      current_event.case_id = current_trace.case_id;
+  set_classic_timezone(timezone_interleaved, "Europe/Berlin");
+
+  auto custom_case_options = custom;
+  custom_case_options.case_id_attribute = "case:custom:id";
+
+  auto absent = classic_performance_options();
+  absent.start_timestamp_attribute = "not:present";
+  const std::string configured_missing =
+      "Heuristics Miner CLASSIC is missing the configured start timestamp attribute";
+
+  const std::vector<ClassicTimestampFixture> fixtures{
+      classic_fixture("omitted-start-selector-present", normal,
+                      classic_performance_options(), classic_ab_frequency(),
+                      classic_ab_frequency(), {19.0, 19.0}, {19.0, 19.0}),
+      classic_fixture("explicit-conventional-start", normal, conventional,
+                      classic_ab_frequency(), classic_ab_frequency(),
+                      {2.0, 4.0}, {2.0, 4.0}),
+      classic_fixture("explicit-custom-start", normal, custom,
+                      classic_ab_frequency(), classic_ab_frequency(),
+                      {3.0, 5.0}, {3.0, 5.0}),
+      classic_fixture("explicit-completion-as-start", normal,
+                      explicit_completion, classic_ab_frequency(),
+                      classic_ab_frequency(), {19.0, 19.0}, {19.0, 19.0}),
+      classic_fixture("negative-conventional-start-wait", negative,
+                      conventional, classic_ab_frequency(),
+                      classic_ab_frequency(), {0.0, 4.0}, {0.0, 4.0}),
+      classic_fixture("sparse-custom-start-destination", sparse_destination,
+                      custom, {}, classic_ab_frequency(), {}, {0.0, 5.0},
+                      configured_missing),
+      classic_fixture("sparse-custom-start-source", sparse_source, custom,
+                      classic_ab_frequency(), classic_ab_frequency(),
+                      {3.0, 5.0}, {3.0, 5.0}),
+      classic_fixture("selected-start-column-absent", normal, absent, {}, {},
+                      {}, {}, configured_missing, configured_missing),
+      classic_fixture("typed-europe-berlin-case-order", timezone_interleaved,
+                      custom, classic_ab_frequency(), classic_ab_frequency(),
+                      {3.0, 5.0}, {3.0, 5.0}, std::nullopt, std::nullopt, {},
+                      interleaved, {9, 3, 7, 1}),
+      classic_fixture("explicit-custom-case-selector-interleaved", normal,
+                      custom_case_options, classic_ab_frequency(),
+                      classic_custom_case_frequency(), {3.0, 5.0}, {0.0},
+                      std::nullopt, std::nullopt,
+                      {"activity-A", "activity-A", "activity-B", "activity-B"},
+                      interleaved, {8, 2, 6, 4}),
+      classic_fixture("explicit-selected-start-pandas-nat", typed_nat, custom,
+                      classic_ab_frequency(), classic_ab_frequency(),
+                      {0.0, 5.0}, {0.0, 5.0}),
+      classic_fixture("interleaved-reverse-completion-order",
+                      reverse_completion, custom, classic_ab_frequency(),
+                      classic_ab_frequency(), {0.0, 0.0}, {0.0, 0.0},
+                      std::nullopt, std::nullopt, {}, interleaved,
+                      {10, 8, 6, 4}),
+  };
+
+  std::vector<std::string> evidence_records;
+  const auto append_evidence = [&](const ClassicTimestampFixture& fixture,
+                                  std::string_view route,
+                                  const HeuristicMinerOptions& options,
+                                  const EventLog& graph_log,
+                                  std::string_view input_snapshot_before,
+                                  std::string_view input_snapshot_after,
+                                  const HeuristicsNet* result_net,
+                                  std::string_view error) {
+    const auto graph = discover_directly_follows_graph(graph_log);
+    std::string record = "{\"fixture\":" + json_string(fixture.name) +
+                         ",\"route\":" + json_string(route) +
+                         ",\"outcome\":" +
+                         json_string(result_net ? "result" : "error") +
+                         ",\"options\":" + classic_options_json(options) +
+                         ",\"input_snapshot_before\":" +
+                         std::string(input_snapshot_before) +
+                         ",\"input_snapshot_after\":" +
+                         std::string(input_snapshot_after) +
+                         ",\"activity_id_to_name\":" +
+                         activity_mapping_json(graph) + ",\"analysis\":";
+    if (result_net == nullptr) {
+      record += "null,\"error\":" + json_string(error) + "}";
+    } else {
+      record += analysis_json(fixture.name + "-" + std::string(route),
+                              graph_log, graph, nullptr, nullptr, result_net) +
+                ",\"error\":null}";
+    }
+    evidence_records.push_back(std::move(record));
+  };
+
+  const auto exercise = [&](const ClassicTimestampFixture& fixture,
+                            bool flat_route) {
+    const auto table = classic_timestamp_table(
+        fixture.source, fixture.custom_case_ids, fixture.row_order,
+        fixture.index_labels);
+    const auto snapshot = flat_route
+                              ? serialize_event_table_json(table)
+                              : serialize_event_table_json(
+                                    event_log_to_table(fixture.source));
+    EventLog graph_log = fixture.source;
+    if (flat_route) {
+      LogConversionOptions conversion;
+      conversion.case_id_key = fixture.options.case_id_attribute;
+      graph_log = event_table_to_event_log(table, conversion);
+    }
+    const auto& expected_dfg =
+        flat_route ? fixture.flat_dfg : fixture.event_log_dfg;
+    const auto& expected_waits =
+        flat_route ? fixture.flat_waits : fixture.event_log_waits;
+    const auto& expected_error =
+        flat_route ? fixture.flat_error : fixture.event_log_error;
+    const std::string route = flat_route ? "event_table" : "event_log";
+    try {
+      const auto result_net = flat_route
+                                  ? discover_heuristics_net(table,
+                                                            fixture.options)
+                                  : discover_heuristics_net(fixture.source,
+                                                            fixture.options);
+      assert(!expected_error.has_value());
+      assert_classic_performance_result(result_net, expected_dfg,
+                                        expected_waits);
+      const auto snapshot_after =
+          flat_route ? serialize_event_table_json(table)
+                     : serialize_event_table_json(
+                           event_log_to_table(fixture.source));
+      assert(snapshot == snapshot_after);
+      append_evidence(fixture, route, fixture.options, graph_log, snapshot,
+                      snapshot_after, &result_net, {});
+    } catch (const std::invalid_argument& error) {
+      assert(expected_error.has_value());
+      assert(error.what() == *expected_error);
+      const auto snapshot_after =
+          flat_route ? serialize_event_table_json(table)
+                     : serialize_event_table_json(
+                           event_log_to_table(fixture.source));
+      assert(snapshot == snapshot_after);
+      append_evidence(fixture, route, fixture.options, graph_log, snapshot,
+                      snapshot_after, nullptr, error.what());
+    }
+  };
+
+  for (const auto& fixture : fixtures) {
+    exercise(fixture, false);
+    exercise(fixture, true);
+  }
+
+  // EventDataView accepts an EventLog while keeping its existing trace
+  // boundaries authoritative even when its flat case selector names no field.
+  auto grouped_view_options = custom;
+  grouped_view_options.case_id_attribute = "case:does:not:exist";
+  const auto grouped_view_net = discover_heuristics_net(
+      EventDataView(normal), grouped_view_options);
+  assert_classic_performance_result(grouped_view_net, classic_ab_frequency(),
+                                    {3.0, 5.0});
+
+  // A converted table/stream tags the canonical case cell with a first-class
+  // role. The selected flat case column must override that carrier metadata.
+  auto role_marked_table = event_log_to_table(normal);
+  const auto activity_column = std::find(role_marked_table.columns.begin(),
+                                         role_marked_table.columns.end(),
+                                         "concept:name");
+  assert(activity_column != role_marked_table.columns.end());
+  const auto activity_index = static_cast<std::size_t>(
+      activity_column - role_marked_table.columns.begin());
+  role_marked_table.columns.insert(role_marked_table.columns.begin() + 2,
+                                   "case:custom:id");
+  if (!role_marked_table.dtypes.empty())
+    role_marked_table.dtypes.insert(role_marked_table.dtypes.begin() + 2,
+                                    "str");
+  for (auto& row : role_marked_table.rows) {
+    assert(activity_index < row.size() && row[activity_index]);
+    const auto& activity_value = *row[activity_index];
+    row.insert(row.begin() + 2,
+               EventAttribute{"case:custom:id",
+                              activity_value.value == "A" ? "activity-A"
+                                                           : "activity-B",
+                              AttributeKind::kString});
+  }
+  role_marked_table.validate();
+  const auto role_marked_table_net = discover_heuristics_net(
+      role_marked_table, custom_case_options);
+  assert_classic_performance_result(role_marked_table_net,
+                                    classic_custom_case_frequency(), {0.0});
+  const auto role_marked_stream =
+      event_table_to_event_stream(role_marked_table);
+  const auto stream_net = discover_heuristics_net(
+      role_marked_stream, custom_case_options);
+  assert_classic_performance_result(stream_net,
+                                    classic_custom_case_frequency(), {0.0});
+  const auto lazy_table = LazyEventTable::from_table(role_marked_table);
+  const auto lazy_net =
+      discover_heuristics_net(lazy_table, custom_case_options);
+  assert_classic_performance_result(lazy_net,
+                                    classic_custom_case_frequency(), {0.0});
+
+  // PLUSPLUS uses the same configured case key for flat carriers while the
+  // EventLog overload above remains governed by its trace boundaries.
+  auto plus_custom_case_options = plus_options();
+  plus_custom_case_options.case_id_attribute = "case:custom:id";
+  const auto plus_custom_case_net =
+      discover_heuristics_net(role_marked_table, plus_custom_case_options);
+  assert(plus_custom_case_net.variant == HeuristicMinerVariant::kPlusPlus);
+  assert(activity_stat(plus_custom_case_net, "A").start_occurrences == 1);
+  assert(activity_stat(plus_custom_case_net, "A").end_occurrences == 1);
+  assert(activity_stat(plus_custom_case_net, "B").start_occurrences == 1);
+  assert(activity_stat(plus_custom_case_net, "B").end_occurrences == 1);
+  const auto plus_event_log_net =
+      discover_heuristics_net(normal, plus_custom_case_options);
+  assert(activity_stat(plus_event_log_net, "A").start_occurrences == 2);
+  assert(activity_stat(plus_event_log_net, "A").end_occurrences == 0);
+  assert(activity_stat(plus_event_log_net, "B").start_occurrences == 0);
+  assert(activity_stat(plus_event_log_net, "B").end_occurrences == 2);
+
+  // The value domains stay separate: a present null date is a missing
+  // selected value, while an ordinary string "NaT" proceeds to date parsing.
+  auto null_date = event("B", "2026-01-01T00:00:20Z");
+  EventAttribute null_start;
+  null_start.key = "custom:start";
+  null_start.kind = AttributeKind::kDate;
+  null_start.is_null = true;
+  null_date.attributes.push_back(null_start);
+  auto null_options = custom;
+  bool null_rejected_as_missing = false;
+  try {
+    (void)discover_heuristics_net(
+        classic_timestamp_log({
+            {classic_timestamp_event("A", "2026-01-01T00:00:01Z",
+                                     std::nullopt,
+                                     "2026-01-01T00:00:00Z"),
+             null_date}}),
+        null_options);
+  } catch (const std::invalid_argument& error) {
+    null_rejected_as_missing = error.what() ==
+                               std::string("Heuristics Miner CLASSIC is missing the configured start timestamp attribute");
+  }
+  assert(null_rejected_as_missing);
+
+  auto string_nat = event("B", "2026-01-01T00:00:20Z");
+  attr(string_nat, "custom:start", "NaT");
+  bool string_nat_rejected_by_parser = false;
+  try {
+    (void)discover_heuristics_net(
+        classic_timestamp_log({
+            {classic_timestamp_event("A", "2026-01-01T00:00:01Z",
+                                     std::nullopt,
+                                     "2026-01-01T00:00:00Z"),
+             string_nat}}),
+        custom);
+  } catch (const std::invalid_argument& error) {
+    string_nat_rejected_by_parser =
+        error.what() != configured_missing;
+  }
+  assert(string_nat_rejected_by_parser);
+
+  // Public explicit-NaT evidence: elapsed performance contributes a zero
+  // sample, while business-hours conversion rejects NaN on both routes.
+  auto business_nat = custom;
+  business_nat.use_business_hours = true;
+  for (const bool flat_route : {false, true}) {
+    const auto table = classic_timestamp_table(typed_nat);
+    const auto snapshot = flat_route ? serialize_event_table_json(table)
+                                     : serialize_event_table_json(
+                                           event_log_to_table(typed_nat));
+    EventLog graph_log = typed_nat;
+    if (flat_route) {
+      LogConversionOptions conversion;
+      conversion.case_id_key = business_nat.case_id_attribute;
+      graph_log = event_table_to_event_log(table, conversion);
+    }
+    const auto snapshot_before = snapshot;
+    bool rejected_nan = false;
+    std::string message;
+    try {
+      if (flat_route)
+        (void)discover_heuristics_net(table, business_nat);
+      else
+        (void)discover_heuristics_net(typed_nat, business_nat);
+    } catch (const std::invalid_argument& error) {
+      message = error.what();
+      rejected_nan = message == "cannot convert float NaN to integer";
+    }
+    assert(rejected_nan);
+    const auto snapshot_after =
+        flat_route ? serialize_event_table_json(table)
+                   : serialize_event_table_json(event_log_to_table(typed_nat));
+    assert(snapshot_before == snapshot_after);
+    ClassicTimestampFixture business_fixture{
+        "explicit_typed_nat_business_hours", typed_nat, business_nat};
+    const auto graph = discover_directly_follows_graph(graph_log);
+    std::string record = "{\"fixture\":" +
+                         json_string(business_fixture.name) +
+                         ",\"route\":" +
+                         json_string(flat_route ? "event_table" : "event_log") +
+                         ",\"outcome\":\"error\",\"options\":" +
+                         classic_options_json(business_nat) +
+                         ",\"input_snapshot_before\":" + snapshot_before +
+                         ",\"input_snapshot_after\":" + snapshot_after +
+                         ",\"activity_id_to_name\":" +
+                         activity_mapping_json(graph) +
+                         ",\"analysis\":null,\"error\":" +
+                         json_string(message) + "}";
+    evidence_records.push_back(std::move(record));
+  }
+
+  if (evidence_path) {
+    std::ofstream output(*evidence_path, std::ios::binary);
+    if (!output)
+      throw std::runtime_error("unable to open CLASSIC evidence output");
+    output << '[';
+    for (std::size_t index = 0; index < evidence_records.size(); ++index) {
+      if (index != 0) output << ',';
+      output << evidence_records[index];
+    }
+    output << "]\n";
+    if (!output)
+      throw std::runtime_error("unable to write CLASSIC evidence output");
+  }
+}
+
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+  std::optional<std::string> classic_flat_evidence;
+  if (argc != 1) {
+    if (argc == 3 && std::string_view(argv[1]) == "--classic-flat-evidence")
+      classic_flat_evidence = argv[2];
+    else
+      throw std::invalid_argument(
+          "usage: test_heuristic_variants [--classic-flat-evidence PATH]");
+  }
   interval_abstraction_and_strict_threshold();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
@@ -1598,5 +2375,6 @@ int main() {
   business_hours_cover_heuristic_waits_and_sojourns();
   subsecond_timestamps_preserve_exact_order_and_business_prefix();
   configurable_activity_and_timestamp_fields();
+  classic_flat_timestamp_acceptance(classic_flat_evidence);
   std::cout << "heuristic variant tests passed\n";
 }
