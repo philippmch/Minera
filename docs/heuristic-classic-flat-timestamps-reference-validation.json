@@ -1,0 +1,21 @@
+{
+  "status": "reviewed_reference_only",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "paired_fixtures": 12,
+  "public_calls": 24,
+  "unchanged_inputs": 24,
+  "matching_graph_pairs": 9,
+  "matching_error_pairs": 1,
+  "coverage_promotion": false,
+  "native_comparison": "pending",
+  "artifacts": [
+    {
+      "path": "docs/heuristic-classic-flat-timestamps-reference.json.gz",
+      "sha256": "faf9ced2f9173c8b18265bcd2a57052227acc8fd7ea139e7ffbfc453e67a1e37"
+    },
+    {
+      "path": "docs/heuristic-classic-flat-timestamps-capture-evidence.json.gz",
+      "sha256": "59aafbea339757d4cfc2636b3e228871b7b30d9c40d6896dea6d0716328eca38"
+    }
+  ]
+}
