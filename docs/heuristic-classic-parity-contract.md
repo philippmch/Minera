@@ -18,8 +18,8 @@ its scope to the already verified HeuristicsNet routes.
 | Missing selected start, typed NaT and input order | `heuristic-classic-flat-native-validation.json` and its archived checks | All 26 paired/control observations pass exact input, selector and represented-result checks. Missing-key exceptions use the documented native diagnostic mapping. |
 | Returned node boundary flags and named sojourn map | `heuristic-classic-object-native-validation.json`; its archived checks and bound public captures | Actual model and serialized fields match 26 flat observations and five direct DFG controls, including fallback nodes and explicit list boundaries with performance data. |
 | Omitted versus explicitly empty raw DFG auxiliary maps | `heuristic-classic-auxiliary-native-validation.json`; its archived checks and bound public controls | Three direct controls and 26 flat observations match. Native supplied/effective presence flags produce actual nullable public fields, preserving existing array fields. |
-| Petri-returning `classic.apply` / `classic.apply_dfg` | `heuristic-classic-petri-reference.json.gz`; `heuristic-classic-petri-reference-validation.json` | Pinned direct signatures and 18 public calls are captured: ten EventLog nets, two missing-key errors and six DFG nets. Actual topology, properties and markings are retained; native comparison remains pending. |
-| Pure XOR/AND Petri construction | `heuristic-classic-petri-diamonds-reference.json.gz`; its validation summary | Two additive inputs are captured through both Petri and HeuristicsNet direct DFG routes. The XOR and AND nets have distinct structures; native comparison remains pending. |
+| Petri-returning `classic.apply` / `classic.apply_dfg` | `heuristic-classic-petri-native-baseline-validation.json`; its archived checks and bound public references | Seventeen of 18 primary cases match. `metadata_3_0_0_0` remains a real topology mismatch: native conversion adds two private input places and arcs absent from the public result. |
+| Pure XOR/AND Petri construction | `heuristic-classic-petri-native-baseline-validation.json`; `heuristic-classic-petri-diamonds-reference.json.gz` | All four additive Petri/HeuristicsNet route checks match, including the XOR/AND structural distinction and AND measures of 0.8. |
 | Distinct catalogue proof | `reference-2.7.22-coverage.json` CLASSIC module row | Add an exact implementation and registered acceptance-test proof only after all module gates are verified. |
 
 ## Required returned-object checks
@@ -58,7 +58,13 @@ gap: XOR returns 4 places, 4 transitions and 8 arcs, while the input with
 cross-branch evidence returns 6 places, 4 transitions and 10 arcs and AND
 measures of 0.8. All four additive route calls preserve their arguments.
 Capture and fixture-helper sources are embedded with hash bindings in the
-reference archives. These observations do not establish native parity.
+reference archives. The native baseline now matches both diamond inputs through
+both routes, while one of the 18 primary cases remains mismatched. Its DFG is
+`A->B:1, B->A:2` with defaults and omitted boundary metadata. Both results keep
+the visible A/B transitions and disconnected source/sink markings, but native
+conversion adds two private input places; the reference leaves both transition
+inputs unwired. The baseline preserves this failure and does not establish
+complete Petri-route parity.
 
 ## Scope boundaries and completion
 

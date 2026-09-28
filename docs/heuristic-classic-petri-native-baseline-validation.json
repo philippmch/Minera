@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "status": "native_baseline_with_known_mismatch",
+  "observations": 22,
+  "matched": 21,
+  "primary_observations": 18,
+  "diamond_route_observations": 4,
+  "unresolved_fixture": "metadata_3_0_0_0",
+  "unresolved_behavior": "DFG A->B:1,B->A:2 yields native six places/four arcs versus reference four places/two arcs; native creates extra private input places for two inputless visible transitions.",
+  "native_core_sha256": "dc27060e1c88b854fcfdaf285dd1aa68172b5ab46203ab7543be6d6bdd69b666",
+  "native_core_checkpoint": "Prior verified CLASSIC flat-input checkpoint, immutable private core/header snapshot; not the subsequently rebuilt shared core.",
+  "comparison_scope": "Captured input fields/options and timestamp/offset values; weighted directed bipartite Petri isomorphism with place/transition kinds, labels including silent transitions, and per-place initial/final tokens. Two additional HeuristicsNet diamond route comparisons check represented edges and AND measures.",
+  "limits": [
+    "Finite baseline with an explicit mismatch; no module completion claim",
+    "Generated names and public properties excluded from structural isomorphism, retained in raw public output",
+    "Berlin EventLog native fixture uses named Europe/Berlin metadata while reference uses a fixed offset; timestamp/offset values match but timezone identity is not established",
+    "Current 22 native keys are unique and executable hashes unchanged, but comparator success must enforce these conditions before use as a completion gate",
+    "Python exception classes use an explicit native missing-start diagnostic mapping"
+  ],
+  "initial_attempt": "Retained initial comparison incorrectly treated two captured KeyErrors as empty nets; corrected outcome handling maps them explicitly.",
+  "archive": {
+    "path": "docs/heuristic-classic-petri-native-baseline.json.gz",
+    "sha256": "ba2e87cdcba2ab51f6f94351ef5199d84769dc8b011317b0456c95cbc1423782",
+    "raw_sha256": "f91bebef08289c160885c8b5204fc749d50cf23c97e5c3b5a6e888a8091d8f64",
+    "members": 162
+  }
+}

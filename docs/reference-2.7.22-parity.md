@@ -6441,3 +6441,31 @@ outputs, scripts, source/binary bindings and final logs. This closes the
 preceding checkpoint's auxiliary-map presence gap within the supported API.
 Direct Petri conversion and the distinct catalogue proof remain open; coverage
 counts are unchanged.
+
+## CLASSIC native Petri baseline
+
+`docs/heuristic-classic-petri-native-baseline-validation.json` and its archive
+preserve 22 actual native route checks, with 21 matches. The 18 primary cases
+match except for `metadata_3_0_0_0`; both XOR/AND controls additionally match
+through the Petri and HeuristicsNet routes. The comparison preserves weighted
+directed topology, place/transition kinds, visible and silent labels, and
+per-place initial/final token counts. Generated names are retained in raw
+reference evidence but excluded from structural isomorphism.
+
+This baseline also excludes public property payloads from isomorphism and
+proves timestamp/offset values rather than Python timezone identity. Its Berlin
+EventLog fixture carries native named-zone metadata while the reference uses
+a fixed offset. Review additionally identified missing success guards for
+duplicate case keys and executable hash changes; the current keys are unique
+and hashes unchanged, but these guards must be added before the comparator is
+used as a completion gate.
+
+The unresolved DFG `A->B:1, B->A:2` keeps two visible transitions with no accepted
+dependency edges or inferred boundaries. Reference conversion leaves their
+inputs unwired and gives each a private output place (four places/two arcs in
+total); native conversion adds two private input places (six places/four arcs).
+The archived baseline is bound to the earlier verified core/header snapshot,
+not the subsequently rebuilt shared checkout. It also retains the initial
+comparison that misread two reference KeyErrors as empty nets, followed by the
+corrected explicit exception mapping. No completion or coverage promotion is
+claimed from this baseline.
