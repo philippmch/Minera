@@ -1229,10 +1229,27 @@ void write_heuristics_net(std::ostream& out,
         << ", \"occurrences\": " << stat.occurrences.to_string()
         << ", \"start_occurrences\": " << stat.start_occurrences
         << ", \"end_occurrences\": " << stat.end_occurrences
-        << ", \"mean_sojourn_seconds\": " << stat.mean_sojourn_seconds << '}'
-        << (i + 1 < net.activity_statistics.size() ? ", " : "");
+        << ", \"mean_sojourn_seconds\": " << stat.mean_sojourn_seconds;
+    if (stat.is_start_activity)
+      out << ", \"is_start_activity\": "
+          << (*stat.is_start_activity ? "true" : "false");
+    if (stat.is_end_activity)
+      out << ", \"is_end_activity\": "
+          << (*stat.is_end_activity ? "true" : "false");
+    out << '}' << (i + 1 < net.activity_statistics.size() ? ", " : "");
   }
-  out << "], \"relation_statistics\": [";
+  out << ']';
+  if (net.sojourn_times) {
+    out << ", \"sojourn_times\": {";
+    std::size_t index = 0;
+    for (const auto& [activity, seconds] : *net.sojourn_times) {
+      write_json_string(out, activity);
+      out << ": " << seconds
+          << (++index < net.sojourn_times->size() ? ", " : "");
+    }
+    out << '}';
+  }
+  out << ", \"relation_statistics\": [";
   for (std::size_t i = 0; i < net.relation_statistics.size(); ++i) {
     const auto& stat = net.relation_statistics[i];
     out << "{\"source\": " << resolve(stat.source)

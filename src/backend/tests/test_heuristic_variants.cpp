@@ -2340,16 +2340,353 @@ void classic_flat_timestamp_acceptance(
   }
 }
 
+std::string classic_frequency_dfg_json(const HeuristicFrequencyDfg& dfg) {
+  std::string result = "[";
+  std::size_t index = 0;
+  for (const auto& [pair, count] : dfg) {
+    if (index++ != 0) result += ',';
+    result += "{\"source\":" + json_string(pair.first) +
+              ",\"target\":" + json_string(pair.second) +
+              ",\"count\":" + std::to_string(count) + "}";
+  }
+  return result + ']';
+}
+
+std::string classic_triples_json(const HeuristicTripleFrequencies& triples) {
+  std::string result = "[";
+  std::size_t index = 0;
+  for (const auto& [triple, count] : triples) {
+    const auto& [first, middle, last] = triple;
+    if (index++ != 0) result += ',';
+    result += "{\"first\":" + json_string(first) +
+              ",\"middle\":" + json_string(middle) +
+              ",\"last\":" + json_string(last) +
+              ",\"count\":" + std::to_string(count) + "}";
+  }
+  return result + ']';
+}
+
+std::string classic_counts_json(
+    const std::map<std::string, std::uint64_t>& counts) {
+  std::string result = "{";
+  std::size_t index = 0;
+  for (const auto& [name, count] : counts) {
+    if (index++ != 0) result += ',';
+    result += json_string(name) + ':' + std::to_string(count);
+  }
+  return result + '}';
+}
+
+std::string classic_optional_counts_json(
+    const std::optional<std::map<std::string, std::uint64_t>>& counts) {
+  return counts ? classic_counts_json(*counts) : "null";
+}
+
+std::string classic_optional_activities_json(
+    const std::optional<std::vector<std::string>>& activities) {
+  if (!activities) return "null";
+  std::string result = "[";
+  for (std::size_t index = 0; index < activities->size(); ++index) {
+    if (index != 0) result += ',';
+    result += json_string((*activities)[index]);
+  }
+  return result + ']';
+}
+
+std::string classic_optional_boundaries_json(
+    const std::optional<HeuristicBoundaryActivities>& boundaries) {
+  if (!boundaries) return "null";
+  if (const auto* activities =
+          std::get_if<std::vector<std::string>>(&*boundaries)) {
+    std::string result = "[";
+    for (std::size_t index = 0; index < activities->size(); ++index) {
+      if (index != 0) result += ',';
+      result += json_string((*activities)[index]);
+    }
+    return result + ']';
+  }
+  return classic_counts_json(
+      std::get<std::map<std::string, std::uint64_t>>(*boundaries));
+}
+
+std::string classic_optional_performance_json(
+    const std::optional<HeuristicDecoratedDfg>& values) {
+  if (!values) return "null";
+  std::string result = "[";
+  std::size_t index = 0;
+  for (const auto& [pair, value] : *values) {
+    const auto* scalar = std::get_if<double>(&value);
+    assert(scalar != nullptr);
+    if (index++ != 0) result += ',';
+    result += "{\"source\":" + json_string(pair.first) +
+              ",\"target\":" + json_string(pair.second) +
+              ",\"value\":" + std::to_string(*scalar) + "}";
+  }
+  return result + ']';
+}
+
+struct ClassicObjectEvidenceFixture {
+  std::string name;
+  HeuristicClassicDfgInput input;
+  HeuristicMinerOptions options;
+  EventLog graph_log;
+  bool public_window_two_present = false;
+  bool public_frequency_triples_present = false;
+  std::map<std::string, std::pair<std::uint64_t, std::uint64_t>>
+      expected_boundary_counts;
+};
+
+std::string classic_object_input_json(
+    const ClassicObjectEvidenceFixture& fixture) {
+  const auto& input = fixture.input;
+  std::string result = "{\"dfg\":" + classic_frequency_dfg_json(input.dfg) +
+                       ",\"activities\":" +
+                       classic_optional_activities_json(input.activities) +
+                       ",\"activity_counts\":" +
+                       classic_optional_counts_json(input.activity_counts) +
+                       ",\"start_counts\":" +
+                       classic_optional_counts_json(input.start_counts) +
+                       ",\"end_counts\":" +
+                       classic_optional_counts_json(input.end_counts) +
+                       ",\"window_two_dfg\":" +
+                       classic_frequency_dfg_json(input.window_two_dfg) +
+                       ",\"frequency_triples\":" +
+                       classic_triples_json(input.frequency_triples) +
+                       ",\"performance_dfg\":" +
+                       classic_optional_performance_json(
+                           input.performance_values) +
+                       ",\"start_activities\":" +
+                       classic_optional_boundaries_json(
+                           input.start_activities) +
+                       ",\"end_activities\":" +
+                       classic_optional_boundaries_json(input.end_activities);
+  // The public Python DFG API has optional window-two and triple arguments;
+  // this native input stores concrete maps, so retain the captured presence
+  // separately instead of conflating omitted with explicitly empty input.
+  result += ",\"public_optional_input_presence\":{\"activities\":" +
+            std::string(input.activities ? "true" : "false") +
+            ",\"activities_occurrences\":" +
+            (input.activity_counts ? "true" : "false") +
+            ",\"start_activities\":" +
+            (input.start_activities ? "true" : "false") +
+            ",\"end_activities\":" +
+            (input.end_activities ? "true" : "false") +
+            ",\"dfg_window_2\":" +
+            (fixture.public_window_two_present ? "true" : "false") +
+            ",\"freq_triples\":" +
+            (fixture.public_frequency_triples_present ? "true" : "false") +
+            ",\"performance_dfg\":" +
+            (input.performance_values ? "true" : "false") + "}}";
+  return result;
+}
+
+std::string classic_object_options_json(
+    const HeuristicMinerOptions& options) {
+  auto result = classic_options_json(options);
+  assert(!result.empty() && result.back() == '}');
+  result.pop_back();
+  result += ",\"dfg_pre_cleaning_noise_threshold\":" +
+            std::to_string(options.dfg_pre_cleaning_noise_threshold) + "}";
+  return result;
+}
+
+void assert_classic_object_fields(const HeuristicsNet& net,
+                                  const DirectlyFollowsGraph& graph,
+                                  std::string_view analysis) {
+  assert(net.variant == HeuristicMinerVariant::kClassic);
+  assert(net.sojourn_times.has_value());
+  assert(net.sojourn_times->empty());
+  assert(analysis.find("\"sojourn_times\": {}") != std::string_view::npos);
+  const auto statistics_begin = analysis.find("\"activity_statistics\": [");
+  assert(statistics_begin != std::string_view::npos);
+  for (const auto activity_id : net.active_activities) {
+    const auto statistic = std::find_if(
+        net.activity_statistics.begin(), net.activity_statistics.end(),
+        [&](const auto& candidate) { return candidate.activity == activity_id; });
+    assert(statistic != net.activity_statistics.end());
+    assert(statistic->is_start_activity.has_value());
+    assert(statistic->is_end_activity.has_value());
+    assert(!*statistic->is_start_activity);
+    assert(!*statistic->is_end_activity);
+    const auto graph_id = graph.activity_id(net.activities[activity_id]);
+    assert(graph_id.has_value());
+    const std::string row_start =
+        "{\"activity\": " + std::to_string(*graph_id) + ",";
+    const auto row = analysis.find(row_start, statistics_begin);
+    assert(row != std::string_view::npos);
+    const auto row_end = analysis.find('}', row);
+    assert(row_end != std::string_view::npos);
+    const auto row_json = analysis.substr(row, row_end - row);
+    assert(row_json.find("\"is_start_activity\": false") !=
+           std::string_view::npos);
+    assert(row_json.find("\"is_end_activity\": false") !=
+           std::string_view::npos);
+  }
+}
+
+void classic_object_fields_acceptance(
+    const std::optional<std::string>& evidence_path = std::nullopt) {
+  auto edge_log = log({trace({event("A", "2026-01-01T00:00:00Z"),
+                              event("B", "2026-01-01T00:00:01Z")})});
+  auto repeated_edge_log = log({
+      trace({event("A", "2026-01-01T00:00:00Z"),
+             event("B", "2026-01-01T00:00:01Z")}),
+      trace({event("A", "2026-01-02T00:00:00Z"),
+             event("B", "2026-01-02T00:00:01Z")}),
+  });
+  auto singleton_log =
+      log({trace({event("A", "2026-01-01T00:00:00Z")})});
+
+  auto inferred = classic_input({{{"A", "B"}, 1}});
+  HeuristicMinerOptions inferred_options;
+  inferred_options.dfg_pre_cleaning_noise_threshold = 0.0;
+  auto end_mapping = inferred;
+  end_mapping.end_activities = HeuristicBoundaryActivities{
+      std::map<std::string, std::uint64_t>{{"Z", 0}, {"A", 4}}};
+  auto start_mapping = inferred;
+  start_mapping.start_activities = HeuristicBoundaryActivities{
+      std::map<std::string, std::uint64_t>{{"Z", 0}, {"A", 4}}};
+
+  HeuristicClassicDfgInput empty_fallback;
+  empty_fallback.activities = std::vector<std::string>{"A"};
+  empty_fallback.activity_counts =
+      std::map<std::string, std::uint64_t>{{"A", 1}};
+  empty_fallback.start_activities =
+      HeuristicBoundaryActivities{std::vector<std::string>{"A"}};
+  empty_fallback.end_activities =
+      HeuristicBoundaryActivities{std::vector<std::string>{"A"}};
+
+  auto explicit_performance = classic_input({{{"A", "B"}, 2}});
+  explicit_performance.activities = std::vector<std::string>{"A", "B"};
+  explicit_performance.activity_counts =
+      std::map<std::string, std::uint64_t>{{"A", 2}, {"B", 2}};
+  explicit_performance.start_activities =
+      HeuristicBoundaryActivities{std::vector<std::string>{"A"}};
+  explicit_performance.end_activities =
+      HeuristicBoundaryActivities{std::vector<std::string>{"B"}};
+  explicit_performance.performance_values.emplace();
+  explicit_performance.performance_values->emplace(
+      std::make_pair(std::string("A"), std::string("B")),
+      HeuristicPerformanceValue{1.5});
+
+  const std::vector<ClassicObjectEvidenceFixture> fixtures{
+      {"boundary_0_0", inferred, inferred_options, edge_log, false, false,
+       {{"A", {1, 0}}, {"B", {0, 1}}}},
+      {"boundary_0_5", end_mapping, inferred_options, edge_log, false, false,
+       {{"A", {1, 4}}, {"B", {0, 0}}}},
+      {"boundary_5_0", start_mapping, inferred_options, edge_log, false, false,
+       {{"A", {4, 0}}, {"B", {0, 1}}}},
+      {"empty-dfg-declared-fallback-boundary", empty_fallback,
+       HeuristicMinerOptions{}, singleton_log, false, false,
+       {{"A", {1, 1}}}},
+      {"explicit-list-boundaries-performance-dfg", explicit_performance,
+       HeuristicMinerOptions{}, repeated_edge_log, false, false,
+       {{"A", {1, 0}}, {"B", {0, 1}}}},
+  };
+
+  std::vector<std::string> evidence_records;
+  for (const auto& fixture : fixtures) {
+    const auto input_before = classic_object_input_json(fixture);
+    const auto graph = discover_directly_follows_graph(fixture.graph_log);
+    const auto result_net =
+        discover_heuristics_net(fixture.input, fixture.options);
+    for (const auto& [name, expected] : fixture.expected_boundary_counts) {
+      const auto& statistic = activity_stat(result_net, name);
+      assert(statistic.start_occurrences == expected.first);
+      assert(statistic.end_occurrences == expected.second);
+    }
+    const auto analysis = analysis_json(fixture.name, fixture.graph_log,
+                                        graph, nullptr, nullptr, &result_net);
+    assert_classic_object_fields(result_net, graph, analysis);
+    if (fixture.name == "empty-dfg-declared-fallback-boundary") {
+      assert(result_net.edges.empty());
+      assert(result_net.active_activities.size() == 1);
+      assert(result_net.activities[result_net.active_activities.front()] ==
+             "A");
+    }
+    if (fixture.name == "explicit-list-boundaries-performance-dfg") {
+      assert(result_net.decoration == HeuristicNetDecoration::kPerformance);
+      assert(result_net.performance_values.has_value());
+      assert(std::get<double>(result_net.performance_values->at({"A", "B"})) ==
+             1.5);
+      assert(analysis.find("\"value\": 1.5") != std::string::npos);
+    }
+    assert(classic_object_input_json(fixture) == input_before);
+    std::string record = "{\"fixture\":" + json_string(fixture.name) +
+                         ",\"route\":\"direct_dfg\",\"outcome\":\"result\"" +
+                         ",\"options\":" +
+                         classic_object_options_json(fixture.options) +
+                         ",\"input_snapshot_before\":" + input_before +
+                         ",\"input_snapshot_after\":" +
+                         classic_object_input_json(fixture) +
+                         ",\"activity_id_to_name\":" +
+                         activity_mapping_json(graph) +
+                         ",\"analysis\":" + analysis +
+                         ",\"error\":null}";
+    evidence_records.push_back(std::move(record));
+  }
+
+  // EventLog discovery shares the direct-DFG implementation path and returns
+  // the same fields on its own model and serialized analysis object.
+  const auto classic_log_graph = discover_directly_follows_graph(edge_log);
+  const auto classic_log_net = discover_heuristics_net(edge_log);
+  const auto classic_log_analysis =
+      analysis_json("classic-object-event-log", edge_log, classic_log_graph,
+                    nullptr, nullptr, &classic_log_net);
+  assert_classic_object_fields(classic_log_net, classic_log_graph,
+                               classic_log_analysis);
+
+  // PLUSPLUS keeps its actual boundary occurrence counts while leaving the
+  // CLASSIC return-object fields absent.
+  const auto plus_log = log({trace({event("A", "2026-01-01T00:00:00Z"),
+                                   event("B", "2026-01-01T00:00:01Z")})});
+  const auto plus_graph = discover_directly_follows_graph(plus_log);
+  const auto plus_net = discover_heuristics_net(plus_log, plus_options());
+  assert(!plus_net.sojourn_times.has_value());
+  assert(activity_stat(plus_net, "A").start_occurrences == 1);
+  assert(activity_stat(plus_net, "B").end_occurrences == 1);
+  for (const auto& statistic : plus_net.activity_statistics) {
+    assert(!statistic.is_start_activity.has_value());
+    assert(!statistic.is_end_activity.has_value());
+  }
+  const auto plus_analysis = analysis_json("classic-plus-object-fields",
+                                           plus_log, plus_graph, nullptr,
+                                           nullptr, &plus_net);
+  assert(plus_analysis.find("\"sojourn_times\"") == std::string::npos);
+  assert(plus_analysis.find("\"is_start_activity\"") == std::string::npos);
+  assert(plus_analysis.find("\"is_end_activity\"") == std::string::npos);
+
+  if (evidence_path) {
+    std::ofstream output(*evidence_path, std::ios::binary);
+    if (!output)
+      throw std::runtime_error("unable to open CLASSIC object evidence output");
+    output << '[';
+    for (std::size_t index = 0; index < evidence_records.size(); ++index) {
+      if (index != 0) output << ',';
+      output << evidence_records[index];
+    }
+    output << "]\n";
+    if (!output)
+      throw std::runtime_error("unable to write CLASSIC object evidence output");
+  }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   std::optional<std::string> classic_flat_evidence;
+  std::optional<std::string> classic_object_evidence;
   if (argc != 1) {
-    if (argc == 3 && std::string_view(argv[1]) == "--classic-flat-evidence")
+    if (argc == 3 && std::string_view(argv[1]) == "--classic-flat-evidence") {
       classic_flat_evidence = argv[2];
-    else
+    } else if (argc == 3 &&
+               std::string_view(argv[1]) == "--classic-object-evidence") {
+      classic_object_evidence = argv[2];
+    } else {
       throw std::invalid_argument(
-          "usage: test_heuristic_variants [--classic-flat-evidence PATH]");
+          "usage: test_heuristic_variants "
+          "[--classic-flat-evidence PATH | --classic-object-evidence PATH]");
+    }
   }
   interval_abstraction_and_strict_threshold();
   lifecycle_fifo_and_configurable_interval_attribute();
@@ -2376,5 +2713,6 @@ int main(int argc, char** argv) {
   subsecond_timestamps_preserve_exact_order_and_business_prefix();
   configurable_activity_and_timestamp_fields();
   classic_flat_timestamp_acceptance(classic_flat_evidence);
+  classic_object_fields_acceptance(classic_object_evidence);
   std::cout << "heuristic variant tests passed\n";
 }

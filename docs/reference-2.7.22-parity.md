@@ -6405,3 +6405,21 @@ not claim full PLUSPLUS parity or full public-object parity: node start/end
 flags and the sojourn map still lack native fields. Python class and exception
 identity are outside the native result/error mapping. Coverage remains
 198 complete / 189 partial modules and 46 complete / 40 partial packages.
+
+## CLASSIC native object-field checkpoint
+
+`docs/heuristic-classic-object-native-validation.json` and its checks archive
+record 31 passing observations: the 26 flat controls and five direct DFG
+controls. CLASSIC now stores and serializes actual false node start/end flags
+and an empty named sojourn map, independently of internal boundary membership.
+PLUSPLUS leaves the new optional fields absent. The registered
+`classic_object_fields_acceptance()` checks direct DFG and EventLog behavior,
+including fallback nodes, nonzero boundary counts and performance decoration.
+
+All six affected native suites pass, and independent implementation review
+found no actionable defects. The archive retains actual native output,
+source/binary bindings, comparison scripts, and the initial threshold-type
+comparison failure; the repaired check compares the floating threshold exactly
+while preserving strict integer count checks. This supersedes the preceding
+checkpoint's missing-node-field limitation. Raw auxiliary-map presence and
+direct Petri route comparisons remain open; coverage counts are unchanged.

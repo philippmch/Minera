@@ -1024,6 +1024,7 @@ HeuristicsNet discover_classic_dfg(
   net.window_two_dfg = input.window_two_dfg;
   net.frequency_triples = input.frequency_triples;
   net.performance_values = input.performance_values;
+  net.sojourn_times.emplace();
 
   // Keep declared names separate from the internal id table.  A direct DFG
   // without an explicit declaration uses its endpoint names as declarations;
@@ -1492,10 +1493,15 @@ HeuristicsNet discover_classic_dfg(
 
   for (std::size_t id = 0; id < net.activities.size(); ++id) {
     const auto& name = net.activities[id];
-    net.activity_statistics.push_back(
-        {id, activity_count(name),
-         starts.contains(name) ? starts.at(name) : 0,
-         ends.contains(name) ? ends.at(name) : 0, 0.0});
+    HeuristicActivityStatistics statistic{
+        id, activity_count(name),
+        starts.contains(name) ? starts.at(name) : 0,
+        ends.contains(name) ? ends.at(name) : 0, 0.0};
+    // These are the public CLASSIC node attributes, separate from the
+    // boundary membership/counts retained above and in net metadata.
+    statistic.is_start_activity = false;
+    statistic.is_end_activity = false;
+    net.activity_statistics.push_back(std::move(statistic));
   }
   std::set<NamePair> statistic_pairs;
   for (const auto& [pair, _] : input.dfg) statistic_pairs.insert(pair);
