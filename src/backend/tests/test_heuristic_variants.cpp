@@ -3,6 +3,7 @@
 #include "minera/json_export.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/model_decoration.hpp"
+#include "minera/petri_analysis.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/event_table_json.hpp"
 #include "../exact_count_ratio.hpp"
@@ -11,10 +12,12 @@
 #include <cassert>
 #include <cmath>
 #include <fstream>
+#include <iterator>
 #include <iostream>
 #include <limits>
 #include <numeric>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -2792,12 +2795,406 @@ void classic_object_fields_acceptance(
   }
 }
 
+std::string heuristic_variant_json_name(HeuristicMinerVariant variant) {
+  switch (variant) {
+    case HeuristicMinerVariant::kClassic: return "classic";
+    case HeuristicMinerVariant::kPlusPlus: return "plusplus";
+  }
+  return "UNKNOWN";
+}
+
+std::string heuristic_aggregation_json_name(
+    HeuristicPerformanceAggregation aggregation) {
+  switch (aggregation) {
+    case HeuristicPerformanceAggregation::kMean: return "mean";
+    case HeuristicPerformanceAggregation::kMedian: return "median";
+    case HeuristicPerformanceAggregation::kMinimum: return "minimum";
+    case HeuristicPerformanceAggregation::kMaximum: return "maximum";
+    case HeuristicPerformanceAggregation::kStandardDeviation:
+      return "standard_deviation";
+    case HeuristicPerformanceAggregation::kSum: return "sum";
+    case HeuristicPerformanceAggregation::kRawValues: return "raw_values";
+    case HeuristicPerformanceAggregation::kAll: return "all";
+  }
+  return "UNKNOWN";
+}
+
+std::string heuristic_options_snapshot_json(
+    const HeuristicMinerOptions& options) {
+  std::string result = "{\"variant\":" +
+                      json_string(heuristic_variant_json_name(options.variant)) +
+                      ",\"activity_attribute\":" +
+                      json_string(options.activity_attribute) +
+                      ",\"timestamp_attribute\":" +
+                      json_string(options.timestamp_attribute) +
+            ",\"dependency_threshold\":";
+  result += options.dependency_threshold
+                ? std::to_string(*options.dependency_threshold)
+                : "null";
+  result += ",\"min_frequency\":" +
+            std::to_string(options.min_frequency) +
+            ",\"connect_all\":" +
+            (options.connect_all ? "true" : "false") +
+            ",\"and_threshold\":" +
+            std::to_string(options.and_threshold) +
+            ",\"min_activity_count\":" +
+            std::to_string(options.min_activity_count) +
+            ",\"decoration\":" +
+            json_string(options.decoration == HeuristicNetDecoration::kPerformance
+                            ? "performance"
+                            : "frequency") +
+            ",\"performance_aggregation\":" +
+            json_string(heuristic_aggregation_json_name(
+                options.performance_aggregation)) +
+            ",\"dfg_pre_cleaning_noise_threshold\":" +
+            std::to_string(options.dfg_pre_cleaning_noise_threshold) +
+            ",\"loop_length_two_threshold\":" +
+            std::to_string(options.loop_length_two_threshold) +
+            ",\"keep_once_per_case\":" +
+            (options.keep_once_per_case ? "true" : "false") +
+            ",\"start_timestamp_attribute\":";
+  result += options.start_timestamp_attribute
+                ? json_string(*options.start_timestamp_attribute)
+                : "null";
+  result += ",\"lifecycle_instance_attribute\":" +
+            json_string(options.lifecycle_instance_attribute) +
+            ",\"use_business_hours\":" +
+            (options.use_business_hours ? "true" : "false") +
+            ",\"business_hour_slots_explicit\":" +
+            (options.business_hour_slots_explicit ? "true" : "false") +
+            ",\"business_hour_slots_count\":" +
+            std::to_string(options.business_hour_slots.size()) +
+            ",\"case_id_attribute\":" +
+            json_string(options.case_id_attribute);
+  return result + "}";
+}
+
+std::string petri_transition_labels_json(const PetriNet& net) {
+  std::string result = "[";
+  for (std::size_t index = 0; index < net.transitions().size(); ++index) {
+    if (index != 0) result += ',';
+    const auto& transition = net.transitions()[index];
+    if (transition.silent()) {
+      result += "null";
+      continue;
+    }
+    assert(*transition.activity < net.activities().size());
+    result += json_string(net.activities()[*transition.activity]);
+  }
+  return result + ']';
+}
+
+std::string native_marking_json(const PetriNet& net, bool initial) {
+  if (net.place_count() == 0 ||
+      (initial ? !net.has_source() : !net.has_sink()))
+    return "[]";
+  const auto markings = default_workflow_markings(net);
+  const auto& marking = initial ? markings.initial : markings.final;
+  std::string result = "[";
+  bool first = true;
+  for (std::size_t place = 0; place < marking.size(); ++place) {
+    if (marking[place] == 0) continue;
+    if (!first) result += ',';
+    first = false;
+    result += "{\"place\":" + std::to_string(place) +
+              ",\"tokens\":" + std::to_string(marking[place]) + "}";
+  }
+  return result + ']';
+}
+
+std::set<std::size_t> petri_place_set(
+    const std::vector<std::size_t>& places) {
+  const std::set<std::size_t> result(places.begin(), places.end());
+  assert(result.size() == places.size());
+  return result;
+}
+
+void assert_inputless_petri_shape(
+    const HeuristicsNet& heuristics, const PetriNet& petri,
+    const std::set<std::string>& expected_labels,
+    const std::set<std::string>& expected_parked_labels,
+    const std::optional<std::string>& expected_start_label,
+    const std::optional<std::string>& expected_end_label,
+    std::size_t expected_places, std::size_t expected_arcs) {
+  assert(heuristics.edges.empty());
+  assert(petri.has_source() && petri.has_sink());
+  assert(petri.source() != petri.sink());
+  assert(petri.place_count() == expected_places);
+  assert(petri.transitions().size() == expected_labels.size());
+
+  const std::set<std::string> registered_labels(petri.activities().begin(),
+                                                petri.activities().end());
+  assert(registered_labels == expected_labels);
+  std::set<std::string> active_labels;
+  for (const std::size_t activity_id : heuristics.active_activities) {
+    assert(activity_id < heuristics.activities.size());
+    active_labels.insert(heuristics.activities[activity_id]);
+  }
+  assert(active_labels == expected_labels);
+
+  std::set<std::string> transition_labels;
+  std::size_t arc_count = 0;
+  std::set<std::size_t> parking_places;
+  for (const auto& transition : petri.transitions()) {
+    assert(!transition.silent());
+    assert(*transition.activity < petri.activities().size());
+    const auto& label = petri.activities()[*transition.activity];
+    assert(transition_labels.insert(label).second);
+    assert(transition.reset_inputs.empty());
+    assert(transition.inhibitor_inputs.empty());
+    arc_count += transition.inputs.size() + transition.outputs.size();
+
+    const std::set<std::size_t> expected_inputs =
+        expected_start_label && label == *expected_start_label
+            ? std::set<std::size_t>{petri.source()}
+            : std::set<std::size_t>{};
+    assert(petri_place_set(transition.inputs) == expected_inputs);
+    if (expected_parked_labels.contains(label)) {
+      assert(transition.outputs.size() == 1);
+      const auto parked = transition.outputs.front();
+      assert(parked != petri.source() && parked != petri.sink());
+      assert(parking_places.insert(parked).second);
+    } else {
+      assert(expected_end_label && label == *expected_end_label);
+      assert(petri_place_set(transition.outputs) ==
+             std::set<std::size_t>{petri.sink()});
+    }
+  }
+  assert(transition_labels == expected_labels);
+  assert(parking_places.size() == expected_parked_labels.size());
+
+  // Parking places keep sinkless output tokens visible and have no consumers.
+  for (const std::size_t place : parking_places) {
+    std::size_t producers = 0;
+    std::size_t consumers = 0;
+    for (const auto& transition : petri.transitions()) {
+      producers += static_cast<std::size_t>(
+          std::count(transition.outputs.begin(), transition.outputs.end(), place));
+      consumers += static_cast<std::size_t>(
+          std::count(transition.inputs.begin(), transition.inputs.end(), place));
+      assert(std::find(transition.reset_inputs.begin(),
+                       transition.reset_inputs.end(), place) ==
+             transition.reset_inputs.end());
+      assert(std::find(transition.inhibitor_inputs.begin(),
+                       transition.inhibitor_inputs.end(), place) ==
+             transition.inhibitor_inputs.end());
+    }
+    assert(producers == 1);
+    assert(consumers == 0);
+  }
+  assert(arc_count == expected_arcs);
+
+  const auto markings = default_workflow_markings(petri);
+  assert(markings.initial.size() == petri.place_count());
+  assert(markings.final.size() == petri.place_count());
+  for (std::size_t place = 0; place < petri.place_count(); ++place) {
+    assert(markings.initial[place] == (place == petri.source() ? 1 : 0));
+    assert(markings.final[place] == (place == petri.sink() ? 1 : 0));
+  }
+}
+
+EventLog inputless_sabae_event_log() {
+  const auto dated_event = [](std::string label, std::string timestamp) {
+    return classic_timestamp_event(std::move(label), timestamp, timestamp,
+                                   std::nullopt);
+  };
+  EventLog result = classic_timestamp_log({
+      {dated_event("S", "2026-01-01T00:00:00+00:00"),
+       dated_event("A", "2026-01-01T00:00:10+00:00"),
+       dated_event("B", "2026-01-01T00:00:20+00:00"),
+       dated_event("A", "2026-01-01T00:00:30+00:00"),
+       dated_event("E", "2026-01-01T00:00:40+00:00")},
+  });
+  auto& only_trace = result.traces.front();
+  only_trace.case_id = "inputless-probe";
+  only_trace.case_id_state = FirstClassAttributeState::kPresent;
+  only_trace.case_id_source_key = "case:concept:name";
+  for (auto& current_event : only_trace.events) {
+    current_event.case_id = only_trace.case_id;
+    current_event.case_id_state = FirstClassAttributeState::kPresent;
+    current_event.case_id_source_key = "case:concept:name";
+  }
+  set_classic_timezone(result, "UTC");
+  return result;
+}
+
+void assert_inputless_sabae_dates(const EventLog& source) {
+  static constexpr std::string_view labels[]{"S", "A", "B", "A", "E"};
+  static constexpr std::string_view timestamps[]{
+      "2026-01-01T00:00:00+00:00", "2026-01-01T00:00:10+00:00",
+      "2026-01-01T00:00:20+00:00", "2026-01-01T00:00:30+00:00",
+      "2026-01-01T00:00:40+00:00"};
+  assert(source.traces.size() == 1);
+  assert(source.traces.front().case_id == "inputless-probe");
+  assert(source.traces.front().events.size() == std::size(labels));
+  for (std::size_t index = 0; index < std::size(labels); ++index) {
+    const auto& current_event = source.traces.front().events[index];
+    assert(current_event.activity == labels[index]);
+    assert(current_event.timestamp == timestamps[index]);
+    assert(current_event.timestamp_attribute.has_value());
+    assert(current_event.timestamp_attribute->kind == AttributeKind::kDate);
+    const auto* completion =
+        std::get_if<NativeDate>(&current_event.timestamp_attribute->typed_value);
+    assert(completion != nullptr);
+    assert(completion->value == timestamps[index]);
+    assert(completion->timezone == std::optional<std::string>{"UTC"});
+    const auto start = std::find_if(
+        current_event.attributes.begin(), current_event.attributes.end(),
+        [](const EventAttribute& attribute) {
+          return attribute.key == "start_timestamp";
+        });
+    assert(start != current_event.attributes.end());
+    assert(start->kind == AttributeKind::kDate);
+    const auto* start_date = std::get_if<NativeDate>(&start->typed_value);
+    assert(start_date != nullptr);
+    assert(start_date->value == timestamps[index]);
+    assert(start_date->timezone == std::optional<std::string>{"UTC"});
+  }
+}
+
+void heuristic_inputless_petri_acceptance(
+    const std::optional<std::string>& evidence_path = std::nullopt) {
+  constexpr std::string_view direct_name =
+      "metadata_3_0_0_0_direct_classic_inputless";
+  constexpr std::string_view eventlog_name =
+      "one-trace-S-A-B-A-E-dependency-threshold-1";
+
+  auto direct_input = classic_input(
+      {{{"A", "B"}, 1}, {{"B", "A"}, 2}});
+  HeuristicMinerOptions direct_options;
+  const auto direct_input_snapshot = [&] {
+    ClassicObjectEvidenceFixture fixture{
+        std::string(direct_name), direct_input, direct_options, {}, {}};
+    return classic_object_input_json(fixture);
+  }();
+  const auto direct_options_snapshot =
+      heuristic_options_snapshot_json(direct_options);
+  const auto direct_graph_log = log({
+      trace({event("A", ""), event("B", "")}),
+      trace({event("B", ""), event("A", "")}),
+      trace({event("B", ""), event("A", "")}),
+  });
+  const auto direct_graph = discover_directly_follows_graph(direct_graph_log);
+  assert(direct_graph.edge_count("A", "B") == 1);
+  assert(direct_graph.edge_count("B", "A") == 2);
+  const auto direct_heuristics =
+      discover_heuristics_net(direct_input, direct_options);
+  const auto direct_petri = to_petri_net(direct_heuristics);
+  assert_inputless_petri_shape(
+      direct_heuristics, direct_petri, {"A", "B"}, {"A", "B"},
+      std::nullopt, std::nullopt, 4, 2);
+  const auto direct_input_after = [&] {
+    ClassicObjectEvidenceFixture fixture{
+        std::string(direct_name), direct_input, direct_options, {}, {}};
+    return classic_object_input_json(fixture);
+  }();
+  assert(direct_input_snapshot == direct_input_after);
+  assert(direct_options_snapshot ==
+         heuristic_options_snapshot_json(direct_options));
+
+  const auto direct_analysis = analysis_json(
+      direct_name, direct_graph_log, direct_graph, nullptr, &direct_petri,
+      &direct_heuristics);
+  assert(direct_analysis.find("\"petri_net\"") != std::string::npos);
+  assert(direct_analysis.find("\"heuristics_net\"") != std::string::npos);
+  std::vector<std::string> records;
+  records.push_back(
+      "{\"name\":" + json_string(direct_name) +
+      ",\"fixture\":" + json_string(direct_name) +
+      ",\"route\":\"direct_dfg\",\"variant\":\"classic\""
+      ",\"status\":\"result\",\"reference_parameters\":{}"
+      ",\"options\":" + direct_options_snapshot +
+      ",\"options_snapshot_before\":" + direct_options_snapshot +
+      ",\"options_snapshot_after\":" +
+      heuristic_options_snapshot_json(direct_options) +
+      ",\"input_snapshot_before\":" + direct_input_snapshot +
+      ",\"input_snapshot_after\":" + direct_input_after +
+      ",\"activity_id_to_name\":" + activity_mapping_json(direct_graph) +
+      ",\"analysis_json\":" + direct_analysis +
+      ",\"petri_transition_labels\":" +
+      petri_transition_labels_json(direct_petri) +
+      ",\"native_initial_marking\":" +
+      native_marking_json(direct_petri, true) +
+      ",\"native_final_marking\":" +
+      native_marking_json(direct_petri, false) + "}");
+
+  const auto source = inputless_sabae_event_log();
+  assert_inputless_sabae_dates(source);
+  const auto event_input_snapshot =
+      serialize_event_table_json(event_log_to_table(source));
+  const std::string event_reference_parameters =
+      "{\"dependency_thresh\":1}";
+  const std::set<std::string> event_labels{"S", "A", "B", "E"};
+  const std::set<std::string> event_parked_labels{"S", "A", "B"};
+  for (const HeuristicMinerVariant variant :
+       {HeuristicMinerVariant::kClassic, HeuristicMinerVariant::kPlusPlus}) {
+    HeuristicMinerOptions options;
+    options.variant = variant;
+    options.dependency_threshold = 1.0;
+    const auto options_before = heuristic_options_snapshot_json(options);
+    const auto heuristics = discover_heuristics_net(source, options);
+    const auto petri = to_petri_net(heuristics);
+    assert_inputless_petri_shape(heuristics, petri, event_labels,
+                                 event_parked_labels, std::string("S"),
+                                 std::string("E"), 5, 5);
+    const auto options_after = heuristic_options_snapshot_json(options);
+    const auto event_input_after =
+        serialize_event_table_json(event_log_to_table(source));
+    assert(options_before == options_after);
+    assert(event_input_snapshot == event_input_after);
+    assert_inputless_sabae_dates(source);
+
+    const auto graph = discover_directly_follows_graph(source);
+    const auto analysis =
+        analysis_json(eventlog_name, source, graph, nullptr, &petri, &heuristics);
+    assert(analysis.find("\"petri_net\"") != std::string::npos);
+    assert(analysis.find("\"heuristics_net\"") != std::string::npos);
+    const auto variant_name = heuristic_variant_json_name(variant);
+    const std::string record_name =
+        std::string(eventlog_name) +
+        (variant == HeuristicMinerVariant::kClassic ? "-CLASSIC" : "-PLUSPLUS");
+    records.push_back(
+        "{\"name\":" + json_string(record_name) +
+        ",\"fixture\":" + json_string(eventlog_name) +
+        ",\"route\":\"EventLog\",\"variant\":" +
+        json_string(variant_name) +
+        ",\"status\":\"result\",\"reference_parameters\":" +
+        event_reference_parameters + ",\"options\":" + options_before +
+        ",\"options_snapshot_before\":" + options_before +
+        ",\"options_snapshot_after\":" + options_after +
+        ",\"input_snapshot_before\":" + event_input_snapshot +
+        ",\"input_snapshot_after\":" + event_input_after +
+        ",\"activity_id_to_name\":" + activity_mapping_json(graph) +
+        ",\"analysis_json\":" + analysis +
+        ",\"petri_transition_labels\":" +
+        petri_transition_labels_json(petri) +
+        ",\"native_initial_marking\":" + native_marking_json(petri, true) +
+        ",\"native_final_marking\":" + native_marking_json(petri, false) +
+        "}");
+  }
+
+  if (evidence_path) {
+    std::ofstream output(*evidence_path, std::ios::binary);
+    if (!output)
+      throw std::runtime_error("unable to open inputless Petri evidence output");
+    output << '[';
+    for (std::size_t index = 0; index < records.size(); ++index) {
+      if (index != 0) output << ',';
+      output << records[index];
+    }
+    output << "]\n";
+    if (!output)
+      throw std::runtime_error("unable to write inputless Petri evidence output");
+  }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   std::optional<std::string> classic_flat_evidence;
   std::optional<std::string> classic_object_evidence;
   std::optional<std::string> classic_auxiliary_evidence;
+  std::optional<std::string> heuristic_inputless_evidence;
   if (argc != 1) {
     if (argc == 3 && std::string_view(argv[1]) == "--classic-flat-evidence") {
       classic_flat_evidence = argv[2];
@@ -2807,11 +3204,15 @@ int main(int argc, char** argv) {
     } else if (argc == 3 &&
                std::string_view(argv[1]) == "--classic-auxiliary-evidence") {
       classic_auxiliary_evidence = argv[2];
+    } else if (argc == 3 &&
+               std::string_view(argv[1]) == "--heuristic-inputless-evidence") {
+      heuristic_inputless_evidence = argv[2];
     } else {
       throw std::invalid_argument(
           "usage: test_heuristic_variants "
           "[--classic-flat-evidence PATH | --classic-object-evidence PATH | "
-          "--classic-auxiliary-evidence PATH]");
+          "--classic-auxiliary-evidence PATH | "
+          "--heuristic-inputless-evidence PATH]");
     }
   }
   interval_abstraction_and_strict_threshold();
@@ -2841,5 +3242,6 @@ int main(int argc, char** argv) {
   classic_flat_timestamp_acceptance(classic_flat_evidence);
   classic_object_fields_acceptance(classic_object_evidence,
                                    classic_auxiliary_evidence);
+  heuristic_inputless_petri_acceptance(heuristic_inputless_evidence);
   std::cout << "heuristic variant tests passed\n";
 }

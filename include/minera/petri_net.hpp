@@ -237,11 +237,14 @@ void fire_petri_transition(const PetriTransition& transition,
 // join wired straight onto the transition, while several bundles meet at a
 // hub place through one silent transition per bundle, keeping the choice
 // exclusive. Starting is one more join alternative (from the source place)
-// and finishing one more split alternative (to the sink). Unlike the former
-// one-token translation this expresses the concurrency the AND measure
-// discovered, so parallel behaviour replays instead of counting as deviation;
-// in exchange, soundness is no longer guaranteed on graphs whose splits and
-// joins do not balance (alignments report such nets as not computable).
+// and finishing one more split alternative (to the sink). An activity with no
+// incoming dependency or start boundary has no input arcs, while an activity
+// with no outgoing dependency or end boundary produces a token into a private
+// parking place. Unlike the former one-token translation this expresses the
+// concurrency the AND measure discovered, so parallel behaviour replays
+// instead of counting as deviation; in exchange, soundness is no longer
+// guaranteed on graphs whose splits and joins do not balance (alignments
+// report such nets as not computable).
 [[nodiscard]] PetriNet to_petri_net(const HeuristicsNet& heuristics);
 
 }  // namespace minera
