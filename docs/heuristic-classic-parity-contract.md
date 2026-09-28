@@ -17,7 +17,7 @@ its scope to the already verified HeuristicsNet routes.
 | EventLog graph, AND, matrices, aggregation and selectors | `reference-2.7.22-parity.md`; the `heuristic-*-validation.json` artifacts referenced there | Existing finite cohorts cover defaults, thresholds, loops, AND measures, duplicate handling, metadata, performance aggregation, timestamp selection, business hours and arithmetic. |
 | Missing selected start, typed NaT and input order | `heuristic-classic-flat-native-validation.json` and its archived checks | All 26 paired/control observations pass exact input, selector and represented-result checks. Missing-key exceptions use the documented native diagnostic mapping. |
 | Returned node boundary flags and named sojourn map | `heuristic-classic-direct-reference.json.gz`; `heuristic-classic-dfg-boundaries-reference.json.gz` | Public observations are available; the native model/serializer and explicit comparisons remain incomplete. |
-| Petri-returning `classic.apply` / `classic.apply_dfg` | No completed direct-route native/reference comparison yet | Verify the pinned public callables, preserve actual returned nets and markings, then compare native output. Native-only conversion tests do not close this gate. |
+| Petri-returning `classic.apply` / `classic.apply_dfg` | `heuristic-classic-petri-reference.json.gz`; `heuristic-classic-petri-reference-validation.json` | Pinned direct signatures and 18 public calls are captured: ten EventLog nets, two missing-key errors and six DFG nets. Actual topology, properties and markings are retained; native comparison remains pending. |
 | Distinct catalogue proof | `reference-2.7.22-coverage.json` CLASSIC module row | Add an exact implementation and registered acceptance-test proof only after all module gates are verified. |
 
 ## Required returned-object checks
@@ -43,6 +43,12 @@ types, transition labels (including silent transitions), weighted directed
 arcs, and initial/final token counts. State explicitly which generated names
 are excluded from semantic comparison. A HeuristicsNet match alone is not
 evidence that its Petri conversion matches.
+
+The initial Petri cohort preserves all 18 inputs and parameter maps unchanged.
+Its six DFG cases come from the existing input catalogue, which does not contain
+a pure diamond/AND-split fixture. The captured self-looping branch must not be
+treated as coverage of that missing construction. Capture and fixture-helper
+sources are embedded with their hash bindings in the reference archive.
 
 ## Scope boundaries and completion
 
