@@ -347,13 +347,13 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
   // Collapses a's alternatives into the place set its transition touches. A
   // single alternative wires directly (an AND split/join on the transition
   // itself); several alternatives meet at a hub place with one silent
-  // transition per bundle, so exactly one bundle is taken. No alternative at
-  // all yields a fresh private place: on the input side the transition is
-  // dead (nothing routes to it), on the output side the token parks there
-  // instead of vanishing — either way the deviation stays visible to replay.
+  // transition per bundle, so exactly one bundle is taken. No input
+  // alternative leaves the transition inputless; no output alternative gets
+  // a fresh private place where the token parks instead of vanishing.
   const auto merge = [&](std::vector<std::vector<std::size_t>> alts,
                          bool joining) -> std::vector<std::size_t> {
     if (alts.empty()) {
+      if (joining) return {};
       return {net.add_place()};
     }
     if (alts.size() == 1) {

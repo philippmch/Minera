@@ -6519,3 +6519,20 @@ wrapper type. The corrected capture records the actual returned public type;
 all other observation fields, the fixture manifest and module proofs match
 the first run. The rejected run is preserved as a nested archive with its
 original scripts and bindings.
+
+## Inputless Petri native repair
+
+`docs/heuristic-petri-inputless-native-validation.json` and its archived checks
+record the repaired converter: empty joining alternatives leave transitions
+unwired, while empty output alternatives retain their private places. This
+resolves the earlier direct-DFG mismatch and matches the CLASSIC and PLUSPLUS
+timed EventLog controls, including actual source/final markings.
+
+All three affected native suites pass. The corrected comparison matches all
+22 archived route observations, and the additional inputless comparison matches
+all three controls with exact input/options fidelity. These 25 observations
+include a repeated DFG input. The archive binds the staged code tree, actual
+core, test binaries, scripts, observations and private probe headers. Independent
+review found no actionable converter, test or comparator defects. The broader
+1,779-case native comparison remains a separate gate; full HeuristicsNet fields
+are outside this Petri comparison, and coverage counts remain unchanged.

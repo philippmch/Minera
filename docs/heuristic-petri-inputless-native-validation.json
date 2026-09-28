@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "status": "verified_inputless_petri_checkpoint",
+  "parent_commit": "2411a25f6ed10a2775ddb653b6c193e489572e0e",
+  "code_tree": "5141251ab4181ffe3c5cb9628e1db2b078be4f55",
+  "core_sha256": "306b1d27dc8c716c2e017898b533cb04d0e9e112c9664275ba4ea54446c20a53",
+  "affected_native_suites": 3,
+  "archived_route_observations": 22,
+  "archived_route_matches": 22,
+  "inputless_control_observations": 3,
+  "inputless_control_matches": 3,
+  "scope": "Empty input alternatives remain unwired in HeuristicsNet-to-Petri conversion; empty output alternatives retain private parking places. Exact input/options fidelity and weighted directed topology, labels and source/final markings match the bounded public controls and earlier route cohort.",
+  "review": "Independent review found no actionable converter, acceptance-test or comparator defects. Raw UTC fixture lexicals were restored before the build after detecting PowerShell date display conversion.",
+  "limits": [
+    "The DFG inputless control repeats an earlier route input; 25 observations are not 25 distinct inputs",
+    "Full public HeuristicsNet field parity is outside this Petri comparison",
+    "Generated names, Python object identity and arbitrary nonempty property payloads remain outside native mapping",
+    "Broader small-DFG comparison remains a separate gate; no CLASSIC module completion claim"
+  ],
+  "archive": {
+    "path": "docs/heuristic-petri-inputless-native-checks.json.gz",
+    "sha256": "9e1b3847e99203a3891a77a1f9bb2d8da847ccec2b7d989feecfd12d23c87c83",
+    "raw_sha256": "f65f510aa0925a85bd70be20177424ba75aea78b361e0047714e08716965b8a6",
+    "members": 172
+  }
+}

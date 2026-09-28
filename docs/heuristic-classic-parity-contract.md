@@ -18,7 +18,7 @@ its scope to the already verified HeuristicsNet routes.
 | Missing selected start, typed NaT and input order | `heuristic-classic-flat-native-validation.json` and its archived checks | All 26 paired/control observations pass exact input, selector and represented-result checks. Missing-key exceptions use the documented native diagnostic mapping. |
 | Returned node boundary flags and named sojourn map | `heuristic-classic-object-native-validation.json`; its archived checks and bound public captures | Actual model and serialized fields match 26 flat observations and five direct DFG controls, including fallback nodes and explicit list boundaries with performance data. |
 | Omitted versus explicitly empty raw DFG auxiliary maps | `heuristic-classic-auxiliary-native-validation.json`; its archived checks and bound public controls | Three direct controls and 26 flat observations match. Native supplied/effective presence flags produce actual nullable public fields, preserving existing array fields. |
-| Petri-returning `classic.apply` / `classic.apply_dfg` | `heuristic-classic-petri-native-baseline-validation.json`; its archived checks and bound public references | Seventeen of 18 primary cases match. `metadata_3_0_0_0` remains a real topology mismatch: native conversion adds two private input places and arcs absent from the public result. |
+| Petri-returning `classic.apply` / `classic.apply_dfg` | `heuristic-petri-inputless-native-validation.json`; its archived checks and bound public references | All 18 primary cases and four additive route observations now match. Empty joining alternatives remain unwired; the earlier `metadata_3_0_0_0` mismatch is resolved. |
 | Pure XOR/AND Petri construction | `heuristic-classic-petri-native-baseline-validation.json`; `heuristic-classic-petri-diamonds-reference.json.gz` | All four additive Petri/HeuristicsNet route checks match, including the XOR/AND structural distinction and AND measures of 0.8. |
 | Small-DFG Petri topology and thresholds | `heuristic-classic-petri-small-dfg-reference-validation.json`; its full public capture | 1,779 finite cases and 3,558 successful unchanged-input public calls cover two-/three-activity graphs, loops and three dependency thresholds. Native Petri comparison remains pending. |
 | Distinct catalogue proof | `reference-2.7.22-coverage.json` CLASSIC module row | Add an exact implementation and registered acceptance-test proof only after all module gates are verified. |
@@ -79,8 +79,15 @@ PLUSPLUS EventLog controls using the UTC trace `S,A,B,A,E` at dependency thresho
 1. Both public Petri results leave A/B inputs unwired, retain private output
 places, and preserve source/final markings. The authoritative PLUSPLUS capture
 checks the public enum's identity against the pinned variant module. This
-establishes the intended behavior for the converter repair; native verification
-and a broader small-DFG comparison remain required before route completion.
+establishes the intended behavior for the converter repair. The native repair
+now leaves empty joining alternatives unwired while retaining private output
+places. `heuristic-petri-inputless-native-validation.json` records three passing
+native suites, all 22 archived route observations matching, and all three
+inputless controls matching exact inputs, options, topology and markings.
+These are 25 observations, not 25 distinct inputs: the direct DFG control repeats
+an earlier input. Independent review found no actionable patch or comparator
+defects. The broader small-DFG comparison remains required before route
+completion; this Petri comparison does not claim full HeuristicsNet field parity.
 
 ## Scope boundaries and completion
 
