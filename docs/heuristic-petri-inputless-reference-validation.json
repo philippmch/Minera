@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "status": "reference_only",
+  "calls": 6,
+  "unique_petri_cases": 3,
+  "public_observations": "The recorded direct CLASSIC DFG and CLASSIC/PLUSPLUS EventLog Petri results leave internal A/B inputs unwired, retaining private output places and source/final markings.",
+  "provenance": "Fresh-context agent produced public probes, then root added an explicit public enum-module identity guard and reran the PLUSPLUS calls. A prior probe task was stopped after an accidental source search; it produced no accepted probe or files after exposure. Incident metadata and prior provenance iterations are embedded without reference source contents.",
+  "limits": [
+    "Finite recorded cases; no universal or native parity claim",
+    "Original PLUSPLUS graph call lacks a variant module hash; additive PLUSPLUS Petri and graph calls have fresh dispatcher/variant before-after bindings",
+    "Python identity and generated node names are retained as reference data, not asserted as native identities"
+  ],
+  "archive": {
+    "path": "docs/heuristic-petri-inputless-reference.json.gz",
+    "sha256": "419e0c2777eaffd3025b9bb5a3ff14b2d31db4ef1e159a683f483fa8fafdf735",
+    "raw_sha256": "547a629284895338a82e8b4e0374054b8b14ca20cbf2cfb740113ad966cf2da2"
+  }
+}
