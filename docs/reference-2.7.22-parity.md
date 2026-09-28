@@ -6316,3 +6316,27 @@ The structural verifier accepts 198 complete and 189 partial module rows. Only
 `algo.conformance.tokenreplay.variants.backwards` is promoted by this checkpoint;
 its dispatcher and the forward variation remain partial. Overall, 229 coverage
 units remain open.
+
+
+## CLASSIC flat timestamp reference checkpoint
+
+`docs/heuristic-classic-flat-timestamps-reference.json.gz` preserves twelve paired
+EventLog/DataFrame fixtures through explicit public CLASSIC discovery: 24 calls
+with unchanged typed input snapshots. The reviewed capture, initial snapshots
+and sources are retained in
+`docs/heuristic-classic-flat-timestamps-capture-evidence.json.gz`; its summary is
+`docs/heuristic-classic-flat-timestamps-reference-validation.json`.
+
+Ten pairs return results, nine of which agree across the captured public graph
+fields, including occurrence and boundary counts, DFG structures, matrices,
+node metadata, AND measures and performance decoration. Custom case selection
+changes DataFrame grouping while grouped EventLog trace boundaries remain
+authoritative. A wholly absent selected start field raises the same KeyError
+on both routes; a missing EventLog event field raises where the corresponding
+DataFrame date cell is NaT and succeeds. The explicit NaT control succeeds on
+both routes with mean performance 2.5. Reversed completion timestamps preserve
+the supplied A-then-B sequence in both captured routes.
+
+This is reference evidence only. Native flat-input support, typed NaT handling
+and the corresponding comparison are pending; CLASSIC remains partial and
+coverage counts are unchanged.
