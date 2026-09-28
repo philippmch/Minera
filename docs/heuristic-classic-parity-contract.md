@@ -66,6 +66,21 @@ conversion adds two private input places; the reference leaves both transition
 inputs unwired. The baseline preserves this failure and does not establish
 complete Petri-route parity.
 
+The corrected baseline (`heuristic-classic-petri-corrected-baseline-validation.json`)
+retains that same 21/22 result while enforcing an exact unique case inventory,
+stable executable hashes, fixed-offset timestamp metadata derived from the
+captured ISO payloads, and available empty reference property maps. Generated
+names remain outside structural comparison; unsupported nonempty properties
+are reported rather than ignored.
+
+`heuristic-petri-inputless-reference.json.gz` adds direct CLASSIC EventLog and
+PLUSPLUS EventLog controls using the UTC trace `S,A,B,A,E` at dependency threshold
+1. Both public Petri results leave A/B inputs unwired, retain private output
+places, and preserve source/final markings. The authoritative PLUSPLUS capture
+checks the public enum's identity against the pinned variant module. This
+establishes the intended behavior for the converter repair; native verification
+and a broader small-DFG comparison remain required before route completion.
+
 ## Scope boundaries and completion
 
 Parent dispatcher input adaptation and PLUSPLUS discovery are separate

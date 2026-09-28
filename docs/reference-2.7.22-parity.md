@@ -6469,3 +6469,30 @@ not the subsequently rebuilt shared checkout. It also retains the initial
 comparison that misread two reference KeyErrors as empty nets, followed by the
 corrected explicit exception mapping. No completion or coverage promotion is
 claimed from this baseline.
+
+## Inputless Petri controls and corrected comparison
+
+`docs/heuristic-petri-inputless-reference.json.gz` and its validation summary
+preserve the direct CLASSIC DFG control and the timed `S,A,B,A,E` EventLog control
+through CLASSIC and PLUSPLUS public Petri routes. Both EventLog results have
+five places, four visible transitions and five arcs; A/B inputs are unwired,
+their outputs retain private places, and the source/final markings remain.
+The authoritative PLUSPLUS capture explicitly checks that the dispatcher enum
+identifies the opaque-pinned variant module, with an optimization-safe guard.
+
+The archive includes provenance metadata for an earlier discarded probe task
+that accidentally searched reference source. That agent produced no accepted
+probe or files after exposure. A fresh-context agent captured the public calls,
+and the primary agent subsequently added and verified the public identity guard.
+No reference source contents are embedded. Earlier capture iterations remain
+available with their stated provenance limits.
+
+`docs/heuristic-classic-petri-corrected-baseline-validation.json` records the
+corrected native comparator: 22 unique cases, stable executable hash, fixed
+offsets derived from actual timestamp payloads, and explicit validation of all
+18 returned Petri results' available empty property maps. Negative gate checks
+reject duplicate keys and executable hash changes. It still reports the same
+21/22 matches against the immutable pre-fix core. Generated names and Python
+timezone identity are outside the native mapping; nonempty public properties
+are rejected as unsupported. Native repair and broader DFG verification remain
+open, and coverage counts are unchanged.
