@@ -798,6 +798,10 @@ HeuristicClassicDfgInput build_classic_input(
   input.activity_counts = std::move(occurrences);
   input.start_counts = std::move(starts);
   input.end_counts = std::move(ends);
+  // Event-log discovery supplies these fields as part of its returned
+  // HeuristicsNet even when the log contains no length-two paths.
+  input.dfg_window_2_supplied = true;
+  input.freq_triples_supplied = true;
   return input;
 }
 
@@ -1024,6 +1028,10 @@ HeuristicsNet discover_classic_dfg(
   net.window_two_dfg = input.window_two_dfg;
   net.frequency_triples = input.frequency_triples;
   net.performance_values = input.performance_values;
+  net.classic_public_dfg_window_2_present =
+      input.dfg_window_2_supplied || !input.window_two_dfg.empty();
+  net.classic_public_freq_triples_present =
+      input.freq_triples_supplied || !input.frequency_triples.empty();
   net.sojourn_times.emplace();
 
   // Keep declared names separate from the internal id table.  A direct DFG

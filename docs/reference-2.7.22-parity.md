@@ -6423,3 +6423,21 @@ comparison failure; the repaired check compares the floating threshold exactly
 while preserving strict integer count checks. This supersedes the preceding
 checkpoint's missing-node-field limitation. Raw auxiliary-map presence and
 direct Petri route comparisons remain open; coverage counts are unchanged.
+
+## CLASSIC auxiliary-map presence checkpoint
+
+`docs/heuristic-classic-auxiliary-native-validation.json` and its checks archive
+record 29 matching observations: 26 flat observations and three exact direct
+DFG controls. Optional public window-two and triple inputs now retain their
+presence independently of their concrete maps. Omitted direct inputs serialize
+as `null` in `classic_public_fields`; explicitly empty and EventLog-computed
+empty maps serialize as `[]`. Existing array fields remain available, nonempty
+legacy map assignments imply presence, and PLUSPLUS output is unchanged.
+
+Six affected native suites pass. Independent review found a test-only JSON
+substring boundary error; the repaired assertions were reviewed and rerun.
+The archive retains the failed first run and the verified inputs, actual
+outputs, scripts, source/binary bindings and final logs. This closes the
+preceding checkpoint's auxiliary-map presence gap within the supported API.
+Direct Petri conversion and the distinct catalogue proof remain open; coverage
+counts are unchanged.

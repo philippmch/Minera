@@ -1346,7 +1346,46 @@ void write_heuristics_net(std::ostream& out,
           << (++index < net.frequency_triples.size() ? ", " : "");
     }
   }
-  out << "], \"and_measures_in\": ";
+  out << ']';
+  if (net.variant == HeuristicMinerVariant::kClassic) {
+    out << ", \"classic_public_fields\": {\"dfg_window_2\": ";
+    if (!net.classic_public_dfg_window_2_present) {
+      out << "null";
+    } else {
+      out << '[';
+      std::size_t index = 0;
+      for (const auto& [pair, count] : net.window_two_dfg) {
+        out << "{\"key\": [";
+        write_json_string(out, pair.first);
+        out << ", ";
+        write_json_string(out, pair.second);
+        out << "], \"value\": " << count << '}'
+            << (++index < net.window_two_dfg.size() ? ", " : "");
+      }
+      out << ']';
+    }
+    out << ", \"freq_triples\": ";
+    if (!net.classic_public_freq_triples_present) {
+      out << "null";
+    } else {
+      out << '[';
+      std::size_t index = 0;
+      for (const auto& [triple, count] : net.frequency_triples) {
+        const auto& [first, middle, last] = triple;
+        out << "{\"key\": [";
+        write_json_string(out, first);
+        out << ", ";
+        write_json_string(out, middle);
+        out << ", ";
+        write_json_string(out, last);
+        out << "], \"value\": " << count << '}'
+            << (++index < net.frequency_triples.size() ? ", " : "");
+      }
+      out << ']';
+    }
+    out << '}';
+  }
+  out << ", \"and_measures_in\": ";
   write_and_measures(net.and_measures_in);
   out << ", \"and_measures_out\": ";
   write_and_measures(net.and_measures_out);
