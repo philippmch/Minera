@@ -6351,9 +6351,11 @@ claiming native completion.
 
 CLASSIC promotion still requires resolution of the public node boundary flags
 and sojourn map, a concise reconciliation of its returned public fields with
-existing EventLog and direct DFG evidence, and its own catalogue
-implementation/test proof. Parent input adapters and PLUSPLUS obligations
-remain separate catalogue gates.
+existing EventLog and direct DFG evidence, direct verification of the
+Petri-returning `apply` / `apply_dfg` routes, and its own catalogue
+implementation/test proof. `docs/heuristic-classic-parity-contract.md` records
+the route-by-route acceptance gates. Parent input adapters and PLUSPLUS
+obligations remain separate catalogue gates.
 
 A focused business-hours control is preserved in
 `docs/heuristic-classic-nat-business-reference.json.gz`, with runtime bindings and
