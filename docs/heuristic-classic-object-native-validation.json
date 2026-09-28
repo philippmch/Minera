@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "status": "verified_partial_object_field_checkpoint",
+  "parent_commit": "d1779046d4de9e38fdaa66d4c5fbb176a8ffe38f",
+  "code_tree": "039234e6cba94f23c634e6a8045ae21782c25788",
+  "flat_observations": 26,
+  "direct_dfg_observations": 5,
+  "passed": 31,
+  "affected_native_suites": 6,
+  "scope": "Actual CLASSIC node start/end flags and named sojourn map, with exact captured input values, selector options and unchanged-input checks; existing flat represented-field comparisons retained. PLUSPLUS omits the new fields.",
+  "remaining_gates": [
+    "Omitted versus explicit-empty raw DFG auxiliary maps",
+    "Direct Petri native/reference route comparison",
+    "Distinct catalogue acceptance proof"
+  ],
+  "limitations": [
+    "Finite captured fixtures, not an exhaustive module proof",
+    "Python class and exception identity outside native mapping"
+  ],
+  "independent_implementation_review": "No actionable findings in the scoped four-file model, serializer and acceptance-test diff.",
+  "archive": {
+    "path": "docs/heuristic-classic-object-native-checks.json.gz",
+    "sha256": "6fb2cdd99dcdf14fcfcc90d00c323f3b9f903ab1e1951d921270fa9efaf4779d",
+    "raw_sha256": "66a15106f9caeece419c2343e7e60800d5416a9a176cedc942d7fb1d71d9938e",
+    "members": 26
+  }
+}

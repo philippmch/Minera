@@ -16,7 +16,7 @@ its scope to the already verified HeuristicsNet routes.
 | DFG count arithmetic and inference | `heuristic-count-ratios-validation.json`; `heuristic-inferred-counts-validation.json` | Specialized cohorts cover large ratios and inferred occurrence counts. |
 | EventLog graph, AND, matrices, aggregation and selectors | `reference-2.7.22-parity.md`; the `heuristic-*-validation.json` artifacts referenced there | Existing finite cohorts cover defaults, thresholds, loops, AND measures, duplicate handling, metadata, performance aggregation, timestamp selection, business hours and arithmetic. |
 | Missing selected start, typed NaT and input order | `heuristic-classic-flat-native-validation.json` and its archived checks | All 26 paired/control observations pass exact input, selector and represented-result checks. Missing-key exceptions use the documented native diagnostic mapping. |
-| Returned node boundary flags and named sojourn map | `heuristic-classic-direct-reference.json.gz`; `heuristic-classic-dfg-boundaries-reference.json.gz`; `heuristic-classic-object-controls-reference.json.gz` | Public observations include declared fallback nodes and explicit list boundaries with performance data; native model/serializer verification remains incomplete. |
+| Returned node boundary flags and named sojourn map | `heuristic-classic-object-native-validation.json`; its archived checks and bound public captures | Actual model and serialized fields match 26 flat observations and five direct DFG controls, including fallback nodes and explicit list boundaries with performance data. |
 | Omitted versus explicitly empty raw DFG auxiliary maps | `heuristic-classic-dfg-boundaries-reference.json.gz`; `heuristic-classic-object-controls-reference.json.gz` | Omitted window-two and triple inputs return `null`; the explicit-empty control returns empty collections. Native input-presence representation and comparison remain incomplete. |
 | Petri-returning `classic.apply` / `classic.apply_dfg` | `heuristic-classic-petri-reference.json.gz`; `heuristic-classic-petri-reference-validation.json` | Pinned direct signatures and 18 public calls are captured: ten EventLog nets, two missing-key errors and six DFG nets. Actual topology, properties and markings are retained; native comparison remains pending. |
 | Pure XOR/AND Petri construction | `heuristic-classic-petri-diamonds-reference.json.gz`; its validation summary | Two additive inputs are captured through both Petri and HeuristicsNet direct DFG routes. The XOR and AND nets have distinct structures; native comparison remains pending. |
@@ -33,11 +33,13 @@ metadata, compares numeric values exactly, and validates typed timestamp input
 payloads separately from lexical values. Empty structures are checked against
 actual native collections rather than assumed to be empty.
 
-The still-missing node boundary flags must remain distinct from internal
-start/end activity membership: the public captures return false flags even
-when boundary counts are nonzero. Likewise, a named public sojourn map is not
-equivalent to a per-activity scalar initialized to zero. Add real model fields
-and serialize them before claiming those output fields match.
+The native node boundary flags remain distinct from internal start/end activity
+membership: the public captures return false flags even when boundary counts
+are nonzero. CLASSIC now stores and serializes those actual flags and an empty
+named sojourn map. The registered `classic_object_fields_acceptance()` case
+also preserves nonzero internal boundary counts and checks that PLUSPLUS omits
+these new optional fields. Six affected native suites and independent review
+pass; omitted versus explicitly empty auxiliary maps remain a separate gate.
 
 For Petri outputs, retain actual place/transition names and properties in the
 reference capture. A structural comparison must preserve place/transition
