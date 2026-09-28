@@ -19,6 +19,7 @@ its scope to the already verified HeuristicsNet routes.
 | Returned node boundary flags and named sojourn map | `heuristic-classic-direct-reference.json.gz`; `heuristic-classic-dfg-boundaries-reference.json.gz`; `heuristic-classic-object-controls-reference.json.gz` | Public observations include declared fallback nodes and explicit list boundaries with performance data; native model/serializer verification remains incomplete. |
 | Omitted versus explicitly empty raw DFG auxiliary maps | `heuristic-classic-dfg-boundaries-reference.json.gz`; `heuristic-classic-object-controls-reference.json.gz` | Omitted window-two and triple inputs return `null`; the explicit-empty control returns empty collections. Native input-presence representation and comparison remain incomplete. |
 | Petri-returning `classic.apply` / `classic.apply_dfg` | `heuristic-classic-petri-reference.json.gz`; `heuristic-classic-petri-reference-validation.json` | Pinned direct signatures and 18 public calls are captured: ten EventLog nets, two missing-key errors and six DFG nets. Actual topology, properties and markings are retained; native comparison remains pending. |
+| Pure XOR/AND Petri construction | `heuristic-classic-petri-diamonds-reference.json.gz`; its validation summary | Two additive inputs are captured through both Petri and HeuristicsNet direct DFG routes. The XOR and AND nets have distinct structures; native comparison remains pending. |
 | Distinct catalogue proof | `reference-2.7.22-coverage.json` CLASSIC module row | Add an exact implementation and registered acceptance-test proof only after all module gates are verified. |
 
 ## Required returned-object checks
@@ -47,9 +48,12 @@ evidence that its Petri conversion matches.
 
 The initial Petri cohort preserves all 18 inputs and parameter maps unchanged.
 Its six DFG cases come from the existing input catalogue, which does not contain
-a pure diamond/AND-split fixture. The captured self-looping branch must not be
-treated as coverage of that missing construction. Capture and fixture-helper
-sources are embedded with their hash bindings in the reference archive.
+a pure diamond/AND-split fixture. Two additive controls close that public-capture
+gap: XOR returns 4 places, 4 transitions and 8 arcs, while the input with
+cross-branch evidence returns 6 places, 4 transitions and 10 arcs and AND
+measures of 0.8. All four additive route calls preserve their arguments.
+Capture and fixture-helper sources are embedded with hash bindings in the
+reference archives. These observations do not establish native parity.
 
 ## Scope boundaries and completion
 
