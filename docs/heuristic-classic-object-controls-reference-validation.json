@@ -1,0 +1,14 @@
+{
+  "status": "reference_only",
+  "observations": 3,
+  "unchanged_inputs": 3,
+  "node_flags": "false for all captured nodes",
+  "sojourn_times": "empty maps",
+  "auxiliary_map_distinction": "Omitted window-two/triple inputs yield null; the explicit-empty control yields empty lists in the public projection.",
+  "archive": {
+    "path": "docs/heuristic-classic-object-controls-reference.json.gz",
+    "sha256": "4bb66765f0059cea9648aa8b7dff8a28905a41575e965b3ff99f171cecd79e77",
+    "raw_sha256": "07c53e06f66bd56ff9f13d811ab3bc1455769de6e6253c386d9709da2a768c5b"
+  },
+  "limits": "Finite fallback, performance/list-boundary, and explicit-empty auxiliary-map controls; no native or universal parity claim."
+}
