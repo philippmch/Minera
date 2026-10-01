@@ -6655,3 +6655,33 @@ This checkpoint preserves the remaining field gaps. Actual native raw
 performance-map observations and the nonempty auxiliary returned-object
 comparisons are still required before the separate catalogue proof can be
 added. CLASSIC and coverage counters remain unchanged.
+
+## CLASSIC actual full returned-object checkpoint
+
+`docs/heuristic-classic-full-object-native-validation.json` and its checks
+archive now retain complete actual native captures for both saved cohorts.
+All 2,931 outcomes pass: 1,080 decorated-value objects, 72 expected missing-path
+rejections and 1,779 small-DFG objects. All inputs and options remain unchanged.
+Every returned-object field category matches, with zero unobserved or
+unsupported cases. The decorated-value cohort includes 264 successful nonempty
+window-two maps/matrices and 264 successful nonempty triple maps/matrices;
+the small-DFG cohort includes actual nonempty per-node AND maps in 288 cases.
+
+The captures observe actual optional performance-map presence and typed
+payloads, raw maps, node flags, loops, edges and serialized fields. Matrix
+comparison preserves retained null, boolean, integer, string, array and object
+values independently of edge-display representations. The archive retains the
+original incorrect projection and its 132 failing objects/306 diagnostics,
+the reviewed correction, both failed probe attempts and the successful command
+records, logs and outputs. All 2,906 archive members preserve their exact bytes
+and hashes. Reference module proofs remain pinned to 2.7.22.
+
+The compiled core and complete source/header bindings are unchanged. The four
+affected native suites and prior 1,779/22+3 Petri checks are reused; this
+checkpoint does not report new suite or converter runs. The new small-DFG
+captures match the earlier common native models exactly.
+
+The current full-object cohorts have identical raw and cleaned DFG domains.
+Supplemental controls must observe an actually pruned path to establish the
+performance-matrix domain. CLASSIC remains partial pending that check and its
+distinct catalogue proof; coverage counters are unchanged.
