@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "status": "verified_order_and_nonfinite_object_checkpoint",
+  "parent_commit": "359008a086ecd6311706e400f0979500778bbe19",
+  "code_tree": "b16de622068c67d5ddb6f5836acde5fe46fd0f49",
+  "core_sha256": "83a7de85c6d48df6679ea0331ab7b7da34a15d0f36908a25bf784e01aebebc0a",
+  "affected_native_suites": 3,
+  "dfg_order_public_controls": 4,
+  "dfg_order_matches": 4,
+  "nonfinite_and_string_public_controls": 5,
+  "nonfinite_and_string_matches": 5,
+  "behavior": "Optional DFG order preserves inferred boundary list order with exact-permutation validation. Omitted map order and explicit boundary overrides remain supported. Nonfinite and string performance values are verified directly in actual native maps, edges and relations.",
+  "validation": "Isolated Debug variant checks passed; Release core, heuristic_variants and petri_net_conversion suites pass. Actual Release fixture observations match all nine pinned public controls with exact represented input/options and no mutations.",
+  "review": "Independent review found no actionable production, registered-test, serializer or comparator defects.",
+  "limits": [
+    "JSON exporter nonfinite rejection remains a separate transport policy.",
+    "This checkpoint does not settle the twelve archived small-DFG Petri topology mismatches or full CLASSIC completion."
+  ],
+  "archive": {
+    "path": "docs/heuristic-classic-order-nonfinite-native-checks.json.gz",
+    "sha256": "b1f7656d8cf336c78e2be164fdbaa3f060e3e245a240bdb3d94c9d12bd4ab451",
+    "raw_sha256": "f56d6573e2a90b0be605ba52426f4dff95737d6af314944f32ed0a2fcc87f0fb",
+    "members": 37
+  }
+}
