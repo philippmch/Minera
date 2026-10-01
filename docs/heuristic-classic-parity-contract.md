@@ -23,8 +23,9 @@ its scope to the already verified HeuristicsNet routes.
 | Petri-returning `classic.apply` / `classic.apply_dfg` | `heuristic-classic-petri-bridge-controls-validation.json`; its archived checks and bound public references | All 18 primary cases and four additive route observations match the current converter. Three inputless CLASSIC/PLUSPLUS controls also match; their existing direct-input serializer explicitly leaves `dfg_order` unobserved. |
 | Pure XOR/AND Petri construction | `heuristic-classic-petri-bridge-controls-validation.json`; `heuristic-classic-petri-diamonds-reference.json.gz` | All four additive Petri/HeuristicsNet route checks match the current converter, including the XOR/AND structural distinction and AND measures of 0.8. |
 | Small-DFG Petri topology and thresholds | `heuristic-classic-petri-small-dfg-native-validation.json`; its complete native and public captures | All 1,779 Petri cases match. The twelve threshold-zero topology failures are resolved, with zero native errors and exact unchanged input/options checks throughout. |
-| Complete direct-DFG returned objects | `heuristic-classic-full-object-gate-validation.json`; its archived public capture and saved-native comparison | All observed fields match in 1,779 saved cases, but actual raw performance-map presence and values were not captured. These gaps prevent a full-object pass. |
-| Nonempty auxiliary maps and matrices | `heuristic-classic-full-object-gate-validation.json`; its new 1,152-case public capture | The capture retains 1,080 complete results and 72 historical errors, with 288 nonempty window-two inputs and 288 nonempty triple inputs. Full native object comparison remains required. |
+| Complete direct-DFG returned objects | `heuristic-classic-full-object-native-validation.json`; its archived full public and actual native captures | All 2,859 objects and 72 expected rejections pass. Actual raw performance-map presence, typed values and matrices are observed; no returned-field gaps remain in these cohorts. |
+| Nonempty auxiliary maps and matrices | `heuristic-classic-full-object-native-validation.json`; its 1,152-case decorated-value cohort | All outcomes pass, including 264 successful nonempty window-two maps/matrices and 264 successful nonempty triple maps/matrices. Each family has 288 nonempty inputs across the successful and rejected calls. |
+| Noise-pruned returned-object matrix domain | Supplemental direct-DFG controls required | The full-object cohorts have identical raw and cleaned DFG domains. An actually pruned path must establish the matrix domain before promotion. |
 | Distinct catalogue proof | `reference-2.7.22-coverage.json` CLASSIC module row | Add an exact implementation and registered acceptance-test proof only after all module gates are verified. |
 
 ## Required returned-object checks
@@ -36,9 +37,10 @@ loop-two and AND fields, and concurrency values for its bounded fixtures.
 It reads actual native node statistics instead of synthesizing them from
 metadata, compares numeric values exactly, and validates typed timestamp input
 payloads separately from lexical values. These checks have bounded field
-coverage: the saved native serializer did not observe raw `performance_dfg`
-presence and values. Its empty-array projection cannot close that field gate.
-Actual native collections are required for each remaining comparison.
+coverage in the earlier audit: its saved native serializer did not observe raw
+`performance_dfg` presence and values. Its empty-array projection could not close
+that field gate. The later full-object checkpoint captures actual native
+collections, optional-map presence and typed payloads independently.
 
 The native node boundary flags remain distinct from internal start/end activity
 membership: the public captures return false flags even when boundary counts
@@ -137,8 +139,29 @@ historical error inventory and messages. No serialization failures or input
 mutations occur. It records nonempty raw window-two and triple maps and their
 matrices, typed performance payloads, node flags, loops and AND maps. Native
 comparison must read actual object fields and map presence rather than infer
-them from the reference, input or defaults. The module remains partial until
-these checks pass.
+them from the reference, input or defaults.
+
+`heuristic-classic-full-object-native-validation.json` records all 2,931 outcomes
+passing: 1,080 value objects, 72 expected missing-path rejections and 1,779
+small-DFG objects. The native captures preserve unchanged inputs and options,
+complete raw maps, optional performance values, node flags, loops, AND fields,
+edges and serialized fields. The performance matrix uses actual retained map
+values over the observed DFG domain, preserving explicit null independently of
+edge decoration. All 17 returned-object field categories match, with no
+unobserved or unsupported cases. The 1,779 captures also match the earlier
+common native models exactly, reusing their verified Petri outputs.
+
+The archive preserves the failed comparison that used edge representations to
+reconstruct the performance matrix: 132 objects differed, with 306 diagnostics.
+Its corrected checker uses retained typed values and excludes synthetic
+relations. Independent review and 28 synthetic checks pass. Both failed native
+probe attempts, the corrected probe commands and their logs remain bound to the
+unchanged compiled core and source tree. The four affected native suites and
+prior Petri checks are reused rather than reported as new runs.
+
+These finite full-object cohorts never prune a DFG path, despite their threshold
+variation. Noise-pruned matrix-domain controls and the distinct catalogue proof
+remain required; the CLASSIC module is still partial.
 
 ## Scope boundaries and completion
 
