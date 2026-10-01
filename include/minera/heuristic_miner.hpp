@@ -333,6 +333,10 @@ struct HeuristicClassicDfgInput {
   // Nonempty maps are considered supplied even when these flags are false.
   bool dfg_window_2_supplied = false;
   bool freq_triples_supplied = false;
+  // Optional order of the direct DFG's paths. When present, this must be an
+  // exact permutation of `dfg`'s keys and controls first-encounter order for
+  // inferred start/end activity lists. An omitted order keeps map-key order.
+  std::optional<std::vector<std::pair<std::string, std::string>>> dfg_order;
 };
 
 // Discovers a heuristics net from an event log. The dependency of a over b is

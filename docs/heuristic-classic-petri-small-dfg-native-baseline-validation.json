@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "status": "native_petri_corpus_mismatches_preserved",
+  "code_tree": "5141251ab4181ffe3c5cb9628e1db2b078be4f55",
+  "core_sha256": "306b1d27dc8c716c2e017898b533cb04d0e9e112c9664275ba4ea54446c20a53",
+  "reference_sha256": "46005f26860bbee7749900d3b6b94f86b0d0ba8bbc7e60f0e6e436699db6f8c6",
+  "fixture_manifest_sha256": "89e402ae4662e3f23fa3689408b287aeae10d76a6ce87b6a0c94719b872ddf1c",
+  "public_reference_archive": "docs/heuristic-classic-petri-small-dfg-reference.json.gz",
+  "summary": {
+    "case_count_expected": 1779,
+    "native_case_count": 1779,
+    "compared_case_count": 1779,
+    "native_error_count": 0,
+    "petri_weighted_directed_isomorphic_count": 1767,
+    "heuristicsnet_selected_public_fields_equal_count": 1779,
+    "full_case_pass_count": 1767,
+    "full_case_mismatch_count": 12,
+    "global_mismatch_count": 0
+  },
+  "mismatch_case_ids": [
+    "three-activity-126-threshold-0",
+    "three-activity-175-threshold-0",
+    "three-activity-231-threshold-0",
+    "three-activity-247-threshold-0",
+    "three-activity-252-threshold-0",
+    "three-activity-253-threshold-0",
+    "three-activity-382-threshold-0",
+    "three-activity-431-threshold-0",
+    "three-activity-462-threshold-0",
+    "three-activity-478-threshold-0",
+    "three-activity-490-threshold-0",
+    "three-activity-491-threshold-0"
+  ],
+  "mismatch_pattern": "Each of twelve three-activity threshold-zero cases has one fewer native place, one fewer silent transition and two fewer arcs than the public result.",
+  "provenance": "The executed runner originally checked manifest-listed headers. Independent supplemental verification binds all 148 compiled headers to the immutable tree; the future runner now fails closed on complete include inventory/content with positive and negative guard checks.",
+  "limits": [
+    "This 1779-case corpus is finite fault-finding evidence, not a universal semantic proof.",
+    "Petri structure is compared by the reviewed weighted directed typed graph helper, including transition labels and source/final markings.",
+    "Reference public properties are required to be available and empty; native serializer does not expose native property payloads.",
+    "Generated object names remain in the raw reference/native artifacts and are excluded from structural isomorphism.",
+    "The HeuristicsNet diagnostic compares selected public graph fields only and is not a full-field equivalence claim."
+  ],
+  "review": "The executed comparison and guard repairs received independent review; complete-include supplemental proof and future guard are reviewed with the preserved private artifacts.",
+  "archive": {
+    "path": "docs/heuristic-classic-petri-small-dfg-native-baseline.json.gz",
+    "sha256": "135c3afa893966e56352daccc9d063e87a73eee20196468051d30731f2024eea",
+    "raw_sha256": "1041c78cde2c33560ec34587a7faf554ec547e6aad7b35e23f0464f21eb7eb17",
+    "members": 177
+  }
+}

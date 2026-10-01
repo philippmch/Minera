@@ -13,8 +13,8 @@ its scope to the already verified HeuristicsNet routes.
 | Direct `classic.apply_heu(EventLog)` | `heuristic-classic-direct-reference.json.gz`; `heuristic-classic-flat-native-checks.json.gz` | Twelve direct public observations match the paired dispatcher inputs and outputs; the native comparison checks their represented fields without counting them as additional unique inputs. |
 | Direct `classic.apply_heu_dfg` discovery | `heuristic-dfg-input-reference.json.gz`; `heuristic-dfg-input-validation.json` | 1,350 finite cases cover declared/inferred activities, occurrences, boundaries, thresholds, noise, windows/triples and accepted graph behavior. |
 | DFG decorated values and loop membership | `heuristic-dfg-values-validation.json`; `heuristic-loop-membership-validation.json` | Specialized cohorts cover supplied performance maps and loop-membership behavior. |
-| Non-finite returned performance values | `heuristic-classic-object-supplement-reference-validation.json` | Five pinned public controls preserve NaN, signed infinities, nested infinity and a distinct literal string. Direct native object comparison remains required; JSON rejection is a separate transport policy. |
-| Direct DFG insertion order | `heuristic-classic-object-supplement-reference-validation.json` | Four public controls establish order-sensitive inferred boundary lists. The native map input has no insertion-order carrier; this gap must be closed rather than excluded from module completion. |
+| Non-finite returned performance values | `heuristic-classic-order-nonfinite-native-validation.json`; bound supplemental public controls | All five controls match actual native maps and edge/relation values with exact input/options fidelity. JSON rejection remains a separate transport policy. |
+| Direct DFG insertion order | `heuristic-classic-order-nonfinite-native-validation.json`; bound supplemental public controls | All four public controls match using optional `dfg_order`. Registered tests additionally cover omitted map order, invalid permutations, empty inputs and explicit boundary overrides. |
 | DFG count arithmetic and inference | `heuristic-count-ratios-validation.json`; `heuristic-inferred-counts-validation.json` | Specialized cohorts cover large ratios and inferred occurrence counts. |
 | EventLog graph, AND, matrices, aggregation and selectors | `reference-2.7.22-parity.md`; the `heuristic-*-validation.json` artifacts referenced there | Existing finite cohorts cover defaults, thresholds, loops, AND measures, duplicate handling, metadata, performance aggregation, timestamp selection, business hours and arithmetic. |
 | Missing selected start, typed NaT and input order | `heuristic-classic-flat-native-validation.json` and its archived checks | All 26 paired/control observations pass exact input, selector and represented-result checks. Missing-key exceptions use the documented native diagnostic mapping. |
@@ -22,7 +22,7 @@ its scope to the already verified HeuristicsNet routes.
 | Omitted versus explicitly empty raw DFG auxiliary maps | `heuristic-classic-auxiliary-native-validation.json`; its archived checks and bound public controls | Three direct controls and 26 flat observations match. Native supplied/effective presence flags produce actual nullable public fields, preserving existing array fields. |
 | Petri-returning `classic.apply` / `classic.apply_dfg` | `heuristic-petri-inputless-native-validation.json`; its archived checks and bound public references | All 18 primary cases and four additive route observations now match. Empty joining alternatives remain unwired; the earlier `metadata_3_0_0_0` mismatch is resolved. |
 | Pure XOR/AND Petri construction | `heuristic-classic-petri-native-baseline-validation.json`; `heuristic-classic-petri-diamonds-reference.json.gz` | All four additive Petri/HeuristicsNet route checks match, including the XOR/AND structural distinction and AND measures of 0.8. |
-| Small-DFG Petri topology and thresholds | `heuristic-classic-petri-small-dfg-reference-validation.json`; its full public capture | 1,779 finite cases and 3,558 successful unchanged-input public calls cover two-/three-activity graphs, loops and three dependency thresholds. Native Petri comparison remains pending. |
+| Small-DFG Petri topology and thresholds | `heuristic-classic-petri-small-dfg-native-baseline-validation.json`; its complete native and public captures | 1,767 of 1,779 native Petri cases match. Twelve three-activity cases at threshold zero remain topology mismatches; all native calls and exact input/options checks succeed. |
 | Distinct catalogue proof | `reference-2.7.22-coverage.json` CLASSIC module row | Add an exact implementation and registered acceptance-test proof only after all module gates are verified. |
 
 ## Required returned-object checks
@@ -91,6 +91,16 @@ an earlier input. Independent review found no actionable patch or comparator
 defects. The broader small-DFG comparison remains required before route
 completion; this Petri comparison does not claim full HeuristicsNet field parity.
 
+The broader native baseline preserves every observation and all twelve topology
+failures. Each failing three-activity, threshold-zero result lacks one place,
+one silent transition and two arcs relative to its public result. All 1,779
+input/options checks pass, with zero native errors and no global comparison
+failures. Complete include inventories and contents match the immutable build
+tree; supplemental verification closes the executed runner's originally limited
+header gate, and the future runner enforces that gate directly. These failures
+remain route-completion obligations; the selected HeuristicsNet diagnostic
+matching all cases does not establish full object parity.
+
 ## Scope boundaries and completion
 
 Parent dispatcher input adaptation and PLUSPLUS discovery are separate
@@ -106,10 +116,14 @@ explicit; they do not excuse differences within supported native inputs.
 The older direct-DFG checkpoint's sorted-map input limitation does not settle
 insertion-order parity. Supplemental public controls show that reversing
 `A->B:1, Z->Y:1` reverses inferred starts from `[A,Z]` to `[Z,A]` and ends
-from `[B,Y]` to `[Y,B]`. The native input must be able to carry that order,
-with existing map callers retaining their established default behavior.
-Non-finite values likewise need direct returned-object comparison even though
-the JSON exporter separately rejects them as non-JSON numeric payloads.
+from `[B,Y]` to `[Y,B]`. The native input now carries that order through optional
+`dfg_order`, requiring an exact permutation of the supplied DFG keys. Existing
+map callers retain their established default behavior and explicit boundaries
+retain precedence. The native checkpoint matches these four controls and all
+five non-finite/string controls, with direct returned-object comparison even
+though the JSON exporter separately rejects non-finite numeric payloads. Three
+affected Release suites, the isolated Debug variant checks and independent
+review pass. The twelve broader Petri topology failures remain open.
 
 Before promotion, reconcile every route and returned-object gate above with
 saved public observations, actual native output, source/binary bindings and

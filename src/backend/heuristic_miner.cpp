@@ -1005,6 +1005,20 @@ HeuristicsNet discover_classic_dfg(
   if (options.variant == HeuristicMinerVariant::kPlusPlus)
     throw std::invalid_argument(
         "Heuristics Miner PLUSPLUS does not support DFG input");
+  if (input.dfg_order) {
+    const auto& order = *input.dfg_order;
+    if (order.size() != input.dfg.size())
+      throw std::invalid_argument(
+          "Classic heuristic DFG order must contain every DFG path exactly "
+          "once");
+    std::set<NamePair> seen;
+    for (const auto& pair : order) {
+      if (!input.dfg.contains(pair) || !seen.insert(pair).second)
+        throw std::invalid_argument(
+            "Classic heuristic DFG order must contain every DFG path exactly "
+            "once");
+    }
+  }
   // Direct DFG inputs have no event-log decoration pass to establish the
   // performance mode.  An already-aggregated map is itself an explicit
   // performance request; with neither performance map, retain the public
@@ -1122,13 +1136,18 @@ HeuristicsNet discover_classic_dfg(
     std::vector<std::string> inferred_ends;
     std::set<std::string> seen_starts;
     std::set<std::string> seen_ends;
-    for (const auto& [pair, _] : input.dfg) {
+    const auto append_boundary = [&](const NamePair& pair) {
       if (!incoming.contains(pair.first) &&
           seen_starts.insert(pair.first).second)
         inferred_starts.push_back(pair.first);
       if (!outgoing.contains(pair.second) &&
           seen_ends.insert(pair.second).second)
         inferred_ends.push_back(pair.second);
+    };
+    if (input.dfg_order) {
+      for (const auto& pair : *input.dfg_order) append_boundary(pair);
+    } else {
+      for (const auto& [pair, _] : input.dfg) append_boundary(pair);
     }
     return std::pair{std::move(inferred_starts), std::move(inferred_ends)};
   };

@@ -6554,3 +6554,42 @@ cannot carry this order. The earlier sorted-map cohort therefore cannot close
 the full boundary-order gate. Both public captures passed independent review,
 and the archive retains scripts, exact raw observations and bindings. No
 module promotion or coverage-count change is claimed.
+
+## Small-DFG native Petri baseline
+
+`docs/heuristic-classic-petri-small-dfg-native-baseline-validation.json` and its
+archive preserve all 1,779 native observations, comparison details, inputs,
+options and build/source bindings. The structural comparison matches 1,767
+cases and retains twelve topology mismatches, all in three-activity graphs at
+dependency threshold zero. Each has one fewer native place, one fewer silent
+transition and two fewer arcs than the public result. Native execution and
+exact input/options fidelity pass for every case; there are no global failures.
+
+The executed runner, actual core, private source/header copies, probe binary
+hashes and full failed graphs remain bound in the archive. Independent review
+cleared the comparison and a supplementary proof that all 148 compiled headers
+match the immutable source tree. The future runner now requires complete header
+inventory/content before capture; guard tests reject missing/extra and changed
+headers. Generated names remain outside structural isomorphism, available empty
+public properties are checked, and the HeuristicsNet diagnostic covers selected
+fields only. CLASSIC remains partial with these twelve Petri failures open.
+
+## CLASSIC DFG order and non-finite object checkpoint
+
+`docs/heuristic-classic-order-nonfinite-native-validation.json` and its checks
+archive record the native ordering repair. Optional `dfg_order` carries the
+direct DFG's insertion order into inferred boundary lists and must contain
+every supplied edge exactly once. Existing map callers keep their established
+order; explicit boundary values retain precedence. Registered acceptance tests
+reject duplicate, missing and foreign paths, distinguish empty input/order,
+and preserve inputs and options.
+
+All four order controls and all five non-finite/string controls match their
+pinned public observations. The latter inspect actual native performance maps,
+edge representations and relation representations with typed NaN, signed
+infinities, nested infinity and a distinct literal string. Valid fixture JSON
+encodes those values only for comparison; production export policy is unchanged.
+Isolated Debug variant checks and all three affected Release suites pass.
+Independent review found no actionable implementation, test or comparator
+defects. This closes the two supplemental object gates while the twelve
+archived small-DFG Petri topology failures remain open; coverage is unchanged.

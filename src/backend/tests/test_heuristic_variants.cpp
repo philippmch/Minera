@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 using namespace minera;
@@ -2509,6 +2510,457 @@ std::string classic_object_options_json(
   return result;
 }
 
+std::string classic_nonfinite_typed_double_json(double value) {
+  if (std::isnan(value))
+    return "{\"type\":\"builtins.float\",\"nonfinite\":\"NaN\"}";
+  if (std::isinf(value))
+    return std::signbit(value)
+               ? "{\"type\":\"builtins.float\",\"nonfinite\":\"-INF\"}"
+               : "{\"type\":\"builtins.float\",\"nonfinite\":\"INF\"}";
+  return "{\"type\":\"builtins.float\",\"value\":" +
+         std::to_string(value) + "}";
+}
+
+std::string classic_nonfinite_structured_json(
+    const HeuristicStructuredValue& value) {
+  return std::visit(
+      [](const auto& item) -> std::string {
+        using Item = std::decay_t<decltype(item)>;
+        if constexpr (std::is_same_v<Item, std::nullptr_t>) {
+          return "{\"type\":\"builtins.NoneType\",\"value\":null}";
+        } else if constexpr (std::is_same_v<Item, bool>) {
+          return std::string("{\"type\":\"builtins.bool\",\"value\":") +
+                 (item ? "true}" : "false}");
+        } else if constexpr (std::is_same_v<Item, std::int64_t> ||
+                             std::is_same_v<Item, std::uint64_t>) {
+          return "{\"type\":\"builtins.int\",\"value\":" +
+                 std::to_string(item) + "}";
+        } else if constexpr (std::is_same_v<Item, double>) {
+          return classic_nonfinite_typed_double_json(item);
+        } else if constexpr (std::is_same_v<Item, std::string>) {
+          return "{\"type\":\"builtins.str\",\"value\":" +
+                 json_string(item) + "}";
+        } else if constexpr (std::is_same_v<
+                                 Item, HeuristicStructuredValue::Array>) {
+          std::string result = "{\"type\":\"builtins.list\",\"items\":[";
+          for (std::size_t index = 0; index < item.size(); ++index) {
+            if (index != 0) result += ',';
+            result += classic_nonfinite_structured_json(item[index]);
+          }
+          return result + "]}";
+        } else {
+          std::string result = "{\"type\":\"builtins.dict\",\"entries\":[";
+          std::size_t index = 0;
+          for (const auto& [key, mapped] : item) {
+            if (index++ != 0) result += ',';
+            result += "{\"key\":{\"type\":\"builtins.str\",\"value\":" +
+                      json_string(key) + "},\"value\":" +
+                      classic_nonfinite_structured_json(mapped) + "}";
+          }
+          return result + "]}";
+        }
+      },
+      value.value);
+}
+
+std::string classic_nonfinite_performance_value_json(
+    const HeuristicPerformanceValue& value) {
+  return std::visit(
+      [](const auto& item) -> std::string {
+        using Item = std::decay_t<decltype(item)>;
+        if constexpr (std::is_same_v<Item, double>) {
+          return classic_nonfinite_typed_double_json(item);
+        } else if constexpr (std::is_same_v<Item, std::vector<double>>) {
+          std::string result = "{\"type\":\"builtins.list\",\"items\":[";
+          for (std::size_t index = 0; index < item.size(); ++index) {
+            if (index != 0) result += ',';
+            result += classic_nonfinite_typed_double_json(item[index]);
+          }
+          return result + "]}";
+        } else if constexpr (
+            std::is_same_v<Item, HeuristicPerformanceSummary>) {
+          return "{\"type\":\"unsupported-performance-summary\"}";
+        } else {
+          return classic_nonfinite_structured_json(item);
+        }
+      },
+      value);
+}
+
+std::string classic_nonfinite_performance_map_json(
+    const HeuristicDecoratedDfg& values) {
+  std::string result = "{\"type\":\"builtins.dict\",\"entries\":[";
+  std::size_t index = 0;
+  for (const auto& [pair, value] : values) {
+    if (index++ != 0) result += ',';
+    result += "{\"key\":{\"type\":\"builtins.tuple\",\"items\":["
+              "{\"type\":\"builtins.str\",\"value\":" +
+              json_string(pair.first) +
+              "},{\"type\":\"builtins.str\",\"value\":" +
+              json_string(pair.second) + "}]},\"value\":" +
+              classic_nonfinite_performance_value_json(value) + "}";
+  }
+  return result + "]}";
+}
+
+std::string classic_dfg_order_json(
+    const std::optional<std::vector<std::pair<std::string, std::string>>>& order) {
+  if (!order) return "null";
+  std::string result = "[";
+  for (std::size_t index = 0; index < order->size(); ++index) {
+    if (index != 0) result += ',';
+    const auto& [source, target] = (*order)[index];
+    result += '[' + json_string(source) + ',' + json_string(target) + ']';
+  }
+  return result + ']';
+}
+
+std::string classic_nonfinite_input_snapshot(
+    const HeuristicClassicDfgInput& input) {
+  return "{\"dfg\":" + classic_frequency_dfg_json(input.dfg) +
+         ",\"activities\":" +
+         classic_optional_activities_json(input.activities) +
+         ",\"activity_counts\":" +
+         classic_optional_counts_json(input.activity_counts) +
+         ",\"start_counts\":" +
+         classic_optional_counts_json(input.start_counts) +
+         ",\"end_counts\":" +
+         classic_optional_counts_json(input.end_counts) +
+         ",\"window_two_dfg\":" +
+         classic_frequency_dfg_json(input.window_two_dfg) +
+         ",\"frequency_triples\":" +
+         classic_triples_json(input.frequency_triples) +
+         ",\"performance_dfg_present\":" +
+         (input.performance_dfg ? "true" : "false") +
+         ",\"start_activities\":" +
+         classic_optional_boundaries_json(input.start_activities) +
+         ",\"end_activities\":" +
+         classic_optional_boundaries_json(input.end_activities) +
+         ",\"performance_values\":" +
+         (input.performance_values
+              ? classic_nonfinite_performance_map_json(
+                    *input.performance_values)
+              : "null") +
+         ",\"dfg_window_2_supplied\":" +
+         (input.dfg_window_2_supplied ? "true" : "false") +
+         ",\"freq_triples_supplied\":" +
+         (input.freq_triples_supplied ? "true" : "false") +
+         ",\"dfg_order\":" + classic_dfg_order_json(input.dfg_order) + "}";
+}
+
+void assert_classic_nonfinite_default_options(
+    const HeuristicMinerOptions& options) {
+  assert(options.variant == HeuristicMinerVariant::kClassic);
+  assert(options.activity_attribute == "concept:name");
+  assert(options.timestamp_attribute == "time:timestamp");
+  assert(!options.dependency_threshold.has_value());
+  assert(options.min_frequency == 1);
+  assert(!options.connect_all);
+  assert(options.and_threshold == 0.65);
+  assert(options.min_activity_count == 1);
+  assert(options.decoration == HeuristicNetDecoration::kFrequency);
+  assert(options.performance_aggregation ==
+         HeuristicPerformanceAggregation::kMean);
+  assert(options.dfg_pre_cleaning_noise_threshold == 0.05);
+  assert(options.loop_length_two_threshold == 0.5);
+  assert(!options.keep_once_per_case);
+  assert(options.most_common_paths.empty());
+  assert(!options.start_timestamp_attribute.has_value());
+  assert(options.lifecycle_instance_attribute == "concept:instance");
+  assert(!options.use_business_hours);
+  assert(options.business_hour_slots.empty());
+  assert(!options.business_hour_slots_explicit);
+  assert(options.case_id_attribute == "case:concept:name");
+}
+
+std::string heuristic_options_snapshot_json(
+    const HeuristicMinerOptions& options);
+
+template <typename Relation>
+std::string classic_nonfinite_relation_record_json(
+    const HeuristicsNet& net, const Relation& value) {
+  return "{\"source\":" + json_string(net.activities[value.source]) +
+         ",\"target\":" + json_string(net.activities[value.target]) +
+         ",\"representation\":" +
+         classic_nonfinite_typed_double_json(value.representation) +
+         ",\"representation_value\":" +
+         (value.representation_value
+              ? classic_nonfinite_performance_value_json(
+                    *value.representation_value)
+              : "null") + "}";
+}
+
+void classic_nonfinite_object_payloads_preserve_typed_values(
+    const std::optional<std::string>& evidence_path = std::nullopt) {
+  struct Fixture {
+    std::string name;
+    HeuristicPerformanceValue input_value;
+    std::string expected_value_json;
+  };
+
+  HeuristicStructuredValue::Array nested_items{
+      HeuristicStructuredValue{std::numeric_limits<double>::infinity()}};
+  HeuristicStructuredValue nested_value{
+      HeuristicStructuredValue::Object{
+          {"x", HeuristicStructuredValue{std::move(nested_items)}}}};
+  const std::vector<Fixture> fixtures{
+      {"nan", std::numeric_limits<double>::quiet_NaN(),
+       "{\"type\":\"builtins.float\",\"nonfinite\":\"NaN\"}"},
+      {"positive_infinity", std::numeric_limits<double>::infinity(),
+       "{\"type\":\"builtins.float\",\"nonfinite\":\"INF\"}"},
+      {"negative_infinity", -std::numeric_limits<double>::infinity(),
+       "{\"type\":\"builtins.float\",\"nonfinite\":\"-INF\"}"},
+      {"nested", std::move(nested_value),
+       "{\"type\":\"builtins.dict\",\"entries\":[{\"key\":{\"type\":\"builtins.str\",\"value\":\"x\"},\"value\":{\"type\":\"builtins.list\",\"items\":[{\"type\":\"builtins.float\",\"nonfinite\":\"INF\"}]}}]}"},
+      {"literal_nan", HeuristicStructuredValue{std::string("NaN")},
+       "{\"type\":\"builtins.str\",\"value\":\"NaN\"}"},
+  };
+
+  std::vector<std::string> evidence_records;
+  for (const auto& fixture : fixtures) {
+    auto input = classic_input({{{"A", "B"}, 1}});
+    input.performance_values.emplace();
+    input.performance_values->emplace(
+        std::make_pair(std::string("A"), std::string("B")),
+        fixture.input_value);
+    HeuristicMinerOptions options;
+
+    // The input uses the captured A>B=1 DFG, default options, omitted
+    // auxiliary metadata, and only the supplied decorated map.
+    assert(!input.activities.has_value());
+    assert(!input.activity_counts.has_value());
+    assert(!input.start_counts.has_value());
+    assert(!input.end_counts.has_value());
+    assert(input.window_two_dfg.empty());
+    assert(input.frequency_triples.empty());
+    assert(!input.performance_dfg.has_value());
+    assert(!input.start_activities.has_value());
+    assert(!input.end_activities.has_value());
+    assert(!input.dfg_window_2_supplied);
+    assert(!input.freq_triples_supplied);
+    assert(!input.dfg_order.has_value());
+    assert_classic_nonfinite_default_options(options);
+
+    const auto input_before = classic_nonfinite_input_snapshot(input);
+    const auto options_before = heuristic_options_snapshot_json(options);
+    const auto net = discover_heuristics_net(input, options);
+    const auto input_after = classic_nonfinite_input_snapshot(input);
+    const auto options_after = heuristic_options_snapshot_json(options);
+    assert(input_before == input_after);
+    assert(!input.dfg_order.has_value());
+    assert(options_before == options_after);
+    assert_classic_nonfinite_default_options(options);
+    assert(net.variant == HeuristicMinerVariant::kClassic);
+    assert(net.decoration == HeuristicNetDecoration::kPerformance);
+    assert(net.performance_values.has_value());
+    assert(net.performance_values->size() == 1);
+    const auto map_value = net.performance_values->find({"A", "B"});
+    assert(map_value != net.performance_values->end());
+    assert(classic_nonfinite_performance_value_json(map_value->second) ==
+           fixture.expected_value_json);
+    assert(net.edges.size() == 1);
+    assert(net.relation_statistics.size() == 1);
+    const auto* result_edge = edge(net, "A", "B");
+    assert(result_edge != nullptr);
+    const auto& result_relation = relation(net, "A", "B");
+    const auto expected_scalar = std::get_if<double>(&fixture.input_value)
+                                     ? fixture.expected_value_json
+                                     : classic_nonfinite_typed_double_json(0.0);
+    assert(classic_nonfinite_typed_double_json(result_edge->representation) ==
+           expected_scalar);
+    assert(classic_nonfinite_typed_double_json(result_relation.representation) ==
+           expected_scalar);
+    assert(result_edge->representation_value.has_value());
+    assert(result_relation.representation_value.has_value());
+    assert(classic_nonfinite_performance_value_json(
+               *result_edge->representation_value) == fixture.expected_value_json);
+    assert(classic_nonfinite_performance_value_json(
+               *result_relation.representation_value) ==
+           fixture.expected_value_json);
+
+    const auto map_json =
+        classic_nonfinite_performance_map_json(*net.performance_values);
+    const auto expected_map_json =
+        "{\"type\":\"builtins.dict\",\"entries\":[{\"key\":{\"type\":\"builtins.tuple\",\"items\":["
+        "{\"type\":\"builtins.str\",\"value\":\"A\"},{\"type\":\"builtins.str\",\"value\":\"B\"}]},\"value\":" +
+        fixture.expected_value_json + "}]}";
+    assert(map_json == expected_map_json);
+
+    std::string record = "{\"name\":" + json_string(fixture.name) +
+                         ",\"route\":\"direct_classic_dfg\",\"input_before\":" +
+                         input_before + ",\"input_after\":" + input_after +
+                         ",\"options_before\":" + options_before +
+                         ",\"options_after\":" + options_after +
+                         ",\"performance_values\":" + map_json +
+                         ",\"edges\":[" +
+                         classic_nonfinite_relation_record_json(
+                             net, *result_edge) +
+                         "],\"relations\":[" +
+                         classic_nonfinite_relation_record_json(
+                             net, result_relation) +
+                         "],\"inputs_unchanged\":" +
+                         (input_before == input_after ? "true" : "false") +
+                         ",\"options_unchanged\":" +
+                         (options_before == options_after ? "true" : "false") +
+                         "}";
+    evidence_records.push_back(std::move(record));
+  }
+
+  if (evidence_path) {
+    std::ofstream output(*evidence_path, std::ios::binary);
+    if (!output)
+      throw std::runtime_error(
+          "unable to open CLASSIC nonfinite object evidence output");
+    output << '[';
+    for (std::size_t index = 0; index < evidence_records.size(); ++index) {
+      if (index != 0) output << ',';
+      output << evidence_records[index];
+    }
+    output << "]\n";
+    if (!output)
+      throw std::runtime_error(
+          "unable to write CLASSIC nonfinite object evidence output");
+  }
+}
+
+void classic_dfg_order_preserves_inferred_boundary_lists(
+    const std::optional<std::string>& evidence_path = std::nullopt) {
+  using Paths = std::vector<std::pair<std::string, std::string>>;
+  using Names = std::vector<std::string>;
+  struct Fixture {
+    std::string name;
+    HeuristicFrequencyDfg dfg;
+    Paths order;
+    Names activities;
+    Names starts;
+    Names ends;
+  };
+  // Expected lists come only from the four immutable public observations.
+  const HeuristicFrequencyDfg disconnected{{{"A", "B"}, 1},
+                                            {{"Z", "Y"}, 1}};
+  const HeuristicFrequencyDfg forked{{{"A", "B"}, 2}, {{"A", "C"}, 2},
+                                    {{"B", "D"}, 2}, {{"C", "D"}, 2}};
+  const std::vector<Fixture> fixtures{
+      {"disconnected_forward", disconnected, {{"A", "B"}, {"Z", "Y"}},
+       {"A", "B", "Y", "Z"}, {"A", "Z"}, {"B", "Y"}},
+      {"disconnected_reversed", disconnected, {{"Z", "Y"}, {"A", "B"}},
+       {"A", "B", "Y", "Z"}, {"Z", "A"}, {"Y", "B"}},
+      {"forked_forward", forked,
+       {{"A", "B"}, {"A", "C"}, {"B", "D"}, {"C", "D"}},
+       {"A", "B", "C", "D"}, {"A"}, {"D"}},
+      {"forked_reversed", forked,
+       {{"C", "D"}, {"B", "D"}, {"A", "C"}, {"A", "B"}},
+       {"A", "B", "C", "D"}, {"A"}, {"D"}},
+  };
+  const auto assert_boundaries = [](const HeuristicsNet& net,
+                                    const Names& starts, const Names& ends) {
+    assert(net.metadata.has_value());
+    assert(std::get<Names>(net.metadata->start_activities) == starts);
+    assert(std::get<Names>(net.metadata->end_activities) == ends);
+  };
+  std::vector<std::string> records;
+  for (const auto& fixture : fixtures) {
+    HeuristicClassicDfgInput input;
+    input.dfg = fixture.dfg;
+    input.dfg_order = fixture.order;
+    HeuristicMinerOptions options;
+    assert_classic_nonfinite_default_options(options);
+    assert(!input.activities && !input.activity_counts && !input.start_counts &&
+           !input.end_counts && !input.start_activities && !input.end_activities &&
+           !input.performance_dfg && !input.performance_values);
+    assert(input.window_two_dfg.empty() && input.frequency_triples.empty());
+    assert(!input.dfg_window_2_supplied && !input.freq_triples_supplied);
+    const auto before = classic_nonfinite_input_snapshot(input);
+    const auto dfg_before = classic_frequency_dfg_json(input.dfg);
+    const auto order_before = classic_dfg_order_json(input.dfg_order);
+    const auto options_before = heuristic_options_snapshot_json(options);
+    const auto net = discover_heuristics_net(input, options);
+    const auto after = classic_nonfinite_input_snapshot(input);
+    const auto options_after = heuristic_options_snapshot_json(options);
+    assert(before == after);
+    assert(input.dfg == fixture.dfg);
+    assert(input.dfg_order == fixture.order);
+    assert(options_before == options_after);
+    assert_classic_nonfinite_default_options(options);
+    assert(net.activities == fixture.activities);
+    assert(net.metadata.has_value());
+    assert(net.metadata->activities == fixture.activities);
+    assert_boundaries(net, fixture.starts, fixture.ends);
+    records.push_back(
+        "{\"name\":" + json_string(fixture.name) +
+        ",\"route\":\"direct_classic_dfg\",\"input_before\":" + before +
+        ",\"input_after\":" + after +
+        ",\"dfg_before\":" + dfg_before +
+        ",\"dfg_after\":" + classic_frequency_dfg_json(input.dfg) +
+        ",\"dfg_order_before\":" + order_before +
+        ",\"dfg_order_after\":" + classic_dfg_order_json(input.dfg_order) +
+        ",\"options_before\":" + options_before +
+        ",\"options_after\":" + options_after +
+        ",\"activities\":" + classic_optional_activities_json(net.activities) +
+        ",\"metadata_activities\":" +
+        classic_optional_activities_json(net.metadata->activities) +
+        ",\"start_activities\":" +
+        classic_optional_boundaries_json(net.metadata->start_activities) +
+        ",\"end_activities\":" +
+        classic_optional_boundaries_json(net.metadata->end_activities) +
+        ",\"inputs_unchanged\":" + (before == after ? "true" : "false") +
+        ",\"options_unchanged\":" +
+        (options_before == options_after ? "true" : "false") + "}");
+  }
+
+  HeuristicClassicDfgInput legacy;
+  legacy.dfg = disconnected;
+  assert(!legacy.dfg_order);
+  assert_boundaries(discover_heuristics_net(legacy), {"A", "Z"}, {"B", "Y"});
+  assert(!legacy.dfg_order);
+  HeuristicClassicDfgInput empty;
+  empty.dfg_order = Paths{};
+  assert_boundaries(discover_heuristics_net(empty), {}, {});
+  const auto reject_order = [&](const HeuristicFrequencyDfg& dfg,
+                                const Paths& order) {
+    HeuristicClassicDfgInput invalid;
+    invalid.dfg = dfg;
+    invalid.dfg_order = order;
+    const auto before = classic_nonfinite_input_snapshot(invalid);
+    bool rejected = false;
+    try {
+      (void)discover_heuristics_net(invalid);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+    assert(before == classic_nonfinite_input_snapshot(invalid));
+  };
+  reject_order(disconnected, {});
+  reject_order(disconnected, {{"A", "B"}, {"A", "B"}});
+  reject_order(disconnected, {{"A", "B"}});
+  reject_order(disconnected, {{"A", "B"}, {"C", "D"}});
+  reject_order({}, {{"A", "B"}});
+  auto explicit_boundaries = legacy;
+  explicit_boundaries.dfg_order = Paths{{"Z", "Y"}, {"A", "B"}};
+  explicit_boundaries.start_activities = Names{"B", "A", "B"};
+  explicit_boundaries.end_activities = Names{"Y", "B"};
+  assert_boundaries(discover_heuristics_net(explicit_boundaries),
+                    {"B", "A", "B"}, {"Y", "B"});
+  explicit_boundaries.start_activities = Names{};
+  explicit_boundaries.end_activities = Names{};
+  assert_boundaries(discover_heuristics_net(explicit_boundaries), {}, {});
+
+  if (evidence_path) {
+    std::ofstream output(*evidence_path, std::ios::binary);
+    if (!output)
+      throw std::runtime_error("unable to open CLASSIC DFG order evidence output");
+    output << '[';
+    for (std::size_t index = 0; index < records.size(); ++index) {
+      if (index != 0) output << ',';
+      output << records[index];
+    }
+    output << "]\n";
+    if (!output)
+      throw std::runtime_error("unable to write CLASSIC DFG order evidence output");
+  }
+}
+
 void assert_classic_object_fields(const HeuristicsNet& net,
                                   const DirectlyFollowsGraph& graph,
                                   std::string_view analysis) {
@@ -2866,7 +3318,20 @@ std::string heuristic_options_snapshot_json(
             std::to_string(options.business_hour_slots.size()) +
             ",\"case_id_attribute\":" +
             json_string(options.case_id_attribute);
-  return result + "}";
+  result += ",\"most_common_paths\":[";
+  std::size_t path_index = 0;
+  for (const auto& [source, target] : options.most_common_paths) {
+    if (path_index++ != 0) result += ',';
+    result += '[' + json_string(source) + ',' + json_string(target) + ']';
+  }
+  result += "],\"business_hour_slots\":[";
+  for (std::size_t index = 0; index < options.business_hour_slots.size(); ++index) {
+    if (index != 0) result += ',';
+    const auto& slot = options.business_hour_slots[index];
+    result += "{\"start_seconds\":" + std::to_string(slot.start_seconds) +
+              ",\"end_seconds\":" + std::to_string(slot.end_seconds) + "}";
+  }
+  return result + "]}";
 }
 
 std::string petri_transition_labels_json(const PetriNet& net) {
@@ -3194,6 +3659,8 @@ int main(int argc, char** argv) {
   std::optional<std::string> classic_flat_evidence;
   std::optional<std::string> classic_object_evidence;
   std::optional<std::string> classic_auxiliary_evidence;
+  std::optional<std::string> classic_nonfinite_evidence;
+  std::optional<std::string> classic_dfg_order_evidence;
   std::optional<std::string> heuristic_inputless_evidence;
   if (argc != 1) {
     if (argc == 3 && std::string_view(argv[1]) == "--classic-flat-evidence") {
@@ -3205,12 +3672,20 @@ int main(int argc, char** argv) {
                std::string_view(argv[1]) == "--classic-auxiliary-evidence") {
       classic_auxiliary_evidence = argv[2];
     } else if (argc == 3 &&
+               std::string_view(argv[1]) == "--classic-nonfinite-evidence") {
+      classic_nonfinite_evidence = argv[2];
+    } else if (argc == 3 &&
+               std::string_view(argv[1]) == "--classic-dfg-order-evidence") {
+      classic_dfg_order_evidence = argv[2];
+    } else if (argc == 3 &&
                std::string_view(argv[1]) == "--heuristic-inputless-evidence") {
       heuristic_inputless_evidence = argv[2];
     } else {
       throw std::invalid_argument(
           "usage: test_heuristic_variants "
           "[--classic-flat-evidence PATH | --classic-object-evidence PATH | "
+          "--classic-nonfinite-evidence PATH | "
+          "--classic-dfg-order-evidence PATH | "
           "--classic-auxiliary-evidence PATH | "
           "--heuristic-inputless-evidence PATH]");
     }
@@ -3235,6 +3710,9 @@ int main(int argc, char** argv) {
   classic_active_nodes_conversion_and_dfg_inference();
   classic_performance_aggregations_and_validation();
   classic_decorated_dfg_values_preserve_typed_payloads();
+  classic_nonfinite_object_payloads_preserve_typed_values(
+      classic_nonfinite_evidence);
+  classic_dfg_order_preserves_inferred_boundary_lists(classic_dfg_order_evidence);
   start_selector_defaults_and_validation();
   business_hours_cover_heuristic_waits_and_sojourns();
   subsecond_timestamps_preserve_exact_order_and_business_prefix();
