@@ -6511,8 +6511,8 @@ boundaries, auxiliary DFG/triple maps and performance maps are omitted.
 The archive retains actual object fields, names, properties and markings,
 the complete ordered fixture manifest, source/helper bindings and opaque
 before/after module proofs. This is a finite reference corpus for detecting
-additional topology differences. Native comparison is pending; neither this
-capture nor its successful calls establish full module parity.
+additional topology differences. Native comparison was pending at this capture
+checkpoint; its successful public calls alone do not establish full module parity.
 
 Review identified that the first HeuristicsNet serializer pass reported its
 wrapper type. The corrected capture records the actual returned public type;
@@ -6534,8 +6534,8 @@ all three controls with exact input/options fidelity. These 25 observations
 include a repeated DFG input. The archive binds the staged code tree, actual
 core, test binaries, scripts, observations and private probe headers. Independent
 review found no actionable converter, test or comparator defects. The broader
-1,779-case native comparison remains a separate gate; full HeuristicsNet fields
-are outside this Petri comparison, and coverage counts remain unchanged.
+1,779-case native comparison followed as a separate gate; full HeuristicsNet
+fields are outside this Petri comparison, and coverage counts remain unchanged.
 
 ## Supplemental CLASSIC returned-object gates
 
@@ -6543,14 +6543,16 @@ are outside this Petri comparison, and coverage counts remain unchanged.
 archive preserve nine pinned public calls with unchanged inputs. Five confirm
 that NaN, positive/negative infinity, nested infinity and the literal string
 `NaN` retain distinct values and types in returned performance maps and edges.
-Native discovery has a corresponding typed representation; a direct native
-object comparison remains required. JSON export rejection is a separate
+Native discovery has a corresponding typed representation; the subsequent
+object checkpoint below supplies the required direct native comparison. JSON
+export rejection is a separate
 transport policy and does not prove or disprove object preservation.
 
 Four insertion-order controls expose a further supported-input gap. Reversing
 the disconnected DFG `A->B:1, Z->Y:1` reverses the inferred start and end lists;
-a fork with singleton boundaries stays unchanged. The current native map
-cannot carry this order. The earlier sorted-map cohort therefore cannot close
+a fork with singleton boundaries stays unchanged. The prior native map could
+not carry this order; the later `dfg_order` checkpoint below repairs it. The
+earlier sorted-map cohort therefore could not close
 the full boundary-order gate. Both public captures passed independent review,
 and the archive retains scripts, exact raw observations and bindings. No
 module promotion or coverage-count change is claimed.
@@ -6572,7 +6574,8 @@ match the immutable source tree. The future runner now requires complete header
 inventory/content before capture; guard tests reject missing/extra and changed
 headers. Generated names remain outside structural isomorphism, available empty
 public properties are checked, and the HeuristicsNet diagnostic covers selected
-fields only. CLASSIC remains partial with these twelve Petri failures open.
+fields only. This baseline retains the twelve failures subsequently resolved
+by the join-bridge checkpoint below.
 
 ## CLASSIC DFG order and non-finite object checkpoint
 
@@ -6591,5 +6594,38 @@ infinities, nested infinity and a distinct literal string. Valid fixture JSON
 encodes those values only for comparison; production export policy is unchanged.
 Isolated Debug variant checks and all three affected Release suites pass.
 Independent review found no actionable implementation, test or comparator
-defects. This closes the two supplemental object gates while the twelve
-archived small-DFG Petri topology failures remain open; coverage is unchanged.
+defects. This closes the two supplemental object gates. The twelve archived
+small-DFG Petri failures remained open until the join-bridge checkpoint below;
+coverage is unchanged.
+
+## CLASSIC Petri join-bridge checkpoint
+
+`docs/heuristic-classic-petri-small-dfg-native-validation.json` and its checks
+archive record all 1,779 matching native Petri outputs, resolving the twelve
+failures retained in the baseline. Exact inputs and options remain unchanged,
+with zero native errors or global mismatches. The graph comparison includes
+place/transition types, visible and silent labels, weighted directed arcs and
+actual initial/final markings. Generated names remain outside isomorphism;
+captured public properties are required to be available and empty.
+
+The generic reducer retains its existing default behavior. HeuristicsNet
+conversion enables a narrow option that preserves a unary silent bridge when
+its input has multiple ordinary producers and its output has another ordinary
+producer. Registered regressions check default contraction, the preservation
+condition, the complete case 126 topology and disconnected boundary markings,
+and unchanged neighboring cases 125/127. All four affected Release suites pass.
+
+`docs/heuristic-classic-petri-bridge-controls-validation.json` and its checks
+archive additionally record all 22 earlier route observations and all three
+inputless controls matching the same build. These 25 observations include a
+repeated DFG input. The new 22-route and broad corpus probes serialize actual
+`dfg_order`, options arrays/enums and workflow markings; the older three-control
+input serializer explicitly leaves `dfg_order` unobserved. All complete private
+header inventories and contents, bound native sources, core, executable,
+fixtures, runners and logs remain tied to the immutable code tree. Independent
+review found no actionable implementation, test or comparison defects.
+
+The original failing baseline stays archived. The 1,779-case HeuristicsNet
+diagnostic still compares selected fields only, and these Petri checks do not
+claim full object equivalence. CLASSIC remains partial pending the separate
+module gate audit and distinct catalogue proof; coverage counts are unchanged.

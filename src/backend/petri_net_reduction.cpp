@@ -342,6 +342,10 @@ bool reduce_series_place(WorkingNet& net, std::vector<bool>& place_alive,
     if (consumers.size() != 1 || consumers.front() != silent) continue;
     const auto producers = ordinary_producers(net, input);
     const auto output_producers = ordinary_producers(net, output);
+    if (options.preserve_join_bridges && producers.size() > 1 &&
+        std::any_of(output_producers.begin(), output_producers.end(),
+                    [&](std::size_t producer) { return producer != silent; }))
+      continue;
     bool shared_producer = false;
     for (const auto producer : producers) {
       if (std::find(output_producers.begin(), output_producers.end(),

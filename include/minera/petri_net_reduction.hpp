@@ -21,6 +21,10 @@ struct PetriNetReductionOptions {
   // callers that need the complete structural rule family can enable them.
   bool enable_parallel_place_fusion = false;
   bool enable_abstraction = false;
+  // Keep a unary silent bridge when its input has multiple ordinary producers
+  // and its output has an ordinary producer other than the bridge. Heuristic
+  // conversion uses this to retain the separate branches feeding a join.
+  bool preserve_join_bridges = false;
 };
 
 struct PetriNetReductionResult {

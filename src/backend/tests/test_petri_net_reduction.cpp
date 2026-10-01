@@ -45,9 +45,64 @@ bool same_net(const PetriNet& lhs, const PetriNet& rhs) {
   return true;
 }
 
+void join_bridge_preservation_is_opt_in_and_requires_external_producer() {
+  for (const bool external_producer : {false, true}) {
+    PetriNet net;
+    net.set_activities({"a", "b", "c", "d", "e"});
+    const auto source = net.add_place();
+    const auto bridge_input = net.add_place();
+    const auto join = net.add_place();
+    const auto sink = net.add_place();
+    net.set_source(source);
+    net.set_sink(sink);
+    net.add_transition(0, {source}, {bridge_input});
+    net.add_transition(1, {source}, {bridge_input});
+    net.add_transition(std::nullopt, {bridge_input}, {join});
+    net.add_transition(2, {join}, {sink});
+    net.add_transition(3, {join}, {sink});
+    if (external_producer) net.add_transition(4, {source}, {join});
+
+    PetriNetReductionOptions defaults;
+    assert(!defaults.preserve_join_bridges);
+    defaults.initial_marking = {1, 0, 0, 0};
+    defaults.final_marking = {0, 0, 0, 1};
+    const auto contracted = reduce_petri_net(net, defaults);
+    assert(contracted.changed);
+    assert(contracted.net.place_count() == 3);
+    assert(contracted.net.transitions().size() ==
+           net.transitions().size() - 1);
+    assert((contracted.old_to_new_place ==
+            std::vector<std::size_t>{0, kRemovedPlace, 1, 2}));
+    assert(contracted.net.transitions()[0].outputs ==
+           std::vector<std::size_t>{1});
+    assert(contracted.net.transitions()[1].outputs ==
+           std::vector<std::size_t>{1});
+
+    auto preserve = defaults;
+    preserve.preserve_join_bridges = true;
+    const auto guarded = reduce_petri_net(net, preserve);
+    if (external_producer) {
+      assert(!guarded.changed);
+      assert(same_net(guarded.net, net));
+      assert((guarded.old_to_new_place ==
+              std::vector<std::size_t>{0, 1, 2, 3}));
+      assert(guarded.markings.initial == preserve.initial_marking);
+      assert(guarded.markings.final == preserve.final_marking);
+    } else {
+      // Several producers alone do not inhibit ordinary series-place fusion.
+      assert(guarded.changed);
+      assert(same_net(guarded.net, contracted.net));
+      assert(guarded.old_to_new_place == contracted.old_to_new_place);
+      assert(guarded.markings.initial == contracted.markings.initial);
+      assert(guarded.markings.final == contracted.markings.final);
+    }
+  }
+}
+
 }  // namespace
 
 int main() {
+  join_bridge_preservation_is_opt_in_and_requires_external_producer();
   {
     const auto result = reduce_petri_net(silent_chain());
     assert(result.changed);
