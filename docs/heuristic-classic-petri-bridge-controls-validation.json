@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "status": "verified_bridge_controls_checkpoint",
+  "parent_commit": "25b2cb45edb5d36aa6505ae7364c236ea67b6f7e",
+  "code_tree": "03522b85b63cc336dcfc642fa3de8e658b6bdb0e",
+  "core_sha256": "885b7b5822df6c4cf0b6b56328d338599b3493e2c46f50032912db4949554134",
+  "affected_native_suites": 4,
+  "archived_route_observations": 22,
+  "archived_route_matches": 22,
+  "inputless_control_observations": 3,
+  "inputless_control_matches": 3,
+  "public_archives": [
+    {
+      "path": "docs/heuristic-classic-petri-reference.json.gz",
+      "sha256": "b35b717f20f2e006dcb6f0c6f8ec3cb2cc6fb1bc4f472f1a69d1b8c98c120d14"
+    },
+    {
+      "path": "docs/heuristic-classic-petri-diamonds-reference.json.gz",
+      "sha256": "844b7f26a1043f680fa566847ecca4da66a1d01e55f2e74da2e9c44e14fc079f"
+    },
+    {
+      "path": "docs/heuristic-petri-inputless-reference.json.gz",
+      "sha256": "419e0c2777eaffd3025b9bb5a3ff14b2d31db4ef1e159a683f483fa8fafdf735"
+    }
+  ],
+  "public_capture_bindings": {
+    "build/heuristic-classic-petri-inputless-clean-reference.json": "366ea9d1a1b9b2962b40f384e825dee18eba56f994e753e56d78284ffe21bd69",
+    "build/heuristic-classic-petri-inputless-plusplus-identity-safe-reference.json": "b9d2ac7d4eeeb1e0e1baa9cb42b08fa0433efafd5ee0fcb48ad05d2463509b8c",
+    "build\\heuristic-classic-petri-reference.json": "c111c4bc4ecde94311ee58c24f5551b33a412aca4e5e14a2cba5cbab504a818c",
+    "build\\heuristic-classic-petri-diamonds-reference.json": "4a2eca6598776f1df7b422b917609c14b6c5903746a051f52bf26dacb1b9c41f"
+  },
+  "binary_bindings": {
+    "build/petri-comparison-checkpoint-build/Release/minera_core.lib": "885b7b5822df6c4cf0b6b56328d338599b3493e2c46f50032912db4949554134",
+    "build/petri-comparison-checkpoint-source/include/minera/petri_net_reduction.hpp": "ce150c640bb3ad2866087010a422f2b84dff669ae3e648fccabe31f10c66b8d6",
+    "build/petri-comparison-checkpoint-source/src/backend/petri_net_reduction.cpp": "695d26880b88647251ca46c50b4a8c6ab548679fdf96ef4fcd004f59f0692888",
+    "build/petri-comparison-checkpoint-source/src/backend/tests/test_petri_net_reduction.cpp": "fc95babaddaea582489ea3a6c202ba262e09f7c530ddab8774d4ecbc63702c1a",
+    "build/petri-comparison-checkpoint-source/include/minera/petri_net.hpp": "9835ce599207ace6fc32bbbb9f60db58fc768e88d3cf387c192f348852924b01",
+    "build/petri-comparison-checkpoint-source/src/backend/petri_net.cpp": "d409005123b977431c2cf1d4181670ed2f825d49baee674fea7716bd18cc08d4",
+    "build/petri-comparison-checkpoint-source/include/minera/heuristic_miner.hpp": "afa2e795e060bcef12e44e198fab2d7d680d76a5d781129382ef9c81328ca6af",
+    "build/petri-comparison-checkpoint-source/src/backend/heuristic_miner.cpp": "1a5c862f14eca291a71707799934e3b1152d16ff5fe01b82ccf01c0f8555fe7f",
+    "build/petri-comparison-checkpoint-source/src/backend/tests/test_heuristic_variants.cpp": "c3168edbadead0c445397ba63ecb9b4b946191b5b4c2fd284e7bde00c4499205",
+    "build/petri-comparison-checkpoint-source/include/minera/event_data.hpp": "15ef60c605f8d11fd8ee4b4df94502d4183b83c10c10ffcf4582bbfbf1c6ae1e",
+    "build/petri-comparison-checkpoint-source/include/minera/event_log.hpp": "8988a1b11a279b0d2305cf23a09333544dde417a616e2488d5470ceb0bb5995c",
+    "build/petri-comparison-checkpoint-source/src/backend/json_export.cpp": "4b371ac91ee361978b7cbd21fdd4817798a701b2cad6a430ae80cb5b291bcbb5",
+    "build/petri-comparison-checkpoint-source/src/backend/tools/minera_export.cpp": "302ad8817eefb28f008ee03e5dfdcb9e55ef0124e1c19b7c2902d013f175049a",
+    "build/petri-comparison-checkpoint-source/src/backend/tests/test_core.cpp": "8f6607d0332eca47d5afb09f9a8c2534679684925270058064d6640e3e03dd6d",
+    "build/petri-comparison-checkpoint-source/src/backend/tests/test_petri_net_conversion.cpp": "5918ec9ce0acfc4298f6ec0412a92d4036f4fbcf76fc1038f03d18b5b25c10a8",
+    "build/petri-comparison-checkpoint-source/CMakeLists.txt": "4f7a3f0947b3be7c3d93097ffd0e01b32f3e7cf6385e6733654790ef92630a96",
+    "build/petri-comparison-checkpoint-build/Release/minera_core_tests.exe": "5f6930cb4253e25b478dd4d77cc3efde42b4323b8dfac686601e349dcf48cf7d",
+    "build/petri-comparison-checkpoint-build/Release/minera_heuristic_variants_tests.exe": "865cabe2cb3afd35412bb002400e060dff09de5112dab089b5f389df5a6f493b",
+    "build/petri-comparison-checkpoint-build/Release/minera_petri_net_conversion_tests.exe": "787ec442e809e13ea6b697fb49a4d46a7241579fbfffee67b5362dfde8296454",
+    "build/petri-comparison-checkpoint-build/Release/minera_petri_net_reduction_tests.exe": "3c2ef85522e6c28903b0ef7cf308dcffe7375584c000c53007910b6ee004457e",
+    "build/petri-comparison-checkpoint-build/Release/minera_export.exe": "0ea35d8315b017d3efaa920f38b9333dc699769ea0381f6fb3bef47845f5cb53",
+    "build\\heuristic-classic-petri-routes-after-bridge-build\\Release\\heuristic_classic_petri_after_bridge.exe": "fd339eb018c5421d08b239f42202dafa844c858218d1956de2b05c54e00790ae",
+    "build\\heuristic-classic-petri-routes-after-bridge-source\\lib\\minera_core.lib": "885b7b5822df6c4cf0b6b56328d338599b3493e2c46f50032912db4949554134"
+  },
+  "scope": "Exact recorded route/control inputs and options, typed fixtures, actual native workflow markings, and weighted directed labeled Petri comparisons.",
+  "limits": [
+    "25 observations are not 25 distinct inputs; the inputless DFG control repeats an earlier route input",
+    "The three-control direct DFG serializer does not observe dfg_order; no value is inferred",
+    "Archived expected reference exceptions retain their exact reviewed native exception mapping; capture errors must be absent",
+    "Selected diamond HeuristicsNet fields are diagnostics, not full HeuristicsNet equivalence",
+    "Generated names, Python identities and nonempty public property payloads remain outside the native mapping",
+    "This bounded checkpoint is not a universal parity or full CLASSIC module claim"
+  ],
+  "archive": {
+    "path": "docs/heuristic-classic-petri-bridge-controls-checks.json.gz",
+    "sha256": "e8531b2818815222be68cec610bc443b157c8c317df50f6fdf13a8f85ea88a95",
+    "raw_sha256": "5ee0a2ffbbb22e603309aac656e5747ae4992741680f9c3e89969ec3929ca4a7",
+    "members": 200
+  }
+}

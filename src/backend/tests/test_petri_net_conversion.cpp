@@ -1,5 +1,8 @@
 #include "minera/petri_net.hpp"
+#include "minera/heuristic_miner.hpp"
+#include "minera/petri_analysis.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <set>
@@ -245,6 +248,106 @@ void variant_names_and_json_are_stable() {
   assert(json.find("A\\\"\\\\B") != std::string::npos);
 }
 
+void classic_dfg_conversion_retains_shared_join_bridge() {
+  // Immutable public cases 125/126/127 at dependency threshold zero. Only
+  // case 126 needs the multi-producer bridge retained; its workflow boundary
+  // places are disconnected because the DFG has no inferred starts or ends.
+  minera::HeuristicClassicDfgInput input;
+  input.dfg = {{{"A", "C"}, 1}, {{"B", "A"}, 1}, {{"B", "B"}, 1},
+               {{"B", "C"}, 1}, {{"C", "A"}, 1}, {{"C", "B"}, 1}};
+  minera::HeuristicMinerOptions options;
+  options.dependency_threshold = 0.0;
+  const auto net = minera::to_petri_net(
+      minera::discover_heuristics_net(input, options));
+  const auto arc_count = [](const minera::PetriNet& value) {
+    std::size_t count = 0;
+    for (const auto& transition : value.transitions())
+      count += transition.inputs.size() + transition.outputs.size();
+    return count;
+  };
+  assert(net.place_count() == 8);
+  assert(net.transitions().size() == 6);
+  assert(arc_count(net) == 16);
+  assert(std::count_if(net.transitions().begin(), net.transitions().end(),
+                       [](const auto& transition) {
+                         return transition.silent();
+                       }) == 3);
+  const auto visible = [&](const std::string& label)
+      -> const minera::PetriTransition& {
+    const auto found = std::find_if(
+        net.transitions().begin(), net.transitions().end(),
+        [&](const auto& transition) {
+          return transition.activity &&
+                 net.activities()[*transition.activity] == label;
+        });
+    assert(found != net.transitions().end());
+    return *found;
+  };
+  const auto& a = visible("A");
+  const auto& b = visible("B");
+  const auto& c = visible("C");
+  assert(a.inputs.size() == 2 && a.outputs.size() == 1);
+  assert(b.inputs.size() == 2 && b.outputs.size() == 1);
+  assert(c.inputs.size() == 1 && c.outputs.size() == 1);
+  const auto contains = [](const auto& places, std::size_t place) {
+    return std::find(places.begin(), places.end(), place) != places.end();
+  };
+  const auto join = c.inputs.front();
+  const auto c_output = c.outputs.front();
+  const auto b_output = b.outputs.front();
+  assert(a.outputs.front() == join);
+  assert(contains(a.inputs, c_output) && contains(b.inputs, c_output));
+  const auto a_branch = a.inputs[0] == c_output ? a.inputs[1] : a.inputs[0];
+  const auto b_branch = b.inputs[0] == c_output ? b.inputs[1] : b.inputs[0];
+  const auto bridge = std::find_if(
+      net.transitions().begin(), net.transitions().end(),
+      [&](const auto& transition) {
+        return transition.silent() && transition.inputs.size() == 1 &&
+               transition.outputs == std::vector<std::size_t>{join};
+      });
+  assert(bridge != net.transitions().end());
+  const auto bridge_input = bridge->inputs.front();
+  std::set<std::size_t> branch_targets;
+  for (const auto& transition : net.transitions()) {
+    if (transition.silent() && &transition != &*bridge) {
+      assert(transition.inputs == std::vector<std::size_t>{b_output});
+      assert(transition.outputs.size() == 2);
+      assert(contains(transition.outputs, bridge_input));
+      branch_targets.insert(transition.outputs[0] == bridge_input
+                                ? transition.outputs[1]
+                                : transition.outputs[0]);
+    }
+    assert(!contains(transition.inputs, net.source()));
+    assert(!contains(transition.outputs, net.source()));
+    assert(!contains(transition.inputs, net.sink()));
+    assert(!contains(transition.outputs, net.sink()));
+  }
+  assert((branch_targets == std::set<std::size_t>{a_branch, b_branch}));
+  const auto markings = minera::default_workflow_markings(net);
+  minera::Marking expected_initial(net.place_count(), 0);
+  minera::Marking expected_final(net.place_count(), 0);
+  expected_initial[net.source()] = 1;
+  expected_final[net.sink()] = 1;
+  assert(markings.initial == expected_initial);
+  assert(markings.final == expected_final);
+
+  auto case125 = input;
+  case125.dfg.erase({"C", "B"});
+  case125.dfg[{"C", "C"}] = 1;
+  const auto control125 = minera::to_petri_net(
+      minera::discover_heuristics_net(case125, options));
+  assert(control125.place_count() == 7);
+  assert(control125.transitions().size() == 5);
+  assert(arc_count(control125) == 13);
+  auto case127 = input;
+  case127.dfg[{"C", "C"}] = 1;
+  const auto control127 = minera::to_petri_net(
+      minera::discover_heuristics_net(case127, options));
+  assert(control127.place_count() == 12);
+  assert(control127.transitions().size() == 9);
+  assert(arc_count(control127) == 26);
+}
+
 }  // namespace
 
 int main() {
@@ -254,4 +357,5 @@ int main() {
   unsupported_and_malformed_trees_are_rejected();
   explicit_standard_variant_matches_default();
   variant_names_and_json_are_stable();
+  classic_dfg_conversion_retains_shared_join_bridge();
 }

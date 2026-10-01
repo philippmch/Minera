@@ -395,7 +395,9 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
     net.add_transition(a, merge(std::move(in_alts), true),
                        merge(std::move(out_alts), false));
   }
-  return reduce_petri_net(net).net;
+  PetriNetReductionOptions reduction_options;
+  reduction_options.preserve_join_bridges = true;
+  return reduce_petri_net(net, reduction_options).net;
 }
 
 PetriNet to_petri_net_transition_bordered(const ProcessTree& tree) {
