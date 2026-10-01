@@ -23,6 +23,8 @@ its scope to the already verified HeuristicsNet routes.
 | Petri-returning `classic.apply` / `classic.apply_dfg` | `heuristic-classic-petri-bridge-controls-validation.json`; its archived checks and bound public references | All 18 primary cases and four additive route observations match the current converter. Three inputless CLASSIC/PLUSPLUS controls also match; their existing direct-input serializer explicitly leaves `dfg_order` unobserved. |
 | Pure XOR/AND Petri construction | `heuristic-classic-petri-bridge-controls-validation.json`; `heuristic-classic-petri-diamonds-reference.json.gz` | All four additive Petri/HeuristicsNet route checks match the current converter, including the XOR/AND structural distinction and AND measures of 0.8. |
 | Small-DFG Petri topology and thresholds | `heuristic-classic-petri-small-dfg-native-validation.json`; its complete native and public captures | All 1,779 Petri cases match. The twelve threshold-zero topology failures are resolved, with zero native errors and exact unchanged input/options checks throughout. |
+| Complete direct-DFG returned objects | `heuristic-classic-full-object-gate-validation.json`; its archived public capture and saved-native comparison | All observed fields match in 1,779 saved cases, but actual raw performance-map presence and values were not captured. These gaps prevent a full-object pass. |
+| Nonempty auxiliary maps and matrices | `heuristic-classic-full-object-gate-validation.json`; its new 1,152-case public capture | The capture retains 1,080 complete results and 72 historical errors, with 288 nonempty window-two inputs and 288 nonempty triple inputs. Full native object comparison remains required. |
 | Distinct catalogue proof | `reference-2.7.22-coverage.json` CLASSIC module row | Add an exact implementation and registered acceptance-test proof only after all module gates are verified. |
 
 ## Required returned-object checks
@@ -33,8 +35,10 @@ window-two/triple structures, accepted edges, node occurrence statistics,
 loop-two and AND fields, and concurrency values for its bounded fixtures.
 It reads actual native node statistics instead of synthesizing them from
 metadata, compares numeric values exactly, and validates typed timestamp input
-payloads separately from lexical values. Empty structures are checked against
-actual native collections rather than assumed to be empty.
+payloads separately from lexical values. These checks have bounded field
+coverage: the saved native serializer did not observe raw `performance_dfg`
+presence and values. Its empty-array projection cannot close that field gate.
+Actual native collections are required for each remaining comparison.
 
 The native node boundary flags remain distinct from internal start/end activity
 membership: the public captures return false flags even when boundary counts
@@ -117,7 +121,24 @@ The 22-route and 1,779-case probes observe actual `dfg_order`; its omission in t
 older three-control input serializer remains explicit. Independent review found
 no actionable implementation, regression or comparison defects. Generated names
 remain outside structural isomorphism and public properties must be available
-and empty. The complete module gate still requires the distinct catalogue audit.
+and empty. The complete module gate still requires full returned-object checks
+and the distinct catalogue audit.
+
+The full-object audit compares every observed field in all 1,779 saved direct
+DFG cases. All match, including actual nonempty per-node AND maps in 288 cases.
+The comparison records both outer and nested raw performance-map paths as
+unobserved; no case receives a full-object pass. Window-two and triple maps are
+empty throughout this corpus, so it cannot prove their nonempty return behavior.
+
+A fresh public capture replays the existing 1,152 decorated-value fixtures with
+the original ordered arguments and supplied map presence. It retains complete
+returned objects for 1,080 cases and all 72 `KeyError` outcomes, matching the
+historical error inventory and messages. No serialization failures or input
+mutations occur. It records nonempty raw window-two and triple maps and their
+matrices, typed performance payloads, node flags, loops and AND maps. Native
+comparison must read actual object fields and map presence rather than infer
+them from the reference, input or defaults. The module remains partial until
+these checks pass.
 
 ## Scope boundaries and completion
 

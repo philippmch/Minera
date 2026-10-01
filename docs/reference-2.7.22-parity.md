@@ -6629,3 +6629,29 @@ The original failing baseline stays archived. The 1,779-case HeuristicsNet
 diagnostic still compares selected fields only, and these Petri checks do not
 claim full object equivalence. CLASSIC remains partial pending the separate
 module gate audit and distinct catalogue proof; coverage counts are unchanged.
+
+## CLASSIC full returned-object audit
+
+`docs/heuristic-classic-full-object-gate-validation.json` and its checks archive
+record a full field audit of the 1,779 saved direct-DFG observations. Every
+observed field matches, including the actual per-node AND maps in 288 cases.
+The earlier native serializer did not capture raw `performance_dfg` presence
+or values. The audit reports both outer and nested paths as unobserved in every
+case, so there are zero full-object passes. Empty-array projections cannot
+settle these fields, and this corpus has no nonempty window-two or triple maps.
+
+The archive also retains a fresh public replay of all 1,152 decorated-value
+fixtures with exact ordered arguments and map presence. It captures 1,080
+complete results and 72 errors matching the historical inventory, error types
+and messages. All inputs remain unchanged, with zero serialization failures.
+There are 288 nonempty window-two inputs and 288 nonempty triple inputs; 264
+successful outputs retain each map and its corresponding matrix. Complete
+returned objects and typed raw payloads supply the remaining native comparison
+targets. Before/after opaque module proofs match the pinned reference commit;
+capture scripts, serializer helpers, fixture construction and ordered call
+specifications are hash bound.
+
+This checkpoint preserves the remaining field gaps. Actual native raw
+performance-map observations and the nonempty auxiliary returned-object
+comparisons are still required before the separate catalogue proof can be
+added. CLASSIC and coverage counters remain unchanged.
