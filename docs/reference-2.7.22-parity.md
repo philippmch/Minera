@@ -7134,3 +7134,45 @@ There are zero new public/native calls, production edits or suite runs in
 this archive step. Nullable auxiliary fields, computed performance output,
 positive AND maps, carrier behavior and full Petri fields remain open.
 PLUSPLUS stays partial; all 228 open coverage units remain in scope.
+
+### PLUSPLUS filtered performance returned-map observations
+
+Fourteen additional actual public EventLog HeuristicsNet calls form seven
+direct/parent pairs with all nine parameters explicit. Their typed DFG,
+performance DFG and performance matrix values agree in every pair. Minimum
+activity and frequency filters remove retained interval relations from all
+three maps. Dependency exclusion removes edges while retaining the maps, and
+entirely filtered performance results retain present empty dictionaries.
+
+At minimum frequency five, BD remains with interval count five and mean
+performance `1.6666666666666667`, computed from three direct waits, 2/2/1.
+In a non-neighbor interval control, the frequency DFG contains AC=1 and BC=1,
+the performance DFG contains only BC=1.0, and the matrix contains AC=0.0 and
+BC=1.0. For these inputs, performance output uses retained interval relations
+with direct observations, while the matrix also retains a zero for a relation
+without a direct wait. This is separate computed output; an unset aggregated
+`performance_values` input cannot stand in for it. Additional native
+aggregations and missing or invalid timestamp behavior remain unproven.
+
+The actual worker exits zero with fourteen results, no reference or
+serialization errors, and no input mutations. The enclosing capture exits one
+after results and process records are saved because its empty-stderr assertion
+rejects a Matplotlib cache diagnostic. Read-only finalization verifies the
+exact saved bytes without rerunning the calls. An earlier preparation failure
+before worker creation or public imports remains separate. Frozen compiled
+inputs and current working inputs have independent exact byte guards;
+line-ending differences are not normalized into asserted source equivalence.
+
+`docs/heuristic-plusplus-filtered-performance-checks.jsonl.gz` and its validation
+preserve 726 members, including immutable UTF-8 snapshots of all 650 working-source
+files, distinct compiled-source bindings, raw results,
+original logs, failures, helpers and finalization proof. The prior 23 helper
+checks and subsequent 29 capture, 21 finalizer, and 22 saver checks are retained.
+Every member byte, SHA and count roundtrips with the unchanged reviewed codec.
+The archive is 4,900,615 bytes, SHA
+`33d4916f883a7a7b01f6f19f7ed5469816daec3971a8ce2c1b51f436faad17cc`;
+validation SHA is
+`00895181c3574ca8e1f838e27e1b70a66d5882e14fe89b5e2d46c5617494b884`.
+Saving adds zero public/native calls, production edits or suite runs. Native
+computed output, full returned objects, carrier behavior and complete Petri
+acceptance remain open. PLUSPLUS stays partial; all 228 open units remain.
