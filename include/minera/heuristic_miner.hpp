@@ -329,6 +329,10 @@ struct HeuristicMinerOptions {
   // Case field used to group flat EventStream/EventTable inputs. Existing
   // EventLog trace boundaries remain authoritative.
   std::string case_id_attribute = "case:concept:name";
+  // PLUSPLUS-only raw selector. Omitted uses decoration; an explicit
+  // "frequency" selects frequency, while any other string selects performance.
+  // Appended to preserve existing positional aggregate initialization.
+  std::optional<std::string> plusplus_decoration_selector = std::nullopt;
 };
 
 struct HeuristicClassicDfgInput {

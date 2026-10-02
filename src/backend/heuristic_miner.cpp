@@ -1601,10 +1601,16 @@ HeuristicsNet discover_classic_dfg(
 
 HeuristicsNet discover_plus_plus(const EventLog& log,
                                  const HeuristicMinerOptions& options) {
+  const HeuristicNetDecoration effective_decoration =
+      options.plusplus_decoration_selector
+          ? (*options.plusplus_decoration_selector == "frequency"
+                 ? HeuristicNetDecoration::kFrequency
+                 : HeuristicNetDecoration::kPerformance)
+          : options.decoration;
   const PlusAbstraction abstraction = build_plus_abstraction(log, options);
   HeuristicsNet net;
   net.variant = HeuristicMinerVariant::kPlusPlus;
-  net.decoration = options.decoration;
+  net.decoration = effective_decoration;
   net.performance_aggregation = options.performance_aggregation;
   net.activity_attribute = canonical_activity_attribute(options);
   net.timestamp_attribute = canonical_timestamp_attribute(options);
@@ -1613,7 +1619,7 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
 
   net.plusplus_public_dfg_window_2_present = false;
   net.plusplus_public_freq_triples_present = false;
-  if (options.decoration == HeuristicNetDecoration::kPerformance)
+  if (effective_decoration == HeuristicNetDecoration::kPerformance)
     net.plusplus_computed_performance_dfg.emplace();
 
   std::unordered_map<std::string, std::size_t> ids;
@@ -1674,13 +1680,13 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
     // These public mean maps follow the retained EFG domain, independently of
     // edge acceptance and the edge's chosen performance aggregation.
     net.plusplus_computed_performance_matrix.emplace(
-        pair, options.decoration == HeuristicNetDecoration::kFrequency
+        pair, effective_decoration == HeuristicNetDecoration::kFrequency
                   ? 0.0
                   : mean_wait);
     if (net.plusplus_computed_performance_dfg && direct_frequency > 0)
       net.plusplus_computed_performance_dfg->emplace(pair, mean_wait);
     const double representation =
-        options.decoration == HeuristicNetDecoration::kFrequency
+        effective_decoration == HeuristicNetDecoration::kFrequency
             ? static_cast<double>(frequency)
             : performance_representation(summary,
                                          options.performance_aggregation);
@@ -1692,10 +1698,10 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
     // PLUSPLUS frequency values retain their integer type even when the count
     // fits exactly in the legacy double compatibility projection.
     const std::optional<HeuristicPerformanceValue> representation_value =
-        options.decoration == HeuristicNetDecoration::kFrequency
+        effective_decoration == HeuristicNetDecoration::kFrequency
             ? HeuristicPerformanceValue{HeuristicStructuredValue{frequency}}
             : structured_performance_representation(
-                  summary, options.decoration, options.performance_aggregation);
+                  summary, effective_decoration, options.performance_aggregation);
     relation.representation_value = representation_value;
     net.relation_statistics.push_back(std::move(relation));
     const double dependency =
