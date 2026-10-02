@@ -32,6 +32,32 @@ commit `cb810e5`, a fresh staged export matched all compiled source bytes and
 passed the structural catalogue verifier. Commit identity and compiled-tree
 identity are distinct provenance fields.
 
+`heuristic-plusplus-route-object-validation.json` preserves a subsequent 112
+actual public calls: 60 HeuristicsNet calls and 52 Petri calls. Direct and
+parent EventLog routes match in all 27 paired HeuristicsNet controls and all
+23 paired Petri controls. The 109 successful results include sequence, XOR,
+positive AND, interval overlap, filtering, custom selectors, and flat carriers.
+Three parent DataFrame Petri calls raise `AttributeError` because their captured
+timestamp columns have object dtype; the errors remain in the evidence.
+Correctly datetime-typed DataFrame Petri controls remain required. None of the
+112 inputs changed.
+
+The same checkpoint compares twelve fresh, complete native objects against
+twelve reused public objects. All seventeen net fields, six fields per node,
+and three fields per outgoing edge produce 348 comparison cells: 248 matched,
+60 ambiguous, and 40 unrepresentable. Ambiguous candidates retain their actual
+values and are not passing checks. In particular, an unset native
+`performance_values` input is not a computed public `performance_dfg` result.
+Native auxiliary empty maps do not represent public `None`, and an unset edge
+scalar alternative does not establish the integer type of a frequency value.
+The full returned-object gate remains open.
+
+Only the new whole-object probe was compiled; the frozen core and its earlier
+four Release suites are reused. Its successful execution records fourteen
+commands and twelve actual native calls. A separate configure cleanup failure
+records zero native calls. The deterministic archive retains 96 exact UTF-8
+members, all command logs and errors, and 654 external byte/hash bindings.
+
 `heuristic-petri-inputless-native-validation.json` supplies the separate narrow
 PLUSPLUS inputless control: five places, four visible transitions, five arcs,
 unwired A/B inputs, private output places, and source/final markings. It does
@@ -52,7 +78,7 @@ reported explicitly rather than filled with a presumed default.
 | `dfg_window_2`, `freq_triples` | Auxiliary maps and their presence state | Saved public values are `None`, while native maps are empty; the current PLUSPLUS representation does not encode that distinction. Longer and repeated traces remain required. |
 | `dfg_window_2_matrix`, `freq_triples_matrix` | Views of the auxiliary maps | Empty dictionaries match the saved cases; the full domain and any positive values remain to be established. |
 | `node_type` | Decoration | Compare frequency and performance results, including edge value types. |
-| `performance_dfg`, `performance_matrix` | Performance presence, relation statistics, and edge representation | Frequency public DFG is `None`; performance DFG is a list, including an empty list. A frequency matrix entry may be zero even when native wait statistics are positive. Differing waits must distinguish count, mean, and representation. |
+| `performance_dfg`, `performance_matrix` | Performance presence, relation statistics, and edge representation | Frequency public DFG is `None`; performance DFG is a dictionary, including an empty dictionary. A frequency matrix entry may be zero even when native wait statistics are positive. Differing waits must distinguish count, mean, and representation. |
 | `sojourn_times` | Optional name-to-double map | Twelve saved comparisons pass, including escaped labels, removed activities, and empty input. Retain this verified obligation when broader inputs are added. |
 | `nodes` | Retained activities, node statistics, maps, and connections | Compare actual node keys and all fields below; empty AND/loop maps alone do not prove positive-map behavior. |
 
@@ -78,15 +104,15 @@ input and parameter state before and after every actual call.
 
 | Public parameter | Native option | Acceptance status |
 | --- | --- | --- |
-| `ACTIVITY_KEY` | `activity_attribute` | Standard/custom selectors are covered by the saved twelve cases. |
-| `START_TIMESTAMP_KEY` | `start_timestamp_attribute` | A selected interval start key is covered; missing-start/lifecycle mode remains open. |
-| `TIMESTAMP_KEY` | `timestamp_attribute` | Custom completion key needs an explicit discriminating control. |
-| `CASE_ID_KEY` | `case_id_attribute` | Custom case grouping needs a flat-carrier control. |
-| `DEPENDENCY_THRESH` | `dependency_threshold` | The inputless dispatcher case covers threshold 1; direct-route below/equal/above edge acceptance remains open. |
-| `AND_MEASURE_THRESH` | `and_threshold` | Positive AND values and below/equal/above acceptance remain open. |
-| `MIN_ACT_COUNT` | `min_activity_count` | Counts 1/2/10 are covered; relation fields incident to a removed activity remain open. |
-| `MIN_DFG_OCCURRENCES` | `min_frequency` | Below/equal/above a concrete positive relation count remains open. |
-| `HEU_NET_DECORATION` | `decoration` | Both decorations are covered on the saved short traces; differing-wait and positive branching controls remain open. |
+| `ACTIVITY_KEY` | `activity_attribute` | Standard/custom selectors are covered by the saved twelve cases and the new paired public routes. |
+| `START_TIMESTAMP_KEY` | `start_timestamp_attribute` | A custom interval start key is observed on both public routes; missing-start/lifecycle mode remains open. |
+| `TIMESTAMP_KEY` | `timestamp_attribute` | Custom completion is observed on public EventLog and flat routes; combine it with performance decoration and native controls. |
+| `CASE_ID_KEY` | `case_id_attribute` | Custom grouping is observed on public flat carriers; correctly datetime-typed DataFrame Petri and native counterparts remain open. |
+| `DEPENDENCY_THRESH` | `dependency_threshold` | Public dependency 1 is accepted below 1 and excluded at or above 1; its matrix entry remains. Compare the full native results. |
+| `AND_MEASURE_THRESH` | `and_threshold` | Positive public measures 1 and 0.5 and strict threshold acceptance are observed, including a connected AND Petri shape. Compare native maps and conversion. |
+| `MIN_ACT_COUNT` | `min_activity_count` | Public controls remove incident relation maps and edges while preserving raw sojourn entries; the complete native field domains remain to be compared. |
+| `MIN_DFG_OCCURRENCES` | `min_frequency` | Public count 2 remains at minimum 2 and is removed at minimum 3, including the returned DFG and matrices. Compare native domains. |
+| `HEU_NET_DECORATION` | `decoration` | Public differing-wait controls distinguish frequency `None`/integer values from performance dictionary/float values; native output presence and scalar types remain open. |
 
 ## Petri and completion gates
 
@@ -95,6 +121,12 @@ existing inputless control. Retain actual names, properties, arc weights,
 multiplicity, markings, and endpoint identities. A comparison based on unique
 names must reject or separately handle collisions rather than silently merging
 places or transitions.
+
+The new public controls establish connected sequence, XOR, positive AND, and
+filtered structures. Their observed names are unique within each returned
+net. The default repeated-trace control excludes zero-dependency cyclic edges,
+so it does not establish cyclic Petri behavior. Actual cycles, collision-focused
+names, and native comparisons of the broader Petri shapes remain required.
 
 Complete the module only after the full field, route, parameter, input, and
 Petri gates above are reconciled against actual pinned public calls and actual

@@ -6924,3 +6924,61 @@ branching, cyclic, and filtered shapes remain required. New capture preparation
 is prospective and is not counted as executed evidence. The earlier four
 Release suites and exact compiled-source verification are reused. No coverage
 row is promoted; PLUSPLUS remains partial with 228 open coverage units.
+
+### PLUSPLUS route controls and complete native objects
+
+The subsequent public capture records 112 actual calls: 60 HeuristicsNet and
+52 Petri calls, with 100 EventLog, six EventStream, and six DataFrame inputs.
+All 27 paired direct/parent HeuristicsNet results and all 23 paired
+direct/parent Petri topologies match. There are 109 successful results, no
+serialization errors, and no input mutations. Three parent DataFrame Petri
+calls raise `AttributeError("Can only use .dt accessor with datetimelike values")`;
+their timestamp columns have object dtype. Those failures are retained, and
+correctly datetime-typed DataFrame controls remain open.
+
+The public controls discriminate all nine parameter selectors or thresholds.
+Positive relation count 2 is retained at minimum 2 and removed at minimum 3,
+including the returned DFG and matrix domains. Activity filtering removes
+incident relation maps while retaining raw sojourn entries. Dependency and AND
+acceptance are strict: a value equal to its threshold is excluded. Positive
+AND measures, connected sequence/XOR/AND conversion, a longer overlapping
+interval trace, and a performance mean of 5.0 are observed. Frequency
+`performance_dfg` is `None`; performance `performance_dfg` is a dictionary.
+These are finite public observations, not a completed native acceptance gate.
+Missing-start/lifecycle inputs, actual cyclic conversion, collision-focused
+names, and broader native field and carrier comparisons remain required.
+
+Twelve new native calls serialize every HeuristicsNet member and the actual
+inputs/options before and after each call. Only the new whole-object probe was
+compiled against frozen core
+`8a1abd9236276c5de53ebc9025089ef2455d1beb6070b21aee05c8a5726ad8ec`,
+compiled tree `513be22bc70ad27b4e08bf72c37d96b88768436b`, parent `f25cfa2`.
+The actual capture context is `cc6117a`, distinct from the compiled tree.
+Fourteen command records cover configure, probe build, and twelve calls;
+all calls succeed without mutation. A prior configure cleanup failure is
+preserved separately with zero native calls. The reviewed Windows process
+helper terminates residual MSBuild children before recording final logs.
+The earlier four core Release suites are reused.
+
+The reviewed comparison pairs these twelve complete native snapshots with
+twelve reused public snapshots, adding no public calls. Its 348 cells cover
+204 net fields, 126 node fields, and 18 edge fields: 248 match, 60 remain
+ambiguous, and 40 are unrepresentable. Ambiguous candidates preserve their
+actual values and do not count as passing. An unset native input
+`performance_values` is not treated as a computed output; auxiliary empty maps
+do not stand in for public `None`, and an unset edge scalar alternative does
+not establish a frequency integer. The comparison report SHA is
+`b8fd8efc40e83c565c5e530265f272ce16e43a663009fecb3e99bdaa02ce99e3`.
+
+`docs/heuristic-plusplus-route-object-checks.jsonl.gz` and
+`docs/heuristic-plusplus-route-object-validation.json` retain all 96 exact UTF-8
+members, failed and successful command records, raw results and verdicts,
+fixtures, helpers, preparations, and 654 external byte/hash bindings. The
+reviewed saver passed ten focused checks and roundtripped every member byte,
+SHA, and count with the unchanged streaming codec. The deterministic archive
+is 1,200,433 bytes, SHA
+`3e1d608659805dc810c0062f20bfce9a77c55973e339ed287046dad3668f6cc7`;
+validation SHA is
+`16a1db8c9c69d8ebbb83bff37b46cf137556617d4eca7b2618df7a319683d48e`.
+No production source changes or new suite runs occur in this checkpoint.
+PLUSPLUS remains partial, and all 228 open coverage units remain in scope.
