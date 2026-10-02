@@ -3931,7 +3931,129 @@ void write_overlap(
   out << '}';
 }
 
+void validate_petri_presentation(const PetriNetPresentation& net) {
+  std::set<std::size_t> places, transitions;
+  const auto properties = [](const HeuristicStructuredValue::Object& value) {
+    validate_heuristic_structured_value(HeuristicStructuredValue{value});
+  };
+  properties(net.properties);
+  for (const auto& place : net.places) {
+    if (!places.insert(place.id).second)
+      throw std::invalid_argument("duplicate presented place ID");
+    properties(place.properties);
+  }
+  for (const auto& transition : net.transitions) {
+    if (!transitions.insert(transition.id).second)
+      throw std::invalid_argument("duplicate presented transition ID");
+    properties(transition.properties);
+  }
+  const auto endpoint = [&](const PetriNodeRef& ref) {
+    switch (ref.kind) {
+      case PetriNodeKind::kPlace:
+        if (places.contains(ref.id)) return;
+        break;
+      case PetriNodeKind::kTransition:
+        if (transitions.contains(ref.id)) return;
+        break;
+      default:
+        throw std::invalid_argument("invalid presented node kind");
+    }
+    throw std::invalid_argument("unknown presented arc endpoint");
+  };
+  for (const auto& arc : net.arcs) {
+    endpoint(arc.source);
+    endpoint(arc.target);
+    if (arc.source.kind == arc.target.kind)
+      throw std::invalid_argument("presented arc must join opposite node kinds");
+    properties(arc.properties);
+  }
+  const auto marking = [&](const std::vector<PetriSparseMarkingEntry>& entries) {
+    std::set<std::size_t> seen;
+    for (const auto& entry : entries) {
+      if (!places.contains(entry.place_id))
+        throw std::invalid_argument("unknown presented marking place");
+      if (!seen.insert(entry.place_id).second)
+        throw std::invalid_argument("duplicate presented marking place");
+    }
+  };
+  marking(net.initial_marking);
+  marking(net.final_marking);
+}
+
+void write_petri_presented_ref(std::ostream& out, const PetriNodeRef& ref) {
+  out << "{\"kind\":\""
+      << (ref.kind == PetriNodeKind::kPlace ? "place" : "transition")
+      << "\",\"id\":" << ref.id << '}';
+}
+
 }  // namespace
+
+std::string petri_net_presentation_json(const PetriNetPresentation& net) {
+  validate_petri_presentation(net);
+  std::ostringstream out;
+  out.imbue(std::locale::classic());
+  // These flags apply only to this API's local stream, including nested props.
+  out << std::setprecision(std::numeric_limits<double>::max_digits10)
+      << std::showpoint;
+  const auto properties = [&](const HeuristicStructuredValue::Object& value) {
+    write_heuristic_structured_value(out, HeuristicStructuredValue{value});
+  };
+  out << "{\"name\":";
+  write_json_string(out, net.name);
+  out << ",\"properties\":";
+  properties(net.properties);
+  out << ",\"places\":[";
+  for (std::size_t i = 0; i < net.places.size(); ++i) {
+    const auto& place = net.places[i];
+    if (i) out << ',';
+    out << "{\"id\":" << place.id << ",\"name\":";
+    write_json_string(out, place.name);
+    out << ",\"properties\":";
+    properties(place.properties);
+    out << '}';
+  }
+  out << "],\"transitions\":[";
+  for (std::size_t i = 0; i < net.transitions.size(); ++i) {
+    const auto& transition = net.transitions[i];
+    if (i) out << ',';
+    out << "{\"id\":" << transition.id << ",\"name\":";
+    write_json_string(out, transition.name);
+    out << ",\"label\":";
+    if (transition.label) write_json_string(out, *transition.label);
+    else out << "null";
+    out << ",\"properties\":";
+    properties(transition.properties);
+    out << '}';
+  }
+  out << "],\"arcs\":[";
+  for (std::size_t i = 0; i < net.arcs.size(); ++i) {
+    const auto& arc = net.arcs[i];
+    if (i) out << ',';
+    out << "{\"source\":";
+    write_petri_presented_ref(out, arc.source);
+    out << ",\"target\":";
+    write_petri_presented_ref(out, arc.target);
+    out << ",\"weight\":" << arc.weight << ",\"properties\":";
+    properties(arc.properties);
+    out << '}';
+  }
+  const auto marking = [&](const std::vector<PetriSparseMarkingEntry>& entries) {
+    out << '[';
+    for (std::size_t i = 0; i < entries.size(); ++i) {
+      if (i) out << ',';
+      out << "{\"place_id\":" << entries[i].place_id
+          << ",\"tokens\":" << entries[i].tokens << '}';
+    }
+    out << ']';
+  };
+  out << "],\"initial_marking\":";
+  marking(net.initial_marking);
+  out << ",\"final_marking\":";
+  marking(net.final_marking);
+  out << '}';
+  return out.str();
+}
+
 
 std::string token_replay_traces_json(
     const std::vector<TokenReplayTraceDiagnostics>& traces,
