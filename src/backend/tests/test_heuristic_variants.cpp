@@ -601,6 +601,71 @@ void plusplus_pandas_occurrence_order_and_self_concurrency() {
   assert(net.raw_concurrency_statistics.front().frequency == 4);
 }
 
+void plusplus_pandas_concurrency_rounding_keeps_exact_waits() {
+  struct Control {
+    std::string date;
+    std::uint32_t completion_ns;
+    std::uint32_t wait_ns;
+    bool concurrent;
+  };
+  const std::vector<Control> controls{
+      {"2024-01-01", 0, 1, true},
+      {"2024-01-01", 0, 500, true},
+      {"2024-01-01", 0, 596, true},
+      {"2024-01-01", 0, 597, false},
+      {"2024-01-01", 999, 1, true},
+      {"1970-01-01", 0, 499, true},
+      {"1970-01-01", 0, 500, false},
+      {"1960-01-01", 0, 501, true},
+      {"2100-01-01", 0, 501, true}};
+  for (const auto& control : controls) {
+    auto table = pandas_interval_table(2);
+    const auto start = table.column_index("start_timestamp");
+    const auto complete = table.column_index("time:timestamp");
+    table.dtypes[start] = table.dtypes[complete] = "datetime64[ns, UTC]";
+    const auto timestamp = [&](int seconds, std::uint32_t nanos) {
+      auto fraction = std::to_string(nanos);
+      return control.date + "T00:00:" + (seconds < 10 ? "0" : "") +
+             std::to_string(seconds) + "." +
+             std::string(9 - fraction.size(), '0') + fraction + "Z";
+    };
+    for (auto& row : table.rows) {
+      const auto& name = row[table.column_index("concept:name")]->value;
+      int first = name == "A" ? 0 : name == "B" ? 1 : name == "C" ? 10 : 12;
+      auto first_ns = name == "B" ? control.completion_ns + control.wait_ns : 0;
+      auto last_ns = name == "A" ? control.completion_ns : first_ns;
+      row[start] = typed_date("start_timestamp", timestamp(first, first_ns));
+      row[complete] = typed_date("time:timestamp", timestamp(first + 1, last_ns));
+      for (const auto column : {start, complete})
+        std::get<NativeDate>(row[column]->typed_value).resolution =
+            NativeDateResolution::kNanosecond;
+    }
+    auto options = plus_options();
+    options.decoration = HeuristicNetDecoration::kPerformance;
+    const auto net = discover_plus_plus_pandas(table, options);
+    assert(net.raw_concurrency_statistics.size() ==
+           (control.concurrent ? 1u : 0u));
+    if (control.concurrent) {
+      const auto& overlap = net.raw_concurrency_statistics.front();
+      assert(overlap.first == "A" && overlap.second == "B");
+      assert(overlap.frequency == 4);
+    }
+    const auto a = activity(net, "A");
+    const auto b = activity(net, "B");
+    const auto measure = std::find_if(net.dependency_measures.begin(),
+        net.dependency_measures.end(), [&](const auto& value) {
+          return value.source == a && value.target == b;
+        });
+    assert(measure != net.dependency_measures.end());
+    assert(measure->value == (control.concurrent ? 0.5 : 1.0));
+    const auto accepted = std::any_of(net.edges.begin(), net.edges.end(),
+        [&](const auto& value) { return value.source == a && value.target == b; });
+    assert(accepted == !control.concurrent);
+    assert(net.plusplus_computed_performance_dfg->at({"A", "B"}) ==
+           static_cast<double>(control.wait_ns) * 1e-9);
+  }
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -4490,6 +4555,7 @@ int main(int argc, char** argv) {
   plusplus_pandas_exact_duration_and_performance();
   plusplus_pandas_nat_statistics_and_error_order();
   plusplus_pandas_occurrence_order_and_self_concurrency();
+  plusplus_pandas_concurrency_rounding_keeps_exact_waits();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();

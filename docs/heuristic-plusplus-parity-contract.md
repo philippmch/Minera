@@ -838,3 +838,63 @@ The independent input comparison still excludes native allocation counters and
 decimal float spelling while retaining actual typed values. PLUSPLUS and Alpha+
 remain partial. No catalogue unit is promoted: coverage stays 46/86 packages and
 199/387 modules, with all 228 open units retained.
+
+## Pandas concurrency timestamp rounding (2026-10-02)
+
+Resolved the three measured nanosecond concurrency gaps from `cc8bd1a`. The pandas
+abstraction now caches epoch seconds rounded to six decimal places for inclusive
+overlap comparisons. It rounds the actual binary epoch value through fixed
+decimal formatting, preserving the observed epoch-dependent boundary. Exact
+timestamp ordering, eventually-follows comparisons, durations and scalar waits
+retain their separate existing precision paths. Generic discovery is unchanged.
+
+Forty-nine new public calls pin 24 gap/fraction/epoch controls, 19 half-microsecond
+boundary controls and three paired HeuristicsNet/Petri controls. All calls return
+objects with no skips or serializer failures. Every completed row, full input
+mutation snapshot, public signature/enum view, unchanged opaque pinned module
+proof and terminal process record is retained. The observed epochs are 1960,
+1970, 2024 and 2100. At the 2024 base, 596 ns remains concurrent while 597 ns does
+not; at the Unix epoch, 499 ns remains concurrent while 500 ns does not. Fractional
+completion controls distinguish the behavior from simply dropping nanoseconds.
+
+The three earlier 1/3/7 ns controls now retain concurrency count 4 and dependency
+0.5, excluding the A/B edge at threshold equality while keeping each exact wait.
+A new registered native regression exercises nine epoch, fractional and boundary
+controls, checking concurrency counts, dependency values, accepted edges and
+performance waits together. A fresh build freezes all 650 inputs and passes the
+five relevant suites with assertions enabled in Release.
+
+Actual replay makes 224 discoveries, 33 presented-Petri conversions and 43 generic
+conversions without additional reference calls. All 147 saved route aliases match
+error categories/messages, mutation occurrence, option preservation and supported
+connection domains. All 98 preceding aliases now match in full. The 91 returned
+HeuristicsNets compare all seventeen net projections and their node/edge
+projections, with 4514 matched field cells and three sojourn mismatches.
+Eighty-eight HeuristicsNet aliases match every supported field. All 33 Petri
+aliases match supported names, nullable labels,
+properties, arc occurrences, weights and sparse markings. All 77 generic cases
+preserve their previously recorded net, Petri, input and error results exactly.
+
+Three new fractional-completion controls expose a separate array-duration gap.
+For A's 1.000001-second duration in nanosecond columns, public `@@diff` and sojourn
+are `1.000001`; native writes and returns `1.0000010000000001`. Thus three supported
+input-after projections also mismatch. Their concurrency, dependency, accepted
+edges and scalar waits match. These raw differences remain explicit completion
+obligations; they do not justify changing the precision of exact waits.
+
+`heuristic-plusplus-pandas-concurrency-checks.jsonl.gz` retains 1587 members
+(21245608 bytes), SHA-256 `8a9cde0e3f092b0bcc759e3dc32652a6a924d1fec681b0182a5eba0fab4625c8`. The archive round-trip verifies every
+member's bytes and hash. Validation is `heuristic-plusplus-pandas-concurrency-validation.json`
+(SHA-256 `9a8564df9a2ccc0ef1a5e12683d2f7a519ad4edec52016c56aab82fd8d59264a`). The full raw values, helper derivations, source
+inputs, binary bindings, comparisons, preparations and execution logs are saved.
+The preceding committed archive is hash-bound as the parent checkpoint and keeps
+its earlier failures and three measured gaps intact.
+
+These controls establish the captured precision behavior; broader timestamp
+ranges/units/timezones, rounding environments, business hours, carrier/parameter
+and error combinations, dictionary iteration order, Python object identity,
+unscoped metadata and adapter routing still require completion evidence. The
+supported input comparison retains typed values while excluding native allocation
+counters and decimal float spelling. PLUSPLUS and Alpha+ remain partial. No
+catalogue units are promoted: coverage remains 46/86 packages and 199/387 modules,
+with 228 incomplete units.
