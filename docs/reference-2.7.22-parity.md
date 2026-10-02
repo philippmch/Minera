@@ -7889,3 +7889,28 @@ Evidence is `heuristic-plusplus-pandas-numeric-checks.jsonl.gz` (SHA-256
 round-trip. Broader parameter types, carriers, errors, metadata, identity and
 routing requirements remain open. PLUSPLUS and Alpha+ stay partial; coverage
 remains 46/86 packages and 199/387 modules, with 228 incomplete units.
+
+### PLUSPLUS pandas literal selector implementation (2026-10-02)
+
+Resolved four pandas selectors literally, including empty names, and matched the
+observed case/activity/completion lookup order and distinct KeyError messages.
+An absent start is copied after successful lookups; dtype and overlapping-role
+errors retain their observed start-only mutation. An internal projection assigns
+event roles without interpreting selected column names as generic native aliases.
+
+All 96 new public aliases match: 22 HeuristicsNet results on 1,118
+supported cells and complete connection domains, eight Petri presentations and
+66 errors, with matching supported input-after, mutation and option checks.
+The first sixty pre-change replays and their actual mismatches remain archived.
+The wider replay matches all 438 aliases on 13,268
+net-field checks, 69 Petri presentations and 89 errors; all 77 generic regressions
+remain unchanged. Actual execution makes 515 discoveries, 69 presented conversions
+and 43 generic conversions without additional reference calls. All five
+assertion-enabled suites pass for the accepted 650-input source snapshot.
+
+Evidence is `heuristic-plusplus-pandas-selector-checks.jsonl.gz` (SHA-256
+`29c93c12e26dd093c0667ee811ccfbf0246bc46b4f32f627673deabbf4a146fa`, 55954295 bytes, 3052 verified members), with
+`heuristic-plusplus-pandas-selector-validation.json`. Every member round-trips.
+Broader parameter, carrier, error, metadata, identity, ordering and routing gates
+remain open. PLUSPLUS and Alpha+ stay partial; coverage remains 46/86 packages and
+199/387 modules, with 228 incomplete units and no promotion.

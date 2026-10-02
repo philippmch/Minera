@@ -2024,13 +2024,51 @@ HeuristicsNet discover_plus_plus_pandas(
   selected.variant = HeuristicMinerVariant::kPlusPlus;
   selected.start_timestamp_attribute =
       options.start_timestamp_attribute.value_or("start_timestamp");
-  const auto column = [&](const std::string& key) {
+  const auto repr = [](const std::string& text) {
+    const char quote = text.find('\'') != std::string::npos &&
+                               text.find('"') == std::string::npos
+                           ? '"' : '\'';
+    std::string result(1, quote);
+    constexpr char hex[] = "0123456789abcdef";
+    for (const unsigned char ch : text) {
+      if (ch == quote || ch == '\\') {
+        result += '\\';
+        result += static_cast<char>(ch);
+      } else if (ch == '\n') result += "\\n";
+      else if (ch == '\r') result += "\\r";
+      else if (ch == '\t') result += "\\t";
+      else if (ch < 32 || ch == 127) {
+        result += "\\x";
+        result += hex[ch >> 4];
+        result += hex[ch & 15];
+      } else result += static_cast<char>(ch);
+    }
+    result += quote;
+    return result;
+  };
+  const auto find_column = [&](const std::string& key)
+      -> std::optional<std::size_t> {
     const auto found = std::find(data.columns.begin(), data.columns.end(), key);
-    if (found == data.columns.end())
-      throw HeuristicPandasError("builtins.KeyError", "'" + key + "'");
+    if (found == data.columns.end()) return std::nullopt;
     return static_cast<std::size_t>(found - data.columns.begin());
   };
-  const auto completed = column(canonical_timestamp_attribute(selected));
+  const auto case_column = find_column(selected.case_id_attribute);
+  if (!case_column)
+    throw HeuristicPandasError("builtins.KeyError", repr(selected.case_id_attribute));
+  const auto activity_column = find_column(selected.activity_attribute);
+  if (!activity_column)
+    throw HeuristicPandasError(
+        "builtins.KeyError", repr("Column not found: " + selected.activity_attribute));
+  const auto start_key = *selected.start_timestamp_attribute;
+  const auto original_start = find_column(start_key);
+  const auto completion_column = find_column(selected.timestamp_attribute);
+  if (!completion_column) {
+    const auto message = original_start
+        ? "[" + repr(selected.timestamp_attribute) + "] not in index"
+        : selected.timestamp_attribute;
+    throw HeuristicPandasError("builtins.KeyError", repr(message));
+  }
+  const auto completed = *completion_column;
   const auto validate_datetime = [&](std::size_t index) {
     const bool valid = !data.dtypes.empty()
         ? std::string_view(data.dtypes.at(index)).starts_with("datetime64[")
@@ -2053,10 +2091,8 @@ HeuristicsNet discover_plus_plus_pandas(
     for (auto& row : data.rows) row.emplace_back();
     return index;
   };
-  const auto start_key = *selected.start_timestamp_attribute;
-  auto start = std::find(data.columns.begin(), data.columns.end(), start_key);
   std::size_t started;
-  if (start == data.columns.end()) {
+  if (!original_start) {
     const auto dtype = data.dtypes.empty() ? std::string{}
                                           : data.dtypes.at(completed);
     started = append_column(start_key, dtype);
@@ -2070,10 +2106,13 @@ HeuristicsNet discover_plus_plus_pandas(
       }
     }
   } else {
-    started = static_cast<std::size_t>(start - data.columns.begin());
+    started = *original_start;
   }
   validate_datetime(completed);
   validate_datetime(started);
+  if (selected.activity_attribute == selected.case_id_attribute)
+    throw HeuristicPandasError(
+        "builtins.KeyError", repr(selected.activity_attribute + "_2"));
   const auto unit = [&](std::size_t index) -> std::int64_t {
     if (!data.dtypes.empty()) {
       const std::string_view dtype = data.dtypes[index];
@@ -2153,11 +2192,51 @@ HeuristicsNet discover_plus_plus_pandas(
         "builtins.TypeError", "Invalid comparison between dtype=timedelta64[" +
                                   std::string(suffix) + "] and int");
   }
-  return discover_plus_plus_from_abstraction(
+  // Mine an internal projection with unambiguous event roles. The caller's
+  // literal selectors and cells remain intact in the mutable dataframe.
+  EventTable projection;
+  projection.columns = {"case:concept:name", "concept:name", "time:timestamp",
+                        "start_timestamp", "@@diff"};
+  const std::vector<std::size_t> source_columns{
+      *case_column, *activity_column, completed, started, difference};
+  if (!data.dtypes.empty())
+    for (const auto index : source_columns)
+      projection.dtypes.push_back(data.dtypes[index]);
+  projection.rows.reserve(data.rows.size());
+  for (const auto& row : data.rows) {
+    EventTable::Row projected;
+    for (std::size_t i = 0; i < source_columns.size(); ++i) {
+      auto cell = row[source_columns[i]];
+      if (cell) {
+        cell->key = projection.columns[i];
+        cell->first_class_role = i == 0 ? FirstClassAttributeRole::kCaseId
+                                : i == 1 ? FirstClassAttributeRole::kActivity
+                                : i == 2 ? FirstClassAttributeRole::kTimestamp
+                                         : FirstClassAttributeRole::kNone;
+        cell->first_class_state = i < 3
+            ? (cell->is_null ? FirstClassAttributeState::kNull
+                             : FirstClassAttributeState::kPresent)
+            : FirstClassAttributeState::kMissing;
+        cell->first_class_source_key = i < 3 ? cell->key : std::string{};
+      }
+      projected.push_back(std::move(cell));
+    }
+    projection.rows.push_back(std::move(projected));
+  }
+  auto projected_options = selected;
+  projected_options.case_id_attribute = "case:concept:name";
+  projected_options.activity_attribute = "concept:name";
+  projected_options.timestamp_attribute = "time:timestamp";
+  projected_options.start_timestamp_attribute = "start_timestamp";
+  auto net = discover_plus_plus_from_abstraction(
       build_pandas_plus_abstraction(
-          classic_event_log(EventDataView(data), selected), selected,
-          start_units, complete_units),
+          classic_event_log(EventDataView(projection), projected_options),
+          projected_options, start_units, complete_units),
       selected);
+  net.activity_attribute = selected.activity_attribute;
+  net.timestamp_attribute = selected.timestamp_attribute;
+  net.activity_ids_are_local = selected.activity_attribute != "concept:name";
+  return net;
 }
 
 HeuristicsNet discover_heuristics_net(

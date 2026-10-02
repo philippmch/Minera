@@ -215,6 +215,7 @@ struct HeuristicsNet {
   // mean the canonical activity and completion-time fields. When activity
   // labels come from a generic field, all ids in this object are local to
   // `activities` and `activity_ids_are_local` is true.
+  // The pandas entry point retains literal selectors, including empty names.
   std::string activity_attribute;
   std::string timestamp_attribute;
   bool activity_ids_are_local = false;
@@ -406,6 +407,8 @@ class HeuristicPandasError : public std::invalid_argument {
 // projection and materializes a missing start column plus @@diff durations.
 // Declared timestamp dtypes are authoritative; object columns raise the public
 // AttributeError category. The generic const-table entry point stays separate.
+// All four column selectors are literal. Lookup failures preserve the public
+// KeyError category, message and input-mutation order.
 [[nodiscard]] HeuristicsNet discover_plus_plus_pandas(
     EventTable& data, const HeuristicMinerOptions& options = {});
 
