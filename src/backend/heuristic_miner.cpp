@@ -591,6 +591,11 @@ PandasTimestamp pandas_timestamp(const EventAttribute* value,
                                  std::int64_t units_per_second) {
   if (value == nullptr || value->is_null || is_typed_nat(*value))
     return std::nullopt;
+  if (const auto* number = std::get_if<double>(&value->typed_value)) {
+    if (std::isnan(*number)) return std::nullopt;
+    throw HeuristicPandasError(
+        "builtins.AttributeError", "'float' object has no attribute 'timestamp'");
+  }
   const auto* date = std::get_if<NativeDate>(&value->typed_value);
   auto parsed = parse_timestamp_exact(date == nullptr ? value->value
                                                       : date->value);
@@ -2109,6 +2114,10 @@ HeuristicsNet discover_plus_plus_pandas(
     started = *original_start;
   }
   validate_datetime(completed);
+  if (!data.dtypes.empty() && data.dtypes[started] == "object" &&
+      std::string_view(data.dtypes[completed]).starts_with("datetime64["))
+    throw HeuristicPandasError(
+        "builtins.TypeError", "cannot subtract DatetimeArray from ndarray[object]");
   validate_datetime(started);
   if (selected.activity_attribute == selected.case_id_attribute)
     throw HeuristicPandasError(
@@ -2150,7 +2159,8 @@ HeuristicsNet discover_plus_plus_pandas(
     return false;
   };
   if (timezone_aware(started) != timezone_aware(completed) ||
-      (timezone_aware(completed) && !any_timestamp(completed)))
+      (started != completed && timezone_aware(completed) &&
+       !any_timestamp(completed)))
     throw HeuristicPandasError(
         "builtins.TypeError",
         "Cannot subtract tz-naive and tz-aware datetime-like objects.");
@@ -2184,7 +2194,7 @@ HeuristicsNet discover_plus_plus_pandas(
     value.value = std::to_string(durations[i]);
     data.rows[i][difference] = std::move(value);
   }
-  if (!any_timestamp(started)) {
+  if (started != difference && !any_timestamp(started)) {
     const auto suffix = duration_units == 1'000'000'000 ? "ns"
                         : duration_units == 1'000'000 ? "us"
                         : duration_units == 1'000 ? "ms" : "s";

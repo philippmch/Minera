@@ -409,6 +409,8 @@ class HeuristicPandasError : public std::invalid_argument {
 // AttributeError category. The generic const-table entry point stays separate.
 // All four column selectors are literal. Lookup failures preserve the public
 // KeyError category, message and input-mutation order.
+// Selecting @@diff as a timestamp preserves its duration overwrite and the
+// resulting public error or missing-value behavior.
 [[nodiscard]] HeuristicsNet discover_plus_plus_pandas(
     EventTable& data, const HeuristicMinerOptions& options = {});
 
