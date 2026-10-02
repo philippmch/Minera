@@ -7088,3 +7088,49 @@ The four passing Release suites and 650 compiled inputs are reused without
 new production edits or suite runs. PLUSPLUS remains partial, the catalogue
 stays at 46/86 packages and 199/387 modules complete, and all 228 open units
 remain in scope.
+
+### PLUSPLUS corrected DFG and complete Petri diagnostic reports
+
+The separate interval-frequency comparison preserves 119 HeuristicsNet
+aliases and 4,573 cells: 3,881 matched, 234 ambiguous, 458 unrepresentable,
+and zero mismatched. Actual `eventually_follows_frequency` statistics produce
+the complete DFG and nested matrix for all 117 supported aliases. The two
+unfamiliar-decoration aliases retain their missing native counterparts.
+The original literal-adjacency report remains immutable in the prior archive.
+Corrected report SHA is
+`612aabda5840270703ee3cba5c2e7f21653b2fe420e1bf840aff6178b820c2ba`.
+Fourteen focused correction checks pass with the prior fifteen checks reused.
+
+The separate Petri report compares all 75 public aliases. There are 69
+matching projected topologies and six differences: three original
+object-dtype DataFrame reference errors against native success, and three
+structural differences for correctly typed overlapping DataFrames. Each of
+those public graphs has four places, four transitions and eight arcs; each
+native graph has five places, four transitions and nine arcs. Four public
+DataFrame input mutations remain explicit, with zero native mutations.
+The report SHA is
+`ad7aa0a5f058753be705d720256485522e228129d4c7cafb19d8576bb53514aa`.
+
+The reviewed matcher preserves separate place/transition identities, visible
+labels, silent transitions, directed multiplicities and initial/final tokens.
+It retains raw explicit-zero and omitted marking domains, positive integer
+arc weights and distinct arc objects. A projected unit-multiarc bijection
+does not prove names, properties or weight-carrier parity. Search-budget or
+vertex-limit exhaustion remains unresolved. Twenty-five focused matcher
+checks pass. All 69 topology matches remain unrepresentable for full Petri
+acceptance; the six differences remain three errors and three mismatches.
+
+`docs/heuristic-plusplus-broad-comparison-checks.jsonl.gz` and its validation
+preserve both complete actual reports, preparations, manifests, attempt
+records, policies, frozen helpers with their original execution origins, and
+static fixtures. The original broad capture/build/public evidence is reused
+through exact external bindings. Twenty-two focused saver checks pass. All
+29 exact UTF-8 members roundtrip byte, SHA and count with the unchanged codec;
+935 external artifacts are bound. The archive is 2,219,138 bytes, SHA
+`af7900ab402825ff91723bcc97efe7a8db9e47367adbded19df59ed2efbc83c3`;
+validation SHA is
+`ee74f776744081c75accf3350a3db7b84706c3e6a18333b6f64ee22df2e74845`.
+There are zero new public/native calls, production edits or suite runs in
+this archive step. Nullable auxiliary fields, computed performance output,
+positive AND maps, carrier behavior and full Petri fields remain open.
+PLUSPLUS stays partial; all 228 open coverage units remain in scope.
