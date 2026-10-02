@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <optional>
 #include <stdexcept>
@@ -34,6 +35,47 @@ struct PetriTransition {
   [[nodiscard]] bool has_extended_arcs() const noexcept {
     return !reset_inputs.empty() || !inhibitor_inputs.empty();
   }
+};
+
+// Opt-in presentation metadata, independent of the executable workflow net.
+// IDs are explicit and local to each node kind; names need not be unique.
+// Ordered arcs and sparse markings retain occurrences and explicit zero entries.
+// Properties contain only recursive JSON values with string keys. Strings are
+// byte strings: callers must supply UTF-8 for interoperable JSON text.
+struct PetriPresentedPlace {
+  std::size_t id;
+  std::string name;
+  HeuristicStructuredValue::Object properties;
+};
+struct PetriPresentedTransition {
+  std::size_t id;
+  std::string name;
+  std::optional<std::string> label;
+  HeuristicStructuredValue::Object properties;
+};
+enum class PetriNodeKind { kPlace, kTransition };
+struct PetriNodeRef {
+  PetriNodeKind kind;
+  std::size_t id;
+};
+struct PetriPresentedArc {
+  PetriNodeRef source;
+  PetriNodeRef target;
+  std::uint64_t weight = 1;
+  HeuristicStructuredValue::Object properties;
+};
+struct PetriSparseMarkingEntry {
+  std::size_t place_id;
+  std::int64_t tokens;
+};
+struct PetriNetPresentation {
+  std::string name;
+  HeuristicStructuredValue::Object properties;
+  std::vector<PetriPresentedPlace> places;
+  std::vector<PetriPresentedTransition> transitions;
+  std::vector<PetriPresentedArc> arcs;
+  std::vector<PetriSparseMarkingEntry> initial_marking;
+  std::vector<PetriSparseMarkingEntry> final_marking;
 };
 
 // A workflow net with exactly one source and one sink place, produced from a

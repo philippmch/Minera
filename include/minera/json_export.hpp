@@ -77,6 +77,16 @@
 #include "minera/local_diagnostics.hpp"
 
 namespace minera {
+// Opt-in serialization of supplied metadata; no discovery or naming rules.
+// Throws std::invalid_argument for duplicate IDs/marking places, invalid node
+// references, same-kind arcs or recursively non-finite property doubles.
+// Names, arc occurrences, sparse explicit zeros and null labels are preserved.
+// JSON integer tokens do not tag native signed/unsigned variants; finite double
+// tokens retain their float family and sign of zero. Strings are escaped bytes,
+// not decoded or UTF-8 validated. Property keys must be strings.
+[[nodiscard]] std::string petri_net_presentation_json(
+    const PetriNetPresentation& presentation);
+
 // Standalone per-trace token replay without discovery or aggregate analysis.
 [[nodiscard]] std::string token_replay_traces_json(
     const std::vector<TokenReplayTraceDiagnostics>& traces,

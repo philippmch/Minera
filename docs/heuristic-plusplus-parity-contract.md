@@ -520,3 +520,74 @@ validation SHA is
 `b19a1a7eac1cbc0189b93097ce9cb4ea2352e222bde62c093e489de4762785bd`.
 Saving adds zero build/test commands or public/native calls. Validation uses
 immutable saved bytes after the source checkpoint is committed.
+
+## Petri metadata presentation
+
+`PetriNetPresentation` supplies a separate carrier for explicitly provided net,
+place and transition names, optional transition labels, recursive JSON
+properties, ordinary arc occurrences and sparse initial/final markings.
+Place and transition IDs occupy separate namespaces and remain independent
+of names. A named transition may have a null label. Repeated names and arc
+endpoint pairs remain separate records; an explicitly supplied zero marking
+entry remains present.
+
+`petri_net_presentation_json` serializes that carrier without changing the
+existing generic `PetriNet` representation or its JSON output. Its node arrays
+retain explicit IDs, arcs retain typed `{kind, id}` endpoints and integer
+weights, and marking arrays retain `{place_id, tokens}` entries. Weights use
+unsigned 64-bit integers and marking counts use signed 64-bit integers.
+Properties reuse `HeuristicStructuredValue::Object`, with string keys and
+recursive JSON values. C++ signed/unsigned integer variants share JSON's
+integer token family; double values retain floating-point tokens, including
+integral-valued doubles and negative zero. String escaping uses the existing
+byte-escaping path; callers supply UTF-8 strings.
+
+Validation rejects duplicate IDs within a node kind, invalid or missing arc
+endpoints, arcs between nodes of the same kind, unknown marking places,
+duplicate entries within a marking and non-finite nested property values.
+Names, transition labels, parallel arc occurrences and explicit marking
+values remain independent of those identity checks.
+
+This API represents metadata supplied by its caller. It does not populate
+names from a HeuristicsNet or establish a general public converter naming
+rule. Projection through reduction and automatic metadata population remain
+open, alongside native carrier routing and full Petri acceptance. PLUSPLUS
+stays partial with all 228 open coverage units retained.
+
+Three registered conversion-suite tests exercise the supplied full AND and
+self-loop metadata fixtures, respectively six places/four transitions/ten
+arcs and three places/two transitions/four arcs. Additional cases cover
+escaped and UTF-8 names, equal names and IDs across node kinds, a named silent
+transition, repeated arcs, non-unit integer weights, extreme integer values,
+nested properties, integral doubles, negative zero and explicit sparse zero
+entries. Eighteen invalid mutations exercise identity and non-finite-property
+rejection. These tests establish carrier behavior for supplied values; they
+do not infer automatic converter names.
+
+Core, request parameters, heuristic variants, Petri conversion and Petri
+reduction Release suites all pass with assertions enabled and zero failed
+tests. The three independent configure, build and test records exit zero with
+finalized logs. All 650 compiled input bindings and seven actual binary
+bindings remain unchanged. Canonical and exported source trees both equal
+`9a22a8a70ec9bd72da4a8023880342ad4a1f8e03`. Build-manifest SHA is
+`e372b73eaa3dd0413dfd2b343a72a488464223b04a260206086dd2bdf85d2aba`;
+core SHA is
+`5b3f8c02c42aef24ba868fcf6d42f7b362d637f974b479ee640b5d5feea83558`.
+
+`docs/petri-presentation-build-checks.jsonl.gz` and its validation preserve
+95 exact UTF-8 members and 1,345 immutable external bindings, including the
+650 compiled inputs and seven actual binaries. Source proof and generation
+origins, final 39 harness checks, historical 35 checks, nine provenance-repair
+checks, fourteen original saver checks, eleven original staged-proof checks
+and seven suite-order repair checks retain distinct byte origins. The mocked
+collector repair matches the exact suite order of the completed build. The
+reviewed pre-release harness and ROOT's single-flag release proof remain
+separate from the released execution helper.
+
+All member bytes, SHA values and counts roundtrip with the reviewed codec.
+The archive is 2,739,718 bytes, SHA
+`483d9bd0d1342cfedf67c1df68f8e284db422847368d864d8f362dca09daaf6a`;
+validation SHA is
+`e39bd64ae10ce02573b349cad91101d632cdf2674f3f3d7e3ce00a0569d5d855`.
+Saving adds zero build/test commands or public/native calls. Durable checks
+retain the actual command snapshots and immutable saved files after commit.
