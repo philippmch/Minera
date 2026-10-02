@@ -7310,3 +7310,99 @@ runs. The public file adds sixteen aliases and six threshold identities;
 combined native eligibility and conversion membership remain unassigned.
 Full native returned-object and Petri acceptance remain open. PLUSPLUS stays
 partial, with all 228 open units retained.
+
+### PLUSPLUS fresh computed returned-object comparisons
+
+A fresh capture against the tested computed-field build completes 77 actual
+discoveries and 43 conversions in 77 probe processes and 79 commands, with zero
+public calls and no native discovery or conversion errors. Its 208 aliases map
+to 78 cases, with 77 eligible cases and the unfamiliar-decoration case 58 still
+unrepresentable. Complete process records, logs, call markers, generated inputs,
+raw results and exact byte guards retain the frozen 650-source/six-binary build
+context. Native output SHA is
+`ded869537a522515d533364f5bbb880660ac152c12cdbb755dc1866c4037b810`;
+actual execution-manifest SHA is
+`14b9ad0a80d32f545f0588192c81a26df0fdafe479c6f90c05753693ce213775`.
+
+The fresh HeuristicsNet report compares 133 public aliases and records 5,041
+matched cells, 82 unrepresentable cells, zero ambiguous cells and zero
+mismatches. All supported aliases agree in their captured typed fields,
+including computed performance output and independent auxiliary presence.
+The 82 remaining cells are 41 fields each for supplement rows 68/69, whose
+explicit decoration value is `supplement-unfamiliar`; no C++ call was made for
+that case. The finite returned objects normalize it to performance mode, with
+floating performance means and edge representation values. Native enum-only
+input representation cannot yet express the requested string. Report SHA is
+`1828e2a55da2cc1d06c988f06c47dc1a1f635429c819c8a9d1da2b5e5c9fe140`.
+
+The independent fresh Petri report actually compares the same 75 public aliases
+and reproduces 69 matching projected topologies and six differences. Its full
+diagnostic categories are 69 unrepresentable objects, three reference errors
+against native success, and three structural mismatches. Four public input
+mutations and zero native mutations remain explicit. Names, properties and
+arc-object/weight storage are still absent from the native carrier; matching
+projected topology does not satisfy full Petri acceptance. Report SHA is
+`bc05dbffe3d76d653f059ee145d8f749f4fbc7da4c9c1b42b796e25bf4f51347`.
+Both report steps make zero new public/native calls or suite runs. The separate
+sixteen public AND/Petri controls retain unassigned native mapping. PLUSPLUS
+remains partial, with all 228 open units retained.
+
+`docs/heuristic-plusplus-computed-object-checks.jsonl.gz` and its validation
+preserve 2,375 exact members and 1,329 immutable external bindings, including
+the original reviewed Petri matcher underlying the unchanged-definition proof.
+All member bytes, SHA values and counts roundtrip with the unchanged codec.
+The archive is 57,270,385 bytes, SHA
+`0dcab5665180a22adee76ab69d573dbc8e45da3b28cb5e79889ace7c82b9e1b2`;
+validation SHA is
+`57612ea208a172997e46c4263bbec24adb492e796ebd542a80035595ed69e0ed`.
+Archiving adds zero calls, comparisons or suite runs. Existing build, public
+capture, static checks and historical failure evidence remain separately
+bound with their original outcomes; no catalogue status is promoted.
+
+### PLUSPLUS public carrier and converter route observations
+
+Ten actual public calls complete across five independent branches using the
+same typed sixteen-row DataFrame and all nine explicit baseline parameters.
+DataFrame parent HeuristicsNet discovery followed by the public HeuristicsNet
+converter returns five places, four transitions and nine arcs. DataFrame
+parent `apply(PLUSPLUS)` returns four places, four transitions and eight arcs,
+exactly matching the saved baseline public result. After public `TO_EVENT_LOG`
+conversion, direct HeuristicsNet discovery plus conversion, direct PLUSPLUS
+`apply`, and parent `apply(PLUSPLUS)` all return the same full five/four/nine
+public Petri object structure. The HeuristicsNet fields agree in all seventeen
+captured fields between the DataFrame and EventLog discoveries.
+
+All three converted EventLogs preserve four traces and sixteen events, their
+order, activities, both timestamps and ancillary values. The DataFrame case
+field becomes the trace concept name; its attrs become EventLog properties.
+Only the DataFrame parent `apply` branch mutates a supplied input, adding a
+float64 `@@diff` column. Parameters and constructors remain unchanged in every
+call. Newly returned HeuristicsNet and EventLog objects are preserved separately
+from mutation of pre-existing inputs.
+
+The five/four/nine results preserve place names `pre_B`, `pre_C`, `pre_D`,
+`sink0`, `source0`; the four/four/eight route instead includes `intplace_A` and
+`pre_D` with source and sink. All returned net/node/arc properties are present
+empty dictionaries; transitions retain names and labels A through D, arcs have
+explicit integer weight one, and sparse markings contain source0=1 and sink0=1.
+The five/four/nine topology and marking projection agree with saved native case
+33, whose carrier still lacks full public names, properties and arc fields.
+The finite fixture localizes the differing output to DataFrame parent `apply`;
+it does not establish an implementation cause or a universal converter rule.
+
+The actual worker exits zero, finalizes 263 stdout bytes and zero stderr bytes,
+and leaves zero active job processes. All eleven opaque module proofs match
+the pinned reference. The wrapper completion manifest and separate before-call
+API signatures/enums snapshot are retained with their exact links and guards.
+`docs/heuristic-plusplus-carrier-converter-checks.jsonl.gz` and its validation
+preserve 707 exact UTF-8 members and 1,325 immutable external bindings, including
+650 independently frozen current sources and the distinct compiled context.
+Original 23 capture checks, eleven mutation-repair checks, 23 saver checks and
+seventeen saver repair checks remain with their exact origins. All member byte,
+SHA and count checks roundtrip with the unchanged reviewed codec. The archive
+is 5,272,193 bytes, SHA
+`ef459af63bd2c607c1a60d427db90f2bb908f9eb294a245eefede24927a8b94a`;
+validation SHA is
+`02e0ddca341fb4bc2d0306568a1d3854fc46bb54e3dbb45442ed64ccdbc1caff`.
+Saving adds zero public/native calls, comparisons, builds or suite runs.
+PLUSPLUS stays partial and all 228 open units remain in scope.
