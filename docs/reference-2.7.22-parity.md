@@ -7496,3 +7496,61 @@ The independent compiled context retains 650 inputs, six binaries and its four
 successful suites. Saving adds zero calls, builds or suite runs. Immutable
 saved-file guards allow later source changes. Full native Petri/carrier gates
 remain open; PLUSPLUS stays partial with all 228 open coverage units retained.
+
+### PLUSPLUS DataFrame and EventLog threshold response
+
+Seven actual public calls compare explicit PLUSPLUS parent `apply` using
+fresh copies of the saved sixteen-row DataFrame and independent copies of its
+public `TO_EVENT_LOG` conversion. Three calls per carrier use AND thresholds
+zero, 0.5 and one; the other eight parameters remain fixed. The conversion
+accounts for the seventh call. Every call succeeds, with zero errors or skipped
+dependents.
+
+| Carrier | AND threshold | Places | Transitions | Arcs |
+| --- | --- | --- | --- | --- |
+| DataFrame | 0 | 6 | 4 | 10 |
+| EventLog | 0 | 6 | 4 | 10 |
+| DataFrame | 0.5 | 4 | 4 | 8 |
+| EventLog | 0.5 | 5 | 4 | 9 |
+| DataFrame | 1 | 4 | 4 | 8 |
+| EventLog | 1 | 4 | 4 | 8 |
+
+The full typed public Petri views match between carriers at zero and one.
+The DataFrame view at 0.5 matches its view at one, while the EventLog view at
+0.5 differs from both. The two 0.5 results reproduce the earlier carrier
+baselines, including input fields, options and full returned objects. This
+finite comparison localizes the observed contrast to the middle threshold;
+it does not establish an implementation cause or a general carrier rule.
+
+Each discovery mutates its supplied DataFrame by adding `@@diff`. The separate
+converter DataFrame and three independent EventLog copies remain unchanged,
+as do all option dictionaries. The copies preserve the converted trace and
+event fields while remaining independent objects. Creation and input mutation
+records remain distinct.
+
+The worker exits zero with finalized logs and zero active job processes.
+Public signatures and eleven unchanged opaque module proofs precede the calls.
+Raw output SHA is
+`3c5063e4801f5695e1dda90d146fe94b418bcfa9987c21f32fb0d3be694eb6d9`;
+execution-record SHA is
+`345f9d9b3821c37d2ad21727cce31cc0d1206c80ea91632734f8e8f2454dbd5c`.
+Native carrier routing and full Petri object gates remain open. PLUSPLUS stays
+partial, retaining all 228 open coverage units.
+
+`docs/heuristic-plusplus-dataframe-and-route-checks.jsonl.gz` and its validation
+preserve 793 exact UTF-8 members, all seven calls, typed returned objects,
+copy and mutation records, signatures and opaque proofs. The earlier carrier
+and converter archives remain complete immutable origins. Thirty-nine capture
+checks, the original 31 saver checks and five repair checks retain distinct
+byte origins. The repair corrects the collector's check count and fixture
+filename; its mocked full-collector checks cover both original failures and
+the repaired success path.
+
+All member bytes, SHA values and counts roundtrip with the reviewed codec.
+The archive is 9,198,372 bytes, SHA
+`8c9c402f7968eddf8b71ae33436e516070bf341b77c53e0b3ce704d208eb705e`;
+validation SHA is
+`1f75d75255ec45b85a0b5c395e101fed426e7ee0dd4b3184595e0b77214e4028`.
+The independent compiled context retains 650 inputs, six binaries and four
+passing assertion-enabled suites. Saving adds zero calls, builds or suite
+runs. Immutable saved-file guards permit later source and HEAD changes.
