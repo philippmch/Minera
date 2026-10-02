@@ -20,6 +20,7 @@ struct WorkingTransition {
   std::vector<std::size_t> outputs;
   std::vector<std::size_t> reset_inputs;
   std::vector<std::size_t> inhibitor_inputs;
+  std::vector<std::size_t> original_indices;
 };
 
 struct WorkingNet {
@@ -122,6 +123,10 @@ PetriNetReductionResult unchanged(const PetriNet& net,
   result.old_to_new_place.resize(net.place_count());
   for (std::size_t place = 0; place < net.place_count(); ++place)
     result.old_to_new_place[place] = place;
+  result.old_to_new_transition.resize(net.transitions().size());
+  for (std::size_t transition = 0; transition < net.transitions().size();
+       ++transition)
+    result.old_to_new_transition[transition] = transition;
   return result;
 }
 
@@ -544,6 +549,9 @@ bool reduce_parallel_transitions(WorkingNet& net) {
           !same_arc_multiset(lhs.reset_inputs, rhs.reset_inputs) ||
           !same_arc_multiset(lhs.inhibitor_inputs, rhs.inhibitor_inputs))
         continue;
+      auto& origins = net.transitions[first].original_indices;
+      origins.insert(origins.end(), rhs.original_indices.begin(),
+                     rhs.original_indices.end());
       net.transitions.erase(net.transitions.begin() +
                             static_cast<std::ptrdiff_t>(second));
       return true;
@@ -674,10 +682,11 @@ PetriNetReductionResult reduce_petri_net(
   working.sink = net.sink();
   working.activities = net.activities();
   working.transitions.reserve(net.transitions().size());
-  for (const auto& transition : net.transitions()) {
+  for (std::size_t index = 0; index < net.transitions().size(); ++index) {
+    const auto& transition = net.transitions()[index];
     working.transitions.push_back(
         {transition.activity, transition.inputs, transition.outputs,
-         transition.reset_inputs, transition.inhibitor_inputs});
+         transition.reset_inputs, transition.inhibitor_inputs, {index}});
   }
 
   std::vector<bool> place_alive(working.place_count, true);
@@ -737,6 +746,8 @@ PetriNetReductionResult reduce_petri_net(
 
   PetriNetReductionResult result;
   result.changed = changed;
+  result.old_to_new_transition.assign(net.transitions().size(),
+                                      kRemovedTransition);
   result.old_to_new_place.assign(working.place_count, kRemovedPlace);
   std::size_t reduced_places = 0;
   for (std::size_t place = 0; place < working.place_count; ++place) {
@@ -776,6 +787,8 @@ PetriNetReductionResult reduce_petri_net(
     }
     const auto index = reduced.add_transition(
         transition.activity, std::move(inputs), std::move(outputs));
+    for (const auto original : transition.original_indices)
+      result.old_to_new_transition[original] = index;
     for (const auto place : transition.reset_inputs) {
       if (place < result.old_to_new_place.size() &&
           result.old_to_new_place[place] != kRemovedPlace)

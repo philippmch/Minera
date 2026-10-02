@@ -45,6 +45,131 @@ bool same_net(const PetriNet& lhs, const PetriNet& rhs) {
   return true;
 }
 
+void assert_transition_mapping(
+    const PetriNet& original, const PetriNetReductionResult& result,
+    const std::vector<std::size_t>& expected) {
+  assert(result.old_to_new_transition.size() == original.transitions().size());
+  assert(result.old_to_new_transition == expected);
+  for (std::size_t old = 0; old < original.transitions().size(); ++old) {
+    const auto mapped = result.old_to_new_transition[old];
+    if (mapped == kRemovedTransition) {
+      assert(!original.transitions()[old].activity.has_value());
+      continue;
+    }
+    assert(mapped < result.net.transitions().size());
+    assert(result.net.transitions()[mapped].activity ==
+           original.transitions()[old].activity);
+  }
+}
+
+void unchanged_transition_identity_including_extended_and_early_return() {
+  for (const bool malformed : {false, true}) {
+    PetriNet net;
+    net.set_activities({"a", "b"});
+    const auto source = net.add_place();
+    const auto guard = net.add_place();
+    const auto sink = net.add_place();
+    net.set_source(source);
+    net.set_sink(sink);
+    const auto visible = net.add_transition(0, {source}, {sink});
+    net.add_reset_arc(visible, guard);
+    net.add_transition(1, {source},
+                       {malformed ? net.place_count() : sink});
+    const auto result = reduce_petri_net(net);
+    assert(!result.changed);
+    assert(same_net(result.net, net));
+    assert_transition_mapping(net, result, {0, 1});
+  }
+  const PetriNet empty;
+  const auto result = reduce_petri_net(empty);
+  assert(!result.changed);
+  assert_transition_mapping(empty, result, {});
+}
+
+void nonadjacent_duplicate_transition_identities_follow_the_survivor() {
+  PetriNet net;
+  net.set_activities({"a"});
+  const auto source = net.add_place();
+  const auto guard = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  const auto first = net.add_transition(std::nullopt, {source}, {sink});
+  net.add_transition(0, {source}, {sink});
+  const auto second = net.add_transition(std::nullopt, {source}, {sink});
+  const auto third = net.add_transition(std::nullopt, {source}, {sink});
+  for (const auto duplicate : {first, second, third})
+    net.add_inhibitor_arc(duplicate, guard);
+  const auto result = reduce_petri_net(net);
+  assert(result.changed);
+  assert(result.net.place_count() == 3);
+  assert(result.net.transitions().size() == 2);
+  assert_transition_mapping(net, result, {0, 1, 0, 0});
+  assert(!result.net.transitions()[0].activity.has_value());
+  assert(result.net.transitions()[0].inputs ==
+         std::vector<std::size_t>{source});
+  assert(result.net.transitions()[0].outputs ==
+         std::vector<std::size_t>{sink});
+  assert(result.net.transitions()[0].inhibitor_inputs ==
+         std::vector<std::size_t>{guard});
+  assert(result.net.transitions()[1].activity ==
+         std::optional<std::size_t>(0));
+}
+
+void fused_transition_identities_shift_after_an_earlier_removal() {
+  PetriNet net;
+  net.set_activities({"a", "b"});
+  const auto source = net.add_place();
+  const auto entry = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.add_transition(std::nullopt, {entry}, {sink});
+  net.add_transition(0, {source}, {entry});
+  net.add_transition(std::nullopt, {source}, {sink});
+  net.add_transition(1, {source}, {sink});
+  net.add_transition(std::nullopt, {source}, {sink});
+  net.add_transition(std::nullopt, {source}, {sink});
+  const auto result = reduce_petri_net(net);
+  assert(result.changed);
+  assert(result.net.place_count() == 2);
+  assert(result.net.transitions().size() == 3);
+  assert_transition_mapping(net, result, {kRemovedTransition, 0, 1, 2, 1, 1});
+  assert(!result.net.transitions()[1].activity.has_value());
+  for (const auto& transition : result.net.transitions()) {
+    assert(transition.inputs == std::vector<std::size_t>{0});
+    assert(transition.outputs == std::vector<std::size_t>{1});
+  }
+}
+
+void fused_transition_identities_are_removed_with_the_representative() {
+  PetriNet net;
+  net.set_activities({"a", "b"});
+  const auto source = net.add_place();
+  const auto entry = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.add_transition(std::nullopt, {entry}, {sink});
+  net.add_transition(0, {source}, {entry});
+  net.add_transition(std::nullopt, {entry}, {sink});
+  net.add_transition(1, {source}, {sink});
+  net.add_transition(std::nullopt, {entry}, {sink});
+  // The shared entry initially blocks splicing. Duplicate fusion makes it
+  // private, so the next fixed-point pass removes the whole fused class.
+  const auto result = reduce_petri_net(net);
+  assert(result.changed);
+  assert(result.net.place_count() == 2);
+  assert(result.net.transitions().size() == 2);
+  assert_transition_mapping(
+      net, result,
+      {kRemovedTransition, 0, kRemovedTransition, 1, kRemovedTransition});
+  for (const auto& transition : result.net.transitions()) {
+    assert(transition.inputs == std::vector<std::size_t>{0});
+    assert(transition.outputs == std::vector<std::size_t>{1});
+  }
+}
+
 void join_bridge_preservation_is_opt_in_and_requires_external_producer() {
   for (const bool external_producer : {false, true}) {
     PetriNet net;
@@ -102,6 +227,10 @@ void join_bridge_preservation_is_opt_in_and_requires_external_producer() {
 }  // namespace
 
 int main() {
+  unchanged_transition_identity_including_extended_and_early_return();
+  nonadjacent_duplicate_transition_identities_follow_the_survivor();
+  fused_transition_identities_shift_after_an_earlier_removal();
+  fused_transition_identities_are_removed_with_the_representative();
   join_bridge_preservation_is_opt_in_and_requires_external_producer();
   {
     const auto result = reduce_petri_net(silent_chain());
@@ -109,6 +238,9 @@ int main() {
     assert(result.net.place_count() == 2);
     assert(result.net.transitions().size() == 1);
     assert(result.net.source() == 0 && result.net.sink() == 1);
+    assert_transition_mapping(
+        silent_chain(), result,
+        {kRemovedTransition, kRemovedTransition, kRemovedTransition, 0});
     assert(result.net.transitions()[0].activity == std::optional<std::size_t>(0));
     assert(result.net.transitions()[0].inputs == std::vector<std::size_t>{0});
     assert(result.net.transitions()[0].outputs == std::vector<std::size_t>{1});
@@ -176,6 +308,7 @@ int main() {
     const auto result = reduce_petri_net(net);
     assert(result.changed);
     assert(result.net.transitions().size() == 3);
+    assert_transition_mapping(net, result, {0, kRemovedTransition, 1, 2});
     assert((result.net.transitions()[0].inputs ==
             std::vector<std::size_t>{0}));
     assert(result.net.transitions()[0].outputs ==
@@ -205,6 +338,7 @@ int main() {
     const auto result = reduce_petri_net(net);
     assert(result.changed);
     assert(result.net.transitions().size() == 3);
+    assert_transition_mapping(net, result, {0, 1, kRemovedTransition, 2});
     assert(result.net.transitions()[2].inputs ==
            std::vector<std::size_t>({1, 2}));
     assert((result.net.transitions()[2].outputs ==
@@ -248,6 +382,7 @@ int main() {
     const auto result = reduce_petri_net(net);
     assert(result.changed);
     assert(result.net.transitions().size() == 2);
+    assert_transition_mapping(net, result, {kRemovedTransition, 0, 1});
     assert((result.net.transitions()[0].inputs ==
             std::vector<std::size_t>{0}));
     assert((result.net.transitions()[0].outputs ==
@@ -278,6 +413,7 @@ int main() {
     assert((result.old_to_new_place ==
             std::vector<std::size_t>{0, 1, 2, 3}));
     assert(result.markings.initial == options.initial_marking);
+    assert_transition_mapping(net, result, {0, 1});
   }
 
   {
@@ -331,6 +467,7 @@ int main() {
     assert(result.changed);
     assert(result.net.place_count() == 3);
     assert(result.net.transitions().size() == 4);
+    assert_transition_mapping(net, result, {0, 1, kRemovedTransition, 2, 3});
     assert((result.old_to_new_place ==
             std::vector<std::size_t>{0, kRemovedPlace, 1, 2}));
     assert(result.net.transitions()[0].outputs ==
@@ -535,6 +672,7 @@ int main() {
     assert(result.changed);
     assert(result.net.place_count() == 4);
     assert(result.net.transitions().size() == 4);
+    assert_transition_mapping(net, result, {0, 1, kRemovedTransition, 2, 3});
     assert((result.old_to_new_place ==
             std::vector<std::size_t>{0, kRemovedPlace, 1, 2, 3}));
     assert(result.net.transitions()[0].outputs ==

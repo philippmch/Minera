@@ -37,9 +37,17 @@ struct PetriNetReductionResult {
   // representative.
   std::vector<std::size_t> old_to_new_place;
   bool changed = false;
+  // Every entry is indexed by a transition in the input net. Surviving
+  // transitions map to their reduced index; fused duplicate silent
+  // transitions share their surviving representative's index. A removed
+  // transition, including a subsequently removed representative, contains
+  // kRemovedTransition.
+  std::vector<std::size_t> old_to_new_transition;
 };
 
 inline constexpr std::size_t kRemovedPlace =
+    std::numeric_limits<std::size_t>::max();
+inline constexpr std::size_t kRemovedTransition =
     std::numeric_limits<std::size_t>::max();
 
 // Applies a fixed-point conservative reduction to a workflow net.  The
