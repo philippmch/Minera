@@ -7914,3 +7914,27 @@ Evidence is `heuristic-plusplus-pandas-selector-checks.jsonl.gz` (SHA-256
 Broader parameter, carrier, error, metadata, identity, ordering and routing gates
 remain open. PLUSPLUS and Alpha+ stay partial; coverage remains 46/86 packages and
 199/387 modules, with 228 incomplete units and no promotion.
+
+### PLUSPLUS pandas duration-column collision implementation (2026-10-03)
+
+Matched errors after @@diff overwrites a selected timestamp, preserved the
+observed successful NaT/empty collisions, and distinguished mixed object/datetime
+subtraction errors before mutation. Both decorations and us/ns/ms units are
+covered. Thirty pre-change errors and their original process records remain
+retained as gap evidence.
+
+All 66 new public controls match: twelve HeuristicsNet results on 516 supported
+cells, four complete supported Petri presentations and fifty errors. Input-after,
+mutation occurrence and option checks match. The wider replay matches all 504
+aliases on 13784 net-field checks, 73 Petri presentations and 139 errors;
+all 77 generic regressions are unchanged. Actual native execution makes 581
+discoveries, 73 presented conversions and 43 generic conversions without new
+reference calls. All five assertion-enabled suites pass for 650 exact inputs.
+
+Evidence is `heuristic-plusplus-pandas-duration-selector-checks.jsonl.gz`
+(SHA-256 `f3b620c52e16b94307d17174fdc47447847ffbf84d5d21bcce46a1aebf7d0ec5`, 47582491 bytes), with
+`heuristic-plusplus-pandas-duration-selector-validation.json`. Every member
+round-trips and the preceding selector checkpoint remains hash-bound. Broader
+carrier, parameter, error, metadata, identity, ordering and routing gates remain
+open. PLUSPLUS and Alpha+ stay partial; coverage remains 46/86 packages and
+199/387 modules, with 228 incomplete units and no catalogue promotion.

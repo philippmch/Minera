@@ -1098,3 +1098,56 @@ representation, dictionary order, object identity, metadata, input ordering,
 timestamp domains and adapter routing remain open. PLUSPLUS and Alpha+ stay
 partial. Coverage stays 46/86 packages and 199/387 modules, with 228 incomplete
 units and no catalogue promotion.
+
+## Pandas duration-column collisions and subtraction errors (2026-10-03)
+
+Executed 66 new public calls in three matrices. Controls select @@diff as start,
+completion or both, copy a missing @@diff start, or retain an unselected datetime
+@@diff column. Microsecond, nanosecond and millisecond timestamp units and both
+decorations are covered. Additional controls distinguish all-NaT timestamp
+columns, an empty naive table, date-valued object columns and copied object starts.
+Sixteen calls return and fifty raise captured errors. No calls are skipped or
+fail during serialization.
+
+The committed pre-change core makes 38 actual replays of the first matrix.
+All thirty error controls differ: Minera raises a generic typed-timestamp error
+where the reference raises AttributeError, "'float' object has no attribute
+'timestamp'". The six supported HeuristicsNet results match 318 cells and the two
+Petri results match. Supported input-after, mutation occurrence and options
+already match; original records and differences remain retained.
+
+The pandas route now maps a numeric timestamp left by overwriting @@diff to the
+observed AttributeError. The overwrite remains visible before this failure.
+NaN duration values are missing timestamps, allowing the observed all-NaT
+collision results. Selecting one column for both timestamps preserves the
+successful all-NaT subtraction, and an empty selected @@diff column returns an
+empty net after its float overwrite. A date-valued object start with datetime
+completion raises the observed subtraction TypeError before @@diff mutation.
+Object completion and both-object controls retain their AttributeError; an
+absent selected start is still copied before the relevant error.
+
+All 66 new aliases match: twelve HeuristicsNet results agree on 516 supported
+net/node/edge cells and complete connection domains, four Petri presentations
+match, and all fifty error types/messages agree. Supported input-after, mutation
+occurrence and option preservation match. The complete replay matches 504 saved
+aliases on 13784 net-field checks, 73 Petri presentations and 139 errors.
+All 77 generic regression results remain exact matches. Actual native execution
+makes 581 discoveries, 73 presented conversions and 43 generic conversions,
+without additional reference calls. All five assertion-enabled suites pass for
+the frozen build containing 650 exact source inputs.
+
+Evidence is `heuristic-plusplus-pandas-duration-selector-checks.jsonl.gz`
+(SHA-256 `f3b620c52e16b94307d17174fdc47447847ffbf84d5d21bcce46a1aebf7d0ec5`, 47582491 bytes,
+3268 verified members), with
+`heuristic-plusplus-pandas-duration-selector-validation.json`. Raw calls,
+mutations, public API views, opaque pinned proofs, process records, logs, helpers,
+probe sources, compiled inputs and binary bindings round-trip byte for byte.
+The preceding selector checkpoint remains hash-bound; its committed source
+checkpoint and original build-parent identity remain separate provenance fields.
+The shared replay uses 262 constructor functions, each creating fresh data;
+literal reconstruction is verified and all aliases are actually executed.
+
+Broader parameter/label types, further collisions, Unicode error representation,
+dictionary order, identity, metadata, input ordering, timestamp domains and
+adapter routing remain open. PLUSPLUS and Alpha+ remain partial. Coverage stays
+46/86 packages and 199/387 modules, with 228 incomplete units and no promotion.

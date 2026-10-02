@@ -887,6 +887,84 @@ void plusplus_pandas_literal_selectors_and_error_order() {
   for (const auto& [_, value] : *copied.sojourn_times) assert(value == 0.0);
 }
 
+void plusplus_pandas_duration_selector_collisions() {
+  const auto append_diff = [](EventTable& table, const std::string& source) {
+    const auto column = table.column_index(source);
+    table.columns.push_back("@@diff");
+    table.dtypes.push_back(table.dtypes[column]);
+    for (auto& row : table.rows) {
+      auto cell = row[column];
+      cell->key = "@@diff";
+      cell->first_class_role = FirstClassAttributeRole::kNone;
+      cell->first_class_state = FirstClassAttributeState::kMissing;
+      cell->first_class_source_key.clear();
+      row.push_back(std::move(cell));
+    }
+  };
+  for (const auto& unit : {"us", "ns", "ms"}) {
+    for (const int selectors : {1, 2, 3, 4}) {
+      auto table = pandas_interval_table(2);
+      table.dtypes[table.column_index("time:timestamp")] =
+          std::string("datetime64[") + unit + ", UTC]";
+      table.dtypes[table.column_index("start_timestamp")] =
+          std::string("datetime64[") + unit + ", UTC]";
+      if (selectors != 4)
+        append_diff(table, selectors == 1 ? "start_timestamp" : "time:timestamp");
+      const auto before = table;
+      auto options = plus_options();
+      if (selectors != 2) options.start_timestamp_attribute = "@@diff";
+      if (selectors == 2 || selectors == 3) options.timestamp_attribute = "@@diff";
+      bool matched = false;
+      try { (void)discover_plus_plus_pandas(table, options); }
+      catch (const HeuristicPandasError& error) {
+        matched = error.reference_type() == "builtins.AttributeError" &&
+                  std::string(error.what()) == "'float' object has no attribute 'timestamp'";
+      }
+      assert(matched);
+      const auto difference = table.column_index("@@diff");
+      assert(table.dtypes[difference] == "float64");
+      for (std::size_t row = 0; row < table.rows.size(); ++row) {
+        assert(std::get<double>(table.rows[row][difference]->typed_value) ==
+               (selectors >= 3 ? 0.0 : std::vector<double>{1.0, 4.0, 2.0, 1.0}[row % 4]));
+        for (std::size_t column = 0; column < before.columns.size(); ++column)
+          if (column != difference) assert(table.rows[row][column] == before.rows[row][column]);
+      }
+      assert(table.index == before.index && table.attributes == before.attributes);
+      assert(table.metadata == before.metadata);
+    }
+  }
+  for (const bool both_times : {false, true}) {
+    auto table = pandas_interval_table(2);
+    append_diff(table, "start_timestamp");
+    for (auto& row : table.rows) row.back() = typed_date("@@diff", "NaT");
+    auto options = plus_options();
+    options.start_timestamp_attribute = "@@diff";
+    if (both_times) options.timestamp_attribute = "@@diff";
+    const auto net = discover_plus_plus_pandas(table, options);
+    assert(net.activities.size() == 4 && net.relation_statistics.empty());
+    for (const auto& [_, value] : *net.sojourn_times) assert(std::isnan(value));
+    for (const auto& row : table.rows) assert(std::isnan(std::get<double>(row.back()->typed_value)));
+  }
+  EventTable empty;
+  empty.columns = {"case:concept:name", "concept:name", "time:timestamp", "start_timestamp", "@@diff"};
+  empty.dtypes = {"str", "str", "datetime64[us]", "datetime64[us]", "datetime64[us]"};
+  auto options = plus_options();
+  options.start_timestamp_attribute = "@@diff";
+  options.timestamp_attribute = "@@diff";
+  assert(discover_plus_plus_pandas(empty, options).activities.empty());
+  assert(empty.dtypes.back() == "float64");
+  auto table = pandas_interval_table(2);
+  table.dtypes[table.column_index("start_timestamp")] = "object";
+  const auto before = table;
+  bool matched = false;
+  try { (void)discover_plus_plus_pandas(table, plus_options()); }
+  catch (const HeuristicPandasError& error) {
+    matched = error.reference_type() == "builtins.TypeError" &&
+              std::string(error.what()) == "cannot subtract DatetimeArray from ndarray[object]";
+  }
+  assert(matched && table.rows == before.rows && table.columns == before.columns);
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -4780,6 +4858,7 @@ int main(int argc, char** argv) {
   plusplus_pandas_signed_array_duration_components();
   plusplus_numeric_count_filters_preserve_public_comparisons();
   plusplus_pandas_literal_selectors_and_error_order();
+  plusplus_pandas_duration_selector_collisions();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();
