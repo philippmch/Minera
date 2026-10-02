@@ -6904,3 +6904,23 @@ are excluded from this change and future implementation. The completed source
 change, public observations, independent review, build, and 12 native checks
 precede that incident. `docs/plusplus-field-audit-cleanroom-incident.json`
 records the incident metadata without upstream source content.
+
+### Complete PLUSPLUS acceptance scope
+
+Fresh independent read-only audits use only our explicit source/header paths
+and saved public results. `docs/heuristic-plusplus-parity-contract.md` records
+the full target: all 17 net fields, six node fields, three edge fields, both
+direct variant routes, parent EventLog/EventStream/DataFrame routes, all nine
+public parameter keys, input preservation, and Petri conversion. The existing
+twelve public calls use the parent `algorithm.apply_heu` PLUSPLUS route;
+inspected direct-route signatures are not counted as direct-route calls.
+
+The audits identify representation obligations that the saved graph
+projections do not settle: null auxiliary fields versus empty maps, direct
+adjacency versus eventually-follows on longer traces, decoration-specific
+performance values, relation domains through activity filtering, and positive
+AND/loop maps. The inputless Petri control remains reusable, while connected,
+branching, cyclic, and filtered shapes remain required. New capture preparation
+is prospective and is not counted as executed evidence. The earlier four
+Release suites and exact compiled-source verification are reused. No coverage
+row is promoted; PLUSPLUS remains partial with 228 open coverage units.
