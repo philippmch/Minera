@@ -6803,18 +6803,24 @@ cases 10/11 change from six to nine arcs while both boundary markings stay
 live. Cleanup changes the graph signature in 118 of 240 matched pairs without
 changing marking or error outcomes.
 
-The native capture returned 7,591 graphs and 2,009 discovery failures. The
-already-audited prefix of processes 0 through 11 contains 4,553 graphs and
-1,207 `std::invalid_argument` failures with message
-`Alpha+: boundary cleanup has no incident transition`. Among its 288
-process/case cells, 96 mix graph and error outcomes, 48 vary the initial
-marking, and 72 vary named adjacency. All 4,553 successful prefix rows keep
-the final marking at live `end` with one token; 254 have detached initial
-support. This within-process variation differs from the public pilot's stable
-cells. It does not establish a universal probability law, a causal effect of
-ordering, or general weighted graph equivalence. Native ordinary arc
-multiplicity is recorded as repeated place IDs; no independent arc-weight
-attribute is manufactured.
+The completed native audit reconciles all 7,591 graphs and 2,009 discovery
+failures, with unchanged inputs in all 9,600 calls. Every error is
+`std::invalid_argument` with message
+`Alpha+: boundary cleanup has no incident transition`. Across all 480
+process/case cells, 40 mix graph and error outcomes (cases 8/9), 80 vary initial
+and joint marking support (cases 6/7 and 12/13), and 120 vary unique-name
+topology and endpoint multiplicity (cases 6/7, 10/11, and 12/13). Final support
+varies in none: all 7,591 successful rows end at live `end` with one token, and
+none has a detached final marking. There are 423 detached initial `start`
+rows. In process 0/case 6, trial 0 has attached `start`, while trial 3 has
+detached initial `start`; both end at live `end`. The final audit corrects the
+preliminary success/error classification used by the prior checkpoint.
+Four hundred rows with duplicate typed place names are excluded from
+name-based graph comparison. This within-process variation differs from the
+public pilot's stable cells. It does not establish a universal probability
+law, a causal effect of ordering, or general weighted graph equivalence.
+Native ordinary arc multiplicity is recorded as repeated place IDs; no
+independent arc-weight attribute is manufactured.
 
 The actual public execution manifest is
 `e3063941fffc36dce1bdd900fb77dc45cc65437d2fac72127a18e11ff492e9a4`;
