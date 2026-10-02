@@ -8637,8 +8637,33 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/heuristic_miner.hpp",
+        "src/backend/heuristic_miner.cpp",
+        "src/backend/petri_net.cpp",
+        "src/backend/petri_net_reduction.cpp",
+        "src/backend/tests/test_heuristic_variants.cpp",
+        "src/backend/tests/test_petri_net_conversion.cpp",
+        "src/backend/tests/test_petri_net_reduction.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.heuristics.variants.classic",
+        "implementation": [
+          {
+            "path": "src/backend/heuristic_miner.cpp",
+            "symbol": "discover_heuristics_net"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_heuristic_variants.cpp",
+            "executable": "minera_heuristic_variants_tests",
+            "case": "classic_dfg_order_preserves_inferred_boundary_lists"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.heuristics.variants.plusplus",

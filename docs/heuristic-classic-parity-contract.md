@@ -2,9 +2,10 @@
 
 Target: PM4Py 2.7.22, pinned commit
 `0715c31f3f1d85924107d6aa5329806db69df899`.
-The module `algo.discovery.heuristics.variants.classic` remains partial.
-This contract records the module's remaining acceptance gates without reducing
-its scope to the already verified HeuristicsNet routes.
+The module `algo.discovery.heuristics.variants.classic` is complete within the
+supported native representation. This contract reconciles its public routes,
+returned-object fields, Petri conversion, saved evidence and distinct catalogue
+proof. Parent dispatcher adaptation and PLUSPLUS remain separate obligations.
 
 ## Routes and evidence
 
@@ -25,8 +26,8 @@ its scope to the already verified HeuristicsNet routes.
 | Small-DFG Petri topology and thresholds | `heuristic-classic-petri-small-dfg-native-validation.json`; its complete native and public captures | All 1,779 Petri cases match. The twelve threshold-zero topology failures are resolved, with zero native errors and exact unchanged input/options checks throughout. |
 | Complete direct-DFG returned objects | `heuristic-classic-full-object-native-validation.json`; its archived full public and actual native captures | All 2,859 objects and 72 expected rejections pass. Actual raw performance-map presence, typed values and matrices are observed; no returned-field gaps remain in these cohorts. |
 | Nonempty auxiliary maps and matrices | `heuristic-classic-full-object-native-validation.json`; its 1,152-case decorated-value cohort | All outcomes pass, including 264 successful nonempty window-two maps/matrices and 264 successful nonempty triple maps/matrices. Each family has 288 nonempty inputs across the successful and rejected calls. |
-| Noise-pruned returned-object matrix domain | Supplemental direct-DFG controls required | The full-object cohorts have identical raw and cleaned DFG domains. An actually pruned path must establish the matrix domain before promotion. |
-| Distinct catalogue proof | `reference-2.7.22-coverage.json` CLASSIC module row | Add an exact implementation and registered acceptance-test proof only after all module gates are verified. |
+| Noise-pruned returned-object matrix domain | `heuristic-classic-noise-matrix-native-validation.json`; its complete public/native captures and archived checks | All eight controls pass: seven full objects and one mapped missing-path rejection. Public DFG/matrix domains use actual cleaned paths; removed supplied performance values remain in the raw map. |
+| Distinct catalogue proof | `reference-2.7.22-coverage.json` CLASSIC module row | The row names `discover_heuristics_net` and the registered `classic_dfg_order_preserves_inferred_boundary_lists` acceptance case. The implementation/test tuple is distinct and exercises production discovery; the structural verifier passes. |
 
 ## Required returned-object checks
 
@@ -51,7 +52,8 @@ these new optional fields. Six affected native suites and independent review
 pass. The auxiliary-presence checkpoint additionally checks omitted direct maps
 as `null`, explicitly empty direct maps as `[]`, and EventLog-computed empty
 maps as `[]`. Legacy nonempty map assignments imply presence; PLUSPLUS keeps
-its prior JSON shape. These checks do not settle Petri conversion behavior.
+its prior JSON shape. At that checkpoint, Petri conversion remained a separate
+gate.
 
 For Petri outputs, retain actual place/transition names and properties in the
 reference capture. A structural comparison must preserve place/transition
@@ -123,8 +125,8 @@ The 22-route and 1,779-case probes observe actual `dfg_order`; its omission in t
 older three-control input serializer remains explicit. Independent review found
 no actionable implementation, regression or comparison defects. Generated names
 remain outside structural isomorphism and public properties must be available
-and empty. The complete module gate still requires full returned-object checks
-and the distinct catalogue audit.
+and empty. That checkpoint left the full returned-object checks and distinct
+catalogue audit pending.
 
 The full-object audit compares every observed field in all 1,779 saved direct
 DFG cases. All match, including actual nonempty per-node AND maps in 288 cases.
@@ -146,8 +148,9 @@ passing: 1,080 value objects, 72 expected missing-path rejections and 1,779
 small-DFG objects. The native captures preserve unchanged inputs and options,
 complete raw maps, optional performance values, node flags, loops, AND fields,
 edges and serialized fields. The performance matrix uses actual retained map
-values over the observed DFG domain, preserving explicit null independently of
-edge decoration. All 17 returned-object field categories match, with no
+values over the common raw/cleaned DFG domain in those cohorts, preserving
+explicit null independently of edge decoration. All 17 returned-object field
+categories match, with no
 unobserved or unsupported cases. The 1,779 captures also match the earlier
 common native models exactly, reusing their verified Petri outputs.
 
@@ -159,9 +162,23 @@ probe attempts, the corrected probe commands and their logs remain bound to the
 unchanged compiled core and source tree. The four affected native suites and
 prior Petri checks are reused rather than reported as new runs.
 
-These finite full-object cohorts never prune a DFG path, despite their threshold
-variation. Noise-pruned matrix-domain controls and the distinct catalogue proof
-remain required; the CLASSIC module is still partial.
+The earlier full-object cohorts have identical raw and cleaned DFG domains.
+The separate eight-call noise checkpoint closes that ambiguity using the ordered
+DFG `A->B:1000, B->C:1000, A->C:1` at noise 0 and 0.5. Its four performance-map
+forms cover absent, complete, retained-null and incomplete maps. Noise 0.5
+removes the low-frequency path from the public DFG and matrices while preserving
+its actual raw performance value when supplied. The incomplete map rejects at
+noise 0 and succeeds after pruning. All seven complete objects and the one
+expected rejection match, with unchanged arguments and zero unobserved fields.
+
+The independent cleaned-domain projector changes only the public DFG/matrix
+domain source. It reads actual native cleaned paths and retained typed values;
+edge/relation representations and raw maps keep their independent checks.
+Twenty-two synthetic checks and independent review pass. The archive binds all
+four actual capture commands, logs, source/header inventory, compiled core,
+probe, public module pins, inputs/options and the successful comparison. Existing
+2,931 full-object outcomes, Petri checks and four native suites are explicitly
+reused; this checkpoint does not rebuild or retest the core.
 
 ## Scope boundaries and completion
 
@@ -188,8 +205,9 @@ affected Release suites, the isolated Debug variant checks and independent
 review pass. The broader Petri comparison subsequently resolves all twelve
 topology failures without changing these object results.
 
-Before promotion, reconcile every route and returned-object gate above with
-saved public observations, actual native output, source/binary bindings and
-appropriate registered tests. Run the structural catalogue verifier after
-adding the distinct proof. Do not substitute coverage counters or a passing
-partial comparator for this audit.
+Every route and returned-object gate above is reconciled with saved public
+observations, actual native output, source/binary bindings and registered tests.
+The distinct catalogue proof passes the structural verifier. CLASSIC is complete;
+the heuristics dispatcher and PLUSPLUS rows remain partial. Coverage now records
+199 complete and 188 partial modules, with 46 complete and 40 partial packages
+and 228 open coverage units.
