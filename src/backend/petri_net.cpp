@@ -400,6 +400,201 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
   return reduce_petri_net(net, reduction_options).net;
 }
 
+PetriNetPresentation to_petri_net_presentation(const HeuristicsNet& heuristics) {
+
+  if (heuristics.variant != HeuristicMinerVariant::kPlusPlus)
+    throw std::invalid_argument("Petri presentation requires PLUSPLUS");
+  const std::size_t n = heuristics.activities.size();
+  PetriNet net;
+  net.set_activities(heuristics.activities);
+  std::vector<std::string> place_names, transition_names;
+  std::size_t hidden_count = 0;
+  const auto add_place = [&](std::string name) {
+    const auto id = net.add_place();
+    place_names.push_back(std::move(name));
+    return id;
+  };
+  const auto add_transition = [&](std::string name,
+                                  std::optional<std::size_t> activity,
+                                  std::vector<std::size_t> inputs,
+                                  std::vector<std::size_t> outputs) {
+    const auto id = net.add_transition(activity, std::move(inputs),
+                                      std::move(outputs));
+    transition_names.push_back(std::move(name));
+    return id;
+  };
+  std::vector<std::vector<std::size_t>> predecessors(n);
+  for (const auto& edge : heuristics.edges) {
+    if (edge.source >= n || edge.target >= n)
+      throw std::invalid_argument("Petri dependency activity index");
+    auto& incoming = predecessors[edge.target];
+    if (std::find(incoming.begin(), incoming.end(), edge.source) == incoming.end())
+      incoming.push_back(edge.source);
+  }
+
+  const std::size_t source = add_place("source0");
+  const std::size_t sink = add_place("sink0");
+  net.set_source(source);
+  net.set_sink(sink);
+
+  // One place per accepted dependency edge: a token on it means the edge has
+  // been taken and the target is now enabled (or awaited).
+  std::map<std::pair<std::size_t, std::size_t>, std::size_t> edge_place;
+  for (const auto& edge : heuristics.edges) {
+    edge_place[{edge.source, edge.target}] = add_place(
+        predecessors[edge.target].size() <= 1
+            ? "pre_" + heuristics.activities[edge.target]
+            : "splace_in_" + heuristics.activities[edge.target] + "_" +
+                  heuristics.activities[edge.source]);
+  }
+
+  // A hand-built net may carry no bundle information; every edge then forms
+  // its own bundle, i.e. plain XOR splits and joins.
+  const bool has_bundles = heuristics.output_bundles.size() == n &&
+                           heuristics.input_bundles.size() == n;
+
+  // The alternatives of a's split (outgoing) or join: one entry per bundle,
+  // holding the edge places the bundle touches.
+  const auto alternatives = [&](std::size_t a, bool outgoing) {
+    std::vector<std::vector<std::size_t>> alts;
+    if (has_bundles) {
+      const auto& bundles =
+          outgoing ? heuristics.output_bundles[a] : heuristics.input_bundles[a];
+      for (const auto& bundle : bundles) {
+        std::vector<std::size_t>& places = alts.emplace_back();
+        places.reserve(bundle.size());
+        for (const std::size_t other : bundle) {
+          places.push_back(outgoing ? edge_place.at({a, other})
+                                    : edge_place.at({other, a}));
+        }
+      }
+    } else {
+      for (const auto& edge : heuristics.edges) {
+        if (outgoing ? edge.source == a : edge.target == a) {
+          alts.push_back({edge_place.at({edge.source, edge.target})});
+        }
+      }
+    }
+    return alts;
+  };
+
+  // Collapses a's alternatives into the place set its transition touches. A
+  // single alternative wires directly (an AND split/join on the transition
+  // itself); several alternatives meet at a hub place with one silent
+  // transition per bundle, so exactly one bundle is taken. No input
+  // alternative leaves the transition inputless; no output alternative gets
+  // a fresh private place where the token parks instead of vanishing.
+  const auto merge = [&](std::vector<std::vector<std::size_t>> alts,
+                         bool joining, std::size_t a) -> std::vector<std::size_t> {
+    if (alts.empty()) {
+      if (joining) return {};
+      // Provisional parking name: this domain has no retained public control.
+      return {add_place("intplace_" + heuristics.activities.at(a))};
+    }
+    if (alts.size() == 1) {
+      return std::move(alts.front());
+    }
+    const std::size_t hub = add_place(
+        (joining ? "pre_" : "intplace_") + heuristics.activities.at(a));
+    for (auto& places : alts) {
+      if (joining) {
+        add_transition("hid_" + std::to_string(++hidden_count), std::nullopt, std::move(places), {hub});
+      } else {
+        add_transition("hid_" + std::to_string(++hidden_count), std::nullopt, {hub}, std::move(places));
+      }
+    }
+    return {hub};
+  };
+
+  const auto contains = [](const std::vector<std::size_t>& list, std::size_t a) {
+    return std::find(list.begin(), list.end(), a) != list.end();
+  };
+
+  std::vector<std::size_t> active = heuristics.active_activities;
+  // Legacy hand-built nets omitted active_activities and should continue to
+  // use every registry entry.  Discovered DFG nets carry metadata even when
+  // their explicit declaration intentionally leaves the active node set
+  // empty; preserve that empty graph during conversion.
+  if (active.empty() && !heuristics.metadata.has_value()) {
+    active.resize(n);
+    for (std::size_t i = 0; i < n; ++i) active[i] = i;
+  }
+  // Public silent names count every join before every split, including
+  // transitions that the reducer later removes.
+  std::vector<std::vector<std::size_t>> inputs(n), outputs(n);
+  for (const std::size_t a : active) {
+    if (a >= n)
+      throw std::invalid_argument("Petri active activity index");
+    auto in_alts = alternatives(a, false);
+    if (contains(heuristics.start_activities, a))
+      in_alts.push_back({source});
+    inputs[a] = merge(std::move(in_alts), true, a);
+  }
+  for (const std::size_t a : active) {
+    auto out_alts = alternatives(a, true);
+    if (contains(heuristics.end_activities, a))
+      out_alts.push_back({sink});
+    outputs[a] = merge(std::move(out_alts), false, a);
+  }
+  for (const std::size_t a : active) {
+    add_transition(heuristics.activities.at(a), a, std::move(inputs[a]),
+                   std::move(outputs[a]));
+  }
+  PetriNetReductionOptions reduction_options;
+  reduction_options.preserve_join_bridges = true;
+
+  const auto reduced = reduce_petri_net(net, reduction_options);
+  // The reducer exposes alias classes, not a distinguished metadata survivor.
+  // Select the lowest original index deterministically when names differ.
+  // Public name-survivor parity for such aliases is not yet established.
+  const auto project = [](const std::vector<std::string>& names,
+                          const std::vector<std::size_t>& mapping,
+                          std::size_t count, std::size_t removed) {
+    if (names.size() != mapping.size())
+      throw std::logic_error("Petri presentation metadata mapping cardinality");
+    std::vector<std::optional<std::string>> slots(count);
+    for (std::size_t old = 0; old < mapping.size(); ++old) {
+      const auto id = mapping[old];
+      if (id == removed) continue;
+      if (id >= count) throw std::logic_error("Petri presentation mapped index");
+      if (!slots[id]) slots[id] = names[old];
+    }
+    std::vector<std::string> result;
+    result.reserve(count);
+    for (auto& value : slots) {
+      if (!value) throw std::logic_error("Petri presentation missing metadata");
+      result.push_back(std::move(*value));
+    }
+    return result;
+  };
+  const auto final_places = project(place_names, reduced.old_to_new_place,
+                                   reduced.net.place_count(), kRemovedPlace);
+  const auto final_transitions = project(
+      transition_names, reduced.old_to_new_transition,
+      reduced.net.transitions().size(), kRemovedTransition);
+  PetriNetPresentation result;
+  for (std::size_t p = 0; p < final_places.size(); ++p)
+    result.places.push_back({p, final_places[p], {}});
+  for (std::size_t t = 0; t < reduced.net.transitions().size(); ++t) {
+    const auto& transition = reduced.net.transitions()[t];
+    std::optional<std::string> label;
+    if (transition.activity)
+      label = reduced.net.activities().at(*transition.activity);
+    result.transitions.push_back({t, final_transitions[t], std::move(label), {}});
+    for (const auto p : transition.inputs)
+      result.arcs.push_back({{PetriNodeKind::kPlace, p},
+                             {PetriNodeKind::kTransition, t}, 1, {}});
+    for (const auto p : transition.outputs)
+      result.arcs.push_back({{PetriNodeKind::kTransition, t},
+                             {PetriNodeKind::kPlace, p}, 1, {}});
+    if (!transition.reset_inputs.empty() || !transition.inhibitor_inputs.empty())
+      throw std::logic_error("Heuristic presentation has extended arcs");
+  }
+  if (reduced.net.has_source()) result.initial_marking.push_back({reduced.net.source(), 1});
+  if (reduced.net.has_sink()) result.final_marking.push_back({reduced.net.sink(), 1});
+  return result;
+}
+
 PetriNet to_petri_net_transition_bordered(const ProcessTree& tree) {
   PetriNet net;
   net.set_activities(tree.activities());

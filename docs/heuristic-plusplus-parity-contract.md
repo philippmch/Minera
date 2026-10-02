@@ -314,9 +314,14 @@ places or transitions.
 The public controls establish connected sequence, XOR, positive AND, filtered
 structures, and a reciprocal ABA cycle below dependency threshold zero.
 Reserved-name controls preserve place and transition identities separately.
-The 69 matching projected topologies do not complete the name/property/weight
-obligations. The saved AAB self-loop control now matches native projected
-conversion topology; its full Petri fields remain open. Identical overlapping
+The automatic PLUSPLUS presentation producer now matches all 69 previously
+matching projected topologies on complete supported Petri fields, including
+names, properties, arc occurrences and weights, endpoint identity, and sparse
+markings. Thirteen additional naming, escaped-label AND, and AAB self-loop
+controls also match. This finite acceptance is saved in
+`heuristic-plusplus-petri-producer-validation.json`; the module remains partial.
+Three datetime-typed DataFrame Petri shape differences and three object-dtype
+reference errors against native success remain open. Identical overlapping
 EventLog and datetime-typed DataFrame controls return equal HeuristicsNet
 fields but different Petri shapes; their cause is not established by these
 observations.
@@ -591,3 +596,36 @@ validation SHA is
 `e39bd64ae10ce02573b349cad91101d632cdf2674f3f3d7e3ce00a0569d5d855`.
 Saving adds zero build/test commands or public/native calls. Durable checks
 retain the actual command snapshots and immutable saved files after commit.
+
+## Automatic PLUSPLUS Petri presentation (2026-10-02)
+
+`minera::to_petri_net_presentation(const HeuristicsNet&)` produces Petri names,
+nullable transition labels, separate place/transition identities, properties,
+unit arc occurrences, and sparse boundary markings for PLUSPLUS inputs. It
+rejects other variants and invalid active indices. The existing generic
+converter remains unchanged.
+
+Incoming join hubs are created for all activities before outgoing split hubs.
+Silent names count transitions removed by reduction; this ordering resolves
+the retained `hid_7`/`hid_8` bundle-collision control. Metadata is projected
+through the reduction maps. Parking-place names and metadata-survivor choices
+outside the saved controls still need public evidence.
+
+Actual replay uses 77 original broad-corpus inputs and thirteen focused
+converter inputs. All 69 previously matching broad topologies now pass the
+complete-field comparator; the six earlier carrier/error outliers remain
+explicit. A separate 77-input replay against the parent production build
+confirms unchanged discoveries, generic conversion, and inputs. Seventeen
+new regression tests are registered: fifteen literal public graph fixtures,
+variant rejection, and active-index rejection. Five Release suites pass with
+`NDEBUG` explicitly undefined.
+
+The compiled production inputs stayed byte-identical when the final collision
+test fixtures were repaired. That test unit was recompiled against the captured
+production library, and all five suites were rerun. The durable archive retains
+returned objects, public aliases, witnesses, source bindings, build and probe
+logs, the prior failed fixture run, and the final passing run. It is
+`heuristic-plusplus-petri-producer-checks.jsonl.gz` (SHA-256
+`f4b335d4e0ffdb99636ea228d477a2c5f406bd6d4248a47471f94b6a505f0f55`). Its validation file records the unchanged
+comparison bounds and remaining limits. This checkpoint makes no catalogue
+promotion: PLUSPLUS and the full target remain partial, with 228 open units.

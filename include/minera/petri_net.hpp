@@ -289,4 +289,9 @@ void fire_petri_transition(const PetriTransition& transition,
 // report such nets as not computable).
 [[nodiscard]] PetriNet to_petri_net(const HeuristicsNet& heuristics);
 
+// Opt-in PLUSPLUS names/labels and explicit unit arc occurrences. Generated
+// metadata is projected through conservative reduction; names may collide.
+[[nodiscard]] PetriNetPresentation to_petri_net_presentation(
+    const HeuristicsNet& heuristics);
+
 }  // namespace minera
