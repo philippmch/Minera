@@ -805,16 +805,35 @@ std::uint64_t get_concurrency(const PlusAbstraction& abstraction,
   return it == abstraction.concurrency.end() ? 0 : it->second;
 }
 
+struct PlusCountThreshold {
+  std::uint64_t integer;
+  std::optional<double> numeric;
+
+  [[nodiscard]] bool accepts(std::uint64_t count) const {
+    if (!numeric) return count >= integer;
+    const double minimum = *numeric;
+    if (std::isnan(minimum)) return false;
+    if (minimum <= 0.0) return true;
+    if (minimum >= 0x1p64) return false;
+    // Compare integer counts without rounding them to double. The checked
+    // conversion truncates a finite positive cutoff below 2^64; a fractional
+    // cutoff requires the next integer occurrence.
+    const auto whole = static_cast<std::uint64_t>(minimum);
+    return count > whole ||
+           (count == whole && minimum == static_cast<double>(whole));
+  }
+};
+
 double plus_dependency(const PlusAbstraction& abstraction,
                        const std::string& first,
                        const std::string& second,
-                       std::uint64_t min_frequency) {
+                       const PlusCountThreshold& min_frequency) {
   const double forward = static_cast<double>(
       get_count(abstraction.eventually_follows, first, second));
   const auto raw_backward =
       get_count(abstraction.eventually_follows, second, first);
   const double backward = static_cast<double>(
-      raw_backward >= min_frequency ? raw_backward : 0);
+      min_frequency.accepts(raw_backward) ? raw_backward : 0);
   const double concurrent =
       static_cast<double>(get_concurrency(abstraction, first, second));
   return (forward - backward) / (forward + backward + concurrent);
@@ -884,7 +903,7 @@ void sort_bundles_by_activity_name(
 std::vector<HeuristicBundle> plus_bundles(
     const PlusAbstraction& abstraction, HeuristicsNet& net,
     std::size_t center, const std::vector<std::size_t>& neighbours,
-    bool outgoing, double threshold, std::uint64_t min_frequency) {
+    bool outgoing, double threshold, const PlusCountThreshold& min_frequency) {
   const std::size_t k = neighbours.size();
   std::vector<std::vector<bool>> adjacent(k, std::vector<bool>(k, false));
   for (std::size_t i = 0; i < k; ++i) {
@@ -893,12 +912,12 @@ std::vector<HeuristicBundle> plus_bundles(
       const auto& n2 = net.activities[neighbours[j]];
       const auto& middle = net.activities[center];
       const double numerator = static_cast<double>(
-          (get_count(abstraction.eventually_follows, n1, n2) >=
-                   min_frequency
+          (min_frequency.accepts(
+               get_count(abstraction.eventually_follows, n1, n2))
                ? get_count(abstraction.eventually_follows, n1, n2)
                : 0) +
-          (get_count(abstraction.eventually_follows, n2, n1) >=
-                   min_frequency
+          (min_frequency.accepts(
+               get_count(abstraction.eventually_follows, n2, n1))
                ? get_count(abstraction.eventually_follows, n2, n1)
                : 0) +
           get_concurrency(abstraction, n1, n2));
@@ -1812,6 +1831,10 @@ HeuristicsNet discover_classic_dfg(
 
 HeuristicsNet discover_plus_plus_from_abstraction(
     const PlusAbstraction& abstraction, const HeuristicMinerOptions& options) {
+  const PlusCountThreshold min_activity{options.min_activity_count,
+                                       options.plusplus_min_activity_count};
+  const PlusCountThreshold min_frequency{options.min_frequency,
+                                        options.plusplus_min_frequency};
   const HeuristicNetDecoration effective_decoration =
       options.plusplus_decoration_selector
           ? (*options.plusplus_decoration_selector == "frequency"
@@ -1834,7 +1857,7 @@ HeuristicsNet discover_plus_plus_from_abstraction(
 
   std::unordered_map<std::string, std::size_t> ids;
   for (const auto& activity : abstraction.activity_order) {
-    if (abstraction.occurrences.at(activity) < options.min_activity_count)
+    if (!min_activity.accepts(abstraction.occurrences.at(activity)))
       continue;
     ids.emplace(activity, net.activities.size());
     net.activities.push_back(activity);
@@ -1872,7 +1895,7 @@ HeuristicsNet discover_plus_plus_from_abstraction(
     const auto source = ids.find(pair.first);
     const auto target = ids.find(pair.second);
     if (source == ids.end() || target == ids.end() ||
-        frequency < options.min_frequency)
+        !min_frequency.accepts(frequency))
       continue;
     const auto direct = abstraction.direct_adjacency.find(pair);
     const std::uint64_t direct_frequency =
@@ -1913,7 +1936,7 @@ HeuristicsNet discover_plus_plus_from_abstraction(
     net.relation_statistics.push_back(std::move(relation));
     const double dependency =
         plus_dependency(abstraction, pair.first, pair.second,
-                        options.min_frequency);
+                        min_frequency);
     net.dependency_measures.push_back(
         {source->second, target->second, dependency});
     if (dependency > effective_dependency_threshold(options))
@@ -1955,10 +1978,10 @@ HeuristicsNet discover_plus_plus_from_abstraction(
               by_name);
     net.output_bundles[activity] =
         plus_bundles(abstraction, net, activity, successors[activity], true,
-                     options.and_threshold, options.min_frequency);
+                     options.and_threshold, min_frequency);
     net.input_bundles[activity] =
         plus_bundles(abstraction, net, activity, predecessors[activity], false,
-                     options.and_threshold, options.min_frequency);
+                     options.and_threshold, min_frequency);
     sort_bundles_by_activity_name(net.output_bundles[activity],
                                   net.activities);
     sort_bundles_by_activity_name(net.input_bundles[activity],

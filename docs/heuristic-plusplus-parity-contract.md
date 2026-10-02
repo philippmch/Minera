@@ -990,3 +990,53 @@ nonfinite count parameters, selector/error breadth, dictionary order, object
 identity, metadata, timestamp domains and adapter routing remain open. PLUSPLUS
 and Alpha+ stay partial; no catalogue unit is promoted. Coverage remains 46/86
 packages and 199/387 modules, with 228 incomplete units.
+
+## PLUSPLUS numeric count thresholds (2026-10-02)
+
+Executed 88 additional public pandas calls: 76 HeuristicsNet controls and twelve
+Petri controls, with both frequency and performance decoration. Count cutoffs
+include negative infinity, -1.5, -1, False, True, signed zero, 0.5, the adjacent
+floating values below/above 4, 4.0, 4.5, 8.5, positive infinity and NaN. Dependency
+and AND controls also cover negative, infinite and NaN thresholds. Every public
+call succeeds, with no skipped calls or serialization errors.
+
+The native API previously exposed unsigned integer count filters. Appended
+optional PLUSPLUS numeric overrides now preserve fractional cutoffs and allow
+negative/nonfinite values. Fractions compare without truncation: a cutoff just
+above four rejects a count of four. NaN rejects every corresponding activity or
+path; negative values retain counts. Overrides apply to node/path filtering and
+the filtered counts used in dependency and AND measures. Omitted overrides keep
+exact integer comparisons. The existing CLASSIC route retains its integer options.
+The replay maps booleans to numeric zero/one and negative integers to their exact
+double values for these controls; the original public parameter types are retained
+in the raw snapshots.
+
+All 88 new aliases match: 76 HeuristicsNet results agree on 3,440
+supported net/node/edge cells and complete connection domains, and all twelve
+Petri presentations agree on names, nullable labels, properties, arc occurrences,
+weights and sparse markings. Supported input-after projections, mutation
+occurrence and option preservation match. The wider replay matches 342 saved
+aliases, including 258 HeuristicsNet results, 61 Petri presentations and 23 mapped
+error controls. Its 12,150 net-field checks match.
+All 77 generic regressions remain exact matches. Replay makes 419 discoveries,
+61 presented conversions and 43 generic conversions, with no new reference calls.
+
+The corrected frozen build contains 650 exact compilation inputs. All five
+assertion-enabled suites pass. The initial build's test incorrectly expected four
+retained paths between cutoffs two and four; the reference fixture has AB/AC at
+two and BD/CD at four. Its terminal failed run and exact inputs remain archived.
+Only the test expectation changes between that build and the accepted build;
+the initially prepared replay was not executed or counted as a native run.
+
+Evidence is `heuristic-plusplus-pandas-numeric-checks.jsonl.gz` (SHA-256
+`da8b1d1cdf71df3e6bcd3b6762d0b9612c3094ca9e7da949746400b6317c350f`, 46779784 bytes, 3079 verified members), with
+`heuristic-plusplus-pandas-numeric-validation.json`. Raw public calls, mutations,
+API views, opaque pinned proofs, process records, logs, helpers, both frozen
+source snapshots, binary bindings and comparisons round-trip byte for byte.
+The preceding filter and compiled-source checkpoints remain hash-bound.
+
+These controls establish the observed numeric cases and their native API mapping.
+Other parameter types, selector/error breadth, dictionary order, object identity,
+metadata, additional timestamp domains and adapter routing remain open. PLUSPLUS
+and Alpha+ remain partial. No catalogue unit is promoted: coverage stays 46/86
+packages and 199/387 modules, with 228 incomplete units.

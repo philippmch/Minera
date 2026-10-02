@@ -708,6 +708,72 @@ void plusplus_pandas_signed_array_duration_components() {
   }
 }
 
+void plusplus_numeric_count_filters_preserve_public_comparisons() {
+  // The 88 public numeric controls retain four occurrences per activity,
+  // AB/AC paths at count two and BD/CD paths at count four. Fractions are not
+  // truncated and NaN rejects.
+  const double infinity = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  struct Control { double threshold; bool retains; std::size_t paths; };
+  const std::vector<Control> controls{
+      {-infinity, true, 4}, {-1.5, true, 4}, {-1.0, true, 4}, {0.0, true, 4},
+      {1.0, true, 4}, {-0.0, true, 4}, {0.5, true, 4},
+      {std::nextafter(4.0, 0.0), true, 2}, {4.0, true, 2},
+      {std::nextafter(4.0, infinity), false, 0}, {4.5, false, 0}, {8.5, false, 0},
+      {infinity, false, 0}, {nan, false, 0}, {0x1p64, false, 0}};
+  for (const auto decoration : {HeuristicNetDecoration::kFrequency,
+                                HeuristicNetDecoration::kPerformance}) {
+    for (const auto& control : controls) {
+      auto options = plus_options();
+      options.decoration = decoration;
+      options.min_activity_count = 9;
+      options.plusplus_min_activity_count = control.threshold;
+      auto table = pandas_interval_table(2);
+      const auto filtered_activities = discover_plus_plus_pandas(table, options);
+      assert(filtered_activities.activities.size() == (control.retains ? 4 : 0));
+      assert(filtered_activities.relation_statistics.size() == (control.retains ? 4 : 0));
+      assert(filtered_activities.raw_activity_statistics.size() == 4);
+      assert(filtered_activities.sojourn_times->size() == 4);
+      assert(options.min_activity_count == 9);
+
+      options.min_activity_count = 1;
+      options.plusplus_min_activity_count.reset();
+      options.min_frequency = 9;
+      options.plusplus_min_frequency = control.threshold;
+      table = pandas_interval_table(2);
+      const auto filtered_paths = discover_plus_plus_pandas(table, options);
+      assert(filtered_paths.activities.size() == 4);
+      assert(filtered_paths.relation_statistics.size() == control.paths);
+      assert(filtered_paths.raw_activity_statistics.size() == 4);
+      assert(filtered_paths.raw_concurrency_statistics.size() == 1);
+      assert(options.min_frequency == 9);
+      assert(std::isnan(control.threshold)
+                 ? std::isnan(*options.plusplus_min_frequency)
+                 : *options.plusplus_min_frequency == control.threshold);
+    }
+  }
+  auto table = pandas_interval_table(2);
+  auto integer_options = plus_options();
+  integer_options.min_activity_count = 9;
+  assert(discover_plus_plus_pandas(table, integer_options).activities.empty());
+  integer_options.min_activity_count = 1;
+  integer_options.min_frequency = std::numeric_limits<std::uint64_t>::max();
+  assert(discover_plus_plus_pandas(table, integer_options).relation_statistics.empty());
+
+  const auto classic_table = pandas_interval_table(2);
+  HeuristicMinerOptions classic_options;
+  const auto classic = discover_heuristics_net(classic_table, classic_options);
+  classic_options.plusplus_min_activity_count = nan;
+  classic_options.plusplus_min_frequency = nan;
+  const auto classic_with_overrides =
+      discover_heuristics_net(classic_table, classic_options);
+  const EventLog empty;
+  const auto graph = discover_directly_follows_graph(empty);
+  assert(analysis_json("classic", empty, graph, nullptr, nullptr, &classic) ==
+         analysis_json("classic", empty, graph, nullptr, nullptr,
+                       &classic_with_overrides));
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -4599,6 +4665,7 @@ int main(int argc, char** argv) {
   plusplus_pandas_occurrence_order_and_self_concurrency();
   plusplus_pandas_concurrency_rounding_keeps_exact_waits();
   plusplus_pandas_signed_array_duration_components();
+  plusplus_numeric_count_filters_preserve_public_comparisons();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();
