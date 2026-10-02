@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <deque>
@@ -606,6 +607,25 @@ auto pandas_instant(const ParsedExactTimestamp& value) {
   return std::pair{value.seconds, value.nanoseconds};
 }
 
+double pandas_concurrency_instant(const ParsedExactTimestamp& value) {
+  // Public pandas concurrency controls compare epoch seconds rounded to six
+  // decimal places. Format the actual binary value so decimal rounding keeps
+  // its epoch-dependent boundary, including sub-microsecond half ties.
+  const double epoch = static_cast<double>(value.seconds) +
+                       static_cast<double>(value.nanoseconds) / 1e9;
+  char text[64];
+  const auto formatted = std::to_chars(text, text + sizeof(text), epoch,
+                                       std::chars_format::fixed, 6);
+  if (formatted.ec != std::errc{})
+    throw std::logic_error("Heuristics Miner pandas timestamp rounding failed");
+  double rounded = 0.0;
+  const auto parsed = std::from_chars(text, formatted.ptr, rounded,
+                                     std::chars_format::fixed);
+  if (parsed.ec != std::errc{} || parsed.ptr != formatted.ptr)
+    throw std::logic_error("Heuristics Miner pandas timestamp rounding failed");
+  return rounded;
+}
+
 double pandas_elapsed(const ParsedExactTimestamp& end,
                       const ParsedExactTimestamp& begin,
                       std::int64_t units_per_second,
@@ -648,6 +668,8 @@ struct PandasInterval {
   std::string activity;
   PandasTimestamp start;
   PandasTimestamp complete;
+  std::optional<double> concurrency_start;
+  std::optional<double> concurrency_complete;
 };
 
 PlusAbstraction build_pandas_plus_abstraction(
@@ -687,14 +709,17 @@ PlusAbstraction build_pandas_plus_abstraction(
       if (number == nullptr)
         throw std::logic_error("Heuristics Miner pandas duration is not a float");
       sojourn[activity].add(*number);
+      const auto start = pandas_timestamp(
+          selected_start_attribute(event, *options.start_timestamp_attribute),
+          start_units);
+      const auto complete = pandas_timestamp(
+          selected_start_attribute(event, canonical_timestamp_attribute(options)),
+          complete_units);
       intervals.push_back({
-          activity,
-          pandas_timestamp(selected_start_attribute(
-                               event, *options.start_timestamp_attribute),
-                           start_units),
-          pandas_timestamp(selected_start_attribute(
-                               event, canonical_timestamp_attribute(options)),
-                           complete_units)});
+          activity, start, complete,
+          start ? std::optional{pandas_concurrency_instant(*start)} : std::nullopt,
+          complete ? std::optional{pandas_concurrency_instant(*complete)}
+                   : std::nullopt});
     }
     std::stable_sort(intervals.begin(), intervals.end(),
                      [](const auto& lhs, const auto& rhs) {
@@ -715,11 +740,11 @@ PlusAbstraction build_pandas_plus_abstraction(
       }
       for (std::size_t j = i + 1; j < intervals.size(); ++j) {
         const auto& second = intervals[j];
-        if (first.start && first.complete && second.start && second.complete &&
-            std::max(pandas_instant(*first.start),
-                     pandas_instant(*second.start)) <=
-                std::min(pandas_instant(*first.complete),
-                         pandas_instant(*second.complete)))
+        if (first.concurrency_start && first.concurrency_complete &&
+            second.concurrency_start && second.concurrency_complete &&
+            std::max(*first.concurrency_start, *second.concurrency_start) <=
+                std::min(*first.concurrency_complete,
+                         *second.concurrency_complete))
           ++directional_concurrency[{first.activity, second.activity}];
       }
     }

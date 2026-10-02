@@ -7771,3 +7771,35 @@ snapshots, opaque proofs, helpers, sources, comparisons, binary hashes and proce
 records are retained, including the superseded failures. Every archive member
 round-trips. Broader pandas/PLUSPLUS and Alpha+ completion gates remain open;
 coverage stays 46/86 packages and 199/387 modules, with 228 incomplete units.
+
+### PLUSPLUS pandas concurrency rounding (2026-10-02)
+
+Resolved the three nanosecond concurrency gaps recorded at `cc8bd1a`. Inclusive
+overlap now uses epoch seconds rounded to six decimal places, preserving the
+epoch-dependent boundary while exact ordering, eventually-follows, durations and
+performance waits retain their existing precision. A registered regression checks
+nine captured controls across concurrency, dependency scores, edges and waits.
+
+Forty-nine new public calls return all 49 objects, including three Petri results,
+without skips or serializer failures. They cover nanosecond gaps, fractional
+completion, half-microsecond boundaries and epochs 1960/1970/2024/2100. The 2024
+596/597 ns boundary and Unix-epoch 499/500 ns boundary distinguish the observed
+rounding path. Worker logs and unchanged opaque proofs are retained.
+
+All five native suites pass with assertions enabled from 650 frozen inputs.
+Actual replay covers all 147 saved route aliases: 91 HeuristicsNets have 4514
+matched net/node/edge cells and three sojourn mismatches. Eighty-eight HeuristicsNet
+aliases, all 33 Petri presentations and 23 errors match in full; all 98 preceding
+aliases now match. Connection domains, mutation occurrence and option preservation
+match throughout. Three new cases expose a separate one-ULP duration and input-after
+difference: public `1.000001` versus native `1.0000010000000001`. Those gaps remain
+open. The 77 generic cases preserve prior
+native results exactly. Replay makes 224 discoveries, 33 presented conversions
+and 43 generic conversions with zero new reference calls.
+
+Evidence is `heuristic-plusplus-pandas-concurrency-checks.jsonl.gz` (SHA-256
+`8a9cde0e3f092b0bcc759e3dc32652a6a924d1fec681b0182a5eba0fab4625c8`, 21245608 bytes, 1587 round-trip-verified members), with
+`heuristic-plusplus-pandas-concurrency-validation.json` (SHA-256 `9a8564df9a2ccc0ef1a5e12683d2f7a519ad4edec52016c56aab82fd8d59264a`).
+The preceding archive remains hash-bound as parent evidence. Broader pandas,
+PLUSPLUS and Alpha+ gates remain open; no catalogue units are promoted. Coverage
+stays 46/86 packages and 199/387 modules, with 228 incomplete units.
