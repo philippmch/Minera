@@ -7554,3 +7554,64 @@ validation SHA is
 The independent compiled context retains 650 inputs, six binaries and four
 passing assertion-enabled suites. Saving adds zero calls, builds or suite
 runs. Immutable saved-file guards permit later source and HEAD changes.
+
+### PLUSPLUS Petri naming controls (2026-10-02)
+
+The pinned 2.7.22 public worker made twelve top-level calls in one process:
+nine parent PLUSPLUS Petri discoveries, one parent heuristics-net discovery,
+and two public converter calls reusing that returned HN. Both converter kwargs
+were omitted. Each discovery used a fresh EventLog and full nine-key options,
+with sequential non-overlapping event intervals and explicit case IDs. The
+fixtures cover a path, split, join, both-sided branching, repeated split/join,
+reordered branches, reserved/escaped labels, HN reuse, and the negative minimum
+subnormal dependency threshold on ABA.
+
+All twelve calls succeeded without reference or serialization errors or skips.
+The eleven Petri snapshots retain typed names, nullable labels, properties,
+endpoint identities, every weighted arc occurrence, and sparse markings. Fresh
+log/trace/event and option identities were checked. Existing EventLogs, options,
+and the HN reused by both conversions remained unchanged; the newly returned HN
+is accounted for as output creation.
+
+The two fresh split/join returns (4/5), the reordered return (4/6), and the two
+conversions of HN8 (9/10) have equal complete portable public Petri field views.
+The reserved/escaped relabeling (7) returns the corresponding changed fields.
+The path returns `pre_B` and `pre_C`; the split returns `intplace_A`, the join
+`pre_C`, and the both-sided fixture `pre_B` and `intplace_B`. The split/join
+fixture returns `intplace_A` and `pre_D`, alongside `source0` and `sink0`.
+The ABA control returns visible A/B and silent names `hid_2` and `hid_4`.
+These are finite public observations. The surviving names do not establish a
+general counter, creation-order, reduction-survivor, or alias naming policy.
+Every observed arc has integer weight one; none repeats an endpoint pair.
+Those absences do not close repeated-arc or nonunit-weight domains.
+
+Capture helper SHA is
+`5c778d7f50fee046e3708ce3544872dcf0541faaca62cdaa6652c9bd95f90357`;
+its 43 focused mocked checks cover the collection body and failure/skip paths.
+Preparation SHA is
+`014352d38b7a722e7be612595bf0e6f139b2793beffb6eeea85c5518e435997a`;
+raw output SHA is
+`06ff9c70931e322b6b80fbfbc4d6ce43f2b1a20cb525de32b4d39053b4080c47`.
+Execution record SHA is
+`63803433e59491524acc762a34ba717ece4df5ace8121481b9c3b3174c40043f`.
+PID 31284 exits zero with finalized logs and zero active job processes. Public
+signatures and eleven unchanged opaque module proofs precede the calls.
+
+`docs/heuristic-plusplus-petri-naming-checks.jsonl.gz` and its validation retain
+827 exact UTF-8 members, the twelve full call/input/output records, signatures,
+opaque proofs, logs, and complete earlier helper/report/fixture origins. The
+25 saver checks exercise the actual mocked collector, including exact capture
+check count and fixture filename, record/plan/input/origin drift rejection.
+The earlier route saver's original 31 checks and five repair checks remain
+separate whole origins without being rerun.
+
+Every member byte, SHA and count roundtrips with the reviewed codec. The archive
+is 8,602,002 bytes, SHA
+`472ea0a39ea1d3372f89862c8c6148432f06c30f6840b43c953b5611df2e94db`;
+validation SHA is
+`2c51cee74d319b1742bf23a304a20bbc52699ab3a39d7567f465442473f8de81`.
+The immutable presentation build context retains 650 inputs, seven binaries and
+five passing assertion-enabled suites. Saving adds zero public/native calls,
+builds or suite runs. Durable guards use immutable BUILD/DOCS paths and permit
+later source and HEAD changes. Automatic native names and full returned-object
+parity remain open. PLUSPLUS stays partial, retaining all 228 open units.
