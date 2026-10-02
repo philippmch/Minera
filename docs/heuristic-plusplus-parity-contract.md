@@ -192,11 +192,35 @@ independently; no normalized-byte equivalence substitutes for those guards.
 The archive preserves 726 members, including immutable snapshots of all 650
 working-source files, distinct compiled-source bindings, original logs and
 failures, and finalization proof. All working snapshots are UTF-8; the saver
-supports binary wrappers when needed. The prior 23 helper checks and subsequent 29 capture, 21 finalizer, and
-22 saver checks are retained. Saving adds no public/native calls, production
+supports binary wrappers when needed. The prior 23 helper checks and subsequent
+29 capture, 21 finalizer, and 22 saver checks are retained. Saving adds no public/native calls, production
 changes or suite runs, and does not promote the module.
 
 ## Returned-object acceptance
+
+`heuristic-plusplus-broad-raw-projection-validation.json` preserves a further
+comparison of the same 119 aliases and 4,573 cells: 4,023 matched, 117 ambiguous,
+433 unrepresentable, and zero mismatched. The complete raw-name concurrency
+map matches all 117 supported aliases, including the two paired controls that
+retain BC=4 after C is removed from the active node table. Retained-ID
+concurrency remains separate backing data and is not the public projection.
+
+Twenty-five positive nested AND maps now match projections of actual native
+rows. The projection preserves center, input/output side, canonical raw-name
+neighbor pairs and floating scores; empty maps and missing backing are kept
+distinct. Captured positive scores include 1.0, 0.8 and 0.5. These finite
+matches do not settle threshold equality or positive-map label collisions.
+The remaining 117 ambiguous cells are computed performance matrices in the
+earlier native capture. Nullable auxiliaries and computed performance DFG
+still lack counterparts there. The separate actual 75-alias Petri diagnostic
+is reused; this HeuristicsNet report's pending Petri entries are not new tests.
+
+The 14-member archive retains the complete actual report, preparation,
+manifest, attempt, frozen helper and 28 projection checks, with seventeen
+saver checks. All exact UTF-8 bytes, hashes and counts roundtrip using the
+unchanged reviewed codec. The earlier corrected report and broad capture
+remain immutable, externally bound evidence. This report and save add no
+public/native calls, production edits, suite runs or catalogue promotion.
 
 Presence, null, empty values, numeric types, and actual keys must be retained.
 Derived matrix views may share backing data, but their complete values and key
@@ -207,13 +231,13 @@ reported explicitly rather than filled with a presumed default.
 | --- | --- | --- |
 | `activities`, `activities_occurrences`, `start_activities`, `end_activities` | Net metadata and boundary counts | Compare complete key domains through filtering, including an edge incident to a removed activity; retain `[{}]` boundary containers for empty results. |
 | `dfg`, `dfg_matrix` | Retained `eventually_follows_frequency` relation statistics | Corrected complete maps and nested matrices match all 117 supported aliases, including overlapping and non-neighbor intervals. Current PLUSPLUS raw/cleaned DFG maps are empty in the saved cases; unfamiliar decoration has no native counterpart. |
-| `concurrent_activities`, `dependency_matrix` | Concurrency and dependency statistics | Compare positive concurrency and matrix entries whose dependencies fail the edge threshold. |
+| `concurrent_activities`, `dependency_matrix` | Raw-name concurrency and retained dependency statistics | Complete raw-name concurrency matches all 117 supported aliases, including positive pairs with filtered activities. Dependency matrices also retain excluded edges. Keep both complete domains when extending the input corpus. |
 | `dfg_window_2`, `freq_triples` | Auxiliary maps and their presence state | Saved public values are `None`, while native maps are empty; the current PLUSPLUS representation does not encode that distinction. Longer and repeated traces remain required. |
 | `dfg_window_2_matrix`, `freq_triples_matrix` | Views of the auxiliary maps | Empty dictionaries match the saved cases; the full domain and any positive values remain to be established. |
 | `node_type` | Decoration | Compare frequency and performance results, including edge value types. |
 | `performance_dfg`, `performance_matrix` | Separate computed performance presence and complete maps | Frequency public DFG is `None`; performance DFG is a dictionary, including a present empty dictionary. The seven performance route pairs establish filtering by retained interval relations, direct-wait means, and matrix zero for a relation with no direct wait. Dependency exclusion retains both maps. A frequency matrix entry may be zero despite positive waits. Native computed output and complete typed counterparts remain required. |
 | `sojourn_times` | Optional name-to-double map | All 117 supported aliases match, including escaped labels, removed activities, and empty input. Retain this verified obligation when broader inputs are added. |
-| `nodes` | Retained activities, node statistics, maps, and connections | Compare actual node keys and all fields below; empty AND/loop maps alone do not prove positive-map behavior. |
+| `nodes` | Retained activities, node statistics, maps, and connections | Twenty-five positive AND maps match projections retaining center, input/output side, canonical raw-name neighbors and float scores. Threshold equality and positive-map label collisions remain open; actual keys and all fields below remain required for new inputs. |
 
 Each node requires `node_occ`, `is_start_activity`, `is_end_activity`,
 `loop_length_two`, `and_measures_in`, and `and_measures_out`. Each outgoing edge
@@ -242,7 +266,7 @@ input and parameter state before and after every actual call.
 | `TIMESTAMP_KEY` | `timestamp_attribute` | Custom completion is observed on public EventLog and flat routes; combine it with performance decoration and native controls. |
 | `CASE_ID_KEY` | `case_id_attribute` | Custom grouping and correctly datetime-typed DataFrame Petri calls are observed publicly; carrier-dependent conversion, input mutation, and native counterparts remain open. |
 | `DEPENDENCY_THRESH` | `dependency_threshold` | Public dependency 1 is accepted below 1 and excluded at or above 1; its matrix entry remains. Compare the full native results. |
-| `AND_MEASURE_THRESH` | `and_threshold` | Positive public measures 1 and 0.5 and strict threshold acceptance are observed, including a connected AND Petri shape. Compare native maps and conversion. |
+| `AND_MEASURE_THRESH` | `and_threshold` | Positive scores 1.0, 0.8 and 0.5 match the finite native map projections, including distinct input/output sides. Threshold equality, positive-map label collisions and complete AND Petri acceptance remain open. |
 | `MIN_ACT_COUNT` | `min_activity_count` | Public controls remove incident relation maps and edges while preserving raw sojourn entries; the complete native field domains remain to be compared. |
 | `MIN_DFG_OCCURRENCES` | `min_frequency` | Public count 2 remains at minimum 2 and is removed at minimum 3, including the returned DFG and matrices. Compare native domains. |
 | `HEU_NET_DECORATION` | `decoration` | Public differing-wait controls distinguish frequency `None`/integer values from performance dictionary/float values; native output presence and scalar types remain open. |

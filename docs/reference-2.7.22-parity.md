@@ -7176,3 +7176,38 @@ validation SHA is
 Saving adds zero public/native calls, production edits or suite runs. Native
 computed output, full returned objects, carrier behavior and complete Petri
 acceptance remain open. PLUSPLUS stays partial; all 228 open units remain.
+
+### PLUSPLUS raw concurrency and positive AND projections
+
+The next comparison reuses the same complete native capture and 119 public
+HeuristicsNet aliases. Across 4,573 cells it records 4,023 matches, 117
+ambiguous cells, 433 unrepresentable cells, and zero mismatches. Raw-name
+concurrency matches every one of the 117 supported aliases, including paired
+controls that retain BC=4 after activity C is filtered from active nodes.
+Retained-ID concurrency remains separately captured and is not substituted
+for this raw public map.
+
+Twenty-five positive nested AND maps match actual native rows after preserving
+the center activity, input/output side, canonical raw-name neighbor pairs and
+floating scores. Observed scores include 1.0, 0.8 and 0.5. Duplicate or malformed
+rows and missing backing cannot pass. Threshold equality and positive-map
+label collisions remain unproven. The 117 remaining ambiguous cells are
+computed performance matrices in the earlier native capture; nullable
+auxiliaries and computed performance DFG remain unrepresentable there.
+The independent actual 75-alias Petri diagnostic is reused explicitly; pending
+Petri entries in this HeuristicsNet report do not count as new comparisons.
+
+`docs/heuristic-plusplus-broad-raw-projection-checks.jsonl.gz` and its validation
+preserve fourteen exact UTF-8 members: complete actual report, preparation,
+manifest, attempt, frozen helper, and named fixtures/check reports. Twenty-eight
+projection checks and seventeen saver checks pass. Exact bytes, SHA and count
+roundtrip with the unchanged reviewed codec. Earlier corrected and original
+reports, public results and compiled inputs remain immutable external evidence.
+Report SHA is
+`d3bba5fbf048bda53f867e6ea6c6982fb49c1a19dabc7aa3e41b5ce7018945af`.
+The archive is 1,515,060 bytes, SHA
+`3a1b026b994de7113c514496d96b443466d09036f57968589051303149cadad4`;
+validation SHA is
+`e0aa1525ff66fe03873ba04b4e64c416f8a4e2377ac87e1a3da232dd72e7460b`.
+The comparison and save add zero public/native calls, production changes or
+suite runs. PLUSPLUS remains partial, with all 228 open units retained.
