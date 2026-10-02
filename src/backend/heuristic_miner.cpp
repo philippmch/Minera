@@ -1676,8 +1676,14 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
         frequency, frequency, representation, false, summary.samples,
         summary.median, summary.minimum, summary.maximum, summary.stdev,
         summary.sum};
-    relation.representation_value = structured_performance_representation(
-        summary, options.decoration, options.performance_aggregation);
+    // PLUSPLUS frequency values retain their integer type even when the count
+    // fits exactly in the legacy double compatibility projection.
+    const std::optional<HeuristicPerformanceValue> representation_value =
+        options.decoration == HeuristicNetDecoration::kFrequency
+            ? HeuristicPerformanceValue{HeuristicStructuredValue{frequency}}
+            : structured_performance_representation(
+                  summary, options.decoration, options.performance_aggregation);
+    relation.representation_value = representation_value;
     net.relation_statistics.push_back(std::move(relation));
     const double dependency =
         plus_dependency(abstraction, pair.first, pair.second,
@@ -1688,8 +1694,7 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
     {
       HeuristicDependency edge{source->second, target->second, dependency,
                                frequency, representation, false};
-      edge.representation_value = structured_performance_representation(
-          summary, options.decoration, options.performance_aggregation);
+      edge.representation_value = representation_value;
       net.edges.push_back(std::move(edge));
     }
   }
