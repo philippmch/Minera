@@ -80,8 +80,9 @@ adding no public or native calls. The archive preserves the original failure,
 the complete raw results, and the finalization separately. It contains 64 exact
 UTF-8 members and fourteen external byte/hash bindings.
 
-These controls distinguish direct adjacency from eventually-follows: plain
-ABC traces return AB and BC, with no AC relation. Positive raw concurrency
+Plain ABC traces return AB and BC, with no AC relation. Overlapping and
+non-neighbor interval controls below distinguish those counts from literal
+event adjacency. Positive raw concurrency
 retains a removed activity under filtering. A dependency threshold immediately
 below zero accepts reciprocal ABA edges and produces an actual cyclic Petri
 net; the equal and above-zero controls exclude those edges. Self-loop controls
@@ -103,6 +104,37 @@ separately. A shared-dictionary discrepancy in embedded configure/build
 metadata is documented; the SHA-bound command files preserve the actual
 before-state. All original bytes remain available.
 
+`heuristic-plusplus-broad-native-validation.json` preserves seventy actual
+native discoveries and forty-three conversions against the same tested core.
+The 194 reused public aliases deduplicate to 71 exact cases; one unfamiliar
+decoration case, covering two aliases, remains unrepresentable and receives
+no native call. The successful capture executes 72 commands in seventy probe
+processes with no discovery or conversion errors. All input and option
+snapshots, complete returned fields, Petri incidences and markings remain raw.
+
+The original comparison covers 119 HeuristicsNet aliases and 4,573 cells:
+3,823 match, 234 are ambiguous, 458 are unrepresentable, and 58 mismatch.
+All 58 differences concern the original literal-adjacency candidate for
+`dfg` and `dfg_matrix`, with 29 aliases in each field. Each affected public
+DFG instead equals the captured native `eventually_follows_frequency` map;
+its matrix contains the same pairs and counts. For example, overlapping
+intervals yield BD=4 and CD=4 where literal adjacency counts each twice.
+An interval control also yields AC=1 with zero literal adjacency. The original
+diagnostic is preserved; these differences do not establish missing native
+frequency counts. A corrected projection requires a separate actual report.
+
+The archive retains two earlier probe failures. Compilation failed with
+MSVC C1128 before any native call. The next attempt compiled, but its first
+uninstrumented process overflowed its stack; discovery and conversion counts
+are unknown for that process. Separate non-inlined case factories and the
+required `/bigobj` option produce the successful capture. Its flushed call
+markers agree with final returned counts. The archive contains 315 exact
+UTF-8 members and 660 external byte/hash bindings, roundtripped with the
+unchanged reviewed codec. It preserves all 75 Petri aliases for a separate
+comparison and keeps names, properties and arc-weight obligations explicit.
+The four passing Release suites and 650 compiled inputs are reused; no new
+public calls or production source changes occur in this evidence checkpoint.
+
 ## Returned-object acceptance
 
 Presence, null, empty values, numeric types, and actual keys must be retained.
@@ -113,7 +145,7 @@ reported explicitly rather than filled with a presumed default.
 | Public fields | Native data to compare | Remaining acceptance |
 | --- | --- | --- |
 | `activities`, `activities_occurrences`, `start_activities`, `end_activities` | Net metadata and boundary counts | Compare complete key domains through filtering, including an edge incident to a removed activity; retain `[{}]` boundary containers for empty results. |
-| `dfg`, `dfg_matrix` | Direct-adjacency relation statistics and any stored DFG maps | Longer interval traces must distinguish direct adjacency from eventually-follows. Current PLUSPLUS raw/cleaned DFG maps are empty in the saved cases. |
+| `dfg`, `dfg_matrix` | Retained `eventually_follows_frequency` relation statistics | Actual overlapping and non-neighbor interval results disprove literal-adjacency projection in 29 aliases. Compare the corrected complete map and nested matrix domains; current PLUSPLUS raw/cleaned DFG maps are empty in the saved cases. |
 | `concurrent_activities`, `dependency_matrix` | Concurrency and dependency statistics | Compare positive concurrency and matrix entries whose dependencies fail the edge threshold. |
 | `dfg_window_2`, `freq_triples` | Auxiliary maps and their presence state | Saved public values are `None`, while native maps are empty; the current PLUSPLUS representation does not encode that distinction. Longer and repeated traces remain required. |
 | `dfg_window_2_matrix`, `freq_triples_matrix` | Views of the auxiliary maps | Empty dictionaries match the saved cases; the full domain and any positive values remain to be established. |
