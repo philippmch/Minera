@@ -1040,3 +1040,61 @@ Other parameter types, selector/error breadth, dictionary order, object identity
 metadata, additional timestamp domains and adapter routing remain open. PLUSPLUS
 and Alpha+ remain partial. No catalogue unit is promoted: coverage stays 46/86
 packages and 199/387 modules, with 228 incomplete units.
+
+## Pandas literal selectors and error order (2026-10-02)
+
+Executed 96 new public calls across three selector matrices. Thirty return
+successfully and 66 raise captured errors; no calls are skipped or fail during
+serialization. Controls include four custom selectors, absent and present empty
+column names, native-looking alias names with different values, completion/start
+role overlap, case/activity role overlap, missing columns in combination, object
+timestamp dtypes, absent starts and auxiliary suffix columns. Both decorations
+and selected Petri routes are covered.
+
+The committed pre-change core fails these controls: the first sixty native
+replays have 59 mismatched and 312 unrepresentable net-field cells, four mismatched
+Petri presentations, thirty mismatched errors, 26 mismatched input-after
+projections and 24 mismatched mutation occurrences. All original raw values,
+process records and comparisons remain retained as before-implementation evidence.
+
+The pandas API now resolves all four selectors as literal column names, including
+empty strings. Lookup order is case, activity, then completion. Missing activity
+and completion messages preserve their observed distinct forms; the completion
+form depends on whether the selected start exists. These lookup errors precede
+input mutation. An absent start is then copied from completion before dtype
+validation. Equal case/activity selectors raise the observed suffixed KeyError
+after datetime validation and any start copy, before adding @@diff. Auxiliary
+suffix columns do not avoid that error in the captured controls.
+
+Successful discovery uses an internal five-column projection with explicit event
+roles, retaining caller selectors and cells in the mutable table. Alternate and
+empty activity/completion names select their actual values rather than falling
+back to native event aliases. The returned native selector metadata retains the
+literal names. Generic const-table and EventLog routes retain their own semantics.
+
+All 96 new aliases match: 22 HeuristicsNet results agree on 1,118
+supported net/node/edge cells and complete connection domains; all eight supported
+Petri presentations and 66 error types/messages agree. Supported input-after
+projections, mutation occurrence and option preservation match. The wider replay
+matches all 438 saved aliases on 13,268 net-field
+checks, 69 Petri presentations and 89 mapped errors. All 77 generic regressions
+remain exact matches. Execution makes 515 discoveries, 69 presented conversions
+and 43 generic conversions, with no new reference calls. All five assertion-enabled
+suites pass for the accepted 650-input frozen build.
+
+Evidence is `heuristic-plusplus-pandas-selector-checks.jsonl.gz` (SHA-256
+`29c93c12e26dd093c0667ee811ccfbf0246bc46b4f32f627673deabbf4a146fa`, 55954295 bytes, 3052 verified members), with
+`heuristic-plusplus-pandas-selector-validation.json`. Calls, mutations, public API
+views, opaque pinned proofs, native process records, logs, helpers, exact source
+inputs, binary bindings and comparisons round-trip byte for byte. The preceding
+compiled-source checkpoint and its 650 inputs remain hash-bound.
+The initial 438-case replay compilation reached its time limit before any native
+discovery. Its finalized records and inputs remain archived. The accepted replay
+shares 242 constructor functions, each creating fresh data;
+literal constructor reconstruction is verified and every alias remains executed.
+
+Broader parameter/label types, additional column collisions, Unicode error
+representation, dictionary order, object identity, metadata, input ordering,
+timestamp domains and adapter routing remain open. PLUSPLUS and Alpha+ stay
+partial. Coverage stays 46/86 packages and 199/387 modules, with 228 incomplete
+units and no catalogue promotion.

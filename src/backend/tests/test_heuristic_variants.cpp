@@ -774,6 +774,119 @@ void plusplus_numeric_count_filters_preserve_public_comparisons() {
                        &classic_with_overrides));
 }
 
+void plusplus_pandas_literal_selectors_and_error_order() {
+  struct ErrorControl {
+    std::string activity = "concept:name";
+    std::string completed = "time:timestamp";
+    std::string case_id = "case:concept:name";
+    std::string started = "start_timestamp";
+    std::string type = "builtins.KeyError";
+    std::string message;
+    bool copies_start = false;
+    bool object_time = false;
+  };
+  const std::vector<ErrorControl> errors{
+      {"missing:activity", "missing:complete", "missing:case", "missing:start",
+       "builtins.KeyError", "'missing:case'"},
+      {"missing:activity", "missing:complete", "case:concept:name", "missing:start",
+       "builtins.KeyError", "'Column not found: missing:activity'"},
+      {"activity", "time:timestamp", "case:concept:name", "start_timestamp",
+       "builtins.KeyError", "'Column not found: activity'"},
+      {"", "time:timestamp", "case:concept:name", "start_timestamp",
+       "builtins.KeyError", "'Column not found: '"},
+      {"concept:name", "missing:complete", "case:concept:name", "start_timestamp",
+       "builtins.KeyError", "\"['missing:complete'] not in index\""},
+      {"concept:name", "missing:complete", "case:concept:name", "missing:start",
+       "builtins.KeyError", "'missing:complete'"},
+      {"concept:name", "", "case:concept:name", "start_timestamp",
+       "builtins.KeyError", "\"[''] not in index\""},
+      {"concept:name", "time:timestamp", "", "start_timestamp",
+       "builtins.KeyError", "''"},
+      {"concept:name", "time:timestamp", "concept:name", "start_timestamp",
+       "builtins.KeyError", "'concept:name_2'"},
+      {"concept:name", "time:timestamp", "concept:name", "missing:start",
+       "builtins.KeyError", "'concept:name_2'", true},
+      {"concept:name", "time:timestamp", "concept:name", "missing:start",
+       "builtins.AttributeError", "Can only use .dt accessor with datetimelike values", true, true},
+      {"missing:activity", "time:timestamp", "case:concept:name", "missing:start",
+       "builtins.KeyError", "'Column not found: missing:activity'", false, true}};
+  for (const auto& control : errors) {
+    auto table = pandas_interval_table(2);
+    if (control.object_time) {
+      table.dtypes[table.column_index("time:timestamp")] = "object";
+      table.dtypes[table.column_index("start_timestamp")] = "object";
+    }
+    const auto before = table;
+    auto options = plus_options();
+    options.activity_attribute = control.activity;
+    options.timestamp_attribute = control.completed;
+    options.case_id_attribute = control.case_id;
+    options.start_timestamp_attribute = control.started;
+    bool matched = false;
+    try { (void)discover_plus_plus_pandas(table, options); }
+    catch (const HeuristicPandasError& error) {
+      matched = error.reference_type() == control.type && error.what() == control.message;
+    }
+    assert(matched);
+    assert(table.columns.size() == before.columns.size() + control.copies_start);
+    assert(std::find(table.columns.begin(), table.columns.end(), "@@diff") == table.columns.end());
+    for (std::size_t row = 0; row < table.rows.size(); ++row)
+      assert(std::equal(before.rows[row].begin(), before.rows[row].end(), table.rows[row].begin()));
+    assert(table.index == before.index && table.attributes == before.attributes);
+    assert(table.metadata == before.metadata);
+  }
+
+  const auto append = [](EventTable& table, const std::string& key, std::size_t source) {
+    table.columns.push_back(key);
+    table.dtypes.push_back(table.dtypes[source]);
+    for (auto& row : table.rows) {
+      auto cell = row[source];
+      cell->key = key;
+      cell->first_class_role = FirstClassAttributeRole::kNone;
+      cell->first_class_state = FirstClassAttributeState::kMissing;
+      cell->first_class_source_key.clear();
+      row.push_back(std::move(cell));
+    }
+  };
+  for (const auto& key : {std::string{"activity"}, std::string{}}) {
+    auto table = pandas_interval_table(2);
+    append(table, key, table.column_index("concept:name"));
+    for (auto& row : table.rows) row.back()->value = "X:" + row.back()->value;
+    auto options = plus_options();
+    options.activity_attribute = key;
+    const auto net = discover_plus_plus_pandas(table, options);
+    assert((net.activities == std::vector<std::string>{"X:A", "X:B", "X:C", "X:D"}));
+    assert(net.activity_attribute == key && net.activity_ids_are_local);
+  }
+  for (const auto& key : {std::string{"timestamp"}, std::string{}}) {
+    auto table = pandas_interval_table(2);
+    append(table, key, table.column_index("time:timestamp"));
+    for (auto& row : table.rows) {
+      auto& cell = *row.back();
+      const auto second = std::stoi(cell.value.substr(17, 2)) + 20;
+      cell.value.replace(17, 2, std::to_string(second));
+      std::get<NativeDate>(cell.typed_value).value = cell.value;
+    }
+    auto options = plus_options();
+    options.timestamp_attribute = key;
+    const auto net = discover_plus_plus_pandas(table, options);
+    assert(net.timestamp_attribute == key);
+    assert(net.relation_statistics.empty());
+    assert(net.sojourn_times->at("A") == 21.0);
+  }
+  auto table = pandas_interval_table(2);
+  append(table, "", table.column_index("case:concept:name"));
+  auto options = plus_options();
+  options.case_id_attribute = "";
+  assert(discover_plus_plus_pandas(table, options).activities.size() == 4);
+  table = pandas_interval_table(2);
+  options = plus_options();
+  options.start_timestamp_attribute = "";
+  const auto copied = discover_plus_plus_pandas(table, options);
+  assert(std::find(table.columns.begin(), table.columns.end(), "") != table.columns.end());
+  for (const auto& [_, value] : *copied.sojourn_times) assert(value == 0.0);
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -4666,6 +4779,7 @@ int main(int argc, char** argv) {
   plusplus_pandas_concurrency_rounding_keeps_exact_waits();
   plusplus_pandas_signed_array_duration_components();
   plusplus_numeric_count_filters_preserve_public_comparisons();
+  plusplus_pandas_literal_selectors_and_error_order();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();
