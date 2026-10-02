@@ -6774,3 +6774,63 @@ within-log construction order, and the faithful native selection rule remain
 open. Alpha+ stays partial; coverage remains 46 complete / 40 partial packages,
 199 complete / 188 partial modules and 228 open units. Finite captures do not
 prove universal support or probability parity.
+
+### Alpha+ final-marking and trace-order pilot
+
+The finite paired pilot in
+`docs/alpha-plus-final-joint-public-checks.jsonl.gz` and
+`docs/alpha-plus-final-joint-native-checks.jsonl.gz` preserves 9,600 actual public
+calls and 9,600 actual native calls. Twelve EventLog families, each with cleanup
+off and on, produce 24 cases. Twenty fresh processes cross five hash seeds,
+two case-list orders, and two trace-list orders; each case is called 20 times
+with fresh inputs. Only the outer trace list is reversed: event sequences,
+trace multiplicities, and the directly-follows multiset stay unchanged.
+The native `short_loops=true` counterpart is separate from the actual public
+parameter map. `PYTHONHASHSEED` records native process context and does not seed
+the native random generator.
+
+The public capture returned 7,520 graphs and 2,080
+`IndexError("list index out of range")` failures, with no input mutations or
+serialization failures. Every one of its 480 process/case cells stayed constant
+across 20 calls. All 7,520 successful final markings contain one live `end`
+place with one token; no detached final marking or variation in both initial
+and final choices was observed. Changing case-list order changes none of the
+240 matched comparisons. Reversing trace-list order changes 28 of 240 matched
+comparisons: eight have unique names and 20 involve a name collision, so those
+20 do not establish general graph isomorphism. At seed 0, cases 6/7 change
+from detached `start` and one arc to live `start` and three arcs. At seed 4,
+cases 10/11 change from six to nine arcs while both boundary markings stay
+live. Cleanup changes the graph signature in 118 of 240 matched pairs without
+changing marking or error outcomes.
+
+The native capture returned 7,591 graphs and 2,009 discovery failures. The
+already-audited prefix of processes 0 through 11 contains 4,553 graphs and
+1,207 `std::invalid_argument` failures with message
+`Alpha+: boundary cleanup has no incident transition`. Among its 288
+process/case cells, 96 mix graph and error outcomes, 48 vary the initial
+marking, and 72 vary named adjacency. All 4,553 successful prefix rows keep
+the final marking at live `end` with one token; 254 have detached initial
+support. This within-process variation differs from the public pilot's stable
+cells. It does not establish a universal probability law, a causal effect of
+ordering, or general weighted graph equivalence. Native ordinary arc
+multiplicity is recorded as repeated place IDs; no independent arc-weight
+attribute is manufactured.
+
+The actual public execution manifest is
+`e3063941fffc36dce1bdd900fb77dc45cc65437d2fac72127a18e11ff492e9a4`;
+the actual native manifest is
+`72b017f26119566ba8ff4e61c2003275508d2a0e1d88f737089dbe2111deb206`.
+Native capture context before and after is `f25cfa2`, distinct from compiled
+tree `03522b85b63cc336dcfc642fa3de8e658b6bdb0e`, compiled parent `25b2cb4`, and
+core `885b7b5822df6c4cf0b6b56328d338599b3493e2c46f50032912db4949554134`.
+Only the new probe was compiled; earlier core tests are reused. The capture
+completed without interruption, so its actual call count is exactly 9,600.
+
+`docs/alpha-plus-final-joint-validation.json` records the ready preparation,
+source and binary bindings, actual command logs, inputs, options, and outcomes.
+The reviewed saver passed 12 focused checks and roundtripped every UTF-8
+member byte, SHA, and count using the unchanged streaming codec: 95 public
+members and 1,225 native members. Both archives are below the size guard and
+use deterministic gzip. Alpha+ remains partial; the 228 open coverage units
+are unchanged. Final and joint selection laws still need evidence beyond
+this finite pilot.
