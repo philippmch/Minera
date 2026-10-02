@@ -7834,3 +7834,29 @@ Every archive member round-trips, and the preceding archive remains hash-bound
 as parent evidence. Broader pandas/PLUSPLUS and Alpha+ gates remain open; coverage
 stays 46/86 packages and 199/387 modules, with 228 incomplete units and no
 catalogue promotion.
+
+### PLUSPLUS pandas filter and threshold controls (2026-10-02)
+
+Captured 66 successful public controls for activity/path count cutoffs, exact
+dependency/AND boundaries and frequency/performance decoration. Fourteen Petri
+calls include empty and partially filtered graphs. All calls retain complete raw
+values and mutation snapshots, unchanged opaque proofs and terminal process logs,
+with no skips or serialization errors.
+
+Actual native replay matches all 52 HeuristicsNet aliases on 2,246 supported
+net/node/edge cells and connection domains, plus all fourteen supported Petri
+presentations. All supported input-after projections, mutation occurrence and
+option preservation match. Replay makes 66 discoveries and fourteen presented
+conversions with no additional reference calls.
+
+The production source remains `e4693ec`. Its verified core, 650 compilation
+inputs, five passing assertion-enabled suites and 77 generic regression results
+are reused as parent evidence. Only the new replay probe is compiled; no new
+production build, suite run or generic conversion is counted.
+
+Evidence is `heuristic-plusplus-pandas-filter-checks.jsonl.gz` (SHA-256
+`397cd79c365240103c42785b7bb22381e1a6320813f6b5c93b9ac106438dc86d`, 7358748 bytes, 322 verified members), with
+`heuristic-plusplus-pandas-filter-validation.json`. All member bytes and hashes
+round-trip. Broader parameter, carrier, error, metadata, identity and routing
+requirements remain open. PLUSPLUS and Alpha+ remain partial; coverage stays
+46/86 packages and 199/387 modules, with 228 incomplete units and no promotion.
