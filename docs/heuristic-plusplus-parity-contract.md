@@ -898,3 +898,55 @@ supported input comparison retains typed values while excluding native allocatio
 counters and decimal float spelling. PLUSPLUS and Alpha+ remain partial. No
 catalogue units are promoted: coverage remains 46/86 packages and 199/387 modules,
 with 228 incomplete units.
+
+## Signed pandas duration components (2026-10-02)
+
+Resolved the three measured duration and mutation gaps from `c1a6748`. Pandas
+duration and performance calculations now combine floored whole seconds,
+microseconds and remaining nanoseconds in that order. Declared datetime units
+still determine the exact integer difference. Millisecond remainders are
+converted to microseconds before scaling. Signed durations retain their observed
+floating cancellation; performance waits still clamp nonpositive differences.
+Sorting, eventually-follows and concurrency retain their separate timestamp paths.
+
+Forty-one new public calls capture 26 unit/array contrasts, eleven signed/zero/day
+controls and four millisecond scaling contrasts. All calls return objects without
+skips or serialization errors. Two calls retain complete Petri presentations.
+The 1.000001-second duration in nanosecond columns now writes and returns exactly
+`1.000001`. Adding an independent 3 ns duration leaves that value unchanged.
+The 7 ms control returns hexadecimal float `0x1.cac083126e978p-8`, distinguishing
+microsecond scaling from direct millisecond scaling. The -1 ns control returns
+`-0x1.12e0bf070a000p-30`, retaining the observed signed component calculation.
+
+A registered regression checks ten captured values across positive, negative,
+zero and day-spanning durations in nanosecond, microsecond and millisecond
+columns. It checks both sojourn projections and every affected `@@diff` cell.
+A fresh 650-input build passes all five relevant suites with assertions enabled
+in Release. Actual replay makes 265 discoveries, 35 presented-Petri conversions
+and 43 generic conversions without new reference calls during replay.
+
+All 188 saved route aliases match supported input-after projections, mutation
+occurrence, option preservation and error category/message. All 130 successful
+HeuristicsNet aliases match 6464 supported net/node/edge field cells across
+all seventeen net projections, including complete connection domains. All 35
+Petri aliases match names, nullable labels, properties, arc occurrences, weights
+and sparse markings. The 77 generic cases preserve their previously recorded
+native net, Petri, input and error results exactly. All three preceding one-ULP
+sojourn/input mismatches are resolved in the same complete replay.
+
+`heuristic-plusplus-pandas-duration-checks.jsonl.gz` retains 1782 members
+(26750742 bytes), SHA-256 `388c8cb1b8e542b446cb0673c726e4362f88725e7094b709729536c11f672dc8`. Every member byte and hash round-trips.
+Validation is `heuristic-plusplus-pandas-duration-validation.json` (SHA-256
+`af419a1b1a1199171378359ce1e42278890a4e8e247d0c19bb2888ee8526e7be`). Raw public/native inputs, returns, mutations and errors,
+opaque pinned proofs, public API views, helpers and derivations, exact sources,
+binary hashes, preparations, comparisons and terminal process logs are retained.
+The preceding committed archive remains hash-bound as parent evidence, preserving
+its three measured gaps.
+
+These finite controls do not establish broader timestamp ranges/units/timezones,
+rounding environments, arbitrary duration aggregation, business hours, other
+carrier/parameter/error combinations, dictionary order, Python object identity,
+unscoped metadata or adapter routing. The supported input projection still keeps
+typed values while excluding native allocation counters and decimal spelling.
+PLUSPLUS and Alpha+ remain partial. No catalogue units are promoted: coverage
+remains 46/86 packages and 199/387 modules, with 228 incomplete units.

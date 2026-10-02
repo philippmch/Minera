@@ -7803,3 +7803,34 @@ Evidence is `heuristic-plusplus-pandas-concurrency-checks.jsonl.gz` (SHA-256
 The preceding archive remains hash-bound as parent evidence. Broader pandas,
 PLUSPLUS and Alpha+ gates remain open; no catalogue units are promoted. Coverage
 stays 46/86 packages and 199/387 modules, with 228 incomplete units.
+
+### PLUSPLUS pandas signed duration components (2026-10-02)
+
+Resolved the three duration-rounding and input-after gaps at `c1a6748`. Array
+durations now combine floored seconds, microseconds and nanoseconds, preserving
+the captured negative cancellation and millisecond-to-microsecond scaling.
+Performance waits retain their nonpositive clamp. A registered regression checks
+ten captured values in both sojourn projections and affected duration cells.
+
+Forty-one new public calls return all 41 objects without skips or serializer
+failures, including two Petri presentations. They cover positive, negative, zero
+and day-spanning values, three declared datetime units, independent nanosecond
+durations and millisecond scaling. Full returned values, mutations, API views,
+unchanged opaque module proofs and terminal worker records are retained.
+
+All five native suites pass with assertions enabled from 650 frozen inputs.
+Actual replay matches all 188 route aliases: 130 HeuristicsNets match 6464
+supported field cells and complete connection domains, 35 Petri presentations
+match every supported field, and 23 errors match category/message. All supported
+input-after projections, mutation occurrence and option preservation match. The
+77 generic cases preserve prior native results exactly. Replay makes 265
+discoveries, 35 presented conversions and 43 generic conversions with no new
+reference calls during replay.
+
+Evidence is `heuristic-plusplus-pandas-duration-checks.jsonl.gz` (SHA-256
+`388c8cb1b8e542b446cb0673c726e4362f88725e7094b709729536c11f672dc8`, 26750742 bytes, 1782 verified members), with
+`heuristic-plusplus-pandas-duration-validation.json` (SHA-256 `af419a1b1a1199171378359ce1e42278890a4e8e247d0c19bb2888ee8526e7be`).
+Every archive member round-trips, and the preceding archive remains hash-bound
+as parent evidence. Broader pandas/PLUSPLUS and Alpha+ gates remain open; coverage
+stays 46/86 packages and 199/387 modules, with 228 incomplete units and no
+catalogue promotion.

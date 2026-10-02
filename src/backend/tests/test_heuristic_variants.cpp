@@ -666,6 +666,48 @@ void plusplus_pandas_concurrency_rounding_keeps_exact_waits() {
   }
 }
 
+void plusplus_pandas_signed_array_duration_components() {
+  struct Control {
+    std::string dtype;
+    std::string completed;
+    double expected;
+  };
+  const std::vector<Control> controls{
+      {"ns", "2024-01-01T00:00:00.000001Z", 1e-6},
+      {"ns", "2024-01-01T00:00:01.000001Z", 1.000001},
+      {"us", "2024-01-01T00:00:02.000001Z", 2.000001},
+      {"ns", "2023-12-31T23:59:59.999999999Z", -0x1.12e0bf070a000p-30},
+      {"us", "2023-12-31T23:59:59.999999Z", -0x1.0c6f7a0b80000p-20},
+      {"ms", "2023-12-31T23:59:59.999Z", -0x1.0624dd2f1aa00p-10},
+      {"ms", "2024-01-01T00:00:00.007Z", 0x1.cac083126e978p-8},
+      {"ns", "2024-01-01T00:00:00Z", 0.0},
+      {"ns", "2024-01-02T00:00:00.000000001Z", 0x1.5180000000045p+16},
+      {"ns", "2023-12-30T23:59:59.999999999Z", -0x1.5180000000044p+16}};
+  for (const auto& control : controls) {
+    auto table = pandas_interval_table(2);
+    const auto name = table.column_index("concept:name");
+    const auto start = table.column_index("start_timestamp");
+    const auto complete = table.column_index("time:timestamp");
+    table.dtypes[start] = table.dtypes[complete] =
+        "datetime64[" + control.dtype + ", UTC]";
+    for (auto& row : table.rows) {
+      if (row[name]->value == "A")
+        row[complete] = typed_date("time:timestamp", control.completed);
+      for (const auto column : {start, complete})
+        std::get<NativeDate>(row[column]->typed_value).resolution =
+            control.dtype == "ns" ? NativeDateResolution::kNanosecond
+                                  : NativeDateResolution::kMicrosecond;
+    }
+    const auto net = discover_plus_plus_pandas(table, plus_options());
+    assert(net.sojourn_times->at("A") == control.expected);
+    assert(activity_stat(net, "A").mean_sojourn_seconds == control.expected);
+    const auto diff = table.column_index("@@diff");
+    for (const auto& row : table.rows)
+      if (row[name]->value == "A")
+        assert(std::get<double>(row[diff]->typed_value) == control.expected);
+  }
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -4556,6 +4598,7 @@ int main(int argc, char** argv) {
   plusplus_pandas_nat_statistics_and_error_order();
   plusplus_pandas_occurrence_order_and_self_concurrency();
   plusplus_pandas_concurrency_rounding_keeps_exact_waits();
+  plusplus_pandas_signed_array_duration_components();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();

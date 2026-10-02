@@ -1,0 +1,167 @@
+{
+  "actual_new_public_calls": 41,
+  "archive": {
+    "byte_count": 26750742,
+    "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\heuristic-plusplus-pandas-duration-checks.jsonl.gz",
+    "round_trip_members_verified": 1782,
+    "sha256": "388c8cb1b8e542b446cb0673c726e4362f88725e7094b709729536c11f672dc8"
+  },
+  "assertions_enabled_test_suites": 5,
+  "binary_bindings": {
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\plusplus-pandas-duration-native-d98214da8273484291672f83fe8150c7\\duration-route-probe\\native-build\\Release\\broad_probe.exe": "15aed91b5ab27935ca3e33cbf2390a98084d4cb43ed5c2e0770f3837d9a1aa38",
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\plusplus-pandas-duration-native-d98214da8273484291672f83fe8150c7\\duration-route-probe\\native-build\\Release\\pandas_probe.exe": "ed312d0cad6831e7fb0382566c22cb5bc54f5b9b90940ac0dfd00e31900ab89e",
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\plusplus-pandas-duration-native-d98214da8273484291672f83fe8150c7\\native-build\\Release\\minera_core.lib": "a1531c3bf3083545d51f139271f725690738e5902a1f378f5a016d1f30684f32",
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\plusplus-pandas-duration-native-d98214da8273484291672f83fe8150c7\\native-build\\Release\\minera_core_tests.exe": "9acbb54bb2c828fac1c1f533b4b63a7ff8d4d7a2a799202b1b1fc70292bf41ea",
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\plusplus-pandas-duration-native-d98214da8273484291672f83fe8150c7\\native-build\\Release\\minera_export.exe": "4fd2e83c6cb119bcb5c9a4354e167c20497956a0ea95cbbca167c4b79cc296e0",
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\plusplus-pandas-duration-native-d98214da8273484291672f83fe8150c7\\native-build\\Release\\minera_heuristic_variants_tests.exe": "f907ad7771f5a7013290d9b4946f9e2a1b4f120db1c8e1cfd5f6dd87e4c67834",
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\plusplus-pandas-duration-native-d98214da8273484291672f83fe8150c7\\native-build\\Release\\minera_petri_net_conversion_tests.exe": "455730fe26105201a69133d12b5fa6865f7b2d7a48797492124e455b6d8094f0",
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\plusplus-pandas-duration-native-d98214da8273484291672f83fe8150c7\\native-build\\Release\\minera_petri_net_reduction_tests.exe": "28662b201f091ebf6a28b25fe12d81305fd2a66f5c9c60a82b35ebaf8ca6eaee",
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\plusplus-pandas-duration-native-d98214da8273484291672f83fe8150c7\\native-build\\Release\\minera_request_params_tests.exe": "26c9028049fb28e586366dc8f7552ee6b105558e8939f4e1b2148b0811ebc200"
+  },
+  "catalogue_promoted": false,
+  "checkpoint_scope": {
+    "full_supported_alias_matches": 188,
+    "full_supported_heuristics_matches": 130,
+    "full_supported_petri_matches": 35,
+    "matched_error_aliases": 23,
+    "remaining_difference_indices": []
+  },
+  "full_parity": false,
+  "kind": "manifest",
+  "member_count": 1782,
+  "parent_checkpoint": {
+    "archive": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\heuristic-plusplus-pandas-concurrency-checks.jsonl.gz",
+    "commit": "c1a67484a2dc5530519b89c93565880fc71b0464",
+    "remaining_difference_indices": [
+      138,
+      139,
+      140
+    ],
+    "round_trip_members_verified": 1587,
+    "sha256": "8a9cde0e3f092b0bcc759e3dc32652a6a924d1fec681b0182a5eba0fab4625c8"
+  },
+  "parent_head": "c1a67484a2dc5530519b89c93565880fc71b0464",
+  "public_runs": [
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 25,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-carrier-variant-dispatch-b5d687c45b1c4ce29ea4ed05e6f62d27",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 8,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-entry-controls-36db42379d71424186c3a0a7906809c8",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 6,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-concurrency-orientation-0e110dfa1b1e4b9b8a46bb5e62c23a13",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 4,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-concurrency-unbalanced-3c67ac60bc7c46d58f6f7e65d88d51cc",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 4,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-start-selector-bf3bbe8f65de4f84a3e08495c7ab72e2",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 20,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-timestamp-boundaries-6d27ea5b08fb47a683d96db8a0fdeb48",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 20,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-performance-nat-0f0d27fa2c8146bb960c4fd7b6026e0c",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 16,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-empty-datetime-525365d8d2354a43a90540e40190eede",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 8,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-wait-scaling-35246db6e4ae4d4ead9487822880b3f3",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 24,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-concurrency-precision-30f2705c5db143cd8876397fd7c5a8ac",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 19,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-concurrency-rounding-7ea014f06bd74a2ea6e6f23c16c2ec8a",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 6,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-concurrency-presentations-0710251d100642b1a012cb279dd665f9",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 26,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-array-durations-3e337882496f4a968cb580b978107ee6",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 11,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-signed-durations-6946a72e869a4cdcabb64dd9d1210ea0",
+      "exit_code": 0
+    },
+    {
+      "active_processes_after": 0,
+      "actual_public_calls": 4,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-millisecond-durations-2ffd50b3769d49e6bca7b925cf13c6fd",
+      "exit_code": 0
+    }
+  ],
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "reference_version": "2.7.22",
+  "retained_public_calls": 201,
+  "schema_version": 1,
+  "source_binding_count": 650,
+  "summary": {
+    "actual_native_discoveries": 265,
+    "actual_native_generic_conversions": 43,
+    "actual_native_presentations": 35,
+    "aliases": 188,
+    "catalogue_promoted": false,
+    "error_nonmatches": [],
+    "full_parity": false,
+    "generic_regression_cases": 77,
+    "generic_regressions": [],
+    "heuristics_aliases": 130,
+    "input_after_nonmatches": [],
+    "input_projection_limitations": [
+      "Public omni_present has no proved mapping to native global scopes. The complete original snapshots remain captured; the native attributes, properties, classifiers and extension fields are compared.",
+      "Float cell decimal spellings are ignored only when an actual typed floating value is retained. Native scalar_identity allocation counters have no public cell counterpart and are excluded from independently constructed expected carrier comparisons."
+    ],
+    "mutation_nonmatches": [],
+    "net_field_status_counts": {
+      "matched": 6464
+    },
+    "new_public_calls": 0,
+    "option_mutations": [],
+    "petri_status_counts": {
+      "matched": 35
+    }
+  }
+}

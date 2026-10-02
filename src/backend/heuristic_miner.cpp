@@ -643,23 +643,24 @@ double pandas_elapsed(const ParsedExactTimestamp& end,
       (fraction < 0 && integral <
                           std::numeric_limits<std::int64_t>::min() - fraction))
     throw std::overflow_error("Heuristics Miner pandas timedelta overflow");
-  // Timedelta arrays scale their integer unit values. Dividing epoch doubles
-  // loses subsecond values and division by the scale can round differently.
-  const double scale = units_per_second == 1'000'000'000 ? 1e-9
-                       : units_per_second == 1'000'000 ? 1e-6
-                       : units_per_second == 1'000 ? 1e-3 : 1.0;
   const auto ticks = integral + fraction;
-  if (!scalar_wait) return static_cast<double>(ticks) * scale;
-  // Scalar performance waits retain separate seconds, microseconds and
-  // nanoseconds; array duration scaling has a different rounding boundary.
-  if (ticks <= 0) return 0.0;
-  double result = static_cast<double>(ticks / units_per_second);
-  const auto remainder = ticks % units_per_second;
+  if (scalar_wait && ticks <= 0) return 0.0;
+  // Public duration and wait controls scale floored whole seconds, then
+  // microseconds and remaining nanoseconds. Durations keep signed values;
+  // only performance waits clamp nonpositive differences to zero.
+  auto whole = ticks / units_per_second;
+  auto remainder = ticks % units_per_second;
+  if (remainder < 0) {
+    --whole;
+    remainder += units_per_second;
+  }
+  double result = static_cast<double>(whole);
   if (units_per_second == 1'000'000'000) {
     result += static_cast<double>(remainder / 1'000) * 1e-6;
     result += static_cast<double>(remainder % 1'000) * 1e-9;
   } else {
-    result += static_cast<double>(remainder) * scale;
+    const auto micros = remainder * (1'000'000 / units_per_second);
+    result += static_cast<double>(micros) * 1e-6;
   }
   return result;
 }
