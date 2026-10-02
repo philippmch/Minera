@@ -321,6 +321,150 @@ const HeuristicLoopLengthTwo* loop_length_two(
   return nullptr;
 }
 
+EventTable pandas_interval_table(std::size_t b_outer_cases) {
+  std::vector<std::vector<Event>> cases;
+  for (std::size_t i = 0; i < 4; ++i) {
+    const bool b_outer = i < b_outer_cases;
+    cases.push_back({
+        classic_timestamp_event("A", "2024-01-01T00:00:01Z",
+                                "2024-01-01T00:00:00Z", std::nullopt),
+        classic_timestamp_event(b_outer ? "B" : "C",
+                                "2024-01-01T00:00:06Z",
+                                "2024-01-01T00:00:02Z", std::nullopt),
+        classic_timestamp_event(b_outer ? "C" : "B",
+                                "2024-01-01T00:00:05Z",
+                                "2024-01-01T00:00:03Z", std::nullopt),
+        classic_timestamp_event("D", "2024-01-01T00:00:08Z",
+                                "2024-01-01T00:00:07Z", std::nullopt)});
+  }
+  return classic_timestamp_table(classic_timestamp_log(std::move(cases)));
+}
+
+void plusplus_pandas_directional_concurrency_acceptance() {
+  // Actual public controls cover uniform, balanced and unbalanced time orders.
+  // The mixed pandas counts differ from generic PLUSPLUS discovery on the same
+  // table; these counts determine the accepted AND splits and Petri structure.
+  for (const auto [b_outer_cases, expected] :
+       std::vector<std::pair<std::size_t, std::uint64_t>>{
+           {4, 4}, {0, 4}, {2, 2}, {3, 1}, {1, 3}}) {
+    auto table = pandas_interval_table(b_outer_cases);
+    const auto before = table;
+    auto options = plus_options();
+    options.and_threshold = 0.0;
+    const auto generic = discover_heuristics_net(table, options);
+    assert(generic.raw_concurrency_statistics.size() == 1);
+    assert(generic.raw_concurrency_statistics.front().frequency == 4);
+    assert(table.rows == before.rows);
+    const auto pandas = discover_plus_plus_pandas(table, options);
+    assert(pandas.raw_concurrency_statistics.size() == 1);
+    const auto& concurrent = pandas.raw_concurrency_statistics.front();
+    assert(concurrent.first == "B" && concurrent.second == "C");
+    assert(concurrent.frequency == expected);
+    assert(options.variant == HeuristicMinerVariant::kPlusPlus);
+    assert(options.and_threshold == 0.0);
+    assert(table.index == before.index);
+    assert(table.attributes == before.attributes);
+    assert(table.metadata == before.metadata);
+    for (std::size_t row = 0; row < table.rows.size(); ++row)
+      assert(std::equal(before.rows[row].begin(), before.rows[row].end(),
+                        table.rows[row].begin()));
+  }
+  auto options = plus_options();
+  options.and_threshold = 0.0;
+  auto table = pandas_interval_table(2);
+  const auto zero = discover_plus_plus_pandas(table, options);
+  assert(and_measure(zero, true, "A", "B", "C")->value == 0.5);
+  assert(and_measure(zero, false, "D", "B", "C")->value == 0.25);
+  options.and_threshold = 0.5;
+  const auto at = discover_plus_plus_pandas(table, options);
+  assert(!and_measure(at, true, "A", "B", "C"));
+  assert(!and_measure(at, false, "D", "B", "C"));
+  const auto petri = to_petri_net_presentation(at);
+  assert(petri.places.size() == 4);
+  assert(petri.transitions.size() == 4);
+  options.and_threshold = std::nextafter(0.5, 0.0);
+  const auto below = discover_plus_plus_pandas(table, options);
+  assert(and_measure(below, true, "A", "B", "C")->value == 0.5);
+}
+
+void plusplus_pandas_duration_mutation_and_start_fallback() {
+  auto table = pandas_interval_table(2);
+  const auto before = table;
+  // The public pandas entry point selects PLUSPLUS even with native defaults.
+  const HeuristicMinerOptions defaults;
+  const auto net = discover_plus_plus_pandas(table, defaults);
+  assert(net.variant == HeuristicMinerVariant::kPlusPlus);
+  assert(defaults.variant == HeuristicMinerVariant::kClassic);
+  assert(!defaults.start_timestamp_attribute);
+  assert(net.sojourn_times->at("A") == 1.0);
+  assert(net.sojourn_times->at("B") == 3.0);
+  assert(net.sojourn_times->at("C") == 3.0);
+  assert(net.sojourn_times->at("D") == 1.0);
+  assert(table.columns.back() == "@@diff" && table.dtypes.back() == "float64");
+  const std::vector<double> expected{1.0, 4.0, 2.0, 1.0};
+  for (std::size_t i = 0; i < table.rows.size(); ++i) {
+    const auto& value = *table.rows[i].back();
+    assert(value.kind == AttributeKind::kFloat);
+    assert(std::get<double>(value.typed_value) == expected[i % 4]);
+  }
+  const auto first = table;
+  // Repeated calls overwrite the duration column without duplicating it.
+  table.rows.front().back()->typed_value = 99.0;
+  table.rows.front().back()->value = "99.0";
+  table.dtypes.back() = "object";
+  (void)discover_plus_plus_pandas(table);
+  assert(table.columns == first.columns && table.rows == first.rows);
+  assert(table.dtypes == first.dtypes);
+
+  table = before;
+  const auto start = table.column_index("start_timestamp");
+  table.columns.erase(table.columns.begin() + start);
+  table.dtypes.erase(table.dtypes.begin() + start);
+  for (auto& row : table.rows) row.erase(row.begin() + start);
+  const auto without_start = table;
+  const auto fallback = discover_plus_plus_pandas(table);
+  assert(table.columns[table.columns.size() - 2] == "start_timestamp");
+  assert(table.columns.back() == "@@diff");
+  assert(table.dtypes[table.dtypes.size() - 2] == "datetime64[us, UTC]");
+  const auto completed = table.column_index("time:timestamp");
+  const auto started = table.column_index("start_timestamp");
+  for (const auto& row : table.rows) {
+    assert(row[started]->value == row[completed]->value);
+    assert(row[started]->typed_value == row[completed]->typed_value);
+    assert(std::get<double>(row.back()->typed_value) == 0.0);
+  }
+  assert(table.index == without_start.index);
+  assert(fallback.raw_concurrency_statistics.empty());
+  for (const auto& [_, value] : *fallback.sojourn_times) assert(value == 0.0);
+  const auto petri = to_petri_net_presentation(fallback);
+  assert(petri.places.size() == 6);
+  assert(petri.transitions.size() == 4);
+  table.validate();
+}
+
+void plusplus_pandas_object_dtype_error_preserves_input() {
+  auto table = pandas_interval_table(2);
+  table.dtypes[table.column_index("time:timestamp")] = "object";
+  table.dtypes[table.column_index("start_timestamp")] = "object";
+  const auto before = table;
+  bool threw = false;
+  try {
+    (void)discover_plus_plus_pandas(table);
+  } catch (const HeuristicPandasError& error) {
+    threw = true;
+    assert(error.reference_type() == "builtins.AttributeError");
+    assert(std::string(error.what()) ==
+           "Can only use .dt accessor with datetimelike values");
+  }
+  assert(threw);
+  assert(table.columns == before.columns && table.dtypes == before.dtypes);
+  assert(table.rows == before.rows && table.index == before.index);
+  assert(table.attributes == before.attributes && table.metadata == before.metadata);
+  // Public direct PLUSPLUS accepts the same object-dtype carrier.
+  const auto generic = discover_heuristics_net(table, plus_options());
+  assert(generic.raw_concurrency_statistics.front().frequency == 4);
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -4203,6 +4347,9 @@ int main(int argc, char** argv) {
   plusplus_frequency_representation_preserves_integer_type();
   plusplus_computed_public_fields_acceptance();
   plusplus_raw_decoration_selector_acceptance();
+  plusplus_pandas_directional_concurrency_acceptance();
+  plusplus_pandas_duration_mutation_and_start_fallback();
+  plusplus_pandas_object_dtype_error_preserves_input();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();

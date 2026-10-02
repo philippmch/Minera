@@ -5,6 +5,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -380,5 +381,27 @@ struct HeuristicClassicDfgInput {
 [[nodiscard]] HeuristicsNet discover_heuristics_net(
     const HeuristicClassicDfgInput& input,
     const HeuristicMinerOptions& options = {});
+
+// A native exception retaining the public Python error category for adapters.
+class HeuristicPandasError : public std::invalid_argument {
+ public:
+  HeuristicPandasError(std::string reference_type, std::string message)
+      : std::invalid_argument(std::move(message)),
+        reference_type_(std::move(reference_type)) {}
+
+  [[nodiscard]] const std::string& reference_type() const noexcept {
+    return reference_type_;
+  }
+
+ private:
+  std::string reference_type_;
+};
+
+// PLUSPLUS's public pandas entry point. It uses the pandas concurrency
+// projection and materializes a missing start column plus @@diff durations.
+// Declared timestamp dtypes are authoritative; object columns raise the public
+// AttributeError category. The generic const-table entry point stays separate.
+[[nodiscard]] HeuristicsNet discover_plus_plus_pandas(
+    EventTable& data, const HeuristicMinerOptions& options = {});
 
 }  // namespace minera
