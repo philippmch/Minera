@@ -161,6 +161,41 @@ The separate 29-member archive roundtrips every exact UTF-8 byte, SHA and
 count and binds 935 external artifacts, including the original broad capture.
 No additional public or native calls, production edits or suite runs occur.
 
+`heuristic-plusplus-filtered-performance-validation.json` preserves fourteen
+additional actual public EventLog HeuristicsNet calls: seven direct/parent
+pairs with all nine parameters explicit. Every pair has identical typed DFG,
+performance DFG and performance matrix values. Activity and minimum-frequency
+filters remove the same retained interval relations from all three maps;
+dependency exclusion removes edges while leaving those maps unchanged.
+An entirely filtered performance result retains three present empty maps.
+
+The minimum-frequency-five control retains BD with interval count five, while
+its mean performance is `1.6666666666666667` from three direct waits, 2/2/1.
+The interval control returns AC=1 and BC=1 in its frequency DFG; its performance
+DFG contains only BC=1.0, while its matrix also contains AC=0.0. For these
+observed inputs, the performance DFG domain is retained interval relations
+with positive direct frequency, and the matrix covers every retained interval
+relation. These observations distinguish computed output from the optional
+aggregated `performance_values` input. Missing or invalid timestamps and
+additional native performance aggregations remain outside this checkpoint.
+
+The actual worker exits zero with fourteen results, no reference or
+serialization errors, and no input mutations. The enclosing capture exits one
+after saving those results because a Matplotlib cache diagnostic violates its
+own empty-stderr assertion. A read-only finalization verifies the exact saved
+diagnostic and original results without repeating any public call. An earlier
+preparation failure, before worker creation or public imports, also remains
+separate: frozen compiled-source bytes and current working-source bytes are
+different physical contexts, including line endings. Exact guards are retained
+independently; no normalized-byte equivalence substitutes for those guards.
+
+The archive preserves 726 members, including immutable snapshots of all 650
+working-source files, distinct compiled-source bindings, original logs and
+failures, and finalization proof. All working snapshots are UTF-8; the saver
+supports binary wrappers when needed. The prior 23 helper checks and subsequent 29 capture, 21 finalizer, and
+22 saver checks are retained. Saving adds no public/native calls, production
+changes or suite runs, and does not promote the module.
+
 ## Returned-object acceptance
 
 Presence, null, empty values, numeric types, and actual keys must be retained.
@@ -176,7 +211,7 @@ reported explicitly rather than filled with a presumed default.
 | `dfg_window_2`, `freq_triples` | Auxiliary maps and their presence state | Saved public values are `None`, while native maps are empty; the current PLUSPLUS representation does not encode that distinction. Longer and repeated traces remain required. |
 | `dfg_window_2_matrix`, `freq_triples_matrix` | Views of the auxiliary maps | Empty dictionaries match the saved cases; the full domain and any positive values remain to be established. |
 | `node_type` | Decoration | Compare frequency and performance results, including edge value types. |
-| `performance_dfg`, `performance_matrix` | Performance presence, relation statistics, and edge representation | Frequency public DFG is `None`; performance DFG is a dictionary, including an empty dictionary. A frequency matrix entry may be zero even when native wait statistics are positive. Differing waits must distinguish count, mean, and representation. |
+| `performance_dfg`, `performance_matrix` | Separate computed performance presence and complete maps | Frequency public DFG is `None`; performance DFG is a dictionary, including a present empty dictionary. The seven performance route pairs establish filtering by retained interval relations, direct-wait means, and matrix zero for a relation with no direct wait. Dependency exclusion retains both maps. A frequency matrix entry may be zero despite positive waits. Native computed output and complete typed counterparts remain required. |
 | `sojourn_times` | Optional name-to-double map | All 117 supported aliases match, including escaped labels, removed activities, and empty input. Retain this verified obligation when broader inputs are added. |
 | `nodes` | Retained activities, node statistics, maps, and connections | Compare actual node keys and all fields below; empty AND/loop maps alone do not prove positive-map behavior. |
 
