@@ -7615,3 +7615,43 @@ five passing assertion-enabled suites. Saving adds zero public/native calls,
 builds or suite runs. Durable guards use immutable BUILD/DOCS paths and permit
 later source and HEAD changes. Automatic native names and full returned-object
 parity remain open. PLUSPLUS stays partial, retaining all 228 open units.
+
+### Automatic PLUSPLUS Petri presentation (2026-10-02)
+
+Added `minera::to_petri_net_presentation(const HeuristicsNet&)` and seventeen
+registered tests: fifteen public graph fixtures, non-PLUSPLUS rejection, and
+invalid active-index rejection. The additive producer retains names, nullable
+labels, node identity, properties, unit arc occurrences, and sparse markings.
+All incoming joins precede outgoing splits; silent numbering includes removed
+transitions. This matches the surviving `hid_7`/`hid_8` collision control.
+
+Actual production replay now matches all 69 previously matching broad Petri
+topologies on every supported presented field, plus thirteen focused naming,
+escaped-label AND, and self-loop controls. Three datetime DataFrame shape
+mismatches and three object-dtype public errors against native success remain
+open. No comparison is accepted on topology alone or by merging equal names.
+
+A separate replay of all 77 broad inputs against the parent production library
+confirms identical discoveries, generic Petri conversion, and input snapshots.
+The six differences from the older computed-field capture were already present
+at the parent build. The accepted runs contain 167 native probe processes,
+154 discovery calls, 86 generic conversions, and 56 automatic presentations;
+they reuse pinned public captures and make zero new public calls.
+
+The initial fixture build exposed an ambiguous `Trace` alias. Compact interval
+fixtures then failed a transition-count assertion. The final collision tests
+use captured converter-relevant native fields, while the broad replay retains
+original typed EventLogs and their metadata. Production inputs and compiled
+artifacts stayed identical for the final test repair. The changed test unit was
+recompiled, and core, request_params, heuristic_variants, petri_net_conversion,
+and petri_net_reduction all passed with assertions enabled in Release.
+
+Evidence is saved in `heuristic-plusplus-petri-producer-checks.jsonl.gz`
+(SHA-256 `f4b335d4e0ffdb99636ea228d477a2c5f406bd6d4248a47471f94b6a505f0f55`,
+4394149 bytes, 389 records), with
+`heuristic-plusplus-petri-producer-validation.json` (SHA-256
+`9914af8595e9f8a98bd4d955f0997a1bc78fbeb331229fdabd867db116c5410a`).
+The archive round-trip was verified. Broader silent-counter, parking-name,
+metadata-survivor, carrier, error, and full module gates remain open. No
+catalogue entries were promoted: coverage stays 46/86 packages and 199/387
+modules, with 228 incomplete units.
