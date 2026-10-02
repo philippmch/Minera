@@ -673,3 +673,52 @@ process records, logs, collectors, and the comparator are retained. The archive
 round-trip is verified. Internal dispatch was not inspected; the observations
 support entry-point equivalence only for these controls. PLUSPLUS and the full
 target stay partial, with 228 open units and no catalogue promotion.
+
+## Native PLUSPLUS pandas entry point (2026-10-02)
+
+`discover_plus_plus_pandas(EventTable&, options)` now implements the separately
+captured PLUSPLUS pandas route. It selects PLUSPLUS, honors the conventional
+start column when the selector is omitted, copies completion timestamps into a
+missing selected start column, and appends or overwrites float64 `@@diff`
+durations. Declared timestamp dtypes determine pandas eligibility. The observed
+object-dtype input raises `HeuristicPandasError` with the public AttributeError
+category and exact message, preserving its input. Generic const-table discovery
+continues through its existing route.
+
+Fourteen new public calls resolve concurrency orientation and start-column
+controls. Uniform B-outer and C-outer traces both return count 4. Balanced mixed
+orientations return 2; mixtures of 3/1 and 1/3 return 1 and 3. The native pandas
+abstraction keeps directional counts and assigns them to canonical pairs in
+sorted order; it does not sum opposite directions. Generic discovery retains
+count 4 on all five controls. At AND threshold zero, the mixed pandas split and
+join scores are 0.5 and 0.25; equality at 0.5 excludes the split.
+
+A fresh native build freezes all 650 source inputs and passes the five core,
+request-parameter, heuristic-variant, Petri-conversion, and Petri-reduction suites
+with assertions enabled. Actual replay makes 111 discoveries, 12 presented-Petri
+conversions and 43 generic conversions. Nineteen successful HeuristicsNet aliases
+match all seventeen supported field projections, with 995 matched net/node/edge
+cells (323/456/216). Twelve Petri aliases match the complete supported names,
+labels, properties, arc occurrences, weights and sparse markings. Three actual
+public dtype errors match category and message. The 34 route aliases match
+supported input-after projections, mutation occurrence and option preservation.
+All 77 generic regression cases preserve their previously captured native net,
+Petri, input and error results exactly.
+
+The saved evidence retains 47 public calls, including the 33 preceding dispatch
+calls and the 14 new controls; no reference calls were made during native replay.
+`heuristic-plusplus-pandas-native-checks.jsonl.gz` has SHA-256
+`0ca044fc58b2084ae49e77cb38ecf63e5908c3362a865e3973c12812a45df696`, with 1,076 round-trip-verified members, all frozen sources,
+collectors, raw input/output snapshots, comparisons, process records, logs and
+hash bindings for nine native binaries. Validation is saved in
+`heuristic-plusplus-pandas-native-validation.json`.
+
+These finite matches do not establish full pandas or PLUSPLUS parity. Public
+unscoped `omni_present` metadata has no proved mapping to native global scopes.
+Independent carrier comparisons exclude native scalar allocation counters and
+float decimal spelling while retaining actual typed values. Dictionary iteration
+order, Python object identity, additional timestamp/null/error domains, and
+broader parameter/carrier combinations remain completion obligations. The new
+mutable entry point must be explicitly selected by adapters that need pandas
+behavior. No catalogue unit is promoted: the full target remains partial at
+46/86 packages and 199/387 modules, with 228 open units.

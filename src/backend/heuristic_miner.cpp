@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <limits>
 #include <map>
 #include <numeric>
 #include <optional>
@@ -382,7 +383,8 @@ struct IntervalTrace {
 
 IntervalTrace to_intervals(const Trace& trace,
                            const HeuristicMinerOptions& options,
-                           bool pre_interval_mode) {
+                           bool pre_interval_mode,
+                           bool pandas_route = false) {
   using LifecycleKey = std::pair<std::string, std::string>;
   struct PendingStart {
     std::string timestamp_text;
@@ -403,7 +405,11 @@ IntervalTrace to_intervals(const Trace& trace,
                     required_business_timestamp_microseconds(timestamp_text,
                                                              "event")}
               : std::optional<std::int64_t>{};
-      const auto* value = selected_start_timestamp(event, options, true);
+      const auto* value =
+          pandas_route && options.start_timestamp_attribute &&
+                  options.start_timestamp_attribute->empty()
+              ? event.attribute("")
+              : selected_start_timestamp(event, options, true);
       if (value == nullptr)
         throw std::invalid_argument(
             "Heuristics Miner PLUSPLUS interval input is missing the "
@@ -492,8 +498,10 @@ IntervalTrace to_intervals(const Trace& trace,
 }
 
 PlusAbstraction build_plus_abstraction(
-    const EventLog& log, const HeuristicMinerOptions& options) {
+    const EventLog& log, const HeuristicMinerOptions& options,
+    bool pandas_route = false) {
   PlusAbstraction out;
+  std::map<NamePair, std::uint64_t> directional_concurrency;
   std::set<std::string> known;
   const auto business_slots =
       options.use_business_hours
@@ -503,11 +511,14 @@ PlusAbstraction build_plus_abstraction(
           : std::vector<BusinessHourSlot>{};
   const bool pre_interval_mode =
       !log.traces.empty() && !log.traces.front().events.empty() &&
-      selected_start_timestamp(log.traces.front().events.front(), options, true) !=
-          nullptr;
+      (pandas_route && options.start_timestamp_attribute &&
+               options.start_timestamp_attribute->empty()
+           ? log.traces.front().events.front().attribute("")
+           : selected_start_timestamp(log.traces.front().events.front(),
+                                      options, true)) != nullptr;
   for (const auto& trace : log.traces) {
     const auto converted =
-        to_intervals(trace, options, pre_interval_mode);
+        to_intervals(trace, options, pre_interval_mode, pandas_route);
     const auto& intervals = converted.sorted;
     if (intervals.empty()) continue;
     // In pre-interval mode discovery preserves trace order for start/end/attribute
@@ -549,8 +560,13 @@ PlusAbstraction build_plus_abstraction(
                      intervals[j].start_microseconds) <=
             std::min(intervals[i].complete_microseconds,
                      intervals[j].complete_microseconds)) {
-          ++out.concurrency[std::minmax(intervals[i].activity,
-                                        intervals[j].activity)];
+          if (pandas_route) {
+            ++directional_concurrency[
+                {intervals[i].activity, intervals[j].activity}];
+          } else {
+            ++out.concurrency[std::minmax(intervals[i].activity,
+                                          intervals[j].activity)];
+          }
         } else {
           break;
         }
@@ -576,6 +592,12 @@ PlusAbstraction build_plus_abstraction(
       out.wait_sums[pair] += wait;
       out.wait_samples[pair].push_back(wait);
     }
+  }
+  if (pandas_route) {
+    // Public pandas controls retain the last sorted directional count for a
+    // canonical activity pair; opposite orientations do not add together.
+    for (const auto& [pair, count] : directional_concurrency)
+      out.concurrency[std::minmax(pair.first, pair.second)] = count;
   }
   return out;
 }
@@ -1600,14 +1622,16 @@ HeuristicsNet discover_classic_dfg(
 }
 
 HeuristicsNet discover_plus_plus(const EventLog& log,
-                                 const HeuristicMinerOptions& options) {
+                                 const HeuristicMinerOptions& options,
+                                 bool pandas_route = false) {
   const HeuristicNetDecoration effective_decoration =
       options.plusplus_decoration_selector
           ? (*options.plusplus_decoration_selector == "frequency"
                  ? HeuristicNetDecoration::kFrequency
                  : HeuristicNetDecoration::kPerformance)
           : options.decoration;
-  const PlusAbstraction abstraction = build_plus_abstraction(log, options);
+  const PlusAbstraction abstraction =
+      build_plus_abstraction(log, options, pandas_route);
   HeuristicsNet net;
   net.variant = HeuristicMinerVariant::kPlusPlus;
   net.decoration = effective_decoration;
@@ -1780,6 +1804,97 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
 }
 
 }  // namespace
+
+HeuristicsNet discover_plus_plus_pandas(
+    EventTable& data, const HeuristicMinerOptions& options) {
+  data.validate();
+  auto selected = options;
+  selected.variant = HeuristicMinerVariant::kPlusPlus;
+  selected.start_timestamp_attribute =
+      options.start_timestamp_attribute.value_or("start_timestamp");
+  const auto column = [&](const std::string& key) {
+    const auto found = std::find(data.columns.begin(), data.columns.end(), key);
+    if (found == data.columns.end())
+      throw HeuristicPandasError("builtins.KeyError", "'" + key + "'");
+    return static_cast<std::size_t>(found - data.columns.begin());
+  };
+  const auto completed = column(canonical_timestamp_attribute(selected));
+  const auto validate_datetime = [&](std::size_t index) {
+    const bool valid = !data.dtypes.empty()
+        ? std::string_view(data.dtypes.at(index)).starts_with("datetime64[")
+        : std::all_of(data.rows.begin(), data.rows.end(), [&](const auto& row) {
+            return !row[index] || row[index]->is_null ||
+                   row[index]->kind == AttributeKind::kDate;
+          });
+    if (!valid)
+      throw HeuristicPandasError(
+          "builtins.AttributeError",
+          "Can only use .dt accessor with datetimelike values");
+  };
+  validate_datetime(completed);
+  const auto append_column = [&](const std::string& key,
+                                 const std::string& dtype) {
+    const auto index = data.columns.size();
+    data.columns.push_back(key);
+    if (!data.dtypes.empty()) data.dtypes.push_back(dtype);
+    if (!data.categorical_dtypes.empty())
+      data.categorical_dtypes.push_back(std::nullopt);
+    for (auto& row : data.rows) row.emplace_back();
+    return index;
+  };
+  const auto start_key = *selected.start_timestamp_attribute;
+  auto start = std::find(data.columns.begin(), data.columns.end(), start_key);
+  std::size_t started;
+  if (start == data.columns.end()) {
+    const auto dtype = data.dtypes.empty() ? std::string{}
+                                          : data.dtypes.at(completed);
+    started = append_column(start_key, dtype);
+    for (auto& row : data.rows) {
+      row[started] = row[completed];
+      if (row[started]) {
+        row[started]->key = start_key;
+        row[started]->first_class_role = FirstClassAttributeRole::kNone;
+        row[started]->first_class_state = FirstClassAttributeState::kMissing;
+        row[started]->first_class_source_key.clear();
+      }
+    }
+  } else {
+    started = static_cast<std::size_t>(start - data.columns.begin());
+  }
+  validate_datetime(started);
+  std::vector<double> durations;
+  durations.reserve(data.rows.size());
+  for (const auto& row : data.rows) {
+    const auto& end = row[completed];
+    const auto& begin = row[started];
+    if (!end || !begin || end->is_null || begin->is_null ||
+        is_typed_nat(*end) || is_typed_nat(*begin)) {
+      durations.push_back(std::numeric_limits<double>::quiet_NaN());
+    } else {
+      durations.push_back(detail::epoch_seconds_from_microseconds(
+          required_timestamp_microseconds(end->value, "event") -
+          required_timestamp_microseconds(begin->value, "start")));
+    }
+  }
+  const auto existing = std::find(data.columns.begin(), data.columns.end(),
+                                  "@@diff");
+  const auto difference = existing == data.columns.end()
+      ? append_column("@@diff", "float64")
+      : static_cast<std::size_t>(existing - data.columns.begin());
+  if (!data.dtypes.empty()) data.dtypes[difference] = "float64";
+  if (!data.categorical_dtypes.empty())
+    data.categorical_dtypes[difference] = std::nullopt;
+  for (std::size_t i = 0; i < data.rows.size(); ++i) {
+    EventAttribute value;
+    value.key = "@@diff";
+    value.kind = AttributeKind::kFloat;
+    value.typed_value = durations[i];
+    value.value = std::to_string(durations[i]);
+    data.rows[i][difference] = std::move(value);
+  }
+  return discover_plus_plus(classic_event_log(EventDataView(data), selected),
+                            selected, true);
+}
 
 HeuristicsNet discover_heuristics_net(
     const EventLog& log,

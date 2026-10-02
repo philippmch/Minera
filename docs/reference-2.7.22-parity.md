@@ -7688,3 +7688,29 @@ Evidence is `heuristic-pandas-dispatch-checks.jsonl.gz` (SHA-256
 (SHA-256 `c1cf86c09f49a16a590155a8bdb5dfca1802c043b186fcf9de3b5b5f276fb65a`). All archived byte members and the gzip
 round-trip were checked. Coverage remains 46/86 packages and 199/387 modules,
 with 228 incomplete units. PLUSPLUS and the full target remain partial.
+
+### Native PLUSPLUS pandas route and regression replay (2026-10-02)
+
+Added the mutable `discover_plus_plus_pandas` entry point for the public pandas
+concurrency projection, missing start-column fallback, `@@diff` durations and
+captured dtype error category/message. Fourteen new public orientation and start
+controls distinguish its behavior from generic table discovery. All five relevant
+native suites pass with assertions enabled from 650 frozen source inputs.
+
+Actual native replay covers 34 route aliases: nineteen returned HeuristicsNets
+match 995 supported field cells across all seventeen net projections and their
+nodes/edges; twelve complete supported Petri presentations match; and three dtype
+errors match. Supported mutation snapshots and option preservation also match.
+The 77 generic regression cases preserve prior native net, Petri, input and error
+results exactly. Replay executes 111 discoveries, 12 presented conversions and
+43 generic conversions without new reference calls. Full raw snapshots, public
+process/proof records, native logs, comparisons, source inputs and nine binary
+hash bindings are retained in `heuristic-plusplus-pandas-native-checks.jsonl.gz`
+(SHA-256 `0ca044fc58b2084ae49e77cb38ecf63e5908c3362a865e3973c12812a45df696`) and
+`heuristic-plusplus-pandas-native-validation.json`; all 1,076 archive members
+round-trip successfully.
+
+Pandas timestamp/null/error breadth, object identity, dictionary iteration order,
+unscoped metadata and adapter routing remain open. This verified implementation
+step does not promote catalogue units or complete PLUSPLUS. Overall coverage stays
+46/86 packages and 199/387 modules, with 228 open units.
