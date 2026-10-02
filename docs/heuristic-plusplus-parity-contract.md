@@ -722,3 +722,50 @@ broader parameter/carrier combinations remain completion obligations. The new
 mutable entry point must be explicitly selected by adapters that need pandas
 behavior. No catalogue unit is promoted: the full target remains partial at
 46/86 packages and 199/387 modules, with 228 open units.
+
+## Pandas timestamp boundaries and measured gaps (2026-10-02)
+
+Twenty additional public calls use ten fresh fixtures and both PLUSPLUS pandas
+entry points, with all nine supported options fixed. Eighteen return successfully
+and two raise the captured AttributeError. There are no skipped calls or
+serializer failures. The worker exits successfully with zero remaining children;
+opaque module proofs match the pinned reference before and after execution.
+
+Actual native replay invokes twenty discoveries and seven Petri presentations on
+the source committed as `63ccbc6`. Touching endpoints, equal starts, zero-duration
+intervals, an existing stale `@@diff` column and reversed rows match all supported
+HeuristicsNet/node/edge projections and complete Petri presentation fields. The
+microsecond and nanosecond Petri outputs also match their supported presentation
+fields, while their sojourn or mutation values do not. Across nine successful
+public HeuristicsNet results, there are 363 matched, two mismatching and 106
+unavailable field cells; the unavailable cells belong to the two NaT controls
+that native discovery rejects. Seven Petri results match; two NaT Petri results
+are unavailable after those native discovery errors.
+
+The next implementation obligations are concrete:
+
+- A NaT start or completion cell is accepted by pandas, leaves activity B's
+  occurrence count intact, and yields its nonmissing sojourn mean
+  2.6666666666666665. Native discovery instead rejects the timestamp.
+- A missing start column is copied from object completion timestamps before
+  pandas raises its dtype error. Native currently raises before adding it.
+- The microsecond fixture returns sojourn 0.000002 for B; native returns
+  0.0000021457672119140625 even though its `@@diff` column is correct.
+- The nanosecond fixture returns sojourn 0.0000000030000000000000004 for B;
+  native returns zero and also writes zero into the duration column.
+
+These controls preserve raw inputs, outputs, failures and mutations in
+`heuristic-pandas-timestamp-boundary-checks.jsonl.gz` (SHA-256
+`41fbe4d8bd85b65089eab10ac1c24352863fff7939c4b3f90dd4a231b98e58be`) and `heuristic-pandas-timestamp-boundary-validation.json`.
+All 100 archive members round-trip. The retained source validation binds the
+previous 650-source archive and tested library; the new probe binary and its
+actual process/log records are hash-bound. Explicit native input adapters map
+captured pandas NaT and float NaN into their existing native typed values. Native
+exception presence and message are established for the NaT failures; the probe's
+fallback category field was emitted as a boolean, so it does not establish their
+concrete exception category. The mapped dtype-error category is captured correctly.
+
+No implementation change or completion claim follows from this contrast-only
+checkpoint. The four gaps remain open, along with broader pandas/PLUSPLUS and
+full-target obligations. Coverage remains 46/86 packages, 199/387 modules, and
+228 open units.
