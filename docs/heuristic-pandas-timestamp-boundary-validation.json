@@ -1,0 +1,61 @@
+{
+  "actual_native_discoveries": 20,
+  "actual_native_presentations": 7,
+  "actual_public_calls": 20,
+  "archive": {
+    "byte_count": 1810953,
+    "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\heuristic-pandas-timestamp-boundary-checks.jsonl.gz",
+    "round_trip_members_verified": 100,
+    "sha256": "41fbe4d8bd85b65089eab10ac1c24352863fff7939c4b3f90dd4a231b98e58be"
+  },
+  "binary_bindings": {
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\plusplus-pandas-native-c255db4e33a74c31ac2f738e7e81f0e6\\native-build\\Release\\minera_core.lib": "261d4ab34e9af3cdf366518d41f6cd09e9ed7a14897b66f2d696bea25a8a9980",
+    "C:\\Users\\pmoch\\Documents\\Minera\\build\\plusplus-pandas-native-c255db4e33a74c31ac2f738e7e81f0e6\\timestamp-boundary-probe-v2\\native-build\\Release\\boundary_probe.exe": "b57c8a2547eb8bf48253fe5db75cd319d8dc6d02803cb65254e75e4380d3a613"
+  },
+  "catalogue_promoted": false,
+  "full_parity": false,
+  "kind": "manifest",
+  "member_count": 100,
+  "native_input_projection": "Captured pandas NaTType maps to native Date/NaT, and captured float NaN maps to native float quiet_NaN. Date dtype resolution/timezone, typed values and complete raw public snapshots are retained. Prior native metadata and identity projection limitations still apply.",
+  "public_errors": 2,
+  "public_successes": 18,
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "reference_version": "2.7.22",
+  "schema_version": 1,
+  "serialization_errors": 0,
+  "skipped_calls": 0,
+  "source_evidence": {
+    "archive_path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\heuristic-plusplus-pandas-native-checks.jsonl.gz",
+    "archive_sha256": "0ca044fc58b2084ae49e77cb38ecf63e5908c3362a865e3973c12812a45df696",
+    "source_binding_count": 650
+  },
+  "summary": {
+    "catalogue_promoted": false,
+    "controls": 20,
+    "error_nonmatches": [
+      6,
+      7,
+      8,
+      9
+    ],
+    "field_status_counts": {
+      "matched": 363,
+      "mismatch": 2,
+      "unrepresentable": 106
+    },
+    "full_parity": false,
+    "input_after_nonmatches": [
+      10,
+      11,
+      18,
+      19
+    ],
+    "native_discoveries": 20,
+    "native_presentations": 7,
+    "petri_status_counts": {
+      "matched": 7,
+      "native_discovery_error": 2
+    }
+  },
+  "tested_head": "63ccbc6be1dcd0a67a19517c7474fd36337fd3aa"
+}

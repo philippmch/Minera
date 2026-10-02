@@ -7714,3 +7714,26 @@ Pandas timestamp/null/error breadth, object identity, dictionary iteration order
 unscoped metadata and adapter routing remain open. This verified implementation
 step does not promote catalogue units or complete PLUSPLUS. Overall coverage stays
 46/86 packages and 199/387 modules, with 228 open units.
+
+### PLUSPLUS pandas timestamp boundaries and remaining gaps (2026-10-02)
+
+Twenty actual public calls and twenty actual native discoveries compare touching
+endpoints, equal starts, zero durations, NaT, missing object start columns, stale
+`@@diff`, reversed rows and microsecond/nanosecond precision. The public worker
+returns eighteen objects and two dtype errors, with no skips or serializer
+failures and zero remaining child processes. Native replay makes seven Petri
+presentations. There are 363 matched field cells, two sojourn mismatches and 106
+unavailable cells after native NaT rejection. Seven full supported Petri
+presentations match; two are unavailable after those discovery errors.
+
+Measured gaps are NaT acceptance, start-column mutation before an object dtype
+error, microsecond sojourn precision, and nanosecond sojourn/duration precision.
+The NaT probe's fallback exception category is emitted as a boolean; its actual
+exception presence and message are retained without claiming a concrete category.
+Raw public/native inputs, outputs, errors, mutations, opaque proofs, collectors,
+probe sources, process records, logs and binary/source evidence bindings are saved
+in `heuristic-pandas-timestamp-boundary-checks.jsonl.gz` (SHA-256
+`41fbe4d8bd85b65089eab10ac1c24352863fff7939c4b3f90dd4a231b98e58be`) and `heuristic-pandas-timestamp-boundary-validation.json`.
+All 100 members round-trip. The tested production source remains `63ccbc6`; this
+checkpoint changes only evidence and documentation. No catalogue unit is promoted:
+46/86 packages and 199/387 modules remain complete, with 228 open units.
