@@ -1151,3 +1151,91 @@ Broader parameter/label types, further collisions, Unicode error representation,
 dictionary order, identity, metadata, input ordering, timestamp domains and
 adapter routing remain open. PLUSPLUS and Alpha+ remain partial. Coverage stays
 46/86 packages and 199/387 modules, with 228 incomplete units and no promotion.
+
+## Pandas row ordering, timestamp ties and Petri counters (2026-10-03)
+
+Executed 118 new successful public calls across two matrices, with both
+decorations. The first covers all 24 permutations within four-event cases,
+interleaved cases, a fixed shuffle, reversed rows/case blocks, case-specific
+labels, and equal start/completion/zero-duration timestamps in both row
+directions. The second varies shuffled activity names, including reserved
+names, and unequal interval orientations with equal starts. Twenty-six calls
+return Petri presentations; 92 return HeuristicsNets. No calls are skipped or
+fail during serialization.
+
+The committed pre-change core executes both complete matrices. The first replay
+has 3,741 matching, nine mismatched and twelve unrepresentable net-field checks;
+ten Petri presentations match and two differ. The second has 874 matching,
+66 mismatched and 42 unrepresentable field checks, and all fourteen Petri
+presentations differ. The unrepresentable cells are actual public edge values
+without corresponding native edges. Supported input-after, option preservation
+and mutation occurrence already match. Raw pre-change runs remain retained.
+
+Pandas interval ordering now compares completion time when starts are equal,
+preserving missing-value placement and stable complete ties. The same interval
+order feeds eventual follows, performance adjacency and directional concurrency.
+Reversing equal-start rows no longer drops the observed A-to-B/C relations;
+unequal orientation controls distinguish their counts and concurrency values.
+Boundary counts and frequency-ordered activity metadata retain their observed
+row-order behavior.
+
+Petri presentation now creates joins in the order their target domains first
+appear while traversing active nodes and name-ordered outgoing relations.
+Splits follow predecessor domains encountered through that join order. All
+joins still precede all splits, and the counter includes transitions later
+removed by reduction. A shuffled frequency registry A/D/C/B now retains the
+observed hid_2 source-to-pre_C and hid_5 source-to-pre_D paths, plus their split
+counter names. Renamed and reserved-label controls distinguish this traversal
+from global activity-name sorting. The HeuristicsNet registry remains intact.
+
+All 118 new aliases match: 92 HeuristicsNet results agree on 4738 supported
+net/node/edge checks and complete connection domains, and all 26 Petri results
+match supported names, nullable labels, properties, arc occurrences, weights
+and sparse markings. Input-after, mutation and option checks match. The wider
+replay matches 622 saved aliases on 18522 net-field checks, 99 Petri
+presentations and 139 errors; all 77 generic regressions remain exact matches.
+Actual execution makes 699 discoveries, 99 presented conversions and 43 generic
+conversions without new reference calls. All five assertion-enabled suites pass
+for the frozen build containing 650 exact compilation inputs.
+
+Evidence is split into accepted, before/failed and superseded archives:
+
+`heuristic-plusplus-pandas-row-order-checks.jsonl.gz` (SHA-256 `a2b79908ded8b7022cf2fafe9b2b330225ed36a1c6d5f01e0843a9beb19711a5`, 54920511 bytes)
+
+`heuristic-plusplus-pandas-row-order-before-checks.jsonl.gz` (SHA-256 `26f5c8a68513555ae7dcf98af350fc2fc5db674bcc34ffdeddf30b4fd7c369bc`, 34890832 bytes)
+
+`heuristic-plusplus-pandas-row-order-superseded-checks.jsonl.gz` (SHA-256 `29c2b063e8b04572a0e9f085fd563a1be5f494efd15788769a35cc890cf83300`, 43115013 bytes)
+
+Their 6287 members round-trip across all three archives;
+`heuristic-plusplus-pandas-row-order-validation.json` binds every segment.
+Raw calls, mutations, public API views, opaque pinned proofs, process records,
+logs, helpers, probe sources, compiled inputs and binary bindings round-trip
+byte for byte. Both pre-change replays and the preceding duration-selector
+checkpoint remain hash-bound. The replay shares 350 constructor functions,
+each creating fresh data; literal reconstruction is checked and every alias
+is actually executed.
+
+The first build failed while compiling the new test fixture, which assigned
+a string to the numeric/date scalar carrier. The next fixture used contiguous
+case orientations instead of the captured alternating orientations and failed
+its Petri assertion; the other four suites passed. Those two corrections affect
+only the test, with identical production changes across the first three
+snapshots. The third snapshot passed all five suites but its full replay still
+had eight mismatched renamed-label Petri presentations: all 18,522 net-field
+checks matched, along with 91 other Petri results and the 77 generic regressions.
+It executed a separate 699 discoveries, 99 presentations and 43 generic
+conversions. That completed diagnostic replay is retained independently of the
+accepted replay. The final producer changes relation traversal and adds a
+renamed-label regression.
+
+Failed command records and all 650 inputs from each earlier snapshot remain
+exactly reconstructible: 648 reuse identical accepted members; Petri producer
+and test deltas retain their original bytes. Neither failed build's prepared
+replay was executed. Unit-test native call counts were not instrumented and
+are not replay counts.
+
+These finite controls expand ordering evidence. Broader parameter/label types,
+further collisions, Unicode errors, dictionary order, identity, metadata,
+additional ordering/timestamp domains and adapter routing remain open. PLUSPLUS
+and Alpha+ remain partial. Coverage stays 46/86 packages and 199/387 modules,
+with 228 incomplete units and no catalogue promotion.
