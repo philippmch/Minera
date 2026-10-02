@@ -326,3 +326,53 @@ native results, with any representation choices documented. The catalogue
 proof must use a distinct tested production symbol and acceptance test, and
 pass the structural verifier. Finite samples do not justify dropping public
 parameters, carriers, positive maps, or conversion obligations from the scope.
+
+## Explicit string decoration selector checkpoint
+
+`HeuristicMinerOptions::plusplus_decoration_selector` now accepts an optional
+string without changing the existing decoration enum. Omission uses that enum;
+an explicit `frequency` selects frequency mode, and other explicit strings
+select performance mode. Resolution applies within PLUSPLUS and leaves CLASSIC
+behavior unchanged. The caller's selector remains intact in input snapshots,
+while the returned net and JSON keep the normalized frequency/performance mode.
+No raw selector field is added to the returned public net.
+
+The saved public supplement rows 68/69 pass `supplement-unfamiliar` and return
+normalized performance mode. Compared with the same-input frequency rows 56/57,
+thirteen top-level fields are identical; performance DFG, performance matrix,
+node type and node edge representations differ. Their A-to-B and B-to-C means
+are floating 1.0, while frequency counts remain integers 3 and 2. This finite
+observation motivates the selector representation. Other unfamiliar values,
+explicit null and non-string inputs remain unverified public domains.
+
+The registered native regression covers selector precedence over conflicting
+enum values, unchanged omitted-enum behavior, the captured unfamiliar selector,
+preserved counts/dependencies/boundaries, mean maps and scalar representations,
+unchanged options, and CLASSIC ignoring the selector. Mean performance keeps
+its existing unset optional representation payloads; frequency retains integer
+payloads. The original static assertion mistake is retained as superseded
+evidence beside its corrected eleven-check preview proof.
+
+A fresh build passes core, heuristic variants, Petri conversion and Petri
+reduction Release suites with assertions enabled. Actual configure, build and
+test records exit zero with finalized logs and exact independent snapshots.
+Canonical and physical exported source trees both equal
+`fd33276fdaea03e862e7081f5262a02c0b97ff78`. Actual build-manifest SHA is
+`2706f1e83c67b6e4a3692dbe521b9ee7dae566577f5189b7a37d9b689d1e2fa2`;
+core SHA is
+`a657bffd3374a0996f7e6cc1ce70a45d5134c6b5ce8bb640a21f8bf187725d44`.
+
+`docs/heuristic-plusplus-decoration-build-checks.jsonl.gz` and its validation
+preserve 71 exact UTF-8 members and 1,336 immutable external bindings, including
+all 650 compiled inputs and six actual binaries. Original thirteen source
+checks, the superseding eleven checks, 23 harness checks and twelve saver checks
+remain bound to their exact origins. Every member byte, SHA and count roundtrips
+with the unchanged reviewed codec. The archive is 1,328,077 bytes, SHA
+`02caea4be7aadb75928837244cf079d7fec7a0b503ae3fe84bc01ca281102942`;
+validation SHA is
+`c6513ac889af72debfbc5ee740015e06d19bea6e1a1a0a99eaf9fe1e7803d784`.
+Saving adds zero build/test commands or public/native discovery calls. The
+focused native comparison against the saved public selector and label controls
+is a separate step; this checkpoint does not claim its results. Full returned
+objects, carrier conversion and Petri completion remain open. PLUSPLUS stays
+partial, with all 228 open coverage units retained.

@@ -3499,6 +3499,10 @@ std::string heuristic_options_snapshot_json(
             std::to_string(options.business_hour_slots.size()) +
             ",\"case_id_attribute\":" +
             json_string(options.case_id_attribute);
+  result += ",\"plusplus_decoration_selector\":";
+  result += options.plusplus_decoration_selector
+                ? json_string(*options.plusplus_decoration_selector)
+                : "null";
   result += ",\"most_common_paths\":[";
   std::size_t path_index = 0;
   for (const auto& [source, target] : options.most_common_paths) {
@@ -3834,6 +3838,125 @@ void heuristic_inputless_petri_acceptance(
   }
 }
 
+void plusplus_raw_decoration_selector_acceptance() {
+  const auto abc = trace({
+      interval("A", "2024-01-01T00:00:00Z", "2024-01-01T00:00:01Z"),
+      interval("B", "2024-01-01T00:00:02Z", "2024-01-01T00:00:03Z"),
+      interval("C", "2024-01-01T00:00:04Z", "2024-01-01T00:00:05Z")});
+  const auto ab = trace({abc.events[0], abc.events[1]});
+  const auto source = log({abc, abc, ab});
+  auto options = plus_options();
+  options.dependency_threshold = 0.5;
+  options.and_threshold = 0.5;
+  const auto baseline = discover_heuristics_net(source, options);
+  struct Control {
+    HeuristicNetDecoration configured;
+    std::string selector;
+    HeuristicNetDecoration effective;
+  };
+  // The unfamiliar literal is the captured supplement control. Other raw
+  // strings follow the native API's documented selector rule.
+  const std::vector<Control> controls{
+      {HeuristicNetDecoration::kPerformance, "frequency",
+       HeuristicNetDecoration::kFrequency},
+      {HeuristicNetDecoration::kFrequency, "performance",
+       HeuristicNetDecoration::kPerformance},
+      {HeuristicNetDecoration::kFrequency, "supplement-unfamiliar",
+       HeuristicNetDecoration::kPerformance}};
+  const HeuristicMeanPerformanceDfg means{
+      {{"A", "B"}, 1.0}, {{"B", "C"}, 1.0}};
+  for (const auto& control : controls) {
+    options.decoration = control.configured;
+    options.plusplus_decoration_selector = control.selector;
+    const auto before = heuristic_options_snapshot_json(options);
+    const auto net = discover_heuristics_net(source, options);
+    assert(heuristic_options_snapshot_json(options) == before);
+    assert(options.decoration == control.configured);
+    assert(options.plusplus_decoration_selector == control.selector);
+    assert(net.decoration == control.effective);
+    assert(net.activities == baseline.activities);
+    assert(net.active_activities == baseline.active_activities);
+    assert(net.start_activities == baseline.start_activities);
+    assert(net.end_activities == baseline.end_activities);
+    assert(net.output_bundles == baseline.output_bundles);
+    assert(net.input_bundles == baseline.input_bundles);
+    assert(net.edges.size() == 2);
+    assert(net.relation_statistics.size() == 2);
+    assert(net.concurrency_statistics.empty());
+    assert(net.loop_length_two.empty());
+    assert(net.and_measures_in.empty() && net.and_measures_out.empty());
+    assert(activity_stat(net, "A").occurrences == 3);
+    assert(activity_stat(net, "B").occurrences == 3);
+    assert(activity_stat(net, "C").occurrences == 2);
+    for (const auto& stats : net.activity_statistics) {
+      assert(stats.is_start_activity == false);
+      assert(stats.is_end_activity == false);
+    }
+    for (const auto& names : std::vector<std::pair<std::string, std::string>>{
+             {"A", "B"}, {"B", "C"}}) {
+      const auto expected_count = names.first == "A" ? 3U : 2U;
+      const auto& stats = relation(net, names.first, names.second);
+      assert(stats.eventually_follows_frequency == expected_count);
+      assert(stats.direct_adjacency_frequency == expected_count);
+      assert(stats.raw_frequency == expected_count);
+      assert(stats.cleaned_frequency == expected_count);
+      assert(stats.mean_wait_seconds == 1.0);
+      const auto* accepted = edge(net, names.first, names.second);
+      assert(accepted != nullptr);
+      assert(accepted->frequency == expected_count);
+      assert(accepted->dependency == 1.0);
+      const auto* measure = dependency_measure(net, names.first, names.second);
+      assert(measure != nullptr);
+      assert(measure->value == 1.0);
+      const double expected_representation =
+          control.effective == HeuristicNetDecoration::kFrequency
+              ? static_cast<double>(expected_count) : 1.0;
+      assert(stats.representation == expected_representation);
+      assert(accepted->representation == expected_representation);
+      if (control.effective == HeuristicNetDecoration::kPerformance) {
+        assert(!stats.representation_value);
+        assert(!accepted->representation_value);
+      } else {
+        assert(stats.representation_value && accepted->representation_value);
+        assert(std::get<std::uint64_t>(std::get<HeuristicStructuredValue>(
+                   *stats.representation_value).value) == expected_count);
+        assert(std::get<std::uint64_t>(std::get<HeuristicStructuredValue>(
+                   *accepted->representation_value).value) == expected_count);
+      }
+    }
+    if (control.effective == HeuristicNetDecoration::kPerformance) {
+      assert(net.plusplus_computed_performance_dfg);
+      assert(*net.plusplus_computed_performance_dfg == means);
+      assert(net.plusplus_computed_performance_matrix == means);
+    } else {
+      assert(!net.plusplus_computed_performance_dfg);
+      assert((net.plusplus_computed_performance_matrix ==
+              HeuristicMeanPerformanceDfg{{{"A", "B"}, 0.0},
+                                          {{"B", "C"}, 0.0}}));
+    }
+  }
+  // CLASSIC retains its enum behavior even with a conflicting raw selector.
+  options.variant = HeuristicMinerVariant::kClassic;
+  const auto graph = discover_directly_follows_graph(source);
+  for (const auto decoration : {HeuristicNetDecoration::kFrequency,
+                                HeuristicNetDecoration::kPerformance}) {
+    options.decoration = decoration;
+    options.plusplus_decoration_selector.reset();
+    const auto omitted = discover_heuristics_net(source, options);
+    const auto omitted_json = analysis_json("classic-selector", source, graph,
+                                           nullptr, nullptr, &omitted);
+    options.plusplus_decoration_selector =
+        decoration == HeuristicNetDecoration::kFrequency
+            ? "performance" : "frequency";
+    const auto before = heuristic_options_snapshot_json(options);
+    const auto explicit_selector = discover_heuristics_net(source, options);
+    assert(heuristic_options_snapshot_json(options) == before);
+    assert(explicit_selector.decoration == decoration);
+    assert(analysis_json("classic-selector", source, graph,
+                         nullptr, nullptr, &explicit_selector) == omitted_json);
+  }
+}
+
 void plusplus_computed_public_fields_acceptance() {
   const auto public_fields = [](const EventLog& source,
                                 const HeuristicsNet& net) {
@@ -4079,6 +4202,7 @@ int main(int argc, char** argv) {
   interval_abstraction_and_strict_threshold();
   plusplus_frequency_representation_preserves_integer_type();
   plusplus_computed_public_fields_acceptance();
+  plusplus_raw_decoration_selector_acceptance();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();
