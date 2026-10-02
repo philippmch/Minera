@@ -426,3 +426,52 @@ validation SHA is
 Saving adds zero comparisons, calls, builds or suite runs. Durable validation
 uses immutable saved files rather than requiring the worktree or HEAD to remain
 at the capture checkpoint.
+
+## Reduction transition identity foundation
+
+`PetriNetReductionResult::old_to_new_transition` now maps every input transition
+to its reduced transition index. Unchanged results use identity mappings;
+removed transitions use `kRemovedTransition`. Duplicate silent transitions map
+to their surviving representative, including aliases transferred through later
+fusion. If that representative is subsequently removed, all its original
+transition identities map to the removed sentinel. This provides the transition
+counterpart to the existing place mapping for a future public Petri metadata
+producer.
+
+The new field follows the existing `changed` field, preserving previous
+aggregate initializer positions. The C++ result layout and structured-binding
+arity change, so downstream users must rebuild and adapt those bindings.
+The native generic JSON serializer still exposes its existing topology fields;
+full public names, properties, arc objects and sparse markings remain open.
+
+Regression fixtures exercise thirteen scenarios and 46 original transition
+entries, including unchanged extended-arc nets, ordinary removals, shifted
+indices, three duplicate aliases, later representative removal and abstraction.
+The private source proof preserves exact base/preview bytes and the six static
+checks; runtime validation comes from the fresh production build. Core,
+heuristic variants, Petri conversion and Petri reduction Release suites all
+pass with assertions enabled, with zero failed tests across four suites.
+Actual configure, build and test records exit zero with finalized logs and
+independent immutable command snapshots.
+
+Canonical and physical exported source trees both equal
+`5ae437dd47d29534c071e919c970df54f1cd9b6e`. Actual build-manifest SHA is
+`56bc8010154ef47b3d4a4fe25c31362bd4af49d13f07f5c2e3011349d9a3384b`;
+core SHA is
+`43f7b204359291297117772e3d9252fad3c6df35ef07e2e033b750cdef90e549`.
+This checkpoint supplies identity mappings; it does not establish a public
+naming rule or full Petri acceptance. PLUSPLUS remains partial and all 228 open
+coverage units remain in scope.
+
+`docs/petri-transition-identity-build-checks.jsonl.gz` and its validation
+preserve 72 exact UTF-8 members and 1,332 immutable external bindings,
+including all 650 compiled inputs and six actual binaries. The six static
+source checks, 22 harness checks, eighteen saver checks and reused original
+harness/guard proofs retain their byte origins. All member bytes, SHA values
+and counts roundtrip with the unchanged reviewed codec. The archive is
+1,127,310 bytes, SHA
+`50197b7f41bc6c5f031770801c7b33ba6b734b7673131321acb6ebd22839c455`;
+validation SHA is
+`bf991e64e70ece2a50017d329fcd353ff6d7d69a49233713710d22ec4f08df59`.
+Saving adds zero build/test commands or public/native calls. Durable validation
+uses immutable saved bytes after the source checkpoint is committed.
