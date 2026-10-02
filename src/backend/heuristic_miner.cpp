@@ -1635,15 +1635,19 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
          end == abstraction.ends.end() ? 0 : end->second,
          abstraction.sojourn_sums.at(activity) /
              static_cast<double>(abstraction.occurrences.at(activity))});
+    net.activity_statistics.back().is_start_activity = false;
+    net.activity_statistics.back().is_end_activity = false;
   }
   // Discovery keeps sojourn data before activity filtering. Preserve every activity
   // and attach an id only when it survived the node filter.
+  net.sojourn_times.emplace();
   for (const auto& activity : abstraction.activity_order) {
+    const double mean_sojourn =
+        abstraction.sojourn_sums.at(activity) /
+        static_cast<double>(abstraction.occurrences.at(activity));
     net.raw_activity_statistics.push_back(
-        {activity,
-         abstraction.occurrences.at(activity),
-         abstraction.sojourn_sums.at(activity) /
-             static_cast<double>(abstraction.occurrences.at(activity))});
+        {activity, abstraction.occurrences.at(activity), mean_sojourn});
+    net.sojourn_times->emplace(activity, mean_sojourn);
   }
 
   for (const auto& [pair, frequency] : abstraction.eventually_follows) {

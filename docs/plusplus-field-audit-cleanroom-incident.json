@@ -1,0 +1,21 @@
+{
+  "agent": "/root/plusplus_full_fields_gate_audit",
+  "audit_recommendations_authorized_for_implementation": false,
+  "incident": "The agent reported that a broad rg search across build/docs/scripts printed installed PM4Py PLUSPLUS source matches.",
+  "independent_completed_change": {
+    "completed_before_incident": true,
+    "evidence": "Reviewed own code and public returned objects; 4 fresh native suites passed and 12 actual native field/regression comparisons matched.",
+    "native_build_manifest_sha256": "a7af0234d86af5b458f64d967ebf178b7e6c56282f10d894c12e29e35312f359",
+    "native_execution_manifest_sha256": "b98b18ed119fc733a93cdc5bb116c8e72b2f18cf3bffd05d73f4614be04fad74",
+    "preview_preparation_sha256": "5a4e2827463520d6a64a13f386e84aeced158151996f37b1e1d485942df4661e",
+    "public_execution_manifest_sha256": "5426b6c8c394e75115683b28d26aa56e230ee67adafaeef333b01a4a2dab1395",
+    "scope": "PLUSPLUS sojourn_times map and present-false node flags"
+  },
+  "integrated_after_alpha_evidence_saved": true,
+  "recorded_at_utc": "2026-10-02 07:44:37 UTC",
+  "response": "Root interrupted the agent immediately and instructed it to stop analysis and avoid sending upstream content. Further implementation must use a fresh bounded audit with explicit Minera file paths and public outputs only.",
+  "root_received_upstream_source_lines": false,
+  "schema_version": 1,
+  "status": "interrupted_and_quarantined",
+  "upstream_source_content_embedded": false
+}

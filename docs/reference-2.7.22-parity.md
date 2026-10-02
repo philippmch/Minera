@@ -6413,7 +6413,7 @@ identity are outside the native result/error mapping. Coverage remains
 record 31 passing observations: the 26 flat controls and five direct DFG
 controls. CLASSIC now stores and serializes actual false node start/end flags
 and an empty named sojourn map, independently of internal boundary membership.
-PLUSPLUS leaves the new optional fields absent. The registered
+At that checkpoint, PLUSPLUS left the new optional fields absent. The registered
 `classic_object_fields_acceptance()` checks direct DFG and EventLog behavior,
 including fallback nodes, nonzero boundary counts and performance decoration.
 
@@ -6840,3 +6840,67 @@ members and 1,225 native members. Both archives are below the size guard and
 use deterministic gzip. Alpha+ remains partial; the 228 open coverage units
 are unchanged. Final and joint selection laws still need evidence beyond
 this finite pilot.
+
+### PLUSPLUS returned sojourn map and node flags
+
+PLUSPLUS now returns an engaged `sojourn_times` map containing every raw
+activity's computed mean, including labels removed by `min_activity_count`.
+Empty inputs return an engaged empty map. Its retained node statistics expose
+`is_start_activity` and `is_end_activity` as explicit `false` values, preserving
+the separate start/end occurrence counts. This changes returned fields without
+changing edge selection, bundles, activity filtering, metadata, or CLASSIC
+behavior. Existing JSON serialization already supports engaged empty maps and
+false optional flags; no exporter change is required.
+
+The public replay made 12 actual pinned PLUSPLUS calls reconstructed from the
+existing local-label capture: canonical and custom activity keys, escaped and
+Unicode labels, minima 1/2/10, interval overlap, empty inputs, and frequency and
+performance decorations. All 12 returned objects expose the captured 17 net
+fields, all canonical serializers succeed, and all 21 observed nodes have both
+flags present as boolean `false`. Inputs and ancillary fields remain unchanged.
+The new registered `plusplus_returned_object_fields_acceptance` test checks
+independent literal sojourn values, filtered and entirely filtered maps, empty
+maps, flags, boundary counts, and exact JSON escaping.
+
+A fresh build from reviewed preview tree
+`513be22bc70ad27b4e08bf72c37d96b88768436b`, parent `f25cfa2`, passed the four
+Release suites `core`, `heuristic_variants`, `petri_net_conversion`, and
+`petri_net_reduction`. Its core SHA is
+`8a1abd9236276c5de53ebc9025089ef2455d1beb6070b21aee05c8a5726ad8ec`;
+build manifest SHA is
+`a7af0234d86af5b458f64d967ebf178b7e6c56282f10d894c12e29e35312f359`.
+The prior compiled core remains immutable. Integration copies the three
+reviewed files from the actual tested source export, matching its exact bytes;
+the commit's documentation tree is later than the preview build's tree.
+
+Twelve actual native CLI calls match the public returned sojourn maps and
+strict boolean node flags, including node sets. The same checks preserve all
+seven saved projections: metadata, active nodes, edges, raw occurrences, raw
+concurrency, dependency measures, and sojourn values. Public manifest SHA is
+`5426b6c8c394e75115683b28d26aa56e230ee67adafaeef333b01a4a2dab1395`;
+native manifest SHA is
+`b98b18ed119fc733a93cdc5bb116c8e72b2f18cf3bffd05d73f4614be04fad74`.
+The independently reviewed checker passed 14 focused checks. No public or
+native calls were rerun to save this checkpoint.
+
+`docs/heuristic-plusplus-returned-fields-checks.jsonl.gz` and
+`docs/heuristic-plusplus-returned-fields-validation.json` preserve 743 UTF-8
+members containing actual outputs, typed public fields, exact inputs/options,
+command logs, source/header/test/CMake and preview bytes, helpers, preparations,
+and native build evidence. The archive is 2,661,801 bytes, SHA
+`959558628bb7d0bf4c42cc4e3fb778e8ba20fbc1e4ae4f576dbfa0279ba4ebb2`.
+The reviewed saver passed nine codec checks and verified every member byte,
+SHA, and count after deterministic compression. Native binaries and unrelated
+binary assets are SHA-bound; our compressed constructor archives use exact
+base64 envelopes. The validation SHA is
+`5e4bcad55c7575a899e5fe96533e9c35c72e627594ff9da6bdc3a36125c220b8`.
+
+This closes the finite returned-map and node-flag mismatch. It does not claim a
+full native comparison of all 17 returned fields or broad PLUSPLUS Petri
+conversion parity. PLUSPLUS remains partial and the 228 open coverage units
+are unchanged. A separate subsequent field-gate audit accidentally searched
+installed upstream source; it was stopped and quarantined. Its recommendations
+are excluded from this change and future implementation. The completed source
+change, public observations, independent review, build, and 12 native checks
+precede that incident. `docs/plusplus-field-audit-cleanroom-incident.json`
+records the incident metadata without upstream source content.
