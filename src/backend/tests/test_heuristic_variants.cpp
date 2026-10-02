@@ -395,6 +395,77 @@ void interval_abstraction_and_strict_threshold() {
   assert(std::abs(edge(relaxed, "B", "C")->dependency - 0.5) < 1e-9);
 }
 
+void plusplus_frequency_representation_preserves_integer_type() {
+  // Two independently specified waits (3 and 7 seconds) distinguish the
+  // frequency count from the performance mean without changing the topology.
+  const auto source = log({
+      trace({interval("A", "2026-04-01T00:00:00Z", "2026-04-01T00:00:01Z"),
+             interval("B", "2026-04-01T00:00:04Z", "2026-04-01T00:00:05Z")}),
+      trace({interval("A", "2026-04-02T00:00:00Z", "2026-04-02T00:00:01Z"),
+             interval("B", "2026-04-02T00:00:08Z", "2026-04-02T00:00:09Z")}),
+  });
+  auto options = plus_options();
+  const auto frequency = discover_heuristics_net(source, options);
+  assert(frequency.activities == (std::vector<std::string>{"A", "B"}));
+  assert(frequency.relation_statistics.size() == 1);
+  assert(frequency.edges.size() == 1);
+  assert(frequency.concurrency_statistics.empty());
+  const auto& frequency_relation = relation(frequency, "A", "B");
+  const auto* frequency_edge = edge(frequency, "A", "B");
+  assert(frequency_edge != nullptr);
+  assert(frequency_edge->dependency == 1.0);
+  assert(frequency_relation.representation == 2.0);
+  assert(frequency_edge->representation == 2.0);
+  for (const auto* value : {&frequency_relation.representation_value,
+                            &frequency_edge->representation_value}) {
+    assert(value->has_value());
+    assert(std::holds_alternative<HeuristicStructuredValue>(**value));
+    const auto& scalar = std::get<HeuristicStructuredValue>(**value).value;
+    assert(std::holds_alternative<std::uint64_t>(scalar));
+    assert(std::get<std::uint64_t>(scalar) == std::uint64_t{2});
+  }
+
+  // The strict threshold removes the accepted edge but retains the typed
+  // relation value, including when no outgoing edge can carry the count.
+  options.dependency_threshold = 1.0;
+  const auto excluded = discover_heuristics_net(source, options);
+  assert(excluded.edges.empty());
+  assert(excluded.relation_statistics.size() == 1);
+  const auto& excluded_relation = relation(excluded, "A", "B");
+  assert(excluded_relation.representation == 2.0);
+  assert(excluded_relation.representation_value.has_value());
+  assert(std::holds_alternative<HeuristicStructuredValue>(
+      *excluded_relation.representation_value));
+  const auto& excluded_scalar = std::get<HeuristicStructuredValue>(
+      *excluded_relation.representation_value).value;
+  assert(std::holds_alternative<std::uint64_t>(excluded_scalar));
+  assert(std::get<std::uint64_t>(excluded_scalar) == std::uint64_t{2});
+
+  options.dependency_threshold = 0.5;
+  options.decoration = HeuristicNetDecoration::kPerformance;
+  options.performance_aggregation = HeuristicPerformanceAggregation::kMean;
+  const auto performance = discover_heuristics_net(source, options);
+  assert(performance.activities == frequency.activities);
+  assert(performance.edges.size() == 1);
+  assert(performance.relation_statistics.size() == 1);
+  assert(performance.concurrency_statistics.empty());
+  assert(performance.output_bundles == frequency.output_bundles);
+  assert(performance.input_bundles == frequency.input_bundles);
+  const auto& performance_relation = relation(performance, "A", "B");
+  const auto* performance_edge = edge(performance, "A", "B");
+  assert(performance_edge != nullptr);
+  assert(performance_edge->dependency == 1.0);
+  assert((performance_relation.wait_samples == std::vector<double>{3.0, 7.0}));
+  static_assert(std::is_same_v<decltype(performance_relation.representation),
+                               double>);
+  static_assert(std::is_same_v<decltype(performance_edge->representation),
+                               double>);
+  assert(performance_relation.representation == 5.0);
+  assert(performance_edge->representation == 5.0);
+  assert(!performance_relation.representation_value.has_value());
+  assert(!performance_edge->representation_value.has_value());
+}
+
 void lifecycle_fifo_and_configurable_interval_attribute() {
   auto s1 = event("A", "2026-01-01T00:00:00Z", "START");
   auto s2 = event("A", "2026-01-01T00:00:01Z", "start");
@@ -3801,6 +3872,7 @@ int main(int argc, char** argv) {
     }
   }
   interval_abstraction_and_strict_threshold();
+  plusplus_frequency_representation_preserves_integer_type();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();

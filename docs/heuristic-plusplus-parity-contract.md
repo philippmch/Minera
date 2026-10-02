@@ -63,6 +63,46 @@ PLUSPLUS inputless control: five places, four visible transitions, five arcs,
 unwired A/B inputs, private output places, and source/final markings. It does
 not settle connected, branching, or cyclic PLUSPLUS Petri structures.
 
+`heuristic-plusplus-supplement-validation.json` preserves seventy further actual
+public calls with seventy successful results and no reference or serialization
+errors. These include eight correctly datetime-typed DataFrame calls, missing
+start timestamps, lifecycle events, repeated traces, reserved-name activities,
+and filtering with positive concurrency. Twenty-one paired HeuristicsNet
+results and nine paired Petri results match on direct and parent EventLog
+routes. Four parent DataFrame Petri calls append a float `@@diff` column; the
+before/after snapshots retain that mutation. The captured timestamp dtype is
+`datetime64[us, UTC]`, distinct from the preparation's planned nanosecond dtype.
+
+The original worker exits 1 after saving all seventy results because its own
+verification omitted the returned `pandas.Timestamp` alias. A subsequent
+read-only finalization corrects that alias and accepts the observed dtype,
+adding no public or native calls. The archive preserves the original failure,
+the complete raw results, and the finalization separately. It contains 64 exact
+UTF-8 members and fourteen external byte/hash bindings.
+
+These controls distinguish direct adjacency from eventually-follows: plain
+ABC traces return AB and BC, with no AC relation. Positive raw concurrency
+retains a removed activity under filtering. A dependency threshold immediately
+below zero accepts reciprocal ABA edges and produces an actual cyclic Petri
+net; the equal and above-zero controls exclude those edges. Self-loop controls
+capture HeuristicsNet values only. Reserved names collide across place and
+transition kinds, while captured names remain unique within each kind.
+
+PLUSPLUS frequency relation and edge representations now preserve an engaged
+integer scalar alternative. A fresh build of canonical source tree
+`fdfbd92359fe459ba6f4bf82c6df4ef6d2129815` passes the core, heuristic variants,
+Petri conversion, and Petri reduction Release suites with assertions enabled.
+The regression also checks threshold exclusion and unchanged floating-point
+performance representation. Broader native field and conversion acceptance
+remains open.
+
+`heuristic-plusplus-frequency-build-validation.json` binds that fresh build,
+its 650 compile inputs, six actual binaries, exact source changes, and four
+passing suites. The archive retains three earlier configure failures
+separately. A shared-dictionary discrepancy in embedded configure/build
+metadata is documented; the SHA-bound command files preserve the actual
+before-state. All original bytes remain available.
+
 ## Returned-object acceptance
 
 Presence, null, empty values, numeric types, and actual keys must be retained.
@@ -105,9 +145,9 @@ input and parameter state before and after every actual call.
 | Public parameter | Native option | Acceptance status |
 | --- | --- | --- |
 | `ACTIVITY_KEY` | `activity_attribute` | Standard/custom selectors are covered by the saved twelve cases and the new paired public routes. |
-| `START_TIMESTAMP_KEY` | `start_timestamp_attribute` | A custom interval start key is observed on both public routes; missing-start/lifecycle mode remains open. |
+| `START_TIMESTAMP_KEY` | `start_timestamp_attribute` | Custom interval start, missing-start, and lifecycle controls are observed publicly; broader native counterparts remain open. |
 | `TIMESTAMP_KEY` | `timestamp_attribute` | Custom completion is observed on public EventLog and flat routes; combine it with performance decoration and native controls. |
-| `CASE_ID_KEY` | `case_id_attribute` | Custom grouping is observed on public flat carriers; correctly datetime-typed DataFrame Petri and native counterparts remain open. |
+| `CASE_ID_KEY` | `case_id_attribute` | Custom grouping and correctly datetime-typed DataFrame Petri calls are observed publicly; carrier-dependent conversion, input mutation, and native counterparts remain open. |
 | `DEPENDENCY_THRESH` | `dependency_threshold` | Public dependency 1 is accepted below 1 and excluded at or above 1; its matrix entry remains. Compare the full native results. |
 | `AND_MEASURE_THRESH` | `and_threshold` | Positive public measures 1 and 0.5 and strict threshold acceptance are observed, including a connected AND Petri shape. Compare native maps and conversion. |
 | `MIN_ACT_COUNT` | `min_activity_count` | Public controls remove incident relation maps and edges while preserving raw sojourn entries; the complete native field domains remain to be compared. |
@@ -122,11 +162,14 @@ multiplicity, markings, and endpoint identities. A comparison based on unique
 names must reject or separately handle collisions rather than silently merging
 places or transitions.
 
-The new public controls establish connected sequence, XOR, positive AND, and
-filtered structures. Their observed names are unique within each returned
-net. The default repeated-trace control excludes zero-dependency cyclic edges,
-so it does not establish cyclic Petri behavior. Actual cycles, collision-focused
-names, and native comparisons of the broader Petri shapes remain required.
+The public controls establish connected sequence, XOR, positive AND, filtered
+structures, and a reciprocal ABA cycle below dependency threshold zero.
+Reserved-name controls preserve place and transition identities separately.
+Native comparisons of these broader shapes, self-loop conversion, and the
+complete name/property/weight obligations remain open. Identical overlapping
+EventLog and datetime-typed DataFrame controls return equal HeuristicsNet
+fields but different Petri shapes; their cause is not established by these
+observations.
 
 Complete the module only after the full field, route, parameter, input, and
 Petri gates above are reconciled against actual pinned public calls and actual

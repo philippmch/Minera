@@ -6982,3 +6982,65 @@ validation SHA is
 `16a1db8c9c69d8ebbb83bff37b46cf137556617d4eca7b2618df7a319683d48e`.
 No production source changes or new suite runs occur in this checkpoint.
 PLUSPLUS remains partial, and all 228 open coverage units remain in scope.
+
+### PLUSPLUS integer frequency values and supplemental controls
+
+PLUSPLUS now stores the actual frequency count as an engaged integer scalar
+alternative on both retained relations and accepted edges. The numeric double
+view remains available. The regression checks the integer type and count,
+dependency threshold exclusion, and the unchanged floating-point performance
+mean. A fresh isolated build of canonical source tree
+`fdfbd92359fe459ba6f4bf82c6df4ef6d2129815`, exact-byte export tree
+`b321434e34ce285a4f20567180869441507e7ba0`, from parent `e6f37f2`, passes the
+core, heuristic variants, Petri conversion, and Petri reduction Release suites
+with assertions enabled. Its actual core SHA is
+`dc5abfa0919b07ad305b53444f0ab419a9f032f9e816d9e1cd9b687b5d9a636d`.
+
+`docs/heuristic-plusplus-frequency-build-checks.jsonl.gz` and its validation
+preserve 116 exact UTF-8 members and 1,329 external byte/hash bindings,
+including all 650 compiled inputs and six actual binaries. The three earlier
+configure failures are retained with zero production build, test, or native
+capture calls. The successful configure and build entries have an embedded
+metadata discrepancy: a shared dictionary later adds test-binary bindings.
+Their SHA-bound command files retain the actual before-state and are the
+authoritative execution records; all other values agree. Twelve focused saver
+checks and complete byte/hash roundtrips pass. Archive SHA is
+`51160bd38d2013481ee0076e527d5ca2474fd3781eb1a15bd822e6e3b88b2cba`,
+1,990,055 bytes; validation SHA is
+`f764f5b5a4f349a6836ff22ba08af5c71621bea9f1e2d647bca15115ff7d3e99`.
+
+The supplemental public capture makes seventy calls with seventy successful
+results, no reference errors, and no serialization errors: 62 EventLog and
+eight datetime-typed DataFrame inputs. Direct and parent EventLog routes match
+in twenty-one paired HeuristicsNet controls and nine paired Petri controls.
+Four parent DataFrame Petri calls append a float `@@diff` column. Actual
+timestamp columns have `datetime64[us, UTC]` dtype; the planned nanosecond
+dtype remains preserved separately. Overlapping DataFrame and EventLog
+controls return equal HeuristicsNet fields but different Petri shapes. These
+observations do not establish the cause of that carrier difference.
+
+The capture worker exits 1 after saving all results because its own verifier
+omits the returned `pandas.Timestamp` alias. Read-only finalization corrects
+that alias and accepts the observed dtype without rerunning public calls.
+The archive keeps the original failure, complete returned values, mutation
+snapshots, and finalization separate. The finalizer's process exit 0 is an
+observed ROOT execution result, not a synthesized command record.
+
+The controls establish missing-start and lifecycle behavior, direct-adjacency
+DFG values on plain ABC traces, and raw concurrency retaining a filtered
+activity. Reciprocal ABA edges below dependency threshold zero produce an
+actual cyclic Petri net. Equal and above-zero thresholds exclude those edges.
+Self-loop observations cover HeuristicsNet fields only. Reserved names collide
+across place and transition kinds; captured names are unique within each kind.
+An unfamiliar decoration string is accepted publicly and returns performance
+values; its native option representation remains unresolved.
+
+`docs/heuristic-plusplus-supplement-checks.jsonl.gz` and its validation retain
+64 exact UTF-8 members and fourteen external byte/hash bindings. Nine focused
+saver checks pass, and every member roundtrips with the unchanged streaming
+codec. Archive SHA is
+`4876685618c248bdb7c32fdf22286c59e10e36842cc859c23d80d9b7027b7b51`,
+1,351,759 bytes; validation SHA is
+`af7209349f454752dea06818f65c7a5c8310c5d981caea625cac9df5ac10c2f4`.
+Full returned-object, carrier, input mutation, and Petri acceptance remains
+open. PLUSPLUS stays partial, with all 228 open coverage units retained.
