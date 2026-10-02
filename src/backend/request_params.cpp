@@ -2253,6 +2253,10 @@ MineParams parse_mine_params(const FieldLookup& field,
           "heuristic_decoration: expected frequency or performance, got '" +
           value + "'");
   }
+  if (supplied("heuristic_plusplus_decoration_selector")) {
+    params.heuristic.plusplus_decoration_selector =
+        field("heuristic_plusplus_decoration_selector");
+  }
   if (const auto value = field("heuristic_start_timestamp_attribute");
       !value.empty()) {
     params.heuristic.start_timestamp_attribute = value;
