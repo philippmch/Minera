@@ -130,7 +130,7 @@ are reconciled.
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both `VERSION_DISCOUNTED_A_STAR` algorithms preserve the asymmetric discounted recurrence, complete model-transition runs, raw ordinary-distance borders, deterministic longer-run ties, exact marking-limit boundaries, objectives, precision/distance diagnostics, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters, with distinct registered proofs |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, strict direct-OCDFG activity/object-type selectors, and cross-family envelope rejection; broader OCEL schema coverage remains |
-| Discovery: Alpha | classic and Alpha+ | **Partial (classic, abstraction, and endpoint modules complete)** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ exposes raw live/detached markings and reserved-label collision cleanup through native/JSON/CLI/HTTP adapters, with repeated output-support checks; identity-dependent selection probabilities and correlations remain outside its complete claim |
+| Discovery: Alpha | classic and Alpha+ | **Partial (classic, abstraction, and endpoint modules complete)** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ exposes raw live/detached markings and reserved-label collision cleanup through native/JSON/CLI/HTTP adapters, with full public/native process captures; its selection law remains partial because native repeated calls vary where the observed public cells stay stable |
 | Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **CLASSIC complete; dispatcher and PLUSPLUS partial** — CLASSIC public EventLog/DFG object and Petri routes, typed returned fields, order, noise pruning and conversion have saved native/public proof; separate dispatcher and PLUSPLUS obligations remain |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
@@ -6718,3 +6718,59 @@ the documented native representation. The catalogue now supplies the distinct
 structural verifier passes: **46 complete / 40 partial packages and 199 complete
 / 188 partial modules, with 228 open coverage units**. CLASSIC is complete;
 the heuristics dispatcher and PLUSPLUS remain partial.
+
+## Alpha+ process selection evidence and remaining law gap
+
+`docs/alpha-plus-process-law-validation.json` binds three streaming UTF-8
+member archives: `alpha-plus-process-law-public-baseline-checks.jsonl.gz`,
+`alpha-plus-process-law-order-label-checks.jsonl.gz`, and
+`alpha-plus-process-law-native-checks.jsonl.gz`. They retain 79,560 public
+baseline calls, 43,200 public order/label controls, and 14,400 actual native
+rows. Every member preserves its exact bytes, size and hash; archive headers,
+inventories and tails round-trip. Independent review and seven codec checks
+pass. The archives contain 198, 132 and 1,197 members, respectively.
+
+The 72,000-call public baseline has constant outcomes within all 3,600
+process/case cells of 20 repeated calls. Ten fresh processes for each recorded
+hash seed also agree for every case. In contrast, the first three audited
+native processes contain 4,320 rows: each process's 36 graph-choice cases
+switch between two weighted graph structures, and its 36 error-prone cases
+mix graph results with the mapped native rejection. Case 0 changes from a
+detached initial token and one live place to a live start place plus a silent
+transition and arcs. This is a structural difference within one process.
+The complete native capture contains 10,853 graphs and 3,547 errors.
+
+The public controls cross five hash seeds, original/reversed/rotated case
+orders, and original versus renamed ordinary labels. The literal
+`artificial_start` and `artificial_end` labels remain fixed. All 2,160
+process/case cells stay constant across their 20 calls, with no input mutations
+or serialization failures. Case-list order changes no observed error counts,
+boundary distributions or summary/weighted-arc outputs. The complete controls
+contain 34,560 graphs and 8,640 `IndexError` outcomes.
+
+Renaming `a` to `label_0` changes outcomes after applying only the declared
+inverse label map to structured comparison fields. It flips error counts in
+216 matched seed/order/case groups and changes graph/boundary signatures in
+378 further successful pairs. For seed 0, case 30, all original-label calls
+have five arcs and a live initial start token; all renamed calls have two
+arcs and a detached start token. Both retain a live final token. Composite
+name collisions occur in 84 of the changed graph pairs, so these summaries
+do not establish general graph isomorphism. Raw typed names and graphs remain
+unchanged in the evidence. These observations do not identify the cause of
+label sensitivity.
+
+The guarded native resume preserves the first 4,320 rows, executes only the
+seven missing processes, and records the actual resume and command contexts
+separately from the compiled tree, parent and core. Its captured row count is
+14,400; the exact total of actual calls remains unknown because the stopped
+attempt may have made unrecorded calls. Source/header inventories, core,
+probe, fixtures, commands, logs, inputs/options and public API/runtime/opaque
+module proofs stay bound. Existing core build/test evidence is reused.
+
+The older 774-row inventory has 598 successful support objects, all with one
+live final token and no detached final marking. Its varying joint marking
+pairs differ only in their initial coordinate. Final and joint-choice behavior,
+within-log construction order, and the faithful native selection rule remain
+open. Alpha+ stays partial; coverage remains 46 complete / 40 partial packages,
+199 complete / 188 partial modules and 228 open units. Finite captures do not
+prove universal support or probability parity.
