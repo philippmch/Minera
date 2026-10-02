@@ -731,8 +731,13 @@ PlusAbstraction build_pandas_plus_abstraction(
                      [](const auto& lhs, const auto& rhs) {
                        if (!lhs.start) return false;
                        if (!rhs.start) return true;
-                       return pandas_instant(*lhs.start) <
-                              pandas_instant(*rhs.start);
+                       const auto first = pandas_instant(*lhs.start);
+                       const auto second = pandas_instant(*rhs.start);
+                       if (first != second) return first < second;
+                       if (!lhs.complete) return false;
+                       if (!rhs.complete) return true;
+                       return pandas_instant(*lhs.complete) <
+                              pandas_instant(*rhs.complete);
                      });
     for (std::size_t i = 0; i < intervals.size(); ++i) {
       const auto& first = intervals[i];

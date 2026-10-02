@@ -7938,3 +7938,32 @@ round-trips and the preceding selector checkpoint remains hash-bound. Broader
 carrier, parameter, error, metadata, identity, ordering and routing gates remain
 open. PLUSPLUS and Alpha+ stay partial; coverage remains 46/86 packages and
 199/387 modules, with 228 incomplete units and no catalogue promotion.
+
+### PLUSPLUS pandas timestamp tie and Petri counter ordering (2026-10-03)
+
+Ordered equal-start intervals by completion time for eventual follows,
+performance and concurrency. Assigned presented silent-transition counters by
+target and predecessor relation traversal within the existing join-then-split
+phases. Reversed, shuffled, renamed and unequal-orientation controls expose
+both former gaps; their complete pre-change runs remain retained. A completed
+intermediate replay with eight renamed-label Petri mismatches and the two
+earlier failed test builds also remain reconstructible.
+
+All 118 new successful public controls match: 92 HeuristicsNet results on 4738
+supported checks and 26 complete supported Petri presentations, with matching
+input-after, mutation and options. The wider replay matches all 622 aliases on
+18522 net-field checks, 99 Petri presentations and 139 errors. All 77 generic
+regressions are unchanged. Actual execution makes 699 discoveries, 99 presented
+conversions and 43 generic conversions without additional reference calls.
+All five assertion-enabled suites pass for 650 exact compilation inputs.
+
+Evidence is `heuristic-plusplus-pandas-row-order-checks.jsonl.gz` (SHA-256
+`a2b79908ded8b7022cf2fafe9b2b330225ed36a1c6d5f01e0843a9beb19711a5`, 54920511 bytes), with
+`heuristic-plusplus-pandas-row-order-validation.json`. Every member round-trips;
+the `heuristic-plusplus-pandas-row-order-before-checks.jsonl.gz` and
+`heuristic-plusplus-pandas-row-order-superseded-checks.jsonl.gz` companions retain
+the earlier runs. Validation binds all three segments and 6287
+verified members. Both pre-change replays and the preceding checkpoint remain bound. Broader
+parameter, carrier, error, metadata, identity, ordering and routing gates remain
+open. PLUSPLUS and Alpha+ stay partial; coverage remains 46/86 packages and
+199/387 modules, with 228 incomplete units and no promotion.

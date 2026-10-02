@@ -965,6 +965,86 @@ void plusplus_pandas_duration_selector_collisions() {
   assert(matched && table.rows == before.rows && table.columns == before.columns);
 }
 
+void plusplus_pandas_timestamp_ties_and_petri_counter_order() {
+  for (const std::size_t b_outer : {1, 3, 4}) {
+    for (const bool reversed : {false, true}) {
+      for (const auto decoration : {HeuristicNetDecoration::kFrequency,
+                                    HeuristicNetDecoration::kPerformance}) {
+        auto table = pandas_interval_table(b_outer);
+        const auto start = table.column_index("start_timestamp");
+        for (auto& row : table.rows)
+          row[start] = typed_date("start_timestamp", "2024-01-01T00:00:02Z");
+        if (reversed) std::reverse(table.rows.begin(), table.rows.end());
+        const auto before = table;
+        auto options = plus_options();
+        options.decoration = decoration;
+        const auto net = discover_plus_plus_pandas(table, options);
+        assert(net.relation_statistics.size() == (b_outer == 4 ? 1 : 2));
+        assert(relation(net, "A", "C").eventually_follows_frequency == b_outer);
+        if (b_outer != 4)
+          assert(relation(net, "A", "B").eventually_follows_frequency == 4 - b_outer);
+        const auto concurrent = std::find_if(net.raw_concurrency_statistics.begin(),
+            net.raw_concurrency_statistics.end(), [](const auto& pair) {
+              return pair.first == "B" && pair.second == "C";
+            });
+        assert(concurrent != net.raw_concurrency_statistics.end());
+        assert(concurrent->frequency == b_outer);
+        if (decoration == HeuristicNetDecoration::kPerformance)
+          assert(net.plusplus_computed_performance_dfg->at({"A", "C"}) == 1.0);
+        for (std::size_t i = 0; i < before.rows.size(); ++i)
+          assert(std::equal(before.rows[i].begin(), before.rows[i].end(), table.rows[i].begin()));
+      }
+    }
+  }
+  auto table = pandas_interval_table(2);
+  const auto activity = table.column_index("concept:name");
+  for (std::size_t i = 0; i < table.rows.size(); ++i) {
+    if (i / 4 != 1 && i / 4 != 2) continue;
+    auto& cell = *table.rows[i][activity];
+    if (cell.value == "B") cell.value = "C";
+    else if (cell.value == "C") cell.value = "B";
+    cell.typed_value = std::monostate{};
+  }
+  const auto rows = table.rows;
+  const std::vector<std::size_t> permutation{8, 11, 7, 5, 3, 13, 10, 9, 4, 0, 6, 12, 1, 15, 14, 2};
+  for (std::size_t i = 0; i < permutation.size(); ++i) table.rows[i] = rows[permutation[i]];
+  const auto net = discover_plus_plus_pandas(table, plus_options());
+  assert((net.activities == std::vector<std::string>{"A", "D", "C", "B"}));
+  const auto presented = to_petri_net_presentation(net);
+  const auto name = [&](const PetriNodeRef& endpoint) -> const std::string& {
+    return endpoint.kind == PetriNodeKind::kPlace
+        ? presented.places.at(endpoint.id).name : presented.transitions.at(endpoint.id).name;
+  };
+  const auto has_arc = [&](const std::string& source, const std::string& target) {
+    return std::any_of(presented.arcs.begin(), presented.arcs.end(), [&](const auto& arc) {
+      return name(arc.source) == source && name(arc.target) == target;
+    });
+  };
+  assert(has_arc("source0", "hid_2") && has_arc("hid_2", "pre_C"));
+  assert(has_arc("source0", "hid_5") && has_arc("hid_5", "pre_D"));
+  assert(has_arc("intplace_B", "hid_8") && has_arc("hid_8", "pre_D"));
+  assert(has_arc("intplace_C", "hid_10") && has_arc("hid_10", "pre_D"));
+  for (auto& row : table.rows) {
+    auto& cell = *row[activity];
+    cell.value = cell.value == "A" ? "Z" : cell.value == "B" ? "Y"
+                 : cell.value == "C" ? "X" : "W";
+  }
+  const auto renamed = to_petri_net_presentation(discover_plus_plus_pandas(table, plus_options()));
+  const auto renamed_name = [&](const PetriNodeRef& endpoint) -> const std::string& {
+    return endpoint.kind == PetriNodeKind::kPlace
+        ? renamed.places.at(endpoint.id).name : renamed.transitions.at(endpoint.id).name;
+  };
+  const auto renamed_arc = [&](const std::string& source, const std::string& target) {
+    return std::any_of(renamed.arcs.begin(), renamed.arcs.end(), [&](const auto& arc) {
+      return renamed_name(arc.source) == source && renamed_name(arc.target) == target;
+    });
+  };
+  assert(renamed_arc("source0", "hid_2") && renamed_arc("hid_2", "pre_X"));
+  assert(renamed_arc("source0", "hid_5") && renamed_arc("hid_5", "pre_W"));
+  assert(renamed_arc("intplace_X", "hid_8") && renamed_arc("hid_8", "pre_W"));
+  assert(renamed_arc("intplace_Y", "hid_10") && renamed_arc("hid_10", "pre_W"));
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -4859,6 +4939,7 @@ int main(int argc, char** argv) {
   plusplus_numeric_count_filters_preserve_public_comparisons();
   plusplus_pandas_literal_selectors_and_error_order();
   plusplus_pandas_duration_selector_collisions();
+  plusplus_pandas_timestamp_ties_and_petri_counter_order();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();

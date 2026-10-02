@@ -520,17 +520,40 @@ PetriNetPresentation to_petri_net_presentation(const HeuristicsNet& heuristics) 
     for (std::size_t i = 0; i < n; ++i) active[i] = i;
   }
   // Public silent names count every join before every split, including
-  // transitions that the reducer later removes.
+  // transitions removed by reduction. Join domains follow the first target
+  // encountered while visiting each node's name-ordered outgoing relations;
+  // split domains follow the corresponding incoming relation traversal.
+  for (const auto a : active)
+    if (a >= n) throw std::invalid_argument("Petri active activity index");
+  const auto name_order = [&](std::size_t lhs, std::size_t rhs) {
+    return heuristics.activities[lhs] < heuristics.activities[rhs];
+  };
+  std::vector<std::vector<std::size_t>> successors(n);
+  for (const auto& edge : heuristics.edges)
+    successors[edge.source].push_back(edge.target);
+  for (auto& neighbours : successors) {
+    std::sort(neighbours.begin(), neighbours.end(), name_order);
+    neighbours.erase(std::unique(neighbours.begin(), neighbours.end()), neighbours.end());
+  }
+  for (auto& neighbours : predecessors) std::sort(neighbours.begin(), neighbours.end(), name_order);
+  const auto append_active = [&](std::vector<std::size_t>& order, std::size_t a) {
+    if (contains(active, a) && !contains(order, a)) order.push_back(a);
+  };
+  std::vector<std::size_t> join_order, split_order;
+  for (const auto a : active)
+    for (const auto target : successors[a]) append_active(join_order, target);
+  for (const auto a : active) append_active(join_order, a);
+  for (const auto a : join_order)
+    for (const auto predecessor : predecessors[a]) append_active(split_order, predecessor);
+  for (const auto a : active) append_active(split_order, a);
   std::vector<std::vector<std::size_t>> inputs(n), outputs(n);
-  for (const std::size_t a : active) {
-    if (a >= n)
-      throw std::invalid_argument("Petri active activity index");
+  for (const std::size_t a : join_order) {
     auto in_alts = alternatives(a, false);
     if (contains(heuristics.start_activities, a))
       in_alts.push_back({source});
     inputs[a] = merge(std::move(in_alts), true, a);
   }
-  for (const std::size_t a : active) {
+  for (const std::size_t a : split_order) {
     auto out_alts = alternatives(a, true);
     if (contains(heuristics.end_activities, a))
       out_alts.push_back({sink});
