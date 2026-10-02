@@ -321,10 +321,12 @@ markings. Thirteen additional naming, escaped-label AND, and AAB self-loop
 controls also match. This finite acceptance is saved in
 `heuristic-plusplus-petri-producer-validation.json`; the module remains partial.
 Three datetime-typed DataFrame Petri shape differences and three object-dtype
-reference errors against native success remain open. Identical overlapping
-EventLog and datetime-typed DataFrame controls return equal HeuristicsNet
-fields but different Petri shapes; their cause is not established by these
-observations.
+reference errors against native success remain open. Public entry-point controls now match the parent DataFrame Petri result to
+`plusplus.apply_pandas` at all three observed AND thresholds. The exported
+`apply_heu_pandas` returns different concurrency counts and AND maps from
+parent/direct `apply_heu` for the same fixture. Native pandas discovery,
+mutation, and error behavior remain open; the public controls are recorded in
+`heuristic-pandas-dispatch-validation.json`.
 
 Complete the module only after the full field, route, parameter, input, and
 Petri gates above are reconciled against actual pinned public calls and actual
@@ -629,3 +631,45 @@ logs, the prior failed fixture run, and the final passing run. It is
 `f4b335d4e0ffdb99636ea228d477a2c5f406bd6d4248a47471f94b6a505f0f55`). Its validation file records the unchanged
 comparison bounds and remaining limits. This checkpoint makes no catalogue
 promotion: PLUSPLUS and the full target remain partial, with 228 open units.
+
+## Pandas entry points and carrier dispatch (2026-10-02)
+
+Thirty-three actual public calls distinguish CLASSIC/PLUSPLUS, parent/direct,
+datetime/object DataFrames, converted EventLogs, and the exported PLUSPLUS
+`apply_pandas`/`apply_heu_pandas` functions. All nine supported options are
+explicit. Dependency threshold stays 0.5; AND threshold is 0, 0.5, or 1.
+Both workers finish successfully with zero remaining child processes. There
+are 29 successful returned objects, four actual AttributeErrors, no serializer
+errors, and no skipped calls. No native function is invoked in this checkpoint.
+
+For the overlapping datetime fixture, PLUSPLUS parent DataFrame Petri output
+matches `apply_pandas` on complete presented fields at all three thresholds.
+Their complete input-after snapshots also match, including the added float64
+`@@diff` duration column. Direct PLUSPLUS DataFrame Petri output instead matches
+the parent/direct EventLog result at AND 0.5. Parent/direct PLUSPLUS HeuristicsNet
+results match all seventeen raw fields for both carriers at that threshold.
+
+The pandas HeuristicsNet differs from generic `apply_heu` in three raw fields:
+`concurrent_activities`, `dfg`, and `nodes`. Concurrency for B/C is 2 versus 4;
+DFG counts are equal but dictionary insertion order differs. At threshold zero,
+pandas reports output/input AND scores 0.5/0.25. At threshold 0.5 both maps are
+empty; the equal output score is excluded. These are finite observations,
+not a rule to halve every native concurrency count.
+
+Object-dtype parent PLUSPLUS Petri and both PLUSPLUS pandas helpers raise
+`AttributeError: Can only use .dt accessor with datetimelike values` without
+input mutation. Direct PLUSPLUS accepts the same object-dtype DataFrame and
+returns the datetime direct-call graph. CLASSIC parent DataFrame Petri accepts
+object timestamps, whereas direct CLASSIC Petri raises the same error. These
+route-specific obligations must remain in the implementation and completion
+audit; CLASSIC observations are not evidence of native route completion.
+
+Saved evidence is `heuristic-pandas-dispatch-checks.jsonl.gz` (SHA-256
+`bbc8cbe45fa4765c269a159ef8f04e374370dacdc9738b519fdd2ab0c8184f08`) and `heuristic-pandas-dispatch-validation.json`
+(SHA-256 `c1cf86c09f49a16a590155a8bdb5dfca1802c043b186fcf9de3b5b5f276fb65a`). Eight complete public Petri comparisons
+match, and two expected route/variant comparisons mismatch. Hash-bound opaque
+module proofs, public signatures/enums, inputs, results, errors, mutations,
+process records, logs, collectors, and the comparator are retained. The archive
+round-trip is verified. Internal dispatch was not inspected; the observations
+support entry-point equivalence only for these controls. PLUSPLUS and the full
+target stay partial, with 228 open units and no catalogue promotion.

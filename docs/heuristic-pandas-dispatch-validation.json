@@ -1,0 +1,1742 @@
+{
+  "actual_native_calls": 0,
+  "actual_public_calls": 33,
+  "archive": {
+    "byte_members": 29,
+    "path": "docs/heuristic-pandas-dispatch-checks.jsonl.gz",
+    "records": 30,
+    "roundtrip_verified": true,
+    "sha256": "bbc8cbe45fa4765c269a159ef8f04e374370dacdc9738b519fdd2ab0c8184f08",
+    "size_bytes": 645546
+  },
+  "catalogue_promoted": false,
+  "errors": [
+    {
+      "carrier": "DataFrame",
+      "dtype": "object",
+      "error": {
+        "message": "Can only use .dt accessor with datetimelike values",
+        "type": "builtins.AttributeError"
+      },
+      "group": "variants",
+      "index": 22,
+      "route": "parent_petri",
+      "variant": "PLUSPLUS"
+    },
+    {
+      "carrier": "DataFrame",
+      "dtype": "object",
+      "error": {
+        "message": "Can only use .dt accessor with datetimelike values",
+        "type": "builtins.AttributeError"
+      },
+      "group": "variants",
+      "index": 23,
+      "route": "direct_petri",
+      "variant": "CLASSIC"
+    },
+    {
+      "carrier": "DataFrame",
+      "dtype": "object",
+      "error": {
+        "message": "Can only use .dt accessor with datetimelike values",
+        "type": "builtins.AttributeError"
+      },
+      "group": "pandas",
+      "index": 6,
+      "route": "pandas_heu",
+      "variant": "PLUSPLUS"
+    },
+    {
+      "carrier": "DataFrame",
+      "dtype": "object",
+      "error": {
+        "message": "Can only use .dt accessor with datetimelike values",
+        "type": "builtins.AttributeError"
+      },
+      "group": "pandas",
+      "index": 7,
+      "route": "pandas_petri",
+      "variant": "PLUSPLUS"
+    }
+  ],
+  "facts": [
+    "Parent PLUSPLUS DataFrame Petri output, input mutation, and options match the exported pandas helper at AND thresholds 0/0.5/1.",
+    "Parent/direct PLUSPLUS HeuristicsNet outputs match all 17 raw fields for the datetime DataFrame and its converted EventLog at AND 0.5.",
+    "Pandas helper concurrency is 2 versus 4 for the generic route in this fixture; the DFG counts match but raw dictionary insertion order differs.",
+    "At threshold zero the pandas helper reports AND output/input scores 0.5/0.25; neither survives threshold equality 0.5.",
+    "The pandas helper adds @@diff with float64 dtype and per-event durations; mutation snapshots match the parent DataFrame Petri route.",
+    "Object-dtype parent PLUSPLUS and both pandas helpers raise AttributeError; direct PLUSPLUS accepts the same object-dtype frame.",
+    "CLASSIC parent/direct DataFrame Petri outputs match for datetime columns but have different object-dtype error behavior."
+  ],
+  "full_parity": false,
+  "groups": [
+    {
+      "calls": 25,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-carrier-variant-dispatch-b5d687c45b1c4ce29ea4ed05e6f62d27",
+      "errors": 2,
+      "mutations": 3,
+      "output_sha256": "1177157dc674218f5d9a649c0e0803f8b88911c77749a9ec4532cc9eb399a79f",
+      "pid": 29472,
+      "successes": 23
+    },
+    {
+      "calls": 8,
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-pandas-entry-controls-36db42379d71424186c3a0a7906809c8",
+      "errors": 2,
+      "mutations": 6,
+      "output_sha256": "f1a4199762ea0b71240bac70606a8a08a8311a370d6dd3b49cc09bfd2c2a2abe",
+      "pid": 17784,
+      "successes": 6
+    }
+  ],
+  "heu_comparisons": [
+    {
+      "different_raw_fields": [],
+      "fields_compared": 17,
+      "name": "PLUSPLUS_parent_vs_direct_DataFrame"
+    },
+    {
+      "different_raw_fields": [],
+      "fields_compared": 17,
+      "name": "PLUSPLUS_parent_DataFrame_vs_EventLog"
+    },
+    {
+      "different_raw_fields": [],
+      "fields_compared": 17,
+      "name": "PLUSPLUS_parent_vs_direct_EventLog"
+    },
+    {
+      "different_raw_fields": [
+        "concurrent_activities",
+        "dfg",
+        "nodes"
+      ],
+      "fields_compared": 17,
+      "name": "PLUSPLUS_pandas_vs_parent_DataFrame"
+    }
+  ],
+  "limits": [
+    "Finite public observations only; no native pandas implementation is claimed and no catalogue entries are promoted.",
+    "Output equality supports public entry-point equivalence for these controls; internal dispatch was not inspected.",
+    "Do not generalize halving concurrency counts beyond this fixture without further public controls.",
+    "All routes, nine parameters, mutation/error behavior, broader carrier domains, and the full target remain in scope."
+  ],
+  "parent_commit": "71371427c66ad1296cc9cd5e1803ebdaa998cb87",
+  "petri_comparison_counts": {
+    "matched": 8,
+    "mismatch": 2
+  },
+  "petri_comparisons": [
+    {
+      "comparison": {
+        "attempted_assignments": 20,
+        "independently_validated": true,
+        "maximum_topology_vertices": 256,
+        "reason": "Complete label/marking/direction/multiplicity-preserving bijection found.",
+        "refinement_rounds": 2,
+        "search_budget": 100000,
+        "status": "matched",
+        "witness": [
+          {
+            "native_id": [
+              "transition",
+              0
+            ],
+            "public_id": [
+              "transition",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              3
+            ],
+            "public_id": [
+              "transition",
+              3
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              0
+            ],
+            "public_id": [
+              "place",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              1
+            ],
+            "public_id": [
+              "place",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              4
+            ],
+            "public_id": [
+              "place",
+              4
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              5
+            ],
+            "public_id": [
+              "place",
+              5
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              1
+            ],
+            "public_id": [
+              "transition",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              2
+            ],
+            "public_id": [
+              "transition",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823792200528
+            ],
+            "public_id": [
+              "arc",
+              1679899257424
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823792049680
+            ],
+            "public_id": [
+              "arc",
+              1679899257296
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823791733008
+            ],
+            "public_id": [
+              "arc",
+              1679899396432
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823791910416
+            ],
+            "public_id": [
+              "arc",
+              1679899007632
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823791921488
+            ],
+            "public_id": [
+              "arc",
+              1679899008784
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823791913040
+            ],
+            "public_id": [
+              "arc",
+              1679898902224
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823791918608
+            ],
+            "public_id": [
+              "arc",
+              1679899009168
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823791909840
+            ],
+            "public_id": [
+              "arc",
+              1679898901136
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823791919824
+            ],
+            "public_id": [
+              "arc",
+              1679898892176
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823791918800
+            ],
+            "public_id": [
+              "arc",
+              1679898891408
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              2
+            ],
+            "public_id": [
+              "place",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              3
+            ],
+            "public_id": [
+              "place",
+              3
+            ]
+          }
+        ],
+        "witness_means": "Existence of one projected topology bijection, not unique object identity or full-field equivalence."
+      },
+      "name": "pandas_vs_parent_and0"
+    },
+    {
+      "comparison": {
+        "attempted_assignments": 16,
+        "independently_validated": true,
+        "maximum_topology_vertices": 256,
+        "reason": "Complete label/marking/direction/multiplicity-preserving bijection found.",
+        "refinement_rounds": 2,
+        "search_budget": 100000,
+        "status": "matched",
+        "witness": [
+          {
+            "native_id": [
+              "place",
+              0
+            ],
+            "public_id": [
+              "place",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              1
+            ],
+            "public_id": [
+              "place",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              0
+            ],
+            "public_id": [
+              "transition",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              1
+            ],
+            "public_id": [
+              "transition",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              2
+            ],
+            "public_id": [
+              "transition",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              3
+            ],
+            "public_id": [
+              "transition",
+              3
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823792196816
+            ],
+            "public_id": [
+              "arc",
+              1679899783056
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823792192272
+            ],
+            "public_id": [
+              "arc",
+              1679899785296
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823821356752
+            ],
+            "public_id": [
+              "arc",
+              1679901873360
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823821362000
+            ],
+            "public_id": [
+              "arc",
+              1679901883536
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823791607504
+            ],
+            "public_id": [
+              "arc",
+              1679901880080
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823792185424
+            ],
+            "public_id": [
+              "arc",
+              1679899782608
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823792198928
+            ],
+            "public_id": [
+              "arc",
+              1679899785552
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823792188688
+            ],
+            "public_id": [
+              "arc",
+              1679899784208
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              2
+            ],
+            "public_id": [
+              "place",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              3
+            ],
+            "public_id": [
+              "place",
+              3
+            ]
+          }
+        ],
+        "witness_means": "Existence of one projected topology bijection, not unique object identity or full-field equivalence."
+      },
+      "name": "pandas_vs_parent_and0.5"
+    },
+    {
+      "comparison": {
+        "attempted_assignments": 16,
+        "independently_validated": true,
+        "maximum_topology_vertices": 256,
+        "reason": "Complete label/marking/direction/multiplicity-preserving bijection found.",
+        "refinement_rounds": 2,
+        "search_budget": 100000,
+        "status": "matched",
+        "witness": [
+          {
+            "native_id": [
+              "place",
+              0
+            ],
+            "public_id": [
+              "place",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              1
+            ],
+            "public_id": [
+              "place",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              0
+            ],
+            "public_id": [
+              "transition",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              1
+            ],
+            "public_id": [
+              "transition",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              2
+            ],
+            "public_id": [
+              "transition",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              3
+            ],
+            "public_id": [
+              "transition",
+              3
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813151888
+            ],
+            "public_id": [
+              "arc",
+              1679899624976
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813155024
+            ],
+            "public_id": [
+              "arc",
+              1679899623504
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813154000
+            ],
+            "public_id": [
+              "arc",
+              1679901877584
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823821981456
+            ],
+            "public_id": [
+              "arc",
+              1679898893904
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813142864
+            ],
+            "public_id": [
+              "arc",
+              1679899626768
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813153936
+            ],
+            "public_id": [
+              "arc",
+              1679899625424
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813143248
+            ],
+            "public_id": [
+              "arc",
+              1679899625488
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813143184
+            ],
+            "public_id": [
+              "arc",
+              1679899634896
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              2
+            ],
+            "public_id": [
+              "place",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              3
+            ],
+            "public_id": [
+              "place",
+              3
+            ]
+          }
+        ],
+        "witness_means": "Existence of one projected topology bijection, not unique object identity or full-field equivalence."
+      },
+      "name": "pandas_vs_parent_and1"
+    },
+    {
+      "comparison": {
+        "attempted_assignments": 20,
+        "independently_validated": true,
+        "maximum_topology_vertices": 256,
+        "reason": "Complete label/marking/direction/multiplicity-preserving bijection found.",
+        "refinement_rounds": 2,
+        "search_budget": 100000,
+        "status": "matched",
+        "witness": [
+          {
+            "native_id": [
+              "transition",
+              0
+            ],
+            "public_id": [
+              "transition",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              3
+            ],
+            "public_id": [
+              "transition",
+              3
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              0
+            ],
+            "public_id": [
+              "place",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              1
+            ],
+            "public_id": [
+              "place",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              4
+            ],
+            "public_id": [
+              "place",
+              4
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              5
+            ],
+            "public_id": [
+              "place",
+              5
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              1
+            ],
+            "public_id": [
+              "transition",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              2
+            ],
+            "public_id": [
+              "transition",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823815910288
+            ],
+            "public_id": [
+              "arc",
+              1823793167824
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823815913680
+            ],
+            "public_id": [
+              "arc",
+              1823793165008
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823810287056
+            ],
+            "public_id": [
+              "arc",
+              1823793159184
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823818412048
+            ],
+            "public_id": [
+              "arc",
+              1823818107600
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823818410768
+            ],
+            "public_id": [
+              "arc",
+              1823818105680
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823817088400
+            ],
+            "public_id": [
+              "arc",
+              1823791545296
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823817077712
+            ],
+            "public_id": [
+              "arc",
+              1823791536720
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823817078416
+            ],
+            "public_id": [
+              "arc",
+              1823821050192
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823817076816
+            ],
+            "public_id": [
+              "arc",
+              1823793193936
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823817073232
+            ],
+            "public_id": [
+              "arc",
+              1823791539280
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              2
+            ],
+            "public_id": [
+              "place",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              3
+            ],
+            "public_id": [
+              "place",
+              3
+            ]
+          }
+        ],
+        "witness_means": "Existence of one projected topology bijection, not unique object identity or full-field equivalence."
+      },
+      "name": "CLASSIC_parent_vs_direct_DataFrame"
+    },
+    {
+      "comparison": {
+        "attempted_assignments": 18,
+        "independently_validated": true,
+        "maximum_topology_vertices": 256,
+        "reason": "Complete label/marking/direction/multiplicity-preserving bijection found.",
+        "refinement_rounds": 2,
+        "search_budget": 100000,
+        "status": "matched",
+        "witness": [
+          {
+            "native_id": [
+              "place",
+              2
+            ],
+            "public_id": [
+              "place",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              0
+            ],
+            "public_id": [
+              "transition",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              0
+            ],
+            "public_id": [
+              "place",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              1
+            ],
+            "public_id": [
+              "place",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              1
+            ],
+            "public_id": [
+              "transition",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              2
+            ],
+            "public_id": [
+              "transition",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              3
+            ],
+            "public_id": [
+              "transition",
+              3
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823814116240
+            ],
+            "public_id": [
+              "arc",
+              1823819742544
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823814113360
+            ],
+            "public_id": [
+              "arc",
+              1823818188688
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823814114576
+            ],
+            "public_id": [
+              "arc",
+              1823818200848
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823814114704
+            ],
+            "public_id": [
+              "arc",
+              1823819738640
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823814110352
+            ],
+            "public_id": [
+              "arc",
+              1823793037456
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823814108304
+            ],
+            "public_id": [
+              "arc",
+              1823793037648
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823814110544
+            ],
+            "public_id": [
+              "arc",
+              1823793045456
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823814110096
+            ],
+            "public_id": [
+              "arc",
+              1823793052368
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823814109456
+            ],
+            "public_id": [
+              "arc",
+              1823793039696
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              3
+            ],
+            "public_id": [
+              "place",
+              3
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              4
+            ],
+            "public_id": [
+              "place",
+              4
+            ]
+          }
+        ],
+        "witness_means": "Existence of one projected topology bijection, not unique object identity or full-field equivalence."
+      },
+      "name": "PLUSPLUS_direct_DataFrame_vs_parent_EventLog"
+    },
+    {
+      "comparison": {
+        "attempted_assignments": 20,
+        "independently_validated": true,
+        "maximum_topology_vertices": 256,
+        "reason": "Complete label/marking/direction/multiplicity-preserving bijection found.",
+        "refinement_rounds": 2,
+        "search_budget": 100000,
+        "status": "matched",
+        "witness": [
+          {
+            "native_id": [
+              "transition",
+              0
+            ],
+            "public_id": [
+              "transition",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              3
+            ],
+            "public_id": [
+              "transition",
+              3
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              0
+            ],
+            "public_id": [
+              "place",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              1
+            ],
+            "public_id": [
+              "place",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              4
+            ],
+            "public_id": [
+              "place",
+              4
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              5
+            ],
+            "public_id": [
+              "place",
+              5
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              1
+            ],
+            "public_id": [
+              "transition",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              2
+            ],
+            "public_id": [
+              "transition",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823810758992
+            ],
+            "public_id": [
+              "arc",
+              1823822747792
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823810759696
+            ],
+            "public_id": [
+              "arc",
+              1823822745744
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823810761232
+            ],
+            "public_id": [
+              "arc",
+              1823822744592
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823810750160
+            ],
+            "public_id": [
+              "arc",
+              1823798084944
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823810750672
+            ],
+            "public_id": [
+              "arc",
+              1823798085200
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823810752016
+            ],
+            "public_id": [
+              "arc",
+              1823798094480
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823810749904
+            ],
+            "public_id": [
+              "arc",
+              1823798093712
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823810751120
+            ],
+            "public_id": [
+              "arc",
+              1823798097424
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823810751376
+            ],
+            "public_id": [
+              "arc",
+              1823798096272
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823810751632
+            ],
+            "public_id": [
+              "arc",
+              1823798095504
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              2
+            ],
+            "public_id": [
+              "place",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              3
+            ],
+            "public_id": [
+              "place",
+              3
+            ]
+          }
+        ],
+        "witness_means": "Existence of one projected topology bijection, not unique object identity or full-field equivalence."
+      },
+      "name": "CLASSIC_parent_vs_direct_EventLog"
+    },
+    {
+      "comparison": {
+        "attempted_assignments": 18,
+        "independently_validated": true,
+        "maximum_topology_vertices": 256,
+        "reason": "Complete label/marking/direction/multiplicity-preserving bijection found.",
+        "refinement_rounds": 2,
+        "search_budget": 100000,
+        "status": "matched",
+        "witness": [
+          {
+            "native_id": [
+              "place",
+              2
+            ],
+            "public_id": [
+              "place",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              0
+            ],
+            "public_id": [
+              "transition",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              0
+            ],
+            "public_id": [
+              "place",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              1
+            ],
+            "public_id": [
+              "place",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              1
+            ],
+            "public_id": [
+              "transition",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              2
+            ],
+            "public_id": [
+              "transition",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              3
+            ],
+            "public_id": [
+              "transition",
+              3
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813886416
+            ],
+            "public_id": [
+              "arc",
+              1823814116240
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813887120
+            ],
+            "public_id": [
+              "arc",
+              1823814113360
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813887952
+            ],
+            "public_id": [
+              "arc",
+              1823814114576
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813885648
+            ],
+            "public_id": [
+              "arc",
+              1823814114704
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813893776
+            ],
+            "public_id": [
+              "arc",
+              1823814110352
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813893968
+            ],
+            "public_id": [
+              "arc",
+              1823814108304
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813892560
+            ],
+            "public_id": [
+              "arc",
+              1823814110544
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813893072
+            ],
+            "public_id": [
+              "arc",
+              1823814110096
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823813892368
+            ],
+            "public_id": [
+              "arc",
+              1823814109456
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              3
+            ],
+            "public_id": [
+              "place",
+              3
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              4
+            ],
+            "public_id": [
+              "place",
+              4
+            ]
+          }
+        ],
+        "witness_means": "Existence of one projected topology bijection, not unique object identity or full-field equivalence."
+      },
+      "name": "PLUSPLUS_parent_vs_direct_EventLog"
+    },
+    {
+      "comparison": {
+        "attempted_assignments": 18,
+        "independently_validated": true,
+        "maximum_topology_vertices": 256,
+        "reason": "Complete label/marking/direction/multiplicity-preserving bijection found.",
+        "refinement_rounds": 2,
+        "search_budget": 100000,
+        "status": "matched",
+        "witness": [
+          {
+            "native_id": [
+              "place",
+              2
+            ],
+            "public_id": [
+              "place",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              0
+            ],
+            "public_id": [
+              "transition",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              0
+            ],
+            "public_id": [
+              "place",
+              0
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              1
+            ],
+            "public_id": [
+              "place",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              1
+            ],
+            "public_id": [
+              "transition",
+              1
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              2
+            ],
+            "public_id": [
+              "transition",
+              2
+            ]
+          },
+          {
+            "native_id": [
+              "transition",
+              3
+            ],
+            "public_id": [
+              "transition",
+              3
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823819742544
+            ],
+            "public_id": [
+              "arc",
+              1823818391888
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823818188688
+            ],
+            "public_id": [
+              "arc",
+              1823818394384
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823818200848
+            ],
+            "public_id": [
+              "arc",
+              1823818393744
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823819738640
+            ],
+            "public_id": [
+              "arc",
+              1823818397776
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823793037456
+            ],
+            "public_id": [
+              "arc",
+              1823818333840
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823793037648
+            ],
+            "public_id": [
+              "arc",
+              1823818330384
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823793045456
+            ],
+            "public_id": [
+              "arc",
+              1823818333392
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823793052368
+            ],
+            "public_id": [
+              "arc",
+              1823818332944
+            ]
+          },
+          {
+            "native_id": [
+              "arc",
+              1823793039696
+            ],
+            "public_id": [
+              "arc",
+              1823818321104
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              3
+            ],
+            "public_id": [
+              "place",
+              3
+            ]
+          },
+          {
+            "native_id": [
+              "place",
+              4
+            ],
+            "public_id": [
+              "place",
+              4
+            ]
+          }
+        ],
+        "witness_means": "Existence of one projected topology bijection, not unique object identity or full-field equivalence."
+      },
+      "name": "PLUSPLUS_direct_object_vs_datetime_DataFrame"
+    },
+    {
+      "comparison": {
+        "attempted_assignments": 0,
+        "maximum_topology_vertices": 256,
+        "reason": "Vertex count or directed unit-multiarc count differs.",
+        "refinement_rounds": 0,
+        "search_budget": 100000,
+        "status": "mismatch",
+        "witness": null,
+        "witness_means": "Existence of one projected topology bijection, not unique object identity or full-field equivalence."
+      },
+      "name": "PLUSPLUS_parent_vs_direct_DataFrame"
+    },
+    {
+      "comparison": {
+        "attempted_assignments": 0,
+        "maximum_topology_vertices": 256,
+        "reason": "Vertex count or directed unit-multiarc count differs.",
+        "refinement_rounds": 0,
+        "search_budget": 100000,
+        "status": "mismatch",
+        "witness": null,
+        "witness_means": "Existence of one projected topology bijection, not unique object identity or full-field equivalence."
+      },
+      "name": "CLASSIC_vs_PLUSPLUS_parent_DataFrame_and0.5"
+    }
+  ],
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "reference_version": "2.7.22",
+  "schema_version": 1,
+  "successes": 29
+}

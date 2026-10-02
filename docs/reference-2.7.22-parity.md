@@ -7655,3 +7655,36 @@ The archive round-trip was verified. Broader silent-counter, parking-name,
 metadata-survivor, carrier, error, and full module gates remain open. No
 catalogue entries were promoted: coverage stays 46/86 packages and 199/387
 modules, with 228 incomplete units.
+
+### PLUSPLUS pandas entry-point contrasts (2026-10-02)
+
+Executed 25 public carrier/variant contrasts and eight public pandas-helper
+controls against pinned PM4Py 2.7.22. Both workers completed with their child
+processes finalized. The 33 calls retain 29 successes, four actual
+AttributeErrors, no serializer errors, and no skips. There are zero native
+calls and no production changes in this checkpoint.
+
+Parent DataFrame PLUSPLUS Petri output and full mutation snapshots match the
+exported `apply_pandas` helper at AND thresholds 0/0.5/1. Direct DataFrame
+PLUSPLUS Petri output matches the converted EventLog route at 0.5. Parent/direct
+PLUSPLUS HeuristicsNet calls match all seventeen raw fields across those
+carriers. Eight complete public Petri comparisons match, while two deliberate
+route/variant comparisons retain their full-field mismatches.
+
+The pandas helper exposes the missing carrier distinction: B/C concurrency
+is 2 rather than 4, and its AND scores are 0.5/0.25 at threshold zero. The 0.5
+output score is excluded at threshold equality. DFG counts match, with a
+separate raw dictionary insertion-order difference. The pandas route adds
+float64 `@@diff` durations and requires datetimelike timestamp columns.
+Object-dtype parent PLUSPLUS/pandas errors differ from successful direct
+PLUSPLUS calls; CLASSIC parent/direct object-dtype behavior also differs.
+These observations define native pandas discovery, mutation, error, and route
+work still required. They do not prove internal dispatch or a universal
+concurrency-halving rule.
+
+Evidence is `heuristic-pandas-dispatch-checks.jsonl.gz` (SHA-256
+`bbc8cbe45fa4765c269a159ef8f04e374370dacdc9738b519fdd2ab0c8184f08`, 645546 bytes,
+30 records) and `heuristic-pandas-dispatch-validation.json`
+(SHA-256 `c1cf86c09f49a16a590155a8bdb5dfca1802c043b186fcf9de3b5b5f276fb65a`). All archived byte members and the gzip
+round-trip were checked. Coverage remains 46/86 packages and 199/387 modules,
+with 228 incomplete units. PLUSPLUS and the full target remain partial.
