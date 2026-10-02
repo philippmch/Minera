@@ -532,6 +532,111 @@ void lifecycle_input_shapes_defer_ignored_timestamp_parsing() {
   assert(custom_missing_threw);
 }
 
+void plusplus_returned_object_fields_acceptance() {
+  // Saved public local-label rows 0_False_{concept:name,task}_{1,2,10}_
+  // PLUSPLUS_frequency retain every raw three-second sojourn. Filtering Z or
+  // all nodes does not filter that returned map; shape 4 exposes an empty map.
+  // The full public replay also observes false start/end flags on every node,
+  // including nodes whose actual start/end occurrence counts are positive.
+  const std::string selected_a = "A\"\\";
+  const std::string selected_b = "B\n";
+  const std::string selected_z = "Z\xce\xa9";
+  auto selected_interval = [](std::string canonical, std::string selected,
+                              std::string start, std::string complete) {
+    auto result = interval(std::move(canonical), std::move(start),
+                           std::move(complete));
+    attr(result, "task", std::move(selected));
+    return result;
+  };
+  auto a = [&] {
+    return selected_interval("canonical_A", selected_a,
+                             "2026-01-01T00:00:00Z", "2026-01-01T00:00:03Z");
+  };
+  auto b = [&] {
+    return selected_interval("canonical_B", selected_b,
+                             "2026-01-01T00:00:05Z", "2026-01-01T00:00:08Z");
+  };
+  const auto source = log({
+      trace({a(), b()}), trace({a(), b()}),
+      trace({selected_interval("canonical_Z", selected_z,
+                               "2026-01-01T00:00:00Z",
+                               "2026-01-01T00:00:03Z")}),
+  });
+  const std::map<std::string, double> canonical_expected{
+      {"canonical_A", 3.0}, {"canonical_B", 3.0}, {"canonical_Z", 3.0}};
+  const std::map<std::string, double> selected_expected{
+      {selected_a, 3.0}, {selected_b, 3.0}, {selected_z, 3.0}};
+  auto options = plus_options();
+  const auto ordinary = discover_heuristics_net(source, options);
+  assert(ordinary.sojourn_times.has_value());
+  assert(*ordinary.sojourn_times == canonical_expected);
+  assert(activity_stat(ordinary, "canonical_A").start_occurrences == 2);
+  assert(activity_stat(ordinary, "canonical_B").end_occurrences == 2);
+  for (const auto& statistic : ordinary.activity_statistics) {
+    assert(statistic.is_start_activity.has_value());
+    assert(statistic.is_end_activity.has_value());
+    assert(!*statistic.is_start_activity);
+    assert(!*statistic.is_end_activity);
+  }
+  assert((ordinary.activities == std::vector<std::string>{
+                                     "canonical_A", "canonical_B", "canonical_Z"}));
+  const auto graph = discover_directly_follows_graph(source);
+  const auto ordinary_json = analysis_json("plusplus-sojourn-canonical", source,
+                                           graph, nullptr, nullptr, &ordinary);
+  assert(ordinary_json.find(
+             "\"sojourn_times\": {\"canonical_A\": 3, \"canonical_B\": 3, "
+             "\"canonical_Z\": 3}") != std::string::npos);
+
+  options.activity_attribute = "task";
+  const std::string selected_wire =
+      R"json("sojourn_times": {"A\"\\": 3, "B\n": 3, ")json" +
+      selected_z + R"json(": 3})json";
+  for (const auto decoration : {HeuristicNetDecoration::kFrequency,
+                                HeuristicNetDecoration::kPerformance}) {
+    options.decoration = decoration;
+    for (const std::uint64_t minimum : {1, 2, 10}) {
+      options.min_activity_count = minimum;
+      const auto net = discover_heuristics_net(source, options);
+      assert(net.activity_ids_are_local);
+      assert(net.sojourn_times.has_value());
+      assert(*net.sojourn_times == selected_expected);
+      for (const auto& statistic : net.activity_statistics) {
+        assert(statistic.is_start_activity.has_value());
+        assert(statistic.is_end_activity.has_value());
+        assert(!*statistic.is_start_activity);
+        assert(!*statistic.is_end_activity);
+      }
+      if (minimum == 1) {
+        assert((net.activities == std::vector<std::string>{
+                                      selected_a, selected_b, selected_z}));
+      } else if (minimum == 2) {
+        assert((net.activities ==
+                std::vector<std::string>{selected_a, selected_b}));
+        assert(net.sojourn_times->at(selected_z) == 3.0);
+      } else {
+        assert(net.activities.empty());
+        assert(net.active_activities.empty());
+        assert(net.edges.empty());
+      }
+      const auto wire = analysis_json("plusplus-sojourn-selected", source,
+                                      graph, nullptr, nullptr, &net);
+      assert(wire.find(selected_wire) != std::string::npos);
+      if (minimum != 10) {
+        assert(wire.find("\"is_start_activity\": false") != std::string::npos);
+        assert(wire.find("\"is_end_activity\": false") != std::string::npos);
+      }
+    }
+  }
+  const auto empty_source = log({});
+  const auto empty = discover_heuristics_net(empty_source, options);
+  assert(empty.sojourn_times.has_value());
+  assert(empty.sojourn_times->empty());
+  const auto empty_graph = discover_directly_follows_graph(empty_source);
+  const auto empty_json = analysis_json("plusplus-sojourn-empty", empty_source,
+                                        empty_graph, nullptr, nullptr, &empty);
+  assert(empty_json.find("\"sojourn_times\": {}") != std::string::npos);
+}
+
 void filtering_and_unfiltered_statistics() {
   const auto source = log({
       trace({interval("A", "2026-01-01T00:00:00Z",
@@ -3191,25 +3296,30 @@ void classic_object_fields_acceptance(
              "[{\"key\": [\"A\", \"B\", \"C\"], \"value\": 3}]}") !=
          std::string::npos);
 
-  // PLUSPLUS keeps its actual boundary occurrence counts while leaving the
-  // CLASSIC return-object fields absent.
+  // PLUSPLUS keeps actual boundary occurrence counts and exposes false public
+  // node flags. The CLASSIC auxiliary return-object fields remain absent.
   const auto plus_log = log({trace({event("A", "2026-01-01T00:00:00Z"),
                                    event("B", "2026-01-01T00:00:01Z")})});
   const auto plus_graph = discover_directly_follows_graph(plus_log);
   const auto plus_net = discover_heuristics_net(plus_log, plus_options());
-  assert(!plus_net.sojourn_times.has_value());
+  assert(plus_net.sojourn_times.has_value());
+  assert(((*plus_net.sojourn_times) ==
+          std::map<std::string, double>{{"A", 0.0}, {"B", 0.0}}));
   assert(activity_stat(plus_net, "A").start_occurrences == 1);
   assert(activity_stat(plus_net, "B").end_occurrences == 1);
   for (const auto& statistic : plus_net.activity_statistics) {
-    assert(!statistic.is_start_activity.has_value());
-    assert(!statistic.is_end_activity.has_value());
+    assert(statistic.is_start_activity.has_value());
+    assert(statistic.is_end_activity.has_value());
+    assert(!*statistic.is_start_activity);
+    assert(!*statistic.is_end_activity);
   }
   const auto plus_analysis = analysis_json("classic-plus-object-fields",
                                            plus_log, plus_graph, nullptr,
                                            nullptr, &plus_net);
-  assert(plus_analysis.find("\"sojourn_times\"") == std::string::npos);
-  assert(plus_analysis.find("\"is_start_activity\"") == std::string::npos);
-  assert(plus_analysis.find("\"is_end_activity\"") == std::string::npos);
+  assert(plus_analysis.find("\"sojourn_times\": {\"A\": 0, \"B\": 0}") !=
+         std::string::npos);
+  assert(plus_analysis.find("\"is_start_activity\": false") != std::string::npos);
+  assert(plus_analysis.find("\"is_end_activity\": false") != std::string::npos);
   assert(plus_analysis.find("\"classic_public_fields\"") ==
          std::string::npos);
 
@@ -3693,6 +3803,7 @@ int main(int argc, char** argv) {
   interval_abstraction_and_strict_threshold();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
+  plusplus_returned_object_fields_acceptance();
   filtering_and_unfiltered_statistics();
   dependency_concurrency_and_no_connect_all();
   and_bundles_are_overlapping_maximal_cliques();

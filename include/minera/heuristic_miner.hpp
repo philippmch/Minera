@@ -110,8 +110,8 @@ struct HeuristicActivityStatistics {
   std::uint64_t start_occurrences = 0;
   std::uint64_t end_occurrences = 0;
   double mean_sojourn_seconds = 0.0;
-  // CLASSIC returns these node attributes explicitly. Keep them optional so
-  // PLUSPLUS does not claim CLASSIC-only object fields.
+  // Both variants return these node attributes explicitly. CLASSIC derives
+  // boundary membership; PLUSPLUS exposes false even for boundary nodes.
   std::optional<bool> is_start_activity;
   std::optional<bool> is_end_activity;
 };
@@ -232,8 +232,8 @@ struct HeuristicsNet {
   // from accepted edges so callers can inspect the returned node and edge
   // attributes without changing the graph or losing filtered relation data.
   std::vector<HeuristicActivityStatistics> activity_statistics;
-  // CLASSIC exposes an engaged name-to-sojourn mapping, including when empty.
-  // PLUSPLUS currently leaves this object field absent.
+  // Both variants expose an engaged name-to-sojourn mapping, including when
+  // empty. PLUSPLUS retains raw activity means even when activities are filtered.
   std::optional<std::map<std::string, double>> sojourn_times;
   std::vector<HeuristicRelationStatistics> relation_statistics;
   std::vector<HeuristicConcurrencyStatistics> concurrency_statistics;
