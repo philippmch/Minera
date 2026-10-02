@@ -121,7 +121,8 @@ its matrix contains the same pairs and counts. For example, overlapping
 intervals yield BD=4 and CD=4 where literal adjacency counts each twice.
 An interval control also yields AC=1 with zero literal adjacency. The original
 diagnostic is preserved; these differences do not establish missing native
-frequency counts. A corrected projection requires a separate actual report.
+frequency counts. The separate actual comparison below applies the corrected
+projection without changing those original observations.
 
 The archive retains two earlier probe failures. Compilation failed with
 MSVC C1128 before any native call. The next attempt compiled, but its first
@@ -135,6 +136,31 @@ comparison and keeps names, properties and arc-weight obligations explicit.
 The four passing Release suites and 650 compiled inputs are reused; no new
 public calls or production source changes occur in this evidence checkpoint.
 
+`heuristic-plusplus-broad-comparison-validation.json` preserves the separate
+corrected comparison: 119 HeuristicsNet aliases, 4,573 cells, 3,881 matched,
+234 ambiguous, 458 unrepresentable, and zero mismatched. All 117 supported
+aliases match their complete interval-frequency DFG and nested matrix; the
+two unfamiliar-decoration aliases still have no native counterpart. The
+frequency, dependency, sojourn, node-count, and edge-value matches retain
+their actual types and complete domains. Nullable auxiliary fields, computed
+performance output, positive AND maps, and unresolved projections remain
+explicit obligations rather than passing cells.
+
+The separate Petri comparison covers all 75 aliases. Projected topology
+matches in 69; six differ. Three are the original object-dtype DataFrame
+reference errors against native success. The other three use correctly typed
+DataFrames with overlapping intervals: each public result has four places,
+four transitions and eight arcs, against native five places, four transitions
+and nine arcs. Four public DataFrame input mutations remain recorded; native
+inputs are unchanged. Bijections preserve visible labels, silent transitions,
+directed multiplicities and initial/final token values. Raw explicit-zero and
+omitted marking domains remain distinct. Search exhaustion cannot pass.
+The 69 topology matches remain unrepresentable for full Petri acceptance
+because native names, properties and arc-object/weight carriers are absent.
+The separate 29-member archive roundtrips every exact UTF-8 byte, SHA and
+count and binds 935 external artifacts, including the original broad capture.
+No additional public or native calls, production edits or suite runs occur.
+
 ## Returned-object acceptance
 
 Presence, null, empty values, numeric types, and actual keys must be retained.
@@ -145,13 +171,13 @@ reported explicitly rather than filled with a presumed default.
 | Public fields | Native data to compare | Remaining acceptance |
 | --- | --- | --- |
 | `activities`, `activities_occurrences`, `start_activities`, `end_activities` | Net metadata and boundary counts | Compare complete key domains through filtering, including an edge incident to a removed activity; retain `[{}]` boundary containers for empty results. |
-| `dfg`, `dfg_matrix` | Retained `eventually_follows_frequency` relation statistics | Actual overlapping and non-neighbor interval results disprove literal-adjacency projection in 29 aliases. Compare the corrected complete map and nested matrix domains; current PLUSPLUS raw/cleaned DFG maps are empty in the saved cases. |
+| `dfg`, `dfg_matrix` | Retained `eventually_follows_frequency` relation statistics | Corrected complete maps and nested matrices match all 117 supported aliases, including overlapping and non-neighbor intervals. Current PLUSPLUS raw/cleaned DFG maps are empty in the saved cases; unfamiliar decoration has no native counterpart. |
 | `concurrent_activities`, `dependency_matrix` | Concurrency and dependency statistics | Compare positive concurrency and matrix entries whose dependencies fail the edge threshold. |
 | `dfg_window_2`, `freq_triples` | Auxiliary maps and their presence state | Saved public values are `None`, while native maps are empty; the current PLUSPLUS representation does not encode that distinction. Longer and repeated traces remain required. |
 | `dfg_window_2_matrix`, `freq_triples_matrix` | Views of the auxiliary maps | Empty dictionaries match the saved cases; the full domain and any positive values remain to be established. |
 | `node_type` | Decoration | Compare frequency and performance results, including edge value types. |
 | `performance_dfg`, `performance_matrix` | Performance presence, relation statistics, and edge representation | Frequency public DFG is `None`; performance DFG is a dictionary, including an empty dictionary. A frequency matrix entry may be zero even when native wait statistics are positive. Differing waits must distinguish count, mean, and representation. |
-| `sojourn_times` | Optional name-to-double map | Twelve saved comparisons pass, including escaped labels, removed activities, and empty input. Retain this verified obligation when broader inputs are added. |
+| `sojourn_times` | Optional name-to-double map | All 117 supported aliases match, including escaped labels, removed activities, and empty input. Retain this verified obligation when broader inputs are added. |
 | `nodes` | Retained activities, node statistics, maps, and connections | Compare actual node keys and all fields below; empty AND/loop maps alone do not prove positive-map behavior. |
 
 Each node requires `node_occ`, `is_start_activity`, `is_end_activity`,
@@ -197,8 +223,8 @@ places or transitions.
 The public controls establish connected sequence, XOR, positive AND, filtered
 structures, and a reciprocal ABA cycle below dependency threshold zero.
 Reserved-name controls preserve place and transition identities separately.
-Native comparisons of these broader shapes, self-loop conversion, and the
-complete name/property/weight obligations remain open. Identical overlapping
+The 69 matching projected topologies do not complete the name/property/weight
+obligations. Self-loop conversion remains open. Identical overlapping
 EventLog and datetime-typed DataFrame controls return equal HeuristicsNet
 fields but different Petri shapes; their cause is not established by these
 observations.
