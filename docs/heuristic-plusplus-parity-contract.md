@@ -298,10 +298,10 @@ input and parameter state before and after every actual call.
 | `TIMESTAMP_KEY` | `timestamp_attribute` | Custom completion is observed on public EventLog and flat routes; combine it with performance decoration and native controls. |
 | `CASE_ID_KEY` | `case_id_attribute` | Custom grouping and correctly datetime-typed DataFrame Petri calls are observed publicly; carrier-dependent conversion, input mutation, and native counterparts remain open. |
 | `DEPENDENCY_THRESH` | `dependency_threshold` | Public dependency 1 is accepted below 1 and excluded at or above 1; its matrix entry remains. Compare the full native results. |
-| `AND_MEASURE_THRESH` | `and_threshold` | Positive scores 1.0, 0.8 and 0.5 match the finite native map projections, including distinct input/output sides. Threshold equality, positive-map label collisions and complete AND Petri acceptance remain open. |
+| `AND_MEASURE_THRESH` | `and_threshold` | Positive scores 1.0, 0.8 and 0.5 match the finite native map projections, including distinct input/output sides. Saved next-down/equal/next-up controls for 1.0 and 0.5 now match native fields with escaped labels; complete AND Petri fields and broader domains remain open. |
 | `MIN_ACT_COUNT` | `min_activity_count` | Public controls remove incident relation maps and edges while preserving raw sojourn entries; the complete native field domains remain to be compared. |
 | `MIN_DFG_OCCURRENCES` | `min_frequency` | Public count 2 remains at minimum 2 and is removed at minimum 3, including the returned DFG and matrices. Compare native domains. |
-| `HEU_NET_DECORATION` | `decoration` | Public differing-wait controls distinguish frequency `None`/integer values from performance dictionary/float values; native output presence and scalar types remain open. |
+| `HEU_NET_DECORATION` | `decoration` and `plusplus_decoration_selector` | Saved frequency/performance field controls and the explicit `supplement-unfamiliar` selector match native presence and scalar types. Other unfamiliar strings, explicit null and non-string selectors remain unverified. |
 
 ## Petri and completion gates
 
@@ -315,7 +315,8 @@ The public controls establish connected sequence, XOR, positive AND, filtered
 structures, and a reciprocal ABA cycle below dependency threshold zero.
 Reserved-name controls preserve place and transition identities separately.
 The 69 matching projected topologies do not complete the name/property/weight
-obligations. Self-loop conversion remains open. Identical overlapping
+obligations. The saved AAB self-loop control now matches native projected
+conversion topology; its full Petri fields remain open. Identical overlapping
 EventLog and datetime-typed DataFrame controls return equal HeuristicsNet
 fields but different Petri shapes; their cause is not established by these
 observations.
@@ -376,3 +377,52 @@ focused native comparison against the saved public selector and label controls
 is a separate step; this checkpoint does not claim its results. Full returned
 objects, carrier conversion and Petri completion remain open. PLUSPLUS stays
 partial, with all 228 open coverage units retained.
+
+## Focused selector, AND-label and self-loop comparison
+
+The source checkpoint `8864276` is followed by a fresh capture from the same
+tested build. Eight actual native discoveries and two conversions complete
+in eight supervised processes and ten command records, with zero public
+calls. Eighteen saved public aliases map to eight distinct inputs: fourteen
+HeuristicsNet aliases and four Petri aliases. The unfamiliar selector controls
+are supplement rows 68/69; the remaining sixteen aliases are the saved AND
+boundary, escaped-label and self-loop controls.
+
+All 718 compared HeuristicsNet cells match, including both unfamiliar-selector
+aliases that the previous enum-only carrier could not represent. The retained
+raw selector remains distinct from the normalized returned performance mode.
+The comparison preserves existing typed normalizers and does not infer results
+for other selector values or input domains. Report SHA is
+`3bfcdbcc63563c6aff74174e2679e651f5ad12d3f53463402cfb64dff3d0dac7`.
+
+All four Petri aliases match projected topology and markings: the two renamed
+AND controls have six places, four transitions and ten arcs; the two AAB
+self-loop controls have three places, two transitions and four arcs. Public
+names, properties, explicit arc weights and full sparse marking objects remain
+unrepresented by the native carrier. Full Petri parity remains false. Report
+SHA is `f30248e9c3dcddee0927deb71017533fc660009f0c1ebe9346a9e867e00ee5b9`.
+
+The first focused capture attempt failed configure because a relative
+preparation path was resolved from the private child directory. Its actual
+exit-one configure record, finalized empty stdout and 308-byte stderr remain
+retained; it made zero build, discovery or conversion calls. The repaired CLI
+resolves incoming paths before dispatch and passes eleven focused checks beside
+the frozen original 34-check proof. Fresh successful capture and both
+comparisons retain independent provenance. Comparing adds zero public/native
+calls, builds or suite runs. These finite results leave PLUSPLUS partial and
+retain all 228 open coverage units.
+
+`docs/heuristic-plusplus-decoration-object-checks.jsonl.gz` and its validation
+preserve 817 exact UTF-8 members, the 650 compiled inputs and six actual
+binaries, current helper/proof origins and saved public capture provenance,
+including the complete AND-label archive. The original failed attempt, frozen
+helper, original 32 saver checks
+and twelve provenance-repair checks remain separate from fresh success. All
+member bytes, SHA values and counts roundtrip with the unchanged reviewed codec.
+The archive is 8,566,703 bytes, SHA
+`e8fefcbfca2f80fbc1ea7e047c1b8178be34b43fd0e72d69c4c02977e3bf4505`;
+validation SHA is
+`8e2918f9fae87afe09f5e3583811570dce5d7ba07ac748d63d23145e5e62bd6b`.
+Saving adds zero comparisons, calls, builds or suite runs. Durable validation
+uses immutable saved files rather than requiring the worktree or HEAD to remain
+at the capture checkpoint.
