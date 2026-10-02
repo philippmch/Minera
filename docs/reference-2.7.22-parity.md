@@ -7406,3 +7406,52 @@ validation SHA is
 `02e0ddca341fb4bc2d0306568a1d3854fc46bb54e3dbb45442ed64ccdbc1caff`.
 Saving adds zero public/native calls, comparisons, builds or suite runs.
 PLUSPLUS stays partial and all 228 open units remain in scope.
+
+### PLUSPLUS explicit selector and focused native controls
+
+Source checkpoint `8864276` adds an optional string decoration selector at the
+end of `HeuristicMinerOptions`. Omission preserves the enum API; explicit
+`frequency` selects frequency, and other explicit strings select performance
+within PLUSPLUS. CLASSIC ignores this selector. The saved unfamiliar string
+returns normalized performance mode while input snapshots preserve its raw
+value. All four required Release suites pass with assertions enabled; the
+separate decoration build archive preserves that tested source and execution.
+
+A fresh focused capture completes eight actual native discoveries and two
+conversions in eight processes and ten command records, with zero public
+calls. Eighteen saved public aliases map to eight inputs: supplement unfamiliar
+selector rows 68/69 and the sixteen AND boundary, escaped-label and self-loop
+controls. All 718 HeuristicsNet cells across fourteen aliases match. This
+resolves the two unfamiliar-selector aliases that the earlier enum-only native
+carrier could not represent. Net report SHA is
+`3bfcdbcc63563c6aff74174e2679e651f5ad12d3f53463402cfb64dff3d0dac7`.
+
+All four Petri aliases match projected topology and markings. The renamed AND
+pair has six places, four transitions and ten arcs; the AAB self-loop pair has
+three places, two transitions and four arcs. Native full names, properties,
+explicit arc weights and sparse marking objects remain unrepresented, so full
+Petri parity is false. Petri report SHA is
+`f30248e9c3dcddee0927deb71017533fc660009f0c1ebe9346a9e867e00ee5b9`.
+
+The first capture attempt fails configure because a relative preparation path
+is resolved from the private child directory. Its actual exit-one record,
+finalized empty stdout and 308-byte stderr remain retained; it makes zero
+build, discovery or conversion calls. The repaired CLI resolves incoming paths
+before dispatch, with eleven focused checks and the frozen original 34-check
+proof. Fresh capture and both comparisons preserve independent provenance;
+comparisons add zero calls, builds or suite runs. Other selector domains and
+full carrier/Petri gates remain open. PLUSPLUS stays partial, retaining all
+228 open coverage units.
+
+`docs/heuristic-plusplus-decoration-object-checks.jsonl.gz` and its validation
+preserve 817 exact UTF-8 members, 650 compiled inputs, six actual binaries,
+original failed-attempt records, helper/check origins and saved public capture
+provenance, including the complete AND-label archive. Original 32 saver checks and twelve repair checks
+retain their distinct byte origins. All member byte, SHA and count checks
+roundtrip with the unchanged reviewed codec. The archive is 8,566,703 bytes,
+SHA `e8fefcbfca2f80fbc1ea7e047c1b8178be34b43fd0e72d69c4c02977e3bf4505`;
+validation SHA is
+`8e2918f9fae87afe09f5e3583811570dce5d7ba07ac748d63d23145e5e62bd6b`.
+Saving adds zero comparisons, calls, builds or suite runs. Post-commit guards
+bind immutable saved files, preserving validation after later source and HEAD
+changes. No catalogue status is promoted.
