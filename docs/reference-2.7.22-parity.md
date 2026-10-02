@@ -7258,3 +7258,55 @@ validation SHA is
 Archiving adds no build/test commands or public/native calls. Fresh broad
 returned-object comparisons, carrier behavior and complete Petri fields
 remain open. PLUSPLUS stays partial and all 228 open units remain in scope.
+
+### PLUSPLUS escaped-label AND boundaries and public Petri controls
+
+Sixteen additional actual public calls complete successfully with unchanged
+inputs: twelve HeuristicsNet calls form six direct/parent pairs and four Petri
+calls form two pairs. All seventeen typed HeuristicsNet fields and canonical
+snapshots agree within every pair. The six controls preserve the same event
+data and non-AND fields while varying only the explicit AND threshold. Labels
+include `__proto__`, `constructor`, `toString`, and a label containing a quote,
+backslash, newline and Omega.
+
+At the floating predecessor of 1.0, the score-1.0 outgoing AND map is present;
+at 1.0 and its successor it is absent. At the predecessor of 0.5, both that
+outgoing map and a score-0.5 incoming map are present; at 0.5 and its successor
+only the outgoing map remains. These are finite returned-map observations,
+including positive maps under the escaped labels. The earlier ordinary-label
+series already preserves the corresponding score-1.0 boundary in public rows
+76/78, 80/82 and 84/86 and native cases 21/22/23. Its output bundles also change
+across the boundary. The earlier gate audit cited the CLASSIC path; PLUSPLUS
+uses the separate strict comparison in `plus_bundles`. These observations
+supersede the earlier statement that ordinary threshold equality lacked a
+controlled observation, without establishing every threshold or carrier.
+
+The renamed below-0.5 Petri pair has six places, four transitions and ten arcs.
+The selfloop-input pair has three places, two transitions and four arcs, forming
+`source0 -> A -> pre_B -> B -> sink0` without an explicit A-to-A relation.
+Both pairs agree in full public fields and sparse markings. All twenty-eight
+returned arc objects have unique identities and valid listed endpoints,
+integer weight one and present empty properties. Net and node properties are
+also present empty dictionaries; names and labels are preserved. Each marking
+contains one explicit integer token at source0 or sink0 and no explicit zero
+entries. The selfloop inputs exactly reuse supplement HeuristicsNet rows 40/41;
+saved native discovery case 47 accepts only A-to-B and previously had zero
+conversion calls. This public pair is not a new native conversion comparison.
+
+The worker exits zero, finalizes its logs with 255 stdout bytes and zero stderr
+bytes, and leaves zero active job processes. All eleven opaque installed-module
+hash proofs match the pinned reference. Original 34 capture checks, eight
+private-cache writability repair checks and nineteen saver checks are retained.
+`docs/heuristic-plusplus-and-label-checks.jsonl.gz` and its validation preserve
+695 exact UTF-8 members and 1,319 immutable external bindings, including 650
+independently frozen working-source files and the distinct compiled context.
+Every member byte, SHA and count roundtrips with the unchanged reviewed codec.
+The archive is 5,237,763 bytes, SHA
+`ad3c9badfa7e776496cd9aaa3b1813feed3eb0cec06c6094892f23ba9a8c7acf`;
+validation SHA is
+`1f7f8e168d59893fcb947fcb7e82f11d12e7d7f42ad1e09d2b12464b113a3dce`.
+Saving adds zero public/native calls, comparisons, production changes or suite
+runs. The public file adds sixteen aliases and six threshold identities;
+combined native eligibility and conversion membership remain unassigned.
+Full native returned-object and Petri acceptance remain open. PLUSPLUS stays
+partial, with all 228 open units retained.
