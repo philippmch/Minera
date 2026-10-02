@@ -7860,3 +7860,32 @@ Evidence is `heuristic-plusplus-pandas-filter-checks.jsonl.gz` (SHA-256
 round-trip. Broader parameter, carrier, error, metadata, identity and routing
 requirements remain open. PLUSPLUS and Alpha+ remain partial; coverage stays
 46/86 packages and 199/387 modules, with 228 incomplete units and no promotion.
+
+### PLUSPLUS numeric count threshold implementation (2026-10-02)
+
+Appended PLUSPLUS numeric count overrides and applied them consistently to
+activity/path filters, reverse dependency counts and AND numerators. Fractional
+cutoffs are not truncated, negative values retain counts and NaN rejects the
+corresponding counts. Existing integer filters remain exact; CLASSIC behavior is
+preserved. Both decoration modes are covered.
+
+All 88 new successful public controls match: 76 HeuristicsNet results on
+3,440 supported net/node/edge cells and complete connection domains,
+plus twelve complete supported Petri presentations. The wider replay matches all
+342 saved aliases on 12,150 net-field checks,
+61 Petri presentations, 23 mapped errors and the supported mutation/option checks.
+All 77 generic regression results are unchanged. Actual native execution makes
+419 discoveries, 61 presented conversions and 43 generic conversions without
+additional reference calls.
+
+All five assertion-enabled suites pass for the accepted 650-input frozen build.
+The initial failed test run and its source remain retained; its path-count
+expectation was corrected from four to two for cutoffs between two and four.
+Its prepared native replay was not executed or counted.
+
+Evidence is `heuristic-plusplus-pandas-numeric-checks.jsonl.gz` (SHA-256
+`da8b1d1cdf71df3e6bcd3b6762d0b9612c3094ca9e7da949746400b6317c350f`, 46779784 bytes, 3079 verified members), with
+`heuristic-plusplus-pandas-numeric-validation.json`. All member bytes and hashes
+round-trip. Broader parameter types, carriers, errors, metadata, identity and
+routing requirements remain open. PLUSPLUS and Alpha+ stay partial; coverage
+remains 46/86 packages and 199/387 modules, with 228 incomplete units.

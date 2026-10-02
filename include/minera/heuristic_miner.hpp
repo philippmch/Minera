@@ -334,6 +334,11 @@ struct HeuristicMinerOptions {
   // "frequency" selects frequency, while any other string selects performance.
   // Appended to preserve existing positional aggregate initialization.
   std::optional<std::string> plusplus_decoration_selector = std::nullopt;
+  // PLUSPLUS accepts signed, fractional and nonfinite numeric count cutoffs.
+  // Supplied values override the integer filters for PLUSPLUS only; omission
+  // retains exact uint64_t comparisons and the existing CLASSIC behavior.
+  std::optional<double> plusplus_min_activity_count = std::nullopt;
+  std::optional<double> plusplus_min_frequency = std::nullopt;
 };
 
 struct HeuristicClassicDfgInput {
