@@ -7026,7 +7026,7 @@ The archive keeps the original failure, complete returned values, mutation
 snapshots, and finalization separate. The finalizer's process exit 0 is an
 observed ROOT execution result, not a synthesized command record.
 
-The controls establish missing-start and lifecycle behavior, direct-adjacency
+The controls establish missing-start and lifecycle behavior, AB and BC
 DFG values on plain ABC traces, and raw concurrency retaining a filtered
 activity. Reciprocal ABA edges below dependency threshold zero produce an
 actual cyclic Petri net. Equal and above-zero thresholds exclude those edges.
@@ -7044,3 +7044,47 @@ codec. Archive SHA is
 `af7209349f454752dea06818f65c7a5c8310c5d981caea625cac9df5ac10c2f4`.
 Full returned-object, carrier, input mutation, and Petri acceptance remains
 open. PLUSPLUS stays partial, with all 228 open coverage units retained.
+
+### PLUSPLUS broad native capture and diagnostic comparison
+
+Seventy actual native discoveries and forty-three conversions reuse the
+tested core `dc5abfa0919b07ad305b53444f0ab419a9f032f9e816d9e1cd9b687b5d9a636d`
+from canonical tree `fdfbd92359fe459ba6f4bf82c6df4ef6d2129815`. The 194 reused
+public aliases deduplicate to 71 exact cases; seventy have a native carrier.
+The unfamiliar decoration case covers two aliases and remains explicitly
+unrepresentable without a native call. All 72 successful commands, seventy
+probe processes, before/after inputs and options, complete native fields,
+Petri incidences, zero marking entries, and actual call markers are retained.
+There are no native discovery or conversion errors and no new public calls.
+
+The original diagnostic compares 119 HeuristicsNet aliases across 4,573 cells:
+3,823 matched, 234 ambiguous, 458 unrepresentable, and 58 mismatched. All
+58 mismatches are the original literal-adjacency projection for `dfg` and
+`dfg_matrix`, with 29 aliases per field. Each affected public DFG matches
+native `eventually_follows_frequency` counts, and each public matrix flattens
+to that same DFG. Overlap yields BD=4 and CD=4 against literal-adjacency counts
+of two; a separate interval yields AC=1 with no literal adjacency. These are
+comparison-projection differences, not evidence of absent native counts.
+The original report remains immutable pending a separate corrected report.
+Its three public reference errors and seventy-five pending Petri comparisons
+remain explicit; a matching cell does not settle full returned-object parity.
+
+Two earlier native probe attempts remain separate. MSVC C1128 stops the first
+before any discovery or conversion. Adding `/bigobj` lets the second compile,
+but its first process overflows its stack without a returned object or call
+journal; its discovery and conversion counts are unknown. The successful
+probe uses separate non-inlined case factories while preserving constructor
+bytes and serialization. Its flushed call markers agree with actual returned
+counts. Failed logs, process records, guards, and helper versions remain raw.
+
+`docs/heuristic-plusplus-broad-native-checks.jsonl.gz` and its validation retain
+315 exact UTF-8 members and 660 external byte/hash bindings. Twenty-six
+focused saver checks pass, and every member byte, SHA and count roundtrips
+with the unchanged reviewed codec. The archive is 18,480,503 bytes, SHA
+`67d072a2d6fd1e08be7b08d140e4844436f0d8e4e8fbf84607cd5b0bd8c3db9c`;
+validation SHA is
+`572b0d1c16588289e04757c6e4124ffe1d41c62477a0b7718a7951d3b1945581`.
+The four passing Release suites and 650 compiled inputs are reused without
+new production edits or suite runs. PLUSPLUS remains partial, the catalogue
+stays at 46/86 packages and 199/387 modules complete, and all 228 open units
+remain in scope.
