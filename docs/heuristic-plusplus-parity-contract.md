@@ -950,3 +950,43 @@ unscoped metadata or adapter routing. The supported input projection still keeps
 typed values while excluding native allocation counters and decimal spelling.
 PLUSPLUS and Alpha+ remain partial. No catalogue units are promoted: coverage
 remains 46/86 packages and 199/387 modules, with 228 incomplete units.
+
+## Pandas filter and threshold controls (2026-10-02)
+
+Executed 66 additional public calls across 26 HeuristicsNet control rows, each
+using frequency and performance decoration, plus fourteen selected Petri calls.
+The controls vary the five exported count/threshold/decoration parameters while
+fixing the four selectors. They cover activity-count cutoffs 0/1/4/5/8/9,
+path-count cutoffs 0/1/2/3/4/5/8/9, dependency values immediately below/equal/above
+0.5 and at 1, and AND values immediately below/equal/above 0.25 and 0.5.
+Fixtures include mixed interval orientation, repeated B activities and touching
+B/C intervals. Selected Petri controls retain empty and partially filtered graphs.
+
+All 66 public calls return successfully without skips or serialization errors.
+Actual native replay matches every supported field and input-after projection:
+52 HeuristicsNet results match 2,246 cells across all seventeen net projections
+and their node/edge projections, including complete connection domains; fourteen
+Petri results match names, nullable labels, properties, arc occurrences, weights
+and sparse markings. Mutation occurrence and option preservation match. Replay
+makes 66 discoveries and fourteen presented conversions without new public calls.
+
+Production source is unchanged at `e4693ec`. The verified core, its 650 frozen
+inputs and five passing assertion-enabled suites are reused. Only the new replay
+probe is compiled. The 77 generic regression results from the preceding accepted
+checkpoint are retained as parent evidence; they are not rerun or counted as new
+discoveries. The build manifest's pre-implementation parent and the committed
+source checkpoint remain distinct provenance fields.
+
+Evidence is `heuristic-plusplus-pandas-filter-checks.jsonl.gz` (SHA-256
+`397cd79c365240103c42785b7bb22381e1a6320813f6b5c93b9ac106438dc86d`, 7358748 bytes, 322 verified members) and
+`heuristic-plusplus-pandas-filter-validation.json`. Raw calls, typed values,
+mutations, public API views, opaque pinned proofs, process records, logs, helpers,
+probe sources and comparisons are retained. Every member byte/hash round-trips.
+All 650 compilation input hashes and the reused binaries are checked against the
+previous checkpoint; that committed archive retains their exact source bytes.
+
+These finite controls expand parameter/filter evidence. Fractional/negative and
+nonfinite count parameters, selector/error breadth, dictionary order, object
+identity, metadata, timestamp domains and adapter routing remain open. PLUSPLUS
+and Alpha+ stay partial; no catalogue unit is promoted. Coverage remains 46/86
+packages and 199/387 modules, with 228 incomplete units.
