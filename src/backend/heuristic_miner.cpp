@@ -145,6 +145,9 @@ struct PlusAbstraction {
   std::map<NamePair, double> wait_sums;
   std::map<NamePair, std::vector<double>> wait_samples;
   std::map<std::string, double> sojourn_sums;
+  // DataFrame means exclude missing durations while occurrence counts keep
+  // those rows. Generic discovery retains its existing sum/count projection.
+  std::map<std::string, double> sojourn_means;
   std::map<NamePair, std::uint64_t> concurrency;
 };
 
@@ -383,8 +386,7 @@ struct IntervalTrace {
 
 IntervalTrace to_intervals(const Trace& trace,
                            const HeuristicMinerOptions& options,
-                           bool pre_interval_mode,
-                           bool pandas_route = false) {
+                           bool pre_interval_mode) {
   using LifecycleKey = std::pair<std::string, std::string>;
   struct PendingStart {
     std::string timestamp_text;
@@ -405,11 +407,7 @@ IntervalTrace to_intervals(const Trace& trace,
                     required_business_timestamp_microseconds(timestamp_text,
                                                              "event")}
               : std::optional<std::int64_t>{};
-      const auto* value =
-          pandas_route && options.start_timestamp_attribute &&
-                  options.start_timestamp_attribute->empty()
-              ? event.attribute("")
-              : selected_start_timestamp(event, options, true);
+      const auto* value = selected_start_timestamp(event, options, true);
       if (value == nullptr)
         throw std::invalid_argument(
             "Heuristics Miner PLUSPLUS interval input is missing the "
@@ -498,10 +496,8 @@ IntervalTrace to_intervals(const Trace& trace,
 }
 
 PlusAbstraction build_plus_abstraction(
-    const EventLog& log, const HeuristicMinerOptions& options,
-    bool pandas_route = false) {
+    const EventLog& log, const HeuristicMinerOptions& options) {
   PlusAbstraction out;
-  std::map<NamePair, std::uint64_t> directional_concurrency;
   std::set<std::string> known;
   const auto business_slots =
       options.use_business_hours
@@ -511,14 +507,11 @@ PlusAbstraction build_plus_abstraction(
           : std::vector<BusinessHourSlot>{};
   const bool pre_interval_mode =
       !log.traces.empty() && !log.traces.front().events.empty() &&
-      (pandas_route && options.start_timestamp_attribute &&
-               options.start_timestamp_attribute->empty()
-           ? log.traces.front().events.front().attribute("")
-           : selected_start_timestamp(log.traces.front().events.front(),
-                                      options, true)) != nullptr;
+      selected_start_timestamp(log.traces.front().events.front(), options,
+                               true) != nullptr;
   for (const auto& trace : log.traces) {
     const auto converted =
-        to_intervals(trace, options, pre_interval_mode, pandas_route);
+        to_intervals(trace, options, pre_interval_mode);
     const auto& intervals = converted.sorted;
     if (intervals.empty()) continue;
     // In pre-interval mode discovery preserves trace order for start/end/attribute
@@ -560,13 +553,8 @@ PlusAbstraction build_plus_abstraction(
                      intervals[j].start_microseconds) <=
             std::min(intervals[i].complete_microseconds,
                      intervals[j].complete_microseconds)) {
-          if (pandas_route) {
-            ++directional_concurrency[
-                {intervals[i].activity, intervals[j].activity}];
-          } else {
-            ++out.concurrency[std::minmax(intervals[i].activity,
-                                          intervals[j].activity)];
-          }
+          ++out.concurrency[std::minmax(intervals[i].activity,
+                                       intervals[j].activity)];
         } else {
           break;
         }
@@ -593,13 +581,188 @@ PlusAbstraction build_plus_abstraction(
       out.wait_samples[pair].push_back(wait);
     }
   }
-  if (pandas_route) {
-    // Public pandas controls retain the last sorted directional count for a
-    // canonical activity pair; opposite orientations do not add together.
-    for (const auto& [pair, count] : directional_concurrency)
-      out.concurrency[std::minmax(pair.first, pair.second)] = count;
-  }
   return out;
+}
+
+using PandasTimestamp = std::optional<ParsedExactTimestamp>;
+
+PandasTimestamp pandas_timestamp(const EventAttribute* value,
+                                 std::int64_t units_per_second) {
+  if (value == nullptr || value->is_null || is_typed_nat(*value))
+    return std::nullopt;
+  const auto* date = std::get_if<NativeDate>(&value->typed_value);
+  auto parsed = parse_timestamp_exact(date == nullptr ? value->value
+                                                      : date->value);
+  if (!parsed)
+    throw std::invalid_argument(
+        "Heuristics Miner PLUSPLUS pandas requires a valid typed timestamp");
+  const auto quantum = 1'000'000'000 / units_per_second;
+  parsed->nanoseconds = static_cast<std::uint32_t>(
+      parsed->nanoseconds / quantum * quantum);
+  return parsed;
+}
+
+auto pandas_instant(const ParsedExactTimestamp& value) {
+  return std::pair{value.seconds, value.nanoseconds};
+}
+
+double pandas_elapsed(const ParsedExactTimestamp& end,
+                      const ParsedExactTimestamp& begin,
+                      std::int64_t units_per_second,
+                      bool scalar_wait = false) {
+  const auto seconds = end.seconds - begin.seconds;
+  const auto limit = std::numeric_limits<std::int64_t>::max();
+  if (seconds > limit / units_per_second ||
+      seconds < std::numeric_limits<std::int64_t>::min() / units_per_second)
+    throw std::overflow_error("Heuristics Miner pandas timedelta overflow");
+  const auto quantum = 1'000'000'000 / units_per_second;
+  const auto fraction = static_cast<std::int64_t>(end.nanoseconds / quantum) -
+                        static_cast<std::int64_t>(begin.nanoseconds / quantum);
+  const auto integral = seconds * units_per_second;
+  if ((fraction > 0 && integral > limit - fraction) ||
+      (fraction < 0 && integral <
+                          std::numeric_limits<std::int64_t>::min() - fraction))
+    throw std::overflow_error("Heuristics Miner pandas timedelta overflow");
+  // Timedelta arrays scale their integer unit values. Dividing epoch doubles
+  // loses subsecond values and division by the scale can round differently.
+  const double scale = units_per_second == 1'000'000'000 ? 1e-9
+                       : units_per_second == 1'000'000 ? 1e-6
+                       : units_per_second == 1'000 ? 1e-3 : 1.0;
+  const auto ticks = integral + fraction;
+  if (!scalar_wait) return static_cast<double>(ticks) * scale;
+  // Scalar performance waits retain separate seconds, microseconds and
+  // nanoseconds; array duration scaling has a different rounding boundary.
+  if (ticks <= 0) return 0.0;
+  double result = static_cast<double>(ticks / units_per_second);
+  const auto remainder = ticks % units_per_second;
+  if (units_per_second == 1'000'000'000) {
+    result += static_cast<double>(remainder / 1'000) * 1e-6;
+    result += static_cast<double>(remainder % 1'000) * 1e-9;
+  } else {
+    result += static_cast<double>(remainder) * scale;
+  }
+  return result;
+}
+
+struct PandasInterval {
+  std::string activity;
+  PandasTimestamp start;
+  PandasTimestamp complete;
+};
+
+PlusAbstraction build_pandas_plus_abstraction(
+    const EventLog& log, const HeuristicMinerOptions& options,
+    std::int64_t start_units, std::int64_t complete_units) {
+  PlusAbstraction out;
+  std::set<std::string> known;
+  std::map<NamePair, std::uint64_t> directional_concurrency;
+  struct Mean {
+    double sum = 0.0;
+    double correction = 0.0;
+    std::uint64_t count = 0;
+    void add(double value) {
+      if (std::isnan(value)) return;
+      const double adjusted = value - correction;
+      const double next = sum + adjusted;
+      correction = (next - sum) - adjusted;
+      sum = next;
+      ++count;
+    }
+  };
+  std::map<std::string, Mean> sojourn;
+  const auto duration_units = std::max(start_units, complete_units);
+  for (const auto& trace : log.traces) {
+    if (trace.events.empty()) continue;
+    ++out.starts[required_activity(trace.events.front(), options)];
+    ++out.ends[required_activity(trace.events.back(), options)];
+    std::vector<PandasInterval> intervals;
+    for (const auto& event : trace.events) {
+      const auto& activity = required_activity(event, options);
+      if (known.insert(activity).second) out.activity_order.push_back(activity);
+      ++out.occurrences[activity];
+      const auto* duration = selected_start_attribute(event, "@@diff");
+      if (duration == nullptr)
+        throw std::logic_error("Heuristics Miner pandas duration column missing");
+      const auto* number = std::get_if<double>(&duration->typed_value);
+      if (number == nullptr)
+        throw std::logic_error("Heuristics Miner pandas duration is not a float");
+      sojourn[activity].add(*number);
+      intervals.push_back({
+          activity,
+          pandas_timestamp(selected_start_attribute(
+                               event, *options.start_timestamp_attribute),
+                           start_units),
+          pandas_timestamp(selected_start_attribute(
+                               event, canonical_timestamp_attribute(options)),
+                           complete_units)});
+    }
+    std::stable_sort(intervals.begin(), intervals.end(),
+                     [](const auto& lhs, const auto& rhs) {
+                       if (!lhs.start) return false;
+                       if (!rhs.start) return true;
+                       return pandas_instant(*lhs.start) <
+                              pandas_instant(*rhs.start);
+                     });
+    for (std::size_t i = 0; i < intervals.size(); ++i) {
+      const auto& first = intervals[i];
+      for (std::size_t j = i + 1; j < intervals.size(); ++j) {
+        const auto& second = intervals[j];
+        if (first.complete && second.start &&
+            pandas_instant(*first.complete) <= pandas_instant(*second.start)) {
+          ++out.eventually_follows[{first.activity, second.activity}];
+          break;
+        }
+      }
+      for (std::size_t j = i + 1; j < intervals.size(); ++j) {
+        const auto& second = intervals[j];
+        if (first.start && first.complete && second.start && second.complete &&
+            std::max(pandas_instant(*first.start),
+                     pandas_instant(*second.start)) <=
+                std::min(pandas_instant(*first.complete),
+                         pandas_instant(*second.complete)))
+          ++directional_concurrency[{first.activity, second.activity}];
+      }
+    }
+    // Pandas performance adjacency follows sorted nonmissing starts. A missing
+    // completion preserves its row but contributes no outgoing wait sample.
+    const PandasInterval* previous = nullptr;
+    for (const auto& current : intervals) {
+      if (!current.start) continue;
+      if (previous != nullptr) {
+        const NamePair pair{previous->activity, current.activity};
+        ++out.direct_adjacency[pair];
+        if (previous->complete) {
+          const auto wait = std::max(
+              0.0, pandas_elapsed(*current.start, *previous->complete,
+                                  duration_units, true));
+          out.wait_sums[pair] += wait;
+          out.wait_samples[pair].push_back(wait);
+        }
+      }
+      previous = &current;
+    }
+  }
+  for (const auto& [activity, mean] : sojourn)
+    out.sojourn_means[activity] =
+        mean.count == 0 ? std::numeric_limits<double>::quiet_NaN()
+                        : mean.sum / static_cast<double>(mean.count);
+  for (const auto& [pair, count] : directional_concurrency)
+    out.concurrency[std::minmax(pair.first, pair.second)] = count;
+  std::stable_sort(out.activity_order.begin(), out.activity_order.end(),
+                   [&](const auto& first, const auto& second) {
+                     return out.occurrences.at(first) >
+                            out.occurrences.at(second);
+                   });
+  return out;
+}
+
+double plus_sojourn_mean(const PlusAbstraction& abstraction,
+                         const std::string& activity) {
+  const auto pandas = abstraction.sojourn_means.find(activity);
+  return pandas != abstraction.sojourn_means.end()
+             ? pandas->second
+             : abstraction.sojourn_sums.at(activity) /
+                   static_cast<double>(abstraction.occurrences.at(activity));
 }
 
 std::uint64_t get_count(const std::map<NamePair, std::uint64_t>& counts,
@@ -1621,17 +1784,14 @@ HeuristicsNet discover_classic_dfg(
   return net;
 }
 
-HeuristicsNet discover_plus_plus(const EventLog& log,
-                                 const HeuristicMinerOptions& options,
-                                 bool pandas_route = false) {
+HeuristicsNet discover_plus_plus_from_abstraction(
+    const PlusAbstraction& abstraction, const HeuristicMinerOptions& options) {
   const HeuristicNetDecoration effective_decoration =
       options.plusplus_decoration_selector
           ? (*options.plusplus_decoration_selector == "frequency"
                  ? HeuristicNetDecoration::kFrequency
                  : HeuristicNetDecoration::kPerformance)
           : options.decoration;
-  const PlusAbstraction abstraction =
-      build_plus_abstraction(log, options, pandas_route);
   HeuristicsNet net;
   net.variant = HeuristicMinerVariant::kPlusPlus;
   net.decoration = effective_decoration;
@@ -1668,8 +1828,7 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
         {id, abstraction.occurrences.at(activity),
          start == abstraction.starts.end() ? 0 : start->second,
          end == abstraction.ends.end() ? 0 : end->second,
-         abstraction.sojourn_sums.at(activity) /
-             static_cast<double>(abstraction.occurrences.at(activity))});
+         plus_sojourn_mean(abstraction, activity)});
     net.activity_statistics.back().is_start_activity = false;
     net.activity_statistics.back().is_end_activity = false;
   }
@@ -1677,9 +1836,7 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
   // and attach an id only when it survived the node filter.
   net.sojourn_times.emplace();
   for (const auto& activity : abstraction.activity_order) {
-    const double mean_sojourn =
-        abstraction.sojourn_sums.at(activity) /
-        static_cast<double>(abstraction.occurrences.at(activity));
+    const double mean_sojourn = plus_sojourn_mean(abstraction, activity);
     net.raw_activity_statistics.push_back(
         {activity, abstraction.occurrences.at(activity), mean_sojourn});
     net.sojourn_times->emplace(activity, mean_sojourn);
@@ -1803,6 +1960,12 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
   return net;
 }
 
+HeuristicsNet discover_plus_plus(const EventLog& log,
+                                 const HeuristicMinerOptions& options) {
+  return discover_plus_plus_from_abstraction(build_plus_abstraction(log, options),
+                                             options);
+}
+
 }  // namespace
 
 HeuristicsNet discover_plus_plus_pandas(
@@ -1831,7 +1994,6 @@ HeuristicsNet discover_plus_plus_pandas(
           "builtins.AttributeError",
           "Can only use .dt accessor with datetimelike values");
   };
-  validate_datetime(completed);
   const auto append_column = [&](const std::string& key,
                                  const std::string& dtype) {
     const auto index = data.columns.size();
@@ -1861,7 +2023,49 @@ HeuristicsNet discover_plus_plus_pandas(
   } else {
     started = static_cast<std::size_t>(start - data.columns.begin());
   }
+  validate_datetime(completed);
   validate_datetime(started);
+  const auto unit = [&](std::size_t index) -> std::int64_t {
+    if (!data.dtypes.empty()) {
+      const std::string_view dtype = data.dtypes[index];
+      if (dtype.starts_with("datetime64[ns")) return 1'000'000'000;
+      if (dtype.starts_with("datetime64[ms")) return 1'000;
+      if (dtype.starts_with("datetime64[s")) return 1;
+      return 1'000'000;
+    }
+    for (const auto& row : data.rows) {
+      if (!row[index]) continue;
+      const auto* date = std::get_if<NativeDate>(&row[index]->typed_value);
+      if (date && date->resolution == NativeDateResolution::kNanosecond)
+        return 1'000'000'000;
+    }
+    return 1'000'000;
+  };
+  const auto start_units = unit(started);
+  const auto complete_units = unit(completed);
+  const auto duration_units = std::max(start_units, complete_units);
+  const auto any_timestamp = [&](std::size_t index) {
+    return std::any_of(data.rows.begin(), data.rows.end(), [&](const auto& row) {
+      return row[index] && !row[index]->is_null && !is_typed_nat(*row[index]);
+    });
+  };
+  const auto timezone_aware = [&](std::size_t index) {
+    if (!data.dtypes.empty())
+      return data.dtypes[index].find(',') != std::string::npos;
+    for (const auto& row : data.rows) {
+      if (!row[index]) continue;
+      const auto* date = std::get_if<NativeDate>(&row[index]->typed_value);
+      if (date && date->timezone) return true;
+      const auto parsed = parse_timestamp_exact(row[index]->value);
+      if (parsed && parsed->timezone_aware) return true;
+    }
+    return false;
+  };
+  if (timezone_aware(started) != timezone_aware(completed) ||
+      (timezone_aware(completed) && !any_timestamp(completed)))
+    throw HeuristicPandasError(
+        "builtins.TypeError",
+        "Cannot subtract tz-naive and tz-aware datetime-like objects.");
   std::vector<double> durations;
   durations.reserve(data.rows.size());
   for (const auto& row : data.rows) {
@@ -1871,9 +2075,9 @@ HeuristicsNet discover_plus_plus_pandas(
         is_typed_nat(*end) || is_typed_nat(*begin)) {
       durations.push_back(std::numeric_limits<double>::quiet_NaN());
     } else {
-      durations.push_back(detail::epoch_seconds_from_microseconds(
-          required_timestamp_microseconds(end->value, "event") -
-          required_timestamp_microseconds(begin->value, "start")));
+      durations.push_back(pandas_elapsed(
+          *pandas_timestamp(&*end, complete_units),
+          *pandas_timestamp(&*begin, start_units), duration_units));
     }
   }
   const auto existing = std::find(data.columns.begin(), data.columns.end(),
@@ -1892,8 +2096,19 @@ HeuristicsNet discover_plus_plus_pandas(
     value.value = std::to_string(durations[i]);
     data.rows[i][difference] = std::move(value);
   }
-  return discover_plus_plus(classic_event_log(EventDataView(data), selected),
-                            selected, true);
+  if (!any_timestamp(started)) {
+    const auto suffix = duration_units == 1'000'000'000 ? "ns"
+                        : duration_units == 1'000'000 ? "us"
+                        : duration_units == 1'000 ? "ms" : "s";
+    throw HeuristicPandasError(
+        "builtins.TypeError", "Invalid comparison between dtype=timedelta64[" +
+                                  std::string(suffix) + "] and int");
+  }
+  return discover_plus_plus_from_abstraction(
+      build_pandas_plus_abstraction(
+          classic_event_log(EventDataView(data), selected), selected,
+          start_units, complete_units),
+      selected);
 }
 
 HeuristicsNet discover_heuristics_net(

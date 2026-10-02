@@ -769,3 +769,72 @@ No implementation change or completion claim follows from this contrast-only
 checkpoint. The four gaps remain open, along with broader pandas/PLUSPLUS and
 full-target obligations. Coverage remains 46/86 packages, 199/387 modules, and
 228 open units.
+
+## Native pandas NaT, duration precision and performance waits (2026-10-02)
+
+The mutable PLUSPLUS pandas route now closes the four measured timestamp gaps
+from the preceding checkpoint. It accepts partial NaT timestamps, retains every
+row in activity occurrence counts, and excludes missing durations from sojourn
+means. An activity with no valid duration retains a NaN mean. Interval sorting
+places missing starts last; eventually-follows and inclusive concurrency require
+the relevant known timestamps. Performance adjacency uses sorted nonmissing
+starts, preserving rows with missing completion while omitting their wait sample.
+
+Missing selected start columns are copied before timestamp dtype validation, so
+the captured object-dtype error retains that added column. Entirely missing start
+columns raise the captured TypeError after adding NaN `@@diff` values. Entirely
+missing timezone-aware completion columns raise the captured timezone TypeError
+before duration mutation. The captured category, message and supported input-after
+projection match for all 23 error aliases in the combined replay.
+
+Declared datetime resolution drives exact integer timestamp differences. Array
+durations scale the integer unit value; scalar performance waits combine whole
+seconds, microseconds and remaining nanoseconds. Eight additional public wait
+controls distinguish these rounding paths, including 3/7 ns and waits just below
+one/five seconds. The nanosecond duration is `3.0000000000000004e-9`, while its
+captured B-to-C wait is `0.999999996`. Activity ordering follows descending
+occurrence counts for the captured unequal-count control, retaining first-seen
+ties. Its repeated B intervals preserve raw self-concurrency `(B, B): 4`.
+
+Forty-four new completed public calls capture performance/NaT, entire missing
+datetime columns and wait scaling: 26 return objects and 18 return actual errors.
+Every completed row, raw snapshot, public signature/enum view, opaque pinned
+module proof and finalized process log is retained. The initial own fixture
+construction failed after sixteen begin markers; no complete returned-object
+file survived, so neither completed nor successful call counts are inferred.
+Its original collector and terminal failure evidence remain separate.
+
+A fresh 650-input native build passes all five relevant suites with assertions
+enabled in Release. Replay executes 175 discoveries, 30 Petri presentations and
+43 generic conversions with zero new reference calls. All 98 public route aliases
+match supported input mutations, option preservation and errors. Forty-five
+HeuristicsNet results compare all seventeen net projections and their supported
+node/edge projections, with 2301 matched cells, six mismatches and nine cells
+unavailable because native has an extra edge. Forty-two HeuristicsNet results
+match every supported field and connection domain; thirty Petri results match all supported
+names, labels, properties, arc occurrences, weights and sparse markings. The 77
+generic cases preserve their previously captured native results exactly.
+
+All ninety preceding route aliases match in full. Three new nanosecond-gap
+controls remain open: at 1, 3 and 7 ns, public A/B concurrency is 4 and dependency
+is 0.5, excluding the edge at threshold equality. Native exact timestamp
+concurrency is empty, producing dependency 1.0 and an extra A/B edge. All eight
+performance wait values themselves match. These results establish a concurrency
+comparison precision gap; they do not establish a general timestamp rounding rule.
+
+The first build's failed nanosecond performance assertion and its diagnostic
+replay are retained as superseded evidence. That replay found four mismatching
+field cells (three wait-related projections and activity ordering), while the
+generic results were unchanged. The successful build and replay retain their
+own source, binary hashes, preparations, collectors, comparisons and process logs.
+`heuristic-plusplus-pandas-timestamps-checks.jsonl.gz` has SHA-256
+`e9fa4fb240c629891540119107a2812de734b954da54884b77e171cfd0235feb`, 24089147 bytes and 1903 round-trip-verified members.
+Validation is `heuristic-plusplus-pandas-timestamps-validation.json`.
+
+These finite matches do not close broader datetime units/ranges/timezones,
+business-hour options, carrier/parameter/error combinations, raw dictionary
+iteration order, Python object identity, unscoped metadata or adapter routing.
+The independent input comparison still excludes native allocation counters and
+decimal float spelling while retaining actual typed values. PLUSPLUS and Alpha+
+remain partial. No catalogue unit is promoted: coverage stays 46/86 packages and
+199/387 modules, with all 228 open units retained.

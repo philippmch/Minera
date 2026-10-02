@@ -7737,3 +7737,37 @@ in `heuristic-pandas-timestamp-boundary-checks.jsonl.gz` (SHA-256
 All 100 members round-trip. The tested production source remains `63ccbc6`; this
 checkpoint changes only evidence and documentation. No catalogue unit is promoted:
 46/86 packages and 199/387 modules remain complete, with 228 open units.
+
+### Native PLUSPLUS pandas NaT and timestamp precision (2026-10-02)
+
+Implemented the four measured pandas timestamp gaps: partial NaT acceptance with
+nonmissing sojourn means, start-column copying before the object-dtype error,
+exact microsecond durations and sojourns, and nanosecond durations and sojourns.
+The route also matches the captured all-missing datetime error/mutation order,
+scalar performance-wait rounding, unequal occurrence ordering and raw repeated-
+activity concurrency. Four new registered regressions cover these behaviors.
+
+Forty-four new completed public calls produce 26 objects and 18 actual errors.
+The initial own fixture failure retains sixteen begin markers and no complete
+returned-object file; completed and successful call counts stay unknown. The
+superseded native build and diagnostic replay retain the failing assertion and
+four field mismatches that drove the final fixes. They are not accepted runs.
+
+All five native suites pass with assertions enabled from 650 frozen inputs.
+Actual replay covers 98 route aliases: 45 HeuristicsNet results have 2301
+matched supported net/node/edge cells, six mismatches and nine extra-edge cells
+unavailable. Forty-two HeuristicsNet results, 30 complete supported Petri
+presentations and 23 errors match in full, including all ninety preceding aliases.
+The three new 1/3/7 ns wait controls expose a concurrency precision gap that changes
+dependency scores and accepted edges; their wait values match. All supported mutations and
+option preservation match. The 77 generic regression cases preserve previous
+net, Petri, input and error results exactly. Replay makes 175 discoveries, 30
+presented conversions and 43 generic conversions with no new reference calls.
+
+Evidence is `heuristic-plusplus-pandas-timestamps-checks.jsonl.gz` (SHA-256
+`e9fa4fb240c629891540119107a2812de734b954da54884b77e171cfd0235feb`, 24089147 bytes, 1903 verified members) and
+`heuristic-plusplus-pandas-timestamps-validation.json`. Full raw outputs, mutation
+snapshots, opaque proofs, helpers, sources, comparisons, binary hashes and process
+records are retained, including the superseded failures. Every archive member
+round-trips. Broader pandas/PLUSPLUS and Alpha+ completion gates remain open;
+coverage stays 46/86 packages and 199/387 modules, with 228 incomplete units.

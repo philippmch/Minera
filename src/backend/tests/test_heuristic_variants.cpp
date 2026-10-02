@@ -465,6 +465,142 @@ void plusplus_pandas_object_dtype_error_preserves_input() {
   assert(generic.raw_concurrency_statistics.front().frequency == 4);
 }
 
+void plusplus_pandas_missing_start_error_mutation() {
+  auto table = pandas_interval_table(2);
+  const auto start = table.column_index("start_timestamp");
+  table.columns.erase(table.columns.begin() + start);
+  table.dtypes.erase(table.dtypes.begin() + start);
+  for (auto& row : table.rows) row.erase(row.begin() + start);
+  const auto complete = table.column_index("time:timestamp");
+  table.dtypes[complete] = "object";
+  const auto before = table;
+  bool threw = false;
+  try {
+    (void)discover_plus_plus_pandas(table);
+  } catch (const HeuristicPandasError& error) {
+    threw = true;
+    assert(error.reference_type() == "builtins.AttributeError");
+  }
+  assert(threw);
+  assert(table.columns.size() == before.columns.size() + 1);
+  assert(table.columns.back() == "start_timestamp");
+  assert(table.dtypes.back() == "object");
+  assert(table.index == before.index);
+  for (const auto& row : table.rows) {
+    assert(row.back()->value == row[complete]->value);
+    assert(row.back()->typed_value == row[complete]->typed_value);
+  }
+  assert(std::find(table.columns.begin(), table.columns.end(), "@@diff") ==
+         table.columns.end());
+}
+
+void plusplus_pandas_exact_duration_and_performance() {
+  for (const bool nanos : {false, true}) {
+    auto table = pandas_interval_table(2);
+    const auto start = table.column_index("start_timestamp");
+    const auto complete = table.column_index("time:timestamp");
+    for (auto& row : table.rows) {
+      if (row[table.column_index("concept:name")]->value != "B") continue;
+      row[start] = typed_date("start_timestamp", nanos
+          ? "2024-01-01T00:00:02.000000001Z"
+          : "2024-01-01T00:00:02.000001Z");
+      row[complete] = typed_date("time:timestamp", nanos
+          ? "2024-01-01T00:00:02.000000004Z"
+          : "2024-01-01T00:00:02.000003Z");
+    }
+    if (nanos) {
+      table.dtypes[start] = table.dtypes[complete] = "datetime64[ns, UTC]";
+      for (auto& row : table.rows)
+        for (const auto column : {start, complete})
+          std::get<NativeDate>(row[column]->typed_value).resolution =
+              NativeDateResolution::kNanosecond;
+    }
+    auto options = plus_options();
+    options.decoration = HeuristicNetDecoration::kPerformance;
+    const auto net = discover_plus_plus_pandas(table, options);
+    const double expected = nanos ? 3.0 * 1e-9 : 2e-6;
+    assert(net.sojourn_times->at("B") == expected);
+    assert(activity_stat(net, "B").mean_sojourn_seconds == expected);
+    assert(net.plusplus_computed_performance_dfg);
+    const auto& waits = *net.plusplus_computed_performance_dfg;
+    assert(waits.at({"A", "B"}) == (nanos ? 1.000000001 : 1.000001));
+    assert(waits.at({"B", "C"}) == (nanos ? 0.999999996 : 0.9999969999999999));
+    assert(waits.at({"B", "D"}) == (nanos ? 4.999999996 : 4.999997));
+    for (const auto& row : table.rows)
+      if (row[table.column_index("concept:name")]->value == "B")
+        assert(std::get<double>(row.back()->typed_value) == expected);
+  }
+}
+
+void plusplus_pandas_nat_statistics_and_error_order() {
+  auto options = plus_options();
+  options.decoration = HeuristicNetDecoration::kPerformance;
+  for (const bool missing_start : {true, false}) {
+    auto table = pandas_interval_table(2);
+    const auto column = table.column_index(
+        missing_start ? "start_timestamp" : "time:timestamp");
+    table.rows[1][column] = typed_date(table.columns[column], "NaT");
+    const auto net = discover_plus_plus_pandas(table, options);
+    assert(activity_stat(net, "B").occurrences == 4);
+    assert(net.sojourn_times->at("B") == 8.0 / 3.0);
+    assert(relation(net, "A", "B").eventually_follows_frequency ==
+           (missing_start ? 1 : 2));
+    assert(relation(net, "B", "D").eventually_follows_frequency == 3);
+    assert(std::isnan(std::get<double>(table.rows[1].back()->typed_value)));
+    const auto& waits = *net.plusplus_computed_performance_dfg;
+    assert(waits.at({"A", "C"}) == (missing_start ? 4.0 / 3.0 : 1.0));
+
+    table = pandas_interval_table(2);
+    for (auto& row : table.rows)
+      if (row[table.column_index("concept:name")]->value == "B")
+        row[column] = typed_date(table.columns[column], "NaT");
+    const auto all_b = discover_plus_plus_pandas(table, options);
+    assert(activity_stat(all_b, "B").occurrences == 4);
+    assert(std::isnan(all_b.sojourn_times->at("B")));
+
+    table = pandas_interval_table(2);
+    for (auto& row : table.rows)
+      row[column] = typed_date(table.columns[column], "NaT");
+    const auto before = table;
+    bool threw = false;
+    try {
+      (void)discover_plus_plus_pandas(table, options);
+    } catch (const HeuristicPandasError& error) {
+      threw = true;
+      assert(error.reference_type() == "builtins.TypeError");
+      assert(std::string(error.what()) == (missing_start
+          ? "Invalid comparison between dtype=timedelta64[us] and int"
+          : "Cannot subtract tz-naive and tz-aware datetime-like objects."));
+    }
+    assert(threw);
+    if (missing_start) {
+      assert(table.columns.back() == "@@diff");
+      for (const auto& row : table.rows)
+        assert(std::isnan(std::get<double>(row.back()->typed_value)));
+    } else {
+      assert(table.columns == before.columns && table.rows == before.rows);
+    }
+    assert(table.index == before.index);
+  }
+}
+
+void plusplus_pandas_occurrence_order_and_self_concurrency() {
+  auto table = pandas_interval_table(2);
+  const auto name = table.column_index("concept:name");
+  for (auto& row : table.rows)
+    if (row[name]->value == "C") row[name]->value = "B";
+  auto options = plus_options();
+  options.decoration = HeuristicNetDecoration::kPerformance;
+  const auto net = discover_plus_plus_pandas(table, options);
+  assert((net.activities == std::vector<std::string>{"B", "A", "D"}));
+  assert(activity_stat(net, "B").occurrences == 8);
+  assert(net.sojourn_times->at("B") == 3.0);
+  assert(net.raw_concurrency_statistics.size() == 1);
+  assert(net.raw_concurrency_statistics.front().first == "B");
+  assert(net.raw_concurrency_statistics.front().second == "B");
+  assert(net.raw_concurrency_statistics.front().frequency == 4);
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -4350,6 +4486,10 @@ int main(int argc, char** argv) {
   plusplus_pandas_directional_concurrency_acceptance();
   plusplus_pandas_duration_mutation_and_start_fallback();
   plusplus_pandas_object_dtype_error_preserves_input();
+  plusplus_pandas_missing_start_error_mutation();
+  plusplus_pandas_exact_duration_and_performance();
+  plusplus_pandas_nat_statistics_and_error_order();
+  plusplus_pandas_occurrence_order_and_self_concurrency();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();
