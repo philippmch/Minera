@@ -48,7 +48,7 @@ test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
 adapter, integration, or missing are complete. The current manifest records 46
-complete and 40 partial dispatcher rows, plus 198 complete and 189 partial
+complete and 40 partial dispatcher rows, plus 199 complete and 188 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
 DFG, causal and correlation discovery, 26-module Inductive discovery, 31-module
@@ -56,7 +56,8 @@ POWL discovery, 13-module footprints discovery/conformance, and the 19-module
 temporal/behavioral adapter stack, plus discounted anti-/multi-alignment and
 classic Declare/log-skeleton discovery and conformance, with distinct
 registered tests, plus the replay-duration diagnostic support module and the
-backwards token-replay variation; 229 coverage units still require exact proof.
+backwards token-replay variation and CLASSIC heuristic discovery; 228 coverage
+units still require exact proof.
 A release may
 additionally run the strict gate:
 
@@ -131,7 +132,7 @@ are reconciled.
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, strict direct-OCDFG activity/object-type selectors, and cross-family envelope rejection; broader OCEL schema coverage remains |
 | Discovery: Alpha | classic and Alpha+ | **Partial (classic, abstraction, and endpoint modules complete)** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ exposes raw live/detached markings and reserved-label collision cleanup through native/JSON/CLI/HTTP adapters, with repeated output-support checks; identity-dependent selection probabilities and correlations remain outside its complete claim |
 | Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
-| Discovery: Heuristics | classic and Heuristics Miner++ | **Partial (implemented core; proof pending)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
+| Discovery: Heuristics | classic and Heuristics Miner++ | **CLASSIC complete; dispatcher and PLUSPLUS partial** — CLASSIC public EventLog/DFG object and Petri routes, typed returned fields, order, noise pruning and conversion have saved native/public proof; separate dispatcher and PLUSPLUS obligations remain |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
 | Discovery: declarative | Declare classic and log skeleton classic | **Complete** — all 18 Declare templates and all six log-skeleton constraint families retain their weighted threshold, vacuity, ordering, and diagnostic contracts; grouped logs, streams, eager/lazy tables, strict custom activity/case selectors, and log-skeleton variant lists are supported by distinct registered proofs |
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete** — all eight statistical DFG routes, eager and lazy table adapters, performance behavior, replacement helpers, graph utilities, both causal variants, all three correlation variants, and all three minimum-self-distance adapters with witnesses have focused native contracts plus JSON/CLI/server/frontend integration; eventually-follows is covered as a native statistical extension outside the algorithm-dispatch catalog |
@@ -6685,3 +6686,35 @@ The current full-object cohorts have identical raw and cleaned DFG domains.
 Supplemental controls must observe an actually pruned path to establish the
 performance-matrix domain. CLASSIC remains partial pending that check and its
 distinct catalogue proof; coverage counters are unchanged.
+
+## CLASSIC noise-domain gate and module completion
+
+`docs/heuristic-classic-noise-matrix-native-validation.json` and its checks
+archive preserve eight exact public/native calls over the ordered DFG
+`A->B:1000, B->C:1000, A->C:1`, pairing noise 0 and 0.5 for absent, complete,
+retained-null and incomplete performance maps. All seven complete objects and
+one expected missing-path rejection match. Inputs and options remain unchanged,
+with zero field gaps, unsupported outcomes or mismatches.
+
+Actual pruning establishes that public DFG and matrix domains use cleaned
+paths. The supplied raw performance map retains the removed path and its typed
+value. Explicit null in a retained matrix cell remains separate from the edge
+display fallback. An incomplete map rejects while that path is retained and
+succeeds once it is pruned. The independent projector changes only the domain
+source; all raw-map and edge/relation checks remain active. Twenty-two synthetic
+checks and independent review pass.
+
+The archive binds the public and native captures, all four actual command
+records and logs, opaque reference module proofs, exact immutable source/header
+inventory, core, probe, fixtures, comparator and successful report. The prior
+2,931 full-object outcomes, 1,779/22+3 Petri observations and four affected
+native suites are reused with their existing immutable bindings. No core change,
+new suite run or converter run is claimed by this evidence checkpoint.
+
+The route/parameter/returned-field audit has no remaining CLASSIC gates within
+the documented native representation. The catalogue now supplies the distinct
+`discover_heuristics_net` implementation proof and registered
+`classic_dfg_order_preserves_inferred_boundary_lists` acceptance case. The
+structural verifier passes: **46 complete / 40 partial packages and 199 complete
+/ 188 partial modules, with 228 open coverage units**. CLASSIC is complete;
+the heuristics dispatcher and PLUSPLUS remain partial.
