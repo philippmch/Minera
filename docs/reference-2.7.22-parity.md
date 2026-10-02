@@ -7455,3 +7455,44 @@ validation SHA is
 Saving adds zero comparisons, calls, builds or suite runs. Post-commit guards
 bind immutable saved files, preserving validation after later source and HEAD
 changes. No catalogue status is promoted.
+
+### PLUSPLUS converter parameter forwarding contrast
+
+Four actual public calls compare two fresh copies of the saved sixteen-row
+DataFrame. Each branch performs parent HeuristicsNet discovery with explicit
+PLUSPLUS and the same nine parameters. Its public HeuristicsNet conversion
+then omits converter parameters in branch A or passes an independent copy of
+all nine parameters in branch F. Both retain the converter's default variant.
+Fresh DataFrames, returned HeuristicsNets and option copies keep the parameter
+contrast separate from prior-call mutations.
+
+All four calls succeed, with zero reference/serialization errors and zero
+skipped dependents. Both HeuristicsNets expose seventeen equal typed fields,
+matching the earlier branch A. Both full public Petri objects also match each
+other and the earlier branch A: five places, four transitions and nine arcs,
+including names, labels, empty property dictionaries, explicit unit arc
+weights and sparse markings. Existing inputs and options remain unchanged;
+newly returned HeuristicsNets are recorded separately. This finite contrast
+shows the same result with omitted and explicit converter parameters; the
+four-place DataFrame parent `apply` result remains unexplained.
+
+The actual worker exits zero, finalizes its logs and leaves zero active job
+processes. Six public signatures and eleven unchanged opaque module proofs
+are retained before calls. Raw output SHA is
+`c5dfc964eb557725fadec4d58e86ea997f08128535a577b0d9994284bd0f749b`;
+actual execution-record SHA is
+`8b830fae2d038c7f50bde0b850a6b81edaf98dc080455cfaf765e6030b8428eb`.
+
+`docs/heuristic-plusplus-converter-parameter-checks.jsonl.gz` and its validation
+preserve 776 exact UTF-8 members, current capture records/objects/API proofs,
+original capture proof origins, forty focused capture checks and 22 saver
+checks. The full earlier carrier archive and validation remain immutable
+origins. All member bytes, SHA values and counts roundtrip with the unchanged
+reviewed codec. The archive is 6,642,407 bytes, SHA
+`d183a084bdbd20684a6964eb7fe05bebd7c0ff988053cfc1e7c910b81ca16697`;
+validation SHA is
+`443b4108d8ebf16e9582b28050a4c8491606841f48f784fb22352b4fd8b31d6d`.
+The independent compiled context retains 650 inputs, six binaries and its four
+successful suites. Saving adds zero calls, builds or suite runs. Immutable
+saved-file guards allow later source changes. Full native Petri/carrier gates
+remain open; PLUSPLUS stays partial with all 228 open coverage units retained.
