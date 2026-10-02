@@ -3834,6 +3834,211 @@ void heuristic_inputless_petri_acceptance(
   }
 }
 
+void plusplus_computed_public_fields_acceptance() {
+  const auto public_fields = [](const EventLog& source,
+                                const HeuristicsNet& net) {
+    const auto graph = discover_directly_follows_graph(source);
+    const auto json = analysis_json("plusplus-computed-fields", source, graph,
+                                    nullptr, nullptr, &net);
+    const auto begin = json.find("\"plusplus_public_fields\": {");
+    assert(begin != std::string::npos);
+    const auto end = json.find(", \"and_measures_in\":", begin);
+    assert(end != std::string::npos);
+    return json.substr(begin, end - begin);
+  };
+  // Captured positive waits 3 and 7 distinguish frequency decoration's absent
+  // performance DFG and zero matrix from the actual mean wait of five.
+  const auto waits = log({
+      trace({interval("A", "2026-04-01T00:00:00Z", "2026-04-01T00:00:01Z"),
+             interval("B", "2026-04-01T00:00:04Z", "2026-04-01T00:00:05Z")}),
+      trace({interval("A", "2026-04-02T00:00:00Z", "2026-04-02T00:00:01Z"),
+             interval("B", "2026-04-02T00:00:08Z", "2026-04-02T00:00:09Z")}),
+  });
+  auto options = plus_options();
+  options.and_threshold = 0.5;
+  const auto frequency = discover_heuristics_net(waits, options);
+  assert(!frequency.plusplus_computed_performance_dfg.has_value());
+  assert((frequency.plusplus_computed_performance_matrix ==
+          HeuristicMeanPerformanceDfg{{{"A", "B"}, 0.0}}));
+  assert(relation(frequency, "A", "B").mean_wait_seconds == 5.0);
+  assert(!frequency.plusplus_public_dfg_window_2_present);
+  assert(!frequency.plusplus_public_freq_triples_present);
+  assert(frequency.classic_public_dfg_window_2_present);
+  assert(frequency.classic_public_freq_triples_present);
+  assert(!frequency.performance_values.has_value());
+  assert(public_fields(waits, frequency) ==
+         "\"plusplus_public_fields\": {\"dfg_window_2\": null, "
+         "\"freq_triples\": null, \"performance_dfg\": null, "
+         "\"performance_matrix\": {\"A\": {\"B\": 0.0}}}");
+  options.decoration = HeuristicNetDecoration::kPerformance;
+  const auto performance = discover_heuristics_net(waits, options);
+  assert(performance.plusplus_computed_performance_dfg.has_value());
+  assert(((*performance.plusplus_computed_performance_dfg) ==
+          HeuristicMeanPerformanceDfg{{{"A", "B"}, 5.0}}));
+  assert(performance.plusplus_computed_performance_matrix ==
+         *performance.plusplus_computed_performance_dfg);
+  assert(!performance.performance_values.has_value());
+  assert(public_fields(waits, performance).find(
+             "\"performance_dfg\": [{\"key\": [\"A\", \"B\"], "
+             "\"value\": 5.0}]") != std::string::npos);
+
+  // Literal five-trace filter_overlap control from the fourteen captured
+  // performance rows: four overlapping AB/CD permutations, then atomic ABD.
+  const auto first = trace({
+      interval("A", "2024-01-01T00:00:00Z", "2024-01-01T00:00:01Z"),
+      interval("B", "2024-01-01T00:00:02Z", "2024-01-01T00:00:06Z"),
+      interval("C", "2024-01-01T00:00:03Z", "2024-01-01T00:00:05Z"),
+      interval("D", "2024-01-01T00:00:07Z", "2024-01-01T00:00:08Z")});
+  const auto second = trace({
+      interval("A", "2024-01-01T00:00:00Z", "2024-01-01T00:00:01Z"),
+      interval("C", "2024-01-01T00:00:02Z", "2024-01-01T00:00:06Z"),
+      interval("B", "2024-01-01T00:00:03Z", "2024-01-01T00:00:05Z"),
+      interval("D", "2024-01-01T00:00:07Z", "2024-01-01T00:00:08Z")});
+  const auto filtered_source = log({first, second, first, second, trace({
+      interval("A", "2024-01-01T00:00:00Z", "2024-01-01T00:00:01Z"),
+      interval("B", "2024-01-01T00:00:02Z", "2024-01-01T00:00:03Z"),
+      interval("D", "2024-01-01T00:00:04Z", "2024-01-01T00:00:05Z")})});
+  const HeuristicMeanPerformanceDfg baseline{
+      {{"A", "B"}, 1.0}, {{"A", "C"}, 1.0},
+      {{"B", "D"}, 5.0 / 3.0}, {{"C", "D"}, 2.0}};
+  struct FilterControl {
+    std::uint64_t min_activity;
+    std::uint64_t min_frequency;
+    HeuristicMeanPerformanceDfg expected;
+  };
+  const std::vector<FilterControl> controls{
+      {1, 1, baseline},
+      {5, 1, {{{"A", "B"}, 1.0}, {{"B", "D"}, 5.0 / 3.0}}},
+      {1, 5, {{{"B", "D"}, 5.0 / 3.0}}},
+      {5, 5, {{{"B", "D"}, 5.0 / 3.0}}},
+      {1000, 1, {}}};
+  for (const auto& control : controls) {
+    options.min_activity_count = control.min_activity;
+    options.min_frequency = control.min_frequency;
+    const auto net = discover_heuristics_net(filtered_source, options);
+    assert(net.plusplus_computed_performance_dfg.has_value());
+    assert(*net.plusplus_computed_performance_dfg == control.expected);
+    assert(net.plusplus_computed_performance_matrix == control.expected);
+    if (!control.expected.empty()) {
+      const auto& bd = relation(net, "B", "D");
+      assert(bd.eventually_follows_frequency == 5);
+      assert(bd.direct_adjacency_frequency == 3);
+      assert((bd.wait_samples == std::vector<double>{2.0, 2.0, 1.0}));
+    } else {
+      assert(net.activities.empty());
+      assert(public_fields(filtered_source, net).find(
+                 "\"performance_dfg\": [], \"performance_matrix\": {}") !=
+             std::string::npos);
+    }
+    auto frequency_options = options;
+    frequency_options.decoration = HeuristicNetDecoration::kFrequency;
+    const auto frequency_net =
+        discover_heuristics_net(filtered_source, frequency_options);
+    assert(!frequency_net.plusplus_computed_performance_dfg);
+    auto expected_zero_matrix = control.expected;
+    for (auto& [_, value] : expected_zero_matrix) value = 0.0;
+    assert(frequency_net.plusplus_computed_performance_matrix ==
+           expected_zero_matrix);
+  }
+  options.min_activity_count = options.min_frequency = 1;
+  options.dependency_threshold = 1.0;
+  const auto no_edges = discover_heuristics_net(filtered_source, options);
+  assert(no_edges.edges.empty());
+  assert(*no_edges.plusplus_computed_performance_dfg == baseline);
+  assert(no_edges.plusplus_computed_performance_matrix == baseline);
+  options.dependency_threshold = 0.5;
+  options.performance_aggregation = HeuristicPerformanceAggregation::kMedian;
+  const auto median = discover_heuristics_net(filtered_source, options);
+  assert(relation(median, "B", "D").representation == 2.0);
+  assert(*median.plusplus_computed_performance_dfg == baseline);
+  assert(median.plusplus_computed_performance_matrix == baseline);
+
+  // Actual interval control AC1 is EFG-only; BC1 has its direct one-second wait.
+  const auto interval_source = log({trace({
+      interval("A", "2024-01-01T00:00:00Z", "2024-01-01T00:00:05Z"),
+      interval("B", "2024-01-01T00:00:02Z", "2024-01-01T00:00:06Z"),
+      interval("C", "2024-01-01T00:00:07Z", "2024-01-01T00:00:08Z")})});
+  options.performance_aggregation = HeuristicPerformanceAggregation::kMean;
+  const auto interval_net = discover_heuristics_net(interval_source, options);
+  assert(relation(interval_net, "A", "C").eventually_follows_frequency == 1);
+  assert(relation(interval_net, "A", "C").direct_adjacency_frequency == 0);
+  assert(((*interval_net.plusplus_computed_performance_dfg) ==
+          HeuristicMeanPerformanceDfg{{{"B", "C"}, 1.0}}));
+  assert((interval_net.plusplus_computed_performance_matrix ==
+          HeuristicMeanPerformanceDfg{{{"A", "C"}, 0.0}, {{"B", "C"}, 1.0}}));
+  assert(public_fields(interval_source, interval_net).find(
+             "\"performance_matrix\": {\"A\": {\"C\": 0.0}, "
+             "\"B\": {\"C\": 1.0}}") != std::string::npos);
+  const EventLog empty;
+  const auto empty_net = discover_heuristics_net(empty, options);
+  assert(empty_net.plusplus_computed_performance_dfg.has_value());
+  assert(empty_net.plusplus_computed_performance_dfg->empty());
+  assert(empty_net.plusplus_computed_performance_matrix.empty());
+  assert(public_fields(empty, empty_net).find(
+             "\"performance_dfg\": [], \"performance_matrix\": {}") !=
+         std::string::npos);
+
+  // Appended PLUSPLUS flags preserve concrete legacy maps independently of
+  // CLASSIC presence, and supplied performance_values remain an input carrier.
+  HeuristicsNet legacy;
+  legacy.variant = HeuristicMinerVariant::kPlusPlus;
+  legacy.activities = {"A", "B", "C", "D"};
+  assert(legacy.plusplus_public_dfg_window_2_present);
+  assert(legacy.plusplus_public_freq_triples_present);
+  assert(public_fields(filtered_source, legacy).find(
+             "\"dfg_window_2\": [], \"freq_triples\": []") !=
+         std::string::npos);
+  legacy.window_two_dfg[{"A", "B"}] = 2;
+  legacy.frequency_triples[{"A", "B", "C"}] = 3;
+  assert(public_fields(filtered_source, legacy).find(
+             "\"dfg_window_2\": [{\"key\": [\"A\", \"B\"], "
+             "\"value\": 2}], \"freq_triples\": [{\"key\": "
+             "[\"A\", \"B\", \"C\"], \"value\": 3}]") !=
+         std::string::npos);
+  const auto classic = discover_heuristics_net(waits, HeuristicMinerOptions{});
+  assert(classic.plusplus_public_dfg_window_2_present);
+  assert(classic.plusplus_public_freq_triples_present);
+  assert(!classic.plusplus_computed_performance_dfg);
+  assert(classic.plusplus_computed_performance_matrix.empty());
+  const auto classic_graph = discover_directly_follows_graph(waits);
+  const auto classic_json = analysis_json("classic-unmodified", waits,
+      classic_graph, nullptr, nullptr, &classic);
+  assert(classic_json.find("\"classic_public_fields\"") != std::string::npos);
+  assert(classic_json.find("\"plusplus_public_fields\"") == std::string::npos);
+  HeuristicsNet escaped;
+  escaped.variant = HeuristicMinerVariant::kPlusPlus;
+  const std::string source_name = "A\"\\\n";
+  const std::string target_name = "B\\\"";
+  escaped.plusplus_computed_performance_dfg =
+      HeuristicMeanPerformanceDfg{{{source_name, target_name}, 1.0}};
+  escaped.plusplus_computed_performance_matrix =
+      HeuristicMeanPerformanceDfg{{{source_name, target_name}, -0.0}};
+  escaped.performance_values.emplace();
+  escaped.performance_values->emplace(
+      std::pair{source_name, target_name}, HeuristicPerformanceValue{77.0});
+  const auto escaped_json = public_fields(empty, escaped);
+  assert(escaped_json.find("\"key\": [" + json_string(source_name) + ", " +
+                           json_string(target_name) + "], \"value\": 1.0") !=
+         std::string::npos);
+  assert(escaped_json.find(json_string(source_name) + ": {" +
+                           json_string(target_name) + ": -0.0}") !=
+         std::string::npos);
+  assert(std::get<double>(escaped.performance_values->begin()->second) == 77.0);
+  for (const bool dfg : {false, true}) {
+    auto invalid = escaped;
+    if (dfg)
+      invalid.plusplus_computed_performance_dfg->begin()->second =
+          std::numeric_limits<double>::quiet_NaN();
+    else
+      invalid.plusplus_computed_performance_matrix.begin()->second =
+          std::numeric_limits<double>::infinity();
+    bool rejected = false;
+    try { (void)public_fields(empty, invalid); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -3873,6 +4078,7 @@ int main(int argc, char** argv) {
   }
   interval_abstraction_and_strict_threshold();
   plusplus_frequency_representation_preserves_integer_type();
+  plusplus_computed_public_fields_acceptance();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();

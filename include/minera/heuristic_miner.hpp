@@ -99,6 +99,10 @@ using HeuristicTripleFrequencies =
              std::uint64_t>;
 using HeuristicPerformanceDfg =
     std::map<std::pair<std::string, std::string>, std::vector<double>>;
+// Computed mean-valued output, distinct from sample input and supplied
+// already-aggregated decorated values.
+using HeuristicMeanPerformanceDfg =
+    std::map<std::pair<std::string, std::string>, double>;
 using HeuristicDecoratedDfg =
     std::map<std::pair<std::string, std::string>, HeuristicPerformanceValue>;
 
@@ -256,6 +260,19 @@ struct HeuristicsNet {
   // manually assembled legacy nets projecting their concrete maps as present.
   bool classic_public_dfg_window_2_present = true;
   bool classic_public_freq_triples_present = true;
+  // Independent PLUSPLUS public-field presence. Legacy manually assembled
+  // nets keep their concrete auxiliary maps present; PLUSPLUS discovery marks
+  // its unavailable window-two/triple outputs absent without altering the maps.
+  bool plusplus_public_dfg_window_2_present = true;
+  bool plusplus_public_freq_triples_present = true;
+  // Computed outputs never overload performance_values (an input carrier).
+  // Performance decoration engages the DFG before filtering, including an
+  // empty result, and includes only retained EFG pairs with direct waits.
+  std::optional<HeuristicMeanPerformanceDfg>
+      plusplus_computed_performance_dfg;
+  // All retained EFG pairs are present. Frequency decoration stores 0.0;
+  // performance decoration stores mean wait (0.0 for an EFG-only pair).
+  HeuristicMeanPerformanceDfg plusplus_computed_performance_matrix;
 };
 
 struct HeuristicMinerOptions {

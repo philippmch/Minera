@@ -1048,6 +1048,20 @@ void write_heuristic_performance_value(
       value);
 }
 
+// Public mean-valued fields preserve double numeric identity even when their
+// value is integral. Keep escaping/non-finite handling with the existing JSON
+// writers and heuristic performance validation rather than changing old fields.
+void write_heuristic_public_double(std::ostream& out, double value) {
+  if (!std::isfinite(value)) throw_non_finite_heuristic_performance_value();
+  std::ostringstream scalar;
+  scalar.imbue(std::locale::classic());
+  scalar << std::setprecision(std::numeric_limits<double>::max_digits10)
+         << value;
+  auto text = scalar.str();
+  if (text.find_first_of(".eE") == std::string::npos) text += ".0";
+  out << text;
+}
+
 void write_heuristics_net(std::ostream& out,
                           const HeuristicsNet& net,
                           const DirectlyFollowsGraph& graph) {
@@ -1072,6 +1086,16 @@ void write_heuristics_net(std::ostream& out,
   for (const auto& stat : net.relation_statistics) {
     if (stat.representation_value)
       validate_heuristic_performance_value(*stat.representation_value);
+  }
+  if (net.variant == HeuristicMinerVariant::kPlusPlus) {
+    if (net.plusplus_computed_performance_dfg) {
+      for (const auto& [_, value] : *net.plusplus_computed_performance_dfg)
+        if (!std::isfinite(value))
+          throw_non_finite_heuristic_performance_value();
+    }
+    for (const auto& [_, value] : net.plusplus_computed_performance_matrix)
+      if (!std::isfinite(value))
+        throw_non_finite_heuristic_performance_value();
   }
   // PLUSPLUS can retain raw statistics for activities filtered out of the
   // native node table.  The exported local-id table must still identify those
@@ -1384,6 +1408,81 @@ void write_heuristics_net(std::ostream& out,
       out << ']';
     }
     out << '}';
+  }
+  if (net.variant == HeuristicMinerVariant::kPlusPlus) {
+    out << ", \"plusplus_public_fields\": {\"dfg_window_2\": ";
+    if (!net.plusplus_public_dfg_window_2_present) {
+      out << "null";
+    } else {
+      out << '[';
+      std::size_t index = 0;
+      for (const auto& [pair, count] : net.window_two_dfg) {
+        out << "{\"key\": [";
+        write_json_string(out, pair.first);
+        out << ", ";
+        write_json_string(out, pair.second);
+        out << "], \"value\": " << count << '}'
+            << (++index < net.window_two_dfg.size() ? ", " : "");
+      }
+      out << ']';
+    }
+    out << ", \"freq_triples\": ";
+    if (!net.plusplus_public_freq_triples_present) {
+      out << "null";
+    } else {
+      out << '[';
+      std::size_t index = 0;
+      for (const auto& [triple, count] : net.frequency_triples) {
+        const auto& [first, middle, last] = triple;
+        out << "{\"key\": [";
+        write_json_string(out, first);
+        out << ", ";
+        write_json_string(out, middle);
+        out << ", ";
+        write_json_string(out, last);
+        out << "], \"value\": " << count << '}'
+            << (++index < net.frequency_triples.size() ? ", " : "");
+      }
+      out << ']';
+    }
+    out << ", \"performance_dfg\": ";
+    if (!net.plusplus_computed_performance_dfg) {
+      out << "null";
+    } else {
+      out << '[';
+      std::size_t index = 0;
+      for (const auto& [pair, mean] : *net.plusplus_computed_performance_dfg) {
+        out << "{\"key\": [";
+        write_json_string(out, pair.first);
+        out << ", ";
+        write_json_string(out, pair.second);
+        out << "], \"value\": ";
+        write_heuristic_public_double(out, mean);
+        out << '}' << (++index < net.plusplus_computed_performance_dfg->size()
+                           ? ", " : "");
+      }
+      out << ']';
+    }
+    // The matrix wire view uses nested raw-name keys, unlike the pair-entry
+    // DFG array. Empty matrices remain concrete empty JSON objects.
+    out << ", \"performance_matrix\": {";
+    std::map<std::string, std::map<std::string, double>> matrix;
+    for (const auto& [pair, mean] : net.plusplus_computed_performance_matrix)
+      matrix[pair.first].emplace(pair.second, mean);
+    std::size_t source_index = 0;
+    for (const auto& [source, targets] : matrix) {
+      write_json_string(out, source);
+      out << ": {";
+      std::size_t target_index = 0;
+      for (const auto& [target, mean] : targets) {
+        write_json_string(out, target);
+        out << ": ";
+        write_heuristic_public_double(out, mean);
+        if (++target_index < targets.size()) out << ", ";
+      }
+      out << '}' << (++source_index < matrix.size() ? ", " : "");
+    }
+    out << "}}";
   }
   out << ", \"and_measures_in\": ";
   write_and_measures(net.and_measures_in);

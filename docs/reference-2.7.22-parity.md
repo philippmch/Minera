@@ -7211,3 +7211,50 @@ validation SHA is
 `e0aa1525ff66fe03873ba04b4e64c416f8a4e2377ac87e1a3da232dd72e7460b`.
 The comparison and save add zero public/native calls, production changes or
 suite runs. PLUSPLUS remains partial, with all 228 open units retained.
+
+### PLUSPLUS computed output presence and tested native maps
+
+PLUSPLUS discovery now has independent auxiliary-field presence flags and
+separate computed mean performance maps. It marks window-two and triple
+outputs absent without changing their backing maps or CLASSIC flags.
+Frequency output leaves computed performance DFG unset and gives every
+retained interval relation a floating zero in the matrix. Performance output
+engages its DFG before filtering, including an empty result, retains direct-wait
+means for eligible interval pairs, and also records matrix zero for a retained
+pair with no direct observation. Dependency edge exclusion retains both maps.
+The selected edge aggregation and supplied `performance_values` input remain
+separate from these computed means.
+
+The new `plusplus_public_fields` JSON block preserves null versus concrete
+empty maps, key/value pair arrays, nested raw-name matrix keys, floating numeric
+tokens, signed zero and escaped labels. Existing nonfinite performance-value
+validation applies before output. Literal regressions cover mean five,
+interval count five against three direct samples with mean five-thirds,
+activity/frequency filters, entirely filtered maps, EFG-only relations,
+dependency exclusion, median edge aggregation independence, input separation,
+legacy/CLASSIC auxiliary presence, and export edge cases.
+
+A fresh build passes the core, heuristic variants, Petri conversion and Petri
+reduction Release suites with assertions enabled. Canonical source tree is
+`2b270cf8a692e15b870803a14d2e8d139a05b4a1`; exact exported source tree is
+`e54fa844adf5875c87a5348080204e5a1c08af1d`. Actual configure, build and test
+commands exit zero, finish their logs, leave zero active job processes, and
+preserve all source and binary guards. Core SHA is
+`66c05425798fe7a57bdf779d07a1dbf040a0802d606eb79ea2da2e2a3accda59`;
+actual build-manifest SHA is
+`ff6034b3802fd4cfe14d3d9bb355a9e5fbcf02d42a019b40f48084150647c4cb`.
+Each command receives an independent snapshot of its bindings, so its embedded
+record exactly equals its preserved disk record. No metadata alias exception
+is needed for this new build.
+
+`docs/heuristic-plusplus-computed-fields-build-checks.jsonl.gz` and its validation
+preserve 56 exact UTF-8 members and bind 1,320 immutable external artifacts,
+including all 650 compiled inputs and six actual binaries. Fourteen source,
+fifteen builder and twenty saver checks are retained. Exact byte, SHA and count
+roundtrip with the unchanged reviewed codec. The archive is 1,240,484 bytes,
+SHA `b37af7a58f25b1ef82a70fd0ee78b1bf38b126f9222246bdf19948018cbad10b`;
+validation SHA is
+`52afe0d8a3004ab90991e92aaa93e49f9eda0070896b41c333bb2c8bbfd91ae0`.
+Archiving adds no build/test commands or public/native calls. Fresh broad
+returned-object comparisons, carrier behavior and complete Petri fields
+remain open. PLUSPLUS stays partial and all 228 open units remain in scope.

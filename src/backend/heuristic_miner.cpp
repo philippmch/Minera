@@ -1611,6 +1611,11 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
   net.activity_ids_are_local =
       !standard_activity_attribute(options.activity_attribute);
 
+  net.plusplus_public_dfg_window_2_present = false;
+  net.plusplus_public_freq_triples_present = false;
+  if (options.decoration == HeuristicNetDecoration::kPerformance)
+    net.plusplus_computed_performance_dfg.emplace();
+
   std::unordered_map<std::string, std::size_t> ids;
   for (const auto& activity : abstraction.activity_order) {
     if (abstraction.occurrences.at(activity) < options.min_activity_count)
@@ -1666,6 +1671,14 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
                             : samples->second);
     const double mean_wait =
         direct_frequency == 0 ? 0.0 : summary.mean;
+    // These public mean maps follow the retained EFG domain, independently of
+    // edge acceptance and the edge's chosen performance aggregation.
+    net.plusplus_computed_performance_matrix.emplace(
+        pair, options.decoration == HeuristicNetDecoration::kFrequency
+                  ? 0.0
+                  : mean_wait);
+    if (net.plusplus_computed_performance_dfg && direct_frequency > 0)
+      net.plusplus_computed_performance_dfg->emplace(pair, mean_wait);
     const double representation =
         options.decoration == HeuristicNetDecoration::kFrequency
             ? static_cast<double>(frequency)

@@ -198,6 +198,38 @@ changes or suite runs, and does not promote the module.
 
 ## Returned-object acceptance
 
+The separate tested production checkpoint adds independent PLUSPLUS auxiliary
+presence flags and computed mean performance outputs. Discovery marks
+`dfg_window_2` and `freq_triples` absent. Frequency output leaves computed
+performance DFG unset and records floating zero matrix values. Performance
+output engages its DFG before filtering, retains an empty result, includes
+retained interval relations with direct waits, and records all retained
+interval relations in its matrix, including zero for a relation with no direct
+wait. Dependency edge exclusion does not remove either map. These mean maps
+remain independent of the selected edge aggregation and the supplied
+`performance_values` input.
+
+The `plusplus_public_fields` JSON block exports absent values as `null`,
+concrete pair maps as key/value arrays, and the performance matrix as nested
+raw-name keys. Floating values preserve numeric tokens such as `0.0`, signed
+zero, escaping and existing nonfinite-value rejection. Legacy auxiliary-map
+defaults and CLASSIC behavior remain independent.
+
+`heuristic-plusplus-computed-fields-build-validation.json` binds a fresh build
+of canonical source tree `2b270cf8a692e15b870803a14d2e8d139a05b4a1`, exact
+export tree `e54fa844adf5875c87a5348080204e5a1c08af1d`, and core SHA
+`66c05425798fe7a57bdf779d07a1dbf040a0802d606eb79ea2da2e2a3accda59`.
+Core, heuristic variants, Petri conversion and Petri reduction Release suites
+all pass with assertions enabled. Literal regressions cover the new presence,
+mean/filter/zero domains, dependency and aggregation independence, and JSON
+edge cases. Fourteen source checks, fifteen builder checks and twenty saver
+checks are retained. Each embedded command record equals its actual disk
+record; independent binding snapshots prevent retrospective metadata changes.
+The 56-member archive binds all 650 compile inputs, six binaries and 1,320
+immutable external artifacts. Full comparisons of the new fields across the
+broad public corpus, carrier differences and full Petri acceptance remain
+required; this tested source checkpoint does not promote the module.
+
 `heuristic-plusplus-broad-raw-projection-validation.json` preserves a further
 comparison of the same 119 aliases and 4,573 cells: 4,023 matched, 117 ambiguous,
 433 unrepresentable, and zero mismatched. The complete raw-name concurrency
@@ -232,10 +264,10 @@ reported explicitly rather than filled with a presumed default.
 | `activities`, `activities_occurrences`, `start_activities`, `end_activities` | Net metadata and boundary counts | Compare complete key domains through filtering, including an edge incident to a removed activity; retain `[{}]` boundary containers for empty results. |
 | `dfg`, `dfg_matrix` | Retained `eventually_follows_frequency` relation statistics | Corrected complete maps and nested matrices match all 117 supported aliases, including overlapping and non-neighbor intervals. Current PLUSPLUS raw/cleaned DFG maps are empty in the saved cases; unfamiliar decoration has no native counterpart. |
 | `concurrent_activities`, `dependency_matrix` | Raw-name concurrency and retained dependency statistics | Complete raw-name concurrency matches all 117 supported aliases, including positive pairs with filtered activities. Dependency matrices also retain excluded edges. Keep both complete domains when extending the input corpus. |
-| `dfg_window_2`, `freq_triples` | Auxiliary maps and their presence state | Saved public values are `None`, while native maps are empty; the current PLUSPLUS representation does not encode that distinction. Longer and repeated traces remain required. |
+| `dfg_window_2`, `freq_triples` | Auxiliary maps and independent PLUSPLUS presence flags | Saved public values are `None`. The tested new discovery marks both fields absent while preserving independent legacy concrete-map defaults. Fresh broad native counterparts of the flags remain required; earlier captures expose only empty maps. |
 | `dfg_window_2_matrix`, `freq_triples_matrix` | Views of the auxiliary maps | Empty dictionaries match the saved cases; the full domain and any positive values remain to be established. |
 | `node_type` | Decoration | Compare frequency and performance results, including edge value types. |
-| `performance_dfg`, `performance_matrix` | Separate computed performance presence and complete maps | Frequency public DFG is `None`; performance DFG is a dictionary, including a present empty dictionary. The seven performance route pairs establish filtering by retained interval relations, direct-wait means, and matrix zero for a relation with no direct wait. Dependency exclusion retains both maps. A frequency matrix entry may be zero despite positive waits. Native computed output and complete typed counterparts remain required. |
+| `performance_dfg`, `performance_matrix` | Separate computed performance presence and complete maps | Frequency public DFG is `None`; performance DFG is a dictionary, including a present empty dictionary. Seven performance route pairs establish retained interval filtering, direct-wait means and matrix zero for a relation with no direct wait. The tested new native outputs preserve these domains and dependency independence. Fresh complete typed counterparts across the broad corpus remain required. |
 | `sojourn_times` | Optional name-to-double map | All 117 supported aliases match, including escaped labels, removed activities, and empty input. Retain this verified obligation when broader inputs are added. |
 | `nodes` | Retained activities, node statistics, maps, and connections | Twenty-five positive AND maps match projections retaining center, input/output side, canonical raw-name neighbors and float scores. Threshold equality and positive-map label collisions remain open; actual keys and all fields below remain required for new inputs. |
 
