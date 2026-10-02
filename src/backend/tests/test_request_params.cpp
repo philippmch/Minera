@@ -3350,6 +3350,65 @@ void parse_dfg_and_edit_alignment_params_contract() {
   assert(threw);
 }
 
+void parse_mine_params_preserves_plusplus_decoration_selector() {
+  const auto defaults = minera::parse_mine_params(fields({}));
+  assert(!defaults.heuristic.plusplus_decoration_selector.has_value());
+  const auto omitted = minera::parse_mine_params(
+      fields({}), [](std::string_view) { return false; });
+  assert(!omitted.heuristic.plusplus_decoration_selector.has_value());
+
+  for (const auto& selector : std::vector<std::string>{
+           "frequency", "performance", "unfamiliar", "", " \t\r\n ",
+           " frequency ", R"(quote="value"\n\u00e9)",
+           "\xC3\xA9\xE9\x9B\xAA"}) {
+    const std::map<std::string, std::string> values{
+        {"heuristic_plusplus_decoration_selector", selector}};
+    const auto params = minera::parse_mine_params(
+        fields(values), [&values](std::string_view name) {
+          return values.contains(std::string(name));
+        });
+    assert(params.heuristic.plusplus_decoration_selector.has_value());
+    assert(*params.heuristic.plusplus_decoration_selector == selector);
+
+    // Lookup alone cannot distinguish an empty field from omission.
+    const auto lookup_only = minera::parse_mine_params(fields(values));
+    assert(lookup_only.heuristic.plusplus_decoration_selector.has_value() ==
+           !selector.empty());
+    if (!selector.empty())
+      assert(*lookup_only.heuristic.plusplus_decoration_selector == selector);
+  }
+}
+
+void parse_mine_params_keeps_plusplus_selector_independent_of_decoration() {
+  const auto frequency = minera::parse_mine_params(fields({
+      {"heuristic_decoration", "performance"},
+      {"heuristic_plusplus_decoration_selector", "frequency"}}));
+  assert(frequency.heuristic.decoration ==
+         minera::HeuristicNetDecoration::kPerformance);
+  assert(frequency.heuristic.plusplus_decoration_selector.has_value());
+  assert(*frequency.heuristic.plusplus_decoration_selector == "frequency");
+
+  const auto unfamiliar = minera::parse_mine_params(fields({
+      {"heuristic_decoration", "frequency"},
+      {"heuristic_plusplus_decoration_selector", "unfamiliar"}}));
+  assert(unfamiliar.heuristic.decoration ==
+         minera::HeuristicNetDecoration::kFrequency);
+  assert(unfamiliar.heuristic.plusplus_decoration_selector.has_value());
+  assert(*unfamiliar.heuristic.plusplus_decoration_selector == "unfamiliar");
+
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"heuristic_decoration", "bogus"},
+        {"heuristic_plusplus_decoration_selector", "frequency"}}));
+  } catch (const std::invalid_argument& error) {
+    threw = true;
+    assert(std::string(error.what()) ==
+           "heuristic_decoration: expected frequency or performance, got 'bogus'");
+  }
+  assert(threw);
+}
+
 void parse_mine_params_rejects_unknown_heuristic_settings() {
   for (const auto& [name, value] :
        std::vector<std::pair<std::string, std::string>>{
@@ -4926,6 +4985,8 @@ int main() {
   parse_mine_params_rejects_an_unknown_inductive_variant();
   parse_mine_params_rejects_invalid_inductive_options();
   parse_mine_params_accepts_infrequent_inductive_variant();
+  parse_mine_params_preserves_plusplus_decoration_selector();
+  parse_mine_params_keeps_plusplus_selector_independent_of_decoration();
   parse_mine_params_rejects_unknown_heuristic_settings();
   parse_mine_params_preserves_explicit_empty_heuristic_schedule();
   parse_mine_params_maps_spectrum_and_batch_options();

@@ -475,3 +475,48 @@ validation SHA is
 `bf991e64e70ece2a50017d329fcd353ff6d7d69a49233713710d22ec4f08df59`.
 Saving adds zero build/test commands or public/native calls. Durable validation
 uses immutable saved bytes after the source checkpoint is committed.
+
+## Request decoration selector
+
+`parse_mine_params` accepts `heuristic_plusplus_decoration_selector` as a
+separate raw string field and assigns it to
+`HeuristicMinerOptions::plusplus_decoration_selector`. Supplied strings retain
+their bytes, including whitespace, literal escapes and UTF-8. A caller that
+provides `FieldPresence` can distinguish an explicitly empty string from an
+omitted field. The lookup-only overload treats an empty result as omission.
+This establishes parser behavior; it does not establish JSON-null semantics or
+prove that every request caller supplies field-presence information.
+
+The existing `heuristic_decoration` field still accepts only `frequency` or
+`performance` and rejects other values with its existing error. The raw
+selector can coexist with either enum value. Its existing PLUSPLUS precedence
+and CLASSIC behavior remain covered by the heuristic suite. Public acceptance
+for additional selector domains remains open.
+
+Two registered parser tests cover omission in both overloads, exact string
+preservation, explicit emptiness with presence information, independent enum
+values and the existing invalid-enum error. The fresh production build passes
+all five assertion-enabled Release suites: core, request parameters, heuristic
+variants, Petri conversion and Petri reduction. Its three independent configure,
+build and test records exit zero with finalized logs; all 650 compiled input
+bindings and seven actual binary bindings remain unchanged through validation.
+
+Canonical and exported source trees both equal
+`5ab9f0b3ad4f831df54a922c54e61a5038c8a0ee`. Build-manifest SHA is
+`543ca290e2c41ba9139a48dec08c63b71a28e58f61e29e4c8329322db0028f27`;
+core SHA is
+`01d7fb85b2a3660a2d9a9f8fd692b56bbf1dd8e92fab2b8cc68b4c2ef6d180b2`.
+The parser change leaves full carrier and Petri object gates open. PLUSPLUS
+stays partial, with all 228 open coverage units retained.
+
+`docs/heuristic-plusplus-selector-request-build-checks.jsonl.gz` and its
+validation retain 78 exact UTF-8 members and 1,335 immutable external bindings,
+including all 650 compiled inputs and seven actual binaries. Source preview,
+patch and proof origins, nineteen harness checks, fourteen saver checks and
+reused earlier proofs remain distinct. All member bytes, SHA values and counts
+roundtrip with the reviewed codec. The archive is 1,738,889 bytes, SHA
+`eab6cdab6da24fa2a59ea8b434753f44937a3c71cfa917c7d168ac01e79f6b5e`;
+validation SHA is
+`b19a1a7eac1cbc0189b93097ce9cb4ea2352e222bde62c093e489de4762785bd`.
+Saving adds zero build/test commands or public/native calls. Validation uses
+immutable saved bytes after the source checkpoint is committed.
