@@ -602,3 +602,107 @@ Evidence: [forward-pltr-carrier-validation.json](forward-pltr-carrier-validation
 | `forward-pltr-carrier-evidence-56.jsonl.gz` | `ba9a8f487d8e50ec39018dc1abca6d75b5ba3c295f0c7f423944758310caf937` | 2137070 |
 | `forward-pltr-carrier-evidence-57.jsonl.gz` | `7f913df99af5cc982afaea5cd298de126fe4f7b14cd78a2cfefd04efdbd9c40c` | 2199148 |
 | `forward-pltr-carrier-evidence-58.jsonl.gz` | `3e439ee64008f0dcfd6bcc7ebffea7bc7b6b7cc59d3cb004350a6c2243284895` | 1753471 |
+
+## Native full forward result API
+
+The production `replay_token_result` API now returns source-order trace rows and,
+when `enable_pltr_fitness` is true, complete place fitness, visible-transition
+fitness and unknown-activity context maps. The new API is forward-only. Its
+`disable_variants` optional policy defaults to source traces for PLTR and activity
+variants otherwise. Explicit false generates activity-only Trace keys without
+case attributes or event payloads. Value-equal source Trace keys retain the first
+representative and combine their ordered context occurrences.
+
+Grouped PLTR counts event repair missing tokens once per variant. Final-marking
+missing tokens and remaining/consumed/produced place counters retain variant
+frequency. Place underfed membership comes from event repair; final deficits alone
+do not create it. Reached-marking membership retains explicit zero and signed keys
+in overfed cohorts, with underfed membership taking precedence for that trace and
+place. Visible transitions are precreated even when never examined; silent
+transitions are omitted from the transition fitness map. Known examined events
+merge the final context used by earlier observations. Unknown events do not update
+it. A stopped blocked known event updates that context but adds no transition
+underfed observation. Repeated unknown events retain one final context per Trace
+key. These rules are implemented in C++, using the same replay path and shared
+owned trace equality/context helpers.
+
+`token_replay_result_json` is an explicit tagged object codec. It retains the
+list/tuple/set/Marking carrier kinds, Place/Transition keys and source/generated
+Trace values, exact signed integer tokens and declared float hexadecimal values.
+`return_names` projects trace transitions and reached marking to names and adds
+parallel activation/enabled label lists. PLTR dictionary keys remain objects.
+The generic `replay_token_traces`, `replay_token_diagnostics` and their existing
+JSON route continue to account for each source trace independently.
+
+The standalone CLI selects this transport with `--token-replay-result` alongside
+`--token-replay-model`. The boolean `--token-replay-enable-pltr-fitness`,
+`--token-replay-disable-variants` and `--token-replay-return-names` options also
+select the full result route. Request parameter parsing accepts the corresponding
+underscore names. The existing standalone default output remains available.
+
+A fresh build freezes 660 exact source inputs: nine existing edits, three new
+inputs and 648 unchanged parent inputs. It builds the core, CLI/server and all
+152 native suites (155 production/test outputs), with no binary reuse. Every
+Release test project explicitly undefines NDEBUG. The new full-result contract
+suite passes an early gate, and the complete 152/152 regression run passes.
+
+The fresh owned probe imports all 95 exact retained weighted models and makes
+2280 actual full-result calls across twelve profiles and normal/mixed-null logs.
+It also repeats 2280 per-trace calls and 2090 count-only calls. All 2280 complete
+legacy native call records remain equal to the prior checkpoint, including trace
+rows, accounting results and errors. Document and trace-equality records remain
+unchanged. Direct raw C++ tagged carriers match all 2216 complete retained public
+returns, including all 2032 PLTR tuples and 184 named results without PLTR. All
+2344 retained public error behaviors match: 2280 mixed-null/string rejections and
+64 float-overflow outcomes. Native exceptions are not asserted to have Python
+exception classes. Mixed null/string rejection occurs before replay and floating
+conversion in the new full API; the generic APIs retain their prior contract.
+
+Another 1140 actual CLI invocations import the same nine source traces from XES,
+with their original case/event attributes and no invented timestamps. The 1108
+successful raw CLI results match both public routes for all 2216 complete returned
+carriers. The 32 CLI overflow exits match all 64 corresponding public error
+outcomes. No Python carrier synthesis is used. Comparisons canonicalize only
+dictionary/Marking/set order and paired enabled name/label set projections;
+activation, problem and context lists remain ordered. The public controls and
+opaque module pin proofs are reused from the prior retained checkpoint: there
+are zero new public calls in this implementation step.
+
+The first CLI harness incorrectly uses `--xes` (an output flag) for its input.
+All 1140 invocations exit with usage before replay; they are not successful replay
+calls or carrier comparisons. The executed helper and raw process witnesses remain
+immutable. A derived correction changes only positional input routing, keeps the
+same input bytes and produces the accepted CLI results above. The rejected run
+is archived separately.
+
+The fresh frozen sources, all 156 production/test/probe binaries, build/test logs,
+raw native/CLI outputs, process witnesses and immutable helpers are archived.
+Every chunk and whole file passes exact archive round-trip verification.
+
+Broader forward parameters, typed/foreign activity and Trace keys, nonmixed null
+inputs, variant ordering and object alias graphs remain open, as do the prior
+silent-choice/cleanup, backwards and adapter acceptance contracts. The tagged
+codec has native date/bytes/container extensions; those extensions are not
+claimed to match unmeasured public object encodings. Weighted aggregate/composite
+conformance remains gated. The catalogue remains 46/86 packages, 199/387 modules
+and 228 incomplete units. No module/package promotion or full parity is claimed.
+
+Evidence: [forward-result-validation.json](forward-result-validation.json).
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `forward-result-evidence-01.jsonl.gz` | `2c106a66dd8c1937136f11badf83b823daaaf9514f28edf8f08192eab2708052` | 5458164 |
+| `forward-result-evidence-02.jsonl.gz` | `d54ce93d688b069e4c302ed1ce6cd241e1a04ad351be07d65b9daceb343e98ee` | 6413869 |
+| `forward-result-evidence-03.jsonl.gz` | `06bae09865fa94cc05d88e4dab3624832196a5f2f999f3038442d3d19d2797c6` | 7704756 |
+| `forward-result-evidence-04.jsonl.gz` | `bae92de487f0176472f241eaeec288011fabdf2461563e8e7626dfb149ae253b` | 7206644 |
+| `forward-result-evidence-05.jsonl.gz` | `494ad11ead3037e681d2fcdf73631798e58d18ca9ddc4a8f33989783559c0f99` | 6619790 |
+| `forward-result-evidence-06.jsonl.gz` | `fef7dbb898d647bc991de7421007b7e7b155f68fec3011717812d35f1a550ad9` | 7713631 |
+| `forward-result-evidence-07.jsonl.gz` | `6f4b87df3d6690563a84c75962ae07fa3ded7710010fb801115e29db27302fad` | 7354395 |
+| `forward-result-evidence-08.jsonl.gz` | `93397867f460747bfb07cccb9989476961c50badb73cbabeb60408d090d8ff3e` | 7692421 |
+| `forward-result-evidence-09.jsonl.gz` | `5435f2ae042607e69ccd93e858821640c66132aef887d07ae6244a331e0d6259` | 13571376 |
+| `forward-result-evidence-10.jsonl.gz` | `298d9fcb6ca3bcbb475c1e774e4e3c460229d05910c78e4543157189e2d822d4` | 22221872 |
+| `forward-result-evidence-11.jsonl.gz` | `d9d57eb2023d4cd99592f8a7d79f3f932c602ce0df5f1a8be47b9117a1bbb9dc` | 18040445 |
+| `forward-result-evidence-12.jsonl.gz` | `b2ab0bc0225d251fb0b33888362fa6bcd10dd088b8db0cfddef0b3c35f9878fa` | 4423387 |
+| `forward-result-evidence-13.jsonl.gz` | `66ca1cee52959147b6b0aa3668ec4baee349bfb98060fd6376f6766a02c174ea` | 7623043 |
+| `forward-result-evidence-14.jsonl.gz` | `0c2b72297cfba5f7f263b44262924efe3a847d3b6eb612983190a9de631c4dbf` | 14855150 |
+| `forward-result-evidence-15.jsonl.gz` | `8f53fe7f1b70b40f7862de30309d6131b56f5bdab629399d7c5779703ce4107a` | 4638946 |

@@ -894,3 +894,15 @@ the generic metric/counting APIs or weighted aggregate conformance gates.
 See [token-replay-parity-contract.md](token-replay-parity-contract.md) and
 [forward-pltr-carrier-validation.json](forward-pltr-carrier-validation.json).
 The catalogue stays at 46/86 packages, 199/387 modules and 228 incomplete units.
+
+## Native forward result follow-up
+
+The full forward result API and opt-in tagged CLI transport are now implemented.
+Raw native and CLI carriers match all 2216 retained complete public returns,
+including 2032 PLTR tuples. The measured mixed-null/string rejection also matches
+in the full API. All 152 freshly built assertion-enabled native suites pass.
+Broader keys/parameters/ordering and prior acceptance contracts remain open;
+weighted aggregate conformance stays gated. See
+[token-replay-parity-contract.md](token-replay-parity-contract.md) and
+[forward-result-validation.json](forward-result-validation.json).
+The catalogue stays at 46/86 packages, 199/387 modules and 228 incomplete units.

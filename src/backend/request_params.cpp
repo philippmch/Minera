@@ -903,6 +903,9 @@ TokenReplayOptions parse_token_replay_params(const FieldLookup& field,
         field("token_replay_max_rows_to_materialize"),
         "token_replay_max_rows_to_materialize");
   }
+  if (supplied("token_replay_disable_variants"))
+    options.disable_variants = parse_boolean(field("token_replay_disable_variants"),
+                                             "token_replay_disable_variants");
   for (const auto& [name, destination] : {
            std::pair<std::string_view, std::vector<std::string>*>{
                "token_replay_root_cause_string_attributes", &options.root_cause.string_attributes},
@@ -930,6 +933,8 @@ TokenReplayOptions parse_token_replay_params(const FieldLookup& field,
            {"token_replay_try_to_reach_final_marking_through_hidden", &options.try_to_reach_final_marking_through_hidden},
            {"token_replay_consider_activities_not_in_model_in_fitness", &options.consider_activities_not_in_model_in_fitness},
            {"token_replay_cleaning_token_flood", &options.cleaning_token_flood},
+           {"token_replay_enable_pltr_fitness", &options.enable_pltr_fitness},
+           {"token_replay_return_names", &options.return_names},
            {"token_replay_exhaustive_invisible_exploration", &options.exhaustive_invisible_exploration},
            {"token_replay_walk_through_hidden_transitions", &options.walk_through_hidden_transitions},
            {"token_replay_include_trace_diagnostics", &options.include_trace_diagnostics},

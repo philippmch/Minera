@@ -14,6 +14,9 @@ std::optional<EventAttribute> native_event_attribute(const Event& event, const s
 // event-value equality. Trace-level values instead retain typed equality.
 std::string root_cause_attribute_category(const EventAttribute& attribute);
 bool root_cause_traces_equal(const Trace& left, const Trace& right);
+// Semantic projections shared by trace equality and the full replay codec.
+std::vector<EventAttribute> native_event_attributes(const Event& event);
+std::vector<EventAttribute> native_trace_attributes(const Trace& trace);
 // Candidate bucket key; callers still confirm matches with trace equality.
 std::string root_cause_trace_fingerprint(const Trace& trace);
 // Typed scalar, tuple, and frozen-set key comparison. Mutable nested values are rejected;
