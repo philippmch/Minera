@@ -360,3 +360,89 @@ Evidence: [weighted-token-replay-validation.json](weighted-token-replay-validati
 | `weighted-token-replay-evidence-19.jsonl.gz` | `722d14bf564090d08ceb4bdebffd0b9569fdf435f7506016a9888931ca5ba173` | 13309668 |
 | `weighted-token-replay-evidence-20.jsonl.gz` | `f759000af2d6c39799c39d7e9c5906e1755a709552a43fda7c95d33c2f12b5ca` | 22982111 |
 | `weighted-token-replay-evidence-21.jsonl.gz` | `60fe66fbf406e1726f283a563b054c98e22c48cc442f4dc5807179fc0bed6b74` | 15820689 |
+
+## Exact ordinary arc magnitudes beyond uint64
+
+PNML integer inscriptions, executable arc metadata, document occurrences and
+presentation/export carriers now retain exact nonnegative integer magnitudes
+with a separate sign. Large, signed and zero weights keep compact endpoints;
+ordinary replay uses the exact token arithmetic introduced in the pushed parent.
+Bounded simulation and CYC token carriers retain their checked range limits.
+
+Thirty new actual public models cover ordinary input, ordinary output and finite
+silent output weights of both signs at 2^64, 2^64+1, 2^128+1, 2^256+1 and 10^400.
+Nine profiles are invoked through both public routes: empty, one, two and three
+events, unknown activity, STOP, CLEANING, PLTR and RETURN_NAMES. These make
+30 actual imports and 540 actual replay calls: 494 returns and 46 float-overflow
+errors. Actual public inputs, markings, logs and parameters remain unchanged.
+All seven opaque module pin proofs match before and after the calls, with only
+recorded CRLF-to-LF normalization. Upstream implementation and bytecode are not
+inspected. The reused outer runner's stale 58-import summary is preserved and
+explicitly audited against the worker's actual import/call markers.
+
+The derived binding preserves the original 65 public models and all new actual
+returns/errors, remapping only model/call indices. It is not a new API producer.
+Before this change, 34 of the combined 95 native imports reject, leaving 612
+public outcomes behind import gates. After the change, all 95 imports succeed.
+The 855 actual native replay invocations return 832 results and 23 float-overflow
+errors. Both independent public routes match all 1664 returned trace outcomes
+across ten fields (16640 fields), all 46 measured float-overflow outcomes and
+2288 measured PLTR place m/r/c/p fields. Positive 10^400 cases that reach fitness
+float conversion fail as measured; negative cases retain their exact integers.
+Python/C++ exception class and message identity is not claimed.
+
+All 95 exact native document exports are independently reimported through the
+public importer. Place/transition names and labels, ordinary endpoint/weight
+multisets and exact initial/final marking keys/counts match. All 1710 complete
+packed public replay returns/errors match after only dictionary/Marking/set order
+canonicalization; ordered lists retain their order. This is public reimport
+evidence, not a native full PLTR tuple/RETURN_NAMES carrier proof or an exporter
+byte/format/property equivalence claim. The 95 reimports and 1710 replay calls
+are actual fresh public calls, bringing this checkpoint to 125 fresh public
+imports and 2250 replay calls (2158 returns and 92 recorded float errors).
+
+The fresh complete build freezes 657 inputs: eight existing edits and 649
+unchanged parent inputs. It produces all 154 core/application/test binaries
+afresh with zero reuse. All 151 assertion-enabled suites pass. The owned exact
+integer header also matches 545 independent arithmetic controls across 3270
+fields. All 855 actual CLI runs match 832 complete native trace JSON results and
+23 checked float-overflow errors. The label regression preserves all 624 public
+trace outcomes/6240 fields; all 352 prior metric cases, 4224 metric outcomes,
+1056 parameter parses and 352 document exports remain unchanged.
+
+Deterministic sub-50-MiB gzip archives retain all 160 linked binaries, all frozen
+inputs, exact exports, public returns/errors, raw logs, actual process witnesses
+and immutable owned helpers. Every chunk and whole file passes exact round-trip
+verification. The pushed parent's validation/archive hashes bind the reused
+65-model oracle, baseline build and prior unsuccessful attempts. This checkpoint
+contains one successful complete build and does not claim a new failed build.
+
+Full native PLTR tuple case sets, transition/unknown dictionaries, RETURN_NAMES
+formatting, broader lexical/digit-limit inputs, other parameters, imported
+arbitrary markings and general silent topologies remain open. PNML markings and
+specialized state carriers remain bounded; dataframe integer cells retain int64
+range checks. Large JSON numbers do not prove exact frontend rendering or input
+transport. Weighted aggregate/composite conformance, precision, alignment,
+specialized transformations and weighted backwards behavior remain unverified;
+the application computed=false/error gate remains. The catalogue is unchanged
+at 46/86 packages, 199/387 modules and 228 incomplete units. No module/package
+promotion or full parity is claimed.
+
+Evidence: [unbounded-ordinary-weight-validation.json](unbounded-ordinary-weight-validation.json).
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `unbounded-ordinary-weight-evidence-01.jsonl.gz` | `4de554ad255b70dcdaf976c4704a3f6b30ae67def2ab0322e3ca717ce1573b3f` | 8902808 |
+| `unbounded-ordinary-weight-evidence-02.jsonl.gz` | `aefade6ad16f61f6befb24e8027e082fcdd259c1ef9a30e77cf0698e0332e526` | 7380442 |
+| `unbounded-ordinary-weight-evidence-03.jsonl.gz` | `812a4365f9cf57e561a71f261f02bab70629b6a98bcf36626e60b2de0107d61b` | 7336017 |
+| `unbounded-ordinary-weight-evidence-04.jsonl.gz` | `84a4043aa3f8512312236867d4c9db523c1b4ba74d4f0cdaeb61233ad618ac22` | 6233267 |
+| `unbounded-ordinary-weight-evidence-05.jsonl.gz` | `da53a666d5d10d4bb2a3ad8b1e9074932e769d480d0faf458cf791506dc904ca` | 7915217 |
+| `unbounded-ordinary-weight-evidence-06.jsonl.gz` | `47d0a30648fb85461e8802a1af146440569242aa51d1c5feba13897b8e0889f4` | 7222875 |
+| `unbounded-ordinary-weight-evidence-07.jsonl.gz` | `c0126c80f9de6c5b7256ae7ca051a0f4866c6108235394915e0625797e2fb281` | 8008834 |
+| `unbounded-ordinary-weight-evidence-08.jsonl.gz` | `318335237e1adb9b1fbab498eec5080120b228a916823ce96a0ce536c0734923` | 12607393 |
+| `unbounded-ordinary-weight-evidence-09.jsonl.gz` | `6376f75e5065c4a1459e00c4c3db660f1e5746685ab2bb628abcb5b38c26687d` | 23147548 |
+| `unbounded-ordinary-weight-evidence-10.jsonl.gz` | `80156e4068449af4b59ea8017bb98aba9fb9091ed0175a1034920ecba22e46cf` | 18515365 |
+| `unbounded-ordinary-weight-evidence-11.jsonl.gz` | `b89dce959cd0c30257c0cf1ca9e96c18f0c107766ad7b401a37cfa7ecafe6900` | 4172382 |
+| `unbounded-ordinary-weight-evidence-12.jsonl.gz` | `824805794f0ff8dbbd8e74907e89592bfe37006a1e7b6981a42fe46013cb0e1a` | 3531088 |
+| `unbounded-ordinary-weight-evidence-13.jsonl.gz` | `4a0a2df59c390272842290c881c29e98a1dd6d7acbe723a2ab0193645457f8e6` | 3498824 |
+| `unbounded-ordinary-weight-evidence-14.jsonl.gz` | `f61fc87469bca7ccf6d5854770df3dd3681b15e596acfa6f32e0e81a5782ea92` | 1854065 |

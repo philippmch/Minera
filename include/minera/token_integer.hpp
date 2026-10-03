@@ -65,6 +65,7 @@ class TokenInteger {
     }
     return result;
   }
+  explicit operator bool() const noexcept { return !limbs_.empty(); }
   explicit operator double() const {
     const auto text = decimal();
     double result = 0;

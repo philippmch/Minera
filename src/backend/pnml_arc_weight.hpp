@@ -11,7 +11,7 @@
 
 namespace minera::detail {
 
-// Signed magnitude retains the full uint64 magnitude without primitive expansion.
+// Exact signed magnitude retains integer inscriptions without primitive expansion.
 inline PetriArcWeight parse_pnml_arc_weight(const std::string& text) {
   const auto invalid = [] { throw std::runtime_error("PNML arc contains an invalid integer weight"); };
   std::vector<std::uint32_t> characters;
@@ -47,7 +47,7 @@ inline PetriArcWeight parse_pnml_arc_weight(const std::string& text) {
       previous_digit = false; continue;
     }
     const auto digit = pnml_decimal_digit(characters[i]);
-    if (digit < 0 || result.magnitude > (std::numeric_limits<std::uint64_t>::max() - static_cast<unsigned>(digit)) / 10) invalid();
+    if (digit < 0) invalid();
     result.magnitude = result.magnitude * 10 + static_cast<unsigned>(digit);
     digit_seen = previous_digit = true;
   }

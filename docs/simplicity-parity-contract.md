@@ -864,3 +864,21 @@ gates are recorded in [token-replay-parity-contract.md](token-replay-parity-cont
 and [weighted-token-replay-validation.json](weighted-token-replay-validation.json).
 Weighted aggregate/composite conformance remains gated; the catalogue is unchanged
 at 46/86 packages, 199/387 modules and 228 incomplete units.
+
+## Exact ordinary-weight carrier follow-up
+
+Ordinary PNML weights now retain exact magnitudes beyond uint64 through parsing,
+executable metadata, document/presentation carriers and export. CYC endpoint
+magnitudes use the same exact carrier while CYC token arithmetic retains checked
+signed-int64 bounds. This carrier change does not establish arbitrary state or
+specialized method parity. All 352 prior metric cases, 4224 metric outcomes,
+1056 parameter parses and 352 exports remain unchanged.
+
+The separate forward replay checkpoint accepts all 95 captured models, matches
+all 1710 public outcomes (1664 returned traces and 46 measured float-overflow
+errors), and preserves all 1710 complete public outcomes after independent
+public reimport of the 95 exact native exports. Its scope and retained evidence
+are in [token-replay-parity-contract.md](token-replay-parity-contract.md) and
+[unbounded-ordinary-weight-validation.json](unbounded-ordinary-weight-validation.json).
+Weighted aggregate/composite conformance remains gated. The catalogue is
+unchanged at 46/86 packages, 199/387 modules and 228 incomplete units.

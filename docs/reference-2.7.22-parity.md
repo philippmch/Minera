@@ -8787,3 +8787,72 @@ parity. The catalogue is unchanged: 46/86 packages, 199/387 modules and 228 inco
 units. No module/package promotion or full parity is claimed.
 
 Evidence: [weighted-token-replay-validation.json](weighted-token-replay-validation.json).
+
+## Exact ordinary arc magnitudes beyond uint64
+
+PNML integer inscriptions, executable arc metadata, document occurrences and
+presentation/export carriers now retain exact nonnegative integer magnitudes
+with a separate sign. Large, signed and zero weights keep compact endpoints;
+ordinary replay uses the exact token arithmetic introduced in the pushed parent.
+Bounded simulation and CYC token carriers retain their checked range limits.
+
+Thirty new actual public models cover ordinary input, ordinary output and finite
+silent output weights of both signs at 2^64, 2^64+1, 2^128+1, 2^256+1 and 10^400.
+Nine profiles are invoked through both public routes: empty, one, two and three
+events, unknown activity, STOP, CLEANING, PLTR and RETURN_NAMES. These make
+30 actual imports and 540 actual replay calls: 494 returns and 46 float-overflow
+errors. Actual public inputs, markings, logs and parameters remain unchanged.
+All seven opaque module pin proofs match before and after the calls, with only
+recorded CRLF-to-LF normalization. Upstream implementation and bytecode are not
+inspected. The reused outer runner's stale 58-import summary is preserved and
+explicitly audited against the worker's actual import/call markers.
+
+The derived binding preserves the original 65 public models and all new actual
+returns/errors, remapping only model/call indices. It is not a new API producer.
+Before this change, 34 of the combined 95 native imports reject, leaving 612
+public outcomes behind import gates. After the change, all 95 imports succeed.
+The 855 actual native replay invocations return 832 results and 23 float-overflow
+errors. Both independent public routes match all 1664 returned trace outcomes
+across ten fields (16640 fields), all 46 measured float-overflow outcomes and
+2288 measured PLTR place m/r/c/p fields. Positive 10^400 cases that reach fitness
+float conversion fail as measured; negative cases retain their exact integers.
+Python/C++ exception class and message identity is not claimed.
+
+All 95 exact native document exports are independently reimported through the
+public importer. Place/transition names and labels, ordinary endpoint/weight
+multisets and exact initial/final marking keys/counts match. All 1710 complete
+packed public replay returns/errors match after only dictionary/Marking/set order
+canonicalization; ordered lists retain their order. This is public reimport
+evidence, not a native full PLTR tuple/RETURN_NAMES carrier proof or an exporter
+byte/format/property equivalence claim. The 95 reimports and 1710 replay calls
+are actual fresh public calls, bringing this checkpoint to 125 fresh public
+imports and 2250 replay calls (2158 returns and 92 recorded float errors).
+
+The fresh complete build freezes 657 inputs: eight existing edits and 649
+unchanged parent inputs. It produces all 154 core/application/test binaries
+afresh with zero reuse. All 151 assertion-enabled suites pass. The owned exact
+integer header also matches 545 independent arithmetic controls across 3270
+fields. All 855 actual CLI runs match 832 complete native trace JSON results and
+23 checked float-overflow errors. The label regression preserves all 624 public
+trace outcomes/6240 fields; all 352 prior metric cases, 4224 metric outcomes,
+1056 parameter parses and 352 document exports remain unchanged.
+
+Deterministic sub-50-MiB gzip archives retain all 160 linked binaries, all frozen
+inputs, exact exports, public returns/errors, raw logs, actual process witnesses
+and immutable owned helpers. Every chunk and whole file passes exact round-trip
+verification. The pushed parent's validation/archive hashes bind the reused
+65-model oracle, baseline build and prior unsuccessful attempts. This checkpoint
+contains one successful complete build and does not claim a new failed build.
+
+Full native PLTR tuple case sets, transition/unknown dictionaries, RETURN_NAMES
+formatting, broader lexical/digit-limit inputs, other parameters, imported
+arbitrary markings and general silent topologies remain open. PNML markings and
+specialized state carriers remain bounded; dataframe integer cells retain int64
+range checks. Large JSON numbers do not prove exact frontend rendering or input
+transport. Weighted aggregate/composite conformance, precision, alignment,
+specialized transformations and weighted backwards behavior remain unverified;
+the application computed=false/error gate remains. The catalogue is unchanged
+at 46/86 packages, 199/387 modules and 228 incomplete units. No module/package
+promotion or full parity is claimed.
+
+Evidence: [unbounded-ordinary-weight-validation.json](unbounded-ordinary-weight-validation.json).
