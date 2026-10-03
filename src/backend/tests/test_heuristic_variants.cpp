@@ -1486,6 +1486,59 @@ void plusplus_pandas_missing_activity_rows() {
   }
 }
 
+void plusplus_pandas_missing_activity_petri_counter_order() {
+  for (const bool categorical : {false, true}) {
+    for (const bool reversed_cases : {false, true}) {
+      for (const bool reversed_categories : {false, true}) {
+        if (reversed_categories && !categorical) continue;
+        for (const auto decoration : {HeuristicNetDecoration::kFrequency,
+                                      HeuristicNetDecoration::kPerformance}) {
+          auto table = categorical ? pandas_activity_category_table()
+                                   : pandas_surrogate_control_table();
+          const auto activity = table.column_index("concept:name");
+          table.rows.front()[activity].reset();
+          if (!categorical) table.dtypes[activity] = "object";
+          if (reversed_categories) {
+            auto& descriptor = *table.categorical_dtypes[activity];
+            std::reverse(descriptor.categories.begin(), descriptor.categories.end());
+            descriptor.ordered = true;
+          }
+          if (reversed_cases) {
+            const auto rows = table.rows;
+            for (std::size_t block = 0; block < 4; ++block)
+              for (std::size_t offset = 0; offset < 4; ++offset)
+                table.rows[4 * block + offset] = rows[4 * (3 - block) + offset];
+          }
+          auto options = plus_options();
+          options.decoration = decoration;
+          const auto net = discover_plus_plus_pandas(table, options);
+          const auto presented = to_petri_net_presentation(net);
+          const std::string hidden = reversed_categories || (!categorical && reversed_cases)
+              ? "hid_4" : "hid_2";
+          assert(presented.places.size() == 5 && presented.transitions.size() == 5);
+          assert(presented.arcs.size() == 11);
+          assert(std::count_if(presented.transitions.begin(), presented.transitions.end(),
+              [&](const auto& transition) {
+                return !transition.label && transition.name == hidden;
+              }) == 1);
+          const auto name = [&](const PetriNodeRef& endpoint) -> const std::string& {
+            return endpoint.kind == PetriNodeKind::kPlace
+                ? presented.places.at(endpoint.id).name : presented.transitions.at(endpoint.id).name;
+          };
+          const auto has_arc = [&](const std::string& source, const std::string& target) {
+            return std::any_of(presented.arcs.begin(), presented.arcs.end(), [&](const auto& arc) {
+              return name(arc.source) == source && name(arc.target) == target;
+            });
+          };
+          assert(has_arc("source0", hidden) && has_arc(hidden, "pre_B"));
+          assert(has_arc("A", "pre_B") && has_arc("pre_B", "B"));
+          assert(has_arc("D", "sink0"));
+        }
+      }
+    }
+  }
+}
+
 void plusplus_pandas_empty_activity_frames() {
   for (const bool aware : {false, true}) {
     auto table = pandas_activity_category_table();
@@ -5411,6 +5464,7 @@ int main(int argc, char** argv) {
   plusplus_pandas_surrogate_category_errors();
   plusplus_pandas_unused_activity_categories();
   plusplus_pandas_missing_activity_rows();
+  plusplus_pandas_missing_activity_petri_counter_order();
   plusplus_pandas_empty_activity_frames();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();

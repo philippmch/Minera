@@ -8100,3 +8100,40 @@ remain hash-bound, with 1,449 public calls in the evidence chain. Broader type,
 ordering, metadata, identity, timestamp and routing gates remain open.
 PLUSPLUS and Alpha+ remain partial; coverage stays 46/86 packages and 199/387
 modules, with 228 incomplete units and no promotion.
+
+### PLUSPLUS pandas Petri join ordering (2026-10-03)
+
+Corrected join traversal to visit a node's own join before its outgoing
+targets, retaining the first domain visit. Hidden numbering still counts
+every join before every split, including removed transitions. The correction
+closes all four naming differences retained at the activity checkpoint.
+Controls distinguish activity frequency order, reversed case tie order,
+category declaration order, Unicode/surrogate names and missing boundaries.
+
+This step retains 240 real PM4Py calls: 192 pandas discoveries and 48 exported
+conversions of the actual returned HN. Direct pandas Petri results, explicit HN
+conversions and repeated Petri results match on all 48 contrasts. Conversions
+leave HN and parameters unchanged. The 384 public pandas group diagnostics
+and 96 returned-net key-order observations are separate from producer calls.
+Opaque pinned-module hashes remain equal before and after. The pre-change
+96-discovery replay retains 32 Petri differences and 2,556 matched HN fields.
+The 48 actual public HN conversions also match the retained native Petri
+presentations; that file-only comparison invokes no additional producers.
+
+All 1,248 retained PLUSPLUS aliases match: 562 supported HN results, 253 Petri
+presentations and 433 expected errors. All 28,622 assessed fields, connection
+domains, input-after, option and mutation checks match; all 77 generic
+regressions remain unchanged. Actual accepted native calls are 1,325
+discoveries, 253 presentations and 43 generic conversions. The baseline adds
+96 discoveries and 48 presentations. Five assertion-enabled suites pass on
+650 exact compilation inputs, with 564 shared data factories. The unchanged
+Unicode decoder retains the preceding exhaustive evidence through the parent.
+
+The three `heuristic-plusplus-pandas-petri-order-*-checks.jsonl.gz` segments
+and `heuristic-plusplus-pandas-petri-order-validation.json` retain 5242
+members byte for byte, with exact sources, helpers, process logs and binary
+hashes. The preceding activity validation and three archive hashes remain
+bound; the evidence chain contains 1,689 real public calls. Broader type,
+ordering, metadata, identity, timestamp and routing gates remain open.
+PLUSPLUS and Alpha+ stay partial. Coverage remains 46/86 packages and 199/387
+modules, with 228 incomplete units and no promotion.

@@ -1555,3 +1555,65 @@ Broader scalar/carrier types, categorical ordering, metadata, identity,
 timestamp and routing domains remain open. PLUSPLUS and Alpha+ stay partial.
 Coverage remains 46/86 packages and 199/387 modules, with 228 incomplete units
 and no promotion.
+
+## Pandas Petri join ordering (2026-10-03)
+
+Executed 192 fresh PM4Py PLUSPLUS pandas discoveries on missing first/end/
+outer/inner activity positions, two missing boundaries, unequal activity
+counts, reversed case order, reversed category declarations, reverse labels,
+Unicode and surrogate labels, and zero minimum activity counts. Both
+decorations, complete category descriptors and all nine options are retained.
+Another 48 exported heuristics-net conversions use the actual returned nets,
+bringing this step to 240 public producer calls. The 384 public pandas grouping
+diagnostics and 96 returned-net key-order observations are counted separately.
+The reference's opaque installed and pinned module hashes match before and
+after. All calls succeed without serialization errors. Direct pandas Petri
+results and conversion of the returned HN match on all 48 controls; repeated
+Petri results also match. Conversions leave the HN and parameters unchanged.
+
+The native pre-change replay matches all 2,556 assessed HN fields but differs
+on 32 of 48 Petri presentations. The complete original results, process logs
+and strict comparisons remain retained. They distinguish frequency order,
+case tie order and category order: a first missing A gives B,C,D,A and
+`hid_2`; reversed object cases give C,B,D,A and `hid_4`; reversed categorical
+declarations give D,C,B,A and `hid_4`. Sorting activity names or replacing one
+known hidden name cannot account for those controls.
+
+The converter now visits a node's own join before its name-ordered outgoing
+targets, preserving the first visit of each domain. Every join still counts
+before every split, including transitions removed by reduction. The finite
+controls preserve all supported place/transition names, labels, properties,
+markings and directed arc occurrences under the unchanged strict comparer.
+The four naming differences from the preceding activity checkpoint now match.
+The 48 explicit public HN conversions also match the actual retained native
+presentations in a file-only comparison that adds no producer calls.
+Regression assertions cover both decorations, object/category inputs,
+reversed cases and reversed categories, including their combined order.
+
+All 1,248 retained PLUSPLUS aliases match: 562 full supported HN results,
+253 Petri presentations and 433 expected errors. All 28,622 assessed net/node/
+edge fields, connection domains, input-after, option and mutation checks match.
+All 77 generic regressions remain unchanged. Actual accepted native calls are
+1,325 discoveries, 253 presentations and 43 generic conversions, using 564
+shared data factories with exact literal reconstruction. The retained baseline
+adds 96 discoveries and 48 presentations. Five assertion-enabled suites pass
+on 650 frozen compilation inputs. The Unicode decoder is unchanged and its
+earlier exhaustive scalar evidence remains bound through the parent.
+
+Three archive segments retain 5242 members byte for byte. They include
+the actual public results, complete carriers, grouping and ordering controls,
+API metadata, opaque module proofs, native returns, exact sources, helpers,
+process logs and binary hashes. The preceding activity validation and three
+archive hashes are bound, giving 1,689 public calls in the evidence chain.
+`heuristic-plusplus-pandas-petri-order-validation.json` records the accounting.
+
+| Evidence segment | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `heuristic-plusplus-pandas-petri-order-core-checks.jsonl.gz` | `606e7e22ce798f28b3e6348cfdc61abf44bbefc4a471384b28f29cb3c61cb913` | 16427093 |
+| `heuristic-plusplus-pandas-petri-order-controls-checks.jsonl.gz` | `438d8116be321f1c563b920540efcf09cce08f4f22208a5772da82f5fcdef479` | 10366473 |
+| `heuristic-plusplus-pandas-petri-order-replay-checks.jsonl.gz` | `8ecb2bae7c51a2f189d2dea20f46094ff79c3108efb8798ab8754f6d7fe08c43` | 74266388 |
+
+These finite controls close the retained naming differences. Broader scalar/
+carrier types, ordering, metadata, identity, timestamp and routing domains
+remain open. PLUSPLUS and Alpha+ stay partial. Coverage remains 46/86 packages
+and 199/387 modules, with 228 incomplete units and no promotion.
