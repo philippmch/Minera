@@ -249,7 +249,8 @@ struct TokenReplayOptions {
   // recursive dependency exploration to the outer invocation.
   bool exhaustive_invisible_exploration = false;
   // Optional exact markings take precedence over the legacy integer vectors.
-  // Dimensions, non-negative input counts and membership validation are shared.
+  // Forward replay retains signed counts. Backwards input counts remain
+  // nonnegative. Dimensions and sparse membership are validated in both modes.
   std::optional<TokenMarking> exact_initial_marking;
   std::optional<TokenMarking> exact_final_marking;
   // Full forward result policies, applied by replay_token_result only.

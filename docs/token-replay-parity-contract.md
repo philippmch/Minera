@@ -1315,3 +1315,95 @@ separate; arbitrary Python result dictionaries, parameter/alias behavior and
 broader evaluator module acceptance are also open. Catalogue totals stay at
 46/86 packages, 199/387 modules and 228 incomplete units, with no promotions or
 full parity claim.
+
+## Exact log-based token fitness and standalone transport
+
+Explicit token-based `evaluate_replay_fitness(EventLog, PetriNet, ...)` now
+replays the grouped log and feeds its source-order trace rows into the exact
+aggregate evaluator. Fitness evaluation no longer runs precision,
+generalization or simplicity as side effects. The compatibility detail
+serializer reports those unevaluated scores as null. Trace diagnostics,
+exact signed counters, transition frequencies and per-trace variant entries
+remain available. The frontend accepts that detail shape and transports the
+forward cleaning control.
+
+`ReplayFitnessOptions` accepts exact initial/final `TokenMarking` values,
+sparse marking-key membership and model element names. Exact values override
+legacy integer vectors. Forward replay retains signed input counts; backwards
+exact markings keep their existing nonnegative gate. A signed final entry
+adjusts a place only when that place is present in the reached marking;
+positive absent final entries still contribute missing tokens. The new
+`PnmlDocument` overload supplies exact document counts, sparse keys and IDs
+unless the caller provides overrides. The PNML document parser's nonnegative
+int64 marking carrier remains separate from unbounded native exact markings.
+
+Trace fitness preserves the public separate-double-conversion calculation,
+while aggregate log fitness uses exact integer division. With a source/final
+count of 2^53 and one visible firing, the observed average trace fitness is
+2^-53 and log fitness is 2^-52; both distinct values survive. Empty/nonpositive
+aggregate denominators retain the public integer-zero log-fitness carrier.
+Nonempty 401-digit marking cases raise `int too large to convert to float`;
+empty logs return the observed zeros. Empty-trace backwards fitness raises
+`float division by zero`. Cleaning defaults to false and can be enabled for
+forward fitness independently of application conformance.
+
+`token_replay_fitness_result_json` emits the complete public four-field tagged
+dictionary: `perc_fit_traces`, `average_trace_fitness`, `log_fitness` and
+`percentage_of_fitting_traces`. Integer/float types and exact float.hex values
+remain explicit. The standalone CLI uses `--replay-fitness-model <file>` on a
+CSV/XES log. `POST /api/replay-fitness` accepts multipart `log` and `model`
+fields without a mining session. Both use explicit token fitness and accept
+the existing evaluation selector/replay controls plus
+`fitness_cleaning_token_flood`. Explicit non-token fitness selection is
+rejected. The existing model-quality bundle and other evaluator families
+retain their separate contracts.
+
+Fresh pinned observations make 3264 direct/parent fitness apply calls, 90
+full-replay calls for marked models and 88 PNML imports. They cover 65 weighted
+PNML models, six path-control models, all 17 original choice models and 18
+exact marking models. Grouped inputs include empty logs/traces, repeated and
+unknown events, cleaning true/false, custom activity selection and backwards
+replay. Additional raw token control parameters are observed at the public
+fitness-wrapper boundary; this cohort does not establish general alias or
+parameter parity. Every public log/model/marking snapshot check is retained.
+
+The native run makes 3264 actual fitness calls, 90 marked-model replay calls
+and 88 imports. All 4584 whole public comparisons in the accepted domain
+(65 weighted models, five path controls and 18 exact marked models) match
+every score, scalar carrier type and float hex. All 86 successful six-field
+marked trace projections match, including signed initial/final counts and
+the observed overflow outcomes. Both native carriers agree on all 1632
+input pairs, as do both pinned public routes. The compatibility detail always
+leaves the three unevaluated quality scores null.
+
+1632 actual CLI processes and 1632 cold-server HTTP requests exercise the same
+profiles, alternating multipart and query options. All 4460 whole public
+comparisons in the accepted wire domain match. Every CLI/HTTP pair and native
+wire comparison matches, including observed backwards errors. Signed and
+above-int64 PNML markings retain 70 explicit carrier-error checks and remain
+unsupported on the wire; they are not counted as matched public fitness.
+
+Two important gaps remain explicit. The 17 original automatic-choice models
+produce 312 different whole dictionaries in native comparisons and another
+312 in wire comparisons. The wider one/empty/mixed/unknown cohort is outside
+the earlier complete fixed-cache proof; these outcomes are retained without
+accepting a score range or stitching fields. Path-control model 5 retains an
+initial zero key in the native PNML document that the reference importer
+omits. Its four scores agree, but its input-carrier parity remains open.
+
+The final 660-input build changes 16 inputs, links all 155 production/test
+artifacts and passes all 152 assertion-enabled Release suites. TypeScript
+and all 87 targeted frontend tests pass on matching frozen frontend sources.
+Retained failures include the missing frontend query field, signed-input
+validation, the negative-final sparse-key distinction, an inconsistent unit
+fixture's key metadata, a diagnostic compile failure and two MSVC C1001
+failures. Compiler continuations use unchanged frozen sources and fresh
+terminal witnesses. The self-review is not an independent reviewer or a
+pre-public oracle.
+
+Evidence is in [weighted-fitness-apply-validation.json](weighted-fitness-apply-validation.json).
+All 11185 files round-trip across 18 lossless archives.
+AUTO dispatch, composite/precision/application conformance, legacy bounded
+precomputed aliases, arbitrary Python result carriers and broader parameter
+domains remain open. Catalogue totals stay at 46/86 packages, 199/387 modules
+and 228 incomplete units, with no promotion or full parity claim.

@@ -535,12 +535,29 @@ ReplayFitnessResult evaluate_replay_fitness(
       out.error = "unsupported replay-fitness variant";
       return out;
   }
+  if (variant != ReplayFitnessVariant::TOKEN_BASED &&
+      (options.exact_initial_marking || options.exact_final_marking)) {
+    out.variant = variant;
+    out.computed = false;
+    out.error = "exact markings require token-based replay fitness";
+    return out;
+  }
   if (const auto error = validate_evaluation_markings(
-          net, options.initial_marking, options.final_marking);
+          net, options.exact_initial_marking ? std::vector<int>{} : options.initial_marking,
+          options.exact_final_marking ? std::vector<int>{} : options.final_marking);
       !error.empty()) {
     out.variant = variant;
     out.computed = false;
     out.error = error;
+    return out;
+  }
+  if ((options.exact_initial_marking &&
+       options.exact_initial_marking->size() != net.place_count()) ||
+      (options.exact_final_marking &&
+       options.exact_final_marking->size() != net.place_count())) {
+    out.variant = variant;
+    out.computed = false;
+    out.error = "marking dimension does not match net";
     return out;
   }
   AlignmentOptions alignment_options = options.alignment_options;
@@ -576,7 +593,7 @@ ReplayFitnessResult evaluate_replay_fitness(
   if (!options.final_marking.empty()) {
     alignment_options.final_marking = options.final_marking;
   }
-  if (decomposed_options) {
+  if (variant != ReplayFitnessVariant::TOKEN_BASED && decomposed_options) {
     if (!options.initial_marking.empty()) {
       decomposed_options->initial_marking =
           unsigned_marking(options.initial_marking);
@@ -635,6 +652,9 @@ ReplayFitnessResult evaluate_replay_fitness(
     // Retain the selected detail engine so serialization does not substitute
     // an unrelated default payload for an otherwise valid empty evaluation.
     if (variant == ReplayFitnessVariant::TOKEN_BASED) {
+      out.log_fitness_is_integer_zero = true;
+      out.token_result_is_fitness_only = true;
+      out.token_result.fitness = 0.0;
       out.token_result.activity_attribute = alignment_options.activity_attribute;
     } else if (decomposed_options) {
       out.decomposed_alignment_result = DecomposedAlignmentResult{};
@@ -657,20 +677,72 @@ ReplayFitnessResult evaluate_replay_fitness(
     replay_options.activity_attribute = alignment_options.activity_attribute;
     replay_options.initial_marking = options.initial_marking;
     replay_options.final_marking = options.final_marking;
-    out.token_result = check_conformance(log, net, replay_options);
-    out.fitness = out.token_result.fitness;
-    out.log_fitness = out.fitness;
-    out.fitting_traces = out.token_result.fitting_traces;
-    double average = 0.0;
-    for (const auto& replay_variant : out.token_result.variants) {
-      average += replay_variant.fitness * double(replay_variant.count);
+    replay_options.exact_initial_marking = options.exact_initial_marking;
+    replay_options.exact_final_marking = options.exact_final_marking;
+    replay_options.initial_marking_keys = options.initial_marking_keys;
+    replay_options.final_marking_keys = options.final_marking_keys;
+    replay_options.place_names = options.place_names;
+    replay_options.transition_names = options.transition_names;
+    replay_options.cleaning_token_flood = options.cleaning_token_flood;
+    std::vector<TokenReplayTraceDiagnostics> rows;
+    try {
+      rows = options.token_replay_variant == TokenReplayVariant::kForward
+                 ? replay_token_result(log, net, replay_options).traces
+                 : replay_token_traces(log, net, replay_options);
+    } catch (const std::overflow_error& error) {
+      if (std::string_view(error.what()) ==
+          "token integer does not fit floating-point range")
+        throw std::overflow_error("int too large to convert to float");
+      throw;
+    } catch (const std::domain_error& error) {
+      if (std::string_view(error.what()) ==
+          "backwards token-replay fitness is undefined when consumed or produced tokens are zero")
+        throw std::domain_error("float division by zero");
+      throw;
     }
-    out.average_trace_fitness = average / double(out.trace_count);
-    if (out.token_result.produced == 0 || out.token_result.consumed == 0) {
-      out.fitness = 0.0;
-      out.log_fitness = 0.0;
-      out.average_trace_fitness = 0.0;
+    out = evaluate_replay_fitness(rows);
+    out.token_result.activity_attribute = alignment_options.activity_attribute;
+    out.token_result.transition_frequencies.assign(net.transitions().size(), 0);
+    for (const auto& row : rows) {
+      for (const auto transition : row.activated_transitions)
+        ++out.token_result.transition_frequencies.at(transition);
     }
+    // Retain per-trace variant details rather than collapsing value-distinct
+    // typed activities which share the same display spelling.
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+      auto& detail = out.token_result.variants[i];
+      for (const auto& event : log.traces[i].events) {
+        const bool primary = options.activity_attribute.empty() ||
+                             options.activity_attribute == "concept:name" ||
+                             options.activity_attribute == "activity";
+        const bool first_class = primary ||
+            event.activity_source_key == alignment_options.activity_attribute ||
+            (event.activity_attribute &&
+             event.activity_attribute->key == alignment_options.activity_attribute);
+        const EventAttribute* attribute = first_class && event.activity_attribute
+            ? &*event.activity_attribute : nullptr;
+        if (!first_class) {
+          const auto entry = std::find_if(event.attributes.begin(), event.attributes.end(),
+              [&](const auto& value) { return value.key == alignment_options.activity_attribute; });
+          if (entry != event.attributes.end()) attribute = &*entry;
+        }
+        if ((attribute && attribute->is_null) ||
+            (first_class && event.activity_state == FirstClassAttributeState::kNull)) {
+          detail.null_activity_indices.push_back(detail.activities.size());
+          detail.activities.emplace_back();
+        } else {
+          detail.activities.push_back(selected_evaluation_activity(
+              event, alignment_options.activity_attribute));
+        }
+      }
+    }
+    std::stable_sort(out.token_result.variants.begin(), out.token_result.variants.end(),
+        [](const auto& a, const auto& b) {
+          if (std::isnan(a.fitness)) return false;
+          if (std::isnan(b.fitness)) return true;
+          return a.fitness < b.fitness;
+        });
+    return out;
   } else if (decomposed_options) {
     const auto projected = project_evaluation_activity(
         log, alignment_options.activity_attribute);
@@ -720,6 +792,41 @@ ReplayFitnessResult evaluate_replay_fitness(
 }
 ReplayFitnessResult evaluate_replay_fitness(const EventLog& l,const ProcessTree& t,ReplayFitnessVariant v) { return evaluate_replay_fitness(l,to_petri_net(t),v); }
 ReplayFitnessResult evaluate_replay_fitness(
+    const EventLog& log, const PnmlDocument& document, ReplayFitnessVariant variant,
+    const ReplayFitnessOptions& options) {
+  auto supplied = options;
+  const auto set_marking = [&](const auto& marking, const auto& keys,
+                               auto& legacy, auto& exact, auto& membership) {
+    if (!exact && legacy.empty()) {
+      if (variant == ReplayFitnessVariant::TOKEN_BASED) {
+        exact = TokenMarking(marking);
+        if (membership.empty()) membership = keys;
+      } else {
+        for (const auto value : marking) {
+          if (value < 0 || value > std::numeric_limits<int>::max()) return false;
+          legacy.push_back(static_cast<int>(value));
+        }
+      }
+    }
+    return true;
+  };
+  if (!set_marking(document.initial_marking, document.initial_marking_keys,
+                   supplied.initial_marking, supplied.exact_initial_marking,
+                   supplied.initial_marking_keys) ||
+      !set_marking(document.final_marking, document.final_marking_keys,
+                   supplied.final_marking, supplied.exact_final_marking,
+                   supplied.final_marking_keys)) {
+    ReplayFitnessResult out;
+    out.variant = variant;
+    out.computed = false;
+    out.error = "PNML marking exceeds alignment token range";
+    return out;
+  }
+  if (supplied.place_names.empty()) supplied.place_names = document.place_ids;
+  if (supplied.transition_names.empty()) supplied.transition_names = document.transition_ids;
+  return evaluate_replay_fitness(log, document.net, variant, supplied);
+}
+ReplayFitnessResult evaluate_replay_fitness(
     const EventLog& l, const ProcessTree& t, ReplayFitnessVariant v,
     const ReplayFitnessOptions& o) {
   return evaluate_replay_fitness(l, to_petri_net(t), v, o);
@@ -751,6 +858,7 @@ ReplayFitnessResult evaluate_replay_fitness(
   ReplayFitnessResult output;
   output.variant = variant;
   output.log_fitness_is_integer_zero = true;
+  output.token_result_is_fitness_only = true;
   output.token_result.fitness = 0.0;
   output.token_result.precision = 0.0;
   output.token_result.generalization = 0.0;

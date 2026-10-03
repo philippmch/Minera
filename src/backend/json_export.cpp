@@ -1779,14 +1779,20 @@ void write_token_replay_root_cause(
   out << "]}";
 }
 
+void write_finite_or_null(std::ostream& out, double value);
+
 void write_conformance(std::ostream& out,
                        const ConformanceResult& conformance,
-                       const DirectlyFollowsGraph& graph) {
+                       const DirectlyFollowsGraph& graph,
+                       bool fitness_only = false) {
   out << "{\"fitness\": " << conformance.fitness
-      << ", \"precision\": " << conformance.precision
-      << ", \"generalization\": " << conformance.generalization
-      << ", \"simplicity\": " << conformance.simplicity
-      << ", \"fitting_traces\": " << conformance.fitting_traces
+      << ", \"precision\": ";
+  if (fitness_only) out << "null"; else out << conformance.precision;
+  out << ", \"generalization\": ";
+  if (fitness_only) out << "null"; else out << conformance.generalization;
+  out << ", \"simplicity\": ";
+  if (fitness_only) out << "null"; else out << conformance.simplicity;
+  out << ", \"fitting_traces\": " << conformance.fitting_traces
       << ", \"trace_count\": " << conformance.trace_count
       << ", \"produced\": " << conformance.produced
       << ", \"consumed\": " << conformance.consumed
@@ -1824,9 +1830,9 @@ void write_conformance(std::ostream& out,
       }
       out << ']';
     }
-    out << ", \"count\": " << variants[i].count
-        << ", \"fitness\": " << variants[i].fitness << '}'
-        << (i + 1 < variants.size() ? ", " : "");
+    out << ", \"count\": " << variants[i].count << ", \"fitness\": ";
+    write_finite_or_null(out, variants[i].fitness);
+    out << '}' << (i + 1 < variants.size() ? ", " : "");
   }
   out << ']';
   if (conformance.trace_diagnostics) {
@@ -2390,7 +2396,8 @@ void write_replay_fitness(std::ostream& out, const ReplayFitnessResult& result,
   } else if (graph != nullptr &&
              result.variant == ReplayFitnessVariant::TOKEN_BASED) {
     out << ", \"token_replay\": ";
-    write_conformance(out, result.token_result, *graph);
+    write_conformance(out, result.token_result, *graph,
+                      result.token_result_is_fitness_only);
   } else if (graph != nullptr &&
              result.variant == ReplayFitnessVariant::ALIGNMENT_BASED) {
     out << ", \"alignments\": ";

@@ -1983,6 +1983,7 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
   }
   for (const [name, value] of [
     ["fitness_consider_unknown_activities", options.fitness_consider_unknown_activities],
+    ["fitness_cleaning_token_flood", options.fitness_cleaning_token_flood],
     ["evaluation_alignment_synchronous_dijkstra", options.evaluation_alignment_synchronous_dijkstra],
     ["evaluation_alignment_use_cache", options.evaluation_alignment_use_cache],
     ["evaluation_alignment_clear_cache", options.evaluation_alignment_clear_cache],
@@ -2122,6 +2123,7 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
   add("evaluation_final_marking", options.evaluation_final_marking);
   add("evaluation_token_replay_variant", options.evaluation_token_replay_variant);
   add("fitness_consider_unknown_activities", options.fitness_consider_unknown_activities);
+  add("fitness_cleaning_token_flood", options.fitness_cleaning_token_flood);
   add("evaluation_alignment_variant", options.evaluation_alignment_variant);
   add("evaluation_alignment_max_states", options.evaluation_alignment_max_states);
   add("evaluation_alignment_max_total_states", options.evaluation_alignment_max_total_states);

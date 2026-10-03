@@ -1,5 +1,6 @@
 #include "minera/dfg_precision.hpp"
 #include "minera/evaluation.hpp"
+#include "minera/json_export.hpp"
 #include "minera/pnml.hpp"
 
 #include <cassert>
@@ -1054,6 +1055,82 @@ void evaluation_event_data_adapters_contract() {
   assert(threw);
 }
 
+void exact_log_fitness_marking_contract() {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto source = net.add_place();
+  (void)net.add_place();
+  const auto target = net.add_place();
+  net.set_source(source);net.set_sink(target);
+  net.add_transition(0, {source}, {target});
+  ReplayFitnessOptions options;
+  const TokenInteger n("9007199254740992");
+  options.exact_initial_marking = TokenMarking{n, 0, 0};
+  options.exact_final_marking = TokenMarking{0, 0, n};
+  options.initial_marking_keys = {true, true, false};
+  options.final_marking_keys = {false, true, true};
+  options.place_names = {"source", "spare", "target"};
+  options.transition_names = {"move"};
+  const auto rounded = evaluate_replay_fitness(log({{"A"}}), net,
+      ReplayFitnessVariant::TOKEN_BASED, options);
+  // Public trace fitness converts operands separately; aggregate fitness
+  // divides exact totals. These distinct observed values must both survive.
+  assert(rounded.computed && rounded.fitness == 0x1p-52 &&
+         rounded.average_trace_fitness == 0x1p-53);
+  assert(rounded.token_result.produced == n + 1 && rounded.token_result.consumed == n + 1);
+  assert(rounded.token_result.transition_frequencies == std::vector<std::uint64_t>{1});
+  assert(rounded.token_result_is_fitness_only && !rounded.log_fitness_is_integer_zero);
+  const auto tagged = token_replay_fitness_result_json(rounded);
+  assert(tagged.find("0x1.0000000000000p-52") != std::string::npos);
+  assert(tagged.find("0x1.0000000000000p-53") != std::string::npos);
+  const DirectlyFollowsGraph graph;
+  const auto compatible = replay_fitness_json(rounded, &graph);
+  assert(compatible.find("\"precision\": null") != std::string::npos &&
+         compatible.find("\"generalization\": null") != std::string::npos &&
+         compatible.find("\"simplicity\": null") != std::string::npos);
+  options.exact_initial_marking = TokenMarking{-3, 0, 0};
+  options.exact_final_marking = TokenMarking{0, 0, 0};
+  const auto signed_marking = evaluate_replay_fitness(log({{"A"}}), net,
+      ReplayFitnessVariant::TOKEN_BASED, options);
+  assert(signed_marking.fitness == 0.0 && signed_marking.average_trace_fitness == 0.0 &&
+         signed_marking.log_fitness_is_integer_zero && signed_marking.token_result.produced == -2);
+  options.exact_initial_marking = TokenMarking{1, 0, 0};
+  options.exact_final_marking = TokenMarking{0, 0, -3};
+  const auto negative_final = evaluate_replay_fitness(log({{}}), net,
+      ReplayFitnessVariant::TOKEN_BASED, options);
+  assert(negative_final.log_fitness_is_integer_zero &&
+         negative_final.token_result.consumed == -3 &&
+         negative_final.token_result.remaining == 1);
+  const TokenInteger huge("1" + std::string(400, '0'));
+  options.exact_initial_marking = TokenMarking{huge, 0, 0};
+  options.exact_final_marking = TokenMarking{0, 0, huge};
+  bool overflow = false;
+  try { (void)evaluate_replay_fitness(log({{"A"}}), net, ReplayFitnessVariant::TOKEN_BASED, options); }
+  catch (const std::overflow_error& error) { overflow = std::string(error.what()) == "int too large to convert to float"; }
+  assert(overflow);
+  assert(evaluate_replay_fitness(EventLog{}, net, ReplayFitnessVariant::TOKEN_BASED, options).log_fitness_is_integer_zero);
+
+  PnmlImportOptions import;
+  import.infer_initial_marking = import.infer_final_marking = import.require_workflow_boundaries = false;
+  const auto signed_weight = parse_pnml_document(R"(<pnml><net id="signed">
+    <place id="source"><initialMarking><text>3</text></initialMarking></place><place id="target"/>
+    <transition id="move"><name><text>A</text></name></transition>
+    <arc id="input" source="source" target="move"><inscription><text>-1</text></inscription></arc>
+    <arc id="output" source="move" target="target"><inscription><text>0</text></inscription></arc>
+    <finalmarkings><marking><place idref="target"><text>1</text></place></marking></finalmarkings>
+  </net></pnml>)", import);
+  const auto nonpositive = evaluate_replay_fitness(log({{"A"}}), signed_weight);
+  assert(nonpositive.computed && nonpositive.log_fitness_is_integer_zero &&
+         nonpositive.fitness == 0.0 && nonpositive.token_result.consumed == 0 &&
+         nonpositive.token_result.produced == 3);
+  auto backwards = ReplayFitnessOptions{};
+  backwards.token_replay_variant = TokenReplayVariant::kBackwards;
+  bool undefined = false;
+  try { (void)evaluate_replay_fitness(log({{}}), sequence_net(), ReplayFitnessVariant::TOKEN_BASED, backwards); }
+  catch (const std::domain_error& error) { undefined = std::string(error.what()) == "float division by zero"; }
+  assert(undefined);
+}
+
 void exact_token_result_aggregation_contract() {
   TokenReplayTraceDiagnostics signed_row;
   signed_row.trace_is_fit = false;
@@ -1410,6 +1487,7 @@ int main() {
   evaluation_event_data_adapters_contract();
   precomputed_replay_aggregation_contract();
   exact_token_result_aggregation_contract();
+  exact_log_fitness_marking_contract();
   emd_pyemd_contract();
   emd_encoding_and_mass_contract();
   process_tree_evaluation_overloads_contract();

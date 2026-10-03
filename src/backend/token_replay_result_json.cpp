@@ -248,4 +248,15 @@ class Codec {
 std::string token_replay_result_json(const TokenReplayResult& result) {
   return Codec(result).encode();
 }
+std::string token_replay_fitness_result_json(const ReplayFitnessResult& result) {
+  if (result.variant != ReplayFitnessVariant::TOKEN_BASED || !result.computed)
+    throw std::invalid_argument(result.error.empty()
+        ? "token fitness result requires computed token-based evaluation" : result.error);
+  return dictionary({
+      {string_value("perc_fit_traces"), real(result.percentage_fit_traces)},
+      {string_value("average_trace_fitness"), real(result.average_trace_fitness)},
+      {string_value("log_fitness"), result.log_fitness_is_integer_zero
+          ? integer(0) : real(result.log_fitness)},
+      {string_value("percentage_of_fitting_traces"), real(result.percentage_fit_traces)}});
+}
 }  // namespace minera

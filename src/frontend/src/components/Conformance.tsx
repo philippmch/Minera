@@ -957,6 +957,8 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
     evaluation_token_replay_variant: next,
     fitness_consider_unknown_activities: next === "backwards"
       ? undefined : current.fitness_consider_unknown_activities,
+    fitness_cleaning_token_flood: next === "backwards"
+      ? undefined : current.fitness_cleaning_token_flood,
   }));
 
   return <section className="panel conf-panel other-alignments">
@@ -981,6 +983,7 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
       {usesTokenReplay && <>
         <label>Replay direction<select value={options.evaluation_token_replay_variant ?? "forward"} onChange={(event) => updateTokenReplayVariant(event.target.value as NonNullable<EvaluationOptions["evaluation_token_replay_variant"]>)}><option value="forward">Forward</option><option value="backwards">Backwards</option></select></label>
         {family === "replay_fitness" && <label className={`checkbox-label ${options.evaluation_token_replay_variant === "backwards" ? "disabled" : ""}`}><input type="checkbox" disabled={options.evaluation_token_replay_variant === "backwards"} checked={options.fitness_consider_unknown_activities ?? false} onChange={(event) => setOptions({ ...options, fitness_consider_unknown_activities: event.target.checked })} /> Penalize unknown activities (forward)</label>}
+        {family === "replay_fitness" && <label className={`checkbox-label ${options.evaluation_token_replay_variant === "backwards" ? "disabled" : ""}`}><input type="checkbox" disabled={options.evaluation_token_replay_variant === "backwards"} checked={options.fitness_cleaning_token_flood ?? false} onChange={(event) => setOptions({ ...options, fitness_cleaning_token_flood: event.target.checked })} /> Clean token flooding (forward)</label>}
       </>}
       {usesAlignment && <>
         <label>Alignment variant<select value={alignmentVariant} onChange={(event) => updateAlignmentVariant(event.target.value as NonNullable<EvaluationOptions["evaluation_alignment_variant"]>)}>{EVALUATION_ALIGNMENT_VARIANTS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>

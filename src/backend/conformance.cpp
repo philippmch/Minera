@@ -163,10 +163,12 @@ class Replayer {
                     bool match_null_activity = false)
       : net_(net),
         initial_(replay_options && replay_options->exact_initial_marking
-          ? resolve_exact_marking(net, *replay_options->exact_initial_marking, true)
+          ? resolve_exact_marking(net, *replay_options->exact_initial_marking, true,
+                                  replay_options->variant == TokenReplayVariant::kForward)
           : Marking(resolve_workflow_marking(net, initial, true))),
         final_(replay_options && replay_options->exact_final_marking
-          ? resolve_exact_marking(net, *replay_options->exact_final_marking, false)
+          ? resolve_exact_marking(net, *replay_options->exact_final_marking, false,
+                                  replay_options->variant == TokenReplayVariant::kForward)
           : Marking(resolve_workflow_marking(net, final, false))) {
     for (std::size_t i = 0; i < net_.activities().size(); ++i) {
       name_to_activity_.emplace(net_.activities()[i], i);
@@ -365,7 +367,9 @@ class Replayer {
       const auto required = TokenInteger(final_[place]);
       counts.consumed += required;
       counts.places[place].consumed += required;
-      if (final_keys[place]) {
+      // A signed final entry only adjusts a place present in the reached
+      // marking. Positive absent entries still contribute missing tokens.
+      if (final_keys[place] && (keys[place] || required > 0)) {
         if (marking[place] >= final_[place]) {
           marking[place] -= final_[place];
         } else {
@@ -727,10 +731,12 @@ class Replayer {
   }
 
  private:
-  static Marking resolve_exact_marking(const PetriNet& net, const Marking& requested, bool initial) {
+  static Marking resolve_exact_marking(const PetriNet& net, const Marking& requested,
+                                     bool initial, bool allow_signed) {
     if (requested.empty()) return Marking(resolve_workflow_marking(net, {}, initial));
     if (requested.size() != net.place_count()) throw std::invalid_argument("exact marking dimension does not match net");
-    if (std::any_of(requested.begin(), requested.end(), [](const auto& count) { return count < 0; }))
+    if (!allow_signed && std::any_of(requested.begin(), requested.end(),
+                                    [](const auto& count) { return count < 0; }))
       throw std::invalid_argument("exact input marking contains a negative token count");
     return requested;
   }
@@ -3402,7 +3408,16 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
       counts = replayer.replay(ids, nullptr, options, &row);
       row.trace_is_fit = counts.forward_fitting(options);
     }
-    if (calculate_fitness) row.trace_fitness = counts.fitness();
+    if (calculate_fitness) {
+      try {
+        row.trace_fitness = counts.fitness();
+      } catch (const std::overflow_error& error) {
+        if (std::string_view(error.what()) ==
+            "token integer does not fit floating-point range")
+          throw std::overflow_error("int too large to convert to float");
+        throw;
+      }
+    }
     row.produced = counts.produced;
     row.consumed = counts.consumed;
     row.missing = counts.missing;
