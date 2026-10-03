@@ -17,6 +17,253 @@
 namespace minera {
 
 namespace {
+// JSON values for the typed PLUSPLUS selector. Python's JSON encoder also
+// emits NaN/Infinity/-Infinity, which preserve the observed nonfinite values.
+class HeuristicDecorationValueParser {
+ public:
+  explicit HeuristicDecorationValueParser(std::string_view text) : text_(text) {}
+
+  HeuristicStructuredValue parse() {
+    auto result = value(0);
+    whitespace();
+    if (position_ != text_.size()) fail("unexpected trailing data");
+    return result;
+  }
+
+ private:
+  [[noreturn]] void fail(std::string_view reason) const {
+    throw std::invalid_argument(
+        "heuristic_plusplus_decoration_value: " + std::string(reason) +
+        " at byte " + std::to_string(position_));
+  }
+
+  void whitespace() {
+    while (position_ < text_.size() &&
+           (text_[position_] == ' ' || text_[position_] == '\t' ||
+            text_[position_] == '\r' || text_[position_] == '\n'))
+      ++position_;
+  }
+
+  bool consume(std::string_view token) {
+    if (text_.substr(position_, token.size()) != token) return false;
+    position_ += token.size();
+    return true;
+  }
+
+  bool digit() const {
+    return position_ < text_.size() && text_[position_] >= '0' &&
+           text_[position_] <= '9';
+  }
+
+  std::uint32_t unicode_unit() {
+    if (text_.size() - position_ < 4) fail("incomplete Unicode escape");
+    std::uint32_t result = 0;
+    for (int i = 0; i < 4; ++i) {
+      const char c = text_[position_++];
+      unsigned hex;
+      if (c >= '0' && c <= '9') hex = c - '0';
+      else if (c >= 'a' && c <= 'f') hex = c - 'a' + 10;
+      else if (c >= 'A' && c <= 'F') hex = c - 'A' + 10;
+      else fail("invalid Unicode escape");
+      result = (result << 4) | hex;
+    }
+    return result;
+  }
+
+  static void append_unicode(std::string& output, std::uint32_t codepoint) {
+    if (codepoint < 0x80) output.push_back(static_cast<char>(codepoint));
+    else if (codepoint < 0x800) {
+      output.push_back(static_cast<char>(0xc0 | (codepoint >> 6)));
+      output.push_back(static_cast<char>(0x80 | (codepoint & 0x3f)));
+    } else if (codepoint < 0x10000) {
+      output.push_back(static_cast<char>(0xe0 | (codepoint >> 12)));
+      output.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
+      output.push_back(static_cast<char>(0x80 | (codepoint & 0x3f)));
+    } else {
+      output.push_back(static_cast<char>(0xf0 | (codepoint >> 18)));
+      output.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3f)));
+      output.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
+      output.push_back(static_cast<char>(0x80 | (codepoint & 0x3f)));
+    }
+  }
+
+  std::string string() {
+    if (!consume("\"")) fail("expected a JSON string");
+    std::string result;
+    while (position_ < text_.size()) {
+      const unsigned char c = static_cast<unsigned char>(text_[position_++]);
+      if (c == '"') return result;
+      if (c < 0x20) fail("unescaped control character");
+      if (c != '\\') {
+        if (c < 0x80) result.push_back(static_cast<char>(c));
+        else {
+          const auto start = position_ - 1;
+          const int following = c >= 0xc2 && c <= 0xdf ? 1 :
+                                c >= 0xe0 && c <= 0xef ? 2 :
+                                c >= 0xf0 && c <= 0xf4 ? 3 : 0;
+          if (!following || text_.size() - position_ < following)
+            fail("invalid UTF-8 string");
+          std::uint32_t codepoint = c & (0x7f >> (following + 1));
+          for (int i = 0; i < following; ++i) {
+            const unsigned char next = static_cast<unsigned char>(text_[position_++]);
+            if ((next & 0xc0) != 0x80) fail("invalid UTF-8 string");
+            codepoint = (codepoint << 6) | (next & 0x3f);
+          }
+          const std::uint32_t minimum = following == 1 ? 0x80 : following == 2 ? 0x800 : 0x10000;
+          if (codepoint < minimum || codepoint > 0x10ffff ||
+              (codepoint >= 0xd800 && codepoint <= 0xdfff))
+            fail("invalid UTF-8 string");
+          result.append(text_.substr(start, following + 1));
+        }
+        continue;
+      }
+      if (position_ == text_.size()) fail("incomplete string escape");
+      switch (text_[position_++]) {
+        case '"': result.push_back('"'); break;
+        case '\\': result.push_back('\\'); break;
+        case '/': result.push_back('/'); break;
+        case 'b': result.push_back('\b'); break;
+        case 'f': result.push_back('\f'); break;
+        case 'n': result.push_back('\n'); break;
+        case 'r': result.push_back('\r'); break;
+        case 't': result.push_back('\t'); break;
+        case 'u': {
+          auto codepoint = unicode_unit();
+          if (codepoint >= 0xd800 && codepoint <= 0xdbff &&
+              text_.substr(position_, 2) == "\\u") {
+            const auto next_position = position_;
+            position_ += 2;
+            const auto low = unicode_unit();
+            if (low >= 0xdc00 && low <= 0xdfff)
+              codepoint = 0x10000 + ((codepoint - 0xd800) << 10) + low - 0xdc00;
+            else position_ = next_position;
+          }
+          // Unpaired escaped surrogates use the native WTF-8 representation.
+          append_unicode(result, codepoint);
+          break;
+        }
+        default: fail("invalid string escape");
+      }
+    }
+    fail("unterminated string");
+  }
+
+  HeuristicStructuredValue number() {
+    const auto start = position_;
+    consume("-");
+    if (consume("0")) {
+      if (digit()) fail("leading zero in JSON number");
+    } else {
+      if (!digit()) fail("expected a JSON value");
+      while (digit()) ++position_;
+    }
+    bool floating = false;
+    if (consume(".")) {
+      floating = true;
+      if (!digit()) fail("expected fraction digits");
+      while (digit()) ++position_;
+    }
+    if (consume("e") || consume("E")) {
+      floating = true;
+      if (!consume("+")) consume("-");
+      if (!digit()) fail("expected exponent digits");
+      while (digit()) ++position_;
+    }
+    const auto token = text_.substr(start, position_ - start);
+    if (floating) {
+      double parsed;
+      const auto result = std::from_chars(token.data(), token.data() + token.size(), parsed);
+      if (result.ec == std::errc::result_out_of_range) {
+        // Preserve Python JSON's overflow to infinity and underflow to signed
+        // zero without depending on the process's numeric locale.
+        const auto exponent_at = token.find_first_of("eE");
+        const auto mantissa = token.substr(0, exponent_at);
+        const auto digits_start = token.front() == '-' ? 1u : 0u;
+        const auto decimal_at = mantissa.find('.');
+        const auto integer_digits = (decimal_at == std::string_view::npos ?
+                                      mantissa.size() : decimal_at) - digits_start;
+        std::int64_t digit_index = 0, significant = -1;
+        for (std::size_t i = digits_start; i < mantissa.size(); ++i) {
+          if (mantissa[i] == '.') continue;
+          if (mantissa[i] != '0' && significant < 0) significant = digit_index;
+          ++digit_index;
+        }
+        std::int64_t exponent = 0;
+        if (exponent_at != std::string_view::npos) {
+          std::size_t i = exponent_at + 1;
+          const bool negative = token[i] == '-';
+          if (negative || token[i] == '+') ++i;
+          constexpr auto cap = std::int64_t{1} << 60;
+          for (; i < token.size(); ++i) {
+            const auto digit_value = token[i] - '0';
+            exponent = exponent > (cap - digit_value) / 10 ? cap :
+                       exponent * 10 + digit_value;
+          }
+          if (negative) exponent = -exponent;
+        }
+        const auto scale = exponent + static_cast<std::int64_t>(integer_digits) - significant - 1;
+        parsed = significant >= 0 && scale >= 0 ?
+                   std::numeric_limits<double>::infinity() : 0.0;
+        if (token.front() == '-') parsed = -parsed;
+        return HeuristicStructuredValue{parsed};
+      }
+      if (result.ec != std::errc{} || result.ptr != token.data() + token.size())
+        fail("number is outside the native double range");
+      return HeuristicStructuredValue{parsed};
+    }
+    std::int64_t signed_value;
+    const auto signed_result = std::from_chars(token.data(), token.data() + token.size(), signed_value);
+    if (signed_result.ec == std::errc{}) return HeuristicStructuredValue{signed_value};
+    std::uint64_t unsigned_value;
+    const auto unsigned_result = std::from_chars(token.data(), token.data() + token.size(), unsigned_value);
+    if (unsigned_result.ec == std::errc{}) return HeuristicStructuredValue{unsigned_value};
+    fail("integer is outside the native int64/uint64 range");
+  }
+
+  HeuristicStructuredValue value(std::size_t depth) {
+    whitespace();
+    if (depth > 256) fail("JSON nesting exceeds 256 levels");
+    if (position_ == text_.size()) fail("expected a JSON value");
+    if (text_[position_] == '"') return HeuristicStructuredValue{string()};
+    if (consume("null")) return HeuristicStructuredValue{nullptr};
+    if (consume("true")) return HeuristicStructuredValue{true};
+    if (consume("false")) return HeuristicStructuredValue{false};
+    if (consume("NaN")) return HeuristicStructuredValue{std::numeric_limits<double>::quiet_NaN()};
+    if (consume("Infinity")) return HeuristicStructuredValue{std::numeric_limits<double>::infinity()};
+    if (consume("-Infinity")) return HeuristicStructuredValue{-std::numeric_limits<double>::infinity()};
+    if (consume("[")) {
+      HeuristicStructuredValue::Array result;
+      whitespace();
+      if (consume("]")) return HeuristicStructuredValue{std::move(result)};
+      do {
+        result.push_back(value(depth + 1));
+        whitespace();
+        if (consume("]")) return HeuristicStructuredValue{std::move(result)};
+        if (!consume(",")) fail("expected comma or closing bracket");
+      } while (true);
+    }
+    if (consume("{")) {
+      HeuristicStructuredValue::Object result;
+      whitespace();
+      if (consume("}")) return HeuristicStructuredValue{std::move(result)};
+      do {
+        whitespace();
+        const auto key = string();
+        whitespace();
+        if (!consume(":")) fail("expected colon after object key");
+        result.insert_or_assign(key, value(depth + 1));
+        whitespace();
+        if (consume("}")) return HeuristicStructuredValue{std::move(result)};
+        if (!consume(",")) fail("expected comma or closing brace");
+      } while (true);
+    }
+    return number();
+  }
+
+  std::string_view text_;
+  std::size_t position_ = 0;
+};
+
 std::size_t parse_nonnegative_size(std::string_view value, std::string_view name) {
   if (value.empty()) throw std::invalid_argument(std::string(name) + ": expected a non-negative integer");
   std::size_t parsed = 0;
@@ -2256,6 +2503,11 @@ MineParams parse_mine_params(const FieldLookup& field,
   if (supplied("heuristic_plusplus_decoration_selector")) {
     params.heuristic.plusplus_decoration_selector =
         field("heuristic_plusplus_decoration_selector");
+  }
+  if (supplied("heuristic_plusplus_decoration_value")) {
+    params.heuristic.plusplus_decoration_value =
+        HeuristicDecorationValueParser(
+            field("heuristic_plusplus_decoration_value")).parse();
   }
   if (const auto value = field("heuristic_start_timestamp_attribute");
       !value.empty()) {

@@ -8215,3 +8215,49 @@ preceding typed-value validation, exact sources, tested binaries and archives.
 Form-field typed routing and broader carrier/scalar, ordered metadata,
 identity and timestamp gates remain open. PLUSPLUS and Alpha+ remain partial;
 coverage stays 46/86 packages, 199/387 modules and 228 incomplete units.
+
+### PLUSPLUS typed decoration request transport (2026-10-03)
+
+Added JSON-valued `heuristic_plusplus_decoration_value` to the shared request
+parser. It retains null, bool, int64/uint64, double, string and nested array/
+string-key object values, including Python JSON nonfinite constants and
+escaped lone surrogates. Typed precedence, omission and CLASSIC behavior stay
+consistent with the native option. Invalid syntax/UTF-8 reports the field and
+byte position. Integer width and a 256-level nesting bound remain explicit.
+The existing server mine route forwards the resulting heuristic options.
+
+The actual old-parser baseline ignores all 22 supplied typed values in
+22 parameter parses; it executes zero discoveries/presentations. The fresh
+accepted build passes five assertion-enabled suites on 650 exact source
+inputs, including grammar, Unicode, nesting, integer and double boundaries.
+
+All 1,468 retained PLUSPLUS aliases match through the real request field:
+672 HN results, 363 Petri presentations, 433 expected errors and 34,452
+assessed net fields. Connection, parameter, input-after and mutation checks
+match. All 77 generic regressions remain unchanged. Accepted native probe
+calls are 1,545 discoveries, 363 presentations and 43 generic conversions.
+The independent typed/wire check matches all values before/after and counts
+2,936 actual field parses from the recorded process markers.
+
+The new Unicode decoder matches independent Windows/Python bytes for all
+1,114,112 escaped code points and 1,112,064 valid JSON scalar string forms, including
+2,048 escaped lone surrogates. Its 2,226,176 parser calls add no mining or
+reference producers. Accepted collected parser calls total 2,229,112; the
+old baseline adds 22. Suite API calls remain separate test evidence.
+
+Three archives retain 5465 exact members, binding full sources,
+actual returns and process logs, original failed/cancelled attempts, tested
+binaries and the parent checkpoint. Those unsuccessful attempts execute zero
+collected native producers or parsers. No public PM4Py call is repeated; the
+bound public evidence chain remains at 1,912 calls.
+`heuristic-plusplus-decoration-wire-validation.json` records the scope.
+
+| Evidence segment | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `heuristic-plusplus-decoration-wire-core-checks.jsonl.gz` | `6b14f8235b8764dd08da27bbfe5e16c8c5110d8400b10ac25b69c663cfeaec0a` | 21012191 |
+| `heuristic-plusplus-decoration-wire-controls-checks.jsonl.gz` | `051bab4c6fa2fdb445613a107a431e5714ab79c8b787f7a965e96f14acebd0e5` | 42404900 |
+| `heuristic-plusplus-decoration-wire-replay-checks.jsonl.gz` | `16dd2b655aae2564d08ce96a4fa43c1027930e8d8cb6aa60bde4e565084dda5a` | 92490326 |
+
+Broader classes, integer/depth domains, dictionary ordering, metadata,
+identity and timestamp gates stay open. PLUSPLUS and Alpha+ remain partial;
+coverage stays 46/86 packages, 199/387 modules and 228 incomplete units.

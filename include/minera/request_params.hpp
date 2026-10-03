@@ -467,6 +467,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 // `time_mode` value that is not one of the three known modes throws
 // std::invalid_argument, so the caller can report it instead of silently mining
 // with the wrong filter.
+// `heuristic_plusplus_decoration_value` carries a JSON value, including the
+// Python JSON constants NaN/Infinity/-Infinity. It retains explicit null and
+// typed containers and takes precedence over the legacy string selector at
+// PLUSPLUS discovery. Integer values must fit int64/uint64; nesting is limited
+// to 256 levels. Escaped unpaired surrogates retain their native WTF-8 bytes.
 [[nodiscard]] MineParams parse_mine_params(const FieldLookup& field);
 [[nodiscard]] MineParams parse_mine_params(const FieldLookup& field,
                                            const FieldPresence& present);

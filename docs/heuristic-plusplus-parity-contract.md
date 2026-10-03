@@ -301,7 +301,7 @@ input and parameter state before and after every actual call.
 | `AND_MEASURE_THRESH` | `and_threshold` | Positive scores 1.0, 0.8 and 0.5 match the finite native map projections, including distinct input/output sides. Saved next-down/equal/next-up controls for 1.0 and 0.5 now match native fields with escaped labels; complete AND Petri fields and broader domains remain open. |
 | `MIN_ACT_COUNT` | `min_activity_count` | Public controls remove incident relation maps and edges while preserving raw sojourn entries; the complete native field domains remain to be compared. |
 | `MIN_DFG_OCCURRENCES` | `min_frequency` | Public count 2 remains at minimum 2 and is removed at minimum 3, including the returned DFG and matrices. Compare native domains. |
-| `HEU_NET_DECORATION` | `decoration`, `plusplus_decoration_selector` and `plusplus_decoration_value` | Twenty-two actual typed values match native fields, parameters and mutations on exported pandas, direct EventLog and parent EventLog/EventStream/DataFrame HN/PN routes. Only the exact string `frequency` selects frequency; supplied null/bool/int/float/list/string-key objects select performance. Broader scalar classes, object key domains/order and form-field typed transport remain open. |
+| `HEU_NET_DECORATION` | `decoration`, `plusplus_decoration_selector`, `plusplus_decoration_value` and JSON request field `heuristic_plusplus_decoration_value` | Twenty-two actual typed values match native fields, parameters and mutations on exported pandas, direct EventLog and parent EventLog/EventStream/DataFrame HN/PN routes. All retained aliases also match through the typed request field. Only the exact string `frequency` selects frequency. Broader classes, integer/container limits and object key domains/order remain open. |
 
 ## Petri and completion gates
 
@@ -1744,3 +1744,78 @@ The HTTP/form-field transport still exposes the string selector. Broader typed
 adapter routes, scalar and carrier classes, ordered metadata, identity and
 timestamp domains remain open. PLUSPLUS and Alpha+ stay partial. Coverage
 remains 46/86 packages and 199/387 modules, with 228 incomplete units.
+
+## Typed decoration request transport (2026-10-03)
+
+`parse_mine_params` now accepts `heuristic_plusplus_decoration_value` as a JSON
+value. The field preserves explicit null, booleans, int64/uint64 values,
+doubles, strings and nested arrays/string-key objects. Python JSON constants
+`NaN`, `Infinity` and `-Infinity` are accepted. Decimal overflow/underflow
+retains infinity and signed zero without a locale-dependent number parser.
+Escaped surrogate pairs decode to UTF-8; escaped lone units retain native
+WTF-8. Literal string bytes require valid Unicode UTF-8. Malformed supplied
+values report the field and byte position. Nesting is currently bounded to
+256 levels; larger Python integers and broader classes remain outside the
+native value representation. Duplicate JSON object keys retain their last value.
+
+For example, `heuristic_plusplus_decoration_value=null` selects performance;
+the JSON string `"frequency"` selects frequency. The native typed value takes
+precedence over the existing raw string selector and enum. Omission retains
+their behavior, and CLASSIC discovery ignores this PLUSPLUS parameter. The
+server's existing mine route passes the parsed heuristic options to discovery.
+The adapter and native call preserve the supplied value and do not coerce it.
+
+An actual old-parser probe executes 22 parameter parses against the pinned
+preceding core. It silently ignores every supplied typed field, leaving the
+optional typed value disengaged. These 22 original values are unrepresentable
+on that request route; no mining call is substituted for an omitted value.
+The probe executes zero public producers, discoveries or presentations.
+
+The fresh accepted build passes five assertion-enabled suites on all 650
+exact compilation inputs. Request regressions cover type/presence and
+precedence, nested containers, escaped/literal Unicode, lone surrogates,
+integer endpoints, nonfinite/signed-zero/overflow/underflow doubles,
+duplicate keys, malformed syntax/UTF-8 and the nesting boundary.
+
+Every retained PLUSPLUS alias is reconstructed with its actual typed selector
+encoded in the request field and parsed by the production adapter. All 1,468
+match: 672 supported HN results, 363 Petri presentations and 433 expected
+errors. All 34,452 assessed fields, connection domains, input-after, option
+and mutation checks match. The 77 generic regressions remain unchanged.
+Actual accepted probe calls are 1,545 discoveries, 363 presentations and
+43 generic conversions, using 567 shared data factories. A file-only decoder
+matches actual native values and retained wire text against each original
+public parameter before and after all 1,468 aliases. The two real field parses
+per alias are separately witnessed, giving 2,936 collected parser calls.
+
+The new JSON Unicode decoder has independent exhaustive evidence: Windows
+`WideCharToMultiByte` supplies expected bytes for all 1,112,064 Unicode scalar
+values, and Python's `surrogatepass` supplies the 2,048 escaped lone units.
+All escaped code points and all scalar UTF-8 string forms match, with the
+JSON-required escaping for controls, quotes and backslashes, totaling
+2,226,176 actual parameter parses. These component checks execute no mining
+or public producer calls. Combined accepted parser captures total 2,229,112;
+the retained old-parser baseline adds 22. Suite-internal API calls are separate
+test evidence and are not included in these collected probe counts.
+
+Three archives retain 5465 members byte for byte, including exact
+sources, accepted and baseline returns, helpers, process logs, parser controls
+and binary hashes. They also retain the failed MSVC assertion-literal build,
+the baseline probe's missing-helper compile failure, and the owned replay
+compiler job stopped to consolidate duplicate lambda instantiations. Each
+unsuccessful attempt executes zero collected parser/discovery/presentation
+calls. Their original bytes and terminal process evidence remain distinct.
+The unchanged pinned public evidence chain remains at 1,912 calls; no public
+reference producer is repeated in this step.
+`heuristic-plusplus-decoration-wire-validation.json` records all accounting.
+
+| Evidence segment | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `heuristic-plusplus-decoration-wire-core-checks.jsonl.gz` | `6b14f8235b8764dd08da27bbfe5e16c8c5110d8400b10ac25b69c663cfeaec0a` | 21012191 |
+| `heuristic-plusplus-decoration-wire-controls-checks.jsonl.gz` | `051bab4c6fa2fdb445613a107a431e5714ab79c8b787f7a965e96f14acebd0e5` | 42404900 |
+| `heuristic-plusplus-decoration-wire-replay-checks.jsonl.gz` | `16dd2b655aae2564d08ce96a4fa43c1027930e8d8cb6aa60bde4e565084dda5a` | 92490326 |
+
+Broader Python scalar/carrier classes, larger integer values, deep containers,
+dictionary insertion order, metadata scope, identity and timestamp domains
+remain open. PLUSPLUS and Alpha+ stay partial, with no catalogue promotion.
+Coverage remains 46/86 packages, 199/387 modules and 228 incomplete units.
