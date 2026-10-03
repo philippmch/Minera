@@ -17,11 +17,13 @@
 namespace minera {
 
 namespace {
-// JSON values for the typed PLUSPLUS selector. Python's JSON encoder also
+// Structured request values. Python's JSON encoder also
 // emits NaN/Infinity/-Infinity, which preserve the observed nonfinite values.
 class HeuristicDecorationValueParser {
  public:
-  explicit HeuristicDecorationValueParser(std::string_view text) : text_(text) {}
+  explicit HeuristicDecorationValueParser(std::string_view text,
+      std::string_view parameter = "heuristic_plusplus_decoration_value")
+      : text_(text), parameter_(parameter) {}
 
   HeuristicStructuredValue parse() {
     auto result = value(0);
@@ -33,7 +35,7 @@ class HeuristicDecorationValueParser {
  private:
   [[noreturn]] void fail(std::string_view reason) const {
     throw std::invalid_argument(
-        "heuristic_plusplus_decoration_value: " + std::string(reason) +
+        std::string(parameter_) + ": " + std::string(reason) +
         " at byte " + std::to_string(position_));
   }
 
@@ -261,8 +263,70 @@ class HeuristicDecorationValueParser {
   }
 
   std::string_view text_;
+  std::string_view parameter_;
   std::size_t position_ = 0;
 };
+
+EventAttribute hidden_cache_value(const HeuristicStructuredValue& value,
+                                 std::string key = {}) {
+  EventAttribute result{std::move(key), ""};
+  std::visit([&](const auto& cell) {
+    using T = std::decay_t<decltype(cell)>;
+    if constexpr (std::is_same_v<T, std::nullptr_t>) {
+      result.is_null = true;
+    } else if constexpr (std::is_same_v<T, std::string>) {
+      result.value = cell;
+    } else if constexpr (std::is_same_v<T, bool>) {
+      result.kind = AttributeKind::kBoolean;
+      result.value = cell ? "true" : "false";
+      result.typed_value = cell;
+    } else if constexpr (std::is_integral_v<T>) {
+      result.kind = AttributeKind::kInt;
+      result.value = std::to_string(cell);
+      result.typed_value = cell;
+    } else if constexpr (std::is_same_v<T, double>) {
+      result.kind = AttributeKind::kFloat;
+      result.typed_value = cell;
+      std::ostringstream text;
+      text.precision(std::numeric_limits<double>::max_digits10);
+      text << cell;
+      result.value = text.str();
+    } else if constexpr (std::is_same_v<T, HeuristicStructuredValue::Array>) {
+      result.container = AttributeContainerKind::kList;
+      for (std::size_t i = 0; i < cell.size(); ++i)
+        result.children.push_back(hidden_cache_value(cell[i], std::to_string(i)));
+    } else {
+      result.container = AttributeContainerKind::kContainer;
+      for (const auto& [name, child] : cell)
+        result.children.push_back(hidden_cache_value(child, name));
+    }
+  }, value.value);
+  return result;
+}
+
+TokenReplayHiddenPathCache parse_hidden_path_cache(std::string_view text) {
+  constexpr std::string_view parameter = "token_replay_places_shortest_path_by_hidden";
+  const auto value = HeuristicDecorationValueParser(text, parameter).parse();
+  const auto* object = std::get_if<HeuristicStructuredValue::Object>(&value.value);
+  if (!object) return hidden_cache_value(value);
+  TokenReplayNamedHiddenPathMatrix matrix;
+  for (const auto& [source, row_value] : *object) {
+    const auto* row = std::get_if<HeuristicStructuredValue::Object>(&row_value.value);
+    if (!row) throw std::invalid_argument(std::string(parameter) + ": expected a place-to-place path object");
+    auto& destination = matrix[source];
+    for (const auto& [target, path_value] : *row) {
+      const auto* path = std::get_if<HeuristicStructuredValue::Array>(&path_value.value);
+      if (!path) throw std::invalid_argument(std::string(parameter) + ": expected an array of transition IDs");
+      auto& transitions = destination[target];
+      for (const auto& transition_value : *path) {
+        const auto* transition = std::get_if<std::string>(&transition_value.value);
+        if (!transition) throw std::invalid_argument(std::string(parameter) + ": expected a string transition ID");
+        transitions.push_back(*transition);
+      }
+    }
+  }
+  return matrix;
+}
 
 std::size_t parse_nonnegative_size(std::string_view value, std::string_view name) {
   if (value.empty()) throw std::invalid_argument(std::string(name) + ": expected a non-negative integer");
@@ -906,6 +970,9 @@ TokenReplayOptions parse_token_replay_params(const FieldLookup& field,
   if (supplied("token_replay_disable_variants"))
     options.disable_variants = parse_boolean(field("token_replay_disable_variants"),
                                              "token_replay_disable_variants");
+  if (supplied("token_replay_places_shortest_path_by_hidden"))
+    options.places_shortest_path_by_hidden = parse_hidden_path_cache(
+        field("token_replay_places_shortest_path_by_hidden"));
   for (const auto& [name, destination] : {
            std::pair<std::string_view, std::vector<std::string>*>{
                "token_replay_root_cause_string_attributes", &options.root_cause.string_attributes},

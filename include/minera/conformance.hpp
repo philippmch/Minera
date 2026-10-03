@@ -192,7 +192,13 @@ enum class TokenReplayVariant {
 // or container carriers retain deferred membership checks at path lookup.
 using TokenReplayHiddenPathMatrix = std::unordered_map<std::size_t,
     std::unordered_map<std::size_t, std::vector<std::size_t>>>;
-using TokenReplayHiddenPathCache = std::variant<TokenReplayHiddenPathMatrix, EventAttribute>;
+// Wire transports identify model elements by their PNML IDs (or configured
+// replay names). Resolve only rows and paths actually examined by replay, so an
+// unused foreign row or invalid transition name does not fail prematurely.
+using TokenReplayNamedHiddenPathMatrix = std::unordered_map<std::string,
+    std::unordered_map<std::string, std::vector<std::string>>>;
+using TokenReplayHiddenPathCache = std::variant<TokenReplayHiddenPathMatrix,
+    EventAttribute, TokenReplayNamedHiddenPathMatrix>;
 
 struct TokenReplayOptions {
   TokenReplayVariant variant = TokenReplayVariant::kForward;

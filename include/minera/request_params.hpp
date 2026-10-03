@@ -454,6 +454,10 @@ using FieldPresence = std::function<bool(std::string_view)>;
     const FieldLookup& field, const FieldPresence& present);
 
 // Replay policy parsing shared by mining and headless replay requests.
+// token_replay_places_shortest_path_by_hidden is JSON: a source-place-ID to
+// target-place-ID object of ordered transition-ID arrays. {} suppresses routing,
+// null selects automatic paths, and other JSON value carriers retain deferred
+// iterable checks. Model IDs resolve only when a path is used.
 [[nodiscard]] TokenReplayOptions parse_token_replay_params(
     const FieldLookup& field);
 [[nodiscard]] TokenReplayOptions parse_token_replay_params(

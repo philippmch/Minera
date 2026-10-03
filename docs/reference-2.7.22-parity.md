@@ -9321,3 +9321,40 @@ catalogue acceptance gates remain open, as do supplied-cache CLI/HTTP transports
 weighted aggregate/composite conformance and general PNML/precision. Totals stay
 at 46/86 packages, 199/387 modules and 228 incomplete units, with no promotions
 or full parity claim.
+
+## Supplied-cache CLI and HTTP transport
+
+The CLI accepts supplied hidden-path caches through
+`--token-replay-places-shortest-path-by-hidden <json>`. The shared request field
+uses the corresponding underscore name and maps place/transition model IDs to
+complete ordered paths. Empty/null caches preserve suppression/automatic routing;
+model-name checks remain deferred until a source/target path is examined. A new
+standalone `POST /api/token-replay` multipart route accepts CSV/XES `log` and PNML
+`model` uploads and emits the same full forward tagged carrier without a mining
+session. Native JSON/schema carrier limits remain explicit in the replay contract.
+
+Each actual transport executes 3634 inputs spanning all six retained cache-control
+models and all seventeen weighted choice models. Actual cache objects map to
+verified model IDs, every captured trace/attribute/event is preserved in XES,
+and initial/final markings are checked. One PNML explicitly encodes the reference
+input's added zero-token gate key; the other twenty-two remain byte exact.
+All 14128 whole comparisons and 408 measured error comparisons against both
+retained public routes pass. All 3634 CLI/HTTP pairs agree. No field mixing,
+path/name swaps or relaxed float comparisons are used. Six further native
+boundary pairs pass for CSV consistency and malformed/used/unused cache behavior.
+The 7268 actual public calls and opaque pin proofs are reused with committed
+archive bindings, with zero new public calls.
+
+The fresh 660-input snapshot has seven edits and 653 unchanged inputs. All 155
+linked production/test outputs are fresh, and all 152 assertion-enabled Release
+suites pass. The original zero-replay Python harness failure is retained with
+its stopped server process; its correction preserves production and frozen input
+bytes. All 1143 evidence members round-trip across fourteen archives, and all
+14536 raw process/request/response files separately round-trip in a lossless
+nested file bundle. See
+[forward-hidden-cache-transport-validation.json](forward-hidden-cache-transport-validation.json)
+and [token-replay-parity-contract.md](token-replay-parity-contract.md).
+Broader forward/input-adapter/cache-alias/search-bound and catalogue gates remain
+open, as do weighted aggregate/composite conformance, general PNML limits and
+exact frontend numeric presentation. Totals stay at 46/86 packages, 199/387
+modules and 228 incomplete units, with no promotions or full parity claim.

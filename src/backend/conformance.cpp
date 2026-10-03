@@ -812,7 +812,38 @@ class Replayer {
     std::vector<detail::HiddenPlacePath> result;
     const auto* matrix = std::get_if<TokenReplayHiddenPathMatrix>(
         &*options.places_shortest_path_by_hidden);
-    if (!matrix) {
+    const auto* named = std::get_if<TokenReplayNamedHiddenPathMatrix>(
+        &*options.places_shortest_path_by_hidden);
+    if (named) {
+      const auto transition_names = detail::replay_element_names(
+          options.transition_names, net_.transitions().size(), "t", "transition_names");
+      for (std::size_t source = 0; source < source_keys.size(); ++source) {
+        if (!source_keys[source]) continue;
+        const auto row = named->find(place_names[source]);
+        if (row == named->end()) continue;
+        for (std::size_t target = 0; target < target_keys.size(); ++target) {
+          if (!target_keys[target]) continue;
+          const auto path = row->second.find(place_names[target]);
+          if (path == row->second.end()) continue;
+          const auto unique_place = [&](std::size_t place) {
+            return std::count(place_names.begin(), place_names.end(), place_names[place]) == 1;
+          };
+          if (!unique_place(source) || !unique_place(target))
+            throw std::invalid_argument("hidden path cache contains an ambiguous place name");
+          std::vector<std::size_t> transitions;
+          transitions.reserve(path->second.size());
+          for (const auto& name : path->second) {
+            const auto found = std::find(transition_names.begin(), transition_names.end(), name);
+            if (found == transition_names.end())
+              throw std::invalid_argument("hidden path cache contains an invalid transition name");
+            if (std::find(found + 1, transition_names.end(), name) != transition_names.end())
+              throw std::invalid_argument("hidden path cache contains an ambiguous transition name");
+            transitions.push_back(static_cast<std::size_t>(found - transition_names.begin()));
+          }
+          result.push_back({source, target, std::move(transitions)});
+        }
+      }
+    } else if (!matrix) {
       // A native value carrier cannot contain model Place objects. Iterable
       // value containers therefore have no matching source keys. Non-iterable
       // scalars fail only when replay actually examines a marking key.
@@ -823,19 +854,20 @@ class Replayer {
       if (std::any_of(source_keys.begin(), source_keys.end(), [](bool present) { return present; }))
         throw std::invalid_argument("hidden path cache is not iterable");
       return result;
-    }
-    for (std::size_t source = 0; source < source_keys.size(); ++source) {
-      if (!source_keys[source]) continue;
-      const auto row = matrix->find(source);
-      if (row == matrix->end()) continue;
-      for (std::size_t target = 0; target < target_keys.size(); ++target) {
-        if (!target_keys[target]) continue;
-        const auto path = row->second.find(target);
-        if (path == row->second.end()) continue;
-        for (const auto transition : path->second)
-          if (transition >= net_.transitions().size())
-            throw std::invalid_argument("hidden path cache contains an invalid transition index");
-        result.push_back({source, target, path->second});
+    } else {
+      for (std::size_t source = 0; source < source_keys.size(); ++source) {
+        if (!source_keys[source]) continue;
+        const auto row = matrix->find(source);
+        if (row == matrix->end()) continue;
+        for (std::size_t target = 0; target < target_keys.size(); ++target) {
+          if (!target_keys[target]) continue;
+          const auto path = row->second.find(target);
+          if (path == row->second.end()) continue;
+          for (const auto transition : path->second)
+            if (transition >= net_.transitions().size())
+              throw std::invalid_argument("hidden path cache contains an invalid transition index");
+          result.push_back({source, target, path->second});
+        }
       }
     }
     std::sort(result.begin(), result.end(), [&](const auto& left, const auto& right) {

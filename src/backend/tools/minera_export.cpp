@@ -1207,6 +1207,8 @@ int usage(const char* program) {
                "  --token-replay-variant <id> Token replay: forward (default)\n"
                "                            or backwards\n"
                "  --token-replay-result      Full forward result as tagged object JSON\n"
+               "  --token-replay-places-shortest-path-by-hidden <json>\n"
+               "                            Place-ID path matrix; {} disables, null computes\n"
                "  --token-replay-enable-pltr-fitness <bool>\n"
                "                            Include place/transition/context maps\n"
                "  --token-replay-disable-variants <bool>\n"
@@ -2254,6 +2256,21 @@ int main(int argc, char** argv) {
     bool* replay_policy = nullptr;
     if (arg == "--token-replay-result") {
       token_replay_result_requested = true;
+      continue;
+    }
+    if (arg == "--token-replay-places-shortest-path-by-hidden") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      constexpr std::string_view name = "token_replay_places_shortest_path_by_hidden";
+      try {
+        const auto parsed = minera::parse_token_replay_params(
+            [&](std::string_view field) { return field == name ? std::string(value) : std::string{}; },
+            [&](std::string_view field) { return field == name; });
+        token_replay_options.places_shortest_path_by_hidden = parsed.places_shortest_path_by_hidden;
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
       continue;
     }
     if (arg == "--token-replay-disable-variants") {

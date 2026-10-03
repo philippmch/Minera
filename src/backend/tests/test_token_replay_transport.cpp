@@ -139,6 +139,111 @@ void replay_policy_request_contract() {
   }
 }
 
+void supplied_hidden_paths_wire_contract() {
+  constexpr const char* field = "token_replay_places_shortest_path_by_hidden";
+  const auto parse = [&](std::string value) {
+    const Fields fields{{field, std::move(value)}};
+    auto options = minera::parse_token_replay_params(lookup(fields), presence(fields));
+    options.place_names = {"source", "gate", "sink"};
+    options.transition_names = {"tau\xc3\xbc", "visible"};
+    return options;
+  };
+  minera::PetriNet net;
+  net.set_activities({"A"});
+  const auto source = net.add_place(), gate = net.add_place(), sink = net.add_place();
+  net.set_source(source); net.set_sink(sink);
+  net.add_transition(std::nullopt, {source}, {gate});
+  net.add_transition(0, {gate}, {sink});
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "case";
+  minera::Event event;
+  event.activity = "A";
+  trace.events = {event, event};
+  log.traces = {trace, trace};
+  const auto result = [&](const auto& options) {
+    return minera::token_replay_result_json(minera::replay_token_result(log, net, options));
+  };
+  const auto named = parse(R"({"source":{"gate":["tau\u00fc"]}})");
+  auto indexed = named;
+  indexed.places_shortest_path_by_hidden = minera::TokenReplayHiddenPathMatrix{{source, {{gate, {0}}}}};
+  for (const bool pltr : {false, true}) {
+    for (const bool names : {false, true}) {
+      for (const bool clean : {false, true}) {
+        auto wire = named;
+        auto direct = indexed;
+        wire.enable_pltr_fitness = direct.enable_pltr_fitness = pltr;
+        wire.return_names = direct.return_names = names;
+        wire.cleaning_token_flood = direct.cleaning_token_flood = clean;
+        assert(result(wire) == result(direct));
+      }
+    }
+  }
+  auto automatic = named;
+  automatic.places_shortest_path_by_hidden.reset();
+  assert(result(parse("null")) == result(automatic));
+  auto empty = named;
+  empty.places_shortest_path_by_hidden = minera::TokenReplayHiddenPathMatrix{};
+  for (const auto* value : {"{}", "[]", "[null,1,true]", "\"cache\"",
+                           R"({"foreign":{"gate":["missing"]}})",
+                           R"({"source":{"foreign":["missing"]}})"})
+    assert(result(parse(value)) == result(empty));
+  const auto defaults = minera::parse_token_replay_params(lookup(Fields{}));
+  assert(!defaults.places_shortest_path_by_hidden);
+  const Fields fields{{field, R"({"source":{"gate":["tau\u00fc"]}})"}};
+  assert(std::holds_alternative<minera::TokenReplayNamedHiddenPathMatrix>(
+      *minera::parse_mine_params(lookup(fields), presence(fields)).token_replay.places_shortest_path_by_hidden));
+  for (const auto* value : {"7", "true", "1.25", "18446744073709551615"}) {
+    const auto options = parse(value);
+    assert(minera::replay_token_result(minera::EventLog{}, net, options).traces.empty());
+    bool rejected = false;
+    try { (void)result(options); }
+    catch (const std::invalid_argument& error) {
+      rejected = std::string(error.what()) == "hidden path cache is not iterable";
+    }
+    assert(rejected);
+    auto disabled = options;
+    disabled.walk_through_hidden_transitions = false;
+    disabled.try_to_reach_final_marking_through_hidden = false;
+    assert(result(disabled) == result([&] {
+      auto options = empty;
+      options.walk_through_hidden_transitions = false;
+      options.try_to_reach_final_marking_through_hidden = false;
+      return options;
+    }()));
+  }
+  auto invalid = parse(R"({"source":{"gate":["missing"]}})");
+  assert(minera::replay_token_result(minera::EventLog{}, net, invalid).traces.empty());
+  bool rejected = false;
+  try { (void)result(invalid); }
+  catch (const std::invalid_argument& error) {
+    rejected = std::string(error.what()) == "hidden path cache contains an invalid transition name";
+  }
+  assert(rejected);
+  for (const auto* value : {"", " ", "null null", "{", R"({"source":[]})",
+                           R"({"source":{"gate":null}})", R"({"source":{"gate":[1]}})"}) {
+    rejected = false;
+    try { (void)parse(value); }
+    catch (const std::invalid_argument& error) {
+      rejected = std::string(error.what()).starts_with(std::string(field) + ":");
+    }
+    assert(rejected);
+  }
+  // Final routing uses the same supplied cache, independently of event routing.
+  minera::PetriNet final_net;
+  const auto start = final_net.add_place(), finish = final_net.add_place();
+  final_net.set_source(start); final_net.set_sink(finish);
+  final_net.add_transition(std::nullopt, {start}, {finish});
+  log.traces = {minera::Trace{}};
+  auto final_options = parse(R"({"start":{"finish":["tau\u00fc"]}})");
+  final_options.place_names = {"start", "finish"};
+  final_options.transition_names = {"tau\xc3\xbc"};
+  final_options.walk_through_hidden_transitions = false;
+  assert(minera::replay_token_result(log, final_net, final_options).traces[0].trace_is_fit);
+  final_options.places_shortest_path_by_hidden = minera::TokenReplayNamedHiddenPathMatrix{};
+  assert(!minera::replay_token_result(log, final_net, final_options).traces[0].trace_is_fit);
+}
+
 void replay_diagnostics_json_contract() {
   minera::PetriNet net;
   net.set_activities({"A"});
@@ -372,6 +477,7 @@ void standalone_replay_json_contract() {
 
 int main() {
   replay_policy_request_contract();
+  supplied_hidden_paths_wire_contract();
   replay_diagnostics_json_contract();
   replay_duration_json_contract();
   replay_root_cause_json_contract();
