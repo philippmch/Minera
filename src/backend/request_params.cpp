@@ -304,6 +304,19 @@ double parse_finite_double(std::string_view value, std::string_view name) {
   return parsed;
 }
 
+double parse_arc_degree_k(std::string_view value, std::string_view name) {
+  std::string owned(value);
+  char* end = nullptr;
+  errno = 0;
+  const double parsed = std::strtod(owned.c_str(), &end);
+  if (end == owned.c_str() || end != owned.c_str() + owned.size() ||
+      errno == ERANGE) {
+    throw std::invalid_argument(std::string(name) + ": expected a number, got '" +
+                                owned + "'");
+  }
+  return parsed;
+}
+
 double parse_temporal_zeta(std::string_view value, std::string_view name) {
   std::string owned(value);
   char* end = nullptr;
@@ -1529,8 +1542,8 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
   }
   if (supplied("simplicity_arc_degree_k")) {
     params.simplicity_options.arc_degree_k =
-        parse_finite_double(require("simplicity_arc_degree_k"),
-                            "simplicity_arc_degree_k");
+        parse_arc_degree_k(require("simplicity_arc_degree_k"),
+                           "simplicity_arc_degree_k");
   }
   if (supplied("simplicity_max_states")) {
     params.simplicity_options.max_states =

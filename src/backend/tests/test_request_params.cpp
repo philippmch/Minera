@@ -3135,8 +3135,8 @@ void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
            std::pair{"precision_max_states", "184467440737095516160"},
            std::pair{"generalization_variant", "token"},
            std::pair{"simplicity_variant", "cardoso"},
-           std::pair{"simplicity_arc_degree_k", "nan"},
-           std::pair{"simplicity_arc_degree_k", "inf"},
+           std::pair{"simplicity_arc_degree_k", "not-a-number"},
+           std::pair{"simplicity_arc_degree_k", "1e9999"},
            std::pair{"simplicity_max_states", "0"},
            std::pair{"simplicity_max_states", "not-an-integer"},
            std::pair{"simplicity_initial_marking", "1,,2"},
@@ -3180,7 +3180,8 @@ void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
                                  "evaluation_final_marking",
                                  "evaluation_token_replay_variant",
                                  "precision_use_task_ids",
-                                 "simplicity_initial_marking"}) {
+                                 "simplicity_initial_marking",
+                                 "simplicity_arc_degree_k"}) {
     const std::map<std::string, std::string> explicit_empty = {
         {field_name, ""}};
     const auto lookup = [&explicit_empty](std::string_view key) -> std::string {
@@ -3204,7 +3205,7 @@ void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
   try {
     (void)minera::parse_evaluation_params(fields({
         {"evaluation_family", "precision"},
-        {"simplicity_arc_degree_k", "nan"}}));
+        {"simplicity_arc_degree_k", "not-a-number"}}));
   } catch (const std::invalid_argument&) {
     threw = true;
   }
@@ -3408,6 +3409,22 @@ void parse_mine_params_keeps_plusplus_selector_independent_of_decoration() {
            "heuristic_decoration: expected frequency or performance, got 'bogus'");
   }
   assert(threw);
+}
+
+void parse_evaluation_params_arc_degree_nonfinite() {
+  for (const auto& text : {"nan", "NaN", "inf", "Infinity", "-inf", "-Infinity"}) {
+    const auto params = minera::parse_evaluation_params(fields({
+        {"evaluation_family", "simplicity"}, {"simplicity_arc_degree_k", text}}));
+    const double k = params.simplicity_options.arc_degree_k;
+    if (text[0] == 'n' || text[0] == 'N') assert(std::isnan(k));
+    else assert(std::isinf(k) && std::signbit(k) == (text[0] == '-'));
+    const auto result = minera::evaluate_simplicity(
+        minera::PetriNet{}, minera::SimplicityVariant::ARC_DEGREE,
+        params.simplicity_options);
+    assert(result.computed);
+    if (std::isnan(k)) assert(std::isnan(result.value));
+    else assert(result.value == (k > 0 ? 1.0 : 0.0));
+  }
 }
 
 void parse_mine_params_preserves_typed_plusplus_decoration() {
@@ -5104,6 +5121,7 @@ int main() {
   parse_mine_params_preserves_plusplus_decoration_selector();
   parse_mine_params_keeps_plusplus_selector_independent_of_decoration();
   parse_mine_params_preserves_typed_plusplus_decoration();
+  parse_evaluation_params_arc_degree_nonfinite();
   parse_mine_params_typed_decoration_unicode();
   parse_mine_params_rejects_malformed_typed_decoration();
   parse_mine_params_rejects_unknown_heuristic_settings();

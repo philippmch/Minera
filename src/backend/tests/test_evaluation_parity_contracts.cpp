@@ -556,6 +556,70 @@ void simplicity_extended_cardoso_contract() {
   assert(close_to(result.simplicity, 1.0));
 }
 
+void simplicity_presented_arc_occurrences_contract() {
+  PetriNetPresentation net;
+  // Node identities are local to each kind; names do not identify endpoints.
+  net.places = {{7, "same", {}}, {19, "same", {}}, {29, "same", {}}};
+  net.transitions = {{7, "same", "A", {}}, {37, "same", std::nullopt, {}}};
+  const auto p = [](std::size_t id) { return PetriNodeRef{PetriNodeKind::kPlace, id}; };
+  const auto t = [](std::size_t id) { return PetriNodeRef{PetriNodeKind::kTransition, id}; };
+  net.arcs = {{p(7), t(7), 1, {}}, {p(7), t(37), 1, {}},
+              {t(7), p(19), 1, {}}, {t(7), p(29), 2, {}},
+              {t(37), p(19), 3, {}}, {t(37), p(29), 1, {}}};
+  const auto same = evaluate_simplicity(net, SimplicityVariant::EXTENDED_CARDOSO);
+  assert(same.computed && same.value == 1.0 && same.edges == 6);
+  net.arcs.pop_back();
+  const auto different = evaluate_simplicity(net, SimplicityVariant::EXTENDED_CARDOSO);
+  assert(different.computed && different.value == 2.0);
+
+  net.places.resize(2);
+  net.transitions.resize(1);
+  net.arcs = {{p(7), t(7), 1, {}}, {p(7), t(7), 2, {}},
+              {t(7), p(19), 1, {}}};
+  SimplicityOptions options;
+  options.arc_degree_k = 0.0;
+  const auto parallel = evaluate_simplicity(net, SimplicityVariant::ARC_DEGREE, options);
+  assert(parallel.computed && parallel.vertices == 3 && parallel.edges == 3);
+  assert(close_to(parallel.value, 1.0 / 3.0));
+  const auto cardoso = evaluate_simplicity(net, SimplicityVariant::EXTENDED_CARDOSO);
+  assert(cardoso.computed && cardoso.value == 1.0);
+  net.arcs[1].weight = 100;
+  assert(evaluate_simplicity(net, SimplicityVariant::ARC_DEGREE, options).value == parallel.value);
+  net.arcs[1].target.id = 999;
+  assert(!evaluate_simplicity(net).computed);
+  net.arcs[1].target = p(19);
+  assert(!evaluate_simplicity(net).computed);
+  net.arcs.clear();
+  net.places[1].id = 7;
+  assert(!evaluate_simplicity(net).computed);
+  assert(!evaluate_simplicity(PetriNetPresentation{}, SimplicityVariant::EXTENDED_CYCLOMATIC).computed);
+}
+
+void simplicity_nonfinite_baseline_contract() {
+  for (const bool empty : {false, true}) {
+    PetriNetPresentation presentation;
+    if (!empty) {
+      presentation.places = {{0, "p", {}}};
+      presentation.transitions = {{0, "t", "A", {}}};
+      presentation.arcs = {{{PetriNodeKind::kPlace, 0},
+                             {PetriNodeKind::kTransition, 0}, 1, {}}};
+    }
+    const auto executable = empty ? PetriNet{} : sequence_net();
+    for (const double k : {std::numeric_limits<double>::quiet_NaN(),
+                           std::numeric_limits<double>::infinity(),
+                           -std::numeric_limits<double>::infinity()}) {
+      SimplicityOptions options;
+      options.arc_degree_k = k;
+      const auto graph = evaluate_simplicity(presentation, SimplicityVariant::ARC_DEGREE, options);
+      const auto net = evaluate_simplicity(executable, SimplicityVariant::ARC_DEGREE, options);
+      assert(graph.computed && net.computed);
+      if (std::isnan(k)) assert(std::isnan(graph.value) && std::isnan(net.value));
+      else assert(graph.value == (k > 0 ? 1.0 : 0.0) && net.value == graph.value);
+      assert(std::isnan(k) ? std::isnan(options.arc_degree_k) : options.arc_degree_k == k);
+    }
+  }
+}
+
 void simplicity_extended_cyclomatic_contract() {
   const auto result = evaluate_simplicity(
       cyclomatic_scc_net(), SimplicityVariant::EXTENDED_CYCLOMATIC);
@@ -1027,6 +1091,8 @@ int main() {
   dfg_precision_default_contract();
   simplicity_arc_degree_contract();
   simplicity_extended_cardoso_contract();
+  simplicity_presented_arc_occurrences_contract();
+  simplicity_nonfinite_baseline_contract();
   simplicity_extended_cyclomatic_contract();
   composite_default_contract();
   evaluation_event_data_adapters_contract();

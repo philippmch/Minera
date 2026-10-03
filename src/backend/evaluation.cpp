@@ -1410,11 +1410,6 @@ SimplicityResult evaluate_simplicity(const PetriNet& net,
   SimplicityResult out;
   out.variant = variant;
   if (variant == SimplicityVariant::ARC_DEGREE) {
-    if (!std::isfinite(options.arc_degree_k)) {
-      out.computed = false;
-      out.error = "invalid arc-degree k";
-      return out;
-    }
     std::size_t arcs = 0;
     for (const auto& transition : net.transitions()) {
       const std::unordered_set<std::size_t> inputs(
@@ -1587,6 +1582,70 @@ SimplicityResult evaluate_simplicity(const PetriNet& net,
   out.complexity = double(out.edges) - double(out.vertices) + double(components);
   out.value = out.complexity;
   out.simplicity = out.value;
+  return out;
+}
+
+SimplicityResult evaluate_simplicity(const PetriNetPresentation& net,
+                                     SimplicityVariant variant,
+                                     const SimplicityOptions& options) {
+  SimplicityResult out;
+  out.variant = variant;
+  const auto reject = [&](const char* error) {
+    out.computed = false;
+    out.error = error;
+    return out;
+  };
+  if (variant != SimplicityVariant::ARC_DEGREE &&
+      variant != SimplicityVariant::EXTENDED_CARDOSO)
+    return reject("presentation simplicity requires arc-degree or extended Cardoso");
+
+  std::unordered_map<std::size_t, std::size_t> places, transitions;
+  for (std::size_t i = 0; i < net.places.size(); ++i)
+    if (!places.emplace(net.places[i].id, i).second)
+      return reject("duplicate presented place identity");
+  for (std::size_t i = 0; i < net.transitions.size(); ++i)
+    if (!transitions.emplace(net.transitions[i].id, i).second)
+      return reject("duplicate presented transition identity");
+
+  std::vector<std::set<std::size_t>> place_successors(net.places.size());
+  std::vector<std::set<std::size_t>> transition_successors(net.transitions.size());
+  for (const auto& arc : net.arcs) {
+    if (arc.source.kind == PetriNodeKind::kPlace &&
+        arc.target.kind == PetriNodeKind::kTransition) {
+      const auto p = places.find(arc.source.id);
+      const auto t = transitions.find(arc.target.id);
+      if (p == places.end() || t == transitions.end())
+        return reject("presented arc refers to an absent endpoint");
+      place_successors[p->second].insert(t->second);
+    } else if (arc.source.kind == PetriNodeKind::kTransition &&
+               arc.target.kind == PetriNodeKind::kPlace) {
+      const auto t = transitions.find(arc.source.id);
+      const auto p = places.find(arc.target.id);
+      if (t == transitions.end() || p == places.end())
+        return reject("presented arc refers to an absent endpoint");
+      transition_successors[t->second].insert(p->second);
+    } else {
+      return reject("presented arc endpoints must be a place and a transition");
+    }
+  }
+  out.edges = net.arcs.size();
+  if (variant == SimplicityVariant::ARC_DEGREE) {
+    out.vertices = net.places.size() + net.transitions.size();
+    const double mean_degree = out.vertices
+        ? 2.0 * double(out.edges) / double(out.vertices) : 0.0;
+    out.complexity = std::max(mean_degree - options.arc_degree_k, 0.0);
+    out.simplicity = out.value = 1.0 / (1.0 + out.complexity);
+  } else {
+    std::size_t total = 0;
+    for (const auto& successors : place_successors) {
+      std::set<std::set<std::size_t>> choices;
+      for (const auto transition : successors)
+        choices.insert(transition_successors[transition]);
+      total += choices.size();
+    }
+    out.vertices = net.places.size();
+    out.complexity = out.simplicity = out.value = double(total);
+  }
   return out;
 }
 

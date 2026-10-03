@@ -8261,3 +8261,36 @@ bound public evidence chain remains at 1,912 calls.
 Broader classes, integer/depth domains, dictionary ordering, metadata,
 identity and timestamp gates stay open. PLUSPLUS and Alpha+ remain partial;
 coverage stays 46/86 packages, 199/387 modules and 228 incomplete units.
+
+### Full-presentation simplicity metrics (2026-10-03)
+
+Added arc-degree and extended Cardoso evaluation for `PetriNetPresentation`.
+Structural arc counts preserve separate occurrences and ignore weights;
+Cardoso choices preserve node identity and distinct successor-place sets.
+Both native arc-degree carriers and the shared request baseline accept NaN
+and infinities. Invalid graph endpoints and malformed numeric fields have
+explicit diagnostics. Existing cyclomatic evaluation keeps its executable net.
+
+All 1,510 actual pinned public controls now match through the parsed request
+family/variant/options and native full presentation. They cover all 256 two-
+place/two-transition incidence graphs and weighted/parallel/empty/choice
+controls. The preceding actual native run had 10 scalar differences and 60
+unsupported parameter cases. All graph, parameter and input-after checks
+match; both native probes execute 1,510 metric calls and 1,510 parser calls.
+Three actual CLI processes verify 12 per-model nonfinite results, including
+the documented computed NaN-to-JSON-null representation.
+
+Four assertion-enabled Release suites pass on 650 frozen inputs. The archive
+retains 776 exact members, including sources, returned values,
+compiler/process logs, byte-verified binary chunks and the initial zero-call
+reference-check failure. Git LF normalization is separately bound to tested
+source bytes. See `simplicity-parity-contract.md` and
+`simplicity-structure-validation.json` for the complete scope and accounting.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `simplicity-structure-checks.jsonl.gz` | `bf9a1a0f1031782e21af3e31d2c022250d1aa3a5109cdc642ea8b1147cc288ff` | 63456521 |
+
+PNML/CLI/server retention of parallel arc occurrences, extended cyclomatic
+and broader evaluation/conformance gates remain open. No catalogue promotion:
+coverage remains 46/86 packages, 199/387 modules and 228 incomplete units.
