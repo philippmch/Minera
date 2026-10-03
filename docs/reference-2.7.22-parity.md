@@ -8424,3 +8424,51 @@ keys, malformed/extended-arc carriers, public exporter byte/ID formatting and
 full application wire precision remain open. The catalogue stays at
 46/86 packages, 199/387 modules and 228 incomplete units.
 Full module/package parity is not established.
+
+## Cyclomatic presentation reachability (2026-10-03)
+
+Parent checkpoint: `89ba2d698bff0d39385e6711724d99cd4ae18a16`.
+Full presentation and ordinary PNML cyclomatic reachability now preserve
+individual weighted input arcs, supplied names and ordered sparse marking
+keys. Enabling checks each input arc separately; graph firing removes depleted
+or oversubscribed consumed entries before producing tokens. New regressions
+cover consume-only and one/two-token source loops. The executable control
+route preserves its existing summed-input behavior.
+
+Fresh pinned captures contain 2,832 actual metrics, 2,692 independent graphs,
+324 default markings, 52 state-name calls and 20 imports, plus 630 calls each
+to enabling, regular firing and weak firing. All producers retain exact inputs,
+outputs, process witnesses and opaque pin hashes without implementation
+inspection. Each accepted/baseline native bundle makes 2,692 request parses
+and 8,076 metric calls. Every target case computes: per route, 2,048/2,062 main
+scalars and 2,039/2,062 complete outcomes match. All 3,934 main target outcomes
+without name aliases and all 1,260 firing outcomes match every field. All
+2,692 executable controls remain unchanged. Fourteen scalar and twenty-three
+full-result differences per route remain in name-alias controls; the 120-call
+order experiment observes varying public results on twelve of fourteen controls.
+These finite comparisons do not promote the catalogue or establish full parity.
+
+All 20 CLI and 20 real HTTP metrics match; all 41 recorded HTTP requests return
+200. Baseline CLI matches 13. An initial probe stack overflow occurs before
+all call markers and remains a zero-call failed attempt. The intermediate
+production build passes five suites but fails 24 non-alias metadata comparisons.
+Fresh weak-firing evidence motivates the correction and a second complete
+652-input build with zero binary reuse; all five assertion-enabled suites pass.
+Both builds, original captures/comparisons, failed initializer and the zero-call
+comparison-subtotal correction survive. Unicode classification verifies all
+1,114,112 codepoints against public Python operations, with zero PM4Py calls.
+The two archives retain 1,197 files/1,272 round-trip-verified rows.
+See `simplicity-parity-contract.md` and `cyclomatic-presentation-validation.json`.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `cyclomatic-presentation-checks.jsonl.gz` | `075f57dbdaad05289aca55f9373b66f21f4205ad06f31aa4ec0a8e2f11557a9d` | 82040213 |
+| `cyclomatic-presentation-intermediate-checks.jsonl.gz` | `c9e823477c9b6980ad50be9a139070b8e021a076ac039c356bc0696ff519b83c` | 64563737 |
+
+Supplied marking-name collisions and reference set/allocation order remain
+open. Additional typed/huge/signed arc-weight and marking domains, extended arcs,
+foreign keys and exception identity, caps/time limits and unbounded graphs are
+not established. Broader evaluation/conformance, composite log/graph/marking,
+PNML metadata, exporter bytes/IDs and full application wire precision remain
+open. The catalogue stays at 46/86 packages, 199/387 modules and
+228 incomplete units. Full module/package parity is not established.

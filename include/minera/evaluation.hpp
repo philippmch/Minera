@@ -136,6 +136,10 @@ struct SimplicityOptions {
   std::size_t max_states = 100000;
   // Arc-degree accepts every double baseline, including NaN and infinities.
   double arc_degree_k = 2.0;
+  // Full presentations/documents can retain sparse signed tokens, explicit
+  // zero entries and marking key order. IDs refer to presented place IDs.
+  // When supplied, this overrides initial_marking, including an empty marking.
+  std::optional<std::vector<PetriSparseMarkingEntry>> presentation_initial_marking;
 };
 
 struct SimplicityResult {
@@ -144,8 +148,8 @@ struct SimplicityResult {
   double complexity = 0.0;
   double value = 0.0;
   std::size_t vertices = 0;
-  // Cyclomatic reachability counts each enabled transition occurrence, even
-  // when several transitions lead from one marking to the same next marking.
+  // Cyclomatic graph arcs retain transition names and marking endpoints;
+  // executable transitions have distinct implicit names.
   std::size_t edges = 0;
   // Graph metadata; the pinned public scalar is reported separately in value.
   std::size_t strongly_connected_components = 0;
@@ -475,16 +479,16 @@ struct ModelEvaluation {
 [[nodiscard]] SimplicityResult evaluate_simplicity(
     const PetriNet&, SimplicityVariant = SimplicityVariant::ARC_DEGREE,
     const SimplicityOptions& = {});
-// Graph-only metrics preserve distinct arc occurrences and node identities in
-// the full presentation. Weights do not multiply structural arcs. Cyclomatic
-// complexity requires the executable PetriNet overload and its reachability.
+// Full presentations preserve distinct arc occurrences and node identities.
+// Cyclomatic reachability enables each input occurrence against its own weight,
+// fires their combined consumption, and retains supplied marking/transition names.
 [[nodiscard]] SimplicityResult evaluate_simplicity(
     const PetriNetPresentation&,
     SimplicityVariant = SimplicityVariant::ARC_DEGREE,
     const SimplicityOptions& = {});
-// Imported document graph metrics retain parallel arcs; cyclomatic complexity
-// uses document.net's executable behavior and the supplied marking options.
-// Stale arc metadata reports an uncomputed result for graph-only metrics.
+// Imported ordinary document arcs use the retained presentation for all variants.
+// Extended arcs keep their executable route for cyclomatic evaluation.
+// Stale ordinary arc metadata reports an uncomputed result.
 [[nodiscard]] SimplicityResult evaluate_simplicity(
     const PnmlDocument&,
     SimplicityVariant = SimplicityVariant::ARC_DEGREE,

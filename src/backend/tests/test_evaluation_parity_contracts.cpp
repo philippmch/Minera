@@ -626,7 +626,8 @@ void simplicity_presented_arc_occurrences_contract() {
   net.arcs.clear();
   net.places[1].id = 7;
   assert(!evaluate_simplicity(net).computed);
-  assert(!evaluate_simplicity(PetriNetPresentation{}, SimplicityVariant::EXTENDED_CYCLOMATIC).computed);
+  const auto empty = evaluate_simplicity(PetriNetPresentation{}, SimplicityVariant::EXTENDED_CYCLOMATIC);
+  assert(empty.computed && empty.vertices == 1 && empty.value == 0.0);
 }
 
 void simplicity_nonfinite_baseline_contract() {
@@ -698,6 +699,72 @@ void simplicity_reachable_transition_occurrences_contract() {
   isolated.add_transition(std::nullopt, {}, {});
   const auto loops = evaluate_simplicity(isolated, SimplicityVariant::EXTENDED_CYCLOMATIC);
   assert(loops.computed && loops.vertices == 1 && loops.edges == 2 && loops.value == 2.0);
+}
+
+void simplicity_presented_reachability_contract() {
+  const auto p = [](std::size_t id) { return PetriNodeRef{PetriNodeKind::kPlace, id}; };
+  const auto t = [](std::size_t id) { return PetriNodeRef{PetriNodeKind::kTransition, id}; };
+  PetriNetPresentation parallel;
+  parallel.places = {{7, "source", {}}, {19, "sink", {}}};
+  parallel.transitions = {{37, "move", "A", {}}};
+  parallel.arcs = {{p(7), t(37), 1, {}}, {p(7), t(37), 1, {}}, {t(37), p(19), 1, {}}};
+  SimplicityOptions options;
+  options.initial_marking = {1, 0};
+  const auto one = evaluate_simplicity(parallel, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+  // Each input occurrence enables against the original token, then both fire.
+  assert(one.computed && one.vertices == 2 && one.edges == 1 && one.value == 1.0);
+  options.initial_marking = {3, 0};
+  const auto three = evaluate_simplicity(parallel, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+  assert(three.computed && three.vertices == 3 && three.edges == 2 && three.value == 2.0);
+  options.presentation_initial_marking = std::vector<PetriSparseMarkingEntry>{{19, 0}, {7, 3}};
+  assert(evaluate_simplicity(parallel, SimplicityVariant::EXTENDED_CYCLOMATIC, options).value == 2.0);
+  options.presentation_initial_marking = std::vector<PetriSparseMarkingEntry>{};
+  assert(evaluate_simplicity(parallel, SimplicityVariant::EXTENDED_CYCLOMATIC, options).value == 0.0);
+  options.presentation_initial_marking.reset();
+  options.max_states = 2;
+  const auto capped = evaluate_simplicity(parallel, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+  assert(!capped.computed && capped.exhausted);
+
+  options = {};
+  options.initial_marking = {1, 0};
+  auto consume = parallel;
+  consume.arcs.pop_back();
+  const auto depleted = evaluate_simplicity(consume, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+  assert(depleted.computed && depleted.vertices == 2 && depleted.edges == 1 &&
+         depleted.strongly_connected_components == 2 && depleted.value == 1.0);
+  consume.arcs.push_back({t(37), p(7), 1, {}});
+  const auto replenished = evaluate_simplicity(consume, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+  assert(replenished.computed && replenished.vertices == 1 && replenished.edges == 1 && replenished.value == 1.0);
+  consume.arcs.back().weight = 2;
+  const auto restored = evaluate_simplicity(consume, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+  assert(restored.computed && restored.vertices == 2 && restored.edges == 2 &&
+         restored.strongly_connected_components == 2 && restored.value == 2.0);
+
+  PetriNetPresentation branch;
+  branch.places = {{7, "p0", {}}, {19, "p1", {}}, {29, "p2", {}}};
+  branch.transitions = {{37, "same", "A", {}}, {41, "same", std::nullopt, {}}};
+  branch.arcs = {{p(7), t(37), 1, {}}, {t(37), p(19), 1, {}},
+                 {p(7), t(41), 1, {}}, {t(41), p(29), 1, {}}};
+  const auto names = evaluate_simplicity(branch, SimplicityVariant::EXTENDED_CYCLOMATIC);
+  assert(names.computed && names.vertices == 3 && names.edges == 2 && names.value == 1.0);
+  branch.places[0].name = "p-0";
+  branch.places[1].name = "p0";
+  branch.places[2].name = "p_0";
+  const auto aliases = evaluate_simplicity(branch, SimplicityVariant::EXTENDED_CYCLOMATIC);
+  assert(aliases.computed && aliases.vertices == 2 && aliases.edges == 2 && aliases.value == 1.0);
+
+  const auto document = parse_pnml_document(R"(<pnml><net id="parallel-input">
+    <place id="source"/><place id="sink"/><transition id="move"/>
+    <arc id="a" source="source" target="move"/><arc id="b" source="source" target="move"/>
+    <arc id="c" source="move" target="sink"/>
+  </net></pnml>)");
+  options = {};
+  options.initial_marking = {1, 0};
+  assert(evaluate_simplicity(document, SimplicityVariant::EXTENDED_CYCLOMATIC, options).value == 1.0);
+  assert(evaluate_simplicity(document.net, SimplicityVariant::EXTENDED_CYCLOMATIC, options).value == 0.0);
+  auto stale = document;
+  stale.net.add_arc(0, 0);
+  assert(!evaluate_simplicity(stale, SimplicityVariant::EXTENDED_CYCLOMATIC, options).computed);
 }
 
 void composite_default_contract() {
@@ -1221,6 +1288,7 @@ int main() {
   simplicity_nonfinite_baseline_contract();
   simplicity_extended_cyclomatic_contract();
   simplicity_reachable_transition_occurrences_contract();
+  simplicity_presented_reachability_contract();
   composite_default_contract();
   composite_document_and_weight_contract();
   evaluation_event_data_adapters_contract();
