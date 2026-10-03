@@ -921,3 +921,16 @@ See [token-replay-parity-contract.md](token-replay-parity-contract.md) and
 Broader parameters/keys and prior acceptance contracts remain unresolved;
 weighted aggregate conformance stays gated. The catalogue remains 46/86 packages,
 199/387 modules and 228 incomplete units, with no promotions.
+
+
+## Forward parameter boundary follow-up
+
+Fresh complete public controls now retain 13440 forward/dispatcher outcomes for
+supplied variants, delimiters, case selectors, reduction, time limits, progress
+and explicit hidden-path caches. The current core matches all measured no-effect
+parameter controls. Explicit caches expose 260 complete-return and 174
+error-behavior differences, retained as the next native implementation gap.
+No production code or catalogue rows change. See
+[token-replay-parity-contract.md](token-replay-parity-contract.md) and
+[forward-controls-validation.json](forward-controls-validation.json).
+The catalogue remains 46/86 packages, 199/387 modules and 228 incomplete units.

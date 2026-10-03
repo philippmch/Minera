@@ -1,0 +1,2358 @@
+{
+  "added": [],
+  "archive_members": {
+    "failed-native-preparation/core-build-witness.json": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 93698,
+      "chunks": 1,
+      "sha256": "e8b50bdbdcf0c95627ce2f013aa73ca254c8f0f327f4c4f574bb21d663eb8679",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-native-caf9145e7f4f41928f39f3192860b0ae\\core-build-witness.json"
+    },
+    "failed-native-preparation/failed-preparation.json": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 462,
+      "chunks": 1,
+      "sha256": "88e54b7a59ec65cc908f110a38655fb35ace626b4da4c4a3e83b5581621a1fac",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-native-caf9145e7f4f41928f39f3192860b0ae\\failed-preparation.json"
+    },
+    "helpers/analyze-forward-remaining-controls-public.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 5669,
+      "chunks": 1,
+      "sha256": "1ce1f50a9cf763c55b54722b7088a79d26a0f4525dab8ba5eb4bef5641e45792",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\analyze-forward-remaining-controls-public.py"
+    },
+    "helpers/analyze-forward-supplied-variants-public.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 5426,
+      "chunks": 1,
+      "sha256": "7f421b1cb0a2a779a35ea9f6209a37b06ea51d8de22eea1f785747f6dfe637be",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\analyze-forward-supplied-variants-public.py"
+    },
+    "helpers/append-forward-controls-docs.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 6094,
+      "chunks": 1,
+      "sha256": "a6200b0a02ce32104e7d3aa7eef089bb044842afb294dba09782de31bf430888",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\append-forward-controls-docs.py"
+    },
+    "helpers/audit-forward-controls-stage.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 4958,
+      "chunks": 1,
+      "sha256": "9de612131e7253daaf83608161312779d5d20b07e074a0cdc8b1733790f694ff",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\audit-forward-controls-stage.py"
+    },
+    "helpers/capture-forward-remaining-controls-public.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 18850,
+      "chunks": 1,
+      "sha256": "83113bf951508ba99a3bfb4bff6be81611b6e963bc9660c7ef9b08f287e0914b",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-forward-remaining-controls-public.py"
+    },
+    "helpers/capture-forward-supplied-variants-public.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 17518,
+      "chunks": 1,
+      "sha256": "87b9f47cd39aaa231df04759c3d4e91405adf56beadc8ecb7d03dd0d0ad8d38a",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-forward-supplied-variants-public.py"
+    },
+    "helpers/capture-simplicity-structure-reference-retry.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 13849,
+      "chunks": 1,
+      "sha256": "c3a6a5adf4c7d6e94928272e8fdfcc3887dd7ad13b03dd7c6210430f0f4490fc",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-simplicity-structure-reference-retry.py"
+    },
+    "helpers/check-forward-control-baseline-corrected-native.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 14600,
+      "chunks": 1,
+      "sha256": "92420d5841144eac2ac726ca49f92a22d2576aa63d7a984d82d254174984ac5f",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\check-forward-control-baseline-corrected-native.py"
+    },
+    "helpers/check-forward-control-baseline-native.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 14569,
+      "chunks": 1,
+      "sha256": "df3ea41b216e1f8bc363bca39bda86423ff3ddd332fd4cebea1e79df7cdc74fd",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\check-forward-control-baseline-native.py"
+    },
+    "helpers/compare-forward-control-baseline-corrected-native.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 6642,
+      "chunks": 1,
+      "sha256": "3e728e76edac74c0d92590573b6d38a30cb815e79aecf69f3ba600fca34b0da9",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\compare-forward-control-baseline-corrected-native.py"
+    },
+    "helpers/compare-forward-control-baseline-native.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 6632,
+      "chunks": 1,
+      "sha256": "a705c6f5d54b1c945d981181b12c904ff633724f79bfef2547bb0450e889d6c7",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\compare-forward-control-baseline-native.py"
+    },
+    "helpers/compare-forward-result-native.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 6307,
+      "chunks": 1,
+      "sha256": "b281d474fd067d747c4baae0b1d2f63656f4fdf14bf53794f8592de4d727c973",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\compare-forward-result-native.py"
+    },
+    "helpers/compare-forward-typed-after-native.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 6710,
+      "chunks": 1,
+      "sha256": "bf81bd15e4d2f7846c0d62bdcb264d1a590d93ddbbfcb87856b9a807e6d0c97e",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\compare-forward-typed-after-native.py"
+    },
+    "helpers/correct-forward-control-baseline-preparation.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 1943,
+      "chunks": 1,
+      "sha256": "f461f8e6e30c0783fcaf57788b57a11ffd1a66d5b36b01bef136dde03a560a3a",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\correct-forward-control-baseline-preparation.py"
+    },
+    "helpers/derive-forward-control-native-baseline.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 2943,
+      "chunks": 1,
+      "sha256": "042bd5d683b73199a61b09d4c450ace5886a4208b0df9804edd344b307528bb4",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\derive-forward-control-native-baseline.py"
+    },
+    "helpers/derive-forward-controls-stage.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 724,
+      "chunks": 1,
+      "sha256": "c33b6e54fe0a6b4f7f438209fe34c2e2e3fe808ca24e2f7810fcbb1eb670c6fa",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\derive-forward-controls-stage.py"
+    },
+    "helpers/derive-forward-remaining-controls-analysis.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 1776,
+      "chunks": 1,
+      "sha256": "052874e1e69eed8e53148b0257c31bb9f18c0937dda80fdc5ced4d06eb75a29a",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\derive-forward-remaining-controls-analysis.py"
+    },
+    "helpers/derive-forward-remaining-controls-public.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 6481,
+      "chunks": 1,
+      "sha256": "e2323094fb9aa55d0586dc6f63711ed1b23a4a4f2d5e8e7dfd76faadaf74ca73",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\derive-forward-remaining-controls-public.py"
+    },
+    "helpers/derive-forward-supplied-variants-public.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 7572,
+      "chunks": 1,
+      "sha256": "97c4cd66ff275916974f78f9f825763d20644930bd1545169904b51d2addb802",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\derive-forward-supplied-variants-public.py"
+    },
+    "helpers/save-forward-controls-evidence.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 13864,
+      "chunks": 1,
+      "sha256": "0e23afb73d88184e5b287d404052e7119db7cebc5dad9e92804ac074cf86447a",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\save-forward-controls-evidence.py"
+    },
+    "helpers/stage-heuristic-subsecond-doc.py": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 654,
+      "chunks": 1,
+      "sha256": "abb80e08c6624e8e0217925cd27774459d56049bea56e3ef9bb74bf2cdd6247b",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\stage-heuristic-subsecond-doc.py"
+    },
+    "input-pointers/forward-control-baseline-corrected-native-current.json": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 140,
+      "chunks": 1,
+      "sha256": "61cb03251603b09a369b53ea06b09cf602ace14f231343a4435e53a8cc611170",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-current.json"
+    },
+    "input-pointers/forward-remaining-controls-public-current.json": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 132,
+      "chunks": 1,
+      "sha256": "bc22863b9ac40a8562e5b95a14e79ca8fa686165a50920be0d250cf9545a02df",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-current.json"
+    },
+    "input-pointers/forward-supplied-variants-public-current.json": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 131,
+      "chunks": 1,
+      "sha256": "69ccc241ce8e78b4df3765d470bc6fd1e577601b5a90332a61b43cdbe5f9ff68",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-current.json"
+    },
+    "native-baseline/0.pnml": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 649,
+      "chunks": 1,
+      "sha256": "f1097d79dfa924f0d6db47d0c0fbd1697424427a225b0c52b68df1852dbd11a1",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\0.pnml"
+    },
+    "native-baseline/1.pnml": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 691,
+      "chunks": 1,
+      "sha256": "22009dbc045f90a48759381a6036b3aaa0a2bd50514eed9f26d858e84641f6d2",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\1.pnml"
+    },
+    "native-baseline/2.pnml": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 624,
+      "chunks": 1,
+      "sha256": "6704bca5fca1a0b656db04dd43d5b85b32bb492ecd999a2ddbd5bd766d3423de",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\2.pnml"
+    },
+    "native-baseline/3.pnml": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 604,
+      "chunks": 1,
+      "sha256": "2dcd4586ffac8259e06f757899ba0b8e2c206a0ae0fab288dfa24706a5f4dbd0",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\3.pnml"
+    },
+    "native-baseline/4.pnml": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 560,
+      "chunks": 1,
+      "sha256": "bf9835b831fe38fbf46d2334a60234b18e73b7d63c7627e142ca8d9a9eb7fe71",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\4.pnml"
+    },
+    "native-baseline/5.pnml": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 1007,
+      "chunks": 1,
+      "sha256": "553da0b563d599a940e5fc8b3af3ef81571f460722375fd8f70b817ae5e236df",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\5.pnml"
+    },
+    "native-baseline/CMakeCache.txt": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 13475,
+      "chunks": 1,
+      "sha256": "fc1bc5a4c0bc0a41e85aea528a83bedcf911e429b704f0591903c0aaa50e0967",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\native-build\\CMakeCache.txt"
+    },
+    "native-baseline/CMakeLists.txt": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 660,
+      "chunks": 1,
+      "sha256": "5ef185ffa49a5f3df78e65eec5c30f29018f747a28af6c4ced83f735e2dedc4e",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\CMakeLists.txt"
+    },
+    "native-baseline/command-0.stderr": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 0,
+      "chunks": 1,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\command-0.stderr"
+    },
+    "native-baseline/command-0.stdout": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 658,
+      "chunks": 1,
+      "sha256": "d26dbe62c10482d7142d774115a1c41379cd0f3c07e400fb49e1ec845cb1cbeb",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\command-0.stdout"
+    },
+    "native-baseline/command-1.stderr": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 0,
+      "chunks": 1,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\command-1.stderr"
+    },
+    "native-baseline/command-1.stdout": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 593,
+      "chunks": 1,
+      "sha256": "0dda17c28573f042a14e81b622fa7d49166df364fea5604a8fdeec971a1be02d",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\command-1.stdout"
+    },
+    "native-baseline/command-2.stderr": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 274422,
+      "chunks": 1,
+      "sha256": "48f89ade320279b08354e0af2f5d17be3f88ef93530bfe7d27a581a51757bb88",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\command-2.stderr"
+    },
+    "native-baseline/command-2.stdout": {
+      "archives": [
+        "forward-controls-evidence-01.jsonl.gz"
+      ],
+      "bytes": 34219296,
+      "chunks": 5,
+      "sha256": "2594d404c9bf7462da71274f0141cd126043297fb46a986d61942c360052a52b",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\command-2.stdout"
+    },
+    "native-baseline/comparison.json": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 7842166,
+      "chunks": 1,
+      "sha256": "7030e7d71ac7bf4b62d5e2d5897aeadc3f85ac6761bc5c6ec25c2e499d5012a7",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\comparison.json"
+    },
+    "native-baseline/core-build-witness.json": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 93698,
+      "chunks": 1,
+      "sha256": "e8b50bdbdcf0c95627ce2f013aa73ca254c8f0f327f4c4f574bb21d663eb8679",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\core-build-witness.json"
+    },
+    "native-baseline/execution.json": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 2168,
+      "chunks": 1,
+      "sha256": "15fb5283186feaaef0cb2f0ea07d81de231d56d17a5c69fb30c14ec0cf186b15",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\execution.json"
+    },
+    "native-baseline/forward_typed_probe.vcxproj": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 60511,
+      "chunks": 1,
+      "sha256": "c540ee841107549ead088d0cf4ada883c2fd5b24fadcf8df8bb8c11e27fbb0c4",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\native-build\\forward_typed_probe.vcxproj"
+    },
+    "native-baseline/preparation.json": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 1413568,
+      "chunks": 1,
+      "sha256": "e4e543c244bc352c7b402a001b6d96e40902de9edeb3db9cdfe2b3bc1088f1db",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\preparation.json"
+    },
+    "native-baseline/probe.cpp": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 119739,
+      "chunks": 1,
+      "sha256": "5fb0877ea03ace99536baadd49a177db6f22e17fbe39fef98cdd1cc896067b06",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\probe.cpp"
+    },
+    "native-baseline/probe.exe": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 966656,
+      "chunks": 1,
+      "sha256": "442ff53eab5a6cbcd2331d5f4743c6226f9b1ef6244d287aa9811043c350604c",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\native-build\\Release\\forward_typed_probe.exe"
+    },
+    "native-baseline/process-witnesses.json": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 1889,
+      "chunks": 1,
+      "sha256": "f8155c06364d3aa8746de4a9ce18b35b95ab397f4661b61f477e181993e99805",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\process-witnesses.json"
+    },
+    "parent-validation.json": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 2343168,
+      "chunks": 1,
+      "sha256": "675bb0a687de88f5ec378bd13f77a8e4a5c7c8b8375450f310c7b4089ee37e09",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-validation.json"
+    },
+    "public-controls/0.pnml": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 649,
+      "chunks": 1,
+      "sha256": "f1097d79dfa924f0d6db47d0c0fbd1697424427a225b0c52b68df1852dbd11a1",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b\\0.pnml"
+    },
+    "public-controls/1.pnml": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 691,
+      "chunks": 1,
+      "sha256": "22009dbc045f90a48759381a6036b3aaa0a2bd50514eed9f26d858e84641f6d2",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b\\1.pnml"
+    },
+    "public-controls/2.pnml": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 624,
+      "chunks": 1,
+      "sha256": "6704bca5fca1a0b656db04dd43d5b85b32bb492ecd999a2ddbd5bd766d3423de",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b\\2.pnml"
+    },
+    "public-controls/3.pnml": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 604,
+      "chunks": 1,
+      "sha256": "2dcd4586ffac8259e06f757899ba0b8e2c206a0ae0fab288dfa24706a5f4dbd0",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b\\3.pnml"
+    },
+    "public-controls/4.pnml": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 560,
+      "chunks": 1,
+      "sha256": "bf9835b831fe38fbf46d2334a60234b18e73b7d63c7627e142ca8d9a9eb7fe71",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b\\4.pnml"
+    },
+    "public-controls/5.pnml": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 1007,
+      "chunks": 1,
+      "sha256": "553da0b563d599a940e5fc8b3af3ef81571f460722375fd8f70b817ae5e236df",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b\\5.pnml"
+    },
+    "public-controls/analysis.json": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 2988170,
+      "chunks": 1,
+      "sha256": "28faef24e899da1e35a88f4694cfb79082fafb1e8a688458fe10e163c64eeb28",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b\\analysis.json"
+    },
+    "public-controls/execution.json": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 872,
+      "chunks": 1,
+      "sha256": "d507dfa06ed76eb648c756086ceb7a57f212faf837d38d053861bc4b69733241",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b\\execution.json"
+    },
+    "public-controls/preparation.json": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz"
+      ],
+      "bytes": 11444738,
+      "chunks": 2,
+      "sha256": "02a2a6816ec7cfefae705da7057bcfb4614a8f3b51f2aab03a2445412ea4afdc",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b\\preparation.json"
+    },
+    "public-controls/public-returned-values.json": {
+      "archives": [
+        "forward-controls-evidence-02.jsonl.gz",
+        "forward-controls-evidence-03.jsonl.gz",
+        "forward-controls-evidence-04.jsonl.gz",
+        "forward-controls-evidence-05.jsonl.gz",
+        "forward-controls-evidence-06.jsonl.gz",
+        "forward-controls-evidence-07.jsonl.gz",
+        "forward-controls-evidence-08.jsonl.gz",
+        "forward-controls-evidence-09.jsonl.gz",
+        "forward-controls-evidence-10.jsonl.gz",
+        "forward-controls-evidence-11.jsonl.gz",
+        "forward-controls-evidence-12.jsonl.gz"
+      ],
+      "bytes": 396687823,
+      "chunks": 48,
+      "sha256": "9ee83a6bb738dbca3289695841e207503b298573bb4a8c627235a09c49f602cd",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b\\public-returned-values.json"
+    },
+    "public-controls/stderr.txt": {
+      "archives": [
+        "forward-controls-evidence-12.jsonl.gz"
+      ],
+      "bytes": 417878,
+      "chunks": 1,
+      "sha256": "3659695d2c1c174a12d5ecee04f36c496b96a46f2b98bde727a6118d887e9a11",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b\\stderr.txt"
+    },
+    "public-controls/stdout.txt": {
+      "archives": [
+        "forward-controls-evidence-12.jsonl.gz"
+      ],
+      "bytes": 108,
+      "chunks": 1,
+      "sha256": "a3d16eb0c9c61cea9ebdb2bd5520814310a5f0fed2c10c4e066730eec349e5dc",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b\\stdout.txt"
+    },
+    "public-variants/0.pnml": {
+      "archives": [
+        "forward-controls-evidence-12.jsonl.gz"
+      ],
+      "bytes": 649,
+      "chunks": 1,
+      "sha256": "f1097d79dfa924f0d6db47d0c0fbd1697424427a225b0c52b68df1852dbd11a1",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2\\0.pnml"
+    },
+    "public-variants/1.pnml": {
+      "archives": [
+        "forward-controls-evidence-12.jsonl.gz"
+      ],
+      "bytes": 691,
+      "chunks": 1,
+      "sha256": "22009dbc045f90a48759381a6036b3aaa0a2bd50514eed9f26d858e84641f6d2",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2\\1.pnml"
+    },
+    "public-variants/2.pnml": {
+      "archives": [
+        "forward-controls-evidence-12.jsonl.gz"
+      ],
+      "bytes": 624,
+      "chunks": 1,
+      "sha256": "6704bca5fca1a0b656db04dd43d5b85b32bb492ecd999a2ddbd5bd766d3423de",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2\\2.pnml"
+    },
+    "public-variants/3.pnml": {
+      "archives": [
+        "forward-controls-evidence-12.jsonl.gz"
+      ],
+      "bytes": 604,
+      "chunks": 1,
+      "sha256": "2dcd4586ffac8259e06f757899ba0b8e2c206a0ae0fab288dfa24706a5f4dbd0",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2\\3.pnml"
+    },
+    "public-variants/4.pnml": {
+      "archives": [
+        "forward-controls-evidence-12.jsonl.gz"
+      ],
+      "bytes": 560,
+      "chunks": 1,
+      "sha256": "bf9835b831fe38fbf46d2334a60234b18e73b7d63c7627e142ca8d9a9eb7fe71",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2\\4.pnml"
+    },
+    "public-variants/5.pnml": {
+      "archives": [
+        "forward-controls-evidence-12.jsonl.gz"
+      ],
+      "bytes": 1007,
+      "chunks": 1,
+      "sha256": "553da0b563d599a940e5fc8b3af3ef81571f460722375fd8f70b817ae5e236df",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2\\5.pnml"
+    },
+    "public-variants/analysis.json": {
+      "archives": [
+        "forward-controls-evidence-12.jsonl.gz"
+      ],
+      "bytes": 1833770,
+      "chunks": 1,
+      "sha256": "bd744f100e31b79083972d5fc877bfc1f5abb8abc2cd3a393f6e6460bcf92edf",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2\\analysis.json"
+    },
+    "public-variants/execution.json": {
+      "archives": [
+        "forward-controls-evidence-12.jsonl.gz"
+      ],
+      "bytes": 869,
+      "chunks": 1,
+      "sha256": "2f5fe716fbfffb9a0e2dff050b6796edced9b5122ded34d613940db85346c9bf",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2\\execution.json"
+    },
+    "public-variants/preparation.json": {
+      "archives": [
+        "forward-controls-evidence-12.jsonl.gz"
+      ],
+      "bytes": 7053669,
+      "chunks": 1,
+      "sha256": "ee90bbe1c1f76dad04e2d93a7673d43fadbabf153b967be0f5dc829144330d0c",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2\\preparation.json"
+    },
+    "public-variants/public-returned-values.json": {
+      "archives": [
+        "forward-controls-evidence-12.jsonl.gz",
+        "forward-controls-evidence-13.jsonl.gz",
+        "forward-controls-evidence-14.jsonl.gz",
+        "forward-controls-evidence-15.jsonl.gz",
+        "forward-controls-evidence-16.jsonl.gz",
+        "forward-controls-evidence-17.jsonl.gz",
+        "forward-controls-evidence-18.jsonl.gz",
+        "forward-controls-evidence-19.jsonl.gz"
+      ],
+      "bytes": 302473031,
+      "chunks": 37,
+      "sha256": "9ffebd11b0b380f0fcc3ee6ca4cb24d9a48013cdf86dbd1c732e7f64868ea676",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2\\public-returned-values.json"
+    },
+    "public-variants/stderr.txt": {
+      "archives": [
+        "forward-controls-evidence-19.jsonl.gz"
+      ],
+      "bytes": 247326,
+      "chunks": 1,
+      "sha256": "a039f6aceea739ba03c321fb2537c7b95081627d1a270576b6cd06aa768d0323",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2\\stderr.txt"
+    },
+    "public-variants/stdout.txt": {
+      "archives": [
+        "forward-controls-evidence-19.jsonl.gz"
+      ],
+      "bytes": 107,
+      "chunks": 1,
+      "sha256": "0c2e1d4b18ae8d84524a866d1f8be4728c5e160770732b2ec07e085ff8d51c43",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2\\stdout.txt"
+    },
+    "stage-baseline.json": {
+      "archives": [
+        "forward-controls-evidence-19.jsonl.gz"
+      ],
+      "bytes": 16675,
+      "chunks": 1,
+      "sha256": "ed6d5371ff85ac38a2fcd8344fa145e9a7a8c09d42a6e02ee3852dfcf007c5bc",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-controls-stage-baseline.json"
+    }
+  },
+  "archives": [
+    {
+      "byte_count": 1339747,
+      "chunk_rows": 44,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-01.jsonl.gz",
+      "sha256": "559933a84a1b29ba6cb928a5f3290f28783eb1f5ef2ba1bfea40a744c8f1e691"
+    },
+    {
+      "byte_count": 2550019,
+      "chunk_rows": 20,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-02.jsonl.gz",
+      "sha256": "da3b7e2f6a868797bff56288ba7af9edeb7f8576fc85b65f29ef76417557c8e2"
+    },
+    {
+      "byte_count": 3330120,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-03.jsonl.gz",
+      "sha256": "953d7c7e6ce9aa84c6f197c381881448c67e91b2772efe1e65372b80a6432c56"
+    },
+    {
+      "byte_count": 3311192,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-04.jsonl.gz",
+      "sha256": "167de5ef02f1c42f57f37798bbea247ece24209491b2b46b8bdc8b8f4b8c7a49"
+    },
+    {
+      "byte_count": 3736395,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-05.jsonl.gz",
+      "sha256": "cb80085f25c19552dd878f48f1c5eea88fe1cf093216565f96b67bc20a8fd678"
+    },
+    {
+      "byte_count": 3269123,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-06.jsonl.gz",
+      "sha256": "b96988c74f3b672768da842084022c8c4dd08bfb004cdda07e707b366a64c6ce"
+    },
+    {
+      "byte_count": 3464470,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-07.jsonl.gz",
+      "sha256": "a5621b5159d804fafebc9f39aabf3fd4d2bc19c378e588709d4b2cbb1eb79ca4"
+    },
+    {
+      "byte_count": 3656749,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-08.jsonl.gz",
+      "sha256": "86e057de9cee17ab238ed4806f70447955c447a6834226f11c9e9d31327d2bf5"
+    },
+    {
+      "byte_count": 3401747,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-09.jsonl.gz",
+      "sha256": "53a40f54fada66d7e61b625206fd649e7d2873d04895d54286ec1e005d89fd95"
+    },
+    {
+      "byte_count": 3776580,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-10.jsonl.gz",
+      "sha256": "e89be1aeb1fd81c5129bdee273d2462ee4ddbd22487ff2400654cbc5c1b4f679"
+    },
+    {
+      "byte_count": 3532494,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-11.jsonl.gz",
+      "sha256": "629088f94034a5f41a596a6f961ba2e877e61f32b234c6b2670641d22469fb3e"
+    },
+    {
+      "byte_count": 2419137,
+      "chunk_rows": 15,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-12.jsonl.gz",
+      "sha256": "e936df15eea95ad946e29f05a5b1f13ea0e9f0f3322095ed7ffb3cbbf5e80160"
+    },
+    {
+      "byte_count": 3333194,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-13.jsonl.gz",
+      "sha256": "6c6eb8145c3ec4481d768fc62352debe0c75df90ac2fe23cdbe9b92b6f2702e5"
+    },
+    {
+      "byte_count": 3137098,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-14.jsonl.gz",
+      "sha256": "98393f09d75388bc0aa773beeb441f50d41a650287d5a05369e72b5f531d5faa"
+    },
+    {
+      "byte_count": 3084574,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-15.jsonl.gz",
+      "sha256": "b01acbc5364647de5e41cba39e5d454f6549b73be7192a521b9275b24f8ef6fd"
+    },
+    {
+      "byte_count": 3240809,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-16.jsonl.gz",
+      "sha256": "af065a1380d62c84f5cc60c8afc57afc5991ea490b2b8caae5f0c70a81a91db4"
+    },
+    {
+      "byte_count": 3329049,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-17.jsonl.gz",
+      "sha256": "67fbcdf3c848d580b73120e70fd73753407b758897e3d29f9545a5ccff899bbb"
+    },
+    {
+      "byte_count": 3428755,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-18.jsonl.gz",
+      "sha256": "c919f19f443f3e1daf7a7be4b2b8b582224dc5775ed291ed9d3e2a7662f4af61"
+    },
+    {
+      "byte_count": 2776308,
+      "chunk_rows": 8,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-controls-evidence-19.jsonl.gz",
+      "sha256": "328adc18a2b8598aa63564fe8534ef726d212e908b79e68801eb0787a4831372"
+    }
+  ],
+  "catalogue_promoted": false,
+  "chunk_rows": 162,
+  "edited": [],
+  "failed_preparation": {
+    "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-native-caf9145e7f4f41928f39f3192860b0ae",
+    "record": {
+      "executed_helper_sha256": "df3ea41b216e1f8bc363bca39bda86423ff3ddd332fd4cebea1e79df7cdc74fd",
+      "fixture_files_written": 0,
+      "native_processes_started": 0,
+      "outer_prepare_exit_code": 1,
+      "reason": "The derived preparation changed capture labels but retained one old sources key. The error occurred before copying the first fixture or invoking CMake. This is a harness failure, with zero native replay calls.",
+      "reported_error": "KeyError: 'unequal'"
+    }
+  },
+  "full_parity": false,
+  "member_count": 74,
+  "native": {
+    "bound_core_build_witness_sha256": "e8b50bdbdcf0c95627ce2f013aa73ca254c8f0f327f4c4f574bb21d663eb8679",
+    "comparison_sha256": "7030e7d71ac7bf4b62d5e2d5897aeadc3f85ac6761bc5c6ec25c2e499d5012a7",
+    "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369",
+    "execution": {
+      "actual_full_result_calls": 6720,
+      "actual_import_calls": 6,
+      "commands": [
+        {
+          "argv": [
+            "cmake",
+            "-S",
+            "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369",
+            "-B",
+            "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\native-build",
+            "-G",
+            "Visual Studio 17 2022",
+            "-A",
+            "x64",
+            "-DCMAKE_GENERATOR_INSTANCE=C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools"
+          ],
+          "exit_code": 0,
+          "finished": 1791045417.7809694,
+          "pid": 32396,
+          "started": 1791045416.4427328,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_sha256": "d26dbe62c10482d7142d774115a1c41379cd0f3c07e400fb49e1ec845cb1cbeb"
+        },
+        {
+          "argv": [
+            "cmake",
+            "--build",
+            "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\native-build",
+            "--config",
+            "Release",
+            "--parallel",
+            "1"
+          ],
+          "exit_code": 0,
+          "finished": 1791045421.1628911,
+          "pid": 26596,
+          "started": 1791045418.1813982,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_sha256": "0dda17c28573f042a14e81b622fa7d49166df364fea5604a8fdeec971a1be02d"
+        },
+        {
+          "argv": [
+            "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-control-baseline-corrected-native-149b8750c6d149f3a5e25f53c2356369\\native-build\\Release\\forward_typed_probe.exe"
+          ],
+          "exit_code": 0,
+          "finished": 1791045422.6988294,
+          "pid": 6784,
+          "started": 1791045421.5670037,
+          "stderr_sha256": "48f89ade320279b08354e0af2f5d17be3f88ef93530bfe7d27a581a51757bb88",
+          "stdout_sha256": "2594d404c9bf7462da71274f0141cd126043297fb46a986d61942c360052a52b"
+        }
+      ],
+      "complete": true,
+      "computed_full_result_calls": 5712,
+      "executable_sha256": "442ff53eab5a6cbcd2331d5f4743c6226f9b1ef6244d287aa9811043c350604c"
+    },
+    "preparation_sha256": "e4e543c244bc352c7b402a001b6d96e40902de9edeb3db9cdfe2b3bc1088f1db",
+    "reused_core_sha256": "2f19db20f7b422d1d3548f65567c755dc73d66cdd472b48d2a5aa95c583bda33",
+    "reused_full_build_manifest_sha256": "434277cf7c7a267733a800bff3b7d55e373a5422b1db55930193e9c345967a3b",
+    "summary": {
+      "actual_native_full_calls": 6720,
+      "actual_native_imports": 6,
+      "catalogue_promoted": false,
+      "complete_return_matches": 11088,
+      "complete_returns_compared": 11348,
+      "error_behavior_matches": 1918,
+      "error_behaviors_compared": 2092,
+      "explicit_hidden_cache_unmapped_in_baseline": true,
+      "full_parity": false,
+      "mismatches_by_cohort": {
+        "custom_phase": 168,
+        "mixed_null": 50,
+        "numeric_equal": 48,
+        "strings": 168
+      },
+      "mismatches_by_difference_path": {
+        "$": 80,
+        "$.values[0].items[0][1].values": 20,
+        "$.values[0].items[0][1].values[0].index": 20,
+        "$.values[0].values[0].items[0][1].values": 60,
+        "$.values[0].values[0].items[0][1].values[0].index": 40,
+        "$.values[0].values[0].items[0][1].values[0].value": 20,
+        "$.values[2].items[0][1].values": 10,
+        "$.values[2].items[0][1].values[0].index": 10,
+        "error_behavior": 174
+      },
+      "new_public_calls": 0,
+      "public_outcomes_compared": 13440,
+      "trace_equality_matrices_matched": 13440
+    }
+  },
+  "parent_archives": [
+    {
+      "byte_count": 8912048,
+      "chunk_rows": 27,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-01.jsonl.gz",
+      "sha256": "0256a1d040050ce8f20d4c4af22999fd50b7d9dfac915ac7968958acae332986"
+    },
+    {
+      "byte_count": 7386962,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-02.jsonl.gz",
+      "sha256": "495bc8e872d15915fdca910845c35a00acf4f5e54c7f0475d2460582001fa75f"
+    },
+    {
+      "byte_count": 7337976,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-03.jsonl.gz",
+      "sha256": "b7e651fbfbaaec2dfb6d64df0d210a57e22fc7015c2d046a33203fefca722289"
+    },
+    {
+      "byte_count": 6242645,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-04.jsonl.gz",
+      "sha256": "68c23489c4d836e6254a26f604fedb3241b2cfd0b03d655a69be6a6cdc27c96f"
+    },
+    {
+      "byte_count": 7847395,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-05.jsonl.gz",
+      "sha256": "a8d0a6ff4a5bf14394fe9113610ef83b69c0fdb7becd4303c68098baba16c498"
+    },
+    {
+      "byte_count": 7221985,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-06.jsonl.gz",
+      "sha256": "2f8a12dd9b61fed1f15436e7f48db3f77928058815a4ccb757fc56e9c9ccf530"
+    },
+    {
+      "byte_count": 8302876,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-07.jsonl.gz",
+      "sha256": "8af73a9e544ba98fd58cc6768d6b61bc2d1e3277c3ec962aa6982509f83883f2"
+    },
+    {
+      "byte_count": 11984882,
+      "chunk_rows": 27,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-08.jsonl.gz",
+      "sha256": "cb51953820af8f390e411a9917d04491d3c72ec90d35780b957290664707db04"
+    },
+    {
+      "byte_count": 23181212,
+      "chunk_rows": 62,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-09.jsonl.gz",
+      "sha256": "ad56b6159e6745d401a7df77d69ed9a0ce0ac10fd3c3d7e3043eacc369c930b7"
+    },
+    {
+      "byte_count": 19170829,
+      "chunk_rows": 475,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-10.jsonl.gz",
+      "sha256": "91af28b9db36720029a3dab598e8740e8cd4c573d653f8473a85de4517694665"
+    },
+    {
+      "byte_count": 4436632,
+      "chunk_rows": 434,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-11.jsonl.gz",
+      "sha256": "33022a58365d26a6dd20471d98501386d4bac8b6a3b568bb149722fc205be89a"
+    },
+    {
+      "byte_count": 7791257,
+      "chunk_rows": 33,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-12.jsonl.gz",
+      "sha256": "0259c03d25c9f61ebc93cc8460f69361b22a537b5ef7148d4e13d6bb477faaf2"
+    },
+    {
+      "byte_count": 3884613,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-13.jsonl.gz",
+      "sha256": "0c334f38541dff349e14c76498a385479a783478ee56c613abf8ab2156359c20"
+    },
+    {
+      "byte_count": 7703955,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-14.jsonl.gz",
+      "sha256": "09e6c131ff0fdaebfa428c902287b2b677c13ca398d425310065f09a4bedb318"
+    },
+    {
+      "byte_count": 7207697,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-15.jsonl.gz",
+      "sha256": "c65031dbc6916ea53c9ee8ac7e135003b5fb115012df813e0d9f606c13839732"
+    },
+    {
+      "byte_count": 6619164,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-16.jsonl.gz",
+      "sha256": "d7fbf7c5c47a6ef350c16a8ad12d25b8274d07b310e799d0538e05ee5977a527"
+    },
+    {
+      "byte_count": 7721321,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-17.jsonl.gz",
+      "sha256": "15fa2d9d361f1d80708f6a68e404ecf359c14d3108dd4a1ab5623f22c43ce62e"
+    },
+    {
+      "byte_count": 7359047,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-18.jsonl.gz",
+      "sha256": "d53f4b5c51738ce8eac7853af0d86810d3efbf6d9faf24adcc6c0d8d14cdaebb"
+    },
+    {
+      "byte_count": 7686930,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-19.jsonl.gz",
+      "sha256": "c7859f7d6b66fa71164c69a8b43211f441f57ec1a2e3448ac7446914a20f9801"
+    },
+    {
+      "byte_count": 13627858,
+      "chunk_rows": 33,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-20.jsonl.gz",
+      "sha256": "0bb94141f16fb9c566d5868cbd9acbf9b81c95654f5c4241de42e0ac06685622"
+    },
+    {
+      "byte_count": 22238044,
+      "chunk_rows": 65,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-21.jsonl.gz",
+      "sha256": "87f3fc7d4656e92381447c99249c926b34ec0a7f682c08677874d8c6ca22d0df"
+    },
+    {
+      "byte_count": 18065969,
+      "chunk_rows": 544,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-22.jsonl.gz",
+      "sha256": "690f1968312f2d94da065e3c711fd6fdf82954dcad2525381fde4f7493f59f31"
+    },
+    {
+      "byte_count": 4344333,
+      "chunk_rows": 389,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-23.jsonl.gz",
+      "sha256": "cd1c356dbf2ebbb65e3c263fd8a9b4892502a756163dcfff180df9b97cf449e8"
+    },
+    {
+      "byte_count": 3157910,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-24.jsonl.gz",
+      "sha256": "add3a78ce3c9422f1a5cbd4ebfdb0cbeee6b9ad00f812687c6e79490fef341e6"
+    },
+    {
+      "byte_count": 3020155,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-25.jsonl.gz",
+      "sha256": "389f4821e88fc941a6e9814aa2c42a2604aedef0ae6c717af1fcfa5c3d12b6df"
+    },
+    {
+      "byte_count": 3135199,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-26.jsonl.gz",
+      "sha256": "61004fbaadf8146b3242499c2faf65ccb40ffb3576e144327b12981a51a40196"
+    },
+    {
+      "byte_count": 2863282,
+      "chunk_rows": 15,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-27.jsonl.gz",
+      "sha256": "7360a9416ea75adce67c38e44e67a33f7d771111493a1e6daec21cd32a4e63d7"
+    },
+    {
+      "byte_count": 3278349,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-28.jsonl.gz",
+      "sha256": "6674d56100bed55cfc1022e94b84a1df2b7d0a427ee5d440f2c01395d4ddfc2d"
+    },
+    {
+      "byte_count": 3257347,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-29.jsonl.gz",
+      "sha256": "c5739d1d3efa0e64bfa466ceb700075eb11c8bd15b74195e610ea72532dd2124"
+    },
+    {
+      "byte_count": 3370072,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-30.jsonl.gz",
+      "sha256": "9df6e06a35f3df0dcae3cae43f4be247901a7537484b63574b3940fdacb00361"
+    },
+    {
+      "byte_count": 3438046,
+      "chunk_rows": 5,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-31.jsonl.gz",
+      "sha256": "77671f7195dced57186b4d4b8faa875cd306ccd6ccae49c771e6fc1b51fbe57a"
+    },
+    {
+      "byte_count": 2920659,
+      "chunk_rows": 1473,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-32.jsonl.gz",
+      "sha256": "3d834ba5feee41ce13bbac2338a6fd205f4b5c60621064f1fcf7a9d551ceb1c6"
+    },
+    {
+      "byte_count": 2936881,
+      "chunk_rows": 1017,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-33.jsonl.gz",
+      "sha256": "752ac7350e1f166993b3f5dc857ae16bc71c9cc43e30ea04c05b40bb8a6870b5"
+    },
+    {
+      "byte_count": 2473434,
+      "chunk_rows": 12,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\forward-typed-key-evidence-34.jsonl.gz",
+      "sha256": "8d19efa553c680c278af9358c42b0702a1fb9737fdf230ebfd4c07425f6b9cf2"
+    }
+  ],
+  "parent_head": "561b6a8deb502ce814edcae0958688a3243babd1",
+  "parent_validation_sha256": "675bb0a687de88f5ec378bd13f77a8e4a5c7c8b8375450f310c7b4089ee37e09",
+  "public": {
+    "controls": {
+      "analysis_sha256": "28faef24e899da1e35a88f4694cfb79082fafb1e8a688458fe10e163c64eeb28",
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b",
+      "execution": {
+        "argv": [
+          "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+          "-B",
+          "-X",
+          "utf8",
+          "C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-forward-remaining-controls-public.py",
+          "--worker",
+          "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-remaining-controls-public-957d5ed98d814907894e90b48b991a8b"
+        ],
+        "environment": {
+          "PYTHONHASHSEED": "0",
+          "PYTHONPATH": "C:/Users/pmoch/Documents/Minera/build/heuristic-subsecond-reference-runtime;C:/Users/pmoch/Documents/Minera/build/heuristic-subsecond-runtime-deps",
+          "TZ": "UTC"
+        },
+        "exit_code": 0,
+        "finished": 1791045181.7029989,
+        "pid": 32628,
+        "started": 1791045164.5452754,
+        "stderr_sha256": "3659695d2c1c174a12d5ecee04f36c496b96a46f2b98bde727a6118d887e9a11",
+        "stdout_sha256": "a3d16eb0c9c61cea9ebdb2bd5520814310a5f0fed2c10c4e066730eec349e5dc"
+      },
+      "module_proofs": [
+        {
+          "crlf_count": 107,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\algo\\conformance\\tokenreplay\\algorithm.py",
+          "module": "pm4py.algo.conformance.tokenreplay.algorithm",
+          "pinned_git_path": "pm4py/algo/conformance/tokenreplay/algorithm.py",
+          "pinned_git_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962",
+          "sha256": "e58f9acf0c6ea4779d2d6b97e1f0997ea35ef01dfa2741dfbc7ddb756b2a76b8"
+        },
+        {
+          "crlf_count": 1770,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\algo\\conformance\\tokenreplay\\variants\\token_replay.py",
+          "module": "pm4py.algo.conformance.tokenreplay.variants.token_replay",
+          "pinned_git_path": "pm4py/algo/conformance/tokenreplay/variants/token_replay.py",
+          "pinned_git_sha256": "96fc7be0ed122d1afd2b824c4d2973e4d95990dcda650ffbe2b3b13ee86400b3",
+          "sha256": "2005106747cec10084a22f6d3468e0d058ab4131553426fb1a32ca86a033b737"
+        },
+        {
+          "crlf_count": 449,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\algo\\conformance\\tokenreplay\\variants\\backwards.py",
+          "module": "pm4py.algo.conformance.tokenreplay.variants.backwards",
+          "pinned_git_path": "pm4py/algo/conformance/tokenreplay/variants/backwards.py",
+          "pinned_git_sha256": "688399992ce0aa2bec68376572a5a81edecaea336389414d28942b76a680a835",
+          "sha256": "ac8848a67b932ccc2856d5a8f6ceadb42b8513271c97ea740813625dd830e0d6"
+        },
+        {
+          "crlf_count": 441,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\objects\\log\\obj.py",
+          "module": "pm4py.objects.log.obj",
+          "pinned_git_path": "pm4py/objects/log/obj.py",
+          "pinned_git_sha256": "d659e507c9cf085dc98197ca7fadd254086c44334681a22de8c497d87ac16dd2",
+          "sha256": "ff7c21a5a1fc435795b08cd5b1d5450014cc8eeeb70589e8b7ae58f6db29ab77"
+        },
+        {
+          "crlf_count": 461,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\objects\\petri_net\\obj.py",
+          "module": "pm4py.objects.petri_net.obj",
+          "pinned_git_path": "pm4py/objects/petri_net/obj.py",
+          "pinned_git_sha256": "b62fd81f1070c2d8552da8fa583b1dbd0f880b122a5af644c35f407eae07db7c",
+          "sha256": "9ed16b55a4616f09e8012d30c3e3830307353a7fecc6dc15ef8054ca5385562f"
+        },
+        {
+          "crlf_count": 70,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\objects\\petri_net\\importer\\importer.py",
+          "module": "pm4py.objects.petri_net.importer.importer",
+          "pinned_git_path": "pm4py/objects/petri_net/importer/importer.py",
+          "pinned_git_sha256": "15472381c9bd440ed6a5cb765a9a3a4f753b130a7f7acb1bfe8e5d6d1b7bb0cb",
+          "sha256": "f8847153770cde7cc4fa48a32c74ade0ffbf417b53f15cb0c39210c0ca9e47ff"
+        },
+        {
+          "crlf_count": 463,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\objects\\petri_net\\importer\\variants\\pnml.py",
+          "module": "pm4py.objects.petri_net.importer.variants.pnml",
+          "pinned_git_path": "pm4py/objects/petri_net/importer/variants/pnml.py",
+          "pinned_git_sha256": "d1302897ece5a4629df7dfc4bf960d8fdda33c6e92544d0284d88954526e6a60",
+          "sha256": "a027bc1b6dc155ae058d3b96cc63d1a74de37189fa2c6e845de02b6ae399ab73"
+        }
+      ],
+      "preparation_sha256": "02a2a6816ec7cfefae705da7057bcfb4614a8f3b51f2aab03a2445412ea4afdc",
+      "returned_sha256": "9ee83a6bb738dbca3289695841e207503b298573bb4a8c627235a09c49f602cd",
+      "summary": {
+        "actual_errors": 1300,
+        "actual_imports": 6,
+        "actual_public_calls": 8160,
+        "by_control_mode": {
+          "cache_empty": {
+            "actual_calls": 480,
+            "complete_outcomes_different_from_omitted": 104,
+            "complete_outcomes_equal_to_omitted": 376,
+            "complete_returns": 440,
+            "errors": 40
+          },
+          "cache_hidden_actual": {
+            "actual_calls": 480,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 480,
+            "complete_returns": 408,
+            "errors": 72
+          },
+          "cache_identity": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 52,
+            "complete_outcomes_equal_to_omitted": 188,
+            "complete_returns": 220,
+            "errors": 20
+          },
+          "cache_integer": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 174,
+            "complete_outcomes_equal_to_omitted": 66,
+            "complete_returns": 48,
+            "errors": 192
+          },
+          "cache_list": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 52,
+            "complete_outcomes_equal_to_omitted": 188,
+            "complete_returns": 220,
+            "errors": 20
+          },
+          "cache_none": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "cache_reverse": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 52,
+            "complete_outcomes_equal_to_omitted": 188,
+            "complete_returns": 220,
+            "errors": 20
+          },
+          "cache_source_only": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "case_id_alt": {
+            "actual_calls": 480,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 480,
+            "complete_returns": 408,
+            "errors": 72
+          },
+          "case_id_none": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "case_id_numeric": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "delimiter_alt": {
+            "actual_calls": 480,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 480,
+            "complete_returns": 408,
+            "errors": 72
+          },
+          "delimiter_none": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "delimiter_numeric": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "omit": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "progress_none": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "progress_true": {
+            "actual_calls": 480,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 480,
+            "complete_returns": 408,
+            "errors": 72
+          },
+          "reduction_false": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "reduction_none": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "reduction_true": {
+            "actual_calls": 480,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 480,
+            "complete_returns": 408,
+            "errors": 72
+          },
+          "reduction_truthy": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "timeout_long": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "timeout_negative": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "timeout_none": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "timeout_text": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "timeout_tiny": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "timeout_zero": {
+            "actual_calls": 480,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 480,
+            "complete_returns": 408,
+            "errors": 72
+          }
+        },
+        "catalogue_promoted": false,
+        "complete_returns": 6860,
+        "complete_routes_compared": 4080,
+        "complete_routes_equal": 4080,
+        "error_shapes": {
+          "builtins.KeyError: (hidden, None)": 612,
+          "builtins.OverflowError: int too large to convert to float": 514,
+          "builtins.TypeError: argument of type 'int' is not iterable": 174
+        },
+        "full_parity": false,
+        "input_mutations_observed": 0,
+        "native_remaining_controls_implemented": false,
+        "serialization_errors": 0
+      }
+    },
+    "variants": {
+      "analysis_sha256": "bd744f100e31b79083972d5fc877bfc1f5abb8abc2cd3a393f6e6460bcf92edf",
+      "directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2",
+      "execution": {
+        "argv": [
+          "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+          "-B",
+          "-X",
+          "utf8",
+          "C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-forward-supplied-variants-public.py",
+          "--worker",
+          "C:\\Users\\pmoch\\Documents\\Minera\\build\\forward-supplied-variants-public-2715135a76d04c948c992286fef14bf2"
+        ],
+        "environment": {
+          "PYTHONHASHSEED": "0",
+          "PYTHONPATH": "C:/Users/pmoch/Documents/Minera/build/heuristic-subsecond-reference-runtime;C:/Users/pmoch/Documents/Minera/build/heuristic-subsecond-runtime-deps",
+          "TZ": "UTC"
+        },
+        "exit_code": 0,
+        "finished": 1791044765.0414307,
+        "pid": 9876,
+        "started": 1791044752.3511193,
+        "stderr_sha256": "a039f6aceea739ba03c321fb2537c7b95081627d1a270576b6cd06aa768d0323",
+        "stdout_sha256": "0c2e1d4b18ae8d84524a866d1f8be4728c5e160770732b2ec07e085ff8d51c43"
+      },
+      "module_proofs": [
+        {
+          "crlf_count": 107,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\algo\\conformance\\tokenreplay\\algorithm.py",
+          "module": "pm4py.algo.conformance.tokenreplay.algorithm",
+          "pinned_git_path": "pm4py/algo/conformance/tokenreplay/algorithm.py",
+          "pinned_git_sha256": "1a84c436c66bdfc03364802cd99022c57622ffae2a17fc9aeaed192b2c256962",
+          "sha256": "e58f9acf0c6ea4779d2d6b97e1f0997ea35ef01dfa2741dfbc7ddb756b2a76b8"
+        },
+        {
+          "crlf_count": 1770,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\algo\\conformance\\tokenreplay\\variants\\token_replay.py",
+          "module": "pm4py.algo.conformance.tokenreplay.variants.token_replay",
+          "pinned_git_path": "pm4py/algo/conformance/tokenreplay/variants/token_replay.py",
+          "pinned_git_sha256": "96fc7be0ed122d1afd2b824c4d2973e4d95990dcda650ffbe2b3b13ee86400b3",
+          "sha256": "2005106747cec10084a22f6d3468e0d058ab4131553426fb1a32ca86a033b737"
+        },
+        {
+          "crlf_count": 449,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\algo\\conformance\\tokenreplay\\variants\\backwards.py",
+          "module": "pm4py.algo.conformance.tokenreplay.variants.backwards",
+          "pinned_git_path": "pm4py/algo/conformance/tokenreplay/variants/backwards.py",
+          "pinned_git_sha256": "688399992ce0aa2bec68376572a5a81edecaea336389414d28942b76a680a835",
+          "sha256": "ac8848a67b932ccc2856d5a8f6ceadb42b8513271c97ea740813625dd830e0d6"
+        },
+        {
+          "crlf_count": 441,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\objects\\log\\obj.py",
+          "module": "pm4py.objects.log.obj",
+          "pinned_git_path": "pm4py/objects/log/obj.py",
+          "pinned_git_sha256": "d659e507c9cf085dc98197ca7fadd254086c44334681a22de8c497d87ac16dd2",
+          "sha256": "ff7c21a5a1fc435795b08cd5b1d5450014cc8eeeb70589e8b7ae58f6db29ab77"
+        },
+        {
+          "crlf_count": 461,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\objects\\petri_net\\obj.py",
+          "module": "pm4py.objects.petri_net.obj",
+          "pinned_git_path": "pm4py/objects/petri_net/obj.py",
+          "pinned_git_sha256": "b62fd81f1070c2d8552da8fa583b1dbd0f880b122a5af644c35f407eae07db7c",
+          "sha256": "9ed16b55a4616f09e8012d30c3e3830307353a7fecc6dc15ef8054ca5385562f"
+        },
+        {
+          "crlf_count": 70,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\objects\\petri_net\\importer\\importer.py",
+          "module": "pm4py.objects.petri_net.importer.importer",
+          "pinned_git_path": "pm4py/objects/petri_net/importer/importer.py",
+          "pinned_git_sha256": "15472381c9bd440ed6a5cb765a9a3a4f753b130a7f7acb1bfe8e5d6d1b7bb0cb",
+          "sha256": "f8847153770cde7cc4fa48a32c74ade0ffbf417b53f15cb0c39210c0ca9e47ff"
+        },
+        {
+          "crlf_count": 463,
+          "crlf_to_lf_conversion_only": true,
+          "installed_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\objects\\petri_net\\importer\\variants\\pnml.py",
+          "module": "pm4py.objects.petri_net.importer.variants.pnml",
+          "pinned_git_path": "pm4py/objects/petri_net/importer/variants/pnml.py",
+          "pinned_git_sha256": "d1302897ece5a4629df7dfc4bf960d8fdda33c6e92544d0284d88954526e6a60",
+          "sha256": "a027bc1b6dc155ae058d3b96cc63d1a74de37189fa2c6e845de02b6ae399ab73"
+        }
+      ],
+      "preparation_sha256": "ee90bbe1c1f76dad04e2d93a7673d43fadbabf153b967be0f5dc829144330d0c",
+      "returned_sha256": "9ffebd11b0b380f0fcc3ee6ca4cb24d9a48013cdf86dbd1c732e7f64868ea676",
+      "summary": {
+        "actual_errors": 792,
+        "actual_imports": 6,
+        "actual_public_calls": 5280,
+        "by_variant_mode": {
+          "bytes_key": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "count_values": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "custom_delimiter": {
+            "actual_calls": 480,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 480,
+            "complete_returns": 408,
+            "errors": 72
+          },
+          "empty": {
+            "actual_calls": 480,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 480,
+            "complete_returns": 408,
+            "errors": 72
+          },
+          "extra": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "index_values": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "inferred": {
+            "actual_calls": 480,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 480,
+            "complete_returns": 408,
+            "errors": 72
+          },
+          "none": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "none_values": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "omit": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "raw_list": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "reverse": {
+            "actual_calls": 480,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 480,
+            "complete_returns": 408,
+            "errors": 72
+          },
+          "scalar_key": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "string_keys": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "string_values": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "subset": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "wrong_key": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          },
+          "zero_frequency": {
+            "actual_calls": 240,
+            "complete_outcomes_different_from_omitted": 0,
+            "complete_outcomes_equal_to_omitted": 240,
+            "complete_returns": 204,
+            "errors": 36
+          }
+        },
+        "catalogue_promoted": false,
+        "complete_returns": 4488,
+        "complete_routes_compared": 2640,
+        "complete_routes_equal": 2640,
+        "error_shapes": {
+          "builtins.KeyError: (hidden, None)": 396,
+          "builtins.OverflowError: int too large to convert to float": 396
+        },
+        "full_parity": false,
+        "native_supplied_variants_implemented": false,
+        "serialization_errors": 0
+      }
+    }
+  },
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "remaining_gates": [
+    "Implement explicit hidden-cache carrier/routing and measured rejection timing, then compare every retained whole return/error.",
+    "Exercise broader/cache foreign carrier and alias domains; no-effect observations are finite and do not certify other adapters.",
+    "Reconcile existing forward choice/cleanup and backwards acceptance contracts; weighted aggregate/composite and other prior gates remain.",
+    "Catalogue unchanged: 46/86 packages, 199/387 modules and 228 incomplete units."
+  ],
+  "round_trip_members_verified": 74,
+  "scope": "Complete actual new public captures and current native baseline. Explicit hidden-cache arguments are unmapped in the current API; all their differences remain open. Measured no-effect options map to the existing options only for these captured EventLog controls. Native exception-class identity is not claimed. The one probe is newly compiled; the completed accepted core/full-build and 152-suite evidence are reused with exact hashes, not counted as fresh here. The naming-only failed preparation precedes fixture copying and all native processes. Every archive chunk and whole file round-trips.",
+  "source_bindings": {
+    "CMakeLists.txt": "1763d9e8af8ca50d2a1b12b971cac8703b2fcfe6e7cb6938bc1a9f7103fd1d33",
+    "include/minera/activity_split.hpp": "778076205f850e43fdbfe0860f5dabfaeb06f40cb68291bd38293567c7a14df2",
+    "include/minera/alpha_miner.hpp": "86e134dc3a321253410e0d8b287064aaf5789a47471e0c489d60dd0bad12567e",
+    "include/minera/alpha_relations.hpp": "8ccf8040bc0d6824290d0d1e2b6eb0403e1e707634b8e56f910620774fb77176",
+    "include/minera/alpha_result_json.hpp": "4d731af151a64a00e34557223c80934dccfdbd2bfcf988d29c70072b1033dfef",
+    "include/minera/attribute_distribution.hpp": "32e3477ebadc433ced9c7ab9573b6f515b771ad910b9bcb5ee8fc82a09899fc8",
+    "include/minera/attribute_kde.hpp": "84834f65b9018cb4c5e91d9c07e925de3a9f605531f9b5fa169c33c1d2dc97ee",
+    "include/minera/attribute_statistics.hpp": "12f85e22acb823adf5993ce9f1fbc34879f26b79dc50a042293c858ce9edb69d",
+    "include/minera/attribute_value_repetition.hpp": "9f8d7cf71e08495dc484a0213a2089c78366cf7dd8ef11d786c38dc167987446",
+    "include/minera/batches.hpp": "abd249e1fbabd9b76ff973d4cf6d030de87e7fff1f315d670ac85c8353470dc3",
+    "include/minera/boundary_activities.hpp": "03e9f714cd1c0b3b78ffd8c715fcccb78ac826777b1598515b886310c4539f48",
+    "include/minera/bpmn.hpp": "7a10544194f47dd1dca5456814e6a215c1bd43667a1f38a9184c6219159ac241",
+    "include/minera/browser_history.hpp": "154334f15754143c22d1c2bec135fc80c09fa08a8f52ad27887287e4db3ee59d",
+    "include/minera/case_arrival.hpp": "d01092c8bc7e2b537e9363403ae77d551dbef5f86b3afbfceb1e0ddc6f0d2e8c",
+    "include/minera/case_grouping.hpp": "cf1cd6f37944ca7a51c6b5f23bf6226ca7afdccab700140ce5d9a4103c41cef4",
+    "include/minera/case_relations.hpp": "5f1437c6ffbab88eec5c59995fa80f2c3d0bc01bc36321f61b2313e7ea622865",
+    "include/minera/case_statistics.hpp": "e8b260413af0b5d4fe1a6769a0a86a96a30b60a1cc62bca526bcbaa3d7dd58ff",
+    "include/minera/chaotic_activities.hpp": "7c0db254de697f9c4ae404b1e99891737304ae147902fa69d01e8ad39a49c99b",
+    "include/minera/clustering.hpp": "784064d9a8de85f3c34e5e6a41e5e15c66ab864654ea98d6b3643970d9a35c08",
+    "include/minera/communication_history.hpp": "958ec85c2122f4caa44db9bb4a9ab2e752ed0818f37e7fd9ff3b312be01ecdd7",
+    "include/minera/concept_drift.hpp": "d504eacc7dad920c94b239a15c72611d558f8b247deec284d9f7726c8e0669f0",
+    "include/minera/conformance.hpp": "4d9269e99f246de6b390ef5986f4b8a05c9493e88614a40d7b9761c0aa69bee8",
+    "include/minera/correlation_miner.hpp": "bfe30d3da70f1681b197beaa4f5042776ec60aa58769a09addd2fdbe21150f19",
+    "include/minera/csv_event_log_importer.hpp": "70358c4134b5b371a614428e9fc2543c21ff0d06f0baf416fbd8fe0411940e9c",
+    "include/minera/cycle_time.hpp": "b3e9e46ba7b92cb3e295d719a7534f3b05a7cd6259ce1e637ef34c2af3f6e5de",
+    "include/minera/data_petri_net.hpp": "212293155f321788d4e1ff4ec031532f1e24b7ee971dfee2f528c4dbfe6a9a3b",
+    "include/minera/dataframe_format.hpp": "e7209a1836d6531cf80b5a0992b4c9a5ec8e64caefb6189efdf3a60923f75878",
+    "include/minera/dataframe_format_json.hpp": "d71be6525f6db2235c9fbebdde8dd4a0bc705343bf2520e0147c1b3db932aff9",
+    "include/minera/dataframe_validation.hpp": "c3f1eb98940be179ca0db670192f821b1c31559cfe08e0a3a0fd6ebdd8dffb71",
+    "include/minera/decision_mining.hpp": "9f5a78d647a45eeb0ac59b08c160002e2c2139934dc4d58c2195cfd4cbc6cef9",
+    "include/minera/decision_table.hpp": "a5eea51efd220862e05dc841af66f23e715119c8bb094ce37db2e85ba19f40f3",
+    "include/minera/declare.hpp": "b48382220a4440380248987e84ddf0e4e540f69209c13bacde9102ff6e32ead6",
+    "include/minera/declare_playout.hpp": "169a99e76451d988832eca068eaff3865f311fc8ae2db479543eef193cd24be0",
+    "include/minera/declare_streaming.hpp": "45a0df0afe42704df32ca35e5105a3d1f9e88eeb000d1f2d6eac9c4287d8edca",
+    "include/minera/decomposed_alignment.hpp": "c6f69ecb32ddc0c447d3496c5aa651bbf3a7d6a23f85c02515b03c8aedddbdf2",
+    "include/minera/dfg_alignment.hpp": "c69abf31bcae80c101840f9ccf190603f2ebe7419dd20e45ee090496443e6d91",
+    "include/minera/dfg_conversion.hpp": "43ad90b7bc7f7f07c6c5a3524b9aabd9b146f7b0b8c030789cd5001fca11b228",
+    "include/minera/dfg_dataframe.hpp": "c4d5d7889a4fa610759ae6f85861f81016ba730e2858948c743b102009d7b3b5",
+    "include/minera/dfg_dataframe_json.hpp": "9918388f0c028f311e04ef224357e138094077728389888a9e3675f1c0a70dc8",
+    "include/minera/dfg_filter.hpp": "afa79d96a5c29c795e7d74a72850dd5ab359696b5f9a3d70899942c5103cbffd",
+    "include/minera/dfg_io.hpp": "2fcf541a54ec84e13cfa8029949fc7de32f69f5c22b5abb875e79b589913108a",
+    "include/minera/dfg_playout.hpp": "cbe82c3097336d8c7dfedc9f4bdf7c16139843ae9b1af1e8bfa8ef13cce84ad5",
+    "include/minera/dfg_precision.hpp": "deb1462274745b0cea3501834cb9a1a5b7f0139be954514741ab257c21cc4e79",
+    "include/minera/dfg_utils.hpp": "6ebf45532268526da01f4ac305438a15aa29949b163653c5dfbb44337360f6d4",
+    "include/minera/dfg_variants.hpp": "eb0944cfdeca4eebb5017bff9d48ca0efe2e7a6e9a1998de7ad33ff1ed212d3f",
+    "include/minera/directly_follows_graph.hpp": "d82f57986c2b2befbaef0cff3f10a869f6232337f4d2204539ef91443dbe4eb1",
+    "include/minera/edit_distance_alignment.hpp": "422f8980e4e1c47630589a19d578930f1b0456508b2d5134414e13d09c8fa33d",
+    "include/minera/embeddings.hpp": "9d7a83b14677b5f20452d996613cb9d812bcbea941e73a839e414abd86dc5f24",
+    "include/minera/enterprise_history.hpp": "cd07320d29887cf8ec5bb94fc0de94744b48c96c87fec9055603470bd83afc29",
+    "include/minera/evaluation.hpp": "3b81bce942b1f92fa47fde060fa0b0de31104fc3cabeb96c32de717584bcb7ac",
+    "include/minera/event_data.hpp": "7d4af705cba85bdbe12af31bc4a7f1d87668430f99e08591cd0e177c7598c0df",
+    "include/minera/event_log.hpp": "dc43e1ef5264ec7d18b091cdd24b190511da44f20d1ed032777338e6e2299d7e",
+    "include/minera/event_table_json.hpp": "589fa0b630a4ce5496506450ce35e3bbef2cb768193098a570b57567316d7abf",
+    "include/minera/eventually_follows.hpp": "41dcd5ec0311fd4a33c441821abfa1349d0d2b414f644ff5857c6213eb4cce34",
+    "include/minera/footprints.hpp": "c0e8234b3b4d332d7dfc99e57cd202f0b076831fda8f6f10d72be1bb53d80c67",
+    "include/minera/genetic_matrix_conversion.hpp": "9c1d5f860c2cee07315b945e9a7961f72462b22d8aba7ed180836157dd8dbb70",
+    "include/minera/genetic_miner.hpp": "16118f43cadf8b2d50d7db2381b4a5a800a5eab088bfab73e7e579091ea468c9",
+    "include/minera/heuristic_count.hpp": "08033a0ea6bebbb65b3038cdb1331c31e50c7ec8e1d7d7748ac86790f113a454",
+    "include/minera/heuristic_miner.hpp": "ffd187ca5c4f149ec240fbc6956fb427f9eed9e53b348c9e659bd617cd8946df",
+    "include/minera/ilp_miner.hpp": "90a924f4dd46e34fa8afdfe9fcf6ae21893feac1b261a4954a574d64337aeb1a",
+    "include/minera/inductive_miner.hpp": "475f9ed8b1119f4b99c284db9b53ca0165f64cb5a5671cf2ac580b9b0fba1571",
+    "include/minera/interval_tree.hpp": "f9c318fb2771412011ffc0a9f6eedd245d837b837fe04a7122768b310168b086",
+    "include/minera/json_export.hpp": "431e797f67a996fdb4dc78a81e46df08e56d1bcb24e676970945f6072447bf9e",
+    "include/minera/knowledge_injection.hpp": "82bc6fba8e16745209282d5fe4ac384d289ffef08657355f932f1485df8c27d7",
+    "include/minera/label_splitting.hpp": "e5c8b60860673c5ba792683aff120415bacabb424d05ea2910b716617e093e7a",
+    "include/minera/link_analysis.hpp": "6ebd9dbe0878d1793700fb037710530ab026bd3963b54894369a38403923d6cf",
+    "include/minera/live_stream.hpp": "2a7fd67685f32a10b6b9a28877454b8593c67ba74a3861e64efe5b0d24362d84",
+    "include/minera/local_diagnostics.hpp": "77e648ecf87602aa9b0c1f7874f9796919c6dc081bc0178174bf6c823df648a2",
+    "include/minera/log_conversion.hpp": "b20b18cd00d5f117b0352bdb57aa2e5917a35ad8775ec45012b07ead4b4c08ca",
+    "include/minera/log_filter.hpp": "f6121e97490c5990e1f4868fe9c0868363c55334f4398a2c4015b6755b4f4a42",
+    "include/minera/log_skeleton.hpp": "0b7ec05d9e4cb5b715bab831078fb9648ed3c9eae6fc6f69c80526b867dcfbe4",
+    "include/minera/log_to_features.hpp": "ac91f437ec84a68102555f13839aca5d2c33e6addc6274c6050427a7b2fad1b7",
+    "include/minera/log_to_target.hpp": "3ac2a933e044dd914c9ad150c595986e9a623a2cfb9884c69d173c79aa3abfcf",
+    "include/minera/log_util.hpp": "022392cd61733787b6c541eb8f0161ba68a76865831a93061c4159b89dd753a2",
+    "include/minera/log_util_json.hpp": "293442c8a34a1ccd2508c5241f7a13ed05858b4de4292bacbbf90eced65d2c13",
+    "include/minera/ltl_filter.hpp": "8f386542e3e1d374388c2bad6032ad22ab33ed09a38d25751afb2dd7ef676d76",
+    "include/minera/minimum_self_distance.hpp": "2af231ddd541ccf369f34b743ecd7b864435abcd0d2cc92132f16d84ffd4196b",
+    "include/minera/model_decoration.hpp": "6a626ef8d2e6d4e7d38b0cba1638b76c34f236177468ca01a690ca8825073b76",
+    "include/minera/monte_carlo.hpp": "ecbc99aad9bba3f3019f8f504ee4258641ba93d73c10897d609d0ef3dc756271",
+    "include/minera/network_analysis.hpp": "9b84bbf64a83fb329c5ea08b57cb0791d590343707b347efbe3ccd5903733c21",
+    "include/minera/oc_causal_net.hpp": "cee637fafe8b82f7f484663804e46d9946532ff0bab8e2918efef42608319dcf",
+    "include/minera/ocel.hpp": "a9b0a045f6bc541729dcfad2f98f72a48702e383e3662c222bb9fa3e50b39dd2",
+    "include/minera/ocel_csv.hpp": "4d3c71f8007c3ea1f7a8f2d415c8685c67bb33d292d4fa152a7cbca7f16583b8",
+    "include/minera/ocel_features.hpp": "b7f4766de2599b233b9b970f743b82f05c5dda744f92da4c21f1b8357aa4190b",
+    "include/minera/ocel_filter.hpp": "fd9b93e03d62558ca96039cd707d5093be3580c14c2f4edb8b2cd6ee7da44cd9",
+    "include/minera/ocel_playout.hpp": "c6198965364be8f0a05315ebc43fe3cdc5ff9450753a8fe10b33f699cc2b0d7b",
+    "include/minera/ocel_query.hpp": "b1d45db217bcc5579ef628ac43db4c83a5cf29f28c01d5d702bd5d835455e482",
+    "include/minera/ocel_sqlite.hpp": "8cbfa5db2e959943576332326327f1ce213b4526f6a57fe6078c84736f9eeedc",
+    "include/minera/ocel_statistics.hpp": "7a75e0adad2cba9cf996d7df3aaf06a0c8258ace00265eb81c980e9b404a36c8",
+    "include/minera/ocel_transform.hpp": "ea094f0ac598624d4287cedf77381b6da90836cc361b29f61e59c6b521484a56",
+    "include/minera/ocel_xml.hpp": "fb3013480fec67d0a5954395e182d75cda335a938a71f3ce326301bc571c99a7",
+    "include/minera/organizational_mining.hpp": "6701b52c69e34d395203049e99bd90fb838b47fe0e7deeb62859f50e51ee93ce",
+    "include/minera/overlap.hpp": "c01aaa25a3fd5de1059d447122cff8cbf06d0cfa6b67b3e79df93b39a2b63c15",
+    "include/minera/passed_time.hpp": "64eec159bc39dbda6302bb0232eff9b5f5f138e366e1bf51faf293a2966d0c3d",
+    "include/minera/path_filter.hpp": "a7ecea288720c8f763326b10636f39be03f13e4f2b6f3fb2559d420c78d6bff0",
+    "include/minera/performance.hpp": "b264629ddab6e32da4cb7320cd4e3325099eaabbdb3745825f5cc41fe5207074",
+    "include/minera/performance_spectrum.hpp": "38c5ec67484ae4559b09e5a566951fb189ac9d5b5a13bf62f165405ef24b38ff",
+    "include/minera/petri_analysis.hpp": "6e9e9b24316a4ac0308c2e64e8e9041bbd019b60760307b33b3657ff3678acee",
+    "include/minera/petri_analysis_json.hpp": "3cbf72584f8d112c9661ee79d01c7414092428a4c3dcc82b8f75acdf21e230d0",
+    "include/minera/petri_anti_alignment.hpp": "cba14f09cf7ec7937734ebcc74cb7dc360c37682b195c9ee3758d5a8de78e53b",
+    "include/minera/petri_multi_alignment.hpp": "3b2a4be215a174b497f4e1604bc9cf0b0ff0f4a18b0539389b6d9335eb3e27be",
+    "include/minera/petri_net.hpp": "7293af391239e5520d109ae34d58213c0d601147aaca114f5e595094d9077d0d",
+    "include/minera/petri_net_reduction.hpp": "020ef335bd0199486b1a6235f3fc092e3ce3903ddb631b5edd377f02cbf60da3",
+    "include/minera/petri_usage_comparison.hpp": "983e8e2a931377dfb8ddccd001ed654990a9db7cb9210bb002d9cf4f0ba1c3bd",
+    "include/minera/playout.hpp": "5c1a76e75b577e028c857d090693895fd07393dd807dfee03dde5ae14799b5c2",
+    "include/minera/pnml.hpp": "309f347eddcb71f4c7cb35ba4fb7a53be212cf62212a3ea095d0d9d651eeaea3",
+    "include/minera/powl.hpp": "0e8942650cb18a46cd1dc79449c863704a67d7bc8abdfb23beb4396b40cc785c",
+    "include/minera/powl_conversion.hpp": "95c7d83b6f07e8711f1f4a7a966833bcce7daeb1dd0c59cf892715a5f30a9714",
+    "include/minera/powl_discovery.hpp": "fbd56bdbbeea32d9d47bcc1994d3cbc6b4c8fa9a0d9be8634c31ad910e9a3c2a",
+    "include/minera/pripel.hpp": "e23ed7a81c6eb09a2526dc89a7a82c20ea7187b34bc9d168edbb1b3ea24fae05",
+    "include/minera/process_cube.hpp": "f64822a164b1e7e020835be98cd016846e4f5b6e495d565db68106835a7cad91",
+    "include/minera/process_tree.hpp": "1c39d78e03dbcdd5383f27f929e2bf77bd291393a0216e8332340db9d9b68c9e",
+    "include/minera/process_tree_alignment.hpp": "a875271cbfce42210734087bfbb66d9d1e9f3e345ba34b7be29bb480760745a3",
+    "include/minera/process_tree_playout.hpp": "2fe7fe1e43daa2cff83e3512981a7fbac1418e40de79961840b925d9d7775cf3",
+    "include/minera/process_tree_reduction.hpp": "bc6b9929dec5cb202e1b77a4d9276e0bdaca9bd111e71665d4d43ea8733f8897",
+    "include/minera/ptml.hpp": "97460780a643b63cf3e16e78792fa19612ac5d98ec2c264661d9f1531e8c443e",
+    "include/minera/random_tree.hpp": "cad5b41653c2db0dade6bb864796e960f58d0212511f311c11509bed277dcdf6",
+    "include/minera/repository_history.hpp": "399215343984d568e60b6c82c5ff610af02c1c721af03b2ca89aadc43c3c82d2",
+    "include/minera/request_params.hpp": "a3e89702133f102608c73a97b6f8f2da71e510a65dbf456cd69b184d2c8b92ac",
+    "include/minera/resource_analysis.hpp": "6ede4e591d6d3d33f334cfe0318b4dcc9ae1174e03bb92ef9195a4b8e4dc7719",
+    "include/minera/resource_profiles.hpp": "9a63b3c031a74922ae394388d4a241b136e5c7356ef6f7581a5b886d1e758e88",
+    "include/minera/rework.hpp": "6e13b7b6a59586615047bc0c27a836ce79b26e926fe30ae4b1d85a9ab6df4c10",
+    "include/minera/role_discovery.hpp": "2a0c0718867a0cbbe52e66d1c864fb3117955ad1cfb05a6052db265db913e879",
+    "include/minera/root_cause.hpp": "ef8f2bd534cac044f2c72a9e89185150f945f9b6b21daade41389dc45b76bbe7",
+    "include/minera/saw_nets.hpp": "321f34ec4cb6618396ec16d7b676a2b4a3748d68c488cb33b986594afea31a04",
+    "include/minera/secure_random.hpp": "2121756e79ab6b03f737c53a996708744560f870483046ac63d3745b34e052f0",
+    "include/minera/segment_filter.hpp": "3d42fcf03e7cb892bbb2d53010969459bdaf08f9c72cfc94223ba9e9bf2c6a04",
+    "include/minera/service_time.hpp": "9c7040a92325fa0877cd1d89ec532cda139a187566d15d6063c679d2907b2245",
+    "include/minera/stochastic_map.hpp": "d0887c542e322a3438780004a7b59504022d7bc4d475fa6db826352f26b86216",
+    "include/minera/stochastic_petri.hpp": "196c61f5e88215543f001d3317c63049ab75680308a31a30ea4b3a8d2950577b",
+    "include/minera/streaming_dfg.hpp": "2062497cfa3ab3c08992aeeda8099682d7ecf850395a91ea220410262d330942",
+    "include/minera/streaming_footprints.hpp": "ab8f0822fce3d35da38d51eb1c46e14aa672f5295e5b484083c649d300360260",
+    "include/minera/streaming_import.hpp": "92f19a3b8c909332313b772922281d5047208d7099fe6609ef16cdedc0fedf62",
+    "include/minera/streaming_store.hpp": "5c08db13930b48b1627144bd04ad542eb3d4176816dfc936fe0f2b0eb8a83004",
+    "include/minera/streaming_tbr.hpp": "1c044bca491d0cdb3e70ecf136c3775019e0bc9ace452ce69f05a16666bd2e5c",
+    "include/minera/streaming_temporal.hpp": "1b298193bc25b3698d2bb1426c0a6d985db7538c0d29ee988d3a65b5192b2a96",
+    "include/minera/temporal_profile.hpp": "b869aa8c3594d17b02c0f405467320d1683753a35a9693c1a395e84e96af98e2",
+    "include/minera/timestamp.hpp": "2f4e0f4fe61814be71b2b4ea1d4c8522b55b8041bd9c31364c22d67fbbd0bb28",
+    "include/minera/timestamp_interleavings.hpp": "c854eb6ff69f22f2d9b37df1dac7b8a2e1ab32013719ceac2df157152f985b7a",
+    "include/minera/token_integer.hpp": "75dd2ab5746295e01ab1136e777b73d855e671f38aa20e814ff3184bec79bd27",
+    "include/minera/trace_variant_query.hpp": "7adc509b46ccf3e95d38de7a364ee7750044baf533a493e968bd37c4d0cb1e85",
+    "include/minera/transition_system.hpp": "9e40fc6a877e22b61332cc2b5e579b0fdf0c7376306f90449735102671dfb36e",
+    "include/minera/trie.hpp": "6cfa3a43a74cc91034c78d1c51b509d5e88e64093f0c23bd927e2d14f521280b",
+    "include/minera/trie_conversion.hpp": "48421250495fa29dcd17ad62334ec1906c920fabbfb4349a4c72968b60aa5c2d",
+    "include/minera/variant_statistics.hpp": "20e187a48fecc903d14b25ee290f62447fbd20583e5d9c7f542b3fe3a036e734",
+    "include/minera/version.hpp": "fc956d6b3d0546fa8a91a7966249f8172718d904a23652af650b0926e9dd58a1",
+    "include/minera/windows_event_log.hpp": "f2de3135e09f35378a8e6ffa477b7b38200101426d4a5e50ef4070bfc74c1fc6",
+    "include/minera/workflow_history.hpp": "7b1c658ebc7a84d50cd0a13b8b19974fa9a18ba65f5b426cda8f3edbabc9a929",
+    "include/minera/xes_event_log_importer.hpp": "e05194df04c4920550eb99a0e8cdf9251c044600ee36e4a9f01027624c1b1384",
+    "include/minera/xes_export.hpp": "eba266e1d5f6af06b064ecffbd97d31d7771f5b60b920231bef9b2a82b4a3fa6",
+    "scripts/generate-cyclomatic-unicode.py": "67201f1bf77c8a960b38553ea49c78d3095aedad8042f96f9aac9e1d9de82209",
+    "scripts/generate-pnml-decimal.py": "43d13855b4bdefbe3f0060ac1ddbe675f08719192781aeddb62d12581b053c1f",
+    "src/README.md": "cadd1f011e5b505bc591a9ae6bbb41c15aa3ade660ca567179a4b524ab2fa802",
+    "src/backend/activity_split.cpp": "890b526938327fe727c5e76d1ad67c67d9cd0adccff8aeda5adb31262431a549",
+    "src/backend/alpha_event_data.cpp": "27673b148231f31ca6ab9f5b789cfa5d927e71e5741ffb49da66ef27134066bc",
+    "src/backend/alpha_miner.cpp": "05b392bae30209a2bb5638e1b9f3a21620d440805fc4f3cbcb1b6650215cb693",
+    "src/backend/alpha_relations.cpp": "b1a7addd0532af034bdc76d6232ba7571539a0aaac2033e3f3cb9d52ec61cb2c",
+    "src/backend/alpha_result_json.cpp": "7689d21f6e67576f3b6a849fec0c8d071d426d9c3e1202c131c7fe60c3151453",
+    "src/backend/attribute_distribution.cpp": "cd09536690b5d880e15a7dd8a927ac5bd2a7736071882b5925cf2154d7fae621",
+    "src/backend/attribute_kde.cpp": "e7532224382ff90dd7f8e21177134a48b93ce0c4f19b097a0455799ddad58d0b",
+    "src/backend/attribute_statistics.cpp": "b3a4a4b07c55065fe6c597392395bc3f4b4f297f31810c33e3ddd24f39fc9bc0",
+    "src/backend/attribute_value_repetition.cpp": "cad857c405a0dc3d60becf108945cf55c7ba548ba643bcccc9ed0d4be8340429",
+    "src/backend/batches.cpp": "7c39a2dd5c3c204fb1082f7ed8584ba9aa412031f0642b32047c2574bbc1f16a",
+    "src/backend/batches/discovery_registry.cpp": "4a1f01a2428e3c1d9a71d826d1f02054c1cc5250fc477a51aef3bcff023ec266",
+    "src/backend/batches/discovery_registry.hpp": "2f634603b92536ce4572c1ff43674bb9003dd56078c59b3dc413b98b6f79a1a5",
+    "src/backend/boundary_activities.cpp": "e56aff09df2b4241835d6edd33d9196a860cc4c2ed1d63851e6b91487485171b",
+    "src/backend/bpmn.cpp": "ecff2511af35e858612512b3b846ae5cd84168444765ef323b16e79751ae0113",
+    "src/backend/browser_history.cpp": "d2cf502a43a5514366fc6596348ac79d98ee1ce6165177e6dac982a8a4a6903b",
+    "src/backend/business_hours.hpp": "e1194c03b16dfeaaf9b4243c83202819a7588dc332f0218e1170302c2dc520e3",
+    "src/backend/case_arrival.cpp": "c64c4aaa1ed13f936fed2101324f032541231b3385014a41e4fe046274988489",
+    "src/backend/case_grouping.cpp": "63bbeb53783be6e1564584bab27c74906ee033c8b423246cb28320b97290d12b",
+    "src/backend/case_relations.cpp": "548c3973dc4c2b9879c6961b3b7e685ae3454be1f09406009f2e53af69930b09",
+    "src/backend/case_statistics.cpp": "831c4dea777daff85f6f72fe7ec0f46a19c63c4b8ac10f4e3d43da2141c418ea",
+    "src/backend/chaotic_activities.cpp": "6a3ac48955e694481130e2354d403180cf0601a85df24f26bc361882641c11fa",
+    "src/backend/clustering.cpp": "48eb4b4a03229753c417bd5252ce1c0e1f20588cb7a462e0ebb8402cfa07e318",
+    "src/backend/communication_history.cpp": "281b261e9029bbf46297d1a23cd9773665b2454b917deb6f9e2ec04ab8bf18e1",
+    "src/backend/concept_drift.cpp": "a0b0d3a07406bcd2e08563a020f76a2bd31e8a83b18c5fec676d77e63cac9f62",
+    "src/backend/concept_drift_table.cpp": "ed409c3a5a997bc52a4fa60e693773d696544aed191ead2e8a396afc9653f927",
+    "src/backend/concept_drift_table_limits.hpp": "84b334a3f9186e9412921c7b047116719d76d35010d7bdc43514f0c147ca29c0",
+    "src/backend/concept_drift_table_output.hpp": "3461bebe6851860d1696ecdd394e35b1512227f5e59c7e6705584879a1f9ce6f",
+    "src/backend/conformance.cpp": "b36230030f420ffbdb27eff74964b56208a590f6284ec9eca21ae074897c1188",
+    "src/backend/correlation_miner.cpp": "891f26b4adf8990b1d72eeac90ec3a094affa0d46f9192ff057e704939daf8eb",
+    "src/backend/csv_event_log_importer.cpp": "b4a60f7b8558afbbbeb94f31a12c7366322e68b0743768d4d0a1987b1965c21a",
+    "src/backend/cycle_time.cpp": "21fa9c28e7c7f13f79cb3555e95cdca7b346c4de5a87f07f19ca555851468c34",
+    "src/backend/cyclomatic_unicode.hpp": "f2962ed0e21dc4c854633327ffb7162917b43f47ba1bdbd2e3797743aa2583ee",
+    "src/backend/data_petri_net.cpp": "cd8d28600d5141399bbe150371b5783833ecfda34c761c3bb3dd9883c5ae69d4",
+    "src/backend/dataframe_format.cpp": "2fe17fa5f2cbddf449deef65487c4ff9edaa275d2967b1822f519456c4f75265",
+    "src/backend/dataframe_format_json.cpp": "830d557550f45597940cd5ba75bfb9572e2647764c0ec9bac3503abd2b50d5ec",
+    "src/backend/dataframe_validation.cpp": "05505a4d251572268164c87133e9f16212facc7a8577d1cd9c04381ad3887043",
+    "src/backend/decision_mining.cpp": "04098790079019ae34e019028853c77955a1c952bf8f40d191dd08fc472fc453",
+    "src/backend/decision_replay.cpp": "c3fe5b1e2177d70cb7327b8ed597e9f8eedf0283217434976802892ed11f3e68",
+    "src/backend/decision_replay.hpp": "87ec7d7d375c0164f86cca7bdb291749dc7a9b937f4dcb538c396ef94687bf55",
+    "src/backend/decision_table.cpp": "a42afcf49f514b959f791dccb403108916a77e5669d07b4597e4df91ed89f54e",
+    "src/backend/declare.cpp": "e4208ffffe245746c1305e35033e39f3be183bd30a27153762e72456981fbe80",
+    "src/backend/declare_playout.cpp": "8266d849ef03df79ed22d5334171d51364860629df3170cde5b97d80b58c81c7",
+    "src/backend/declare_streaming.cpp": "6190033a578f5b09136bd5360fce459e946b3c87e8ed09011b7a0f5781ed1adb",
+    "src/backend/decomposed_alignment.cpp": "75fa9f53490b1a8e3baf2024552ad9e2d50b78f84aadf1a79e737665901131c8",
+    "src/backend/dfg_alignment.cpp": "1c7573a8ae885f7d19e90cf714d2c4e753c7b51c69458e27c17d1d4d4e56c896",
+    "src/backend/dfg_conversion.cpp": "574d8f4e348b7c692b7006a6771f59a218c8b24c80ddcef4fb85e42452181d20",
+    "src/backend/dfg_dataframe.cpp": "c76e19304a4161df8f2c6ca7e50defc463aa89ab3ba5d07fb556103510755611",
+    "src/backend/dfg_dataframe_json.cpp": "c8fed02dfd5f1b59156b7e53583311b70df399810c64b9f9fe87db98a8e93f11",
+    "src/backend/dfg_filter.cpp": "9e93bcfcee2d67688898c3c70a78e24e415dc48e96985c50d1d6009f863e2fd5",
+    "src/backend/dfg_io.cpp": "a8de74a6e33dadfb2beea7f433816d032d21d59889601807fa4f058f2fdedd90",
+    "src/backend/dfg_playout.cpp": "97b6f47bed20eaf3b684cf731e9241c065f9322c30dc3858a973c24e16d1a7a8",
+    "src/backend/dfg_precision.cpp": "a90763783a79a1b81de07c162f1b7c2e45d692a5ad952575531aba0d37bd52b4",
+    "src/backend/dfg_utils.cpp": "674edef9a0f017189a6e78932531844251bceced0d10b63596bc7de34b011b34",
+    "src/backend/dfg_variants.cpp": "679512b7fe5a132c7482e0f9d5c959bfe37c11316710c77eabccb54d58e504ee",
+    "src/backend/directly_follows_graph.cpp": "4069693c623f27ccefbdf03c6858c12dfffadc761a107c8f507fe065c2596135",
+    "src/backend/edit_distance_alignment.cpp": "32654a2b05536e5ebea850b3b192d57878bcaec458b6c839782cb289f6c09b30",
+    "src/backend/embeddings.cpp": "6b3ecf7170ce8d7cab730ec3187e32565fcc249b477e67d695b5848c13eaffab",
+    "src/backend/enterprise_history.cpp": "ff21bae2b4b9055742e9ee8e558a289f4d7644d1028013cb7319f93eea5a06a7",
+    "src/backend/evaluation.cpp": "e54a29d551618a55002919fe236b72db62b13465294a4410619d8956cef84759",
+    "src/backend/event_data.cpp": "1dc9f875b22abc18e212ee8fd83a532d878625cd025e8ac61b3bd3def863b483",
+    "src/backend/event_ordering.cpp": "cc8fd16360a071b57d06ce8026b8229d70ac5e57814794ea7b7ee29e1f85c4fd",
+    "src/backend/eventually_follows.cpp": "433d5157fb8cac4fedf16ff4c103ca5121d7d40d439d47e42e77f6731471be69",
+    "src/backend/exact_count_ratio.hpp": "9eb1363a5c0221e93d810abd2dc723478e27d5377db97b6a69fc5eed65e184b2",
+    "src/backend/exact_mean.hpp": "4e1bacd098dcf123ce3efa93d21bea9df6cae782c8cf10e776f9c848354a0be0",
+    "src/backend/exact_stdev.hpp": "6773caa96e83353a60f47f6fa41461b44dcfb9d884be74c44d43f1e23cb4e6a0",
+    "src/backend/footprints.cpp": "05fc8b878ff2a1ee30914c32ced202b011f89733173d0fe4064ae739a1c68730",
+    "src/backend/footprints/conformance_evaluation.cpp": "336b54f7a6a8b3537c733bfa2ae7f216087c1eeb42bc38f742185a9d0fc54988",
+    "src/backend/footprints/conformance_evaluation.hpp": "3fa41b2d698699d0abeffc2581ff761e0702362d81a872d57d1c5de8d1445e5c",
+    "src/backend/footprints/conformance_log_extensive.cpp": "76c3143d81b3b002dccad513391afbfe725ed066d5f40e674a5b8c37d6d9ec0d",
+    "src/backend/footprints/conformance_log_extensive.hpp": "cdf27903aceeb9f7afe1b4ac877ab536b51edc98e0c3018a347190e793e7548e",
+    "src/backend/footprints/conformance_log_model.cpp": "c070ad0b6adecda144c461195f32fdeee185d29cc1aaaaa3ae895f83886dffd4",
+    "src/backend/footprints/conformance_log_model.hpp": "75b55a5cf9266c6deadc92938667ee6fa21f3a2fc555d459f833fa9c443add08",
+    "src/backend/footprints/conformance_trace_extensive.cpp": "2468d6eb19059b70cf726c892d57012c5f579fd071185b2803edaba4f28a76c8",
+    "src/backend/footprints/conformance_trace_extensive.hpp": "748a6f630078fc46c4af7a9af10e7f1f4bdd8dbeec611837b49a1bcfa296cc47",
+    "src/backend/footprints/conformance_tree_visualization.cpp": "0eedc94cdd1c841c41a01bc681036c11ce04ddc4b6d6c2a8f76a3763328a4783",
+    "src/backend/footprints/conformance_tree_visualization.hpp": "f6483936c67e16ff2b5ea14b2f47c42c11d23c5251efa176f18dea3de80b21f3",
+    "src/backend/footprints/discovery_log.cpp": "75bac0d4d3be199f655d7cc1866d00ea4346d080a59b366d016a8c3f6908ce82",
+    "src/backend/footprints/discovery_models.cpp": "a585902b7202735cb115d90a09a5590276dad752706190bbd3f0d555c6180fb7",
+    "src/backend/footprints/discovery_registry.cpp": "1de6da0a2384bc8a07992abec401a3d2b102b40b07b931964ff44f415427aac3",
+    "src/backend/footprints/discovery_registry.hpp": "6e4705f5b56fa72ea1fcf09775d07d81b7e318ba3d849ee269a8986f83decf5f",
+    "src/backend/footprints_models.cpp": "fe51ee4b7f5842f11206b191c38a460b24435ad7cf91334b52c2937fe02a0186",
+    "src/backend/genetic_matrix_conversion.cpp": "0c0f93aa42692fc9ab9cc5316daab011bff5eb95431fbf9d0c8244f7df2b0483",
+    "src/backend/genetic_miner.cpp": "1695842cfb1967bd9ec9a038e4d31bf8b27e37daa87d5f11469ed80caa8a9bab",
+    "src/backend/gzip_codec.cpp": "125334e6d4fa8e70d785b62902d4ff5a8c4a5a417b6a68526a125ad0afaaef5a",
+    "src/backend/gzip_codec.hpp": "f39564b78aa7ddb08ae9d4bf96793d316757a549537424d276ef9bf550077660",
+    "src/backend/heuristic_miner.cpp": "9cdd847797fa4a6164caf0b4208ac9599d51b5d09b666cdb24cb0a2a4120bdb3",
+    "src/backend/ilp_miner.cpp": "b068cff777c6819128f6a6fd06627479ace39ca5d2dc47f64cf31339209a17f7",
+    "src/backend/inductive/semantics.hpp": "101d8b0b6648ace80738e1d7aa4a2c7870c39cf0e1f492039f9c16c28146080a",
+    "src/backend/inductive_miner.cpp": "d74729339e57cd5bcd376dc595fe9a08902d8c882174cb4becf98761b5fa8a2f",
+    "src/backend/interval_tree.cpp": "244563bcedf60adaf64f6d1b011356f49dcd0ab25e92302230a5114e43226c8a",
+    "src/backend/json_export.cpp": "3a8c89e0eacfa16fc1dfb4bca1d921e44d3e7ba54cbbd63b6a5e7a303c8fe2c2",
+    "src/backend/knowledge_injection.cpp": "99af437c0e9d7ffb5963e1dd8cabe8fa63722e96f17d1dd78b87e15ae3d9e539",
+    "src/backend/label_splitting.cpp": "a6547c3784e113c72cac404e645fa1943f105a941e45b2cb59e72b14aa3ba3eb",
+    "src/backend/link_analysis.cpp": "cc5836dec7b4e73629b26600b36ed16e347e3f36581bb126ebaa5ba68113d663",
+    "src/backend/live_stream.cpp": "a0dd78418754c6d0099afc94f8e1b3aa613a40df95261bea1896d4637fe8c661",
+    "src/backend/local_diagnostics.cpp": "7718fac8612d04a81bdd77c0e813fa238541f4e9e7ac780851e49ce4e0b9e83f",
+    "src/backend/log_conversion.cpp": "ffd9b16fe3e52a41c955ab928e0b807719987644e8d710968399ae7721371cb4",
+    "src/backend/log_filter.cpp": "a7e911a27e976406449623a13892b07a36326f15b19264a6b282a379bb24438f",
+    "src/backend/log_skeleton.cpp": "2e031e94757c048cb3817440925a210901a3483b4043edfb184cad109bd1d415",
+    "src/backend/log_to_features.cpp": "203610d7e032746b4f3d430e7e011979ea2d97cd739639161c37625ea1c14d1e",
+    "src/backend/log_to_target.cpp": "ab461f30b0ee1d90d2e0b9642ffc79624c0622faa669263b1dce8d0365403c1e",
+    "src/backend/log_util.cpp": "12b378137621dcff429cfc2964317dc7c710d0f198f2c3b1c00e43775253fddd",
+    "src/backend/log_util_json.cpp": "163d5bf174224e756afce56143c12d26d8b1ec9fc58f4b273abac12ab62ebee1",
+    "src/backend/ltl_filter.cpp": "1f06647faa3dfc9278e41abc92c19114cd76c2248640c3a951281ac730430584",
+    "src/backend/minimum_self_distance.cpp": "c1d3164e23e2bd0664fdd3a863cb8628945fda563f8f593f3f615cd2089b6a03",
+    "src/backend/model_decoration.cpp": "d259912de72567778731573fc44cd3d7fa8c0b0089bce07eeb1833ecc502068c",
+    "src/backend/monte_carlo.cpp": "363da13e7265f2eed10a87db55fa433073f40e6d9944644201816b33591a5ade",
+    "src/backend/monte_carlo_json.cpp": "d9fe07bd690e397147110869457781f311c95ca762ce049207bc9adefbf1fb10",
+    "src/backend/network_analysis.cpp": "9fda8f78438dbac67d07067a966ee3e6ac9ee8189c21654057b80b17808da518",
+    "src/backend/oc_causal_net.cpp": "35c2940e723c5ae1c2682cb66013e5525cb244ad79d73b8de39e51bec19afe1d",
+    "src/backend/ocel.cpp": "9724d0b65418ae80c4ff0adfcf1061dcaf6f28dd5718d39b88c23cf890bd23ed",
+    "src/backend/ocel_csv.cpp": "8496df221d7d97bb9c37a1ba7cd5b1908a293226b62caa461b5bb85ca942e770",
+    "src/backend/ocel_features.cpp": "08a092e91bb0cb978897443995d061922f1b9e25f79d137fc29101a516f23f61",
+    "src/backend/ocel_filter.cpp": "71904d742b5f688809afd1698bb3cd1ec0e9f7d3d3bd25ff64774e1f2665f8a5",
+    "src/backend/ocel_playout.cpp": "fc6927ad9777e70dc363077ec88b38ce8c87d51eed5e8823189593acd45fb639",
+    "src/backend/ocel_query.cpp": "c4cba77557df9e4d6517939d0ec51266914b6223739e510af4de5da588295ad0",
+    "src/backend/ocel_sqlite.cpp": "20f3b7942c7166cda8a12ffd54c8fd50b29f968270680c09fecb60d379b50096",
+    "src/backend/ocel_statistics.cpp": "ab9800b2526308e96383af3ea0afee8aedd646bf93955324fec0244a2984037c",
+    "src/backend/ocel_transform.cpp": "9e5317667db188c6ab8338ef54d4c2514626b1427c96040cba9df93355be04be",
+    "src/backend/ocel_xml.cpp": "8270531dd82417cd1b0d46e1d3a9119127912e24c4ab478b89eab6c88ba768d7",
+    "src/backend/ocpn_projection.hpp": "0045bfb3e7984dc609a724ac83cc5582da3dab45e7adfa100cb5638c52fe8b36",
+    "src/backend/organizational_mining.cpp": "419a16b6e6370b6ad3d0c76c5c8a05bd3db1a85d1dafb19996e1c56ca433ff81",
+    "src/backend/overlap.cpp": "ee871fc4d520d867f3560e80c55ce2fe00701705ca4ea1e3ac06020fd1828d25",
+    "src/backend/passed_time.cpp": "2c81c0cbae1cbfc82489d28b7033f7a4996d126e83889f5eaa5889fd9e1dd622",
+    "src/backend/path_filter.cpp": "1ff11efa6d6d21743a5c475206aa90107f77f7a31104e033c4c7ebc77ad44878",
+    "src/backend/performance.cpp": "b207b6f0550750a54c34b4a7fa78e6ffa6e3b75f6c2c83e70b547126c6a534eb",
+    "src/backend/performance_spectrum.cpp": "53cda6f4c7b7b710c4688f4a7a924d6ceea6b8769a0b9f832c57c0acd95cdb2a",
+    "src/backend/performance_spectrum/components.cpp": "39ecbba584049fe3ba7cb66ac50863684df832acc0b21ac4681b404725363480",
+    "src/backend/performance_spectrum/components.hpp": "06da813d9da886764489ca8ed51096999eb036fc2e6a51315bb662f4d2bdeb6b",
+    "src/backend/petri_analysis.cpp": "f7d2e4d540959c74f0591f0ec88cd0357c6c495d35d1cadac87b23e3c9af36a4",
+    "src/backend/petri_analysis_json.cpp": "e44040828350cd61c0e451085f390e79a23f2cec87bd687a72f499909fbb15e0",
+    "src/backend/petri_anti_alignment.cpp": "87d8f46ffe01855a78c1df21e7ad2b71aba11801daf87fa6e83e20f2255c4b90",
+    "src/backend/petri_multi_alignment.cpp": "2da3d17be38eab29ca98d32f05fb8ee99d459cd1af3e21f58500653b4153db8d",
+    "src/backend/petri_net.cpp": "851832ceb5e7540ac18a5d149992e54bf2e09c6933c506fd483de8c97eb83897",
+    "src/backend/petri_net_reduction.cpp": "a4f4b5b4ae5ae1290fb41f1bcc4ecb7a2eae1872eb7d8bddc112ef930341e7f5",
+    "src/backend/petri_replay_internal.hpp": "055c85c3d85ca443a4b4fa76bf3b3d6b60148d4d6b33869e574e014307bfc09f",
+    "src/backend/petri_usage_comparison.cpp": "2dae9ce3ee825e16e489198c8f3d65bb0f5462ce0447129aa5947e8a3e5c412f",
+    "src/backend/playout.cpp": "e8ca1c3aa17aea45773787c41d676ca82aa33dba871c2e105a9f23e8ddf1db15",
+    "src/backend/pnml.cpp": "5cec1b6a91af6eace4f33df65654448a5dc7ebd475565ced4991c22725d5a070",
+    "src/backend/pnml_arc_weight.hpp": "f19ae5e047711e91ad1816f1f8e30a98df491472d253e8658b7613159fe99f02",
+    "src/backend/pnml_decimal.hpp": "68c5b8b50b1e0a5df4e6e59d928d4962ace8fa94ad4e63f55a15f51eb26b7970",
+    "src/backend/powl.cpp": "d19f9745b9f6336858dafb9a050b23a13ca6803962550c786a83698ff6263060",
+    "src/backend/powl/semantics.hpp": "bfca9faf0f8cfc574c34c6b9d4bd43a360004ce6610892c6f3057ef446634aa3",
+    "src/backend/powl_conversion.cpp": "dea47f255e663738658411eb0744ab801957f1d800f4d50188e7f65057345d07",
+    "src/backend/powl_discovery.cpp": "c4240ecf265b9be742d2672e1fc1e6405c2d1acbb7642da262423c561f292840",
+    "src/backend/pripel.cpp": "a1f6b22878c864de1679d80c3e68d8f3b1c7a8c989ff56a5a7a4e3da1bf3942e",
+    "src/backend/process_cube.cpp": "2a4d73fd7e59ca413ef136c161a945ab8d5d54ae190a78ed115ee6842388f087",
+    "src/backend/process_tree_alignment.cpp": "52df9a2a0109fbde834682c85aba477674a2c7a6e9f1a8385ad8812d4b27646e",
+    "src/backend/process_tree_playout.cpp": "fda5a3ffc6f3d7e87fc49e89a6027643e85621861fa77efa854aa66254deb7f0",
+    "src/backend/process_tree_reduction.cpp": "21b23cd34c55735dd86e97681b69d15e084a8afeca53f0da06cb70906805d38b",
+    "src/backend/ptml.cpp": "96dfe706661d25abe6408c58400efc8392bd0ca25bf999b7b98ad667329d8c4b",
+    "src/backend/random_tree.cpp": "8af2a81614b2a8ae843d890fa3d7c50f72d029f4f88291c902bd8263fdd1f805",
+    "src/backend/repository_history.cpp": "af124f841994f60615705572188c358fb3e57bf043383dd31e31b424aa3c158d",
+    "src/backend/request_params.cpp": "79584eaa2f13d87ac4c6a0eabf94c7d15a74de3efbe5f7662ea6081e4942939d",
+    "src/backend/resource_analysis.cpp": "b8a512a6267fd75bc9b3d0a892f9d37d84e86b4d398f85113e94dc81daccbf3c",
+    "src/backend/resource_profiles.cpp": "357afd7686729ad18abb489f04111667f7d78363875cb52d4d0e5b5c834598ef",
+    "src/backend/rework.cpp": "f84f412a18fd7e2090c12bdf85dc502c6e0d5594f6544a01f9ba3668de8d4d56",
+    "src/backend/role_discovery.cpp": "1cbcdabee641dca5e038c6f9d01f30be11ea86eea88be2fa25741c666b75d8e2",
+    "src/backend/root_cause.cpp": "fc1b31ee753f1dd823862e5e2ae3ecd23a9d73afb629e284403fcae6c6a3a780",
+    "src/backend/root_cause_trace_key.cpp": "df7020188fd1e1d9ca6ed1574e0e619d6481f798fdae70f1025d7db227d5a89c",
+    "src/backend/root_cause_trace_key.hpp": "10a343c7de3d289ee98e273ddb0645a6fd1f021d6aab681152f1a88195cc4321",
+    "src/backend/root_cause_unicode.hpp": "624bf4b78912fc682a7f604ad12a5e2e350430b16f9bb2fe21c130de62dd23ba",
+    "src/backend/rust_xes_unicode.hpp": "7680c04371bc79e39f3bbf880ed4f7e3546093bb7d3265d7fad284f4b6562291",
+    "src/backend/saw_nets.cpp": "3708e32755b1452f94484052295fbb48745ce3d6422eec05e25e7cc7b775181f",
+    "src/backend/secure_random.cpp": "9b07d8e811b162e2fbbdbf6c216f0bc567b6e0610ec77c47a54c8cb74e02e230",
+    "src/backend/segment_filter.cpp": "8378a29abf150231817f61cc214509e18f146a6b51d579fbd0b8835516ecd359",
+    "src/backend/service_time.cpp": "1e4150b9bff9b1657c98ace516d691448672c042dd330227f8bf24ae703bc50d",
+    "src/backend/stochastic_map.cpp": "6e057dfe0f0d177cef20de49a3c2a91b438cb8ceeab5894b8b9da0fc9f96648f",
+    "src/backend/stochastic_petri.cpp": "fb31ca298eac5bf8c8893baf61f5aa4353c8295e4b70d1d6397fcd90a37cd0b7",
+    "src/backend/streaming_dfg.cpp": "8c249c47597964bd676a80872ed045a924110b75fb17d0b89602ee506e6b58c2",
+    "src/backend/streaming_footprints.cpp": "216eb91ca2864ae25a0f8c5e3bfa1045c8f69f2245541317d9471f239b477a0a",
+    "src/backend/streaming_import.cpp": "4fa6bc388b413bd23a0017a764a6aa5498d51ccd003821da9feb2c6215266914",
+    "src/backend/streaming_store.cpp": "a5886ed0a41a1eefc69f32549ca6933115245ccbca98e16eb088a830544289b6",
+    "src/backend/streaming_tbr.cpp": "5da9cc55cf4f5bd18df48e61ab8d5895994ecb06f254479a727e88a6973f025d",
+    "src/backend/streaming_temporal.cpp": "22086b8e9cd88db6abc579f815ff146b6b8bf1b16c161c9d3b9fa9383afc2ad4",
+    "src/backend/temporal_profile.cpp": "25e7d77ec6358714e0006a186326839f3a04a33b5a23c580a994242e970b2f6a",
+    "src/backend/tests/bose_dispatch_tests.hpp": "4852b4866d9b2dbc35d9ffb9d2346db7212a9b52dd4b712c92d01aa920a4e065",
+    "src/backend/tests/bose_follows_alphabet_tests.hpp": "56bcc85015d12dea204eccea878082ebda9b691bc1f42226a2c0c726599143f4",
+    "src/backend/tests/bose_frozenset_tests.hpp": "dd6bff80d0d46acce1c1f60a4d6f323da40ad2bce9115a25a9ff2e684d28e655",
+    "src/backend/tests/bose_log_apply_tests.hpp": "ca20f955e0fb6b32628fa2fae4a5feac6b595441205bc36ef06afc011d4f198d",
+    "src/backend/tests/bose_na_tests.hpp": "940fb449c6ea84d5515f5960de59a8fc40ee11c7e42353952472b5122ab598ba",
+    "src/backend/tests/bose_permutation_numeric_fixture.hpp": "c7b41c1b769d19b0853639068aded88f369c7bfd7d3dd6971e0b7a705878ade5",
+    "src/backend/tests/bose_table_activity_tests.hpp": "f8df89f751b1e5281df05c0ff452fe624b9d53a18e1e4798043617ecffbbdc2b",
+    "src/backend/tests/bose_table_extra_tests.hpp": "b571d0ceaaa5c882510537ab7d6cad3850bb3a14178629b64d7d7f4ba3982563",
+    "src/backend/tests/bose_table_order_tests.hpp": "9a56969ee93e578ea8bcbb98736362dd8097b6ab36f7ff1570237fc6b5d5b683",
+    "src/backend/tests/bose_table_timestamp_tests.hpp": "7fc16562057d5e7fb1cbfdc499d9ae8fe179ecf03328b723f6e9c3f2c49ea6cd",
+    "src/backend/tests/bose_typed_direct_tests.hpp": "95b4816175706c36947f4d165846f97c16c50d6514b833662e5fa2bb8a418182",
+    "src/backend/tests/bose_typed_helpers_tests.hpp": "c4752daeb18f312669be7988b1ef5488dd650e006c042aa398237b68087f7940",
+    "src/backend/tests/case_relations_dtype_reference_cases.hpp": "e47dfba37844ac648ae35c081b04fc185306bc9ee1199ea7261adf3fbefa8bd9",
+    "src/backend/tests/case_relations_index_reference_cases.hpp": "26bd9a66da05416cd58db9f878a57584a7dd5bd8a80fd1a1d9a053e65608a456",
+    "src/backend/tests/case_relations_reference_cases.hpp": "781c0cac7c8abe4f41016951c3cf74c5dbd98fcd31075a7aca28c30ad34e8599",
+    "src/backend/tests/container_case_grouping_reference_cases.hpp": "c8569550f6f1768d33484cedc444c2e62266b76827b6fcb6e1a34b84d8914c84",
+    "src/backend/tests/conversion_case_grouping_reference_cases.hpp": "bb9651d323ebc1f4e16f2444d1a7d7f65a615178baa66900d2d8fdfa4d1bd2d1",
+    "src/backend/tests/correlation_mining_parity_contracts.cpp": "5d7494bf5dbca91d229df858a85535fa039715ea139f226825802098f42b8a48",
+    "src/backend/tests/dataframe_column_validation_reference_cases.hpp": "0c14652693455d66f237fdc11bbcd7ed147c256339c6ec49118a8ef3e202f4bf",
+    "src/backend/tests/dataframe_conversion_metadata_reference_cases.hpp": "98b4412dc35b13c555a96d28405d9a3999789b09ee364574a3aa5d29e9a654cd",
+    "src/backend/tests/dataframe_format_reference_cases.hpp": "80069c6de241d6d3cf2c591c9255601560dfb53155098ed3e1c4feafa928acd3",
+    "src/backend/tests/dfg_alignment_probe.cpp": "b53fbe2387dfb143223abfa2d95328c6f64f724ee244294aa7a30a7fe79787ac",
+    "src/backend/tests/fixtures/case_relations.csv": "091c60eeea612699247d1cc3c3031e707537f3916583e8e12ef5f961601fb8f8",
+    "src/backend/tests/fixtures/correlation_blank_case.csv": "31b3835550715853b2930f36d8f8c55d2ce02bd49d39f6e961a4e47e9c464286",
+    "src/backend/tests/fixtures/correlation_case_activity.csv": "ecd7b17b1f7fb812ce792ac9a6038443997d228681e598f89ea64e979bdcebdf",
+    "src/backend/tests/fixtures/correlation_classic_split_source_order.csv": "bfafcf3fd9f2627d0159f9f62ddc00613c2307f20ed00638938a42d9024f5455",
+    "src/backend/tests/fixtures/correlation_custom_case.csv": "7396acb3ce92524de298ebe9fd915f54189891f785015548821bdb9eaa31c7ab",
+    "src/backend/tests/fixtures/dfg_causal_custom_activity.csv": "4c0654a12bef696ce3fd8db40462fbcf023e64963836367674d6d43d169972ce",
+    "src/backend/tests/fixtures/etot_empty_graph.json": "1ce4c9cceeda691652af1973984340cf5fd4a4631d8a1e3aaafc2c3492dd7580",
+    "src/backend/tests/fixtures/ocdfg_empty_graph.json": "f1269ddb2e6ad7323a329656717345590c055565c48ef2a1a6a58ffebdad72a6",
+    "src/backend/tests/fixtures/ocel_split.json": "a7e921347188c01470de9b875845fd6c35f1ae8678e0c0a64392a90adcae9fe9",
+    "src/backend/tests/fixtures/otg_empty_graph.json": "337d9a46befa017d553bb6fb64c4c5ffc633025e4090be5b815ae5a37cc3a5ea",
+    "src/backend/tests/fixtures/temporal_business_calendar.inc": "0b6382b864003ae55952e6ae3e98fbc72f462bc669de01a816aa1cbbd24dd898",
+    "src/backend/tests/fixtures/temporal_fiscal_calendar.inc": "247824a2a143a1913d3c02ba8eb8928f21a1ddacfa0c8c01a855c96d9e995362",
+    "src/backend/tests/fixtures/temporal_frozen_case_order.inc": "c02adab633ef06d432680576de2a201734dbd3b29599b439414a21812829dd26",
+    "src/backend/tests/fixtures/temporal_metric_destination_cases.inc": "cbe9f5e1cff335e65af25d7377b5a93354f272d030ab6a6cfa4119eae86bcf9b",
+    "src/backend/tests/fixtures/temporal_semi_wom_calendar.inc": "4d4804d0e11607799c187e2ee0c8993a2a47108bc3d237d357fd711c18eb2dc8",
+    "src/backend/tests/fixtures/timestamp_interleavings_left.csv": "f620adb666a8d3cc2fc25ed1ea311509a27e6036655da139049a83bffedb19bc",
+    "src/backend/tests/fixtures/timestamp_interleavings_relations.csv": "03edd77b3430b0554cd8d6a7de16d3147ea9bf87fddb66b11f87fea6f7845c97",
+    "src/backend/tests/fixtures/timestamp_interleavings_right.csv": "088ebd5738dde3b79e11c95c38ed275880a1cb2c504a47ecd31bb0f491816ecf",
+    "src/backend/tests/minimum_self_distance_parity_contracts.cpp": "f803bb9748f6d5098ad2a3cb055e388c27906085ef06ef602adcb4d827e493c1",
+    "src/backend/tests/native_na_model_tests.hpp": "b6d9e9b9c128c388c2158678b5cd7e71b50e696f5e2d2f6fda0cf49fe2d29a44",
+    "src/backend/tests/stochastic_fit_probe.cpp": "7ce50ca288ec38c5d381c001e1898f9e5a980f7899cf1b5ab6b29030088774ee",
+    "src/backend/tests/temporal_alias_expected.inc": "1f69b5eb940d5b231bad62e93f432cb566ef459cd688914643ffd2780a9c499a",
+    "src/backend/tests/temporal_frequency_boundaries_expected.inc": "978cefaa59729153335328e00d51ec53e7323317ecc968552de9e8a3c6183faf",
+    "src/backend/tests/temporal_subsecond_expected.inc": "bc51610609af4f8c13e25afbc55356c93120b116a323f247278de1094dbe7545",
+    "src/backend/tests/test_activity_split.cpp": "66c741133a8127dd743cce7e34a7b24b98714cfe2e80ee97ada8d9ac135f26be",
+    "src/backend/tests/test_alignment_variants.cpp": "63fb53c9679cc544d9dd4318f7b5d48225c562537d90b86ad069d8762963c17a",
+    "src/backend/tests/test_alpha_event_data.cpp": "7668709fc8bb1f5c0880d6eb1a664fff0cd050e35b406dc2383d8f7f9b7ba12c",
+    "src/backend/tests/test_alpha_miner.cpp": "1e8109d980fa4e8632655a0b1eb2523346b370b3941f53a4db4453772bb665b5",
+    "src/backend/tests/test_alpha_parity_contracts.cpp": "666b336fdace74b6f7d2ded8112c993641bf2fd3d504d50bcc716450bd97b940",
+    "src/backend/tests/test_alpha_result_json.cpp": "8a97ab44a4de92eb749cf040fa71bfb5517ebf2a504e063c9b78aaf186bc7e85",
+    "src/backend/tests/test_analysis_parity_contracts.cpp": "7cf2b6845a5a7f49adb75fa06c333b758422f48b97e586182a676f6ceb5f83f5",
+    "src/backend/tests/test_attribute_distribution.cpp": "1bde722632ff67b42bbc8e3d575408e97189d1c3c7aa30ef465154f5816920f3",
+    "src/backend/tests/test_attribute_kde.cpp": "5757605809b0cdf962f2c42367999f47fc6900776b9be062b40b404fbcbd78c2",
+    "src/backend/tests/test_attribute_statistics.cpp": "29d637ee6ce044ff157e94b229d099c154884de6f1193f3f0b49e3bcec6de90a",
+    "src/backend/tests/test_attribute_value_repetition.cpp": "3369d17b2a791322f97e594b3fcc54e325f693117277603c589ed7512cff5481",
+    "src/backend/tests/test_batches_parity_contracts.cpp": "7097d8776682d0236a133cc5cfd3943d7a9a068a929f31eae01c4126d2170baa",
+    "src/backend/tests/test_bose_parity_contracts.cpp": "61068e9d8247bd555d8d2ca9cc652ed9c81113f5e2cb1298964a56c2c5229f15",
+    "src/backend/tests/test_boundary_activities.cpp": "e28f23b74a0f018c067cf00dd7bde5b29c54c55a982bf567eb6fba3f5458a5e0",
+    "src/backend/tests/test_browser_history.cpp": "e484057b3dc62c16f3fb5105280c177eced91fd58d90b620bc35051bb1f7c316",
+    "src/backend/tests/test_case_arrival.cpp": "9989120fa7e8038932062e89ab30a4fea5509640b4512b1029e735ebaac087d2",
+    "src/backend/tests/test_case_grouping.cpp": "8e302ec93c5bb1995077b6d886e5c971b171767d552de25fec01e420fa5170a6",
+    "src/backend/tests/test_case_relations.cpp": "c54a93b8917674095aa41fe9231f7fca0d7925a81fe107915dbbfc176dc8a62a",
+    "src/backend/tests/test_case_statistics.cpp": "cbd119d64722a3e4138d4a1b705230a3897cce1c428e5c5fdf7e06145351f40e",
+    "src/backend/tests/test_chaotic_activities.cpp": "58b41fa6d1d4b962f633c005d523ed45db0d37c9ac133ebcb1151ae32d504ff2",
+    "src/backend/tests/test_clustering.cpp": "d7f0d64348f76eb80dcb58bbf7de9df1a48593e8c2e7398804850993fb8107ab",
+    "src/backend/tests/test_communication_history.cpp": "104b6b82b61f9fc03c3a5c3e8afc4fd9014bbccedbcf3cea41941229af7722ea",
+    "src/backend/tests/test_concept_drift.cpp": "6a3bf994f6d981a63db5acad55e96e8b3c83b8d77566787241a05a0adcde1238",
+    "src/backend/tests/test_core.cpp": "a9aa494eaf14cc2bb4e3e69261de8fd99a66489b989069900b41d92734b19c22",
+    "src/backend/tests/test_correlation_miner.cpp": "33da74c5e5c56101c01fd267ebf32662b1cb358a402f9b042a7e112bea13c8b3",
+    "src/backend/tests/test_cycle_time.cpp": "a27199fb1b00f79fa993deb208fec02b3c7e715a34f6819100ceff3212b3f163",
+    "src/backend/tests/test_data_petri_net.cpp": "ee3e60e424dd6ef3bc6b6a45e0e8e5e12416b9daa4e7615086293269d3067678",
+    "src/backend/tests/test_dataframe_format.cpp": "6b3ee7c521b08d550c5a5b378ee9c182fe5bbe971e6c0393270cfaf0c16a132c",
+    "src/backend/tests/test_dataframe_format_json.cpp": "a209dc3ce7bbc358347ebdbda6ddd630280f32aca85d2d01d718a5d80a53673b",
+    "src/backend/tests/test_dataframe_validation.cpp": "1db6bb97b8f8eba0f813562057751a5cd4bcc88107afdf35a4a34d6e857ac067",
+    "src/backend/tests/test_decision_table.cpp": "b18a4a6daf5c080d928a25915d9310c88a3f2243482ba117e1f21ae081600976",
+    "src/backend/tests/test_declare.cpp": "21356497523f9731fc74a55ce85b20b0b7267c61fc194e85639390e3e1508638",
+    "src/backend/tests/test_declare_variants.cpp": "0d3d4a105de4d74572b551e70dae28fdd9b4ae891aa639949c67ee20b35e4128",
+    "src/backend/tests/test_decomposed_alignment.cpp": "31df5a2e4bc1061ee998e3b1710b25e997fae71618e7e0ae622ac74cd8e4bef1",
+    "src/backend/tests/test_dfg_alignment.cpp": "7e34f8a3422a1db067f4a78390df37d0a1e5a6bfdb6cf9c1a1fe16380168b9eb",
+    "src/backend/tests/test_dfg_conversion.cpp": "9aa267e8bdb25afbc559c7b106d4c5510c01ce05996083d0d016139d9a18745f",
+    "src/backend/tests/test_dfg_dataframe.cpp": "4c41f68a2b9dbebc300f63ad534019c81068ed9476d5f6fd6313297d831ecf6e",
+    "src/backend/tests/test_dfg_dataframe_json.cpp": "5178f0b88285c710e560dfb486383b62bc15329b13341226bed584f03dcbcfd9",
+    "src/backend/tests/test_dfg_filter.cpp": "49ab0a6b77a7237befbf322a0440089b74c625e341fa805ba142e5532b3b9d33",
+    "src/backend/tests/test_dfg_io.cpp": "dc2b32e45a95ae5a44d6b2ddd6e8282a7d9ef6b14633cace273a6a39fda6e0f5",
+    "src/backend/tests/test_dfg_parity_contracts.cpp": "e54c9f5048b5584a0685b24f7b8c2dbb32050a69ce0077969f325d7fdf698c93",
+    "src/backend/tests/test_dfg_playout.cpp": "a95b8c0f9d5eb4070626b8f8cadd4550656a8db0dae312ab877a31181822dd5c",
+    "src/backend/tests/test_dfg_precision.cpp": "f805271693c1ab3ff7ee198a40cad1ddaae683f669665e6ae53786afcd4f6ce7",
+    "src/backend/tests/test_dfg_utils.cpp": "798615df38b3781b2388c2b463410fd52b3feeb07b42f9256233d4c3ed049ee6",
+    "src/backend/tests/test_dfg_variants.cpp": "f4368e68e5256e503a355838f207108682c76f6d46ae0543209f8d0f95a7cd96",
+    "src/backend/tests/test_edit_distance_alignment.cpp": "c44040863873eb6453513037a520eab994c2b8ee4638db40f2bc1ee518948f96",
+    "src/backend/tests/test_embedding_runtime.cpp": "6e7bae6f20972dc494112212328ebf75557c738163e232602e7006b5beb370f8",
+    "src/backend/tests/test_embeddings.cpp": "ba26d648527f488e872bfd49e0cc2b0c87da52678bfe2877a5ba9156940465d9",
+    "src/backend/tests/test_enterprise_history.cpp": "c2b06d4235d8250fa48543f6bae9bb2ab4141dc7e476c56390c21324ebf3be3f",
+    "src/backend/tests/test_evaluation.cpp": "38bf81292f4ce21b81cd4d2ba7346f768c50a7bd494e8ddbd33e0a87d2830016",
+    "src/backend/tests/test_evaluation_parity_contracts.cpp": "d74a2fc8e2cdd0d8323bfb44c4222ce4a3d8649246601030cea303d1639c0e24",
+    "src/backend/tests/test_event_data.cpp": "9191fb59d2a58d7badae8cc393c995ee2d1fae1231db1971bae9fce5f39ff1b2",
+    "src/backend/tests/test_footprints.cpp": "dfe08b06a103a31829c028006f85b5ed1bd9f5a55428f725ebd8f33e0a5a4f80",
+    "src/backend/tests/test_footprints_conformance_parity_contracts.cpp": "0767244f8e63eacdf57861a4ef6355de10d1b949221796d9ecb3769baf57c702",
+    "src/backend/tests/test_footprints_discovery_parity_contracts.cpp": "11a3ec7df9368506a85f49146b2b2072bba86b410f4dcf7ebafe50e09327723f",
+    "src/backend/tests/test_footprints_models.cpp": "c7dd26ab42dd92d8901191f38324b7fdd71064388f5b5bc0150f91b1e168f2c0",
+    "src/backend/tests/test_genetic_matrix_conversion.cpp": "243a45d22afe432a00221f43e66fce37bd006110453f370a45bf3f2684de891f",
+    "src/backend/tests/test_genetic_miner.cpp": "ef59bcdfeccd6d130183b9d21eb7887e6590eea448fa983a66a1474e9321bf98",
+    "src/backend/tests/test_heuristic_variants.cpp": "bb1def8df6c35d6f4f9a9f8d951794784b03a646fc0c82924227d553e68bbbcd",
+    "src/backend/tests/test_ilp_miner.cpp": "47703cb945cdcad56013b434b408b40499d73ba86b7c2c2bc00b73a5f9fcfc17",
+    "src/backend/tests/test_inductive_miner.cpp": "b54489718724606c70116c2625af6aeac92d41940e89f7e225fc179b1e142494",
+    "src/backend/tests/test_inductive_parity_contracts.cpp": "fb7553d8e68d7e6ce5fcbfaf0f38bf01fcf159f82e0ee55eb1ea736e10f41010",
+    "src/backend/tests/test_interval_tree.cpp": "7d73eddd0a93553c3c87ced96ecc80cd48db49b7e6e71ccf32ad3d56256e7df0",
+    "src/backend/tests/test_knowledge_injection.cpp": "c72b85396aa86df4d27dd1b2d4019edca6fe48ddf947255f2c378875e095dc80",
+    "src/backend/tests/test_label_splitting.cpp": "8cbeee4c9ff13757d2067b1864edb2b81b1bf98f237ffc7d8c635d652d4e4ab4",
+    "src/backend/tests/test_link_analysis.cpp": "e98a7a4150985fefd1e710895215dcebeba13d64ad2d0aa29cbaf7d3a4a73869",
+    "src/backend/tests/test_live_stream.cpp": "afc1379b28c441fddb9ecb67c41fb24e504de2f91f454882ae6f4add801518a2",
+    "src/backend/tests/test_local_diagnostics.cpp": "461df4223dd7fa1a264209493a02170d48eb562249ef7b606bcd0e0cd7962419",
+    "src/backend/tests/test_log_conversion.cpp": "094007acd468005006b5ecf61f0053a36b69dc74ab83660081947c79cbac836b",
+    "src/backend/tests/test_log_skeleton.cpp": "251cd819dff6e5edd59ef61b181a68c29413e05cd970a795f54f9332cb553dea",
+    "src/backend/tests/test_log_to_features.cpp": "3b51d9622271f0215ecad173677a9596c5e1e2a8ff7040e2dec75a79285ba3b6",
+    "src/backend/tests/test_log_to_target.cpp": "5bcb3f48117930057eedcd2094d2475dbbe5301c2ff8dfbc815acf3bff9bb1e5",
+    "src/backend/tests/test_log_util.cpp": "f7840a7cba88ca907df18ec93cf6198dc18c9b96ef06e2d61c37ba7d9f348066",
+    "src/backend/tests/test_ltl_filter.cpp": "694eeaef7620f3b1594dffa85ed27b18bc4f894708ef1912686c87ed109f0d5b",
+    "src/backend/tests/test_monte_carlo.cpp": "adee2d142aa068743d3346137a847579d5c8580dfeaae72e2aa9e6cbbd425791",
+    "src/backend/tests/test_native_na.cpp": "b6568e9049c56ddb2a5d7c29d64f6c4f4664de136c8b96912cb98dfe1097a7f8",
+    "src/backend/tests/test_network_analysis.cpp": "9f83fe37865c345708930b6cc166da41c69431f4e092cdc3aa14ea40abff8af7",
+    "src/backend/tests/test_oc_causal_net.cpp": "acdc1345600218fca12209f127b6e22db97e13eb34f69fc6d5eb4b9b66a207b7",
+    "src/backend/tests/test_ocel.cpp": "671d675210aff6413ba751a139d53f64f939f40a5d52aa67a673d9ca39d77e61",
+    "src/backend/tests/test_ocel_csv.cpp": "c332c534e336888aa97c7edb9cd1b63b8b11c8e9379cb48039f74f8ef3fe32e7",
+    "src/backend/tests/test_ocel_feature_components.cpp": "b7ad1112039c4b665c86327d5dc8e8af69e4e8e8a8766c68df011b21d2da97d1",
+    "src/backend/tests/test_ocel_features.cpp": "bfe68351148215586e7e9f80234fe97b2fdce6c9c8c270e92032a041e54fb884",
+    "src/backend/tests/test_ocel_filter.cpp": "e3c586a84173b0e82b948b0da4a4466e0141c07881f207f6ac29f90b67b0cad7",
+    "src/backend/tests/test_ocel_playout.cpp": "3c175f6876a39dc8954d37416be95797aedb92ecd502b819110670950a359afb",
+    "src/backend/tests/test_ocel_query.cpp": "4ff6dd83313ada9a2ce8c76a6f28f27ccfdb2e11735403d819d29ffa833e7355",
+    "src/backend/tests/test_ocel_sqlite.cpp": "ea565475a09d0b9eb21f420dd8366e0c5a6365a0f34cfba0bf86e78f3929c504",
+    "src/backend/tests/test_ocel_statistics.cpp": "5aec4136ff97f3631b175eab78c04b19a1db5a8eae752707b610e32e392b486b",
+    "src/backend/tests/test_ocel_transform.cpp": "d3bb10c214908c62c80a6330b43c2f85b4b2d1da9b4217f7de80c220cbfa0c2f",
+    "src/backend/tests/test_ocel_xml.cpp": "422535eb1422c6e70ff1460214ac4fe783ea7e0ba0a068d705dc0ad44bfc862a",
+    "src/backend/tests/test_organizational_mining.cpp": "20661a0cc45cd1649be516a4582a0ee032622838c8cbdc9aca4039b22e848137",
+    "src/backend/tests/test_organizational_parity_contracts.cpp": "0234016ebe3a19f9ed90e7922dec209c4e10c846e2ef0c9a02821f5377d525c1",
+    "src/backend/tests/test_overlap.cpp": "d878ef1eca257a540c72eb8e7f1fb77932642b6c1e8c1c46f4df71b8d13a1a1c",
+    "src/backend/tests/test_overlap_json.cpp": "0a042b4dd62934c0ead4ca7d37fabf29ab75e79527556bf1e84ec73d19b1749f",
+    "src/backend/tests/test_passed_time.cpp": "1a67f0e74ac6848bc9a87f1eef6c5d25745a434ab587e6361ee5042769cc02f7",
+    "src/backend/tests/test_path_filter.cpp": "b2e702259cb499c98b88033c0f0db798cf793305f15ce5717a8e8a6e259cf3ce",
+    "src/backend/tests/test_performance_spectrum_parity_contracts.cpp": "f04be048004c232a9b3615cb1f35a4af0e29df8bce152458d68d1140045d7696",
+    "src/backend/tests/test_perspectives.cpp": "00387865bdbd0052ece4e09de77676008724f64a47806539d06a71962da5b1c1",
+    "src/backend/tests/test_petri_analysis.cpp": "c325c418503a75dabe30625b1c9300a07444aec867bb25e129d7ed6017ab036c",
+    "src/backend/tests/test_petri_anti_multi_alignment.cpp": "c74f8eee0bf66eef53d48b786550e422cec3da5882b49addab51551d8d59b8d6",
+    "src/backend/tests/test_petri_extended_arcs.cpp": "ee4e7802cb03376553d1c02459edea4eb6734f58ac5dd04a16ca255ae1da6d04",
+    "src/backend/tests/test_petri_net_conversion.cpp": "23abf70b1af66367a09ba82b7095cd688c1713a8ebb2243f6f2731777817d25c",
+    "src/backend/tests/test_petri_net_reduction.cpp": "dc7e7e9b0dd0cbcc2c0baa10bbe48bc6d620343439bf8e4c0158d5202a5995cd",
+    "src/backend/tests/test_petri_usage_comparison.cpp": "e104339c0a49f15c903b34c8222f2d1d9343410263a71df0202d7a247767778e",
+    "src/backend/tests/test_playout.cpp": "fed5fcab8b0e48d79d25318a891eff60014bc52ccf4017b512146d54d45229a5",
+    "src/backend/tests/test_powl.cpp": "1194cc09c60e1f47fda9df28c9000b1ba5dca9c90d2d0b1ff4ee5302406d54c9",
+    "src/backend/tests/test_powl_conversion.cpp": "cba9d06843a0e95cf98ae0f7f264a3f4ab43b7990753ae0e0021f5512b2bb9e6",
+    "src/backend/tests/test_powl_discovery.cpp": "f3a7d4f0ed87b48f7c7bfa5cfba05d4e62f67e2edfaba6456910bd746cfe1a65",
+    "src/backend/tests/test_powl_parity_contracts.cpp": "8df88f4f4893629e93a329ded98e803c0657dca35d8d92c7d2be26b3e2785970",
+    "src/backend/tests/test_pripel.cpp": "51244da590307e756653aff64be42228101ffc61a2f19aa571139631b63f98d1",
+    "src/backend/tests/test_process_cube.cpp": "175560c708500fe154e1af64dd8af98aab32f3eba0a7766b9ab756226e410365",
+    "src/backend/tests/test_process_tree_alignment.cpp": "8e8effb2ed484af086fbd764ff6993a41a0fb5ae4f537b508d97f24a8215f8ce",
+    "src/backend/tests/test_process_tree_playout.cpp": "3d796156f9a85311def679fbb8c434a00f09eac99545abd5e1c7ddda6523fd0e",
+    "src/backend/tests/test_process_tree_reduction.cpp": "d45ee4fdb21404a8e1e5ce64e77f57516d71f50cfedce87b927d6cb1b7ebf3cb",
+    "src/backend/tests/test_random_tree.cpp": "ace421bde2f25441d51963207d9e663f3b07c51b0407ac9523399ae679bdb6e5",
+    "src/backend/tests/test_repository_history.cpp": "6d2d52f82b7b975a8d106b337c3b81be3dfd814865dd06a8d503eebde33f1dd8",
+    "src/backend/tests/test_request_params.cpp": "c5db0230318e04c1200ced344c2472ab34b5e0e8bdbb82958dca7d3d46d458d2",
+    "src/backend/tests/test_resource_profiles.cpp": "531b58004f4b0df30c86e35c701470a5dd6f2116357e278fca46e82fd4c62dda",
+    "src/backend/tests/test_rework.cpp": "5a104dc8a099ae77cd94ebe5383d2f599a8d4768339f37801f7af7e0e82ed70f",
+    "src/backend/tests/test_role_discovery.cpp": "e4c5f81dbbe463089ae2b2bd8a3a7be349b9a0f42aa4186c3887f8d59f4284ae",
+    "src/backend/tests/test_root_cause.cpp": "117aa2ae4d56579bc96cb7098ba9120871a8fd860cfef917b6af1135b676e53d",
+    "src/backend/tests/test_saw_nets.cpp": "8b24c36bfc3674a200de3845511afc7c4dd7983a4e4af36a42a6afb3824e9432",
+    "src/backend/tests/test_segment_filter.cpp": "a836f56bf9ebc3a4fd2daa36cbf296c9bf5c5ba91e1d7819acdb1eb29003e9d5",
+    "src/backend/tests/test_service_time.cpp": "45b216f463eccf65f3b99f2b6dca98b25e4ef5c99b71d514f5514b966ecbea4b",
+    "src/backend/tests/test_stochastic_map.cpp": "c589f1e29cc8688d21d30fe35c72d0a74b5d11c829b528b534d218466deb5355",
+    "src/backend/tests/test_stochastic_petri.cpp": "5854d8e7d0034e7b265e318093ed350b95301596ba91aaa1ec9c953a7e592cda",
+    "src/backend/tests/test_streaming_dfg.cpp": "03605161746ee63d2b9c7f614e004fe9ce1ee7e09a0be868080d55b4fba2b4ca",
+    "src/backend/tests/test_streaming_footprints.cpp": "12aa8322fbdfbb224d92470549881166c2fdbaa911eff3fcf89612f95a52853c",
+    "src/backend/tests/test_streaming_import.cpp": "b1644edd9ed8d7184570d21be0725fd433030784bb6c7a74ca6b5412bdafc61b",
+    "src/backend/tests/test_streaming_store.cpp": "7d2acc2c01bbbae9fea1f4e60303529880cdae816b3beb28aabc4a6444eb1292",
+    "src/backend/tests/test_streaming_tbr.cpp": "aa81cdbba5d4240bbe56b8ec4c90e0d4262511a0cc23b323953a59d3d9309a87",
+    "src/backend/tests/test_streaming_temporal.cpp": "9f0d4fd3a641c12d044882788b585611e7372eb8423ed7e48771c61c91f3a239",
+    "src/backend/tests/test_temporal_behavioral.cpp": "222e308e163d9fd8c0f5d1842d196a9527781a02f60ab865bc62df8902ff9145",
+    "src/backend/tests/test_temporal_profile_parity_contracts.cpp": "2a9eb244074e2acc993ec318db1693971a32b16bf025f4a647bbb2bbaefe6ffe",
+    "src/backend/tests/test_timestamp_interleavings.cpp": "e7a9d8e99aa7420e6814ecebad7f001d97c505aa174fc1e0837a4482ad0fbaf7",
+    "src/backend/tests/test_token_replay_dataframe_diagnostics.cpp": "b3639708ec9cb9336fae09bdffdd025ecc9636fa58a2d05f924ac879a3b780d8",
+    "src/backend/tests/test_token_replay_diagnostics.cpp": "2ca0a7f44862cebea47c62cb672221ae27a8d2462367ba69dc3f59ca32b39207",
+    "src/backend/tests/test_token_replay_duration.cpp": "18a88758c6037c68a6612032bee22a46ff2edf6e37116c396e79696a2ad6eb12",
+    "src/backend/tests/test_token_replay_event_data.cpp": "8f2d36e4fbccf2d9c55d15f5f24898d34a25f62b01ed3bd8f6f9496ed764ab9c",
+    "src/backend/tests/test_token_replay_result.cpp": "b08c2090a08581122d62b2c23dc2b90c1f832142cf91730d414867aca24b1893",
+    "src/backend/tests/test_token_replay_root_cause.cpp": "1106d78935a5c1d14c3428ca213064ea2bb80af0d1b0e99fb11ef04deb0856ef",
+    "src/backend/tests/test_token_replay_transport.cpp": "cac610230a854318aa44c5fce7fa104df3c33a9c336382012d0b5bfd4b084f1f",
+    "src/backend/tests/test_trace_variant_query.cpp": "6bbd1a473782cbf49d02f48dcfa645fd035066c64586571d28329ede5ccf3e05",
+    "src/backend/tests/test_trie.cpp": "39b94aa169ebaf210c215759e4e8a8b61ada9de39a3de6bfcecbc16238937723",
+    "src/backend/tests/test_trie_conversion.cpp": "660f650bd3795e3144d025c17c739f25f2625963d1409252abf38062938be161",
+    "src/backend/tests/test_variant_statistics.cpp": "5972772b89c4fcfdf4c7a3901bed2140569b6a6a9d31eba7755cc102f1c9cf8f",
+    "src/backend/tests/test_weighted_token_replay.cpp": "ab246b4fc07baa7708b2d3872e3b2054a0ed35423aa926b3062c41b3b3eba4cb",
+    "src/backend/tests/test_windows_event_log.cpp": "cc2bfb000e2091e8adb29b1d51b5dc8bc2e72f246cad0bea23f6c56f0bf27f2c",
+    "src/backend/tests/test_workflow_history.cpp": "ad3ec60136a79d1180c55529866880ea9967e99c86410188a889d48eba99180a",
+    "src/backend/tests/test_xes_io.cpp": "10682a519262484558f841818a63995df1f3ac9126c0b3e88211cd705f8a8980",
+    "src/backend/tests/token_replay_dataframe_grouping_reference_cases.hpp": "1fa369f10a329278d0bd9e63ef15fd7266af30837e699fa5937c841ddd7c91d2",
+    "src/backend/tests/token_replay_diagnostics_dataframe_reference_cases.hpp": "559d8903394469109be9ab58569f14e2163968fec15bd1f118a051408e2584a0",
+    "src/backend/tests/transition_system_parity_contracts.cpp": "ece5a90930c1415bf618e912d4260196432aeb6451c6ce62588499e4a50b1d94",
+    "src/backend/tests/xes_nested_expected.inc": "657ade9f2bcc8977347bfc24042146a9a9a2f6f0a1c9aa61f5512c91463e8b62",
+    "src/backend/timestamp.cpp": "6fc5f471f3a8e6b2388087a4cb2fa23143f1d52a514a4e14dce03214e6caaaf5",
+    "src/backend/timestamp_interleavings.cpp": "d29f631d32c242ccd27fef2e4b1e24e987ebc685a107642706906a9732da0dee",
+    "src/backend/token_replay_context.hpp": "d940edc25c9f17fb441a157129f81622ec5b5f8bd18dfd070c54da898fc68f81",
+    "src/backend/token_replay_duration.cpp": "495af55bd8fc6a4627544576dd62425054b9606cdea599a3444d4d7657575a7d",
+    "src/backend/token_replay_event_data.cpp": "2d88e0a0e4631d8101dc300aeb13077670ec0799b6d462dfd86afbb955d7bc4a",
+    "src/backend/token_replay_result_json.cpp": "4d47c819fe77ce8f6409f64c8f269f1cf7b6a9e9a66ed1dd25e6dba875be55b4",
+    "src/backend/token_replay_root_cause.cpp": "5f4977c3bd9052abf15ec50d9146ca873e29addcfdbfcc941dac946776e4bfbe",
+    "src/backend/tools/case_relations_input.hpp": "17754e9643227d473aa372294fbfbde20d781ea0098fb276769b60946f3eb93b",
+    "src/backend/tools/embedding_runtime.hpp": "290697275e2ee1740c8dd6e66e25f1003a8bbb00e0754ef377da6a7fcb56b971",
+    "src/backend/tools/minera_data_petri.cpp": "1a757bdb7ef06503dbc0d755f0f62975dedf82b0910dca92689372bddb2f6dc1",
+    "src/backend/tools/minera_decision_table.cpp": "fd314c5dd21e7369df49b6427da1d251d843173f596aa1ec47418011d2ec9c75",
+    "src/backend/tools/minera_dfg.cpp": "6741b12cd493d256c2e92bd1103427e6293d8041cd24db9108dfc3e40c74b29b",
+    "src/backend/tools/minera_dfg_precision.cpp": "c5c3f2e1f88a7a827feda3a48ea2c8e0de8efb50d91bf716d677adf2df886f5e",
+    "src/backend/tools/minera_export.cpp": "e445f2d0c9d8596c6ef6ff06bbb688dc9e7cb1fc6563e5959a2c87ae94e59d92",
+    "src/backend/tools/minera_format_dataframe.cpp": "6eb907e1ef78a8eef48a8e2bb7f63b87ca9b1c7a4119407da3a6cf357209a2ba",
+    "src/backend/tools/minera_generate_sample.cpp": "2f6ebe9f9db1946cfbac2471e965f5b0c5f52a753c26bdc8005bc4693c7f2c47",
+    "src/backend/tools/minera_knowledge.cpp": "2f6b03d7f49f74d6f77fc63b65c71fe47d9420f16642195b3d236aafe672965a",
+    "src/backend/tools/minera_live_stream.cpp": "3914d41460276a19fef99a00a0379fc35b61b33c36f209b0edb88fcb5fe96974",
+    "src/backend/tools/minera_log_util.cpp": "1d72384a5f78195097a205c210987386cb6bac652160ed01325beaeef91732ae",
+    "src/backend/tools/minera_ocel.cpp": "11c3e9b9aea9800d70f97cd2c7a063db00350e1687754072afa93dc3712e9aa4",
+    "src/backend/tools/minera_playout.cpp": "71257fd528accbf8e4fe923ae81ffa6dc3184fac08868541d68e106de9544cfd",
+    "src/backend/tools/minera_process_cube.cpp": "854112ef0a9c2d558a6ffed679ad6c0c17b52826da98148202043b40d5d1e9f4",
+    "src/backend/tools/minera_server.cpp": "4af015e7d357279bcbcd8c359345129158d8331262b2fa219d73a362fb7dec6f",
+    "src/backend/tools/minera_stream_import.cpp": "dd0d5ea2151cd88c9c3b7e9de1fe71ca85ca450b463ae714d4473e111faba519",
+    "src/backend/tools/minera_streaming_dfg.cpp": "b929a25cadeb489557bae44772aecbc903dc9ae03d3d73fe94661459554a2a77",
+    "src/backend/tools/minera_streaming_footprints.cpp": "f8314e9e55851b39f9068e3e557c4798d97aefdbabe436fe41a341f4f633ff7f",
+    "src/backend/tools/minera_streaming_store.cpp": "080df78907eae17f4ed7923df028d1e52b5f7f2da648ce3c067574b0e79a94c2",
+    "src/backend/tools/minera_streaming_tbr.cpp": "0be049f99b946fbefa1129518f0fc42b2308760b0dd01bf392d62c6516722521",
+    "src/backend/tools/minera_streaming_temporal.cpp": "2d3ecaeb12b1523b8012d28c57d2571dbcdc8e69ede0a1cafa5f0f462b46cac0",
+    "src/backend/tools/pnml_model_options.hpp": "67b1b45ce69e1991f073d1bf4bee950aa7789cae0c0fec09414308a90bb524d1",
+    "src/backend/tools/repository_history_runtime.hpp": "31cbabab9a53f6add61c1c043a64337f3fae4c1b48c2ca5f1562a15bf3925d3a",
+    "src/backend/trace_variant_query.cpp": "8922bbef56e0c271e5e157ff6e594e49ebd3e3ad847bb940586f97e05c759e17",
+    "src/backend/transition_system.cpp": "8f2431c97eb665e012c6b364af600fed61bc65a7a2324fcd8a2d71b64e6c2188",
+    "src/backend/trie.cpp": "55b0c2520671bf5c54d965593a87bcb9757eace5a3b56439eba2f9d88b499e21",
+    "src/backend/trie_conversion.cpp": "5a0c43bdfaa86ce12f1f31b150f7d7b707e1f33a3317a6d5df11421d6035f90e",
+    "src/backend/variant_statistics.cpp": "d1e394729e179e09f5e4ca2a1789db26b6bc437255dd7fc5a89a4980dfa75c52",
+    "src/backend/windows_event_log.cpp": "4937022415147caaaa779b2e8d8deaef8cdb7d9dfc66802b5fb8d1d56e36df8d",
+    "src/backend/workflow_history.cpp": "508e87d8c4abb18b0ed536fc23ce3054d6a1a801c587724f91c0cbd39ad7575c",
+    "src/backend/xes_event_log_importer.cpp": "31241e5a37509d7f4ff9ec23cd6bec1f45a84240169a1190077c014655fdc5e6",
+    "src/backend/xes_export.cpp": "94a521a3381000bd58880e63ebf3b461c0fee2d3857451c4dbc1b96e42fb88c0",
+    "src/backend/xml_pull_parser.hpp": "065dea0501fcf2dc5c668affb7cefe062ff784fddef65e55aef03d94b095189c",
+    "src/frontend/index.html": "648efb9515b5bd4da2f4c04d8a6be2f0d8de5968617d091ea3ebd26c8f7d9cff",
+    "src/frontend/package-lock.json": "04ea239f18993b885208e519662bfd4e3e014545d38d952f84284f4cb8d6505d",
+    "src/frontend/package.json": "7f2361b0a98d18a5bd9df2a1c80187d77d791c0fc1e629e42d33f070625683a9",
+    "src/frontend/public/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+    "src/frontend/src/App.tsx": "6b2daa7b51b5389aca29c20e2d9c1d8b7201da2456a671cc12f3a144b0f08ef4",
+    "src/frontend/src/alpha-result.ts": "adfb045125d8de13dfc6e8fd1e9dfc10d29ed1947cb826e444e7f62052290a21",
+    "src/frontend/src/api.ts": "e8e6c69594e6d0f39bf0651350124cd9f22ed5365472ce8049e04572978c7a26",
+    "src/frontend/src/app-logic.ts": "9c9b6f5e251d8be519836af5ae68a5200d9dd9bc9fbbcfbc3c0525e211a6c2a9",
+    "src/frontend/src/components/ActivityTable.tsx": "6513c9fda5f06b1cce89bb574f983846f1f6d6e177b39b31312cf246d3b832b1",
+    "src/frontend/src/components/Batches.tsx": "d130a5a54437a88665765c503c1e784352c7f02bd37e05eb78dbfa0193551572",
+    "src/frontend/src/components/Conformance.tsx": "bd5656ec9e400fe8afe3b6506a0700c17cdc69ac4fa751585bf3b7d7ec428fa3",
+    "src/frontend/src/components/CorrelationMining.tsx": "efa6b26473f44247dfefd0d6707cc62a21cd8f2a8a188c7ed97451707cf611b6",
+    "src/frontend/src/components/DeclareModel.tsx": "fec6de33a480b529e5181248c753dc48933037d63b967c0316d9bd0b19b633cd",
+    "src/frontend/src/components/DependencyGraph.tsx": "22c98ddb5fe63cc38bb1632a1cf6ead957e11180bd0a3847b7ba034c91b54f7a",
+    "src/frontend/src/components/DfgDataframe.tsx": "5a84e0532f640f74e81be5bf8190abcd1596c4ba08ffe831451776ccc1119ec2",
+    "src/frontend/src/components/DfgVariants.tsx": "d72d9c66df17d64b9917023702aed7a12db40c659130d21fce475db84b9002ef",
+    "src/frontend/src/components/DottedChart.tsx": "9154fb731a669ab66380edd42239b13bb5a34ced046d92dac5af1e1575a0f280",
+    "src/frontend/src/components/EventLogView.tsx": "77f9d4f858b87070e7fe7ceb06651c08e9dc66460e9a01f0a3228338fd699022",
+    "src/frontend/src/components/EventuallyFollows.tsx": "2a545ea1ce24a252e2deb2c8ec59c8cde425e4fa2799030745f80d9151a267c8",
+    "src/frontend/src/components/Filters.tsx": "8e20151936e0c4d82ec2ea71cf003762691645a6c6c95cc19633c40cf0f43f3a",
+    "src/frontend/src/components/FootprintsModel.tsx": "b0e3f62d42e3f16dae80616b1a7b79ba778d68fa78e4dbea1ba7b35873dc147e",
+    "src/frontend/src/components/Kpis.tsx": "3205ae6a46c62d467c65af0d3499e71cd52c0cdb1809ace1322205b9ce2d051e",
+    "src/frontend/src/components/Landing.tsx": "05680bbdcaff35b6614f397e082b0672f08a3558633ce5baf378175d98a96e23",
+    "src/frontend/src/components/LogSkeletonModel.tsx": "769c40e8cbb25808465427a4fb08763e242a56ee996e43b05e0bae82b9919cff",
+    "src/frontend/src/components/OcdfgModel.tsx": "44787f74670eba47eb94e9bfeb85774f47f5f018c9f7499a0a528326470d8073",
+    "src/frontend/src/components/OcelExplorer.tsx": "213c8515979acd8d3c92585692f6c9b823728325fbdb37ad20a4d4a14a1bbbaa",
+    "src/frontend/src/components/OcelGraphModel.tsx": "ce287cf7de99517def09eaffa362083860e1e00c3c7b820879b87a455ca279ae",
+    "src/frontend/src/components/PerformanceSpectrum.tsx": "09bce5930511b72c5d8666b64aba251cd0f7b8207ca5e57d0f40d505e264fdae",
+    "src/frontend/src/components/PetriAnalysis.tsx": "fd402017b7b7c04e375a058ca81e0ab9438573bb9fe9ae5fb73ff85c9c78e19d",
+    "src/frontend/src/components/PetriNet.tsx": "d9e217f14cacf97340a87f04900334cd02b9cb56de9aadb924b5d6ab4aa1c0c3",
+    "src/frontend/src/components/PowlModel.tsx": "6a9faf9eed9c1e26da7ef88163890c148446cb9a9b520e1446037df86ac49efd",
+    "src/frontend/src/components/ProcessMap.tsx": "c98d5d04acc738f9b7d75a0c7f8d9ede8bf716efd4be6c462a274bba9d1437d3",
+    "src/frontend/src/components/ProcessModel.tsx": "8cf3c19afeaeeaba593c081a84e209b6e2afabebb238e45fbe66dd45e3ebd414",
+    "src/frontend/src/components/ProcessTree.tsx": "ffb83984b1baa52841009f532d2352013895c630255d15380da32de188fa523d",
+    "src/frontend/src/components/Resources.tsx": "3b66188d33def38ddd2fc52bc72ad93631512721876933ed1070286d425f9d24",
+    "src/frontend/src/components/TopBar.tsx": "fac8565c63a4bf8b5dad1c08565b04b28c9991421e5f0158be52f69eecd6b25a",
+    "src/frontend/src/components/VariantList.tsx": "49d3314d64e4dbc59602fde9c8643a812adceadc06df9bfc447772b783281271",
+    "src/frontend/src/conformance.ts": "a4e3d87b5e2208b1302e1d3341582428dc24bc7d0b2875a49099adc5e7150ab2",
+    "src/frontend/src/dependency-layout.ts": "eb3672b5743e4b12b111a2c4f4d29357ff8632bcbcdb528d501f435332da5932",
+    "src/frontend/src/dotted-chart.ts": "6745bb981c89d60ef8a19b2a0d1f39eccd6ea8abd4b225cb2d3e4bae19d4962d",
+    "src/frontend/src/eventually-follows.ts": "e567d87a06e47ca7b23f7c014e5253abb565ea2b1872b7be045f9fd580b5684f",
+    "src/frontend/src/heuristic-miner.ts": "32bd0911e3e3ec528c25c992acd843a3485c563ab369a439224fb851ee6aa555",
+    "src/frontend/src/layout.ts": "7f46d91718da9444c21b80035503abcd7b89a8daacc69e56ee57e7a001fdbeb4",
+    "src/frontend/src/main.tsx": "9f14840785035a7ad44d93177890861739412b4e21fe2778b5efa66a6eb24f67",
+    "src/frontend/src/miners.ts": "f57146a43493795d26fe88395c2b737c348c6b9e6bc6d2567aa8fa073c413a46",
+    "src/frontend/src/ocdfg-layout.ts": "58754e048c8e6a7f25a059c6eec2c5f494e21a50cad00155af3863a0e4dd0f70",
+    "src/frontend/src/ocel-graph-layout.ts": "aaecbda5b9151f27c359fbf789a8e2a967740e0351cce3cbc8cfe25d42e1a5e2",
+    "src/frontend/src/performance-spectrum.ts": "dcfd0899612ee9bc189bfdebe3788f888b7cc6eb867f0d414e4f7b59600f80c0",
+    "src/frontend/src/petri-decoration.ts": "b9c94e9237b7a3acc6469c0fa7c61fb13f1d2c3a9b2a47d7bcd66f360ad5fa51",
+    "src/frontend/src/petri-layout.ts": "e5da5a4b3f5cec29da956592e0e0c9f6be5964ba22508d948b74f2d92c10a6e7",
+    "src/frontend/src/styles.css": "c87a0c311a0b90b74ff9aa50b42b05c5bfc2e7a3faafccb687a8bc1a68d64114",
+    "src/frontend/src/tree-layout.ts": "07db583178e683676906f416d459f82e4acd56b14c54ac7e9e0050adbf270fdc",
+    "src/frontend/src/types.ts": "7d4d7499202eab4b5d5a232bc1894c4364c86ac475cbae11f87214e0a1bea988",
+    "src/frontend/src/variant-insights.ts": "bcb95470d435e22ea5bb38f934a960444a21a50f348f4bad0c75c496cf0f6c37",
+    "src/frontend/src/vite-env.d.ts": "424faf9241dd699dda995b367ed36665732da1e6ec1f33b2fd40394488ecac92",
+    "src/frontend/test/setup.ts": "1b00d0a718ce4d8e3babd03ba0113d18dd1b74518b6526cfe67b7c3e69ffa21d",
+    "src/frontend/tests/alpha-result.test.ts": "57083c41c2f3c3072c3c175b5d394d08bba9ea4dc66e8587995bafdd439dfae0",
+    "src/frontend/tests/api.test.ts": "a883ada562be5a9085bc3f650365579790d230ab56266d1f8bd151687b7871d4",
+    "src/frontend/tests/app-logic.test.ts": "4250e0c1359b75e23185f86d2f98918200602019944142490134f3a294521b98",
+    "src/frontend/tests/components/Batches.test.ts": "db7d871579f3f0ca56bb6041b49769d3de9496e26c0d4f8c6f0fa371969a9887",
+    "src/frontend/tests/components/CorrelationMining.test.ts": "a38bf13d3e0803c4931f9b886130c0bacefc7e1dd3ae2d23b87299f55daa80c8",
+    "src/frontend/tests/components/EventLogView.test.ts": "23936dbd116176cbc357933c4fe7ec692e9c637d9e9a20f2f15ecfd5b3a446d2",
+    "src/frontend/tests/components/Filters.test.ts": "180a41ace29627c4afb67f64c07abee999725db832f56bbfdb3e9df939ca4846",
+    "src/frontend/tests/components/PerformanceSpectrum.test.ts": "4e0dbc77adbf798c316b385583ff66b418601c3c9d793e155e0bc3e5a8c616bf",
+    "src/frontend/tests/components/TokenReplayDiagnostics.test.ts": "2a4e8c8347f874f753dda3648234c42110c7ee8a0b2de2fe89b138aac0765c31",
+    "src/frontend/tests/conformance.test.ts": "158f05e81bc4780390078e3d87ac2cdd911127df6237a7fb9820778a85615353",
+    "src/frontend/tests/decision-tables-types.test.ts": "7c26616dceae3f158efd2665f315e609899246bad2158e57eb6138ce9fcfde5e",
+    "src/frontend/tests/decision-tables.test.ts": "eaf6a0f9f63afbf05d237d49d0b1cb386dd5708f7e4db655fc3b3aa5d1e8c9a7",
+    "src/frontend/tests/dependency-layout.test.ts": "6d489d9743823a95edbe374e4f82afc3205101eecbb7616cf6d16df1a00e54a4",
+    "src/frontend/tests/dfg-dataframe.test.ts": "4e9b78049e1d1a52667ec6683902f4132314ad37e15dfa3d47d1afeb365fab86",
+    "src/frontend/tests/dotted-chart.test.ts": "d8b1b411b47aa24c681dcb9d7def1c85bdd2bea02bd63d7eac95068adbdf0dcf",
+    "src/frontend/tests/eventually-follows.test.ts": "0022612250123d8f3527398f485a89f2417183d7bbd6bfd060d0021b921800e1",
+    "src/frontend/tests/filters-validation.test.ts": "4150abd99849d0655d057c24c73299830b65ed468028480ddf8e3f57d176f918",
+    "src/frontend/tests/first-class-attribute-contract.test.ts": "9ddb52e0abdff0d8fa88dc6a76e6b1c5fb5c262bacb6e3f86d634dbe69daaf0c",
+    "src/frontend/tests/heuristic-miner.test.ts": "bfaebbfc8fbca1602c51ad727aa766784da48e0ce4aacbb5e2fc96e7fb12d156",
+    "src/frontend/tests/layout.test.ts": "9153e408cc9ab16836acb0135d8ddff179b755c26ece8f7cb419565eaf0f045d",
+    "src/frontend/tests/log-conversion.test.ts": "2d7189213b8462eca54834e0a5e988bcd9fa950718cf46d27c2ab39e27b61b1d",
+    "src/frontend/tests/monte-carlo-scheduler.test.ts": "7ff31165acaab52355522e8c0de411c970e91e5594e14516e81201581fdbef42",
+    "src/frontend/tests/ocdfg-layout.test.ts": "315745bd728c055bba39930815363565586b01a44778c365490cfceed247da2c",
+    "src/frontend/tests/ocel-graph-layout.test.ts": "5a9e6ab6c4b3525f27031159c7a4879c8416e47850a4b4f4f7a6de9fe35c9805",
+    "src/frontend/tests/performance-spectrum.test.ts": "a42a50b52605f9f70e4ae59547dccaacc63636a7e8b49a1732cfe7b4da5dec83",
+    "src/frontend/tests/petri-decoration.test.ts": "8459e9dd4d6bb26d67cd4776f937af43d5b9c7937e7ae5ac9ff42833da157060",
+    "src/frontend/tests/petri-layout.test.ts": "f89629e8ca7a4b78a13e46f4b838a0258cc35b2546e14b558caadcf088679dae",
+    "src/frontend/tests/stochastic-map-sparse.test.ts": "0397d1b956b01536248fd790e3f48fc81426f4be77e2d9f579179859e58864ad",
+    "src/frontend/tests/tree-layout.test.ts": "2e32a66d0e928211a24bb1238355c3000cfc51a98a42a35bf0cc2a32f64ef9b3",
+    "src/frontend/tests/types.test.ts": "08fb0a1accf88b30034d58adb238821263b0dfdf71d102356004e36a87cab7e4",
+    "src/frontend/tests/variant-insights.test.ts": "f3f76ef479a9b6db64c0102ca95931297ad3974c2f05e5392679d20d4e5381b3",
+    "src/frontend/tsconfig.json": "8b035bceb545f9198f37dd48d4aa0d9176fcc52736933a03ffcaab3f6c2544cc",
+    "src/frontend/vite.config.ts": "735e1110ba08fc9f06003d0e673b882a4393f5d8e0144352e56d3ce5b7ee10b7",
+    "src/frontend/vitest.config.ts": "c967a837afa02495ff07816460ee50034adf9d48561af28e437bcf83ecfed0cd",
+    "third_party/httplib.h": "d47579b1d08cdc5eb9db17685502fcb7aff2cf869420053ebd1475d2e1ba90ac"
+  },
+  "summary": {
+    "actual_native_full_calls": 6720,
+    "actual_native_imports": 6,
+    "actual_new_public_calls": 13440,
+    "actual_new_public_imports": 12,
+    "actual_public_errors": 2092,
+    "baseline_complete_return_differences": 260,
+    "baseline_complete_returns_matched": 11088,
+    "baseline_error_behavior_differences": 174,
+    "baseline_error_behaviors_matched": 1918,
+    "baseline_mismatches_retained": 434,
+    "catalogue_promoted": false,
+    "complete_public_returns": 11348,
+    "complete_public_route_pairs_equal": 6720,
+    "failed_preparation_native_calls": 0,
+    "fresh_full_builds": 0,
+    "fresh_probe_binaries": 1,
+    "full_parity": false,
+    "serialization_errors": 0,
+    "source_inputs_rebound_unchanged": 660,
+    "trace_equality_matrices_matched": 13440
+  }
+}

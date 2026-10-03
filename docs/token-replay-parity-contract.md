@@ -821,3 +821,85 @@ promotion or full parity is claimed.
 | `forward-typed-key-evidence-32.jsonl.gz` | `3d834ba5feee41ce13bbac2338a6fd205f4b5c60621064f1fcf7a9d551ceb1c6` | 2920659 |
 | `forward-typed-key-evidence-33.jsonl.gz` | `752ac7350e1f166993b3f5dc857ae16bc71c9cc43e30ea04c05b40bb8a6870b5` | 2936881 |
 | `forward-typed-key-evidence-34.jsonl.gz` | `8d19efa553c680c278af9358c42b0702a1fb9737fdf230ebfd4c07425f6b9cf2` | 2473434 |
+
+
+## Forward supplied variants and hidden-cache parameter checkpoint
+
+Two new public workers each import the same six exact weighted PNML models.
+Together they execute 13440 actual calls through the direct forward and parent
+dispatcher routes, retaining 11348 complete returned carriers and 2092 actual
+errors with zero serialization gaps. Every direct/dispatcher pair has an equal
+whole outcome. Model/marking/log/parameter snapshots and seven opaque pinned
+module proofs remain unchanged before and after. The five EventLog cohorts cover
+duplicate source traces and case IDs, equal numeric activity keys, mixed null
+activities, enum/string custom activity selectors and an empty log. Four full
+result policies include grouped/source PLTR and named carriers.
+
+The supplied-variant worker makes 5280 calls across 18 forms. Omitted/None/empty
+maps, inferred and reordered maps, subsets, extra foreign Trace values, zero
+frequencies, index/string/integer/None values, tuple/string/bytes/scalar keys,
+custom delimiters and a raw list all retain the complete omitted-parameter
+outcomes on these inputs: 4488 returns and 792 errors. This is an observed
+no-effect for these exact EventLog controls, including contradictory carriers;
+it does not establish a universal result for other input adapters or domains.
+
+The other worker makes 8160 calls across 27 controls for CASE_ID_KEY, delimiter,
+IS_REDUCTION, THREAD_MAX_EX_TIME, PLACES_SHORTEST_PATH_BY_HIDDEN and progress.
+Case selectors, reduction settings, zero/negative/tiny/None/text/long time limits,
+delimiters and progress settings preserve the measured return/error outcomes.
+Progress console bytes are retained separately and are not claimed to be equal.
+Hidden-cache matrices are owned constructions from public Petri-net arc
+endpoints, with actual Place and Transition keys/values. An actual single-hidden
+path matrix and source-only cache preserve these controls, while empty,
+identity-only, reversed and empty-list caches alter 260 complete outcomes.
+A non-iterable integer cache adds 174 observed TypeErrors. There are 434
+differences from omitted-cache behavior; no input mutations are observed.
+
+One freshly compiled native probe binds the existing accepted core and all 660
+unchanged source inputs. It makes six imports and 6720 actual full API/codec
+calls. Both public routes compare all 13440 complete outcomes. The probe matches
+11088 of 11348 complete returns, 1918 of 2092 error behaviors and every Trace
+equality matrix. All 434 differences belong to explicit hidden-cache controls.
+The current native option has no supplied-cache carrier; those cache arguments
+are explicitly unmapped in this baseline. The other measured no-effect
+parameters map to the existing EventLog options. This does not claim support for
+unmeasured values or adapters. Native output fields are never synthesized.
+
+The first native preparation fails on one stale capture label before copying
+its first fixture or invoking CMake. Its helper and incomplete preparation are
+retained, with zero native calls. A derived helper corrects that label, compiles
+the probe and completes all three actual processes with exit zero. The public
+captures, raw native carriers, process witnesses, helpers, failed preparation
+and probe binary are archived, with every chunk and whole file round-tripping.
+The earlier accepted production build and test evidence are reused; this step
+does not claim a fresh full build or another 152-suite run.
+
+The next production requirement is an explicit hidden-path-cache override,
+including empty-cache routing and the measured rejection timing. Broader cache
+paths, cyclic/choice/cleanup behavior, foreign key carriers, input adapters and
+alias graphs remain open. The prior forward/backwards acceptance contracts and
+weighted aggregate/composite gates still apply. The catalogue stays at 46/86
+packages, 199/387 modules and 228 incomplete units, with no promotions or full
+parity claim. Evidence: [forward-controls-validation.json](forward-controls-validation.json).
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `forward-controls-evidence-01.jsonl.gz` | `559933a84a1b29ba6cb928a5f3290f28783eb1f5ef2ba1bfea40a744c8f1e691` | 1339747 |
+| `forward-controls-evidence-02.jsonl.gz` | `da3b7e2f6a868797bff56288ba7af9edeb7f8576fc85b65f29ef76417557c8e2` | 2550019 |
+| `forward-controls-evidence-03.jsonl.gz` | `953d7c7e6ce9aa84c6f197c381881448c67e91b2772efe1e65372b80a6432c56` | 3330120 |
+| `forward-controls-evidence-04.jsonl.gz` | `167de5ef02f1c42f57f37798bbea247ece24209491b2b46b8bdc8b8f4b8c7a49` | 3311192 |
+| `forward-controls-evidence-05.jsonl.gz` | `cb80085f25c19552dd878f48f1c5eea88fe1cf093216565f96b67bc20a8fd678` | 3736395 |
+| `forward-controls-evidence-06.jsonl.gz` | `b96988c74f3b672768da842084022c8c4dd08bfb004cdda07e707b366a64c6ce` | 3269123 |
+| `forward-controls-evidence-07.jsonl.gz` | `a5621b5159d804fafebc9f39aabf3fd4d2bc19c378e588709d4b2cbb1eb79ca4` | 3464470 |
+| `forward-controls-evidence-08.jsonl.gz` | `86e057de9cee17ab238ed4806f70447955c447a6834226f11c9e9d31327d2bf5` | 3656749 |
+| `forward-controls-evidence-09.jsonl.gz` | `53a40f54fada66d7e61b625206fd649e7d2873d04895d54286ec1e005d89fd95` | 3401747 |
+| `forward-controls-evidence-10.jsonl.gz` | `e89be1aeb1fd81c5129bdee273d2462ee4ddbd22487ff2400654cbc5c1b4f679` | 3776580 |
+| `forward-controls-evidence-11.jsonl.gz` | `629088f94034a5f41a596a6f961ba2e877e61f32b234c6b2670641d22469fb3e` | 3532494 |
+| `forward-controls-evidence-12.jsonl.gz` | `e936df15eea95ad946e29f05a5b1f13ea0e9f0f3322095ed7ffb3cbbf5e80160` | 2419137 |
+| `forward-controls-evidence-13.jsonl.gz` | `6c6eb8145c3ec4481d768fc62352debe0c75df90ac2fe23cdbe9b92b6f2702e5` | 3333194 |
+| `forward-controls-evidence-14.jsonl.gz` | `98393f09d75388bc0aa773beeb441f50d41a650287d5a05369e72b5f531d5faa` | 3137098 |
+| `forward-controls-evidence-15.jsonl.gz` | `b01acbc5364647de5e41cba39e5d454f6549b73be7192a521b9275b24f8ef6fd` | 3084574 |
+| `forward-controls-evidence-16.jsonl.gz` | `af065a1380d62c84f5cc60c8afc57afc5991ea490b2b8caae5f0c70a81a91db4` | 3240809 |
+| `forward-controls-evidence-17.jsonl.gz` | `67fbcdf3c848d580b73120e70fd73753407b758897e3d29f9545a5ccff899bbb` | 3329049 |
+| `forward-controls-evidence-18.jsonl.gz` | `c919f19f443f3e1daf7a7be4b2b8b582224dc5775ed291ed9d3e2a7662f4af61` | 3428755 |
+| `forward-controls-evidence-19.jsonl.gz` | `328adc18a2b8598aa63564fe8534ef726d212e908b79e68801eb0787a4831372` | 2776308 |
