@@ -94,10 +94,13 @@ inline bool is_name_char(char ch) {
 // needs for its <text> nodes.
 class XmlPullParser {
  public:
-  explicit XmlPullParser(std::string_view xml, bool emit_character_data = false)
-      : xml_(xml), emit_character_data_(emit_character_data) {}
+  explicit XmlPullParser(std::string_view xml, bool emit_character_data = false,
+                         bool coalesce_character_data = false)
+      : xml_(xml), emit_character_data_(emit_character_data),
+        coalesce_character_data_(coalesce_character_data) {}
 
-  enum class Kind { StartElement, EndElement, CharacterData, EndOfInput };
+  enum class Kind { StartElement, EndElement, CharacterData,
+                    ProcessingInstruction, EndOfInput };
 
   struct Token {
     Kind kind = Kind::EndOfInput;
@@ -110,6 +113,9 @@ class XmlPullParser {
   Token next() {
     while (pos_ < xml_.size()) {
       const auto open = xml_.find('<', pos_);
+      if (emit_character_data_ && coalesce_character_data_ &&
+          (open != pos_ || xml_.substr(pos_, 9) == "<![CDATA["))
+        return read_coalesced_text();
       if (emit_character_data_ && open != pos_) {
         const auto end = open == std::string_view::npos ? xml_.size() : open;
         const std::string_view run = xml_.substr(pos_, end - pos_);
@@ -134,6 +140,11 @@ class XmlPullParser {
       const char marker = xml_[pos_];
       if (marker == '?') {
         skip_until("?>");
+        if (coalesce_character_data_) {
+          Token token;
+          token.kind = Kind::ProcessingInstruction;
+          return token;
+        }
         continue;
       }
       if (marker == '!') {
@@ -156,6 +167,28 @@ class XmlPullParser {
   }
 
  private:
+  Token read_coalesced_text() {
+    Token token;
+    token.kind = Kind::CharacterData;
+    while (pos_ < xml_.size()) {
+      const auto open = xml_.find('<', pos_);
+      if (open != pos_) {
+        const auto end = open == std::string_view::npos ? xml_.size() : open;
+        token.text += decode_entities(xml_.substr(pos_, end - pos_));
+        pos_ = end;
+      }
+      if (xml_.substr(pos_, 9) == "<![CDATA[") {
+        const auto end = xml_.find("]]>", pos_ + 9);
+        if (end == std::string_view::npos)
+          throw std::runtime_error("XML input has an unterminated CDATA section");
+        token.text.append(xml_.substr(pos_ + 9, end - pos_ - 9));
+        pos_ = end + 3;
+      } else if (xml_.substr(pos_, 4) == "<!--") {
+        skip_until("-->");
+      } else break;
+    }
+    return token;
+  }
   static bool whitespace_only(std::string_view text) {
     for (const char ch : text) {
       if (!std::isspace(static_cast<unsigned char>(ch))) return false;
@@ -277,6 +310,7 @@ class XmlPullParser {
   std::string_view xml_;
   std::size_t pos_ = 0;
   bool emit_character_data_ = false;
+  bool coalesce_character_data_ = false;
 };
 
 // Returns the value of the named attribute, or nullptr when absent.

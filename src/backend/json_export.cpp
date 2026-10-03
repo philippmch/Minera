@@ -4033,7 +4033,8 @@ std::string petri_net_presentation_json(const PetriNetPresentation& net) {
     write_petri_presented_ref(out, arc.source);
     out << ",\"target\":";
     write_petri_presented_ref(out, arc.target);
-    out << ",\"weight\":" << arc.weight << ",\"properties\":";
+    out << ",\"weight\":" << (arc.negative_weight && arc.weight ? "-" : "")
+        << arc.weight << ",\"properties\":";
     properties(arc.properties);
     out << '}';
   }

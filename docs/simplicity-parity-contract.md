@@ -500,3 +500,127 @@ broader evaluation/conformance/composite domains and full application numeric
 wire precision remain open. The catalogue stays at 46/86 packages,
 199/387 modules and 228 incomplete units. Full module/package parity is not
 established.
+
+## PNML arc weights and XML annotation text
+
+PNML reset/inhibitor input weights now retain their signed magnitude through
+the document, primitive extended-arc metadata, full presentation and both native
+export routes. Nonunit, zero, signed, ASCII sign/padding/underscore and Unicode
+decimal lexemes use an independently written integer parser. Ordinary zero
+weights remain presented arc occurrences. Ordinary signed PNML weights reject
+explicitly when no primitive multiplicity projection exists. Typed output arcs
+still reject on this measured traditional-net domain.
+
+The generated owned decimal classifier uses public Python 3.11.9 Unicode 14
+operations: 1,114,112 classified and round-trip-checked codepoints, 660 decimal
+codepoints in 66 blocks and 58 actual leading/trailing integer-whitespace calls.
+These are standard-library operations, with zero PM4Py calls. The executed
+generator, record and exact header are hash-bound. Native public controls and
+registered regressions exercise Arabic and fullwidth digits; the generation
+check is not a claim of a native parser call for every Unicode codepoint.
+
+Arc annotation text follows the measured public XML behavior. Repeated text
+children use the last value, including empty text. Adjacent ordinary text, CDATA
+and removed comments coalesce. A child element or processing instruction ends
+the first text segment, so its following tail is ignored. Prefix-qualified
+arctype/text elements are recognized. Empty numeric text rejects, while an
+inscription without a text child leaves the default weight. XML coalescing is
+opt-in for PNML; existing default XML consumers retain their mode.
+
+Direct full-presentation cyclomatic evaluation handles signed weights and
+uint64 magnitudes with checked signed64 marking arithmetic. Huge positive
+inputs can be disabled without conversion overflow. Negative inputs add tokens
+during classic weak firing; negative outputs retain negative token entries.
+Reset/inhibitor documents and primitive extended nets supply their retained
+weights to this classic default metric. Other execution consumers keep their
+arc-type behavior; this checkpoint does not establish their semantic parity.
+
+The original public matrix contains 262 actual imports: 172 successes and 90
+errors (12 ValueError, 10 TypeError and 68 Exception). It spans 144 input/output
+weight controls, 96 type-text controls and 22 inscription-text controls. Its
+independent unit source guard bounds successful graphs to two firings, including
+signed and arbitrarily large public integers. Every original row is retained.
+Actual public scalar calls, object fields and independently returned graphs are
+the oracles. Before/after opaque proofs for 11 modules match the pinned commit
+after recorded CRLF-to-LF conversion only. No upstream implementation or
+bytecode is inspected, and no reference scalar is synthesized.
+
+The baseline native bundle makes 248 safe imports and 1,152 metrics; the final
+bundle makes the same 248 imports and 1,392 metrics. Successful imports improve
+from 114 to 150, carrier weight/type matches from 78 to 150, and rejection
+boolean matches from 74 to all 90 public import errors. Direct signed-magnitude
+presentation construction improves from 156 to 164. Every successful final
+document matches all three metric outcomes and six checked fields: 450 outcomes.
+Presentations match 489/492 outcomes, with three explicit marking-range gates.
+Primitive nets match 449/450, with the explicit zero-input structural gate.
+The full comparison records 8,331 matching fields without discarding failures.
+Cyclomatic metadata derives from returned public graphs; structural vertices
+and arc-degree complexity derive from public input fields. Non-cyclomatic SCC
+and primitive structural edges are local zero metadata. Input/parameter/carrier
+snapshots are unchanged.
+
+Every one of the 150 actual native document exports is independently reimported
+by the pinned runtime. All arc weights/types, net subclasses, metric triplets,
+enabling results and nonzero initial/final/weak-firing marking entries match.
+Across original and reimport captures, totals are 412 actual public imports,
+966 metrics and 322 calls each to graph construction, export, enabling and weak
+firing. All 150 CLI and 150 loopback HTTP evaluations match their original
+public integer scalars, and all 301 recorded HTTP requests return 200. Startup
+health and discovery internals are outside instrumented producer counts. The
+task-owned server is stopped after checks. The previous 352-case matrix is
+also rerun with the byte-identical probe against the new core: all 4,224 metrics,
+1,056 parameter parses, carrier snapshots and exact document exports stay
+identical. No new public calls are made for that regression comparison.
+
+The full serial build compiles all production, application and test binaries
+afresh from 655 frozen source/configuration inputs. Eight old files change and
+three are added; 644 old inputs remain unchanged. Four suites initially pass,
+while the Petri suite fails its obsolete ordinary zero-weight rejection
+assertion. Only that old assertion is corrected. The accepted bundle freezes
+655 inputs, 654 byte-identical to the compiled candidate, and recompiles only
+the corrected Petri suite with project references disabled. Seven exact core,
+application and unchanged-suite binaries are hash-guarded through configure,
+test compilation and all five passing suites. Release NDEBUG undefinition,
+new assertion text, process logs and all binary hashes are retained and checked.
+
+A zero-call preparation failure (missing local writer) and a zero-call probe
+compile failure (guessed serialization header) remain with their original
+helpers, exact fixtures/probe files, correction records and available logs.
+Actual process witnesses for the compile failure are retained. Missing original
+preparation process timestamps are not reconstructed. Corrected producers are
+new derivatives; no executed helper is overwritten. The failed full candidate
+and its original failed test binary also remain.
+
+The three individually sub-50-MiB archives retain 4,315 exact files in
+4,350 chunk rows. All 655 accepted inputs, public/native/application
+captures, attempted failures, generated classifier proof, fresh core, original
+and corrected test binaries, applications and probes survive. The fresh core
+spans two archives; reused accepted binaries bind the exact candidate bytes.
+Every chunk and whole file passes exact base64 round-trip verification across
+the archive set. The preceding pushed archives bind unchanged baseline inputs
+and binaries. No package/module catalogue promotion is inferred.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `pnml-extended-annotations-checks.jsonl.gz` | `3f3ba6d32f20d266cde3e91917e5c55786ee72338c12bcb4b51712a4412182a7` | 24426111 |
+| `pnml-extended-annotations-core-1.jsonl.gz` | `e48213b907f80854a0ef812603f8056e690a3835ef8b2ae20e4d55b59431b090` | 23224772 |
+| `pnml-extended-annotations-core-2.jsonl.gz` | `25e1baf9ccb82fc3fc2a29154b3be94e12fbb81fbec8b11b023dfb5d1fc67ecd` | 26838333 |
+
+The retained matrix still has 14 ordinary positive weights whose native
+imports are deliberately unattempted because primitive multiplicity expands
+into vector slots; the smallest of these weights is 2,147,483,647. Eight public
+successes exceed uint64 weight magnitude. Four signed ordinary PNML cases lack
+a primitive execution projection. Three directly presented output weights
+exceed signed64 reachable marking range and report uncomputed. One ordinary
+zero-input case loses primitive structural adjacency: direct executable Cardoso
+is 1, while the actual public, document and presentation results are 2. These
+are explicit remaining gates, with their original public rows retained.
+
+Exception class/message equality, additional malformed/repeated/namespace
+annotations, combinations of typed inputs and outputs, supplied marking-name
+collisions and set/allocation-order dependence remain open. General metadata,
+foreign keys, IDs, zero-key/order behavior, public exporter byte formats,
+unbounded graphs, time limits/state caps, full application numeric precision
+and broader evaluation/conformance/composite domains remain open. The catalogue
+stays at 46/86 packages, 199/387 modules and 228 incomplete units. Full
+module/package parity is not established.

@@ -792,6 +792,33 @@ void simplicity_extended_document_cyclomatic_contract() {
   }
 }
 
+void simplicity_signed_weighted_presentation_contract() {
+  PetriNetPresentation net;
+  net.places = {{0,"source",{}},{1,"gate",{}},{2,"sink",{}}};
+  net.transitions = {{0,"move",std::string("A"),{}}};
+  net.arcs = {{{PetriNodeKind::kPlace,0},{PetriNodeKind::kTransition,0},1,{}},
+              {{PetriNodeKind::kPlace,1},{PetriNodeKind::kTransition,0},2,{}},
+              {{PetriNodeKind::kTransition,0},{PetriNodeKind::kPlace,2},1,{}}};
+  SimplicityOptions options;
+  options.presentation_initial_marking = std::vector<PetriSparseMarkingEntry>{{0,2},{1,3}};
+  const auto weighted = evaluate_simplicity(net,SimplicityVariant::EXTENDED_CYCLOMATIC,options);
+  assert(weighted.computed && weighted.vertices == 2 && weighted.value == 1.0);
+  net.arcs[1].weight = 1; net.arcs[1].negative_weight = true;
+  const auto signed_input = evaluate_simplicity(net,SimplicityVariant::EXTENDED_CYCLOMATIC,options);
+  assert(signed_input.computed && signed_input.vertices == 3 && signed_input.value == 2.0);
+  net.arcs[1].negative_weight = false; net.arcs[1].weight = 0;
+  assert(evaluate_simplicity(net,SimplicityVariant::EXTENDED_CYCLOMATIC,options).value == 2.0);
+  net.arcs[1].weight = std::numeric_limits<std::uint64_t>::max();
+  const auto blocked = evaluate_simplicity(net,SimplicityVariant::EXTENDED_CYCLOMATIC,options);
+  assert(blocked.computed && blocked.vertices == 1 && blocked.value == 0.0);
+  net.arcs[1].weight = 1; net.arcs[2].negative_weight = true;
+  const auto signed_output = evaluate_simplicity(net,SimplicityVariant::EXTENDED_CYCLOMATIC,options);
+  assert(signed_output.computed && signed_output.vertices == 3 && signed_output.value == 2.0);
+  net.arcs[2].negative_weight = false; net.arcs[2].weight = 2147483648ull;
+  const auto large_output = evaluate_simplicity(net,SimplicityVariant::EXTENDED_CYCLOMATIC,options);
+  assert(large_output.computed && large_output.vertices == 3 && large_output.value == 2.0);
+}
+
 void composite_default_contract() {
   const auto events = log({{"A", "B"}, {"A"}});
   const auto net = sequence_net();
@@ -1315,6 +1342,7 @@ int main() {
   simplicity_reachable_transition_occurrences_contract();
   simplicity_presented_reachability_contract();
   simplicity_extended_document_cyclomatic_contract();
+  simplicity_signed_weighted_presentation_contract();
   composite_default_contract();
   composite_document_and_weight_contract();
   evaluation_event_data_adapters_contract();

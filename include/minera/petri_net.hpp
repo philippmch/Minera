@@ -22,6 +22,13 @@ namespace minera {
 // allow firing when their place is empty.
 enum class PetriArcType { kNormal, kReset, kInhibitor };
 
+// Retained extended-arc weight for interchange and classic graph evaluation.
+// Reset/inhibitor execution still follows the arc type, independent of weight.
+struct PetriArcWeight {
+  std::uint64_t magnitude = 1;
+  bool negative = false;
+};
+
 // A transition in a labeled workflow net. A transition with no activity is
 // silent (tau): it routes tokens but consumes no event during replay.
 struct PetriTransition {
@@ -30,6 +37,21 @@ struct PetriTransition {
   std::vector<std::size_t> outputs;     // place ids produced when firing
   std::vector<std::size_t> reset_inputs;      // reset arcs (place -> transition)
   std::vector<std::size_t> inhibitor_inputs;  // inhibitor arcs
+  std::vector<PetriArcWeight> reset_weights;
+  std::vector<PetriArcWeight> inhibitor_weights;
+
+  [[nodiscard]] PetriArcWeight reset_arc_weight(std::size_t index) const {
+    if (reset_weights.empty()) return {};
+    if (reset_weights.size() != reset_inputs.size())
+      throw std::invalid_argument("Petri reset weight dimensions are invalid");
+    return reset_weights.at(index);
+  }
+  [[nodiscard]] PetriArcWeight inhibitor_arc_weight(std::size_t index) const {
+    if (inhibitor_weights.empty()) return {};
+    if (inhibitor_weights.size() != inhibitor_inputs.size())
+      throw std::invalid_argument("Petri inhibitor weight dimensions are invalid");
+    return inhibitor_weights.at(index);
+  }
 
   [[nodiscard]] bool silent() const noexcept { return !activity.has_value(); }
   [[nodiscard]] bool has_extended_arcs() const noexcept {
@@ -63,6 +85,8 @@ struct PetriPresentedArc {
   PetriNodeRef target;
   std::uint64_t weight = 1;
   HeuristicStructuredValue::Object properties;
+  // weight is the absolute magnitude; negative zero is equivalent to zero.
+  bool negative_weight = false;
 };
 struct PetriSparseMarkingEntry {
   std::size_t place_id;
@@ -89,7 +113,7 @@ class PetriNet {
                              std::vector<std::size_t> inputs,
                              std::vector<std::size_t> outputs) {
     transitions_.push_back(
-        PetriTransition{activity, std::move(inputs), std::move(outputs), {}, {}});
+        PetriTransition{activity, std::move(inputs), std::move(outputs), {}, {}, {}, {}});
     return transitions_.size() - 1;
   }
 
@@ -113,8 +137,13 @@ class PetriNet {
         contains(target.inhibitor_inputs)) {
       throw std::invalid_argument("Petri transition cannot duplicate arc types for a place");
     }
-    if (type == PetriArcType::kReset) target.reset_inputs.push_back(place);
-    else target.inhibitor_inputs.push_back(place);
+    auto& endpoints = type == PetriArcType::kReset ? target.reset_inputs : target.inhibitor_inputs;
+    auto& weights = type == PetriArcType::kReset ? target.reset_weights : target.inhibitor_weights;
+    if (weights.empty()) weights.resize(endpoints.size());
+    if (weights.size() != endpoints.size())
+      throw std::invalid_argument("Petri extended weight dimensions are invalid");
+    endpoints.push_back(place);
+    weights.push_back({});
   }
 
   // Adds the output side of an ordinary transition-place arc.  Repeated
@@ -128,12 +157,16 @@ class PetriNet {
     transitions_[transition].outputs.push_back(place);
   }
 
-  void add_reset_arc(std::size_t transition, std::size_t place) {
+  void add_reset_arc(std::size_t transition, std::size_t place,
+                     std::uint64_t weight = 1, bool negative = false) {
     add_arc(transition, place, PetriArcType::kReset);
+    transitions_[transition].reset_weights.back() = {weight, negative && weight != 0};
   }
 
-  void add_inhibitor_arc(std::size_t transition, std::size_t place) {
+  void add_inhibitor_arc(std::size_t transition, std::size_t place,
+                         std::uint64_t weight = 1, bool negative = false) {
     add_arc(transition, place, PetriArcType::kInhibitor);
+    transitions_[transition].inhibitor_weights.back() = {weight, negative && weight != 0};
   }
 
   [[nodiscard]] bool has_extended_arcs() const noexcept {
