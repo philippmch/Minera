@@ -1382,6 +1382,133 @@ void plusplus_pandas_surrogate_category_errors() {
   }
 }
 
+EventTable pandas_activity_category_table() {
+  auto table = pandas_surrogate_control_table();
+  const auto column = table.column_index("concept:name");
+  table.dtypes[column] = "category";
+  table.categorical_dtypes.resize(table.columns.size());
+  EventTableCategoricalDtype descriptor;
+  descriptor.categories_dtype = "object";
+  for (const std::string name : {"unused", "A", "B", "C", "D"}) {
+    EventAttribute category;
+    category.kind = AttributeKind::kString;
+    category.value = name;
+    descriptor.categories.push_back(category);
+  }
+  table.categorical_dtypes[column] = std::move(descriptor);
+  return table;
+}
+
+void plusplus_pandas_unused_activity_categories() {
+  auto options = plus_options();
+  auto table = pandas_activity_category_table();
+  auto net = discover_plus_plus_pandas(table, options);
+  assert((net.activities == std::vector<std::string>{"A", "B", "C", "D"}));
+  assert(net.sojourn_times->size() == 4);
+  table = pandas_activity_category_table();
+  options.min_activity_count = 0;
+  net = discover_plus_plus_pandas(table, options);
+  assert((net.activities == std::vector<std::string>{"A", "B", "C", "D", "unused"}));
+  const auto& unused = activity_stat(net, "unused");
+  assert(unused.occurrences == 0 && unused.start_occurrences == 0 && unused.end_occurrences == 0);
+  assert(std::isnan(unused.mean_sojourn_seconds));
+  assert(net.sojourn_times->size() == 4 && !net.sojourn_times->contains("unused"));
+  assert(net.metadata->activities_occurrences.at("unused") == 0);
+  assert(net.relation_statistics.size() == 4);
+  assert(relation(net, "A", "B").eventually_follows_frequency == 2);
+}
+
+void plusplus_pandas_missing_activity_rows() {
+  for (const bool categorical : {false, true}) {
+    for (const bool nan : {false, true}) {
+      const auto source = [&] {
+        auto table = categorical ? pandas_activity_category_table() : pandas_surrogate_control_table();
+        if (!categorical) table.dtypes[table.column_index("concept:name")] = "object";
+        return table;
+      };
+      const auto clear_activity = [&](EventTable::Row& row, std::size_t column) {
+        if (!nan) { row[column].reset(); return; }
+        EventAttribute missing;
+        missing.key = "concept:name";
+        missing.kind = AttributeKind::kFloat;
+        missing.value = "nan";
+        missing.typed_value = std::numeric_limits<double>::quiet_NaN();
+        row[column] = missing;
+      };
+      auto table = source();
+      const auto column = table.column_index("concept:name");
+      clear_activity(table.rows.front(), column);
+      const auto before = table;
+      auto options = plus_options();
+      options.decoration = HeuristicNetDecoration::kPerformance;
+      auto net = discover_plus_plus_pandas(table, options);
+      assert((net.activities == std::vector<std::string>{"B", "C", "D", "A"}));
+      assert(activity_stat(net, "A").occurrences == 3);
+      assert(activity_stat(net, "B").start_occurrences == 1);
+      assert(relation(net, "A", "B").eventually_follows_frequency == 1);
+      assert(relation(net, "A", "C").eventually_follows_frequency == 2);
+      assert(net.sojourn_times->size() == 4 && net.sojourn_times->at("A") == 1.0);
+      assert(table.rows.size() == before.rows.size());
+      for (std::size_t i = 0; i < before.rows.size(); ++i)
+        assert(std::equal(before.rows[i].begin(), before.rows[i].end(), table.rows[i].begin()));
+
+      table = source();
+      for (auto& row : table.rows)
+        if (row[column]->value == "B") clear_activity(row, column);
+      net = discover_plus_plus_pandas(table, options);
+      assert((net.activities == std::vector<std::string>{"A", "C", "D"}));
+      assert(net.relation_statistics.size() == 2);
+      assert(relation(net, "A", "C").eventually_follows_frequency == 4);
+      assert(relation(net, "C", "D").eventually_follows_frequency == 4);
+      assert(net.plusplus_computed_performance_dfg->at({"A", "C"}) == 1.0);
+      assert(net.plusplus_computed_performance_dfg->at({"C", "D"}) == 2.0);
+
+      // The missing inner C remains a wait barrier between outer B and D.
+      table = source();
+      clear_activity(table.rows[2], column);
+      net = discover_plus_plus_pandas(table, options);
+      assert(activity_stat(net, "C").occurrences == 3);
+      assert(net.sojourn_times->at("C") == 10.0 / 3.0);
+      assert(relation(net, "C", "D").eventually_follows_frequency == 3);
+      assert(net.plusplus_computed_performance_dfg->at({"B", "D"}) == 2.0);
+
+      table = source();
+      for (auto& row : table.rows) clear_activity(row, column);
+      bool matched = false;
+      try { (void)discover_plus_plus_pandas(table, options); }
+      catch (const HeuristicPandasError& error) {
+        matched = error.reference_type() == "builtins.TypeError" &&
+            std::string(error.what()) == "Invalid comparison between dtype=timedelta64[us] and int";
+      }
+      assert(matched && table.columns.back() == "@@diff" && table.rows.size() == 16);
+      assert(std::get<double>(table.rows.front().back()->typed_value) == 1.0);
+    }
+  }
+}
+
+void plusplus_pandas_empty_activity_frames() {
+  for (const bool aware : {false, true}) {
+    auto table = pandas_activity_category_table();
+    table.rows.clear();
+    table.index.reset();
+    const auto dtype = aware ? "datetime64[us, UTC]" : "datetime64[us]";
+    table.dtypes[table.column_index("start_timestamp")] = dtype;
+    table.dtypes[table.column_index("time:timestamp")] = dtype;
+    const auto before = table;
+    bool matched = false;
+    try { (void)discover_plus_plus_pandas(table, plus_options()); }
+    catch (const HeuristicPandasError& error) {
+      matched = error.reference_type() == "builtins.TypeError" &&
+          std::string(error.what()) == (aware
+              ? "cannot subtract DatetimeArray from ndarray[object]"
+              : "Invalid comparison between dtype=timedelta64[us] and int");
+    }
+    assert(matched && table.rows.empty());
+    if (aware) assert(table.columns == before.columns && table.dtypes == before.dtypes);
+    else assert(table.columns.back() == "@@diff" && table.dtypes.back() == "float64");
+  }
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -5282,6 +5409,9 @@ int main(int argc, char** argv) {
   plusplus_pandas_surrogate_activity_groups();
   plusplus_pandas_surrogate_case_groups();
   plusplus_pandas_surrogate_category_errors();
+  plusplus_pandas_unused_activity_categories();
+  plusplus_pandas_missing_activity_rows();
+  plusplus_pandas_empty_activity_frames();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();

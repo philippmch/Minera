@@ -1476,3 +1476,82 @@ Broader carrier and parameter types, categorical and dictionary ordering,
 metadata completeness, identity, timestamp and routing domains remain open.
 PLUSPLUS and Alpha+ stay partial. Coverage remains 46/86 packages and 199/387
 modules, with 228 incomplete units and no promotion.
+
+## Pandas missing and categorical activities (2026-10-03)
+
+Executed 72 fresh PM4Py PLUSPLUS calls on 18 complete DataFrame fixtures, with
+all nine options explicit, both decorations and HN/PN routes. The controls
+cover unused and reordered categories, an unused surrogate category, unequal
+counts, zero minimum activity counts, missing first/middle/all activity values,
+empty category and object columns, aware and naive timestamps, and object
+timestamp dtypes. Actual category values, dtype and ordering are captured.
+Another 144 separately counted public pandas grouping diagnostics leave the
+visible inputs unchanged. No result serialization failures occurred.
+
+For these controls, missing activity rows retain their caller-side duration
+values while activity counts, sojourn means, boundaries and interval relations
+exclude them. Removing all B values yields A-to-C and C-to-D relations with
+frequency four, and performance waits of one and two seconds. A missing first
+A changes the first case's start activity to B. Missing all activity values
+raises the exact timedelta comparison TypeError after adding `@@diff`.
+Empty aware frames raise the captured subtraction TypeError before mutation;
+empty naive frames raise the timedelta comparison TypeError after adding
+`@@diff`. Timestamp dtype validation retains its observed error precedence.
+Performance adjacency retains missing activity rows as barriers and omits
+pairs touching them, so the mean waits use only actual labeled adjacencies.
+
+Declared unused activity categories have zero occurrences. They join the
+returned activities and nodes when the minimum activity count admits zero,
+and they contribute no sojourn entry. Positive-count activities precede them;
+frequency ties follow category declaration order. An unused activity surrogate
+does not trigger the categorical case-key encoding error.
+
+The complete pre-change replay retains 72 actual discoveries and 20 native
+presentations. It exposes 66 net-field mismatches, 260 unrepresentable field
+comparisons, eight Petri mismatches, four Petri comparisons without native
+results, and 28 error differences. Input-after, option and mutation checks
+already match. These original comparisons remain diagnostic evidence.
+The first implementation incorrectly removed missing activity rows from wait
+adjacency as well. Its regression suite failed; a retained 72-discovery replay
+isolates 11 performance-field and four Petri differences. A fresh build tests
+the correction. A second failed regression exposed the explicit-null event
+state, which must be distinguished from a missing role. All three sets of 650
+compilation inputs and process logs remain retained. The failed replay's 22
+presentations are counted separately; prepared unexecuted replays add no calls.
+
+The replay assesses 1,152 retained PLUSPLUS aliases and matches 1,148: 514 full
+supported HN results, 201 Petri presentations and 433 expected errors. All
+26066 assessed net/node/edge fields and connection domains match. Input-after,
+option and mutation checks match, and all 77 generic regressions remain
+unchanged. Actual accepted calls total 1,229 discoveries, 205 presentations
+and 43 generic conversions, using 528 shared fresh-data factories with exact
+literal reconstruction. Five assertion-enabled suites pass on 650 frozen
+compilation inputs. The Unicode decoder is unchanged; its preceding exhaustive
+builtin comparison remains bound through the parent checkpoint.
+
+Four newly captured missing-first-activity Petri aliases still differ in their
+hidden transition name, `hid_4` versus `hid_2`. A file-only diagnostic changes
+that one name in copied native presentations and then matches every supported
+field and arc occurrence using the unchanged strict comparer. The original
+returns remain byte-identical; modified-copy matches give no parity credit.
+That diagnostic makes zero public or native producer calls. All preceding
+1,080 controls remain matched. The remaining name/order behavior is the next
+implementation gate.
+
+Three archive segments retain 6311 members byte for byte, including
+the new public returns and mutations, grouping diagnostics, API metadata,
+opaque pinned-module proofs, exact sources, helpers, probes, process logs and
+binary bindings. The preceding surrogate checkpoint's five archive hashes and
+validation are bound, giving 1,449 public calls in the evidence chain.
+`heuristic-plusplus-pandas-activity-validation.json` records the accounting.
+
+| Evidence segment | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `heuristic-plusplus-pandas-activity-core-checks.jsonl.gz` | `040d096533da69a6ca02a03ef5fcd246a6fd8c4b952a269156902e6bc4358fb0` | 37180147 |
+| `heuristic-plusplus-pandas-activity-controls-checks.jsonl.gz` | `b5512693cc7a221ff24e21328dee01afdb71682691c5478485ef6384aa212abe` | 32477858 |
+| `heuristic-plusplus-pandas-activity-replay-checks.jsonl.gz` | `0e346c93ff11d780012332bd954bccc28711053ebea47cff731384d81c70b9bd` | 67732406 |
+
+Broader scalar/carrier types, categorical ordering, metadata, identity,
+timestamp and routing domains remain open. PLUSPLUS and Alpha+ stay partial.
+Coverage remains 46/86 packages and 199/387 modules, with 228 incomplete units
+and no promotion.
