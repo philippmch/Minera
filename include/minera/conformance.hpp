@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <string>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 #include "minera/event_data.hpp"
@@ -71,6 +72,8 @@ struct TokenReplayTraceDiagnostics {
   // Membership of the reached marking, including explicit zero-token keys.
   // Forward replay supplies one entry per place; older/backwards rows may omit it.
   std::vector<bool> reached_marking_keys;
+  // Places removed by token-flood cleaning still contribute PLTR overfed traces.
+  std::vector<std::size_t> cleaned_place_indices;
 };
 
 struct TokenReplayDurationComparison {
@@ -184,6 +187,13 @@ enum class TokenReplayVariant {
   BACKWARDS = kBackwards,
 };
 
+// Place-to-place paths contain transition indices from the supplied net.
+// An explicit empty matrix suppresses structural hidden routing. Native scalar
+// or container carriers retain deferred membership checks at path lookup.
+using TokenReplayHiddenPathMatrix = std::unordered_map<std::size_t,
+    std::unordered_map<std::size_t, std::vector<std::size_t>>>;
+using TokenReplayHiddenPathCache = std::variant<TokenReplayHiddenPathMatrix, EventAttribute>;
+
 struct TokenReplayOptions {
   TokenReplayVariant variant = TokenReplayVariant::kForward;
   bool stop_immediately_unfit = false;
@@ -241,6 +251,9 @@ struct TokenReplayOptions {
   bool enable_pltr_fitness = false;
   std::optional<bool> disable_variants;
   bool return_names = false;
+  // Forward pre-event and final routing use this cache when supplied. Absence
+  // (or an explicit null native value) computes structural paths from the net.
+  std::optional<TokenReplayHiddenPathCache> places_shortest_path_by_hidden;
 };
 
 struct TokenReplayTraceReference {

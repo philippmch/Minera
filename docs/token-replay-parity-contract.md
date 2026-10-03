@@ -903,3 +903,89 @@ parity claim. Evidence: [forward-controls-validation.json](forward-controls-vali
 | `forward-controls-evidence-17.jsonl.gz` | `67fbcdf3c848d580b73120e70fd73753407b758897e3d29f9545a5ccff899bbb` | 3329049 |
 | `forward-controls-evidence-18.jsonl.gz` | `c919f19f443f3e1daf7a7be4b2b8b582224dc5775ed291ed9d3e2a7662f4af61` | 3428755 |
 | `forward-controls-evidence-19.jsonl.gz` | `328adc18a2b8598aa63564fe8534ef726d212e908b79e68801eb0787a4831372` | 2776308 |
+
+## Supplied hidden paths and cleaned-place PLTR membership
+
+The forward C++ API now accepts `places_shortest_path_by_hidden` as a
+place-index matrix of transition-index paths, or a native value carrier.
+Absence and explicit null retain structural path computation. An explicitly
+empty matrix suppresses hidden routing before events and when reaching the
+final marking. Supplied paths retain their order, including partial paths,
+repeated transitions and identity entries, and use the existing replay kernel.
+The matrix is examined at path lookup; a non-iterable scalar fails only when
+a marking key is actually examined. Empty logs, disabled routing, null PLTR
+keys and earlier failures retain their measured precedence. Iterable native
+value containers cannot contain model Place objects and have no matching rows.
+This is an EventLog/PetriNet C++ API contract; complex supplied-cache parsing
+through the CLI, HTTP and other adapters remains unimplemented.
+
+Token-flood cleaning now records the places it clears. Their traces remain in
+the PLTR overfed-trace sets after the reached marking loses those place keys.
+The change preserves token counts and the full tagged return carrier.
+
+The 13440 public outcomes from the preceding parameter checkpoint are reused
+with exact hashes. The accepted native probe matches all 11348 complete returns,
+2092 measured error behaviors and 13440 independent Trace equality matrices.
+This closes the preceding 260 return and 174 error-behavior differences.
+
+Two fresh public captures add 8424 actual calls through both the direct and
+parent APIs, with 8016 complete returns, 408 actual errors and zero serialization
+errors. Each imports six owned PNML fixtures and exercises 351 profiles across
+three log cohorts, eleven cache forms, nine policies and selected enum/string
+parameter keys. The forms include complete, empty, prefix, last-step, selected
+branch, identity, repeated-transition, null and integer caches. Every input,
+marking, log and parameter snapshot is unchanged after each public call, and
+the seven opaque module pin proofs are unchanged before and after each capture.
+All 4212 direct/parent outcome pairs agree as complete carriers or actual errors.
+
+The first fixture capture omitted explicit invisibility markers. Public import
+snapshots prove that its transitions have visible fallback labels, so it is
+retained as visible-routing and cleaning evidence. A derived capture changes
+only the ProM invisibility declarations; public snapshots independently confirm
+silent-transition counts of 2, 2, 2, 4, 2 and 2. These corrected fixtures cover
+multi-step pre-event/final paths, a join, a choice, a self-loop and an explicit
+zero-token initial marking key. The accepted core matches all 4008 complete
+returns and 204 errors in each fixture capture, with no differences or partial
+carrier acceptance.
+
+| Accepted comparison | Whole returns matched | Error behaviors matched |
+| --- | ---: | ---: |
+| Retained parameter controls | 11348 | 2092 |
+| New visible-routing/cleaning controls | 4008 | 204 |
+| Corrected invisible-path controls | 4008 | 204 |
+| Retained typed-key controls | 4758 | 3018 |
+| Retained 95-model full-result controls | 2216 | 2344 |
+
+The 95-model regression also preserves all 2280 legacy native records and 2032
+complete tuple carriers, with 2280 per-trace calls and 2090 accounting calls.
+The positional CLI completes 1140 actual processes: 1108 results and 32 expected
+floating-point overflow failures. Both retained public routes match all 2216
+CLI complete carriers, 2032 tuple carriers and 64 error behaviors. No native
+output fields are synthesized, and native exception classes are not asserted
+to be Python classes.
+
+The initial compile fails on an incorrect native enum name before any replay.
+The corrected candidate and final build each freeze 660 inputs, with three
+edited and 657 unchanged, produce 155 fresh binaries and pass all 152
+assertion-enabled Release suites. Passing tests do not alone establish semantic
+acceptance: the first compiled candidate retains 144 whole-result differences
+in cleaned-place PLTR sets. The final diagnostic tracking resolves all 144.
+Seven actual probe builds retain 131 imports and 25926 full-result calls in
+total, including both candidates and regressions. Their immutable early-core
+witnesses are separately bound to the final five-command build manifests.
+The generated-helper delimiter failure and correction are also retained; that
+failure precedes every native process from that helper. The evidence retains
+317 fresh full-build/probe binaries, frozen inputs, fixtures, raw returns,
+process witnesses, comparisons and helpers. Parent captures and builds are
+reused with verified hashes and are not counted as fresh public calls or builds.
+
+Evidence and byte-level archive hashes are in
+[forward-hidden-cache-validation.json](forward-hidden-cache-validation.json).
+All 5499 retained files round-trip across 42 archives, including every chunk,
+whole-file digest and byte count.
+Broader foreign/aliased cache objects, invalid model rows, extended-arc cache
+matrices and adapter transports remain unmeasured. The prior forward
+choice/flood-cleaning and backwards acceptance contracts, weighted
+aggregate/composite gates, bounded carriers and general PNML/precision gates
+still apply. The catalogue remains 46/86 packages, 199/387 modules and 228
+incomplete units, with no promotions or full parity claim.
