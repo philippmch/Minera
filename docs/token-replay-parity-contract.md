@@ -706,3 +706,118 @@ Evidence: [forward-result-validation.json](forward-result-validation.json).
 | `forward-result-evidence-13.jsonl.gz` | `66ca1cee52959147b6b0aa3668ec4baee349bfb98060fd6376f6766a02c174ea` | 7623043 |
 | `forward-result-evidence-14.jsonl.gz` | `0c2b72297cfba5f7f263b44262924efe3a847d3b6eb612983190a9de631c4dbf` | 14855150 |
 | `forward-result-evidence-15.jsonl.gz` | `8f53fe7f1b70b40f7862de30309d6131b56f5bdab629399d7c5779703ce4107a` | 4638946 |
+
+
+## Typed forward variants and null error precedence checkpoint
+
+The full forward result API now groups typed activity variants using measured
+numeric key equality, retaining the first typed representative. Booleans, integers
+and equal integral floats coalesce, including positive and negative zero. Mutable
+activity keys are rejected. Variant frequencies are compared before activity
+tuples; only tied frequencies need cross-type ordering. The earlier blanket
+mixed-null/string guard was too broad. Unequal-frequency mixtures can return,
+while incompatible tied keys retain the measured rejection behavior. Bounded
+stable merging handles the measured partial ordering of nonfinite numeric keys.
+
+An explicit null activity can select an actual silent transition in the full
+API. PLTR does not precreate fitness entries for silent transitions, so an examined
+null event produces the measured missing-transition-key rejection before repair,
+firing or fitness conversion. This also establishes the observed error precedence
+when a silent output exceeds floating-point range. The generic per-trace and
+count-only APIs keep their established contracts.
+
+Two actual public captures each import six exact retained weighted PNML models
+and execute 3888 forward/dispatcher calls. Together they retain 12 imports,
+7776 actual calls, 4758 complete returns and 3018 actual errors, with zero
+serialization gaps. The 27 log cohorts include empty/missing/null activity,
+numeric equality and integer limits, nonfinite floats, bytes, tuples, mutable
+keys, mixed activity types, typed Trace/event attributes and enum/string custom
+activity selectors. Thirteen policy profiles and tied/unequal variant-frequency
+controls are measured. All input objects remain unchanged. Seven opaque module
+pin proofs match before and after; only public signatures, enum members and
+actual return values are inspected. The public signature and all 18 Parameters
+members are retained, without claiming every parameter is implemented.
+
+The actual parent-core probe exposes 214 complete-return and 1886 error-behavior
+differences. The first fresh candidate matches all 4758 complete returns but
+retains 106 error-priority differences. Its passing test run is not semantic
+acceptance. The corrected C++ API/codec matches all 4758 whole returned carriers,
+all 3018 measured error behaviors and all 7776 public Trace equality matrices,
+with zero measured differences. Each typed native probe makes 3888 actual calls;
+comparisons against two public routes do not double the actual native call count.
+Exception behavior is matched as an observed constraint, without asserting that
+C++ and Python exception classes are identical. Raw mutable Python list/dict
+activity values map to native mutable containers solely for rejection checks;
+their raw value codec/equality is not claimed to be identical.
+
+Both candidate and corrected builds freeze 660 inputs (two existing edits,
+658 unchanged, no additions), compile 155 fresh production/test outputs and pass
+all 152 assertion-enabled Release suites. Each has five actual terminal-zero
+process records and verifies NDEBUG removal in every test project. Three probe
+preparations bind immutable core-build witness snapshots after the core and early
+suite finish. Those snapshots are separately joined here to the complete final
+build manifests, with matching source and core hashes. All 310 fresh full-build
+outputs and four fresh probe binaries are retained. The baseline probe reuses the
+previous accepted core; its parent binaries are not counted as freshly rebuilt.
+
+The corrected 95-model regression makes 95 imports, 2280 full-result calls,
+2280 per-trace calls and 2090 count-only calls. It matches all 2216 retained
+complete public carriers (2032 PLTR tuples), all 2344 public error behaviors and
+all 2280 prior generic native records. Another 1140 positional-input CLI runs
+produce 1108 successful returns and 32 overflow exits, matching all 2216 complete
+public carriers, 2032 tuples and 64 error outcomes. These 95-model public controls
+are reused from the parent evidence and are not counted as new public calls.
+Comparisons normalize only dictionary/Marking/set order and paired enabled-name
+set projections; activation, problem and context lists remain ordered.
+
+Frozen sources, binaries, projects, complete raw public/native/CLI outputs,
+process witnesses, immutable helpers, baseline differences and the first
+candidate's differences remain archived. Every chunk and entire file round-trips
+exactly. Evidence:
+[forward-typed-key-validation.json](forward-typed-key-validation.json).
+
+Unmeasured VARIANTS/cache/time/reduction/case-id/delimiter parameters, broader
+ordering domains, date/NA/frozenset/foreign keys and object alias graphs remain
+open. The prior forward silent-choice/cleanup, backwards and adapter acceptance
+contracts still require reconciliation. Weighted aggregate/composite conformance,
+specialized bounded carriers, large frontend JSON precision and general PNML
+lexical/marking/export behavior remain gated or unresolved. The catalogue remains
+46/86 packages, 199/387 modules and 228 incomplete units. No module/package
+promotion or full parity is claimed.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `forward-typed-key-evidence-01.jsonl.gz` | `0256a1d040050ce8f20d4c4af22999fd50b7d9dfac915ac7968958acae332986` | 8912048 |
+| `forward-typed-key-evidence-02.jsonl.gz` | `495bc8e872d15915fdca910845c35a00acf4f5e54c7f0475d2460582001fa75f` | 7386962 |
+| `forward-typed-key-evidence-03.jsonl.gz` | `b7e651fbfbaaec2dfb6d64df0d210a57e22fc7015c2d046a33203fefca722289` | 7337976 |
+| `forward-typed-key-evidence-04.jsonl.gz` | `68c23489c4d836e6254a26f604fedb3241b2cfd0b03d655a69be6a6cdc27c96f` | 6242645 |
+| `forward-typed-key-evidence-05.jsonl.gz` | `a8d0a6ff4a5bf14394fe9113610ef83b69c0fdb7becd4303c68098baba16c498` | 7847395 |
+| `forward-typed-key-evidence-06.jsonl.gz` | `2f8a12dd9b61fed1f15436e7f48db3f77928058815a4ccb757fc56e9c9ccf530` | 7221985 |
+| `forward-typed-key-evidence-07.jsonl.gz` | `8af73a9e544ba98fd58cc6768d6b61bc2d1e3277c3ec962aa6982509f83883f2` | 8302876 |
+| `forward-typed-key-evidence-08.jsonl.gz` | `cb51953820af8f390e411a9917d04491d3c72ec90d35780b957290664707db04` | 11984882 |
+| `forward-typed-key-evidence-09.jsonl.gz` | `ad56b6159e6745d401a7df77d69ed9a0ce0ac10fd3c3d7e3043eacc369c930b7` | 23181212 |
+| `forward-typed-key-evidence-10.jsonl.gz` | `91af28b9db36720029a3dab598e8740e8cd4c573d653f8473a85de4517694665` | 19170829 |
+| `forward-typed-key-evidence-11.jsonl.gz` | `33022a58365d26a6dd20471d98501386d4bac8b6a3b568bb149722fc205be89a` | 4436632 |
+| `forward-typed-key-evidence-12.jsonl.gz` | `0259c03d25c9f61ebc93cc8460f69361b22a537b5ef7148d4e13d6bb477faaf2` | 7791257 |
+| `forward-typed-key-evidence-13.jsonl.gz` | `0c334f38541dff349e14c76498a385479a783478ee56c613abf8ab2156359c20` | 3884613 |
+| `forward-typed-key-evidence-14.jsonl.gz` | `09e6c131ff0fdaebfa428c902287b2b677c13ca398d425310065f09a4bedb318` | 7703955 |
+| `forward-typed-key-evidence-15.jsonl.gz` | `c65031dbc6916ea53c9ee8ac7e135003b5fb115012df813e0d9f606c13839732` | 7207697 |
+| `forward-typed-key-evidence-16.jsonl.gz` | `d7fbf7c5c47a6ef350c16a8ad12d25b8274d07b310e799d0538e05ee5977a527` | 6619164 |
+| `forward-typed-key-evidence-17.jsonl.gz` | `15fa2d9d361f1d80708f6a68e404ecf359c14d3108dd4a1ab5623f22c43ce62e` | 7721321 |
+| `forward-typed-key-evidence-18.jsonl.gz` | `d53f4b5c51738ce8eac7853af0d86810d3efbf6d9faf24adcc6c0d8d14cdaebb` | 7359047 |
+| `forward-typed-key-evidence-19.jsonl.gz` | `c7859f7d6b66fa71164c69a8b43211f441f57ec1a2e3448ac7446914a20f9801` | 7686930 |
+| `forward-typed-key-evidence-20.jsonl.gz` | `0bb94141f16fb9c566d5868cbd9acbf9b81c95654f5c4241de42e0ac06685622` | 13627858 |
+| `forward-typed-key-evidence-21.jsonl.gz` | `87f3fc7d4656e92381447c99249c926b34ec0a7f682c08677874d8c6ca22d0df` | 22238044 |
+| `forward-typed-key-evidence-22.jsonl.gz` | `690f1968312f2d94da065e3c711fd6fdf82954dcad2525381fde4f7493f59f31` | 18065969 |
+| `forward-typed-key-evidence-23.jsonl.gz` | `cd1c356dbf2ebbb65e3c263fd8a9b4892502a756163dcfff180df9b97cf449e8` | 4344333 |
+| `forward-typed-key-evidence-24.jsonl.gz` | `add3a78ce3c9422f1a5cbd4ebfdb0cbeee6b9ad00f812687c6e79490fef341e6` | 3157910 |
+| `forward-typed-key-evidence-25.jsonl.gz` | `389f4821e88fc941a6e9814aa2c42a2604aedef0ae6c717af1fcfa5c3d12b6df` | 3020155 |
+| `forward-typed-key-evidence-26.jsonl.gz` | `61004fbaadf8146b3242499c2faf65ccb40ffb3576e144327b12981a51a40196` | 3135199 |
+| `forward-typed-key-evidence-27.jsonl.gz` | `7360a9416ea75adce67c38e44e67a33f7d771111493a1e6daec21cd32a4e63d7` | 2863282 |
+| `forward-typed-key-evidence-28.jsonl.gz` | `6674d56100bed55cfc1022e94b84a1df2b7d0a427ee5d440f2c01395d4ddfc2d` | 3278349 |
+| `forward-typed-key-evidence-29.jsonl.gz` | `c5739d1d3efa0e64bfa466ceb700075eb11c8bd15b74195e610ea72532dd2124` | 3257347 |
+| `forward-typed-key-evidence-30.jsonl.gz` | `9df6e06a35f3df0dcae3cae43f4be247901a7537484b63574b3940fdacb00361` | 3370072 |
+| `forward-typed-key-evidence-31.jsonl.gz` | `77671f7195dced57186b4d4b8faa875cd306ccd6ccae49c771e6fc1b51fbe57a` | 3438046 |
+| `forward-typed-key-evidence-32.jsonl.gz` | `3d834ba5feee41ce13bbac2338a6fd205f4b5c60621064f1fcf7a9d551ceb1c6` | 2920659 |
+| `forward-typed-key-evidence-33.jsonl.gz` | `752ac7350e1f166993b3f5dc857ae16bc71c9cc43e30ea04c05b40bb8a6870b5` | 2936881 |
+| `forward-typed-key-evidence-34.jsonl.gz` | `8d19efa553c680c278af9358c42b0702a1fb9737fdf230ebfd4c07425f6b9cf2` | 2473434 |

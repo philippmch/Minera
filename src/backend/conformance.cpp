@@ -159,7 +159,8 @@ class Replayer {
  public:
   explicit Replayer(const PetriNet& net, const std::vector<int>& initial = {},
                     const std::vector<int>& final = {},
-                    const TokenReplayOptions* replay_options = nullptr)
+                    const TokenReplayOptions* replay_options = nullptr,
+                    bool match_null_activity = false)
       : net_(net),
         initial_(replay_options && replay_options->exact_initial_marking
           ? resolve_exact_marking(net, *replay_options->exact_initial_marking, true)
@@ -170,11 +171,12 @@ class Replayer {
     for (std::size_t i = 0; i < net_.activities().size(); ++i) {
       name_to_activity_.emplace(net_.activities()[i], i);
     }
-    transitions_by_activity_.resize(net_.activities().size());
+    transitions_by_activity_.resize(net_.activities().size() + (match_null_activity ? 1 : 0));
     for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
       const auto& transition = net_.transitions()[t];
       if (transition.silent()) {
         silent_transitions_.push_back(t);
+        if (match_null_activity) transitions_by_activity_.back().push_back(t);
       } else {
         transitions_by_activity_[*transition.activity].push_back(t);
       }
@@ -189,6 +191,12 @@ class Replayer {
     const auto it = name_to_activity_.find(name);
     return it == name_to_activity_.end() ? std::nullopt
                                          : std::optional<std::size_t>(it->second);
+  }
+
+  [[nodiscard]] std::optional<std::size_t> null_activity_id() const {
+    return transitions_by_activity_.size() > net_.activities().size() &&
+           !silent_transitions_.empty()
+        ? std::optional<std::size_t>(net_.activities().size()) : std::nullopt;
   }
 
   // Token-replay bookkeeping for one trace.
@@ -295,6 +303,10 @@ class Replayer {
         if (diagnostics) diagnostics->replay_stopped = true;
         break;
       }
+      // A null-selected silent event has no PLTR transition-map key. This
+      // rejection occurs during the event, before per-trace float conversion.
+      if (options.enable_pltr_fitness && *step == net_.activities().size())
+        throw std::invalid_argument("null transition PLTR key");
       const auto before_cleaning = forced && !components.empty()
           ? keys : detail::ReplayMarkingKeys{};
       emit(chosen, true);
@@ -3268,11 +3280,11 @@ namespace {
 
 std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
     const EventLog& event_log, const PetriNet& net, TokenReplayOptions options,
-    bool calculate_fitness) {
+    bool calculate_fitness, bool full_result = false) {
   validate_token_replay_event_limit(event_log, options);
   if (!valid_token_replay_variant(options.variant))
     throw std::invalid_argument("unsupported token replay variant");
-  const Replayer replayer(net, options.initial_marking, options.final_marking, &options);
+  const Replayer replayer(net, options.initial_marking, options.final_marking, &options, full_result);
   const auto activity_attribute = options.activity_attribute.empty()
                                       ? std::string("concept:name")
                                       : options.activity_attribute;
@@ -3289,7 +3301,8 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
       names.push_back(activity.display_name);
       ids.push_back(activity.model_label
                         ? replayer.activity_id(*activity.model_label)
-                        : std::nullopt);
+                        : full_result && !activity.display_name ? replayer.null_activity_id()
+                                                              : std::nullopt);
     }
     Replayer::Counts counts;
     if (options.variant == TokenReplayVariant::kBackwards) {
@@ -3333,60 +3346,128 @@ TokenReplayResult replay_token_result(
   validate_token_replay_event_limit(log, options);
   const auto selector = options.activity_attribute.empty()
       ? std::string("concept:name") : options.activity_attribute;
-  // Public forward preprocessing orders activity labels before replay. Retain
-  // the measured mixed-null/string failure even when replay would overflow.
-  bool has_null = false, has_string = false;
-  for (const auto& trace : log.traces) for (const auto& event : trace.events) {
+  struct FullVariant {
+    std::vector<EventAttribute> activities;
+    std::vector<std::size_t> sources;
+  };
+  std::vector<FullVariant> variants;
+  std::unordered_map<std::string, std::vector<std::size_t>> variant_buckets;
+  const auto selected_cell = [&](const Event& event) {
     const auto activity = selected_replay_activity(event, selector);
-    has_null = has_null || !activity.display_name;
-    has_string = has_string || activity.model_label.has_value();
+    auto cell = native_event_attribute(event, selector);
+    if (!cell) cell = EventAttribute{selector, activity.display_name.value_or(""),
+                                    AttributeKind::kString, !activity.display_name};
+    cell->key = selector;
+    cell->first_class_role = FirstClassAttributeRole::kNone;
+    cell->first_class_source_key.clear();
+    if (!root_cause_key_is_hashable(*cell))
+      throw std::invalid_argument("unhashable activity variant key");
+    return *cell;
+  };
+  for (std::size_t source = 0; source < log.traces.size(); ++source) {
+    FullVariant candidate;
+    std::string fingerprint;
+    for (const auto& event : log.traces[source].events) {
+      candidate.activities.push_back(selected_cell(event));
+      append_identity_field(fingerprint, 'a',
+          root_cause_scalar_key_fingerprint(candidate.activities.back()));
+    }
+    auto& bucket = variant_buckets[fingerprint];
+    auto selected = variants.size();
+    for (const auto index : bucket) {
+      const auto& existing = variants[index].activities;
+      if (existing.size() != candidate.activities.size()) continue;
+      bool equal = true;
+      for (std::size_t i = 0; i < existing.size(); ++i)
+        if (!root_cause_scalar_keys_equal(existing[i], candidate.activities[i])) { equal = false; break; }
+      if (equal) { selected = index; break; }
+    }
+    if (selected == variants.size()) {
+      bucket.push_back(selected);
+      variants.push_back(std::move(candidate));
+    }
+    variants[selected].sources.push_back(source);
   }
-  if (has_null && has_string)
-    throw std::invalid_argument("'<' not supported between instances of 'str' and 'NoneType'");
-
+  // Frequency ties compare activity tuples. Different frequencies do not need
+  // cross-type ordering. Numeric equality includes bool/int/integral floats.
+  const auto less = [&](auto&& self, const EventAttribute& left,
+                         const EventAttribute& right) -> bool {
+    if (root_cause_scalar_keys_equal(left, right)) return false;
+    if (left.container == AttributeContainerKind::kTuple &&
+        right.container == AttributeContainerKind::kTuple) {
+      for (std::size_t i = 0; i < std::min(left.children.size(), right.children.size()); ++i) {
+        if (root_cause_scalar_keys_equal(left.children[i], right.children[i])) continue;
+        return self(self, left.children[i], right.children[i]);
+      }
+      return left.children.size() < right.children.size();
+    }
+    const auto nan = [](const EventAttribute& cell) {
+      return cell.kind == AttributeKind::kFloat && std::isnan(native_attribute_number(cell));
+    };
+    if ((nan(left) && native_scalar_order_kind(right) == NativeScalarOrderKind::kNumeric) ||
+        (nan(right) && native_scalar_order_kind(left) == NativeScalarOrderKind::kNumeric)) return false;
+    if ((left.is_null && native_scalar_order_kind(right) == NativeScalarOrderKind::kString) ||
+        (right.is_null && native_scalar_order_kind(left) == NativeScalarOrderKind::kString))
+      throw std::invalid_argument("'<' not supported between instances of 'str' and 'NoneType'");
+    try { return native_scalar_key_compare(left, right) < 0; }
+    catch (const std::invalid_argument&) {
+      throw std::invalid_argument("unordered activity variant keys");
+    }
+  };
+  std::vector<std::size_t> order;
+  for (std::size_t i = 0; i < variants.size(); ++i) order.push_back(i);
+  const auto ordered_before = [&](auto left, auto right) {
+    const auto& a = variants[left]; const auto& b = variants[right];
+    if (a.sources.size() != b.sources.size()) return a.sources.size() > b.sources.size();
+    for (std::size_t i = 0; i < std::min(a.activities.size(), b.activities.size()); ++i) {
+      if (root_cause_scalar_keys_equal(a.activities[i], b.activities[i])) continue;
+      return less(less, b.activities[i], a.activities[i]);
+    }
+    return a.activities.size() > b.activities.size();
+  };
+  // Scalar NaNs have a partial order. Explicit stable merging keeps the
+  // comparisons bounded without requiring strict weak ordering from scalars.
+  std::vector<std::size_t> scratch(order.size());
+  for (std::size_t width = 1; width < order.size();) {
+    for (std::size_t begin = 0; begin < order.size();) {
+      const auto middle = begin + std::min(width, order.size() - begin);
+      const auto end = middle + std::min(width, order.size() - middle);
+      auto left = begin, right = middle;
+      for (auto out = begin; out < end; ++out) {
+        if (left == middle || (right < end && ordered_before(order[right], order[left])))
+          scratch[out] = order[right++];
+        else scratch[out] = order[left++];
+      }
+      begin = end;
+    }
+    order.swap(scratch);
+    if (width >= order.size() - width) break;
+    width += width;
+  }
   const bool grouped = !options.disable_variants.value_or(options.enable_pltr_fitness);
   EventLog replay_log;
-  std::vector<std::size_t> group_for_source, first_source, frequencies;
-  std::map<std::vector<std::string>, std::size_t> variants;
-  for (std::size_t source = 0; source < log.traces.size(); ++source) {
-    const auto& trace = log.traces[source];
-    std::vector<std::string> key;
-    if (grouped) for (const auto& event : trace.events)
-      key.push_back(selected_replay_activity(event, selector).variant_key);
-    std::size_t group = replay_log.traces.size();
-    bool inserted = true;
-    if (grouped) {
-      const auto found = variants.emplace(std::move(key), group);
-      group = found.first->second;
-      inserted = found.second;
+  std::vector<std::size_t> group_for_source(log.traces.size()), first_source, frequencies;
+  if (grouped) for (const auto& variant : variants) {
+    Trace generated;
+    for (const auto& activity : variant.activities) {
+      Event event;
+      event.attributes.push_back(activity);
+      generated.events.push_back(std::move(event));
     }
-    if (inserted) {
-      Trace generated;
-      if (grouped) {
-        for (const auto& event : trace.events) {
-          auto selected = native_event_attribute(event, selector);
-          if (!selected && standard_activity_attribute(selector)) {
-            const auto activity = selected_replay_activity(event, selector);
-            selected = EventAttribute{selector, activity.display_name.value_or(""),
-                                      AttributeKind::kString, !activity.display_name};
-          }
-          if (!selected) throw std::invalid_argument("selected activity is missing");
-          selected->key = selector;
-          selected->first_class_role = FirstClassAttributeRole::kNone;
-          selected->first_class_source_key.clear();
-          Event projected;
-          projected.attributes.push_back(std::move(*selected));
-          generated.events.push_back(std::move(projected));
-        }
-      } else generated = trace;
-      replay_log.traces.push_back(std::move(generated));
-      first_source.push_back(source);
-      frequencies.push_back(0);
-    }
-    ++frequencies[group];
-    group_for_source.push_back(group);
+    for (const auto source : variant.sources) group_for_source[source] = replay_log.traces.size();
+    replay_log.traces.push_back(std::move(generated));
+    first_source.push_back(variant.sources.front());
+    frequencies.push_back(variant.sources.size());
   }
-  const auto rows = replay_token_traces(replay_log, net, options);
+  else {
+    replay_log = log;
+    for (std::size_t source = 0; source < log.traces.size(); ++source) {
+      group_for_source[source] = source;
+      first_source.push_back(source);
+      frequencies.push_back(1);
+    }
+  }
+  const auto rows = replay_token_trace_rows(replay_log, net, options, true, true);
   TokenReplayResult result;
   result.return_names = options.return_names;
   result.place_names = detail::replay_element_names(

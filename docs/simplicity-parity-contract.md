@@ -906,3 +906,18 @@ weighted aggregate conformance stays gated. See
 [token-replay-parity-contract.md](token-replay-parity-contract.md) and
 [forward-result-validation.json](forward-result-validation.json).
 The catalogue stays at 46/86 packages, 199/387 modules and 228 incomplete units.
+
+
+## Typed forward result follow-up
+
+Typed variant equality, frequency-tie ordering, mutable-key rejection and explicit
+null activity/silent-transition error precedence now match all 4758 fresh public
+complete returns and 3018 measured errors. Both fresh builds pass all 152
+assertion-enabled suites. The corrected 95-model native/CLI regressions preserve
+all prior complete results and generic records. The baseline and first candidate
+differences, actual process witnesses and 314 fresh binaries are retained.
+See [token-replay-parity-contract.md](token-replay-parity-contract.md) and
+[forward-typed-key-validation.json](forward-typed-key-validation.json).
+Broader parameters/keys and prior acceptance contracts remain unresolved;
+weighted aggregate conformance stays gated. The catalogue remains 46/86 packages,
+199/387 modules and 228 incomplete units, with no promotions.
