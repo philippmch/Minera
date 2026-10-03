@@ -7994,3 +7994,35 @@ alongside the successful retry at a shorter path. Broader type, error, metadata,
 identity, ordering and routing gates remain open. PLUSPLUS and Alpha+ stay
 partial; coverage remains 46/86 packages and 199/387 modules, with 228 incomplete
 units and no promotion.
+
+### PLUSPLUS pandas Unicode selector-error implementation (2026-10-03)
+
+Matched Unicode 14 string escapes and nested lookup messages while preserving
+printable labels, quote selection and lone-surrogate scalar identities. The
+234-call public matrix reproduces 140 pre-change error mismatches. After the fix,
+all 210 selector errors match; ordinary Unicode label and column controls match.
+An independent exhaustive sweep matches all 1,114,112 single-code-point native
+KeyError messages against Python builtins, making zero additional PM4Py calls.
+
+The first capture's OWN serializer fails on two successful surrogate Petri
+results. Its complete raw capture and baseline remain retained; the repaired
+OWN serializer produces a fresh 234-call matrix without serialization failures.
+The checkpoint counts all 468 new reference calls and retains 1,175 calls.
+
+The full replay resolves 924 of 928 aliases: 436 full supported HN results,
+127 Petri presentations and 361 errors. All input, mutation and option checks
+match, and all 77 generic regressions remain unchanged. Four lone-surrogate
+label aliases remain open, with seventeen actual net-field mismatches and
+24 unrepresentable edge-field occurrences. The 21445 matching field checks
+do not erase those gaps. Actual replay counts are 1,005 discoveries,
+129 presentations and 43 generic conversions; the scalar sweep adds
+1,114,112 native discoveries. Five assertion-enabled suites pass on 650 exact
+compilation inputs, and all archive members round-trip.
+
+Evidence is `heuristic-plusplus-pandas-unicode-checks.jsonl.gz` (SHA-256
+`c02fddee386b7b5055c6102034c56e1cc8a55e92a0dece2d024672ba4c5f872b`, 103247692 bytes), with
+`heuristic-plusplus-pandas-unicode-validation.json`. The preceding missing-case
+checkpoint remains hash-bound. Surrogate grouping, further type, ordering,
+metadata, identity and routing gates remain open. PLUSPLUS and Alpha+ remain
+partial; coverage stays 46/86 packages and 199/387 modules, with 228 incomplete
+units and no promotion.
