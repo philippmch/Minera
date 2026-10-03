@@ -93,7 +93,8 @@ void write_pnml(std::ostream& out, const PetriNet& net,
 // Imported arc occurrences retain order, weights, types and nonempty arc IDs.
 // Without arc metadata, endpoints retain first-occurrence order when grouped.
 // Empty ID/key metadata derives pN/tN IDs and positive-token keys. Supplied
-// metadata must have exact dimensions; IDs must be nonempty and globally unique,
+// metadata must have exact dimensions; IDs must be globally unique (an explicit
+// empty ID is retained),
 // and supplied keys must include every positive token. Validation precedes output.
 void write_pnml(std::ostream& out, const PnmlDocument& document,
                 std::string_view name = "net");

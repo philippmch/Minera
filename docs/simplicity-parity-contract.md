@@ -737,3 +737,120 @@ identity, broader malformed/repeated/namespace combinations, metadata, foreign
 keys/IDs, set/order dependence and marking-name/zero-key behavior remain open.
 The catalogue stays at 46/86 packages, 199/387 modules and 228 incomplete units.
 Full module/package parity is not established.
+
+## PNML transition labels and invisible flags
+
+The native importer defaults a transition with an absent or empty usable name
+to its visible node ID. It takes the first nonempty direct name/text initial
+segment, retaining whitespace. CDATA and comments join that segment; a child
+element or processing instruction ends it, and tails are excluded. Later name
+elements can supply a label after an empty segment; they cannot overwrite an
+already selected label. Namespace-local name/text elements follow the measured
+controls. A visible empty transition ID remains an empty string label and is
+distinct from a silent transition. Document export retains that explicit ID
+and continues to validate global node-ID uniqueness before output.
+
+A toolspecific element marks a transition silent when its tool contains the
+case-sensitive ProM text and its activity contains the measured invisible
+marker. Other tools and lowercase prom do not set the flag. Missing tool or
+missing activity on a ProM toolspecific element is rejected. Four actual public
+import rejections match native rejection booleans; exception classes/messages
+remain different and are not claimed equivalent.
+
+Two fresh public captures attempt 43 PNML imports: 39 succeed and four reject.
+The successful models make 624 actual direct/dispatcher forward replay calls
+and 39 public exports. Eight logs per model cover empty traces and typed t0,
+A, B, AB, empty-string, space and newline activities. The corrected native
+probe makes 43 imports, 39 exports and 312 actual replay invocations; each
+native invocation maps to both independently invoked public routes. All 39
+labels and transition names match, and all 624 public trace outcomes match all
+ten returned trace fields (6240 fields), including ordered activated/problem
+lists, enabled-transition sets and exact reached-marking keys/counts. Native
+document and public net/marking snapshots remain unchanged across replay.
+
+Every successful native export is independently imported by the pinned public
+runtime. All 39 exact input byte bindings, labels/names, ordinary arc endpoints
+and weights, net classes, initial/final marking keys/counts and 624 complete
+public replay returns match the original public controls. Dictionary/Marking
+item order is canonicalized only for comparison. Object identity, net/object
+properties and public serializer formatting equality are not inferred.
+
+An additional public API inventory makes zero semantic calls. A fresh weighted
+discovery matrix attempts 58 successful imports and 1044 actual forward replay
+calls across nine profiles and both routes. All 1044 calls return, snapshots
+of net/markings/log/parameters remain unchanged, and all 522 route pairs have
+identical complete returns. The ten fixtures originally named owned_hidden
+contain no ProM invisible marker: the actual public label is hidden. They are
+retained as visible named-transition controls; no weighted silent-routing
+coverage is claimed. Actual signed and over-uint64 results are retained for
+the separate weighted replay correction. These observations do not establish
+native weighted conformance parity.
+
+Across the inventory, weighted discovery, label controls and exact native
+export reimports, this checkpoint makes 140 fresh public imports, 2292 actual
+replay calls and 78 actual exports. Seven or nine opaque module proofs before
+and after each process match the pinned PM4Py 2.7.22 commit after recorded
+CRLF-to-LF conversion only. No upstream implementation or bytecode is read.
+
+The prior 352-control regression is executed on the new frozen core with a
+byte-identical owned probe and reused public observations. Entire returned
+cases, 4224 metric outcomes, 1056 parameter parses and 352 exact document
+exports remain identical to the pushed parent. Application checks make 43
+actual CLI invocations and 83 recorded loopback HTTP requests: each route has
+39 accepted models and four rejected imports. Seven conformance fields per
+accepted model match the captured t0-event trace. Every accepted HTTP bundle
+is followed by an exact GET PNML carrier byte check; all 39 match. Both checks
+must pass. Startup health and discovery internals are outside recorded request
+counts. The task-owned server is stopped after the checks.
+
+The first full build passes 18 of 19 assertion-enabled suites, then fails the
+old arc-occurrence assertion that unnamed t1 is silent. Only that obsolete
+expectation is updated to visible label t1. A fresh full serial build passes
+all 19 suites, including both forward replay diagnostics/transport suites.
+Both builds freeze 655 source/configuration inputs and compile 22 binaries
+afresh with zero reuse. The accepted source changes three existing inputs and
+preserves 652 from the parent. Release NDEBUG is explicitly undefined for all
+19 test projects and new assertion expressions survive in the actual binary.
+
+Original failed preparations/derivations remain retained: a stale weighted
+fixture-count guard after copying 48 fixtures, a followup pointer-count guard,
+a partial build derivation with an incorrect pointer literal, and an integration
+packed-bool decoder failure before any application call. A baseline probe
+also executes successfully but emits invalid JSON because std::quoted wins
+over an owned helper for lvalue strings. Its raw bytes and three exit-zero
+process witnesses are retained as failed serialization, never accepted as
+comparison evidence. A corrected derivative makes 43 imports/344 replays and
+supplies the valid baseline. Missing outer failure PID/timestamps are not
+reconstructed. No producer failure is hidden or overwritten.
+
+Six individually sub-50-MiB deterministic gzip archives preserve 2,004
+exact members in 2,076 base64 chunk rows, including both fresh cores,
+all 48 build/probe binaries, all 655 accepted source inputs, differing failed
+inputs, explicit identical-source aliases, public inputs/returns and immutable
+helpers/process witnesses. Every chunk and entire file passes exact round-trip
+verification across the archive set. Parent archives bind reused evidence.
+Frontend code is unchanged and its previous checks are not reported as fresh.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `pnml-transition-labels-checks-1.jsonl.gz` | `61a70a2b93391dfe247013fa6c2c1661c71bced65a9e6311112b1d491f22b34b` | 29164468 |
+| `pnml-transition-labels-checks-2.jsonl.gz` | `563d529b2a46452d81c9cbda7f334ee511fd6e32d25ae8badf37ffc020e943ee` | 19098859 |
+| `pnml-transition-labels-failed-core-1.jsonl.gz` | `0a0601ade81eb3f9612dac5e9f5ec3b1705407147bb08d01381d42dfb7f48011` | 23210238 |
+| `pnml-transition-labels-failed-core-2.jsonl.gz` | `ffbbfb9449c4695ab774c2fb21120003860dced69703bce73bb27e5961372ec2` | 26886096 |
+| `pnml-transition-labels-accepted-core-1.jsonl.gz` | `8934614bd69c56b2915e88b4d4324bd60088869903251c2a911f5c79836aa890` | 23224891 |
+| `pnml-transition-labels-accepted-core-2.jsonl.gz` | `5233c6d7fd0414985c80ecfc2f19285550a156814518098bdb02928ec8b08596` | 26877623 |
+
+Compact weighted replay/conformance is not corrected by this label change.
+The existing application computed=false/error gate remains for zero, signed and
+large ordinary weights. Public replay observations contain negative consumed or
+produced totals and accumulated totals/markings exceeding uint64; native replay
+still counts compact ordinary endpoints by one and lacks arbitrary signed integer
+counters/markings. Weighted hidden routing, other diagnostic and parameter
+variants, specialized analysis/transformation, full UI numeric precision and
+unbounded numeric/state behavior remain open.
+
+Exception class/message identity is not matched. General malformed/repeated/
+namespace combinations, exporter formatting and metadata, empty place IDs,
+foreign IDs/keys, set/order dependence and broader markings remain unverified.
+The catalogue stays at 46/86 packages, 199/387 modules and 228 incomplete units.
+No package/module promotion or full parity is claimed.

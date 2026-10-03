@@ -8642,3 +8642,61 @@ identity, broader malformed/repeated/namespace combinations, metadata, foreign
 keys/IDs, set/order dependence and marking-name/zero-key behavior remain open.
 The catalogue stays at 46/86 packages, 199/387 modules and 228 incomplete units.
 Full module/package parity is not established.
+
+## PNML transition labels and invisible flags (2026-10-03)
+
+Parent checkpoint: `35c538e03f80fb72846644e5075eaec57cafd82c`.
+Absent/empty usable names now fall back to visible node IDs; the first nonempty
+direct name/text initial segment retains whitespace and measured mixed XML
+semantics. ProM invisible flags use the measured tool/activity matching and
+reject missing required attributes. An explicit empty transition ID stays
+visible with empty-string label and survives document export/reimport.
+
+All 43 import booleans, 39 successful labels/names and 624 public trace outcomes
+match; ten trace fields yield 6240 matches. The native producer invokes replay
+312 times, mapping to both independently called public routes. All 39 exact
+native exports are independently reimported; their carrier/marking semantics
+and 624 complete public replay returns match. Fresh weighted discovery adds
+58 imports/1044 replays and 522 equal route pairs. The ten intended hidden
+fixtures actually import visible under label hidden and do not prove weighted
+hidden routing. Inventory plus all captures total 140 fresh public imports,
+2292 replays and 78 exports, with before/after opaque pinned module proofs.
+
+The 352-case regression retains entire JSON equality, 4224 metric outcomes and
+1056 parameter parses. All 43 CLI and 83 HTTP checks align import outcomes;
+39 successful conformance bundles per route match seven captured fields and
+all 39 HTTP exports bind the exact current imported model. Both full builds
+compile 22 binaries afresh from 655 frozen inputs with zero reuse. The first
+fails one obsolete silent-label assertion after 18 passing suites; the accepted
+build passes all 19. Accepted source changes three inputs, preserving 652.
+
+Six archives retain 2,004 files and 2,076 fully verified chunk rows,
+both fresh cores, all 48 binaries, original failures, corrected derivatives,
+public observations and explicit source aliases. See
+`simplicity-parity-contract.md` and `pnml-transition-labels-validation.json`.
+Weighted replay/conformance remains a separate numeric correction; the existing
+application gate stays in place. No catalogue promotion or full parity claim.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `pnml-transition-labels-checks-1.jsonl.gz` | `61a70a2b93391dfe247013fa6c2c1661c71bced65a9e6311112b1d491f22b34b` | 29164468 |
+| `pnml-transition-labels-checks-2.jsonl.gz` | `563d529b2a46452d81c9cbda7f334ee511fd6e32d25ae8badf37ffc020e943ee` | 19098859 |
+| `pnml-transition-labels-failed-core-1.jsonl.gz` | `0a0601ade81eb3f9612dac5e9f5ec3b1705407147bb08d01381d42dfb7f48011` | 23210238 |
+| `pnml-transition-labels-failed-core-2.jsonl.gz` | `ffbbfb9449c4695ab774c2fb21120003860dced69703bce73bb27e5961372ec2` | 26886096 |
+| `pnml-transition-labels-accepted-core-1.jsonl.gz` | `8934614bd69c56b2915e88b4d4324bd60088869903251c2a911f5c79836aa890` | 23224891 |
+| `pnml-transition-labels-accepted-core-2.jsonl.gz` | `5233c6d7fd0414985c80ecfc2f19285550a156814518098bdb02928ec8b08596` | 26877623 |
+
+Compact weighted replay/conformance is not corrected by this label change.
+The existing application computed=false/error gate remains for zero, signed and
+large ordinary weights. Public replay observations contain negative consumed or
+produced totals and accumulated totals/markings exceeding uint64; native replay
+still counts compact ordinary endpoints by one and lacks arbitrary signed integer
+counters/markings. Weighted hidden routing, other diagnostic and parameter
+variants, specialized analysis/transformation, full UI numeric precision and
+unbounded numeric/state behavior remain open.
+
+Exception class/message identity is not matched. General malformed/repeated/
+namespace combinations, exporter formatting and metadata, empty place IDs,
+foreign IDs/keys, set/order dependence and broader markings remain unverified.
+The catalogue stays at 46/86 packages, 199/387 modules and 228 incomplete units.
+No package/module promotion or full parity is claimed.
