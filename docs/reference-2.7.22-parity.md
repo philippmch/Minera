@@ -8061,3 +8061,42 @@ members round-trip byte for byte. The archive retains 1,377 public calls across
 Broader type, ordering, metadata, identity, timestamp and routing gates remain
 open. PLUSPLUS and Alpha+ remain partial; coverage stays 46/86 packages and
 199/387 modules, with 228 incomplete units and no promotion.
+
+### PLUSPLUS pandas missing/categorical activity implementation (2026-10-03)
+
+Matched missing-activity filtering in counts, sojourns, case boundaries and
+interval relations while retaining every caller row and duration mutation.
+Performance adjacency retains missing rows as barriers and omits pairs that
+touch them. The first implementation removed those barriers; its failed suite
+and 72-discovery diagnostic replay remain retained with exact sources and logs.
+A second failed suite exposed explicit-null event roles; the final build tests
+that correction too, with all three sets of exact inputs retained.
+Unused categorical activities now retain zero counts and appear when the
+minimum count admits zero, without adding unobserved sojourn values. Empty
+aware/naive inputs and all-missing activity inputs reproduce exact public
+errors and their mutation timing. Evidence comprises 72 fresh PM4Py calls
+and 144 separately counted public pandas grouping diagnostics on complete
+category carriers. The pre-change 72-discovery replay retains the actual
+field, Petri and error differences.
+
+Of 1,152 retained PLUSPLUS aliases, 1,148 match: 514 full supported HN results,
+201 Petri presentations and 433 expected errors. The 26066 assessed fields,
+connection domains, input-after, option and mutation checks match. All 77
+generic regressions remain unchanged. Actual accepted calls are 1,229
+discoveries, 205 presentations and 43 generic conversions. Five assertion-
+enabled suites pass on 650 exact compilation inputs. The unchanged Unicode
+decoder retains the preceding exhaustive scalar evidence through the parent.
+
+Four new missing-first-activity Petri aliases still differ in the hidden name
+`hid_4` versus `hid_2`. A file-only renamed-copy diagnostic isolates that name
+while preserving every original producer artifact; those copied matches give
+no parity credit and invoke no producers. All 1,080 preceding controls remain
+matched. The remaining name/order behavior stays open for the next step.
+
+The three `heuristic-plusplus-pandas-activity-*-checks.jsonl.gz` segments and
+`heuristic-plusplus-pandas-activity-validation.json` retain 6311 members
+byte for byte. The preceding surrogate validation and five archive segments
+remain hash-bound, with 1,449 public calls in the evidence chain. Broader type,
+ordering, metadata, identity, timestamp and routing gates remain open.
+PLUSPLUS and Alpha+ remain partial; coverage stays 46/86 packages and 199/387
+modules, with 228 incomplete units and no promotion.

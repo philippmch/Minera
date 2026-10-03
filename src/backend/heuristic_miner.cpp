@@ -718,6 +718,12 @@ bool pandas_string_column(const EventTable& table, std::size_t column) {
   });
 }
 
+bool pandas_missing_cell(const std::optional<EventAttribute>& cell) {
+  if (!cell || cell->is_null || is_typed_nat(*cell)) return true;
+  const auto* number = std::get_if<double>(&cell->typed_value);
+  return number != nullptr && std::isnan(*number);
+}
+
 struct PandasStringGroups {
   explicit PandasStringGroups(bool merge) : enabled(merge) {}
   bool enabled;
@@ -735,6 +741,7 @@ struct PandasInterval {
   PandasTimestamp complete;
   std::optional<double> concurrency_start;
   std::optional<double> concurrency_complete;
+  bool missing_activity = false;
 };
 
 PlusAbstraction build_pandas_plus_abstraction(
@@ -770,9 +777,7 @@ PlusAbstraction build_pandas_plus_abstraction(
   // independently of the case groups used by the interval algorithms.
   for (const auto& row : projection.rows) {
     const auto& label = row[1];
-    if (!label || label->is_null)
-      throw std::invalid_argument(
-          "Heuristics Miner PLUSPLUS: event is missing activity attribute");
+    if (pandas_missing_cell(label)) continue;
     const auto& activity = label->value;
     if (known.insert(activity).second) out.activity_order.push_back(activity);
     ++out.occurrences[activity];
@@ -788,9 +793,11 @@ PlusAbstraction build_pandas_plus_abstraction(
     std::vector<std::string> ordered;
     std::set<std::string> seen;
     for (const auto& category : projection.categorical_dtypes[1]->categories)
-      if (category.kind == AttributeKind::kString && known.contains(category.value) &&
-          seen.insert(category.value).second)
+      if (category.kind == AttributeKind::kString &&
+          seen.insert(category.value).second) {
+        out.occurrences.try_emplace(category.value, 0);
         ordered.push_back(category.value);
+      }
     for (const auto& activity : out.activity_order)
       if (seen.insert(activity).second) ordered.push_back(activity);
     out.activity_order = std::move(ordered);
@@ -801,6 +808,7 @@ PlusAbstraction build_pandas_plus_abstraction(
     PandasStringGroups cases(true);
     std::map<std::string, NamePair> boundaries;
     for (const auto& row : projection.rows) {
+      if (pandas_missing_cell(row[1])) continue;
       const auto& key = cases.group(row[0]->value);
       const auto& activity = row[1]->value;
       auto [found, inserted] = boundaries.try_emplace(key, NamePair{activity, activity});
@@ -815,12 +823,23 @@ PlusAbstraction build_pandas_plus_abstraction(
     if (trace.events.empty()) continue;
     const bool missing_case = trace.case_id_state == FirstClassAttributeState::kNull;
     if (!missing_case && !string_cases) {
-      ++out.starts[required_activity(trace.events.front(), options)];
-      ++out.ends[required_activity(trace.events.back(), options)];
+      const auto present = [](const auto& event) {
+        return event.has_activity() &&
+               event.activity_state != FirstClassAttributeState::kNull;
+      };
+      const auto first = std::find_if(trace.events.begin(), trace.events.end(), present);
+      const auto last = std::find_if(trace.events.rbegin(), trace.events.rend(), present);
+      if (first != trace.events.end()) {
+        ++out.starts[required_activity(*first, options)];
+        ++out.ends[required_activity(*last, options)];
+      }
     }
     std::vector<PandasInterval> intervals;
     for (const auto& event : trace.events) {
-      const auto& activity = required_activity(event, options);
+      const bool missing_activity = !event.has_activity() ||
+          event.activity_state == FirstClassAttributeState::kNull;
+      const auto activity = missing_activity ? std::string{}
+                                            : required_activity(event, options);
       const auto start = pandas_timestamp(
           selected_start_attribute(event, *options.start_timestamp_attribute),
           start_units);
@@ -831,7 +850,7 @@ PlusAbstraction build_pandas_plus_abstraction(
           activity, start, complete,
           start ? std::optional{pandas_concurrency_instant(*start)} : std::nullopt,
           complete ? std::optional{pandas_concurrency_instant(*complete)}
-                   : std::nullopt});
+                   : std::nullopt, missing_activity});
     }
     std::stable_sort(intervals.begin(), intervals.end(),
                      [](const auto& lhs, const auto& rhs) {
@@ -847,8 +866,10 @@ PlusAbstraction build_pandas_plus_abstraction(
                      });
     for (std::size_t i = 0; i < intervals.size(); ++i) {
       const auto& first = intervals[i];
+      if (first.missing_activity) continue;
       for (std::size_t j = i + 1; j < intervals.size(); ++j) {
         const auto& second = intervals[j];
+        if (second.missing_activity) continue;
         if (first.complete && second.start &&
             pandas_instant(*first.complete) <= pandas_instant(*second.start)) {
           ++out.eventually_follows[{efg_sources.group(first.activity),
@@ -858,6 +879,7 @@ PlusAbstraction build_pandas_plus_abstraction(
       }
       for (std::size_t j = i + 1; j < intervals.size(); ++j) {
         const auto& second = intervals[j];
+        if (second.missing_activity) continue;
         if (first.concurrency_start && first.concurrency_complete &&
             second.concurrency_start && second.concurrency_complete &&
             std::max(*first.concurrency_start, *second.concurrency_start) <=
@@ -869,13 +891,15 @@ PlusAbstraction build_pandas_plus_abstraction(
     }
     // Pandas performance adjacency follows sorted nonmissing starts. A missing
     // completion preserves its row but contributes no outgoing wait sample.
+    // Missing activity rows block adjacency and produce no labeled wait pair.
     // Missing case groups still supply intervals, but no performance waits.
     if (missing_case ||
         (string_cases && pandas_string_has_surrogate(trace.case_id))) continue;
     const PandasInterval* previous = nullptr;
     for (const auto& current : intervals) {
       if (!current.start) continue;
-      if (previous != nullptr) {
+      if (previous != nullptr && !previous->missing_activity &&
+          !current.missing_activity) {
         const NamePair pair{wait_sources.group(previous->activity),
                             wait_targets.group(current.activity)};
         ++out.direct_adjacency[pair];
@@ -2311,15 +2335,10 @@ HeuristicsNet discover_plus_plus_pandas(
     }
     return false;
   };
-  const auto missing_case = [](const auto& cell) {
-    if (!cell || cell->is_null || is_typed_nat(*cell)) return true;
-    const auto* number = std::get_if<double>(&cell->typed_value);
-    return number != nullptr && std::isnan(*number);
-  };
   const bool string_cases = pandas_string_column(data, *case_column);
-  if (!data.rows.empty() && timezone_aware(completed) &&
+  if (timezone_aware(completed) &&
       std::all_of(data.rows.begin(), data.rows.end(), [&](const auto& row) {
-        return missing_case(row[*case_column]) ||
+        return pandas_missing_cell(row[*case_column]) ||
                (string_cases && pandas_string_has_surrogate(row[*case_column]->value));
       }))
     throw HeuristicPandasError(
@@ -2360,7 +2379,11 @@ HeuristicsNet discover_plus_plus_pandas(
     value.value = std::to_string(durations[i]);
     data.rows[i][difference] = std::move(value);
   }
-  if (started != difference && !any_timestamp(started)) {
+  const bool any_activity = std::any_of(
+      data.rows.begin(), data.rows.end(), [&](const auto& row) {
+        return !pandas_missing_cell(row[*activity_column]);
+      });
+  if (started != difference && (!any_timestamp(started) || !any_activity)) {
     const auto suffix = duration_units == 1'000'000'000 ? "ns"
                         : duration_units == 1'000'000 ? "us"
                         : duration_units == 1'000 ? "ms" : "s";
@@ -2386,9 +2409,9 @@ HeuristicsNet discover_plus_plus_pandas(
     EventTable::Row projected;
     for (std::size_t i = 0; i < source_columns.size(); ++i) {
       auto cell = row[source_columns[i]];
-      // Pandas pools missing scalar kinds into one interval case. Normalize
-      // only the internal grouping cell; retain the caller's actual scalar.
-      if (i == 0 && missing_case(cell)) {
+      // Normalize missing case/activity scalars only in the internal event
+      // roles; retain the caller's actual scalar and duration values.
+      if (i < 2 && pandas_missing_cell(cell)) {
         cell = EventAttribute{};
         cell->is_null = true;
       }
