@@ -532,7 +532,7 @@ void pnml_document_preserves_arc_occurrences() {
   assert(document.net.transitions()[0].outputs == std::vector<std::size_t>({1, 1, 1}));
   const auto graph = to_petri_net_presentation(document);
   assert(graph.arcs.size() == 7 && graph.arcs[1].weight == 2 && graph.arcs[2].weight == 2);
-  assert(graph.transitions[0].label == "A" && !graph.transitions[1].label);
+  assert(graph.transitions[0].label == "A" && graph.transitions[1].label == "t1");
   const auto xml = to_pnml(document);
   assert(xml.find("id=\"first&#10;&amp;\"") != std::string::npos);
   assert(xml.find("id=\"second\"") != std::string::npos);
@@ -601,7 +601,7 @@ void pnml_document_export_rejects_atomically() {
   invalid = valid; invalid.final_marking[0] = -1; rejects(invalid);
   invalid = valid; invalid.place_ids = {"one"}; rejects(invalid);
   invalid = valid; invalid.place_ids = {"same", "same"}; rejects(invalid);
-  invalid = valid; invalid.place_ids = {"", "two"}; rejects(invalid);
+  invalid = valid; invalid.place_ids = {"", ""}; rejects(invalid);
   invalid = valid; invalid.place_ids = {"one", "two"};
   invalid.transition_ids = {"one"}; rejects(invalid);
   invalid = valid; invalid.place_ids = {"t0", "two"}; rejects(invalid);
@@ -776,6 +776,89 @@ void pnml_compact_ordinary_weight_contract() {
   }
 }
 
+void pnml_transition_label_contract() {
+  struct Control { const char* xml; bool imported; std::optional<std::string> label; };
+  const std::vector<Control> controls = {
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"t0"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"t0"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name>A</name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"t0"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text/></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"t0"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text></text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"t0"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>A</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text> </text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{" "}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>
+</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"\n"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text><![CDATA[]]></text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"t0"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>A<![CDATA[B]]></text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"AB"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>A<!--owned-->B</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"AB"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>A<?owned test?>B</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>A<b/>B</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text><b/>A</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"t0"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>A</text></name><name><text>B</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>A</text><text>B</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>A</text></name><name><text/></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>A</text><text/></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><wrapper><text>A</text></wrapper></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"t0"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><x:name xmlns:x="urn:owned"><x:text>A</x:text></x:name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name xmlns="urn:owned"><text>A</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific tool="ProM" version="6.4" activity="$invisible$"/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::nullopt},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific tool="Other" activity="$invisible$"/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"t0"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific activity="$invisible$"/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",false,std::nullopt},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>A</text></name><toolspecific tool="ProM" activity="$invisible$"/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::nullopt},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific tool="ProM" activity="$invisible$"/><name><text>A</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::nullopt},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>A</text></name><toolspecific tool="ProM" activity="A"/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id=""></transition><arc source="p0" target=""/><arc source="" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{""}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id=""><name><text>A</text></name></transition><arc source="p0" target=""/><arc source="" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name/><name><text>A</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text/><text>A</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name>unused</name><name><text>A</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text><b/></text><text>A</text></name></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"A"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific tool="ProM_extra" activity="$invisible$"/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::nullopt},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific tool="Custom_ProM_plugin" activity="$invisible$"/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::nullopt},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific tool="prom" activity="$invisible$"/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"t0"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",false,std::nullopt},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><name><text>A</text></name><toolspecific activity="A"/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",false,std::nullopt},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific tool="ProM"/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",false,std::nullopt},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific tool="ProM" activity=" $invisible$ "/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::nullopt},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific tool="ProM" activity=""/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::optional<std::string>{"t0"}},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific tool="ProM" activity="$invisible$"/><toolspecific tool="ProM" activity="A"/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::nullopt},
+{R"labels_fixture(<pnml><net id="label"><page id="page"><place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/><transition id="t0"><toolspecific tool="ProM" activity="A"/><toolspecific tool="ProM" activity="$invisible$"/></transition><arc source="p0" target="t0"/><arc source="t0" target="p1"/></page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>)labels_fixture",true,std::nullopt}
+  };
+  for (const auto& control : controls) {
+    PnmlImportOptions options;
+    options.infer_initial_marking = options.infer_final_marking = options.require_workflow_boundaries = false;
+    std::optional<PnmlDocument> document;
+    bool rejected = false;
+    try { document = parse_pnml_document(control.xml,options); }
+    catch (const std::runtime_error&) { rejected = true; }
+    assert(rejected == !control.imported);
+    if (!document) continue;
+    const auto presentation = to_petri_net_presentation(*document);
+    assert(presentation.transitions.size() == 1);
+    assert(presentation.transitions.front().label == control.label);
+    const auto restored = parse_pnml_document(to_pnml(*document),options);
+    assert(restored.transition_ids == document->transition_ids);
+    assert(to_petri_net_presentation(restored).transitions.front().label == control.label);
+    EventLog log;
+    Trace trace; trace.case_id = "owned-label";
+    if (control.label) {
+      Event event; event.activity = *control.label;
+      event.activity_state = FirstClassAttributeState::kPresent;
+      event.activity_source_key = "concept:name";
+      event.activity_attribute = EventAttribute{"concept:name",*control.label,AttributeKind::kString,false};
+      trace.events.push_back(std::move(event));
+    }
+    log.traces.push_back(std::move(trace));
+    const auto diagnostics = replay_token_traces(log,document->net,
+        minera::tools::pnml_replay_options(*document,{}));
+    assert(diagnostics.size() == 1 && diagnostics.front().trace_is_fit);
+    assert(diagnostics.front().trace_fitness == 1.0);
+    assert(diagnostics.front().activated_transitions == std::vector<std::size_t>{0});
+    assert(diagnostics.front().produced == 2 && diagnostics.front().consumed == 2);
+    assert(diagnostics.front().missing == 0 && diagnostics.front().remaining == 0);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -795,4 +878,5 @@ int main() {
   pnml_arc_type_wire_contract();
   pnml_extended_weight_and_text_contract();
   pnml_compact_ordinary_weight_contract();
+  pnml_transition_label_contract();
 }

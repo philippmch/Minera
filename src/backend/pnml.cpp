@@ -190,8 +190,8 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
     for (std::size_t i = 0; i < count; ++i) {
       auto id = configured.empty() ? std::string(prefix) + std::to_string(i)
                                    : configured[i];
-      if (id.empty() || !used_ids.insert(id).second)
-        throw std::invalid_argument("PNML node IDs must be nonempty and unique");
+      if (!used_ids.insert(id).second)
+        throw std::invalid_argument("PNML node IDs must be unique");
       result.push_back(std::move(id));
     }
     return result;
@@ -519,6 +519,7 @@ struct ParsedTransition {
   int priority = 0;
   double weight = 1.0;
   bool has_stochastic_data = false;
+  bool has_named_label = false;
 };
 
 struct ParsedArc {
@@ -620,7 +621,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
         throw std::runtime_error("PNML has a duplicate transition id '" + *id +
                                  "'");
       }
-      transitions.push_back({*id, "", false});
+      transitions.push_back({*id, *id, false});
     } else if (token.name == "arc") {
       const auto* source = detail::attribute(token.attributes, "source");
       const auto* target = detail::attribute(token.attributes, "target");
@@ -631,9 +632,15 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       if (const auto* id = detail::attribute(token.attributes, "id")) arcs.back().id = *id;
     } else if (token.name == "toolspecific" &&
                stack_ends_with(stack, {"transition"})) {
+      const auto* tool = detail::attribute(token.attributes, "tool");
+      if (!tool)
+        throw std::runtime_error("PNML toolspecific is missing its tool attribute");
       const auto* activity = detail::attribute(token.attributes, "activity");
-      if (activity && *activity == "$invisible$" && !transitions.empty()) {
-        transitions.back().invisible = true;
+      if (tool->find("ProM") != std::string::npos) {
+        if (!activity)
+          throw std::runtime_error("PNML ProM toolspecific is missing its activity attribute");
+        if (activity->find("$invisible$") != std::string::npos && !transitions.empty())
+          transitions.back().invisible = true;
       }
     } else if (token.name == "marking" &&
                stack_ends_with(stack, {"finalmarkings"})) {
@@ -645,6 +652,15 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   std::string stochastic_property_key;
   struct ArcText { bool inscription; std::size_t depth; std::string value; bool first_segment = true; };
   std::optional<ArcText> arc_text;
+  struct LabelText { std::size_t depth; std::string value; bool first_segment = true; };
+  std::optional<LabelText> label_text;
+  const auto finish_label_text = [&] {
+    if (!label_text->value.empty() && !transitions.back().has_named_label) {
+      transitions.back().label = std::move(label_text->value);
+      transitions.back().has_named_label = true;
+    }
+    label_text.reset();
+  };
   const auto finish_arc_text = [&] {
     if (arc_text->inscription) {
       const auto weight = detail::parse_pnml_arc_weight(arc_text->value);
@@ -663,9 +679,6 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     if (stack_ends_with(stack, {"place", "initialMarking", "text"}) &&
         !places.empty()) {
       places.back().initial_tokens = parse_token_count(value);
-    } else if (stack_ends_with(stack, {"transition", "name", "text"}) &&
-               !transitions.empty()) {
-      transitions.back().label = value;
     } else if (stack_ends_with(stack, {"transition", "toolspecific", "property"}) &&
                !transitions.empty() && !stochastic_property_key.empty()) {
       auto& transition = transitions.back();
@@ -693,6 +706,11 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       token.name.erase(0, colon + 1);
     if (token.kind == detail::XmlPullParser::Kind::EndOfInput) break;
     if (token.kind == detail::XmlPullParser::Kind::CharacterData) {
+      if (label_text) {
+        if (label_text->first_segment && stack.size() == label_text->depth)
+          label_text->value += token.text;
+        continue;
+      }
       if (arc_text) {
         if (arc_text->first_segment && stack.size() == arc_text->depth)
           arc_text->value += token.text;
@@ -703,10 +721,17 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     }
     if (token.kind == detail::XmlPullParser::Kind::ProcessingInstruction) {
       if (arc_text) arc_text->first_segment = false;
+      if (label_text) label_text->first_segment = false;
       continue;
     }
     if (token.kind == detail::XmlPullParser::Kind::StartElement) {
       if (arc_text) arc_text->first_segment = false;
+      if (label_text) label_text->first_segment = false;
+      if (in_net && !transitions.empty() && !transitions.back().has_named_label &&
+          token.name == "text" && stack_ends_with(stack, {"transition", "name"})) {
+        label_text = LabelText{stack.size() + 1, {}};
+        if (token.self_closing) finish_label_text();
+      }
       if (in_net && !arcs.empty() && token.name == "text" &&
           (stack_ends_with(stack, {"arc", "arctype"}) || stack_ends_with(stack, {"arc", "inscription"}))) {
         arc_text = ArcText{stack.back() == "inscription", stack.size() + 1, {}};
@@ -739,6 +764,8 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     // EndElement: unwind to the matching open element.
     if (arc_text && token.name == "text" && stack.size() == arc_text->depth)
       finish_arc_text();
+    if (label_text && token.name == "text" && stack.size() == label_text->depth)
+      finish_label_text();
     while (!stack.empty() && stack.back() != token.name) stack.pop_back();
     if (!stack.empty()) stack.pop_back();
     if (token.name == "property") stochastic_property_key.clear();
@@ -829,7 +856,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   for (std::size_t t = 0; t < transitions.size(); ++t) {
     const auto& parsed = transitions[t];
     std::optional<std::size_t> activity;
-    if (!parsed.invisible && !parsed.label.empty()) {
+    if (!parsed.invisible) {
       const auto [it, inserted] =
           activity_ids.emplace(parsed.label, activities.size());
       if (inserted) activities.push_back(parsed.label);
