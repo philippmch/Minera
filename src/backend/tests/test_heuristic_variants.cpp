@@ -4744,6 +4744,11 @@ std::string heuristic_options_snapshot_json(
   result += options.plusplus_decoration_selector
                 ? json_string(*options.plusplus_decoration_selector)
                 : "null";
+  result += ",\"plusplus_decoration_value\":{\"engaged\":";
+  result += options.plusplus_decoration_value ? "true,\"value\":" : "false,\"value\":";
+  result += options.plusplus_decoration_value
+      ? classic_nonfinite_structured_json(*options.plusplus_decoration_value) : "null";
+  result += '}';
   result += ",\"most_common_paths\":[";
   std::size_t path_index = 0;
   for (const auto& [source, target] : options.most_common_paths) {
@@ -5198,6 +5203,56 @@ void plusplus_raw_decoration_selector_acceptance() {
   }
 }
 
+void plusplus_typed_decoration_values() {
+  const auto source = log({trace({
+      interval("A", "2024-01-01T00:00:00Z", "2024-01-01T00:00:01Z"),
+      interval("B", "2024-01-01T00:00:02Z", "2024-01-01T00:00:03Z"),
+      interval("C", "2024-01-01T00:00:04Z", "2024-01-01T00:00:05Z")})});
+  const std::vector<HeuristicStructuredValue> performance_values{
+      {nullptr}, {false}, {true}, {std::int64_t{0}}, {std::int64_t{1}},
+      {std::int64_t{-1}}, {std::uint64_t{0}}, {0.5}, {-0.0},
+      {std::numeric_limits<double>::quiet_NaN()},
+      {std::numeric_limits<double>::infinity()},
+      {-std::numeric_limits<double>::infinity()},
+      {std::string{}}, {std::string("Frequency")},
+      {HeuristicStructuredValue::Array{}},
+      {HeuristicStructuredValue::Array{{std::string("frequency")}, {nullptr}, {false}}},
+      {HeuristicStructuredValue::Object{}},
+      {HeuristicStructuredValue::Object{{"value", {HeuristicStructuredValue::Array{{std::int64_t{1}}, {nullptr}, {std::string("performance")}}}}}}
+  };
+  auto options = plus_options();
+  assert(!options.plusplus_decoration_value);
+  const auto defaults = discover_heuristics_net(source, options);
+  assert(defaults.decoration == HeuristicNetDecoration::kFrequency);
+  const auto reference_petri = petri_net_presentation_json(to_petri_net_presentation(defaults));
+  for (const auto& value : performance_values) {
+    options.plusplus_decoration_selector = "frequency";
+    options.plusplus_decoration_value = value;
+    const auto before = heuristic_options_snapshot_json(options);
+    const auto net = discover_heuristics_net(source, options);
+    assert(heuristic_options_snapshot_json(options) == before);
+    assert(net.decoration == HeuristicNetDecoration::kPerformance);
+    assert(net.plusplus_computed_performance_dfg->at({"A", "B"}) == 1.0);
+    assert(net.plusplus_computed_performance_matrix.at({"B", "C"}) == 1.0);
+    assert(petri_net_presentation_json(to_petri_net_presentation(net)) == reference_petri);
+    auto table = pandas_surrogate_control_table();
+    const auto pandas = discover_plus_plus_pandas(table, options);
+    assert(heuristic_options_snapshot_json(options) == before);
+    assert(pandas.decoration == HeuristicNetDecoration::kPerformance);
+    assert(pandas.plusplus_computed_performance_dfg->at({"A", "B"}) == 1.0);
+    assert(pandas.plusplus_computed_performance_matrix.at({"C", "D"}) == 2.0);
+    options.variant = HeuristicMinerVariant::kClassic;
+    assert(discover_heuristics_net(source, options).decoration == HeuristicNetDecoration::kFrequency);
+    options.variant = HeuristicMinerVariant::kPlusPlus;
+  }
+  options.decoration = HeuristicNetDecoration::kPerformance;
+  options.plusplus_decoration_selector = "performance";
+  options.plusplus_decoration_value = HeuristicStructuredValue{std::string("frequency")};
+  assert(discover_heuristics_net(source, options).decoration == HeuristicNetDecoration::kFrequency);
+  options.plusplus_decoration_value.reset();
+  assert(discover_heuristics_net(source, options).decoration == HeuristicNetDecoration::kPerformance);
+}
+
 void plusplus_computed_public_fields_acceptance() {
   const auto public_fields = [](const EventLog& source,
                                 const HeuristicsNet& net) {
@@ -5444,6 +5499,7 @@ int main(int argc, char** argv) {
   plusplus_frequency_representation_preserves_integer_type();
   plusplus_computed_public_fields_acceptance();
   plusplus_raw_decoration_selector_acceptance();
+  plusplus_typed_decoration_values();
   plusplus_pandas_directional_concurrency_acceptance();
   plusplus_pandas_duration_mutation_and_start_fallback();
   plusplus_pandas_object_dtype_error_preserves_input();

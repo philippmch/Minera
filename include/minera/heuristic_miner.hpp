@@ -340,6 +340,11 @@ struct HeuristicMinerOptions {
   // retains exact uint64_t comparisons and the existing CLASSIC behavior.
   std::optional<double> plusplus_min_activity_count = std::nullopt;
   std::optional<double> plusplus_min_frequency = std::nullopt;
+  // Typed PLUSPLUS decoration parameter. Explicit null and non-string values
+  // select performance; only the exact string "frequency" selects frequency.
+  // When supplied, this takes precedence over the legacy string selector and
+  // enum. Omission preserves their behavior; CLASSIC ignores this parameter.
+  std::optional<HeuristicStructuredValue> plusplus_decoration_value = std::nullopt;
 };
 
 struct HeuristicClassicDfgInput {

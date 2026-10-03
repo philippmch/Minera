@@ -8137,3 +8137,42 @@ bound; the evidence chain contains 1,689 real public calls. Broader type,
 ordering, metadata, identity, timestamp and routing gates remain open.
 PLUSPLUS and Alpha+ stay partial. Coverage remains 46/86 packages and 199/387
 modules, with 228 incomplete units and no promotion.
+
+### PLUSPLUS typed decoration values (2026-10-03)
+
+Added `HeuristicMinerOptions::plusplus_decoration_value` to preserve explicit
+null, booleans, signed/unsigned integers, doubles, strings and nested array/
+object values. The exact string `frequency` selects frequency; other supplied
+values select performance. This typed value takes precedence over the existing
+string selector and enum, while omission retains their behavior. CLASSIC
+ignores the parameter. The form-field adapter remains a separate routing gate.
+
+Evidence comprises 89 fresh PM4Py calls: one exported log conversion and 88
+discoveries over 22 values, on pandas and direct EventLog HN/PN routes. All nine
+options are explicit; every call succeeds. Parameters and direct EventLogs
+remain unchanged, and the actual pandas `@@diff` mutation is retained. Another
+90 group diagnostics and 44 returned-net key-order observations are counted
+separately. The pre-change API matches all 28 string cases and cannot represent
+60 non-string aliases; those original unsupported inputs remain retained with
+zero native calls rather than substituted values.
+
+All 1,336 retained PLUSPLUS aliases match: 606 supported HN results, 297 Petri
+presentations and 433 errors. All 30,954 assessed fields, connection domains,
+input-after, options and mutations match, and all 77 generic regressions remain
+unchanged. Accepted calls are 1,413 discoveries, 297 presentations and 43
+generic conversions; the retained baseline adds 28 discoveries and 14
+presentations. Five assertion-enabled suites pass on 650 exact sources, with
+566 shared data factories. An independent file-only decoder matches actual
+typed selectors to the original public parameters before and after all 1,336
+calls. It adds no producer calls; native integer-family and dictionary-order
+representation limits are explicit in the validation. The Unicode decoder is
+unchanged and the earlier exhaustive evidence remains bound through the parent.
+
+The three `heuristic-plusplus-decoration-values-*-checks.jsonl.gz` segments
+and `heuristic-plusplus-decoration-values-validation.json` retain 5190
+members byte for byte, including exact sources, helpers, logs and binary
+hashes. The preceding ordering validation and three archive hashes remain
+bound, with 1,778 public calls in the chain. Broader type, metadata, identity,
+timestamp and routing gates remain open. PLUSPLUS and Alpha+ stay partial;
+coverage remains 46/86 packages and 199/387 modules, with 228 incomplete units
+and no promotion.

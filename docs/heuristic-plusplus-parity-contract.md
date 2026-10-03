@@ -1617,3 +1617,73 @@ These finite controls close the retained naming differences. Broader scalar/
 carrier types, ordering, metadata, identity, timestamp and routing domains
 remain open. PLUSPLUS and Alpha+ stay partial. Coverage remains 46/86 packages
 and 199/387 modules, with 228 incomplete units and no promotion.
+
+## Typed PLUSPLUS decoration values (2026-10-03)
+
+Executed 89 fresh pinned public calls: one exported DataFrame-to-EventLog
+conversion followed by 88 discoveries on 22 decoration values. Each value
+uses independent pandas HN/PN frames and independent copies of the converted
+EventLog for direct HN/PN routes. All nine options are explicit. The values
+cover standard and unfamiliar strings, empty/case-variant/escaped/surrogate
+strings, explicit null, both booleans, zero/positive/negative integers,
+fractional/signed-zero/nonfinite floats, and empty/nested lists and dictionaries.
+Every call succeeds without serialization errors. Parameters remain unchanged;
+direct EventLogs remain unchanged, while pandas discovery retains the captured
+`@@diff` mutation. The 90 pandas group diagnostics and 44 returned-net key-order
+observations are separately counted and leave their inputs unchanged. Opaque
+installed and pinned module hashes match before and after.
+
+Only the exact string `frequency` selects frequency mode on these controls.
+Every other supplied value, including explicit null, false, zero and empty
+containers, selects performance mode and returns the performance DFG and
+matrix. Selection follows equality with that string, rather than truthiness or
+coercion. The pre-change native API matches all 28 actual string cases, including
+742 assessed HN fields and 14 Petri presentations. Its optional string selector
+cannot represent the other 60 actual supplied values; those original aliases
+remain explicitly unrepresentable in the retained baseline manifest and add
+no native producer calls.
+
+`HeuristicMinerOptions::plusplus_decoration_value` now accepts a typed
+`HeuristicStructuredValue`, preserving null, bool, signed/unsigned integer,
+double, string, array and string-key object values. When supplied it takes
+precedence over the existing string selector and enum. Omission retains their
+behavior, and CLASSIC ignores this PLUSPLUS-only parameter. Native discovery
+uses frequency for the exact string and performance for other supplied values.
+The caller's actual typed value remains intact before and after discovery.
+The form-field adapter still exposes the existing string selector; this step
+extends the native options API. Broader adapter routing remains a separate gate.
+
+All 1,336 retained PLUSPLUS aliases match: 606 supported HN results, 297 Petri
+presentations and 433 expected errors. All 30,954 assessed net/node/edge fields,
+connection domains, input-after, option and mutation checks match. All 77
+generic regressions remain unchanged. Accepted native calls total 1,413
+discoveries, 297 presentations and 43 generic conversions. The retained baseline
+adds 28 discoveries and 14 presentations. Five assertion-enabled suites pass
+on 650 exact compilation inputs, with 566 shared data factories and exact
+literal reconstruction.
+
+A separate file-only check independently decodes the actual typed native
+selector and compares it to each original public parameter before and after
+all 1,336 calls. Every value matches, and no options mutate. That check adds
+zero public/native producer calls. Native signed/unsigned integers preserve
+Python int values within int64/uint64; native object values use ordered maps,
+without claiming cross-runtime Python dictionary insertion order. Complete
+original public parameter snapshots remain retained. The Unicode decoder is
+unchanged; earlier exhaustive scalar evidence remains bound through the parent.
+
+Three archives retain 5190 members byte for byte: actual public and
+native returns, complete carriers and parameters, baseline unsupported aliases,
+API metadata, grouping/key orders, opaque module proofs, sources, helpers,
+process logs and binary hashes. The preceding ordering validation and three
+archive hashes remain bound, bringing the public evidence chain to 1,778 calls.
+`heuristic-plusplus-decoration-values-validation.json` records all accounting.
+
+| Evidence segment | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `heuristic-plusplus-decoration-values-core-checks.jsonl.gz` | `1ae64dac966c148046ebfbdccf2b0b2e8155fe05521e1d788654525b0d27247c` | 17492929 |
+| `heuristic-plusplus-decoration-values-controls-checks.jsonl.gz` | `4e9ec3f92efbd977597f7c082a3586fdf8ad22bde8b11380c50962459206d76c` | 6195391 |
+| `heuristic-plusplus-decoration-values-replay-checks.jsonl.gz` | `815731c8812771e8a1ba80af4ffe69764c4e900cf03ee6d93aef80207b934667` | 81874280 |
+
+Broader scalar/carrier types, ordered metadata, identity, timestamps and adapter
+routes remain open. PLUSPLUS and Alpha+ stay partial; coverage remains 46/86
+packages and 199/387 modules, with 228 incomplete units and no promotion.

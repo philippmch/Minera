@@ -1984,8 +1984,15 @@ HeuristicsNet discover_plus_plus_from_abstraction(
                                        options.plusplus_min_activity_count};
   const PlusCountThreshold min_frequency{options.min_frequency,
                                         options.plusplus_min_frequency};
+  const auto* typed_decoration = options.plusplus_decoration_value
+      ? std::get_if<std::string>(&options.plusplus_decoration_value->value)
+      : nullptr;
   const HeuristicNetDecoration effective_decoration =
-      options.plusplus_decoration_selector
+      options.plusplus_decoration_value
+          ? (typed_decoration && *typed_decoration == "frequency"
+                 ? HeuristicNetDecoration::kFrequency
+                 : HeuristicNetDecoration::kPerformance)
+          : options.plusplus_decoration_selector
           ? (*options.plusplus_decoration_selector == "frequency"
                  ? HeuristicNetDecoration::kFrequency
                  : HeuristicNetDecoration::kPerformance)
