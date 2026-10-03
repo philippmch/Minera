@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -3409,6 +3410,121 @@ void parse_mine_params_keeps_plusplus_selector_independent_of_decoration() {
   assert(threw);
 }
 
+void parse_mine_params_preserves_typed_plusplus_decoration() {
+  using Value = minera::HeuristicStructuredValue;
+  const auto parse = [](const std::string& json) {
+    return minera::parse_mine_params(fields({
+        {"heuristic_variant", "plusplus"},
+        {"heuristic_plusplus_decoration_value", json}})).heuristic;
+  };
+  assert(!minera::parse_mine_params(fields({})).heuristic.plusplus_decoration_value);
+  const auto null_options = parse("null");
+  assert(null_options.plusplus_decoration_value);
+  assert(std::holds_alternative<std::nullptr_t>(null_options.plusplus_decoration_value->value));
+  const auto ignored = minera::parse_mine_params(
+      fields({{"heuristic_plusplus_decoration_value", "null"}}),
+      [](std::string_view) { return false; });
+  assert(!ignored.heuristic.plusplus_decoration_value);
+  for (const auto& [json, alternative] :
+       std::vector<std::pair<std::string, std::size_t>>{
+           {"null", 0}, {"false", 1}, {"true", 1}, {"0", 2}, {"-1", 2},
+           {"-9223372036854775808", 2}, {"9223372036854775807", 2},
+           {"9223372036854775808", 3}, {"18446744073709551615", 3},
+           {"0.5", 4}, {"-0.0", 4}, {"1e2", 4}, {"NaN", 4},
+           {"Infinity", 4}, {"-Infinity", 4}, {"\"\"", 5},
+           {"\"Frequency\"", 5}, {"\"frequency\"", 5},
+           {"[]", 6}, {"[\"frequency\",null,{\"value\":false}]", 6},
+           {"{}", 7}, {"{\"value\":[1,null,\"performance\"]}", 7}}) {
+    const auto options = parse(" \n\t" + json + "\r ");
+    assert(options.plusplus_decoration_value->value.index() == alternative);
+    const auto net = minera::discover_heuristics_net(minera::EventLog{}, options);
+    const bool frequency = json == "\"frequency\"";
+    assert(net.decoration == (frequency ? minera::HeuristicNetDecoration::kFrequency :
+                                         minera::HeuristicNetDecoration::kPerformance));
+  }
+  assert(std::get<std::int64_t>(parse("-9223372036854775808").plusplus_decoration_value->value) ==
+         std::numeric_limits<std::int64_t>::min());
+  assert(std::get<std::uint64_t>(parse("18446744073709551615").plusplus_decoration_value->value) ==
+         std::numeric_limits<std::uint64_t>::max());
+  assert(std::signbit(std::get<double>(parse("-0.0").plusplus_decoration_value->value)));
+  assert(std::isnan(std::get<double>(parse("NaN").plusplus_decoration_value->value)));
+  for (const auto& json : {"1e309", "-1e309", "1e999999999999999999999999", "-1e999999999999999999999999"}) {
+    const auto actual = std::get<double>(parse(json).plusplus_decoration_value->value);
+    assert(std::isinf(actual) && std::signbit(actual) == (json[0] == '-'));
+  }
+  for (const auto& json : {"1e-999", "-1e-999", "1e-999999999999999999999999", "-1e-999999999999999999999999"}) {
+    const auto actual = std::get<double>(parse(json).plusplus_decoration_value->value);
+    assert(actual == 0.0 && std::signbit(actual) == (json[0] == '-'));
+  }
+  const auto nested = parse(R"({"value":[1,null,"performance"]})");
+  const auto& object = std::get<Value::Object>(nested.plusplus_decoration_value->value);
+  const auto& array = std::get<Value::Array>(object.at("value").value);
+  assert(array.size() == 3 && std::get<std::int64_t>(array[0].value) == 1);
+  assert(std::holds_alternative<std::nullptr_t>(array[1].value));
+  assert(std::get<std::string>(array[2].value) == "performance");
+  const auto duplicates = parse(R"({"x":1,"x":2})");
+  assert(std::get<std::int64_t>(std::get<Value::Object>(duplicates.plusplus_decoration_value->value).at("x").value) == 2);
+  const auto priority = minera::parse_mine_params(fields({
+      {"heuristic_variant", "plusplus"}, {"heuristic_decoration", "performance"},
+      {"heuristic_plusplus_decoration_selector", "performance"},
+      {"heuristic_plusplus_decoration_value", R"("\u0066requency")"}}));
+  assert(priority.heuristic.decoration == minera::HeuristicNetDecoration::kPerformance);
+  assert(*priority.heuristic.plusplus_decoration_selector == "performance");
+  assert(minera::discover_heuristics_net(minera::EventLog{}, priority.heuristic).decoration ==
+         minera::HeuristicNetDecoration::kFrequency);
+  auto classic = priority.heuristic;
+  classic.variant = minera::HeuristicMinerVariant::kClassic;
+  assert(minera::discover_heuristics_net(minera::EventLog{}, classic).decoration ==
+         minera::HeuristicNetDecoration::kPerformance);
+}
+
+void parse_mine_params_typed_decoration_unicode() {
+  const auto decode = [](const std::string& json) {
+    auto params = minera::parse_mine_params(fields({{"heuristic_plusplus_decoration_value", json}}));
+    return std::get<std::string>(params.heuristic.plusplus_decoration_value->value);
+  };
+  // Keep raw JSON literals outside assert's MSVC wide-string macro expansion.
+  const std::vector<std::pair<std::string, std::string>> cases{
+      {R"("\"\\\/\b\f\n\r\t")", "\"\\/\b\f\n\r\t"},
+      {R"("a\u0000b")", std::string("a\0b", 3)},
+      {R"("\u00e9\u96ea")", "\xc3\xa9\xe9\x9b\xaa"},
+      {"\"\xc3\xa9\xe9\x9b\xaa\"", "\xc3\xa9\xe9\x9b\xaa"},
+      {R"("\ud83d\ude00")", "\xf0\x9f\x98\x80"},
+      {R"("\uDBFF\uDFFF")", "\xf4\x8f\xbf\xbf"},
+      {R"("\ud800")", "\xed\xa0\x80"},
+      {R"("\udfff")", "\xed\xbf\xbf"},
+      {R"("\ud800\u0041")", std::string("\xed\xa0\x80") + "A"},
+      {R"("\ud800\ud800")", "\xed\xa0\x80\xed\xa0\x80"}};
+  for (const auto& [json, expected] : cases) assert(decode(json) == expected);
+}
+
+void parse_mine_params_rejects_malformed_typed_decoration() {
+  std::vector<std::string> values{
+      "", " ", "frequency", "Null", "nan", "+1", "01", "-01", "-", ".5",
+      "1.", "1e", "1e+", "null false", "NaNx", "Infinityx", "[1,]", "[,1]",
+      "[1", "{1:2}", "{\"x\" 1}", "{\"x\":1,}", "{\"x\":}", "{}[]",
+      "\"unterminated", R"("\v")", R"("\u000")", R"("\u00XZ")",
+      "\"unescaped\ncontrol\"", "\"\xc0\xaf\"", "\"\xed\xa0\x80\"",
+      "\"\xf4\x90\x80\x80\"", "\"\xc2\"", "18446744073709551616", "-9223372036854775809",
+      std::string(257, '[') + "null" + std::string(257, ']')};
+  for (const auto& value : values) {
+    const std::map<std::string, std::string> supplied{{"heuristic_plusplus_decoration_value", value}};
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields(supplied), [&supplied](std::string_view name) {
+        return supplied.contains(std::string(name));
+      });
+    } catch (const std::invalid_argument& error) {
+      threw = true;
+      assert(std::string(error.what()).starts_with("heuristic_plusplus_decoration_value:"));
+    }
+    assert(threw);
+  }
+  const auto deepest = minera::parse_mine_params(fields({
+      {"heuristic_plusplus_decoration_value", std::string(256, '[') + "null" + std::string(256, ']')}}));
+  assert(deepest.heuristic.plusplus_decoration_value);
+}
+
 void parse_mine_params_rejects_unknown_heuristic_settings() {
   for (const auto& [name, value] :
        std::vector<std::pair<std::string, std::string>>{
@@ -4987,6 +5103,9 @@ int main() {
   parse_mine_params_accepts_infrequent_inductive_variant();
   parse_mine_params_preserves_plusplus_decoration_selector();
   parse_mine_params_keeps_plusplus_selector_independent_of_decoration();
+  parse_mine_params_preserves_typed_plusplus_decoration();
+  parse_mine_params_typed_decoration_unicode();
+  parse_mine_params_rejects_malformed_typed_decoration();
   parse_mine_params_rejects_unknown_heuristic_settings();
   parse_mine_params_preserves_explicit_empty_heuristic_schedule();
   parse_mine_params_maps_spectrum_and_batch_options();
