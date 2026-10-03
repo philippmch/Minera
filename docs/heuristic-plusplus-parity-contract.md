@@ -1384,3 +1384,95 @@ Unicode surrogate grouping, broader label/carrier/parameter types, dictionary
 ordering, metadata completeness, object identity, further timestamp and routing
 domains remain open. PLUSPLUS and Alpha+ stay partial. Coverage remains 46/86
 packages and 199/387 modules, with 228 incomplete units and no promotion.
+
+## Pandas surrogate grouping (2026-10-03)
+
+Executed 152 fresh public PLUSPLUS calls with all nine options explicit, both
+decorations and HN/PN routes. The controls vary lone-surrogate labels and case
+keys, printable and empty strings, numeric and missing case values, category
+dtypes, timezone-aware and naive timestamps, copied starts, input ordering,
+distinct case boundaries and interval durations. A further 304 separately
+counted public pandas groupby calls inspect returned grouping indices after
+the result snapshots. Those diagnostics leave the visible inputs unchanged and
+are excluded from the 152 initial PM4Py calls. The retained three initial
+pre-change native replays execute 152 discoveries and 74 presentations. Their
+original categorical carrier projections omit category declarations and remain
+explicitly diagnostic; the noncategorical witnesses remain complete.
+
+For these all-string object columns, strings containing surrogate code points
+share a first encountered grouping representative. Activity occurrence counts
+and caller labels stay distinct. Sojourn means use raw row order; EFG, waits and
+directional concurrency independently select source and target representatives
+from their own relation sequences. Concurrency retains the existing canonical
+pair overwrite behavior. Surrogate case boundaries pool raw input first/last
+rows while interval case identities remain separate. Performance waits exclude
+those case keys only for the observed pure-string grouping domain. Mixed
+numeric or missing case columns retain distinct surrogate cases.
+
+All-surrogate cases with aware completion timestamps raise the captured TypeError
+before `@@diff` is added, after a required start-column copy. Naive counterparts
+succeed with pooled boundaries and empty performance DFGs. Observed categorical
+activity keys remain distinct and frequency ties follow category declaration
+order. Categorical case keys raise the exact UnicodeEncodeError, including
+unused categories, first contiguous surrogate ranges and code-point positions;
+datetime dtype validation and copied-start mutation occur first. These controls
+do not establish arbitrary categorical domains or frontend JSON adapter parity.
+
+The initial snapshots retain the dtype name but omit category declarations.
+An initial full replay therefore reproduces four ordering differences and
+28 error/mutation differences with incomplete category inputs. That replay's
+1,157 discoveries, 197 presentations and 43 generic conversions remain retained.
+The OWN snapshot and input adapters now capture and project actual public
+category values, dtype and ordering. Fifty fresh public calls complete all
+categorical fixtures, including ten older controls. Before/after inputs, errors
+and mutation flags are exactly equal to their original captures after removing
+only the newly added category metadata. These file-only equality checks make
+no producer calls. The complete category carriers reproduce four ordering and
+28 error differences against the preceding core in a further 50 discoveries
+and 20 presentations. New capture counts total 202 PM4Py calls and 384 public
+pandas grouping diagnostics; original incomplete snapshots are preserved.
+
+The complete replay now matches all 1,080 retained PLUSPLUS aliases: 492 full
+supported HN results, 183 Petri presentations and 405 expected errors. All
+24972 assessed net/node/edge fields and connection domains match. All
+input-after, option and mutation checks match, and all 77 generic regressions
+remain unchanged. This resolves the preceding checkpoint's two HN and two PN
+surrogate-label differences. The OWN Petri string codec preserves surrogate
+code points losslessly while retaining the existing graph, property, marking
+and arc comparison rules. Actual replay counts are 1,157 discoveries,
+183 presentations and 43 generic conversions, using 498 shared fresh-data
+factories with exact literal reconstruction.
+
+All five assertion-enabled suites pass on 650 frozen compilation inputs. The
+first build's heuristic suite failed because an OWN regression fixture expected
+alternating interval order but used a helper with consecutive outer intervals.
+The corrected fixture is tested in a fresh build; the failed build's exact
+650 inputs, logs and binary pins remain retained. An independent repeated
+scalar sweep confirms all 1,114,112 native KeyError messages match Python 3.11.9
+builtin bytes, with SHA-256 `a8ef0a9a1b13cc42df5de4374e841126018be12f36230d9a9bc3742b7bdf1f41` and zero PM4Py calls.
+The accepted replay and scalar sweep account for 1,115,269 instrumented native
+discoveries; including all retained replay diagnostics gives 1,116,628. Unit-suite
+calls are separate from these evidence counts.
+
+The archive retains 1,377 actual public calls across 36 capture directories,
+including the preceding checkpoint's original serializer failures and dispatch
+context. Five hash-bound segments preserve all 10797 members byte
+for byte, each below 100 MiB, with
+`heuristic-plusplus-pandas-surrogate-validation.json`:
+
+| Evidence segment | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `heuristic-plusplus-pandas-surrogate-checks.jsonl.gz` | `61dc40fbac61e35169e6ff2e13cd4fd88121b90fdcbfbf4c971823f9b9e56d10` | 14366579 |
+| `heuristic-plusplus-pandas-surrogate-before-checks.jsonl.gz` | `f8154de3087bad3b737a95b78a2b0e56b272a742b65403e465cc3e890409b1b6` | 28298246 |
+| `heuristic-plusplus-pandas-surrogate-reference-checks.jsonl.gz` | `bb75a08a134d58e18b6ce382bd1a3161c7cf401c21518fd68a7a1ba2a1c03dbe` | 15020269 |
+| `heuristic-plusplus-pandas-surrogate-replay-checks.jsonl.gz` | `5ee39ffc347def03d3a51c48508cc04414897f7fa19b08c9d514cf3ed618733b` | 66793857 |
+| `heuristic-plusplus-pandas-surrogate-projection-checks.jsonl.gz` | `99e9ccdbd25699f0f3298fb19e539259feff6292dba1f607f72fea333963c80f` | 66502887 |
+
+Public API metadata, opaque pinned-module proofs, actual returns and mutations,
+diagnostics, helpers, probes, process records, exact sources and binary bindings
+remain retained. The preceding Unicode checkpoint remains hash-bound.
+
+Broader carrier and parameter types, categorical and dictionary ordering,
+metadata completeness, identity, timestamp and routing domains remain open.
+PLUSPLUS and Alpha+ stay partial. Coverage remains 46/86 packages and 199/387
+modules, with 228 incomplete units and no promotion.

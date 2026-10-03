@@ -1160,6 +1160,228 @@ void plusplus_pandas_unicode_lookup_errors() {
   }
 }
 
+EventTable pandas_surrogate_control_table() {
+  auto table = pandas_interval_table(2);
+  const auto column = table.column_index("concept:name");
+  // The public fixtures alternate which activity owns the outer interval.
+  for (std::size_t i = 4; i < 12; ++i) {
+    auto& cell = *table.rows[i][column];
+    if (cell.value == "B") cell.value = "C";
+    else if (cell.value == "C") cell.value = "B";
+    cell.typed_value = std::monostate{};
+  }
+  return table;
+}
+
+void plusplus_pandas_surrogate_activity_groups() {
+  const std::vector<std::string> names{"\355\240\200", "\355\277\277", "C\355\252\274", "D"};
+  const auto renamed = [&] {
+    auto table = pandas_surrogate_control_table();
+    const auto column = table.column_index("concept:name");
+    table.dtypes[column] = "object";
+    for (auto& row : table.rows) {
+      auto& cell = *row[column];
+      cell.value = names[std::string("ABCD").find(cell.value)];
+      cell.typed_value = std::monostate{};
+    }
+    return table;
+  };
+  auto options = plus_options();
+  options.decoration = HeuristicNetDecoration::kPerformance;
+  auto table = renamed();
+  const auto before = table;
+  auto net = discover_plus_plus_pandas(table, options);
+  assert(net.activities == names);
+  for (const auto& name : names) assert(activity_stat(net, name).occurrences == 4);
+  assert(net.sojourn_times->size() == 2);
+  assert(net.sojourn_times->at(names[0]) == 7.0 / 3.0);
+  assert(relation(net, names[0], names[1]).eventually_follows_frequency == 4);
+  assert(relation(net, names[0], "D").eventually_follows_frequency == 8);
+  assert(net.plusplus_computed_performance_dfg->at({names[0], names[1]}) == 0.5);
+  assert(net.plusplus_computed_performance_dfg->at({names[0], "D"}) == 2.0);
+  assert(net.raw_concurrency_statistics.size() == 1);
+  assert(net.raw_concurrency_statistics[0].first == names[2]);
+  assert(net.raw_concurrency_statistics[0].second == names[1]);
+  assert(net.raw_concurrency_statistics[0].frequency == 4);
+  for (std::size_t i = 0; i < before.rows.size(); ++i)
+    assert(std::equal(before.rows[i].begin(), before.rows[i].end(), table.rows[i].begin()));
+
+  // Raw means, EFG, waits and concurrency choose independent representatives.
+  table = renamed();
+  const std::vector<int> durations{1, 4, 8, 1, 2, 8, 4, 1, 3, 4, 8, 1, 4, 8, 4, 1};
+  const auto start = table.column_index("start_timestamp");
+  const auto completed = table.column_index("time:timestamp");
+  for (std::size_t i = 0; i < table.rows.size(); ++i) {
+    const int second = std::stoi(table.rows[i][completed]->value.substr(17, 2)) - durations[i];
+    const std::string stamp = second < 0 ? "2023-12-31T23:59:" + std::to_string(60 + second) + "Z"
+        : "2024-01-01T00:00:0" + std::to_string(second) + "Z";
+    table.rows[i][start] = typed_date("start_timestamp", stamp);
+  }
+  net = discover_plus_plus_pandas(table, options);
+  assert(relation(net, names[2], names[1]).eventually_follows_frequency == 4);
+  assert(relation(net, names[2], "D").eventually_follows_frequency == 8);
+  assert(net.plusplus_computed_performance_dfg->size() == 1);
+  assert(net.plusplus_computed_performance_dfg->at({names[2], "D"}) == 1.5);
+  assert(net.raw_concurrency_statistics[0].first == names[2]);
+  assert(net.raw_concurrency_statistics[0].second == names[0]);
+  assert(net.raw_concurrency_statistics[0].frequency == 10);
+
+  for (const bool ordered : {false, true}) {
+    table = renamed();
+    const auto column = table.column_index("concept:name");
+    table.dtypes[column] = "category";
+    table.categorical_dtypes.resize(table.columns.size());
+    EventTableCategoricalDtype descriptor;
+    descriptor.categories_dtype = "object";
+    descriptor.ordered = ordered;
+    for (auto i = names.rbegin(); i != names.rend(); ++i) {
+      EventAttribute category;
+      category.value = *i;
+      category.kind = AttributeKind::kString;
+      descriptor.categories.push_back(category);
+    }
+    table.categorical_dtypes[column] = descriptor;
+    net = discover_plus_plus_pandas(table, options);
+    assert((net.activities == std::vector<std::string>{names[3], names[2], names[1], names[0]}));
+    assert(net.sojourn_times->size() == 4);
+    assert(net.sojourn_times->at(names[1]) == 3.0);
+    assert(net.sojourn_times->at(names[2]) == 3.0);
+    assert(relation(net, names[0], names[1]).eventually_follows_frequency == 2);
+    assert(net.plusplus_computed_performance_dfg->size() == 4);
+  }
+}
+
+void plusplus_pandas_surrogate_case_groups() {
+  auto options = plus_options();
+  options.decoration = HeuristicNetDecoration::kPerformance;
+  const std::vector<std::string> keys{"one", "\355\240\200", "\355\277\277", "four"};
+  const auto cases = [&] {
+    auto table = pandas_surrogate_control_table();
+    const auto column = table.column_index("case:concept:name");
+    table.dtypes[column] = "object";
+    for (std::size_t i = 0; i < table.rows.size(); ++i) {
+      auto& cell = *table.rows[i][column];
+      cell.value = keys[i / 4];
+      cell.typed_value = std::monostate{};
+    }
+    return table;
+  };
+  for (const bool reverse : {false, true}) {
+    auto table = cases();
+    const auto activity_column = table.column_index("concept:name");
+    const std::vector<std::string> sequences{"ABCD", "EFGH", "IJKL", "MNOP"};
+    for (std::size_t i = 0; i < table.rows.size(); ++i) {
+      auto& cell = *table.rows[i][activity_column];
+      cell.value = sequences[i / 4][std::string("ABCD").find(cell.value)];
+      cell.typed_value = std::monostate{};
+    }
+    const auto rows = table.rows;
+    const std::vector<std::size_t> order = reverse
+        ? std::vector<std::size_t>{8,9,10,11,4,5,6,7,0,1,2,3,12,13,14,15}
+        : std::vector<std::size_t>{4,8,0,12,5,9,1,13,6,10,2,14,7,11,3,15};
+    for (std::size_t i = 0; i < order.size(); ++i) table.rows[i] = rows[order[i]];
+    const auto net = discover_plus_plus_pandas(table, options);
+    assert(activity_stat(net, reverse ? "I" : "E").start_occurrences == 1);
+    assert(activity_stat(net, reverse ? "H" : "L").end_occurrences == 1);
+    assert(activity_stat(net, reverse ? "E" : "I").start_occurrences == 0);
+    assert(relation(net, "E", "G").eventually_follows_frequency == 1);
+    assert(relation(net, "I", "J").eventually_follows_frequency == 1);
+    assert(net.plusplus_computed_performance_dfg->size() == 4);
+    assert(!net.plusplus_computed_performance_dfg->contains({"E", "G"}));
+  }
+  for (const bool missing : {false, true}) {
+    auto table = cases();
+    const auto column = table.column_index("case:concept:name");
+    for (std::size_t i = 0; i < 4; ++i) {
+      auto& cell = *table.rows[i][column];
+      cell.kind = missing ? AttributeKind::kString : AttributeKind::kInt;
+      cell.value = missing ? "" : "1";
+      cell.is_null = missing;
+      if (missing) cell.typed_value = std::monostate{};
+      else cell.typed_value = std::int64_t{1};
+    }
+    const auto net = discover_plus_plus_pandas(table, options);
+    assert(activity_stat(net, "A").start_occurrences == (missing ? 3 : 4));
+    assert(net.plusplus_computed_performance_dfg->at({"A", "B"}) == 1.0);
+    assert(net.plusplus_computed_performance_dfg->at({"A", "C"}) == 1.0);
+  }
+  auto table = cases();
+  const auto column = table.column_index("case:concept:name");
+  const std::vector<std::string> invalid_keys{"\355\240\200", "\355\277\277", "\355\252\274", "\355\263\277"};
+  for (std::size_t i = 0; i < table.rows.size(); ++i)
+    table.rows[i][column]->value = invalid_keys[i / 4];
+  auto selected = options;
+  selected.start_timestamp_attribute = "copied:start";
+  bool matched = false;
+  try { (void)discover_plus_plus_pandas(table, selected); }
+  catch (const HeuristicPandasError& error) {
+    matched = error.reference_type() == "builtins.TypeError" &&
+              std::string(error.what()) == "cannot subtract DatetimeArray from ndarray[object]";
+  }
+  assert(matched && table.columns.back() == "copied:start");
+  assert(std::find(table.columns.begin(), table.columns.end(), "@@diff") == table.columns.end());
+  for (const auto& key : {"start_timestamp", "time:timestamp", "copied:start"}) {
+    const auto timestamp = table.column_index(key);
+    table.dtypes[timestamp] = "datetime64[us]";
+    for (auto& row : table.rows) {
+      auto& cell = *row[timestamp];
+      cell.value.pop_back();
+      auto& date = std::get<NativeDate>(cell.typed_value);
+      date.value = cell.value;
+      date.timezone.reset();
+    }
+  }
+  const auto net = discover_plus_plus_pandas(table, options);
+  assert(activity_stat(net, "A").start_occurrences == 1);
+  assert(activity_stat(net, "D").end_occurrences == 1);
+  assert(relation(net, "A", "B").eventually_follows_frequency == 2);
+  assert(net.plusplus_computed_performance_dfg->empty());
+}
+
+void plusplus_pandas_surrogate_category_errors() {
+  const std::vector<std::pair<std::string, std::string>> controls{
+      {"\355\263\277", "character '\\udcff' in position 0"},
+      {"\316\251\360\237\247\252\355\263\277tail", "character '\\udcff' in position 2"},
+      {"x\355\263\277\355\277\277y", "characters in position 1-2"}};
+  for (const auto& [category_name, message] : controls) {
+    for (const bool object_time : {false, true}) {
+      auto table = pandas_interval_table(2);
+      const auto column = table.column_index("case:concept:name");
+      table.dtypes[column] = "category";
+      table.categorical_dtypes.resize(table.columns.size());
+      EventTableCategoricalDtype descriptor;
+      descriptor.categories_dtype = "object";
+      // An unused category still raises before the duration column is added.
+      EventAttribute category;
+      category.kind = AttributeKind::kString;
+      category.value = category_name;
+      descriptor.categories.push_back(category);
+      for (std::size_t i = 0; i < 4; ++i) {
+        category.value = table.rows[4 * i][column]->value;
+        descriptor.categories.push_back(category);
+      }
+      table.categorical_dtypes[column] = descriptor;
+      if (object_time) table.dtypes[table.column_index("time:timestamp")] = "object";
+      auto options = plus_options();
+      options.start_timestamp_attribute = "copied:start";
+      const auto before = table;
+      bool matched = false;
+      try { (void)discover_plus_plus_pandas(table, options); }
+      catch (const HeuristicPandasError& error) {
+        matched = error.reference_type() == (object_time ? "builtins.AttributeError" : "builtins.UnicodeEncodeError") &&
+            std::string(error.what()) == (object_time
+                ? "Can only use .dt accessor with datetimelike values"
+                : "'utf-8' codec can't encode " + message + ": surrogates not allowed");
+      }
+      assert(matched && table.columns.back() == "copied:start");
+      assert(table.columns.size() == before.columns.size() + 1);
+      assert(std::find(table.columns.begin(), table.columns.end(), "@@diff") == table.columns.end());
+      for (std::size_t i = 0; i < before.rows.size(); ++i)
+        assert(std::equal(before.rows[i].begin(), before.rows[i].end(), table.rows[i].begin()));
+    }
+  }
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -5057,6 +5279,9 @@ int main(int argc, char** argv) {
   plusplus_pandas_timestamp_ties_and_petri_counter_order();
   plusplus_pandas_missing_case_groups();
   plusplus_pandas_unicode_lookup_errors();
+  plusplus_pandas_surrogate_activity_groups();
+  plusplus_pandas_surrogate_case_groups();
+  plusplus_pandas_surrogate_category_errors();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();

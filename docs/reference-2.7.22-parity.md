@@ -8026,3 +8026,38 @@ checkpoint remains hash-bound. Surrogate grouping, further type, ordering,
 metadata, identity and routing gates remain open. PLUSPLUS and Alpha+ remain
 partial; coverage stays 46/86 packages and 199/387 modules, with 228 incomplete
 units and no promotion.
+
+### PLUSPLUS pandas surrogate-grouping implementation (2026-10-03)
+
+Matched operation-specific surrogate grouping while retaining distinct caller
+labels, activity counts and interval case identities. Raw-row case boundaries,
+independent sojourn/EFG/wait/concurrency representatives, mixed case-key types,
+category order and exact encoding-error mutation timing follow 152 initial
+public controls and 50 recaptures with complete category declarations. Their
+before/after inputs, errors and mutation flags agree after excluding only the
+added metadata. The total is 202 new PM4Py calls and 384 separately counted
+public pandas grouping diagnostics.
+
+All 1,080 retained PLUSPLUS aliases now match: 492 full supported HN results,
+183 Petri presentations and 405 errors. The 24972 assessed net/node/edge
+fields, connection domains and all input, mutation and option checks match.
+The previous four surrogate-label aliases are resolved. All 77 generic
+regressions remain unchanged. Actual full replay counts are 1,157 discoveries,
+183 presentations and 43 generic conversions; three retained pre-change replays
+add 152 discoveries and 74 presentations. Their categorical projections remain
+diagnostic; complete category carriers add 50 pre-change discoveries and
+20 presentations. The retained initial full replay lacks category metadata
+and adds 1,157 discoveries and 197 presentations; it is superseded by the
+complete accepted replay. A repeated exhaustive control matches
+all 1,114,112 native scalar KeyError messages against Python builtins, with zero
+PM4Py calls. Five assertion-enabled suites pass on 650 exact sources after
+correcting an OWN fixture's interval order; the failed test build is retained.
+
+Evidence is the five `heuristic-plusplus-pandas-surrogate-*-checks.jsonl.gz`
+segments, including `heuristic-plusplus-pandas-surrogate-checks.jsonl.gz`, with
+`heuristic-plusplus-pandas-surrogate-validation.json`. All 10797
+members round-trip byte for byte. The archive retains 1,377 public calls across
+36 directories, and the preceding Unicode checkpoint remains hash-bound.
+Broader type, ordering, metadata, identity, timestamp and routing gates remain
+open. PLUSPLUS and Alpha+ remain partial; coverage stays 46/86 packages and
+199/387 modules, with 228 incomplete units and no promotion.
