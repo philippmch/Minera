@@ -1672,9 +1672,12 @@ SimplicityResult evaluate_simplicity(const ProcessTree& tree,
   return evaluate_simplicity(to_petri_net(tree), variant, options);
 }
 
-CompositeEvaluationResult evaluate_composite(
+namespace {
+
+CompositeEvaluationResult evaluate_composite_impl(
     const EventLog& log, const PetriNet& net,
-    const CompositeEvaluationOptions& options) {
+    const CompositeEvaluationOptions& options,
+    const PnmlDocument* document) {
   enforce_evaluation_event_log_cap(log, options.max_rows_to_materialize);
   CompositeEvaluationResult out;
   out.fitness_details.variant = ReplayFitnessVariant::TOKEN_BASED;
@@ -1689,15 +1692,9 @@ CompositeEvaluationResult evaluate_composite(
   }
   const double total = options.fitness_weight + options.precision_weight +
                        options.simplicity_weight + options.generalization_weight;
-  if (!std::isfinite(options.fitness_weight) ||
-      !std::isfinite(options.precision_weight) ||
-      !std::isfinite(options.simplicity_weight) ||
-      !std::isfinite(options.generalization_weight) ||
-      options.fitness_weight < 0.0 || options.precision_weight < 0.0 ||
-      options.simplicity_weight < 0.0 || options.generalization_weight < 0.0 ||
-      !std::isfinite(total) || total <= 0.0) {
+  if (total == 0.0) {
     out.computed = false;
-    out.error = "composite weights must be finite, non-negative, and have a positive total";
+    out.error = "composite weights must have a non-zero total";
     out.fitness_details.computed = false;
     out.fitness_details.error = out.error;
     return out;
@@ -1736,8 +1733,9 @@ CompositeEvaluationResult evaluate_composite(
   const auto generalization = evaluate_generalization(
       log, net, GeneralizationVariant::GENERALIZATION_TOKEN,
       generalization_options);
-  const auto simplicity = evaluate_simplicity(
-      net, SimplicityVariant::ARC_DEGREE);
+  const auto simplicity = document
+      ? evaluate_simplicity(*document, SimplicityVariant::ARC_DEGREE)
+      : evaluate_simplicity(net, SimplicityVariant::ARC_DEGREE);
   out.fitness_details = fitness;
   out.fitness = fitness.log_fitness;
   out.fitness_score = out.fitness;
@@ -1764,6 +1762,38 @@ CompositeEvaluationResult evaluate_composite(
   return out;
 }
 
+}  // namespace
+
+CompositeEvaluationResult evaluate_composite(
+    const EventLog& log, const PetriNet& net,
+    const CompositeEvaluationOptions& options) {
+  return evaluate_composite_impl(log, net, options, nullptr);
+}
+
+CompositeEvaluationResult evaluate_composite(
+    const EventLog& log, const PnmlDocument& document,
+    const CompositeEvaluationOptions& options) {
+  auto selected = options;
+  const auto inherit_marking = [&](const std::vector<std::int64_t>& stored,
+                                   std::vector<int>& marking) {
+    if (!marking.empty() || stored.empty()) return true;
+    if (stored.size() != document.net.place_count()) return false;
+    for (const auto tokens : stored) {
+      if (tokens < 0 || tokens > std::numeric_limits<int>::max()) return false;
+      marking.push_back(static_cast<int>(tokens));
+    }
+    return true;
+  };
+  if (!inherit_marking(document.initial_marking, selected.initial_marking) ||
+      !inherit_marking(document.final_marking, selected.final_marking)) {
+    CompositeEvaluationResult out;
+    out.computed = out.fitness_details.computed = false;
+    out.error = out.fitness_details.error = "PNML markings must match the place count and fit the native int range";
+    return out;
+  }
+  return evaluate_composite_impl(log, document.net, selected, &document);
+}
+
 CompositeEvaluationResult evaluate_composite(
     const EventLog& log, const ProcessTree& tree,
     const CompositeEvaluationOptions& options) {
@@ -1788,6 +1818,16 @@ CompositeEvaluationResult evaluate_composite(
                            options.case_id_attribute,
                            options.max_rows_to_materialize),
       tree, options);
+}
+
+CompositeEvaluationResult evaluate_composite(
+    const EventDataView& data, const PnmlDocument& document,
+    const CompositeEvaluationOptions& options) {
+  return evaluate_composite(
+      evaluation_event_log(data, options.activity_attribute,
+                           options.case_id_attribute,
+                           options.max_rows_to_materialize),
+      document, options);
 }
 
 StochasticLanguage derive_stochastic_language(const EventLog& log,

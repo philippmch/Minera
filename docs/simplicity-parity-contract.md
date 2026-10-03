@@ -3,7 +3,7 @@
 The target is PM4Py 2.7.22, pinned to
 `0715c31f3f1d85924107d6aa5329806db69df899`. The simplicity package remains
 **partial**. This checkpoint verifies the graph-only arc-degree and extended
-Cardoso metrics through a native full-presentation and imported PNML entry points.
+Cardoso metrics through native full-presentation and imported PNML entry points.
 
 `evaluate_simplicity(const PetriNetPresentation&, ...)` preserves distinct
 place/transition identities and separate arc occurrences. Names do not identify
@@ -20,7 +20,8 @@ The shared `simplicity_arc_degree_k` request field retains those values, signed
 zero and finite baselines. Malformed/empty/range-error numeric strings remain
 invalid. Three actual CLI processes verify all four per-model results: NaN is
 encoded as JSON null with `computed=true`, while the infinity controls encode
-1 and 0. Other request fields retain their existing numeric validation.
+1 and 0. Composite coefficient domains are described below; other request fields
+retain their existing numeric validation.
 
 The preceding presentation capture executes 1,510 actual calls, with zero reference errors or
 input/parameter mutations. It includes all 256 binary incidence graphs on two
@@ -71,7 +72,8 @@ represent firing multiplicities. `to_petri_net_presentation(document)` projects
 the current nodes and original arc objects for graph metrics. The document
 simplicity overload and imported-model CLI/server routes use that projection
 for arc-degree and Cardoso; cyclomatic still uses executable reachability and
-caller-supplied marking options. Composite evaluation remains executable-only.
+caller-supplied marking options. Composite evaluation uses retained arc
+occurrences for its simplicity component, as described below.
 
 Document export preserves each imported arc occurrence and its weight/type/ID.
 Metadata must exactly reproduce executable arc order and multiplicities;
@@ -124,10 +126,84 @@ Preceding pushed evidence and its baseline core remain hash-bound.
 | --- | --- | ---: |
 | `simplicity-pnml-checks.jsonl.gz` | `bd84b9c898c79133607c330d3efa53aa2834e045f0d3dd569490495310771180` | 69762434 |
 
-Extended cyclomatic reachability/parameters, composite evaluation and broader
-evaluation/conformance dependencies remain open. General PNML metadata,
-marking keys, malformed/extended-arc and additional carrier domains are outside
-these finite comparisons. Public PNML imports omit explicit zero-token keys
-that native documents preserve; public exporter byte/ID formatting is not
-claimed equivalent. The catalogue remains 46/86 packages, 199/387 modules and
+## Composite evaluation on imported documents
+
+The composite overloads accept `PnmlDocument` on EventLog/EventDataView and
+stream/table/lazy carriers. Fitness, precision and generalization use the
+executable net; simplicity uses retained arc occurrences. The EventDataView
+route materializes once, and no additional fitness replay is introduced.
+Omitted marking vectors inherit complete document markings when supplied;
+explicit vectors override them. Stored markings must match the place count,
+contain nonnegative tokens and fit the native int range. Stale arc metadata
+produces an explicit uncomputed result. Imported CLI/server evaluation uses
+the document overload.
+
+Composite weight parsing now preserves negative values, signed zero, infinity
+and NaN. Normalization accepts negative totals; overflowed totals and
+nonfinite coefficients follow the observed IEEE arithmetic. A zero total
+parses successfully and produces an explicit uncomputed evaluation result,
+corresponding to the public ZeroDivisionError. Malformed, empty and range-error
+numeric strings remain rejected. Exception class/stack identity is not claimed.
+
+The fresh pinned parent-API capture makes 784 PNML imports and 784 composite
+calls: 688 return results and 96 raise the zero-total error. Four weighted,
+parallel and sequential graphs cover fitting/mixed/empty inputs, 16 coefficient
+profiles, EventLog/DataFrame carriers, string/enum keys and alternate activity
+attributes. All graph/log/marking/parameter snapshots are unchanged. Sixteen
+opaque module proofs match the pin before/after, with only recorded CRLF-to-LF
+normalization. No upstream implementation or bytecode is inspected.
+
+Each actual before/after native probe makes 784 imports, 784 request parses and
+1,960 composite calls. The baseline parses 400 requests, matches 740 metric or
+error results, rejects 720 valid aliases, and has 500 simplicity plus 320
+aggregate scalar differences among its computed results. The accepted probe
+parses all requests and matches all 1,960 outcomes: 1,720 successful results
+yield 17,200 exact scalar matches, and 240 zero-total aliases are uncomputed.
+All returned fitness fields, precision, generalization, simplicity, aggregate
+and fscore are checked. Native aliases/normalized coefficient metadata are
+recorded separately from public-returned fields. NaNs compare as NaNs; raw
+MSVC hexfloat spelling remains retained.
+
+Grouped native carriers preserve public EventLog empty traces. Flat native
+stream/table/lazy carriers match public DataFrame rows, which cannot represent
+empty traces. Each lazy input is materialized exactly once. Baseline metrics
+use typed constructor options independently of parser rejection; accepted
+metrics exclusively use successfully parsed options. Document, input and
+option snapshots are unchanged.
+
+The baseline's 196 real CLI runs include 100 successful exits and 50 matching
+metric/error results. All 196 accepted CLI runs and 196 real loopback HTTP
+evaluations match; all 228 recorded HTTP requests return 200. Empty CSV,
+alternate activity attributes, 24 zero-total results and 36 computed nonfinite
+aggregates are covered. Application numbers retain six significant digits and
+nonfinite values serialize as null; exact native doubles are checked separately.
+The task-owned server is deliberately terminated after the checks, and that
+exit is retained separately from request success. Discovery internals and the
+startup health request are not added to instrumented producer call counts.
+
+A fresh full Release compile on 650 frozen source/configuration inputs passes
+all five assertion-enabled suites: core, request parameters, evaluation,
+evaluation contracts and extended Petri arcs. No build reuse is needed in
+this step. Seven source files differ from the preceding checkpoint. Release
+NDEBUG undefinition, new assertion text, actual process logs and tested binary
+hashes are verified. The archive retains 2,827 exact files in 2,864
+verified chunk rows, including before/after outputs, complete accepted sources,
+public values, CLI/HTTP records and accepted/test/probe binaries. Two zero-call
+public API inspection failures, the zero-call probe compile failure and the
+comparison's MSVC NaN decoding correction retain their original helpers and
+derivation accounting. The preceding pushed archive and baseline core are
+hash-bound; full package/catalogue completion is not inferred.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `composite-pnml-checks.jsonl.gz` | `e2914a4d7a7dc5ba5bfd6faf471c26ee3179250e47af6992b57bc53e4b04711e` | 74739515 |
+
+Extended cyclomatic reachability/parameters and broader evaluation/conformance
+dependencies remain open. Additional composite graph/log/marking, typed or
+nonnumeric parameter domains and exception-class/stack identity are outside
+these finite comparisons. General PNML metadata, marking keys,
+malformed/extended-arc and additional carrier domains remain open. Public PNML
+imports omit explicit zero-token keys that native documents preserve; public
+exporter byte/ID formatting and full application wire precision are not claimed
+equivalent. The catalogue remains 46/86 packages, 199/387 modules and
 228 incomplete units. Full module/package parity is not established.

@@ -699,6 +699,61 @@ void composite_default_contract() {
   assert(close_to(result.fscore, expected_fscore));
 }
 
+void composite_document_and_weight_contract() {
+  const auto document = parse_pnml_document(R"(<pnml><net id="parallel">
+    <place id="start"><initialMarking><text>4</text></initialMarking></place>
+    <place id="finish"/><transition id="A"><name><text>A</text></name></transition>
+    <arc id="one" source="start" target="A"/>
+    <arc id="two" source="start" target="A"><inscription><text>2</text></inscription></arc>
+    <arc id="three" source="start" target="A"/>
+    <arc id="out1" source="A" target="finish"><inscription><text>2</text></inscription></arc>
+    <arc id="out2" source="A" target="finish"/>
+    <finalmarkings><marking><place idref="finish"><text>3</text></place></marking></finalmarkings>
+  </net></pnml>)");
+  const auto events = log({{"A"}, {"A"}, {"A"}, {"A"}, {"A"}, {"A"}, {"A"}, {"A"}, {"A"}});
+  const auto result = evaluate_composite(events, document);
+  assert(result.computed && result.fitness == 1.0 && result.precision == 1.0);
+  assert(result.simplicity == 3.0 / 7.0 && result.generalization == 0.6666666666666667);
+  assert(result.metrics_average_weight == 65.0 / 84.0);
+  assert(result.fitness_details.trace_count == 9 && result.fitness_details.fitting_traces == 9);
+  assert(evaluate_composite(EventDataView(events), document).metrics_average_weight == result.metrics_average_weight);
+  assert(evaluate_composite(events, parse_pnml_document(to_pnml(document))).simplicity == result.simplicity);
+  CompositeEvaluationOptions negative;
+  negative.fitness_weight = negative.precision_weight =
+      negative.simplicity_weight = negative.generalization_weight = -1.0;
+  const auto normalized_negative = evaluate_composite(events, document, negative);
+  assert(normalized_negative.computed && normalized_negative.fitness_weight == 0.25);
+  assert(normalized_negative.metrics_average_weight == result.metrics_average_weight);
+  CompositeEvaluationOptions overflow;
+  overflow.fitness_weight = overflow.precision_weight =
+      overflow.simplicity_weight = overflow.generalization_weight = 1e308;
+  const auto normalized_overflow = evaluate_composite(events, document, overflow);
+  assert(normalized_overflow.computed && normalized_overflow.fitness_weight == 0.0);
+  assert(normalized_overflow.metrics_average_weight == 0.0);
+  for (const double weight : {std::numeric_limits<double>::quiet_NaN(),
+                              std::numeric_limits<double>::infinity(),
+                              -std::numeric_limits<double>::infinity()}) {
+    auto options = CompositeEvaluationOptions{};
+    options.fitness_weight = weight;
+    const auto nonfinite = evaluate_composite(events, document, options);
+    assert(nonfinite.computed && std::isnan(nonfinite.metrics_average_weight));
+  }
+  CompositeEvaluationOptions zero;
+  zero.fitness_weight = 1.0; zero.precision_weight = -1.0;
+  zero.simplicity_weight = zero.generalization_weight = 0.0;
+  assert(!evaluate_composite(events, document, zero).computed);
+  auto stale = document;
+  stale.net.add_arc(0, 0);
+  assert(!evaluate_composite(events, stale).computed);
+  CompositeEvaluationOptions explicit_marks;
+  explicit_marks.initial_marking = {4, 0};
+  explicit_marks.final_marking = {0, 3};
+  stale = document;
+  stale.initial_marking = {std::numeric_limits<std::int64_t>::max(), 0};
+  assert(!evaluate_composite(events, stale).computed);
+  assert(evaluate_composite(events, stale, explicit_marks).fitness == 1.0);
+}
+
 EventStream flat_evaluation_stream() {
   EventStream stream;
   for (const auto& row : {std::pair{"case-1", "A"},
@@ -1130,6 +1185,7 @@ int main() {
   simplicity_nonfinite_baseline_contract();
   simplicity_extended_cyclomatic_contract();
   composite_default_contract();
+  composite_document_and_weight_contract();
   evaluation_event_data_adapters_contract();
   precomputed_replay_aggregation_contract();
   emd_pyemd_contract();

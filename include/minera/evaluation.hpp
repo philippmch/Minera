@@ -152,6 +152,8 @@ struct SimplicityResult {
 };
 
 struct CompositeEvaluationOptions {
+  // Public weight normalization accepts negative, infinite and NaN values.
+  // A zero total is undefined and reports an uncomputed result.
   double fitness_weight = 0.25;
   double precision_weight = 0.25;
   double simplicity_weight = 0.25;
@@ -488,11 +490,21 @@ struct ModelEvaluation {
 [[nodiscard]] CompositeEvaluationResult evaluate_composite(
     const EventLog&, const PetriNet&,
     const CompositeEvaluationOptions& = {});
+// Uses executable replay metrics and retained document arc occurrences for
+// simplicity, without repeating token replay or projecting away parallel arcs.
+// Omitted option markings use complete document markings when present; explicit
+// option vectors override them. Replay markings must fit the native int range.
+[[nodiscard]] CompositeEvaluationResult evaluate_composite(
+    const EventLog&, const PnmlDocument&,
+    const CompositeEvaluationOptions& = {});
 [[nodiscard]] CompositeEvaluationResult evaluate_composite(
     const EventLog&, const ProcessTree&,
     const CompositeEvaluationOptions& = {});
 [[nodiscard]] CompositeEvaluationResult evaluate_composite(
     const EventDataView&, const PetriNet&,
+    const CompositeEvaluationOptions& = {});
+[[nodiscard]] CompositeEvaluationResult evaluate_composite(
+    const EventDataView&, const PnmlDocument&,
     const CompositeEvaluationOptions& = {});
 [[nodiscard]] CompositeEvaluationResult evaluate_composite(
     const EventDataView&, const ProcessTree&,
@@ -511,6 +523,21 @@ struct ModelEvaluation {
     const LazyEventTable& data, const PetriNet& net,
     const CompositeEvaluationOptions& options = {}) {
   return evaluate_composite(EventDataView(data), net, options);
+}
+[[nodiscard]] inline CompositeEvaluationResult evaluate_composite(
+    const EventStream& data, const PnmlDocument& document,
+    const CompositeEvaluationOptions& options = {}) {
+  return evaluate_composite(EventDataView(data), document, options);
+}
+[[nodiscard]] inline CompositeEvaluationResult evaluate_composite(
+    const EventTable& data, const PnmlDocument& document,
+    const CompositeEvaluationOptions& options = {}) {
+  return evaluate_composite(EventDataView(data), document, options);
+}
+[[nodiscard]] inline CompositeEvaluationResult evaluate_composite(
+    const LazyEventTable& data, const PnmlDocument& document,
+    const CompositeEvaluationOptions& options = {}) {
+  return evaluate_composite(EventDataView(data), document, options);
 }
 [[nodiscard]] inline CompositeEvaluationResult evaluate_composite(
     const EventStream& data, const ProcessTree& tree,

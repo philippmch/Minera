@@ -7640,8 +7640,11 @@ int main(int argc, char** argv) {
                       model_evaluation.simplicity_options);
             break;
           case minera::EvaluationFamily::kComposite:
-            result.composite = minera::evaluate_composite(
-                evaluation_log, *petri, model_evaluation.composite_options);
+            result.composite = miner == "imported" && imported_document
+                ? minera::evaluate_composite(
+                      evaluation_log, *imported_document, model_evaluation.composite_options)
+                : minera::evaluate_composite(
+                      evaluation_log, *petri, model_evaluation.composite_options);
             break;
         }
         evaluation->push_back(std::move(result));
