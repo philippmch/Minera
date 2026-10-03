@@ -9279,3 +9279,45 @@ Independent whole replay-path derivation for every structural cache remains
 open, along with the broader forward/backwards, adapter and catalogue acceptance
 gates. Totals remain 46/86 packages, 199/387 modules and 228 incomplete units,
 with no promotions or full parity claim.
+
+## Complete original choice/flood paths
+
+The original seventeen weighted acyclic fixtures now complete their fixed-order
+choice/flood acceptance contract. An independent input-derived oracle calculates
+whole replay paths for all 382 structural matrices from the previously exhausted
+1,217,856 fixed local orders. Each cache stays fixed across repeated events;
+cleaning and PLTR policies produce 1528 complete expected records frozen before
+the new public capture. Ordered firings, weighted repair/cleanup, markings,
+counters, fitness and full diagnostic carriers are derived together.
+
+The fresh capture returns all 3056 direct/parent outcomes, and the accepted core
+returns all 1528 native outcomes. Every complete comparison and all 3056 Trace
+equality matrices match. The oracle also explains the retained 680 public/340
+native parent results and all 501 whole historical observations. Nine opaque
+module pin proofs and actual inputs remain unchanged. A recorded self-review
+checks 1528 flow ledgers and 3720 event steps and rejects both changing the cache
+between events and combining fields from different paths.
+
+All enumerated-cache outcomes agree with physical reachability and the reported
+eventually-enabled diagnostic. Two supplemental empty-cache states distinguish
+those behaviors; 47 fresh direct helper calls confirm the complete derived
+marking set. The step retains 3137 actual public helper calls in total. Cleanup
+is proved within these inputs through active sink co-membership; standalone
+component-helper carriers remain open. All three oracle versions, the initial
+parent diagnostic differences and intermediate provenance-alias failure are
+retained; corrections preserve every pre-public expected whole carrier. The
+first generated native probe overflows its default stack before any full replay
+call. Separating generated factories resolves it with the same 1 MiB stack;
+both binaries and actual process witnesses are retained.
+
+No production inputs change. The accepted core, all 660 frozen inputs and its
+152 passing assertion-enabled Release suites are reused with byte bindings;
+there is no fresh full build or suite run. All 269 evidence files round-trip
+across sixteen archives. See
+[forward-choice-complete-validation.json](forward-choice-complete-validation.json)
+and [token-replay-parity-contract.md](token-replay-parity-contract.md).
+Broader forward/backwards, adapter, cache/alias, search-bound and distinct
+catalogue acceptance gates remain open, as do supplied-cache CLI/HTTP transports,
+weighted aggregate/composite conformance and general PNML/precision. Totals stay
+at 46/86 packages, 199/387 modules and 228 incomplete units, with no promotions
+or full parity claim.
