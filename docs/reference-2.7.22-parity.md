@@ -9037,3 +9037,81 @@ conformance remains gated. The catalogue remains 46/86 packages, 199/387 modules
 and 228 incomplete units. No module/package promotion or full parity is claimed.
 
 Evidence: [forward-result-validation.json](forward-result-validation.json).
+
+
+## Typed forward variants and null error precedence checkpoint
+
+The full forward result API now groups typed activity variants using measured
+numeric key equality, retaining the first typed representative. Booleans, integers
+and equal integral floats coalesce, including positive and negative zero. Mutable
+activity keys are rejected. Variant frequencies are compared before activity
+tuples; only tied frequencies need cross-type ordering. The earlier blanket
+mixed-null/string guard was too broad. Unequal-frequency mixtures can return,
+while incompatible tied keys retain the measured rejection behavior. Bounded
+stable merging handles the measured partial ordering of nonfinite numeric keys.
+
+An explicit null activity can select an actual silent transition in the full
+API. PLTR does not precreate fitness entries for silent transitions, so an examined
+null event produces the measured missing-transition-key rejection before repair,
+firing or fitness conversion. This also establishes the observed error precedence
+when a silent output exceeds floating-point range. The generic per-trace and
+count-only APIs keep their established contracts.
+
+Two actual public captures each import six exact retained weighted PNML models
+and execute 3888 forward/dispatcher calls. Together they retain 12 imports,
+7776 actual calls, 4758 complete returns and 3018 actual errors, with zero
+serialization gaps. The 27 log cohorts include empty/missing/null activity,
+numeric equality and integer limits, nonfinite floats, bytes, tuples, mutable
+keys, mixed activity types, typed Trace/event attributes and enum/string custom
+activity selectors. Thirteen policy profiles and tied/unequal variant-frequency
+controls are measured. All input objects remain unchanged. Seven opaque module
+pin proofs match before and after; only public signatures, enum members and
+actual return values are inspected. The public signature and all 18 Parameters
+members are retained, without claiming every parameter is implemented.
+
+The actual parent-core probe exposes 214 complete-return and 1886 error-behavior
+differences. The first fresh candidate matches all 4758 complete returns but
+retains 106 error-priority differences. Its passing test run is not semantic
+acceptance. The corrected C++ API/codec matches all 4758 whole returned carriers,
+all 3018 measured error behaviors and all 7776 public Trace equality matrices,
+with zero measured differences. Each typed native probe makes 3888 actual calls;
+comparisons against two public routes do not double the actual native call count.
+Exception behavior is matched as an observed constraint, without asserting that
+C++ and Python exception classes are identical. Raw mutable Python list/dict
+activity values map to native mutable containers solely for rejection checks;
+their raw value codec/equality is not claimed to be identical.
+
+Both candidate and corrected builds freeze 660 inputs (two existing edits,
+658 unchanged, no additions), compile 155 fresh production/test outputs and pass
+all 152 assertion-enabled Release suites. Each has five actual terminal-zero
+process records and verifies NDEBUG removal in every test project. Three probe
+preparations bind immutable core-build witness snapshots after the core and early
+suite finish. Those snapshots are separately joined here to the complete final
+build manifests, with matching source and core hashes. All 310 fresh full-build
+outputs and four fresh probe binaries are retained. The baseline probe reuses the
+previous accepted core; its parent binaries are not counted as freshly rebuilt.
+
+The corrected 95-model regression makes 95 imports, 2280 full-result calls,
+2280 per-trace calls and 2090 count-only calls. It matches all 2216 retained
+complete public carriers (2032 PLTR tuples), all 2344 public error behaviors and
+all 2280 prior generic native records. Another 1140 positional-input CLI runs
+produce 1108 successful returns and 32 overflow exits, matching all 2216 complete
+public carriers, 2032 tuples and 64 error outcomes. These 95-model public controls
+are reused from the parent evidence and are not counted as new public calls.
+Comparisons normalize only dictionary/Marking/set order and paired enabled-name
+set projections; activation, problem and context lists remain ordered.
+
+Frozen sources, binaries, projects, complete raw public/native/CLI outputs,
+process witnesses, immutable helpers, baseline differences and the first
+candidate's differences remain archived. Every chunk and entire file round-trips
+exactly. Evidence:
+[forward-typed-key-validation.json](forward-typed-key-validation.json).
+
+Unmeasured VARIANTS/cache/time/reduction/case-id/delimiter parameters, broader
+ordering domains, date/NA/frozenset/foreign keys and object alias graphs remain
+open. The prior forward silent-choice/cleanup, backwards and adapter acceptance
+contracts still require reconciliation. Weighted aggregate/composite conformance,
+specialized bounded carriers, large frontend JSON precision and general PNML
+lexical/marking/export behavior remain gated or unresolved. The catalogue remains
+46/86 packages, 199/387 modules and 228 incomplete units. No module/package
+promotion or full parity is claimed.

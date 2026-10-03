@@ -107,13 +107,13 @@ void rejection_and_transport() {
   Event null;
   null.activity_state = FirstClassAttributeState::kNull;
   EventLog log;
-  log.traces = {trace("mixed", {event("A"), null})};
+  log.traces = {trace("known", {event("A")}), trace("null", {null})};
   bool rejected = false;
   try { (void)replay_token_result(log, model(), policy); }
   catch (const std::invalid_argument& error) {
     rejected = std::string(error.what()) == "'<' not supported between instances of 'str' and 'NoneType'";
   }
-  assert(rejected && replay_token_traces(log, model(), policy).size() == 1);
+  assert(rejected && replay_token_traces(log, model(), policy).size() == 2);
   policy.variant = TokenReplayVariant::kBackwards;
   rejected = false;
   try { (void)replay_token_result(EventLog{}, model(), policy); }
@@ -126,10 +126,68 @@ void rejection_and_transport() {
   });
   assert(parsed.enable_pltr_fitness && parsed.return_names && parsed.disable_variants == false);
 }
+
+void typed_variant_and_null_contracts() {
+  const auto net = model();
+  auto policy = options();
+  policy.disable_variants = false;
+  Event integer, real, boolean;
+  integer.attributes.push_back({"concept:name", "1", AttributeKind::kInt});
+  EventAttribute floating{"concept:name", "1.0", AttributeKind::kFloat};
+  floating.typed_value = 1.0; real.attributes.push_back(floating);
+  EventAttribute truth{"concept:name", "true", AttributeKind::kBoolean};
+  truth.typed_value = true; boolean.attributes.push_back(truth);
+  EventLog log;
+  log.traces = {trace("integer", {integer}), trace("real", {real}), trace("boolean", {boolean})};
+  const auto grouped = replay_token_result(log, net, policy);
+  assert(grouped.pltr_fitness->trace_references.size() == 1);
+  assert(grouped.pltr_fitness->unknown_activities.size() == 1);
+  assert(grouped.pltr_fitness->unknown_activities[0].activity.kind == AttributeKind::kInt);
+  assert(grouped.pltr_fitness->places[2].missing == 3);
+  Event null;
+  null.activity_state = FirstClassAttributeState::kNull;
+  policy.enable_pltr_fitness = false;
+  log.traces = {trace("known", {event("A")}), trace("null", {null}), trace("known again", {event("A")})};
+  assert(replay_token_result(log, net, policy).traces.size() == 3);
+  Event mutable_activity;
+  EventAttribute list{"concept:name", ""};
+  list.container = AttributeContainerKind::kList;
+  mutable_activity.attributes.push_back(list);
+  log.traces = {trace("mutable", {mutable_activity})};
+  bool rejected = false;
+  try { (void)replay_token_result(log, net, policy); }
+  catch (const std::invalid_argument& error) { rejected = std::string(error.what()) == "unhashable activity variant key"; }
+  assert(rejected);
+  PetriNet silent;
+  const auto source = silent.add_place(), sink = silent.add_place();
+  silent.set_source(source); silent.set_sink(sink);
+  silent.add_transition(std::nullopt, {source}, {sink});
+  policy = {}; log.traces = {trace("null", {null})};
+  const auto replayed = replay_token_result(log, silent, policy);
+  assert(replayed.traces[0].activated_transitions == std::vector<std::size_t>{0});
+  assert(replayed.traces[0].unknown_event_indices.empty() && replayed.traces[0].trace_is_fit);
+  assert(replay_token_traces(log, silent, policy)[0].unknown_event_indices == std::vector<std::size_t>{0});
+  policy.enable_pltr_fitness = true;
+  rejected = false;
+  try { (void)replay_token_result(log, silent, policy); }
+  catch (const std::invalid_argument& error) { rejected = std::string(error.what()) == "null transition PLTR key"; }
+  assert(rejected);
+  silent.set_ordinary_arc_weights(0, {}, {{TokenInteger("1" + std::string(400, '0')), false}});
+  rejected = false;
+  try { (void)replay_token_result(log, silent, policy); }
+  catch (const std::invalid_argument& error) { rejected = std::string(error.what()) == "null transition PLTR key"; }
+  assert(rejected);
+  policy.enable_pltr_fitness = false;
+  rejected = false;
+  try { (void)replay_token_result(log, silent, policy); }
+  catch (const std::overflow_error&) { rejected = true; }
+  assert(rejected);
+}
 }  // namespace
 int main() {
   variants_and_keys();
   contexts_and_stop();
   rejection_and_transport();
+  typed_variant_and_null_contracts();
   std::cout << "full forward token replay result contracts passed\n";
 }
