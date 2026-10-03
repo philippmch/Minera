@@ -1239,3 +1239,71 @@ further collisions, Unicode errors, dictionary order, identity, metadata,
 additional ordering/timestamp domains and adapter routing remain open. PLUSPLUS
 and Alpha+ remain partial. Coverage stays 46/86 packages and 199/387 modules,
 with 228 incomplete units and no catalogue promotion.
+
+## Pandas missing case groups and case carriers (2026-10-03)
+
+Executed 72 new public calls across two matrices, with both decorations and all
+nine options explicit. They cover empty strings, None, NaN, integers, floats,
+booleans, mixed numeric/string keys, categorical keys with unused/reversed
+categories, partial and complete missing case columns, interleaved rows,
+missing first events, new labels on missing cases, naive/aware timestamps,
+second resolution and copied missing starts. Forty-two calls return
+HeuristicsNets, eighteen return Petri presentations and twelve raise captured
+errors. No calls are skipped or fail during serialization.
+
+The committed pre-change core replays all 72 calls. The first matrix has
+1,506 matching and 54 mismatched field checks, eight matching and two mismatched
+Petri presentations, and four mismatched errors/input-after/mutation checks.
+The second has 683 matching, 61 mismatched and eighteen unrepresentable field
+checks; all eight Petri presentations differ. Eight error/input-after checks
+and six mutation occurrences differ. The unrepresentable fields contain actual
+public edge values absent from the native edge domains. Original raw runs and
+comparisons remain retained.
+
+The pandas interval projection now pools missing case scalar kinds into one
+internal case without changing caller cells. Missing cases contribute interval
+follows and concurrency, and all rows contribute activity counts and sojourn
+means. Boundaries and performance waits exclude missing case groups. Activity
+frequency ties follow the original column row order, independently of grouped
+case traversal. Empty strings remain valid case values, and the existing
+numeric equality rules continue to distinguish string keys from numbers while
+grouping equal integer/float/bool keys.
+
+An entirely missing case column with aware completion timestamps raises the
+observed subtraction TypeError before @@diff mutation. A missing start column
+is still copied before that failure. The corresponding naive controls succeed:
+their boundary dictionaries and performance DFG are empty, while their interval
+relations, global counts and sojourn values remain present. These controls
+distinguish missing case handling from dropping rows or creating extra boundaries.
+
+All 72 aliases match on their supported full result/error and input checks.
+The 42 HeuristicsNets match 2322 net/node/edge checks and complete connection
+domains; all eighteen Petri presentations match names, nullable labels,
+properties, directed arc occurrences, weights and sparse markings. The complete
+replay matches 694 saved aliases on 20844 net-field checks, 117 Petri
+presentations and 151 errors. All 77 generic regressions remain unchanged.
+The replay executes 771 discoveries, 117 presentations and 43 generic conversions
+without additional reference calls. All five assertion-enabled suites pass for
+the frozen build containing 650 exact compilation inputs.
+
+Evidence is `heuristic-plusplus-pandas-case-checks.jsonl.gz` (SHA-256
+`77a0f23667f5909ad764a10513782423f300736e41b2a912f7fee027c3484f03`, 70230661 bytes, 4216
+verified members), with `heuristic-plusplus-pandas-case-validation.json`.
+Actual public calls, mutations, API views, opaque pinned-module proofs, native
+process records, logs, helpers, probe code, compilation inputs and binary bindings
+round-trip byte for byte. Both pre-change replays and all three segments of the
+preceding ordering checkpoint remain hash-bound. The replay shares 396 data
+constructors, each creating fresh data; literal reconstruction is verified and
+every alias is executed.
+
+The initial edge probe configure failed with MSBuild FTK1011 at its long tracking
+path. Its 28-case preparation and finalized command records remain retained;
+it made zero native discoveries. A shorter path produced the complete pre-change
+replay against the same hash-bound committed core. Its exact frozen inputs
+remain separate from the working edits and the later accepted build.
+
+These controls expand case-carrier evidence. Broader carrier/parameter/label
+types, remaining collisions, Unicode errors, dictionary order, object identity,
+complete metadata, further timestamp/ordering domains and adapter routing remain
+open. PLUSPLUS and Alpha+ stay partial. Coverage remains 46/86 packages and
+199/387 modules, with 228 incomplete units and no catalogue promotion.

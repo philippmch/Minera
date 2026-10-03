@@ -680,7 +680,8 @@ struct PandasInterval {
 
 PlusAbstraction build_pandas_plus_abstraction(
     const EventLog& log, const HeuristicMinerOptions& options,
-    std::int64_t start_units, std::int64_t complete_units) {
+    std::int64_t start_units, std::int64_t complete_units,
+    const EventTable& projection) {
   PlusAbstraction out;
   std::set<std::string> known;
   std::map<NamePair, std::uint64_t> directional_concurrency;
@@ -699,22 +700,34 @@ PlusAbstraction build_pandas_plus_abstraction(
   };
   std::map<std::string, Mean> sojourn;
   const auto duration_units = std::max(start_units, complete_units);
+  // Column statistics retain all rows and their original frequency-tie order,
+  // independently of the case groups used by the interval algorithms.
+  for (const auto& row : projection.rows) {
+    const auto& label = row[1];
+    if (!label || label->is_null)
+      throw std::invalid_argument(
+          "Heuristics Miner PLUSPLUS: event is missing activity attribute");
+    const auto& activity = label->value;
+    if (known.insert(activity).second) out.activity_order.push_back(activity);
+    ++out.occurrences[activity];
+    const auto& duration = row[4];
+    if (!duration)
+      throw std::logic_error("Heuristics Miner pandas duration column missing");
+    const auto* number = std::get_if<double>(&duration->typed_value);
+    if (number == nullptr)
+      throw std::logic_error("Heuristics Miner pandas duration is not a float");
+    sojourn[activity].add(*number);
+  }
   for (const auto& trace : log.traces) {
     if (trace.events.empty()) continue;
-    ++out.starts[required_activity(trace.events.front(), options)];
-    ++out.ends[required_activity(trace.events.back(), options)];
+    const bool missing_case = trace.case_id_state == FirstClassAttributeState::kNull;
+    if (!missing_case) {
+      ++out.starts[required_activity(trace.events.front(), options)];
+      ++out.ends[required_activity(trace.events.back(), options)];
+    }
     std::vector<PandasInterval> intervals;
     for (const auto& event : trace.events) {
       const auto& activity = required_activity(event, options);
-      if (known.insert(activity).second) out.activity_order.push_back(activity);
-      ++out.occurrences[activity];
-      const auto* duration = selected_start_attribute(event, "@@diff");
-      if (duration == nullptr)
-        throw std::logic_error("Heuristics Miner pandas duration column missing");
-      const auto* number = std::get_if<double>(&duration->typed_value);
-      if (number == nullptr)
-        throw std::logic_error("Heuristics Miner pandas duration is not a float");
-      sojourn[activity].add(*number);
       const auto start = pandas_timestamp(
           selected_start_attribute(event, *options.start_timestamp_attribute),
           start_units);
@@ -761,6 +774,8 @@ PlusAbstraction build_pandas_plus_abstraction(
     }
     // Pandas performance adjacency follows sorted nonmissing starts. A missing
     // completion preserves its row but contributes no outgoing wait sample.
+    // Missing case groups still supply intervals, but no performance waits.
+    if (missing_case) continue;
     const PandasInterval* previous = nullptr;
     for (const auto& current : intervals) {
       if (!current.start) continue;
@@ -2163,6 +2178,17 @@ HeuristicsNet discover_plus_plus_pandas(
     }
     return false;
   };
+  const auto missing_case = [](const auto& cell) {
+    if (!cell || cell->is_null || is_typed_nat(*cell)) return true;
+    const auto* number = std::get_if<double>(&cell->typed_value);
+    return number != nullptr && std::isnan(*number);
+  };
+  if (!data.rows.empty() && timezone_aware(completed) &&
+      std::all_of(data.rows.begin(), data.rows.end(), [&](const auto& row) {
+        return missing_case(row[*case_column]);
+      }))
+    throw HeuristicPandasError(
+        "builtins.TypeError", "cannot subtract DatetimeArray from ndarray[object]");
   if (timezone_aware(started) != timezone_aware(completed) ||
       (started != completed && timezone_aware(completed) &&
        !any_timestamp(completed)))
@@ -2222,6 +2248,12 @@ HeuristicsNet discover_plus_plus_pandas(
     EventTable::Row projected;
     for (std::size_t i = 0; i < source_columns.size(); ++i) {
       auto cell = row[source_columns[i]];
+      // Pandas pools missing scalar kinds into one interval case. Normalize
+      // only the internal grouping cell; retain the caller's actual scalar.
+      if (i == 0 && missing_case(cell)) {
+        cell = EventAttribute{};
+        cell->is_null = true;
+      }
       if (cell) {
         cell->key = projection.columns[i];
         cell->first_class_role = i == 0 ? FirstClassAttributeRole::kCaseId
@@ -2246,7 +2278,7 @@ HeuristicsNet discover_plus_plus_pandas(
   auto net = discover_plus_plus_from_abstraction(
       build_pandas_plus_abstraction(
           classic_event_log(EventDataView(projection), projected_options),
-          projected_options, start_units, complete_units),
+          projected_options, start_units, complete_units, projection),
       selected);
   net.activity_attribute = selected.activity_attribute;
   net.timestamp_attribute = selected.timestamp_attribute;
