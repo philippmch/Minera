@@ -132,6 +132,7 @@ struct SimplicityOptions {
   std::vector<int> initial_marking;
   std::vector<int> final_marking;
   std::size_t max_states = 100000;
+  // Arc-degree accepts every double baseline, including NaN and infinities.
   double arc_degree_k = 2.0;
 };
 
@@ -466,6 +467,13 @@ struct ModelEvaluation {
 }
 [[nodiscard]] SimplicityResult evaluate_simplicity(
     const PetriNet&, SimplicityVariant = SimplicityVariant::ARC_DEGREE,
+    const SimplicityOptions& = {});
+// Graph-only metrics preserve distinct arc occurrences and node identities in
+// the full presentation. Weights do not multiply structural arcs. Cyclomatic
+// complexity requires the executable PetriNet overload and its reachability.
+[[nodiscard]] SimplicityResult evaluate_simplicity(
+    const PetriNetPresentation&,
+    SimplicityVariant = SimplicityVariant::ARC_DEGREE,
     const SimplicityOptions& = {});
 
 [[nodiscard]] CompositeEvaluationResult evaluate_composite(
