@@ -9209,3 +9209,40 @@ Supplied-cache CLI/HTTP transports, broader foreign cache/alias domains and
 prior forward/backwards acceptance contracts remain open. Weighted aggregate
 and composite conformance remain gated. The catalogue remains 46/86 packages,
 199/387 modules and 228 incomplete units, with no promotions or full parity claim.
+
+## Minimized silent-choice oracle and cleaned underfed-place correction
+
+Twelve new acyclic controls isolate the enabled and blocked silent alternatives
+from retained flood case 62. A fresh capture retains 1152 complete outcomes from
+both public routes, with independently varied cleaning/PLTR flags, repeated
+events and fixed supplied-cache choices. An independent oracle derives whole
+path results from the owned inputs and enumerates every feasible global silent
+order in this bounded topology, keeping it consistent throughout each trace.
+It explains all public outcomes and rejects per-event order changes and mixtures
+of fields from different paths.
+
+The unchanged parent core retains 30 unexplained unique native results, or 60
+whole direct/parent comparisons. They expose a cleaned gate that is reported as
+both underfed and overfed. The correction restores measured underfed-membership
+precedence and adds a native weighted-gate regression. The corrected core matches
+all 1152 public results exactly; all 576 unique native carriers belong to whole
+oracle paths. A recorded self-review verifies the oracle's actual input scope
+and pure input-derived implementation, with identical expected carriers before
+and after the fix.
+
+The fresh build freezes 660 inputs (two edits, 658 unchanged) and passes all 152
+assertion-enabled Release suites. The retained parameter, visible/invisible-path,
+typed and 95-model regressions match every complete carrier and measured error
+behavior, preserving all 2280 legacy native records. Raw public outcomes,
+oracle paths and rejected controls, baseline/corrected carriers, process
+witnesses and fresh build/probe binaries are retained with byte bindings.
+The 1140 positional CLI processes preserve every expected result/error; all
+3699 evidence files round-trip across 18 archives, retaining 162 fresh binaries.
+
+See [token-replay-parity-contract.md](token-replay-parity-contract.md) and
+[forward-choice-oracle-validation.json](forward-choice-oracle-validation.json).
+The original seventeen larger weighted choice/flood fixtures still need complete
+path enumeration. Broader forward/backwards and adapter acceptance contracts,
+cache/alias domains and weighted aggregate/composite gates remain open. Catalogue
+totals remain 46/86 packages, 199/387 modules and 228 incomplete units, with no
+promotions or full parity claim.

@@ -3602,11 +3602,10 @@ TokenReplayResult replay_token_result(
       place.remaining += counts.remaining * frequency;
       place.consumed += counts.consumed * frequency;
       place.produced += counts.produced * frequency;
-      if (std::find(row.cleaned_place_indices.begin(), row.cleaned_place_indices.end(), p)
-          != row.cleaned_place_indices.end())
-        add_member(place.overfed_traces, reference);
       if (event_missing > 0) add_member(place.underfed_traces, reference);
-      else if (row.reached_marking_keys[p] && (!final_keys[p] || counts.remaining != 0))
+      else if (std::find(row.cleaned_place_indices.begin(), row.cleaned_place_indices.end(), p)
+                   != row.cleaned_place_indices.end() ||
+               (row.reached_marking_keys[p] && (!final_keys[p] || counts.remaining != 0)))
         add_member(place.overfed_traces, reference);
     }
     const std::set<std::size_t> unknown(row.unknown_event_indices.begin(),
