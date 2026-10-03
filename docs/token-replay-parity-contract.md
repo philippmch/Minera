@@ -1178,3 +1178,75 @@ catalogue acceptance remain open. Supplied-cache CLI/HTTP transports, weighted
 aggregate/composite conformance and general PNML/precision gates also remain
 open. Catalogue totals stay at 46/86 packages, 199/387 modules and 228 incomplete
 units, with no promotions or full parity claim.
+
+## Supplied hidden-path cache transport
+
+Supplied caches now reach forward replay through the CLI and standalone HTTP
+route as complete ordered model-ID paths. The C++ cache carrier also accepts
+`TokenReplayNamedHiddenPathMatrix`; the existing index matrix remains available.
+Named rows resolve against PNML IDs or configured replay names only when replay
+examines that source/target pair. Unused foreign rows remain unused, while a used
+invalid or ambiguous model ID raises the explicit native diagnostic. Empty and
+null caches retain their existing suppression/automatic-routing meanings.
+
+The CLI accepts `--token-replay-places-shortest-path-by-hidden <json>` alongside
+`--token-replay-model` and `--token-replay-result`. The corresponding request field
+is `token_replay_places_shortest_path_by_hidden`. Its object grammar is
+`{"source":{"gate":["s0","s1"]}}`: place IDs form both dictionary levels and
+transition IDs form the ordered path. Empty rows, partial paths, identity entries
+and repeated transitions are retained. `{}` suppresses routing and `null` selects
+automatic paths. Other JSON value carriers retain deferred iterable checks;
+integers use the shared parser's int64/uint64 representation and nesting limit.
+Malformed JSON or matrix shapes fail at the transport boundary. This wire grammar
+does not imply support for arbitrary Python cache-object or alias graphs.
+
+`POST /api/token-replay` accepts multipart `log` (CSV or XES) and `model` (PNML)
+uploads and returns the same full forward tagged carrier as the CLI, without a
+mining session. Replay/import controls may be multipart fields or query
+parameters. The route preserves supplied PNML markings and uses the existing
+log importers. Runtime and parse failures return HTTP 400 with the exact native
+diagnostic. The full result API's forward-variant contract still applies.
+
+Actual CLI and HTTP checks each execute 3634 faithful model/profile inputs.
+They cover all 351 profiles on the six retained chain/join/choice/self-loop/
+zero-key controls and all 1528 policies on the original seventeen weighted
+fixtures, including every one of their 382 complete fixed caches. Actual
+Place/Transition parameter objects become their verified model IDs; source
+trace boundaries, typed attributes/events and log attributes are retained in XES.
+One PNML adds an explicit zero-token gate marking to reproduce the actual public
+marking modified after import. The other twenty-two PNML files remain byte exact.
+Every represented initial/final marking is checked against the captured input.
+
+Both transports return 3532 complete carriers and 102 expected failures each.
+All 14128 complete comparisons against both retained public routes match every
+field; all 408 error comparisons match the measured iterable-cache rejection.
+All 3634 CLI/HTTP whole-outcome pairs agree. Float hexadecimal values, exact
+integer counts, carrier types and ordered activation/problem/context lists stay
+strict. Only unordered dictionary/Marking/set slots and paired enabled-name/label
+projections are canonicalized. The 7268 public calls and opaque module pin proofs
+are reused through their already committed archive bindings; no new public calls
+are claimed. Six additional CLI/HTTP boundary pairs pass, covering native CSV
+consistency, malformed JSON/rows and used/unused invalid transition names. Those
+CSV checks establish native transport consistency, with broader Python input
+adapter parity still a separate gate.
+
+One fresh build freezes 660 inputs (seven edits, 653 unchanged), produces 155
+fresh linked production/test artifacts and passes all 152 assertion-enabled
+Release suites. The first Python HTTP harness shadows its imported module and
+fails before any CLI process or HTTP replay request. Its stopped server process,
+original helper and frozen preparation are retained; a derived correction uses
+identical production bytes and request inputs. A recorded self-review checks the
+source/build/process bindings, actual input translation and every comparison.
+The review does not claim an independent human or subagent review.
+
+Evidence and byte-level hashes are in
+[forward-hidden-cache-transport-validation.json](forward-hidden-cache-transport-validation.json).
+All 1143 archive members round-trip across fourteen archives. An additional
+lossless JSONL bundle retains and independently round-trips all 14536 original
+CLI stdout/stderr and HTTP request/response files, with per-file names, byte
+counts and SHA-256 digests. Broader forward controls, supported input adapters,
+cache/variant aliases, standalone component carriers, search bounds and distinct
+catalogue acceptance remain open. Weighted aggregate/composite conformance,
+general PNML carrier limits and exact frontend numeric presentation also remain
+open. Catalogue totals stay at 46/86 packages, 199/387 modules and 228 incomplete
+units, with no promotions or full parity claim.
