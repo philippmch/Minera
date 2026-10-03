@@ -1061,3 +1061,59 @@ globally consistent full-path enumeration and reconciliation with every
 diagnostic field. Broader forward/backwards, supported adapter, cache/alias and
 distinct catalogue acceptance gates remain open. No catalogue row is promoted;
 totals remain 46/86 packages, 199/387 modules and 228 incomplete units.
+
+## Original seventeen fixtures: complete carriers and fixed structural caches
+
+The original seventeen weighted acyclic choice/flood fixtures now have fresh
+complete direct/parent captures. They preserve the exact retained PNML, original
+XES trace attributes/events and each fixture's hidden-walk, exhaustive and
+final-routing flags. Cleaning and PLTR are varied independently. Five cache
+policies cover automatic routing, the actual public structural matrix, owned
+ascending/descending structural orders and an empty matrix. All 680 public
+calls return complete carriers and all 340 direct/parent pairs agree. The eight
+opaque module pin proofs and all actual net, marking, log and parameter
+snapshots remain unchanged. The public shortest-path and cleaning-component
+helpers supply 34 additional actual returns.
+
+A fresh probe of the unchanged accepted production core makes 340 full API
+calls. All 544 direct/parent comparisons with identical supplied caches match
+every field. Automatic-cache comparison retains 48 exact matches and 88 strict
+differences. The result of each of the 68 native automatic-cache calls matches one
+whole actual public result under the fixed ascending cache through both public
+routes, giving 136 complete public witnesses. Activation/problem order,
+markings, token counters, fitness, PLTR memberships and context lists are kept
+together; no fields are combined across choices.
+
+An independently written pure graph oracle enumerates all 424 simple structural
+paths in these owned acyclic nets and retains every minimum-length path. It
+resolves ties using one fixed outgoing silent-arc order per place and one fixed
+output order per transition, shared by every source search and repeated event.
+Complete enumeration of all 1,217,856 such configurations yields 382 distinct
+complete shortest-path matrices. Every matrix retains a concrete fixed-order
+witness and its configuration multiplicity. The actual public cache is
+explained by its captured public arc orders for all seventeen nets; all 51
+actual-public/ascending/descending control matrices belong to the enumerated
+sets. This structural domain permits fixed local arc orders; it does not claim
+to reproduce the distribution of Python object allocation or set iteration.
+
+A recorded self-review checks the oracle's input-only implementation, all 680
+actual input snapshots, every matrix witness and multiplicity, and every whole
+native/public witness. A negative control combines individually shortest paths
+into a matrix that no one fixed order can explain; the complete enumeration
+rejects it. The initial component-name serializer failure and an archive
+validator's byte-distinct JSON-manifest assertion are retained with their
+corrections. Neither is a reference replay failure. One new probe is built;
+the completed parent build, all 660 unchanged frozen inputs and its 152 passing
+assertion-enabled suites are reused with exact byte bindings. Every chunk and
+all 148 evidence files round-trip across two archives.
+
+Evidence and archive byte hashes are in
+[forward-choice-original-validation.json](forward-choice-original-validation.json).
+This completes structural-cache enumeration and supplies whole public witnesses
+for the current native automatic choices. It does not independently derive the
+whole replay results for all 382 matrices. Full-path firing, cleanup, counters
+and diagnostic derivation remain required before the original-seventeen
+legal-set contract is complete. Broader forward/backwards, adapter, cache/alias
+and distinct catalogue acceptance gates remain open. Catalogue totals remain
+46/86 packages, 199/387 modules and 228 incomplete units, with no promotions or
+full parity claim.
