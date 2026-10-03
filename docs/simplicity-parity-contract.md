@@ -624,3 +624,116 @@ unbounded graphs, time limits/state caps, full application numeric precision
 and broader evaluation/conformance/composite domains remain open. The catalogue
 stays at 46/86 packages, 199/387 modules and 228 incomplete units. Full
 module/package parity is not established.
+
+## Compact ordinary PNML weights
+
+Ordinary arcs retain zero, signed and large weights without magnitude-sized
+allocations. A transition containing a zero, signed or greater-than-1024
+ordinary arc stores one signed-magnitude weight per endpoint occurrence.
+Small positive ordinary weights keep the preceding repeated-unit convention.
+The six independently captured 1023/1024/1025 input/output controls cross that
+storage boundary. Document, primitive-net, full-presentation and both native
+PNML export routes retain the measured arc weights, signs and zero adjacency.
+Legacy primitive PNML export sorting remains unchanged.
+
+Shared enabling and firing use checked signed-magnitude arithmetic. Direct
+compact ordinary enabling is measured for 18 models; all match the public
+classic result. Sixteen actual weak firings match the independently returned
+markings, while two report explicit signed64 limits. Default cyclomatic
+evaluation projects compact ordinary nets to the full presentation. The old
+ordinary-zero primitive Cardoso adjacency gap is closed in this matrix.
+Other specialized consumers are not inferred to support compact weights.
+
+The original 262 public observations are reused from the preceding pushed
+checkpoint, including all 90 import errors. This step makes six fresh public
+boundary imports and 170 fresh imports of exact native export bytes: 176 imports,
+528 metric calls and 176 calls each to graph construction, export, enabling and
+weak firing. Actual public APIs, returned fields and independently returned
+graphs supply the oracles. Before/after opaque proofs for 11 modules match the
+pinned PM4Py 2.7.22 commit after recorded CRLF-to-LF conversion only. No upstream
+implementation or bytecode is inspected; no reference scalar is synthesized.
+
+Both native executions attempt all 268 matrix imports and make 1530 actual
+metric calls, plus 18 enabling and 18 weak-firing calls. Each has 170 successful
+imports/presentations with matching arc carriers and all 90 public rejection
+booleans aligned. Across document, presentation and primitive-net routes, all
+170 arc-degree and all 170 Cardoso outcomes match per route; cyclomatic matches
+167 per route. In total 1521/1530 outcomes match all six checked fields, yielding
+9126 matching fields. Nine metric outcomes retain explicit marking-range gates.
+Structural metadata is checked against actual public input fields; primitive
+structural edges and non-cyclomatic SCC remain local zero metadata.
+
+All 170 independently reimported native exports preserve weights/types, net
+subclasses, actual metric triplets, enabling and nonzero weak/initial/final
+markings. Every final actual export is byte-identical to its captured public
+reimport input, so no public recapture is counted. The previous 352-case matrix
+is executed against both newly built cores using the byte-identical owned
+probe and old public oracles. All returned cases, 4224 metric outcomes, 1056
+parameter parses, snapshots and exact document exports remain identical.
+
+The first full candidate passes all 17 assertion-enabled native suites but
+fails five large-output application imports during automatic conformance.
+Five HTTP model checks return 400; following metrics use the prior model,
+creating misleading raw matches. That application run is retained as failed
+and is never accepted as validation. The corrected import path retains compact
+models for independent supported evaluations and exports. Its conformance
+bundle carries computed=false and an error; placeholder conformance fields,
+including sound, are invalid in that bundle. The frontend displays the error
+before any conformance scores or method controls.
+
+Final application checks make 170 actual CLI runs, all exiting zero, and 511
+recorded loopback HTTP requests, all returning 200. CLI and HTTP each have 167
+public cyclomatic scalar matches and three explicit range diagnostics. Before
+every HTTP metric, GET PNML binds the exact exported bytes of the newly imported
+model. All 170 bindings match. Eighteen compact models expose unavailable
+conformance in both CLI and HTTP; no weighted conformance score is claimed.
+The task-owned server is stopped after checks. Startup health and discovery
+internals are outside these instrumented producer counts.
+
+Both full serial builds compile core, applications and 17 suites afresh from
+655 frozen source/configuration inputs, with zero binary reuse. The accepted
+build changes 12 existing inputs and preserves 643 from the parent. All 17
+suites pass with Release NDEBUG explicitly undefined; new assertion expressions
+survive in the actual test binary. Frontend TypeScript and Vite production
+builds pass, along with 253 existing tests across the types, app-logic and
+conformance files. Rendered UI inspection is not claimed.
+
+A failed derived preparer accidentally changed the expected source count from
+655 to 1255. Its 655 exact copied inputs survive; no CMake/build/native/public
+commands ran. The original helper remains immutable and a corrected derivative
+prepares the accepted build. Available process witnesses and all failed
+application bytes survive; missing outer failure PID/timestamps are not
+reconstructed. All 44 actual core/application/test/probe binaries are retained.
+Candidate and failed-preparation source aliases explicitly bind identical
+accepted bytes, while every differing candidate input is retained separately.
+
+Six individually sub-50-MiB deterministic gzip archives preserve 6,354
+exact members in 6,424 base64 chunk rows. Each fresh core spans two
+archives. Every chunk and whole file passes exact round-trip verification
+across the archive set. The prior pushed archives bind reused oracles and
+baseline evidence. No catalogue promotion is inferred.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `pnml-ordinary-weights-checks-1.jsonl.gz` | `786968b97538d125bf913b50a4b3d3af666d74b4edbad3890397e481bc938659` | 29333608 |
+| `pnml-ordinary-weights-checks-2.jsonl.gz` | `dad9d61add74d7793a22dd1161275638bdb325802537914e78921f45df9e7d5f` | 18405793 |
+| `pnml-ordinary-weights-candidate-core-1.jsonl.gz` | `03458ed238a647b3fc9a00fd4a68c1e79a964e283b14d265830df4a2ee679c88` | 23230248 |
+| `pnml-ordinary-weights-candidate-core-2.jsonl.gz` | `2b3e209ef18c971ae2457a0e1c8e907f2c74126024702e07acca4da280373e6d` | 26870038 |
+| `pnml-ordinary-weights-final-core-1.jsonl.gz` | `051fc19ec341470af20a41e454c726af6cd0a497612a2d039d53dde45fc2e794` | 23229589 |
+| `pnml-ordinary-weights-final-core-2.jsonl.gz` | `275ab2069605a531b884a94d8db2532c988f4e663d0d5f47d6bb6010b5b2e30f` | 26874479 |
+
+Eight successful public integer weight magnitudes still exceed uint64 and
+reject explicitly in the native importer. Three large output profiles exceed
+signed64 reachable markings on each of three metric routes: nine uncomputed
+outcomes. Two independently attempted weak firings exceed signed64. Arbitrary
+integer carriers and markings remain incomplete.
+
+Specialized weighted conformance, replay, analysis, transformation and composite
+consumers remain unverified. The application exposes unavailable conformance for
+the compact-weight models; this checkpoint does not implement those methods.
+Weighted frontend graph rendering/labels, full application numeric precision,
+unbounded reachability and time/state limits remain open. Exception class/message
+identity, broader malformed/repeated/namespace combinations, metadata, foreign
+keys/IDs, set/order dependence and marking-name/zero-key behavior remain open.
+The catalogue stays at 46/86 packages, 199/387 modules and 228 incomplete units.
+Full module/package parity is not established.

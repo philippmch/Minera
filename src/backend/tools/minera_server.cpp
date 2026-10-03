@@ -4124,7 +4124,8 @@ void handle_check_model(const httplib::Request& request,
     const auto replay_options = document
         ? minera::tools::pnml_replay_options(*document, session->token_replay)
         : session->token_replay;
-    const minera::ModelConformance conformance{
+    const auto gated = minera::tools::pnml_conformance_weight_gate(imported);
+    const minera::ModelConformance conformance = gated ? *gated : minera::ModelConformance{
         "imported", document
             ? minera::final_marking_reachable(imported,
                   replay_options.initial_marking, replay_options.final_marking)

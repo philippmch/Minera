@@ -1,9 +1,11 @@
 #include "minera/conformance.hpp"
+#include "minera/evaluation.hpp"
 #include "minera/ilp_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/petri_analysis.hpp"
 #include "minera/pnml.hpp"
 #include "minera/playout.hpp"
+#include "../tools/pnml_model_options.hpp"
 
 #include <cassert>
 #include <initializer_list>
@@ -190,7 +192,8 @@ void weighted_arc_round_trip() {
       <finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings>
     </page></net></pnml>)");
   assert(zero_weight.arc_occurrences->front().weight == 0);
-  assert(zero_weight.net.transitions().front().inputs.empty());
+  assert(zero_weight.net.transitions().front().inputs == std::vector<std::size_t>{0});
+  assert(zero_weight.net.transitions().front().input_arc_weight(0).magnitude == 0);
   assert(parse_pnml_document(to_pnml(zero_weight)).arc_occurrences->front().weight == 0);
 
   bool rejected = false;
@@ -713,6 +716,66 @@ void pnml_extended_weight_and_text_contract() {
   assert(rejected);
 }
 
+void pnml_compact_ordinary_weight_contract() {
+  struct Weight { const char* text; std::uint64_t magnitude; bool negative; };
+  const std::vector<Weight> weights = {{"0",0,false},{"-1",1,true},{"-2",2,true},
+    {"1025",1025,false},{"2147483648",2147483648ull,false},
+    {"18446744073709551615",std::numeric_limits<std::uint64_t>::max(),false}};
+  for (const bool input : {true,false}) for (const auto& weight : weights) {
+    const std::string inscription = "<inscription><text>" + std::string(weight.text) + "</text></inscription>";
+    const auto xml = std::string("<pnml><net id=\"compact\"><place id=\"source\"><initialMarking><text>2</text></initialMarking></place>") +
+      "<place id=\"gate\"><initialMarking><text>3</text></initialMarking></place><place id=\"sink\"/><transition id=\"move\"/>" +
+      "<arc source=\"source\" target=\"move\"/><arc source=\"gate\" target=\"move\">" + (input ? inscription : "") + "</arc>" +
+      "<arc source=\"move\" target=\"sink\">" + (input ? "" : inscription) + "</arc>" +
+      "<finalmarkings><marking><place idref=\"sink\"><text>1</text></place></marking></finalmarkings></net></pnml>";
+    const auto document = parse_pnml_document(xml);
+    const auto& transition = document.net.transitions().front();
+    assert(transition.has_compact_ordinary_arcs());
+    assert(transition.inputs.size() == 2 && transition.outputs.size() == 1);
+    const auto gate = minera::tools::pnml_conformance_weight_gate(document.net);
+    assert(gate && !gate->computed && !gate->error.empty());
+    DirectlyFollowsGraph registry;
+    const auto unavailable = imported_model_json(*gate,registry);
+    assert(unavailable.find("\"computed\": false") != std::string::npos);
+    const auto retained = input ? transition.input_arc_weight(1) : transition.output_arc_weight(0);
+    assert(retained.magnitude == weight.magnitude && retained.negative == weight.negative);
+    const auto round_trip = parse_pnml_document(to_pnml(document));
+    const auto primitive = parse_pnml_document(to_pnml(document.net,document.initial_marking,document.final_marking));
+    for (const auto* following : {&round_trip,&primitive}) {
+      const auto& arc = following->arc_occurrences->at(input ? 1 : 2);
+      assert(arc.weight == weight.magnitude && arc.negative_weight == weight.negative);
+    }
+    auto derived = document; derived.arc_occurrences.reset();
+    const auto projection = to_petri_net_presentation(derived);
+    assert(projection.arcs.at(input ? 1 : 2).weight == weight.magnitude);
+    assert(projection.arcs.at(input ? 1 : 2).negative_weight == weight.negative);
+    std::vector<std::int64_t> marking{2,3,0};
+    assert(petri_transition_enabled(transition,marking) == (!input || weight.negative || weight.magnitude <= 3));
+    bool overflow = false;
+    try { fire_petri_transition(transition,marking); }
+    catch (const std::overflow_error&) { overflow = true; }
+    const bool output_overflow = !input && !weight.negative && weight.magnitude > std::uint64_t(std::numeric_limits<std::int64_t>::max());
+    assert(overflow == output_overflow);
+    if (!overflow) {
+      assert(marking[0] == 1);
+      const auto gate = input ? weight.negative ? 3 + static_cast<std::int64_t>(weight.magnitude)
+          : weight.magnitude >= 3 ? 0 : 3 - static_cast<std::int64_t>(weight.magnitude) : 2;
+      const auto sink = input ? 1 : weight.negative ? -static_cast<std::int64_t>(weight.magnitude) : static_cast<std::int64_t>(weight.magnitude);
+      assert(marking[1] == gate && marking[2] == sink);
+    }
+    SimplicityOptions options; options.initial_marking = {2,3,0};
+    const auto result = evaluate_simplicity(document.net,SimplicityVariant::EXTENDED_CYCLOMATIC,options);
+    if (output_overflow) assert(!result.computed && result.error.find("range") != std::string::npos);
+    else assert(result.computed && result.value == (input && !weight.negative && weight.magnitude > 3 ? 0.0 : 2.0));
+    if (input && !weight.magnitude)
+      assert(evaluate_simplicity(document.net,SimplicityVariant::EXTENDED_CARDOSO).value == 2.0);
+    auto stale = document; stale.arc_occurrences->at(input ? 1 : 2).weight = 7;
+    bool rejected = false;
+    try { (void)to_pnml(stale); } catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -731,4 +794,5 @@ int main() {
   normal_alignment_smoke();
   pnml_arc_type_wire_contract();
   pnml_extended_weight_and_text_contract();
+  pnml_compact_ordinary_weight_contract();
 }

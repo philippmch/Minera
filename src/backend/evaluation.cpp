@@ -1669,7 +1669,8 @@ SimplicityResult evaluate_presented_cyclomatic(
 SimplicityResult evaluate_simplicity(const PetriNet& net,
                                      SimplicityVariant variant,
                                      const SimplicityOptions& options) {
-  if (variant == SimplicityVariant::EXTENDED_CYCLOMATIC && net.has_extended_arcs()) {
+  if (variant == SimplicityVariant::EXTENDED_CYCLOMATIC &&
+      (net.has_extended_arcs() || net.has_compact_ordinary_arcs())) {
     PnmlDocument projection;
     projection.net = net;
     return evaluate_simplicity(projection, variant, options);

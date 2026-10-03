@@ -22,8 +22,8 @@ struct PnmlArcOccurrence {
   PetriArcType type = PetriArcType::kNormal;
   std::size_t weight = 1;
   std::string id;  // Empty derives an export ID.
-  // weight is the magnitude. Signed extended inputs retain their sign without
-  // expanding the primitive execution vectors. Ordinary signed inputs reject.
+  // weight is the magnitude. Compact ordinary and extended arcs retain their
+  // sign without expanding the primitive execution vectors.
   bool negative_weight = false;
 };
 

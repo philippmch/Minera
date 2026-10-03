@@ -22,7 +22,7 @@ namespace minera {
 // allow firing when their place is empty.
 enum class PetriArcType { kNormal, kReset, kInhibitor };
 
-// Retained extended-arc weight for interchange and classic graph evaluation.
+// Retained arc weight for interchange and classic graph evaluation.
 // Reset/inhibitor execution still follows the arc type, independent of weight.
 struct PetriArcWeight {
   std::uint64_t magnitude = 1;
@@ -39,6 +39,26 @@ struct PetriTransition {
   std::vector<std::size_t> inhibitor_inputs;  // inhibitor arcs
   std::vector<PetriArcWeight> reset_weights;
   std::vector<PetriArcWeight> inhibitor_weights;
+  // Empty uses the historical repeated-unit endpoints. Otherwise one weight
+  // accompanies each ordinary arc occurrence, including zero and signed arcs.
+  std::vector<PetriArcWeight> input_weights;
+  std::vector<PetriArcWeight> output_weights;
+
+  [[nodiscard]] PetriArcWeight input_arc_weight(std::size_t index) const {
+    if (input_weights.empty()) return {};
+    if (input_weights.size() != inputs.size())
+      throw std::invalid_argument("Petri input weight dimensions are invalid");
+    return input_weights.at(index);
+  }
+  [[nodiscard]] PetriArcWeight output_arc_weight(std::size_t index) const {
+    if (output_weights.empty()) return {};
+    if (output_weights.size() != outputs.size())
+      throw std::invalid_argument("Petri output weight dimensions are invalid");
+    return output_weights.at(index);
+  }
+  [[nodiscard]] bool has_compact_ordinary_arcs() const noexcept {
+    return !input_weights.empty() || !output_weights.empty();
+  }
 
   [[nodiscard]] PetriArcWeight reset_arc_weight(std::size_t index) const {
     if (reset_weights.empty()) return {};
@@ -113,7 +133,7 @@ class PetriNet {
                              std::vector<std::size_t> inputs,
                              std::vector<std::size_t> outputs) {
     transitions_.push_back(
-        PetriTransition{activity, std::move(inputs), std::move(outputs), {}, {}, {}, {}});
+        PetriTransition{activity, std::move(inputs), std::move(outputs), {}, {}, {}, {}, {}, {}});
     return transitions_.size() - 1;
   }
 
@@ -131,6 +151,7 @@ class PetriNet {
       if (contains(target.reset_inputs) || contains(target.inhibitor_inputs))
         throw std::invalid_argument("Petri transition cannot mix arc types for a place");
       target.inputs.push_back(place);
+      if (!target.input_weights.empty()) target.input_weights.push_back({});
       return;
     }
     if (contains(target.inputs) || contains(target.reset_inputs) ||
@@ -155,6 +176,23 @@ class PetriNet {
     if (place >= place_count_)
       throw std::out_of_range("Petri place index is invalid");
     transitions_[transition].outputs.push_back(place);
+    if (!transitions_[transition].output_weights.empty())
+      transitions_[transition].output_weights.push_back({});
+  }
+
+  // Explicit ordinary weights avoid multiplicity-sized allocations. Supplying
+  // no weights on a side preserves the historical repeated-unit convention.
+  void set_ordinary_arc_weights(std::size_t transition,
+                               std::vector<PetriArcWeight> inputs,
+                               std::vector<PetriArcWeight> outputs) {
+    auto& target = transitions_.at(transition);
+    if ((!inputs.empty() && inputs.size() != target.inputs.size()) ||
+        (!outputs.empty() && outputs.size() != target.outputs.size()))
+      throw std::invalid_argument("Petri ordinary weight dimensions are invalid");
+    for (auto& weight : inputs) weight.negative = weight.negative && weight.magnitude;
+    for (auto& weight : outputs) weight.negative = weight.negative && weight.magnitude;
+    target.input_weights = std::move(inputs);
+    target.output_weights = std::move(outputs);
   }
 
   void add_reset_arc(std::size_t transition, std::size_t place,
@@ -176,6 +214,11 @@ class PetriNet {
                        });
   }
 
+  [[nodiscard]] bool has_compact_ordinary_arcs() const noexcept {
+    return std::any_of(transitions_.begin(), transitions_.end(),
+        [](const PetriTransition& transition) { return transition.has_compact_ordinary_arcs(); });
+  }
+
   // Extends an existing transition while assembling composite model views
   // (for example a merged object-centric net). The public read-only view of
   // transitions remains stable for callers that only inspect a net.
@@ -185,6 +228,10 @@ class PetriNet {
     if (transition >= transitions_.size())
       throw std::out_of_range("Petri transition index is invalid");
     auto& target = transitions_[transition];
+    if (!target.input_weights.empty())
+      target.input_weights.insert(target.input_weights.end(), inputs.size(), PetriArcWeight{});
+    if (!target.output_weights.empty())
+      target.output_weights.insert(target.output_weights.end(), outputs.size(), PetriArcWeight{});
     target.inputs.insert(target.inputs.end(), inputs.begin(), inputs.end());
     target.outputs.insert(target.outputs.end(), outputs.begin(), outputs.end());
   }
@@ -245,8 +292,22 @@ template <typename Token>
 [[nodiscard]] bool petri_transition_enabled(
     const PetriTransition& transition, const std::vector<Token>& marking) {
   std::vector<std::size_t> required(marking.size(), 0);
-  for (const auto place : transition.inputs) {
+  for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
+    const auto place = transition.inputs[index];
     if (place >= marking.size()) return false;
+    if (!transition.input_weights.empty()) {
+      const auto weight = transition.input_arc_weight(index);
+      if (weight.negative) {
+        if constexpr (std::is_signed_v<Token>) {
+          constexpr auto limit = std::uint64_t{1} << std::numeric_limits<Token>::digits;
+          if (weight.magnitude < limit && marking[place] < -static_cast<Token>(weight.magnitude)) return false;
+        }
+      } else {
+        if constexpr (std::is_signed_v<Token>) if (marking[place] < 0) return false;
+        if (static_cast<std::uint64_t>(marking[place]) < weight.magnitude) return false;
+      }
+      continue;
+    }
     if constexpr (std::is_signed_v<Token>) {
       if (marking[place] < 0) return false;
     }
@@ -260,12 +321,78 @@ template <typename Token>
   return true;
 }
 
+// Checked signed-magnitude arithmetic works for signed and unsigned markings
+// without converting a uint64 weight to a signed token first.
+template <typename Token>
+[[nodiscard]] bool petri_adjust_tokens(Token value, std::uint64_t magnitude,
+                                       bool negative, Token& result) {
+  static_assert(std::is_integral_v<Token> && !std::is_same_v<Token, bool> && sizeof(Token) <= 8);
+  if constexpr (!std::is_signed_v<Token>) {
+    if (negative) {
+      if (magnitude > value) return false;
+      result = value - static_cast<Token>(magnitude);
+    } else {
+      if (magnitude > std::numeric_limits<Token>::max() - value) return false;
+      result = value + static_cast<Token>(magnitude);
+    }
+  } else {
+    constexpr auto limit = std::uint64_t{1} << std::numeric_limits<Token>::digits;
+    const auto absolute = [](Token number) { return number < 0 ? std::uint64_t(-(number + 1)) + 1 : std::uint64_t(number); };
+    if (!negative) {
+      if (value >= 0) {
+        if (magnitude > std::uint64_t(std::numeric_limits<Token>::max() - value)) return false;
+        result = value + static_cast<Token>(magnitude);
+      } else if (magnitude >= absolute(value)) {
+        const auto remaining = magnitude - absolute(value);
+        if (remaining >= limit) return false;
+        result = static_cast<Token>(remaining);
+      } else {
+        const auto remaining = absolute(value) - magnitude;
+        result = remaining == limit ? std::numeric_limits<Token>::min() : -static_cast<Token>(remaining);
+      }
+    } else {
+      if (value <= 0) {
+        if (magnitude > limit - absolute(value)) return false;
+        const auto remaining = absolute(value) + magnitude;
+        result = remaining == limit ? std::numeric_limits<Token>::min() : -static_cast<Token>(remaining);
+      } else if (magnitude <= std::uint64_t(value)) {
+        result = value - static_cast<Token>(magnitude);
+      } else {
+        const auto remaining = magnitude - std::uint64_t(value);
+        if (remaining > limit) return false;
+        result = remaining == limit ? std::numeric_limits<Token>::min() : -static_cast<Token>(remaining);
+      }
+    }
+  }
+  return true;
+}
+
 template <typename Token>
 void fire_petri_transition(const PetriTransition& transition,
                            std::vector<Token>& marking) {
-  for (const auto place : transition.inputs) --marking[place];
+  for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
+    const auto place = transition.inputs[index];
+    if (transition.input_weights.empty()) { --marking.at(place); continue; }
+    const auto weight = transition.input_arc_weight(index);
+    auto& value = marking.at(place);
+    if (!weight.negative && (value <= 0 || weight.magnitude >= static_cast<std::uint64_t>(value))) {
+      value = 0; continue;
+    }
+    Token following;
+    if (!petri_adjust_tokens(value, weight.magnitude, !weight.negative, following))
+      throw std::overflow_error("Petri firing exceeds supported token range");
+    value = following <= 0 ? 0 : following;
+  }
   for (const auto place : transition.reset_inputs) marking[place] = 0;
-  for (const auto place : transition.outputs) {
+  for (std::size_t index = 0; index < transition.outputs.size(); ++index) {
+    const auto place = transition.outputs[index];
+    if (!transition.output_weights.empty()) {
+      const auto weight = transition.output_arc_weight(index);
+      Token following;
+      if (!petri_adjust_tokens(marking.at(place),weight.magnitude,weight.negative,following))
+        throw std::overflow_error("Petri firing exceeds supported token range");
+      marking[place] = following; continue;
+    }
     if (marking[place] == std::numeric_limits<Token>::max())
       throw std::overflow_error("Petri firing exceeds supported token range");
     ++marking[place];
