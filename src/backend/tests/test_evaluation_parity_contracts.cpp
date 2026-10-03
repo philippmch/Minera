@@ -664,6 +664,42 @@ void simplicity_extended_cyclomatic_contract() {
   assert(close_to(result.value, 4.0));
 }
 
+void simplicity_reachable_transition_occurrences_contract() {
+  PetriNet parallel;
+  parallel.add_place(); parallel.add_place();
+  parallel.set_activities({"A"});
+  parallel.add_transition(0, {0}, {1});
+  parallel.add_transition(std::nullopt, {0}, {1});
+  const auto alternatives = evaluate_simplicity(parallel, SimplicityVariant::EXTENDED_CYCLOMATIC);
+  assert(alternatives.computed && alternatives.vertices == 2 && alternatives.edges == 2);
+  assert(alternatives.strongly_connected_components == 2 && alternatives.value == 2.0);
+
+  PetriNet cycle;
+  cycle.add_place(); cycle.add_place();
+  cycle.set_activities({"A"});
+  cycle.add_transition(0, {0}, {1});
+  cycle.add_transition(std::nullopt, {1}, {0});
+  SimplicityOptions options;
+  options.initial_marking = {1, 0};
+  const auto one_token = evaluate_simplicity(cycle, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+  assert(one_token.computed && one_token.vertices == 2 && one_token.edges == 2);
+  assert(one_token.strongly_connected_components == 1 && one_token.value == 2.0);
+  options.initial_marking = {2, 0};
+  const auto two_tokens = evaluate_simplicity(cycle, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+  assert(two_tokens.computed && two_tokens.vertices == 3 && two_tokens.edges == 4);
+  assert(two_tokens.strongly_connected_components == 1 && two_tokens.value == 4.0);
+  PnmlDocument document;
+  document.net = cycle;
+  assert(evaluate_simplicity(document, SimplicityVariant::EXTENDED_CYCLOMATIC, options).value == 4.0);
+
+  PetriNet isolated;
+  isolated.set_activities({"A"});
+  isolated.add_transition(0, {}, {});
+  isolated.add_transition(std::nullopt, {}, {});
+  const auto loops = evaluate_simplicity(isolated, SimplicityVariant::EXTENDED_CYCLOMATIC);
+  assert(loops.computed && loops.vertices == 1 && loops.edges == 2 && loops.value == 2.0);
+}
+
 void composite_default_contract() {
   const auto events = log({{"A", "B"}, {"A"}});
   const auto net = sequence_net();
@@ -1184,6 +1220,7 @@ int main() {
   simplicity_imported_arc_occurrences_contract();
   simplicity_nonfinite_baseline_contract();
   simplicity_extended_cyclomatic_contract();
+  simplicity_reachable_transition_occurrences_contract();
   composite_default_contract();
   composite_document_and_weight_contract();
   evaluation_event_data_adapters_contract();
