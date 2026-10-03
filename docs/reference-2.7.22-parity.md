@@ -8951,3 +8951,89 @@ Weighted aggregate/composite conformance remains gated. The catalogue remains
 promotion or full parity is claimed.
 
 Evidence: [forward-pltr-carrier-validation.json](forward-pltr-carrier-validation.json).
+
+## Native full forward result API
+
+The production `replay_token_result` API now returns source-order trace rows and,
+when `enable_pltr_fitness` is true, complete place fitness, visible-transition
+fitness and unknown-activity context maps. The new API is forward-only. Its
+`disable_variants` optional policy defaults to source traces for PLTR and activity
+variants otherwise. Explicit false generates activity-only Trace keys without
+case attributes or event payloads. Value-equal source Trace keys retain the first
+representative and combine their ordered context occurrences.
+
+Grouped PLTR counts event repair missing tokens once per variant. Final-marking
+missing tokens and remaining/consumed/produced place counters retain variant
+frequency. Place underfed membership comes from event repair; final deficits alone
+do not create it. Reached-marking membership retains explicit zero and signed keys
+in overfed cohorts, with underfed membership taking precedence for that trace and
+place. Visible transitions are precreated even when never examined; silent
+transitions are omitted from the transition fitness map. Known examined events
+merge the final context used by earlier observations. Unknown events do not update
+it. A stopped blocked known event updates that context but adds no transition
+underfed observation. Repeated unknown events retain one final context per Trace
+key. These rules are implemented in C++, using the same replay path and shared
+owned trace equality/context helpers.
+
+`token_replay_result_json` is an explicit tagged object codec. It retains the
+list/tuple/set/Marking carrier kinds, Place/Transition keys and source/generated
+Trace values, exact signed integer tokens and declared float hexadecimal values.
+`return_names` projects trace transitions and reached marking to names and adds
+parallel activation/enabled label lists. PLTR dictionary keys remain objects.
+The generic `replay_token_traces`, `replay_token_diagnostics` and their existing
+JSON route continue to account for each source trace independently.
+
+The standalone CLI selects this transport with `--token-replay-result` alongside
+`--token-replay-model`. The boolean `--token-replay-enable-pltr-fitness`,
+`--token-replay-disable-variants` and `--token-replay-return-names` options also
+select the full result route. Request parameter parsing accepts the corresponding
+underscore names. The existing standalone default output remains available.
+
+A fresh build freezes 660 exact source inputs: nine existing edits, three new
+inputs and 648 unchanged parent inputs. It builds the core, CLI/server and all
+152 native suites (155 production/test outputs), with no binary reuse. Every
+Release test project explicitly undefines NDEBUG. The new full-result contract
+suite passes an early gate, and the complete 152/152 regression run passes.
+
+The fresh owned probe imports all 95 exact retained weighted models and makes
+2280 actual full-result calls across twelve profiles and normal/mixed-null logs.
+It also repeats 2280 per-trace calls and 2090 count-only calls. All 2280 complete
+legacy native call records remain equal to the prior checkpoint, including trace
+rows, accounting results and errors. Document and trace-equality records remain
+unchanged. Direct raw C++ tagged carriers match all 2216 complete retained public
+returns, including all 2032 PLTR tuples and 184 named results without PLTR. All
+2344 retained public error behaviors match: 2280 mixed-null/string rejections and
+64 float-overflow outcomes. Native exceptions are not asserted to have Python
+exception classes. Mixed null/string rejection occurs before replay and floating
+conversion in the new full API; the generic APIs retain their prior contract.
+
+Another 1140 actual CLI invocations import the same nine source traces from XES,
+with their original case/event attributes and no invented timestamps. The 1108
+successful raw CLI results match both public routes for all 2216 complete returned
+carriers. The 32 CLI overflow exits match all 64 corresponding public error
+outcomes. No Python carrier synthesis is used. Comparisons canonicalize only
+dictionary/Marking/set order and paired enabled name/label set projections;
+activation, problem and context lists remain ordered. The public controls and
+opaque module pin proofs are reused from the prior retained checkpoint: there
+are zero new public calls in this implementation step.
+
+The first CLI harness incorrectly uses `--xes` (an output flag) for its input.
+All 1140 invocations exit with usage before replay; they are not successful replay
+calls or carrier comparisons. The executed helper and raw process witnesses remain
+immutable. A derived correction changes only positional input routing, keeps the
+same input bytes and produces the accepted CLI results above. The rejected run
+is archived separately.
+
+The fresh frozen sources, all 156 production/test/probe binaries, build/test logs,
+raw native/CLI outputs, process witnesses and immutable helpers are archived.
+Every chunk and whole file passes exact archive round-trip verification.
+
+Broader forward parameters, typed/foreign activity and Trace keys, nonmixed null
+inputs, variant ordering and object alias graphs remain open, as do the prior
+silent-choice/cleanup, backwards and adapter acceptance contracts. The tagged
+codec has native date/bytes/container extensions; those extensions are not
+claimed to match unmeasured public object encodings. Weighted aggregate/composite
+conformance remains gated. The catalogue remains 46/86 packages, 199/387 modules
+and 228 incomplete units. No module/package promotion or full parity is claimed.
+
+Evidence: [forward-result-validation.json](forward-result-validation.json).

@@ -356,6 +356,24 @@ bool contains_native_na(const EventAttribute& value) {
 
 }  // namespace
 
+std::vector<EventAttribute> native_event_attributes(const Event& event) {
+  std::vector<EventAttribute> result;
+  for (auto& [key, value] : event_attributes(event)) {
+    value.key = key;
+    result.push_back(std::move(value));
+  }
+  return result;
+}
+
+std::vector<EventAttribute> native_trace_attributes(const Trace& trace) {
+  std::vector<EventAttribute> result;
+  for (auto& [key, value] : trace_attributes(trace)) {
+    value.key = key;
+    result.push_back(std::move(value));
+  }
+  return result;
+}
+
 bool root_cause_traces_equal(const Trace& left, const Trace& right) {
   if (left.events.size() != right.events.size() ||
       !dictionary_equal(trace_attributes(left), trace_attributes(right))) return false;

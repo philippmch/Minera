@@ -1,5 +1,7 @@
 #include "minera/conformance.hpp"
 #include "petri_replay_internal.hpp"
+#include "root_cause_trace_key.hpp"
+#include "token_replay_context.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -3322,6 +3324,191 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
 std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
     const EventLog& event_log, const PetriNet& net, TokenReplayOptions options) {
   return replay_token_trace_rows(event_log, net, std::move(options), true);
+}
+
+TokenReplayResult replay_token_result(
+    const EventLog& log, const PetriNet& net, TokenReplayOptions options) {
+  if (options.variant != TokenReplayVariant::kForward)
+    throw std::invalid_argument("full token replay result requires forward replay");
+  validate_token_replay_event_limit(log, options);
+  const auto selector = options.activity_attribute.empty()
+      ? std::string("concept:name") : options.activity_attribute;
+  // Public forward preprocessing orders activity labels before replay. Retain
+  // the measured mixed-null/string failure even when replay would overflow.
+  bool has_null = false, has_string = false;
+  for (const auto& trace : log.traces) for (const auto& event : trace.events) {
+    const auto activity = selected_replay_activity(event, selector);
+    has_null = has_null || !activity.display_name;
+    has_string = has_string || activity.model_label.has_value();
+  }
+  if (has_null && has_string)
+    throw std::invalid_argument("'<' not supported between instances of 'str' and 'NoneType'");
+
+  const bool grouped = !options.disable_variants.value_or(options.enable_pltr_fitness);
+  EventLog replay_log;
+  std::vector<std::size_t> group_for_source, first_source, frequencies;
+  std::map<std::vector<std::string>, std::size_t> variants;
+  for (std::size_t source = 0; source < log.traces.size(); ++source) {
+    const auto& trace = log.traces[source];
+    std::vector<std::string> key;
+    if (grouped) for (const auto& event : trace.events)
+      key.push_back(selected_replay_activity(event, selector).variant_key);
+    std::size_t group = replay_log.traces.size();
+    bool inserted = true;
+    if (grouped) {
+      const auto found = variants.emplace(std::move(key), group);
+      group = found.first->second;
+      inserted = found.second;
+    }
+    if (inserted) {
+      Trace generated;
+      if (grouped) {
+        for (const auto& event : trace.events) {
+          auto selected = native_event_attribute(event, selector);
+          if (!selected && standard_activity_attribute(selector)) {
+            const auto activity = selected_replay_activity(event, selector);
+            selected = EventAttribute{selector, activity.display_name.value_or(""),
+                                      AttributeKind::kString, !activity.display_name};
+          }
+          if (!selected) throw std::invalid_argument("selected activity is missing");
+          selected->key = selector;
+          selected->first_class_role = FirstClassAttributeRole::kNone;
+          selected->first_class_source_key.clear();
+          Event projected;
+          projected.attributes.push_back(std::move(*selected));
+          generated.events.push_back(std::move(projected));
+        }
+      } else generated = trace;
+      replay_log.traces.push_back(std::move(generated));
+      first_source.push_back(source);
+      frequencies.push_back(0);
+    }
+    ++frequencies[group];
+    group_for_source.push_back(group);
+  }
+  const auto rows = replay_token_traces(replay_log, net, options);
+  TokenReplayResult result;
+  result.return_names = options.return_names;
+  result.place_names = detail::replay_element_names(
+      options.place_names, net.place_count(), "p", "place_names");
+  result.transition_names = detail::replay_element_names(
+      options.transition_names, net.transitions().size(), "t", "transition_names");
+  for (const auto& transition : net.transitions())
+    result.transition_labels.push_back(transition.activity
+        ? std::optional<std::string>(net.activities().at(*transition.activity)) : std::nullopt);
+  for (std::size_t source = 0; source < log.traces.size(); ++source) {
+    auto row = rows[group_for_source[source]];
+    row.trace_index = source;
+    row.case_id = log.traces[source].case_id;
+    result.traces.push_back(std::move(row));
+  }
+  if (!options.enable_pltr_fitness) return result;
+
+  auto& fitness = result.pltr_fitness.emplace();
+  fitness.places.resize(net.place_count());
+  std::vector<std::optional<std::size_t>> transition_slots(net.transitions().size());
+  for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+    if (net.transitions()[t].silent()) continue;
+    transition_slots[t] = fitness.transitions.size();
+    TokenReplayTransitionFitness entry;
+    entry.transition_index = t;
+    fitness.transitions.push_back(std::move(entry));
+  }
+  TokenMarking final_marking;
+  if (options.exact_final_marking && !options.exact_final_marking->empty())
+    final_marking = *options.exact_final_marking;
+  else for (const auto count : resolve_workflow_marking(net,
+      options.exact_final_marking ? std::vector<int>{} : options.final_marking, false))
+    final_marking.emplace_back(count);
+  const auto final_keys = detail::resolve_replay_marking_keys(
+      options.final_marking_keys, final_marking, "final_marking_keys");
+  std::unordered_map<std::string, std::vector<std::size_t>> trace_buckets;
+  const auto add_context = [](std::vector<TokenReplayTraceContexts>& entries,
+                              std::size_t reference, const Event& context, bool replace) {
+    auto found = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
+      return entry.trace_reference == reference;
+    });
+    if (found == entries.end()) {
+      entries.push_back({reference, {context}});
+    } else if (replace) found->contexts = {context};
+    else found->contexts.push_back(context);
+  };
+  const auto add_member = [](std::vector<std::size_t>& members, std::size_t reference) {
+    if (std::find(members.begin(), members.end(), reference) == members.end())
+      members.push_back(reference);
+  };
+  for (std::size_t group = 0; group < rows.size(); ++group) {
+    const auto& row = rows[group];
+    const auto& trace = replay_log.traces[group];
+    auto& bucket = trace_buckets[root_cause_trace_fingerprint(trace)];
+    std::size_t reference = fitness.trace_references.size();
+    for (const auto candidate : bucket) {
+      if (root_cause_traces_equal(fitness.trace_references[candidate].value, trace)) {
+        reference = candidate;
+        break;
+      }
+    }
+    if (reference == fitness.trace_references.size()) {
+      fitness.trace_references.push_back({grouped ? std::nullopt
+          : std::optional<std::size_t>(first_source[group]), trace});
+      bucket.push_back(reference);
+    }
+    const auto context = detail::token_replay_context(trace, row);
+    const TokenInteger frequency(frequencies[group]);
+    for (std::size_t p = 0; p < row.places.size(); ++p) {
+      const auto& counts = row.places[p];
+      const auto final_missing = final_keys[p]
+          ? std::max(TokenInteger(0), final_marking[p] - row.reached_marking[p])
+          : TokenInteger(0);
+      const auto event_missing = counts.missing - final_missing;
+      auto& place = fitness.places[p];
+      place.missing += event_missing + final_missing * frequency;
+      place.remaining += counts.remaining * frequency;
+      place.consumed += counts.consumed * frequency;
+      place.produced += counts.produced * frequency;
+      if (event_missing > 0) add_member(place.underfed_traces, reference);
+      else if (row.reached_marking_keys[p] && (!final_keys[p] || counts.remaining != 0))
+        add_member(place.overfed_traces, reference);
+    }
+    const std::set<std::size_t> unknown(row.unknown_event_indices.begin(),
+                                        row.unknown_event_indices.end());
+    for (const auto& event : row.event_diagnostics) {
+      if (unknown.contains(event.event_index)) {
+        auto activity = native_event_attribute(trace.events[event.event_index], selector);
+        if (!activity) {
+          const auto selected = selected_replay_activity(trace.events[event.event_index], selector);
+          activity = EventAttribute{selector, selected.display_name.value_or(""),
+                                   AttributeKind::kString, !selected.display_name};
+        }
+        auto found = std::find_if(fitness.unknown_activities.begin(),
+            fitness.unknown_activities.end(), [&](const auto& entry) {
+              return root_cause_scalar_keys_equal(entry.activity, *activity);
+            });
+        if (found == fitness.unknown_activities.end()) {
+          fitness.unknown_activities.push_back({std::move(*activity), {}});
+          found = std::prev(fitness.unknown_activities.end());
+        }
+        add_context(found->traces, reference, context, true);
+        continue;
+      }
+      if (!event.transitions_with_problems.empty()) {
+        if (row.replay_stopped && event.event_index + 1 == row.replayed_events) continue;
+        const auto t = event.transitions_with_problems.back();
+        if (transition_slots[t])
+          add_context(fitness.transitions[*transition_slots[t]].underfed_traces,
+                      reference, context, false);
+      } else {
+        for (auto it = event.activated_transitions.rbegin();
+             it != event.activated_transitions.rend(); ++it) {
+          if (!transition_slots[*it]) continue;
+          add_context(fitness.transitions[*transition_slots[*it]].fit_traces,
+                      reference, context, false);
+          break;
+        }
+      }
+    }
+  }
+  return result;
 }
 
 std::vector<std::vector<std::size_t>> replay_token_activation_sequences(

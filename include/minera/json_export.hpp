@@ -92,6 +92,10 @@ namespace minera {
     const std::vector<TokenReplayTraceDiagnostics>& traces,
     TokenReplayVariant variant = TokenReplayVariant::kForward);
 
+// Tagged object codec preserves tuple/list/set, object dictionary keys, exact
+// integers, declared floats and source/generated Trace references in JSON.
+[[nodiscard]] std::string token_replay_result_json(const TokenReplayResult& result);
+
 // Serializes an analysis (the imported event log plus its discovered
 // directly-follows graph) into the JSON document consumed by the frontend.
 // When `tree` is non-null its process tree is embedded under "process_tree";

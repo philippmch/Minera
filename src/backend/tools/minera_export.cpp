@@ -1206,6 +1206,13 @@ int usage(const char* program) {
                "  --process-tree-reduction-activity-key <name>\n"
                "  --token-replay-variant <id> Token replay: forward (default)\n"
                "                            or backwards\n"
+               "  --token-replay-result      Full forward result as tagged object JSON\n"
+               "  --token-replay-enable-pltr-fitness <bool>\n"
+               "                            Include place/transition/context maps\n"
+               "  --token-replay-disable-variants <bool>\n"
+               "                            Retain source traces instead of activity variants\n"
+               "  --token-replay-return-names <bool>\n"
+               "                            Project trace markings and transitions to names\n"
                "  --token-replay-consider-remaining-in-fitness <bool>\n"
                "                            Include leftover tokens in fit classification\n"
                "  --token-replay-try-to-reach-final-marking-through-hidden <bool>\n"
@@ -1857,6 +1864,7 @@ int main(int argc, char** argv) {
   std::filesystem::path compare_petri_reference;
   std::filesystem::path compare_petri_model;
   std::filesystem::path token_replay_model;
+  bool token_replay_result_requested = false;
   std::string compare_petri_miner = "inductive";
   bool compare_petri_miner_used = false;
   std::string compare_petri_activity_attribute;
@@ -2244,6 +2252,21 @@ int main(int argc, char** argv) {
       continue;
     }
     bool* replay_policy = nullptr;
+    if (arg == "--token-replay-result") {
+      token_replay_result_requested = true;
+      continue;
+    }
+    if (arg == "--token-replay-disable-variants") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try { token_replay_options.disable_variants = parse_boolean(value, arg); }
+      catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      token_replay_result_requested = true;
+      continue;
+    }
     for (const auto& [name, destination] : {
              std::pair<std::string_view, bool*>{
                  "--token-replay-consider-remaining-in-fitness", &token_replay_options.consider_remaining_in_fitness},
@@ -2251,6 +2274,8 @@ int main(int argc, char** argv) {
              {"--token-replay-consider-activities-not-in-model-in-fitness", &token_replay_options.consider_activities_not_in_model_in_fitness},
              {"--token-replay-walk-through-hidden-transitions", &token_replay_options.walk_through_hidden_transitions},
              {"--token-replay-cleaning-token-flood", &token_replay_options.cleaning_token_flood},
+             {"--token-replay-enable-pltr-fitness", &token_replay_options.enable_pltr_fitness},
+             {"--token-replay-return-names", &token_replay_options.return_names},
              {"--token-replay-exhaustive-invisible-exploration", &token_replay_options.exhaustive_invisible_exploration},
              {"--token-replay-include-trace-diagnostics", &token_replay_options.include_trace_diagnostics},
              {"--token-replay-include-duration-diagnostics", &token_replay_options.include_duration_diagnostics},
@@ -2266,6 +2291,8 @@ int main(int argc, char** argv) {
         std::cerr << "error: " << error.what() << '\n';
         return 2;
       }
+      if (arg == "--token-replay-enable-pltr-fitness" || arg == "--token-replay-return-names")
+        token_replay_result_requested = true;
       continue;
     }
     if (arg == "--alignment-activity-attribute" ||
@@ -5426,6 +5453,10 @@ int main(int argc, char** argv) {
     std::cerr << "error: EMD options require --emd-reference <file>\n";
     return 2;
   }
+  if (token_replay_result_requested && token_replay_model.empty()) {
+    std::cerr << "error: --token-replay-result requires --token-replay-model\n";
+    return 2;
+  }
   if (!token_replay_model.empty() &&
       (!compare_petri_reference.empty() || !compare_petri_model.empty() ||
        compare_petri_miner_used || compare_petri_replay_option_used ||
@@ -6243,8 +6274,10 @@ int main(int argc, char** argv) {
       const auto document = minera::import_pnml_document(token_replay_model, model_options);
       const auto replay_options = minera::tools::pnml_replay_options(
           document, token_replay_options);
-      const auto body = minera::token_replay_traces_json(
-          minera::replay_token_traces(log, document.net, replay_options), replay_options.variant);
+      const auto body = token_replay_result_requested
+          ? minera::token_replay_result_json(minera::replay_token_result(log, document.net, replay_options))
+          : minera::token_replay_traces_json(
+              minera::replay_token_traces(log, document.net, replay_options), replay_options.variant);
       if (output.empty()) std::cout << body << '\n';
       else {
         std::ofstream file(output);
