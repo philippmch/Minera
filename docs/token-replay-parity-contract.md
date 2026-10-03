@@ -1117,3 +1117,64 @@ legal-set contract is complete. Broader forward/backwards, adapter, cache/alias
 and distinct catalogue acceptance gates remain open. Catalogue totals remain
 46/86 packages, 199/387 modules and 228 incomplete units, with no promotions or
 full parity claim.
+
+## Original seventeen fixtures: complete fixed-order replay paths
+
+The original seventeen weighted acyclic choice/flood fixtures now satisfy their
+complete fixed-order acceptance contract. The independent whole-path oracle
+uses the exact owned PNML/XES inputs and all 382 complete structural matrices
+from the previously exhausted 1,217,856 fixed local arc-order configurations.
+Each matrix remains fixed throughout the repeated trace. Cleaning and PLTR vary
+independently, giving 1528 whole expected records. The oracle derives ordered
+silent/visible firings, weak weighted repairs, cleanup, markings, token counters,
+fitness and full diagnostic carriers from inputs alone. Its finite physical
+silent-state search has a strictly decreasing potential for these acyclic nets.
+
+All 1528 whole predictions were frozen before the fresh public producer started.
+Seventeen fresh public imports yield 3056 complete direct/parent returns, with
+zero replay or serialization errors and 1528 equal route pairs. Seventeen native
+imports yield 1528 complete full API returns. Every native/public comparison
+matches the complete carrier exactly: 3056 comparisons and 3056 Trace equality
+matrices. The oracle explains all fresh returns, the retained parent 680 public
+and 340 native returns, and all 501 original/resampled historical observations
+under their exact legacy serializer. Historical results are matched as whole
+paths; fresh tagged carriers separately cover types and identities absent from
+that older serializer. Nine opaque public module pin proofs and all actual input
+snapshots remain unchanged.
+
+The reported eventually-enabled diagnostic is distinct from physical silent
+reachability. All 382 supplied-cache outcomes agree with both derivations. Two
+supplemental empty-cache states have physically reachable visible transitions
+but an empty actual public diagnostic. Forty-seven fresh direct helper calls
+cover every distinct derived marking and both controls. Together with 3056
+post-replay diagnostic helper calls and 34 structural helper calls, this step
+retains 3137 actual helper calls. Helper evaluation leaves the marking, net and
+original replay result unchanged. The domain-specific cleanup derivation uses
+the active sink co-membership: only the first forced visible event can introduce
+that newly surviving key. This proves the replay cleanup effect here; standalone
+structural-component helper carrier parity remains open.
+
+A recorded self-review checks all 1528 weighted-flow ledgers, 3720 event steps
+and 382 fixed matrices. Negative controls reject a replay that changes global
+order between events and a carrier mixing trace fields from one path with PLTR
+fields from another. Three immutable oracle versions are retained. The first
+version's eight public/four native parent diagnostic differences and a later
+intermediate-marking alias failure remain visible; their corrections leave all
+1528 pre-public whole-return predictions unchanged. The first generated native
+probe terminates with stack overflow before its first full replay call. The
+corrected probe separates generated cache/profile factories and succeeds with
+the same default 1 MiB PE stack reserve; both binaries and actual process records
+are retained. No production inputs change. All 660 frozen inputs and the accepted
+core/build manifest remain byte-bound to the reused 152 passing assertion-enabled
+Release suites. This step does not claim a fresh full build or test-suite run.
+
+Evidence and archive byte hashes are in
+[forward-choice-complete-validation.json](forward-choice-complete-validation.json).
+All 269 retained files, chunks, byte counts and whole-file digests round-trip
+across sixteen archives. This closes the original-seventeen fixed-order
+choice/flood contract. Broader forward/backwards controls, supported adapters,
+cache/alias domains, standalone component carriers, search bounds and distinct
+catalogue acceptance remain open. Supplied-cache CLI/HTTP transports, weighted
+aggregate/composite conformance and general PNML/precision gates also remain
+open. Catalogue totals stay at 46/86 packages, 199/387 modules and 228 incomplete
+units, with no promotions or full parity claim.
