@@ -520,9 +520,9 @@ PetriNetPresentation to_petri_net_presentation(const HeuristicsNet& heuristics) 
     for (std::size_t i = 0; i < n; ++i) active[i] = i;
   }
   // Public silent names count every join before every split, including
-  // transitions removed by reduction. Join domains follow the first target
-  // encountered while visiting each node's name-ordered outgoing relations;
-  // split domains follow the corresponding incoming relation traversal.
+  // transitions removed by reduction. Visit each node's own join before its
+  // name-ordered outgoing targets, retaining the first visit of each domain.
+  // Splits follow the corresponding incoming relation traversal.
   for (const auto a : active)
     if (a >= n) throw std::invalid_argument("Petri active activity index");
   const auto name_order = [&](std::size_t lhs, std::size_t rhs) {
@@ -540,8 +540,10 @@ PetriNetPresentation to_petri_net_presentation(const HeuristicsNet& heuristics) 
     if (contains(active, a) && !contains(order, a)) order.push_back(a);
   };
   std::vector<std::size_t> join_order, split_order;
-  for (const auto a : active)
+  for (const auto a : active) {
+    append_active(join_order, a);
     for (const auto target : successors[a]) append_active(join_order, target);
+  }
   for (const auto a : active) append_active(join_order, a);
   for (const auto a : join_order)
     for (const auto predecessor : predecessors[a]) append_active(split_order, predecessor);
