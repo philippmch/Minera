@@ -1054,6 +1054,68 @@ void evaluation_event_data_adapters_contract() {
   assert(threw);
 }
 
+void exact_token_result_aggregation_contract() {
+  TokenReplayTraceDiagnostics signed_row;
+  signed_row.trace_is_fit = false;
+  signed_row.trace_fitness = 1.25;
+  signed_row.consumed = 2;
+  signed_row.produced = 2;
+  signed_row.missing = -2;
+  signed_row.remaining = -2;
+  const auto signed_result = evaluate_replay_fitness(
+      std::vector<TokenReplayTraceDiagnostics>{signed_row});
+  assert(signed_result.computed && signed_result.fitness == 2.0 &&
+         signed_result.average_trace_fitness == 1.25 &&
+         signed_result.percentage_fit_traces == 0.0 &&
+         !signed_result.log_fitness_is_integer_zero);
+  assert(signed_result.token_result.missing == -2 &&
+         signed_result.token_result.trace_diagnostics->front().remaining == -2);
+  signed_row.trace_is_fit = true;
+  signed_row.consumed = -2;
+  const auto nonpositive = evaluate_replay_fitness(
+      std::vector<TokenReplayTraceDiagnostics>{signed_row});
+  assert(nonpositive.fitting_traces == 1 && nonpositive.fitness == 0.0 &&
+         nonpositive.average_trace_fitness == 0.0 &&
+         nonpositive.percentage_fit_traces == 0.0 &&
+         nonpositive.log_fitness_is_integer_zero);
+  signed_row.consumed = TokenInteger("9007199254740993");
+  signed_row.produced = TokenInteger("9007199254740991");
+  signed_row.missing = TokenInteger("9007199254740992");
+  signed_row.remaining = TokenInteger("3002399751580330");
+  TokenReplayResult full;
+  full.traces.push_back(signed_row);
+  const auto rounded = evaluate_replay_fitness(full);
+  assert(rounded.fitness == 0x1.5555555555557p-2);
+  assert(full.traces.front().consumed == TokenInteger("9007199254740993"));
+  const std::string huge = "1" + std::string(400, '0');
+  full.traces.front().produced = TokenInteger(huge);
+  full.traces.front().consumed = TokenInteger(huge);
+  full.traces.front().missing = TokenInteger(huge);
+  full.traces.front().remaining = 0;
+  full.traces.front().trace_fitness = std::numeric_limits<double>::infinity();
+  const auto large = evaluate_replay_fitness(full);
+  assert(large.fitness == 0.5 && std::isinf(large.average_trace_fitness) &&
+         large.token_result.produced == TokenInteger(huge));
+  full.traces.front().trace_fitness = std::numeric_limits<double>::quiet_NaN();
+  assert(std::isnan(evaluate_replay_fitness(full).average_trace_fitness));
+  assert(evaluate_replay_fitness(TokenReplayResult{}).log_fitness_is_integer_zero);
+  assert(!evaluate_replay_fitness(full, ReplayFitnessVariant::ALIGNMENT_BASED).computed);
+
+  // Halfway significands, subnormal ties and overflow exercise the rounding
+  // needed by large weighted totals, independently of cancellation in fitness.
+  assert(token_integer_ratio(TokenInteger("9007199254740993"), 1) == 0x1p+53);
+  assert(token_integer_ratio(TokenInteger("9007199254740995"), 1) == 0x1.0000000000002p+53);
+  TokenInteger power = 1;
+  for (int i = 0; i < 1075; ++i) power *= 2;
+  assert(token_integer_ratio(1, power) == 0.0);
+  assert(token_integer_ratio(3, power) == 0x0.0000000000002p-1022);
+  assert(std::signbit(token_integer_ratio(-1, power)));
+  bool overflow = false;
+  try { (void)token_integer_ratio(power, 1); }
+  catch (const std::overflow_error&) { overflow = true; }
+  assert(overflow);
+}
+
 void precomputed_replay_aggregation_contract() {
   const std::vector<PrecomputedTokenReplay> token_results{
       PrecomputedTokenReplay{true, false, true, 1.0, 0, 4, 0, 4, {2, 1}, {}},
@@ -1347,6 +1409,7 @@ int main() {
   composite_document_and_weight_contract();
   evaluation_event_data_adapters_contract();
   precomputed_replay_aggregation_contract();
+  exact_token_result_aggregation_contract();
   emd_pyemd_contract();
   emd_encoding_and_mass_contract();
   process_tree_evaluation_overloads_contract();

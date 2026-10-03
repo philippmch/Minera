@@ -9358,3 +9358,39 @@ Broader forward/input-adapter/cache-alias/search-bound and catalogue gates remai
 open, as do weighted aggregate/composite conformance, general PNML limits and
 exact frontend numeric presentation. Totals stay at 46/86 packages, 199/387
 modules and 228 incomplete units, with no promotions or full parity claim.
+
+### Exact fitness aggregation from weighted replay results
+
+The new `evaluate_replay_fitness` overloads accept full token replay results or
+trace rows directly, retaining exact signed counts and the original rows.
+Fitting classification uses the supplied Boolean independently of trace fitness.
+Outside-unit and nonfinite double fitness propagate. Empty/nonpositive aggregate
+token denominators retain all-zero public scores and the integer-zero
+`log_fitness` carrier flag. Exact integer division rounds to binary64 using the
+significand and remainder, including subnormals, signed zero and overflow;
+converting huge operands to double is unnecessary.
+
+2486 fresh pinned aggregate calls cover 1243 frozen inputs through direct and
+parent routes. These include the complete signed small-counter grid, huge
+integer totals, nonfinite/outside-unit fitness, mixed/cancelling rows and 1040
+byte-bound prior weighted replay observations. Both native carriers execute
+2486 aggregate calls: all 4972 whole public-route comparisons match every
+metric, carrier type and float hex. All 4972 independent comparisons, 2486
+counter checks, 7458 input/retained-row checks and both sets of 1243 route pairs
+match. A separate 2315-call native integer-division cohort matches actual Python
+division outcomes. No fresh public replay calls are claimed.
+
+The fresh 660-input build changes four inputs, links 155 fresh artifacts and
+passes all 152 assertion-enabled Release suites. A failed comparer cannot read
+MSVC's NaN display; its retained derived correction leaves every production,
+probe and finite observation byte unchanged. The self-review is not an
+independent review or a pre-public oracle. All 1026 retained files round-trip
+across 12 archives; evidence and hashes are in
+[weighted-fitness-aggregate-validation.json](weighted-fitness-aggregate-validation.json).
+
+This accepts the declared C++ exact aggregation domain. Log-based/CLI/HTTP
+weighted fitness dispatch and general marking carriers remain open, alongside
+legacy bounded precomputed aliases, Python result-carrier/parameter domains,
+composite/precision/application conformance and exact frontend presentation.
+Catalogue totals remain 46/86 packages, 199/387 modules and 228 incomplete
+units. No catalogue promotion or full parity claim is made.
