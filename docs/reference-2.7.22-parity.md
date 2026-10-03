@@ -9246,3 +9246,36 @@ path enumeration. Broader forward/backwards and adapter acceptance contracts,
 cache/alias domains and weighted aggregate/composite gates remain open. Catalogue
 totals remain 46/86 packages, 199/387 modules and 228 incomplete units, with no
 promotions or full parity claim.
+
+## Original silent-choice fixtures and fixed cache enumeration
+
+The original seventeen weighted choice/flood fixtures now retain 680 complete
+public outcomes from both replay routes, preserving their exact PNML, original
+trace data and case-specific controls. Cleaning and PLTR vary independently
+across automatic, actual-public, ascending, descending and empty cache policies.
+All 340 public route pairs agree and actual inputs remain unchanged. A fresh
+probe of the accepted core makes 340 full calls; all 544 comparisons with the
+same supplied cache match every result field.
+
+The 88 strict automatic-cache differences remain in the evidence. All 68 native
+automatic-cache call results match whole actual public ascending-cache results
+through both routes, preserving each path's ordered firings and complete
+diagnostics together. An independent pure graph oracle exhausts 1,217,856 fixed
+local arc-order configurations into 382 distinct complete structural caches.
+Every cache retains a fixed-order witness and multiplicity. A recorded
+self-review verifies all actual inputs, cache memberships and whole-result
+witnesses, and rejects an inconsistent matrix assembled from individually
+shortest paths.
+
+The completed parent build and 152 passing assertion-enabled suites are reused
+with exact core/manifest bindings and all 660 frozen inputs unchanged. One new
+probe binary, raw full carriers, helper failures and corrections, process
+witnesses, enumerated caches and the scope review are retained. All 148 files
+round-trip across two archives. See
+[forward-choice-original-validation.json](forward-choice-original-validation.json)
+and [token-replay-parity-contract.md](token-replay-parity-contract.md).
+
+Independent whole replay-path derivation for every structural cache remains
+open, along with the broader forward/backwards, adapter and catalogue acceptance
+gates. Totals remain 46/86 packages, 199/387 modules and 228 incomplete units,
+with no promotions or full parity claim.
