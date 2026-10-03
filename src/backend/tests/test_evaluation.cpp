@@ -36,11 +36,11 @@ void cardoso_deduplicates_weighted_outputs() {
   PetriNet n; auto p=n.add_place(),a=n.add_place(),b=n.add_place(); n.set_source(p); n.set_sink(b); n.set_activities({"A","B"}); n.add_transition(0,{p},{a,a,b}); n.add_transition(1,{p},{a,b});
   auto s=evaluate_simplicity(n,SimplicityVariant::EXTENDED_CARDOSO); assert(s.value==1.0);
 }
-void cyclomatic_collapses_parallel_transition_edges() {
+void cyclomatic_counts_parallel_transition_edges() {
   PetriNet n; auto p=n.add_place(),q=n.add_place(); n.set_source(p); n.set_sink(q); n.set_activities({"A","B"}); n.add_transition(0,{p},{q}); n.add_transition(1,{p},{q});
   auto s=evaluate_simplicity(n,SimplicityVariant::EXTENDED_CYCLOMATIC);
-  assert(s.computed && s.vertices==2 && s.edges==1);
-  assert(s.strongly_connected_components==2 && s.value==1.0);
+  assert(s.computed && s.vertices==2 && s.edges==2);
+  assert(s.strongly_connected_components==2 && s.value==2.0);
 }
 void unexecuted_transition_penalty() {
   auto n=sequence_net(); auto r=evaluate_generalization(log({{"A"}}),n);
@@ -891,7 +891,7 @@ int main() {
   EmdOptions strict; strict.strict_equal_mass=true; StochasticLanguage unequal{{{{"x"},2.0}},2.0};
   auto bad=evaluate_emd(unequal,a,strict); assert(!bad.computed);
   auto card=evaluate_simplicity(n,SimplicityVariant::EXTENDED_CARDOSO); assert(card.computed&&card.complexity>0);
-  weighted_input_enablement(); cardoso_deduplicates_weighted_outputs(); cyclomatic_collapses_parallel_transition_edges();
+  weighted_input_enablement(); cardoso_deduplicates_weighted_outputs(); cyclomatic_counts_parallel_transition_edges();
   unexecuted_transition_penalty();
   generalization_counts_silent_routing_and_unseen_branches();
   projection_records_have_place_markings();

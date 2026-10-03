@@ -8378,3 +8378,49 @@ imports omit explicit zero-token keys that native documents preserve; public
 exporter byte/ID formatting and full application wire precision are not claimed
 equivalent. The catalogue remains 46/86 packages, 199/387 modules and
 228 incomplete units. Full module/package parity is not established.
+
+## Cyclomatic reachable transition occurrences (2026-10-03)
+
+Parent checkpoint: `aca20ffe344462a28b98c972f9e401645975ef24`.
+The executable cyclomatic metric now preserves distinct enabled transition
+occurrences between the same marking pair and matches the observed public
+cycle scalar. Strongly connected components remain separate graph metadata.
+Regressions cover alternatives, cycles with one/two tokens, document forwarding
+and isolated loops.
+
+Fresh pinned observations contain 1,684 metric calls, 2,788 independent graph
+calls and 324 default-marking discoveries. Each native before/after probe makes
+1,426 request parses and 2,852 metric calls on faithfully representable controls.
+The baseline has 416 score and 280 edge-count differences; all 2,852 accepted
+scalars and graph metadata match, with 17,112 alias/metadata field comparisons.
+The 258 supplied-name/distinct-input-arc observations remain outside the
+executable projection and preserve explicit remaining gates. All metric calls
+succeed; 18 initial graph snapshot adapter errors survive separately. The fresh
+adapter retains endpoint aliases, and larger naming experiments reject a
+small-matrix pair-count shortcut. No catalogue promotion follows.
+
+All 25 accepted CLI and 25 real HTTP scalar results match, with 51 recorded HTTP
+requests returning 200; the baseline CLI matches 8. A terminal MSVC C1001 capture
+in unchanged code is retained. The fresh serial production compilation succeeds;
+four suites pass and one old parallel-transition expectation fails. Correcting
+only that test keeps 649 of 650 inputs byte-identical. The accepted build reuses
+seven byte-verified core/test/application binaries, compiles the corrected
+evaluation suite and passes all five assertion-enabled suites. The failed
+test source/executable/logs and zero-call retry-preparation correction survive.
+The archive contains 1,144 exact files/1,183 verified chunk rows,
+tested binaries, process logs and original captures. See
+`simplicity-parity-contract.md` and `cyclomatic-reachability-validation.json`.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `cyclomatic-reachability-checks.jsonl.gz` | `7f1700b8c466591d4cb885d0c314fb4a5e90ebf7bb3d586e9ce82cad99d0e48c` | 74628422 |
+
+Cyclomatic presentation and marking-name collisions, distinct parallel
+input-arc enabling, typed/huge weights and markings, extended arc semantics,
+caps and unbounded graphs remain open. Broader evaluation/conformance and
+additional composite graph/log/marking, nonnumeric parameter and exception
+identity domains are not established. General PNML metadata, explicit marking
+keys, malformed/extended-arc carriers, public exporter byte/ID formatting and
+full application wire precision remain open. The catalogue stays at
+46/86 packages, 199/387 modules and 228 incomplete units.
+Full module/package parity is not established.

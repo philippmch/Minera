@@ -144,7 +144,10 @@ struct SimplicityResult {
   double complexity = 0.0;
   double value = 0.0;
   std::size_t vertices = 0;
+  // Cyclomatic reachability counts each enabled transition occurrence, even
+  // when several transitions lead from one marking to the same next marking.
   std::size_t edges = 0;
+  // Graph metadata; the pinned public scalar is reported separately in value.
   std::size_t strongly_connected_components = 0;
   bool computed = true;
   bool exhausted = false;

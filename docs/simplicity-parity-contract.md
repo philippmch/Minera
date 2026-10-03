@@ -2,8 +2,8 @@
 
 The target is PM4Py 2.7.22, pinned to
 `0715c31f3f1d85924107d6aa5329806db69df899`. The simplicity package remains
-**partial**. This checkpoint verifies the graph-only arc-degree and extended
-Cardoso metrics through native full-presentation and imported PNML entry points.
+**partial**. The sections below record graph-only arc-degree/Cardoso
+observations, imported PNML/composite paths and executable cyclomatic comparisons.
 
 `evaluate_simplicity(const PetriNetPresentation&, ...)` preserves distinct
 place/transition identities and separate arc occurrences. Names do not identify
@@ -198,12 +198,94 @@ hash-bound; full package/catalogue completion is not inferred.
 | --- | --- | ---: |
 | `composite-pnml-checks.jsonl.gz` | `e2914a4d7a7dc5ba5bfd6faf471c26ee3179250e47af6992b57bc53e4b04711e` | 74739515 |
 
-Extended cyclomatic reachability/parameters and broader evaluation/conformance
-dependencies remain open. Additional composite graph/log/marking, typed or
-nonnumeric parameter domains and exception-class/stack identity are outside
-these finite comparisons. General PNML metadata, marking keys,
-malformed/extended-arc and additional carrier domains remain open. Public PNML
-imports omit explicit zero-token keys that native documents preserve; public
-exporter byte/ID formatting and full application wire precision are not claimed
-equivalent. The catalogue remains 46/86 packages, 199/387 modules and
-228 incomplete units. Full module/package parity is not established.
+## Cyclomatic reachable transition occurrences
+
+The executable cyclomatic metric counts each enabled transition occurrence
+between reachable markings, including alternatives that share a target.
+The public scalar on the observed implicit-name executable domain equals
+that occurrence count. The native value, simplicity and complexity aliases
+report it; strongly connected components remain separate graph metadata.
+Default empty-preset initialization, explicit marking vectors and the native
+state cap keep their existing behavior. Document forwarding uses the corrected
+executable route; full-presentation cyclomatic support remains open.
+
+Two alternatives from one marking to the same next marking now give 2 rather
+than 1. A two-state cycle with one token gives 2 rather than the previous 1;
+with two tokens it has three markings/four occurrences and gives 4 rather
+than 2. Its actual strongly connected component count remains 1. Isolated
+transition loops count separately. All-visible, silent, mixed and empty-label
+controls establish that these observed cycle scalars do not depend on labels.
+
+Fresh pinned evidence contains 1,684 actual public metric calls, 2,788 separately
+witnessed reachability API calls and 324 public default-marking discoveries.
+The initial matrix includes all 121 token-nonincreasing binary incidence graphs
+on two places/two transitions, sparse/dense zero and positive markings,
+weighted/parallel controls and observed elapsed-time parameters. Larger controls
+include cycles, entries/exits, branches, joins, loops, supplied-name collisions
+and alternate labels. Every public metric succeeds. Before/after module hashes
+match the pin with only recorded CRLF normalization; no upstream implementation
+or bytecode is inspected.
+
+An initial graph snapshot adapter encounters 18 endpoint-identity KeyErrors;
+its original helper/output survives. A fresh graph capture includes referenced
+endpoint objects even when name equality has merged graph.states membership.
+It adds 1,428 graph calls and no metric calls. The failed snapshot rows are not
+accepted graph observations. Scalar conclusions do not use synthesized graph
+scores. A tempting source-name/transition-name pair-count rule fits all 1,428
+small-matrix metrics but fails 80 of 216 larger supplied-place-name controls;
+those observations retain the open presentation/name-order gates.
+
+The native probes each execute 1,426 request parses and 2,852 actual metric
+calls across executable/document routes. They compare 1,426 faithfully
+representable public controls; 258 supplied-name/distinct-input-arc cases remain
+explicitly outside that executable projection. The baseline matches 2,436
+complete outcomes, with 416 scalar and 280 edge-count differences. The accepted
+probe matches all 2,852 scalars and all three graph metadata fields exactly,
+giving 17,112 field comparisons across the three scalar aliases and metadata.
+Native doubles represent captured public integer scalars numerically. Public
+graph metadata comes from independently returned named-transition graphs.
+Document and option snapshots are unchanged.
+
+The 25 before/after CLI controls include parallel alternatives, weighted routing,
+diamond/fork/join structures, cycles with different markings and label variants.
+The baseline matches 8; all 25 accepted CLI and 25 real loopback HTTP metrics
+match exactly. All 51 recorded HTTP requests return 200. These integer scores
+fit existing application numeric precision; broader wire precision is not
+inferred. Discovery internals and startup health requests are not added to the
+instrumented producer counts, and the server is deliberately stopped afterward.
+
+The first fresh build hits MSVC C1001 in unchanged components.cpp/xutility and
+does not run tests. That terminal capture remains separate. A second fresh full
+build uses all 650 identical source/configuration inputs with one build worker
+and no binary reuse. Four suites pass; the old evaluation suite still expects
+parallel transitions to collapse to one edge/value one. That expectation and
+its test name are corrected to the captured value two. The accepted bundle
+keeps 649 inputs byte-identical to that successful production compilation,
+reuses seven byte-verified binaries (core, four unchanged suites, CLI/server),
+and compiles the corrected evaluation test against the bound core. All five
+assertion-enabled Release suites then pass: core, request parameters,
+evaluation, evaluation contracts and extended Petri arcs. Reused binary hashes
+are guarded before and after configure, corrected test compilation and CTest.
+Release NDEBUG undefinition and retained new assertion text are verified.
+An initial retry-preparation audit mishandles the unexecuted planned CTest
+record; its zero-call original and corrected helper remain retained.
+
+The archive contains 1,144 exact files in 1,183 verified chunk rows,
+including all accepted sources, original public/native captures, failures,
+CLI/HTTP records and tested core/application/test/probe binaries. The preceding
+pushed evidence and baseline core remain hash-bound. These finite comparisons
+do not establish full cyclomatic, simplicity or dependency/package parity.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `cyclomatic-reachability-checks.jsonl.gz` | `7f1700b8c466591d4cb885d0c314fb4a5e90ebf7bb3d586e9ce82cad99d0e48c` | 74628422 |
+
+Cyclomatic presentation and marking-name collisions, distinct parallel
+input-arc enabling, typed/huge weights and markings, extended arc semantics,
+caps and unbounded graphs remain open. Broader evaluation/conformance and
+additional composite graph/log/marking, nonnumeric parameter and exception
+identity domains are not established. General PNML metadata, explicit marking
+keys, malformed/extended-arc carriers, public exporter byte/ID formatting and
+full application wire precision remain open. The catalogue stays at
+46/86 packages, 199/387 modules and 228 incomplete units.
+Full module/package parity is not established.

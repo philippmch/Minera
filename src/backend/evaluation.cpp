@@ -1524,12 +1524,9 @@ SimplicityResult evaluate_simplicity(const PetriNet& net,
         adjacency.emplace_back();
         queue.push(it->second);
       }
-      // The reachability graph is directed-simple: transition labels do not
-      // create parallel edges when they lead to the same marking.
-      if (std::find(adjacency[source].begin(), adjacency[source].end(),
-                    it->second) == adjacency[source].end()) {
-        adjacency[source].push_back(it->second);
-      }
+      // Each enabled transition contributes its own reachable occurrence,
+      // including transitions that reach the same marking.
+      adjacency[source].push_back(it->second);
     }
   }
 
@@ -1580,7 +1577,9 @@ SimplicityResult evaluate_simplicity(const PetriNet& net,
     }
   }
   out.strongly_connected_components = components;
-  out.complexity = double(out.edges) - double(out.vertices) + double(components);
+  // The pinned public scalar counts reachable transition occurrences on the
+  // executable carrier. SCCs remain separate graph metadata, including cycles.
+  out.complexity = double(out.edges);
   out.value = out.complexity;
   out.simplicity = out.value;
   return out;
