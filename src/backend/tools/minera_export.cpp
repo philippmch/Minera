@@ -7210,6 +7210,8 @@ int main(int argc, char** argv) {
     }
     const auto model = [&](std::string id, const minera::PetriNet& petri,
                            const minera::PnmlDocument* document = nullptr) {
+      if (auto gated = minera::tools::pnml_conformance_weight_gate(petri,id))
+        return *gated;
       const bool is_powl = id == "powl";
       const bool is_inductive = id == "inductive";
       const bool is_alpha = id == "alpha";

@@ -8580,3 +8580,65 @@ unbounded graphs, time limits/state caps, full application numeric precision
 and broader evaluation/conformance/composite domains remain open. The catalogue
 stays at 46/86 packages, 199/387 modules and 228 incomplete units. Full
 module/package parity is not established.
+
+## Compact ordinary PNML weights (2026-10-03)
+
+Parent checkpoint: `f0934d3da788e4b34e866899ff299446b5127e4e`.
+Zero, signed and large ordinary arc weights now use bounded occurrence storage
+when a transition needs compact weights. Shared checked enabling/firing,
+primitive cyclomatic projection, zero structural adjacency and both PNML export
+routes preserve the measured semantics. Specialized weighted conformance is
+explicitly unavailable, with computed=false/error in CLI and HTTP and a frontend
+diagnostic that hides invalid scores.
+
+The original 262 public observations are reused. Fresh boundary and exact-export
+reimports make 176 imports, 528 metrics and 176 graph/export/enabling/weak calls
+each. Both native probes attempt 268 imports and 1530 metrics plus 18 enabling
+and 18 weak firings. All 170 successful arc carriers match, and 1521 metric
+outcomes match six fields (9126 matching fields). All 90 public rejection
+booleans align. Every native export reimport matches its carrier, subclass,
+actual metric triplet and semantic markings; all 170 final exports bind those
+exact captured inputs. Both reruns of the old 352-case matrix retain identical
+cases and all 4224 metric outcomes/1056 parameter parses.
+
+The initial candidate passes 17 suites but five automatic conformance imports
+fail; its misleading stale-model HTTP metrics are rejected as evidence. After
+the diagnostic correction, all 170 CLI runs exit zero and all 511 HTTP requests
+return 200. Each route has 167 scalar matches and three explicit range results;
+170 HTTP evaluations bind the exact freshly imported model bytes. Eighteen
+compact models expose unavailable conformance. Both complete builds are fresh
+with 20 binaries each and zero reuse. Accepted inputs total 655, with 12 edits
+and 643 unchanged from the parent. All 17 assertion-enabled suites, TypeScript,
+Vite and 253 existing frontend tests pass. Rendered QA is not claimed.
+
+Six archives retain 6,354 files/6,424 round-trip-verified chunk rows,
+including both fresh cores, all 44 binaries, original failures/helpers, captures
+and explicit source aliases. A failed source-count preparer makes zero build
+calls and remains retained with a corrected derivative. Public runtime pin
+proofs match without inspecting upstream implementation or bytecode. See
+`simplicity-parity-contract.md` and `pnml-ordinary-weights-validation.json`.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `pnml-ordinary-weights-checks-1.jsonl.gz` | `786968b97538d125bf913b50a4b3d3af666d74b4edbad3890397e481bc938659` | 29333608 |
+| `pnml-ordinary-weights-checks-2.jsonl.gz` | `dad9d61add74d7793a22dd1161275638bdb325802537914e78921f45df9e7d5f` | 18405793 |
+| `pnml-ordinary-weights-candidate-core-1.jsonl.gz` | `03458ed238a647b3fc9a00fd4a68c1e79a964e283b14d265830df4a2ee679c88` | 23230248 |
+| `pnml-ordinary-weights-candidate-core-2.jsonl.gz` | `2b3e209ef18c971ae2457a0e1c8e907f2c74126024702e07acca4da280373e6d` | 26870038 |
+| `pnml-ordinary-weights-final-core-1.jsonl.gz` | `051fc19ec341470af20a41e454c726af6cd0a497612a2d039d53dde45fc2e794` | 23229589 |
+| `pnml-ordinary-weights-final-core-2.jsonl.gz` | `275ab2069605a531b884a94d8db2532c988f4e663d0d5f47d6bb6010b5b2e30f` | 26874479 |
+
+Eight successful public integer weight magnitudes still exceed uint64 and
+reject explicitly in the native importer. Three large output profiles exceed
+signed64 reachable markings on each of three metric routes: nine uncomputed
+outcomes. Two independently attempted weak firings exceed signed64. Arbitrary
+integer carriers and markings remain incomplete.
+
+Specialized weighted conformance, replay, analysis, transformation and composite
+consumers remain unverified. The application exposes unavailable conformance for
+the compact-weight models; this checkpoint does not implement those methods.
+Weighted frontend graph rendering/labels, full application numeric precision,
+unbounded reachability and time/state limits remain open. Exception class/message
+identity, broader malformed/repeated/namespace combinations, metadata, foreign
+keys/IDs, set/order dependence and marking-name/zero-key behavior remain open.
+The catalogue stays at 46/86 packages, 199/387 modules and 228 incomplete units.
+Full module/package parity is not established.

@@ -915,6 +915,17 @@ void write_petri_net(std::ostream& out,
     write_place_list(out, transition.reset_inputs);
     out << ", \"inhibitor_inputs\": ";
     write_place_list(out, transition.inhibitor_inputs);
+    const auto weights = [&](const char* name,const std::vector<PetriArcWeight>& values) {
+      if (values.empty()) return;
+      out << ", \"" << name << "\": [";
+      for (std::size_t j = 0; j < values.size(); ++j) {
+        if (j) out << ',';
+        out << (values[j].negative && values[j].magnitude ? "-" : "") << values[j].magnitude;
+      }
+      out << ']';
+    };
+    weights("input_weights",transition.input_weights);
+    weights("output_weights",transition.output_weights);
     out << '}' << (i + 1 < transitions.size() ? ", " : "");
   }
   out << "]}";
@@ -1991,8 +2002,12 @@ void write_footprints(std::ostream& out, const FootprintResult& footprints,
 // alignment result.
 void write_model_conformance(std::ostream& out, const ModelConformance& model,
                              const DirectlyFollowsGraph& graph) {
-  out << "{\"sound\": " << (model.sound ? "true" : "false")
-      << ", \"token_replay\": ";
+  out << "{\"sound\": " << (model.sound ? "true" : "false");
+  if (!model.computed) {
+    out << ", \"computed\": false, \"error\": ";
+    write_json_string(out,model.error);
+  }
+  out << ", \"token_replay\": ";
   write_conformance(out, model.token_replay, graph);
   out << ", \"footprints\": ";
   write_footprints(out, model.footprints, graph);
@@ -5844,6 +5859,17 @@ std::string pnml_document_json(const PnmlDocument& document) {
     places("outputs", transition.outputs);
     places("reset_inputs", transition.reset_inputs);
     places("inhibitor_inputs", transition.inhibitor_inputs);
+    const auto weights = [&](const char* name,const std::vector<PetriArcWeight>& values) {
+      if (values.empty()) return;
+      out << ",\"" << name << "\":[";
+      for (std::size_t j = 0; j < values.size(); ++j) {
+        if (j) out << ',';
+        out << (values[j].negative && values[j].magnitude ? "-" : "") << values[j].magnitude;
+      }
+      out << ']';
+    };
+    weights("input_weights",transition.input_weights);
+    weights("output_weights",transition.output_weights);
     out << '}';
   }
   out << "],\"stochastic_map\":";

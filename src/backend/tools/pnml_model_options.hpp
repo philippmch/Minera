@@ -13,6 +13,19 @@
 
 namespace minera::tools {
 
+// The legacy conformance bundle counts repeated unit endpoints. Retain compact
+// weighted models for independent supported routes without publishing invented
+// conformance scores or treating an unavailable reachability check as unsound.
+[[nodiscard]] inline std::optional<ModelConformance> pnml_conformance_weight_gate(
+    const PetriNet& net, std::string miner = "imported") {
+  if (!net.has_compact_ordinary_arcs()) return std::nullopt;
+  ModelConformance result;
+  result.miner = std::move(miner);
+  result.computed = false;
+  result.error = "Conformance for zero, signed or large ordinary arc weights is not available yet.";
+  return result;
+}
+
 template <typename Integer>
 [[nodiscard]] std::vector<Integer> pnml_marking(
     const std::vector<std::int64_t>& marking) {

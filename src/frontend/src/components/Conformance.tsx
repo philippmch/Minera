@@ -309,7 +309,13 @@ export function Conformance({
         minerId &&
         method &&
         (supported && models ? (
-          method.artifact === "alignments" ? (
+          models.computed === false ? (
+            <section className="panel map-panel">
+              <div className="model-empty">
+                {models.error ?? "Conformance is unavailable for this model."}
+              </div>
+            </section>
+          ) : method.artifact === "alignments" ? (
             <Alignments
               data={viewData}
               minerId={minerId}

@@ -605,7 +605,8 @@ struct ActivityDeviation {
 
 // The conformance of one discovered model, so the frontend can offer any miner
 // against any method. `miner` is the UI registry id ("inductive", "alpha",
-// "heuristic"). Token replay is always computed (it is cheap and robust);
+// "heuristic"). Token replay is normally computed; unsupported weight domains
+// expose an unavailable bundle through computed/error instead of placeholder scores.
 // `alignments` is optional so the server can defer the costlier alignment to an
 // on-demand request while the CLI export still embeds it.
 struct ModelConformance {
@@ -614,6 +615,10 @@ struct ModelConformance {
   ConformanceResult token_replay;
   FootprintResult footprints;
   std::optional<AlignmentResult> alignments;
+  // When false, the conformance fields above are unavailable. The model can
+  // still be retained for independent supported evaluations and export.
+  bool computed = true;
+  std::string error;
 };
 
 }  // namespace minera

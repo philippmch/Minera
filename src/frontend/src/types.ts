@@ -4903,6 +4903,9 @@ export interface CorrelationVariantsAnalysis {
 
 /** Conformance results for one discovered model. */
 export interface ModelConformance {
+  /** False means the conformance bundle is unavailable; the model remains usable. */
+  computed?: boolean;
+  error?: string;
   /** Whether the model's final marking is reachable — the bar for alignment. */
   sound: boolean;
   token_replay: Conformance;

@@ -57,6 +57,20 @@ std::vector<std::pair<std::size_t, std::size_t>> weighted_endpoints(
   return weights;
 }
 
+template <class Callback>
+void for_each_ordinary_arc(const PetriTransition& transition, bool input,
+                           Callback callback) {
+  const auto& endpoints = input ? transition.inputs : transition.outputs;
+  const auto& weights = input ? transition.input_weights : transition.output_weights;
+  if (weights.empty()) {
+    for (const auto& [place,weight] : weighted_endpoints(endpoints))
+      callback(place,PetriArcWeight{weight,false});
+  } else {
+    for (std::size_t index = 0; index < endpoints.size(); ++index)
+      callback(endpoints[index],input ? transition.input_arc_weight(index) : transition.output_arc_weight(index));
+  }
+}
+
 void validate_arc_occurrences(const PnmlDocument& document) {
   if (!document.arc_occurrences) return;
   // Compare directly against executable vectors without expanding untrusted
@@ -74,10 +88,18 @@ void validate_arc_occurrences(const PnmlDocument& document) {
     std::size_t* position = nullptr;
     std::size_t multiplicity = arc.weight;
     if (arc.type == PetriArcType::kNormal) {
-      if (arc.negative_weight && arc.weight)
-        throw std::invalid_argument("PNML ordinary signed arcs have no primitive execution projection");
       endpoints = arc.input ? &transition.inputs : &transition.outputs;
       position = arc.input ? &cursor.inputs : &cursor.outputs;
+      const auto& weights = arc.input ? transition.input_weights : transition.output_weights;
+      if (!weights.empty()) {
+        multiplicity = 1;
+        if (*position >= endpoints->size())
+          throw std::invalid_argument("PNML arc occurrences do not match executable arcs");
+        const auto weight = arc.input ? transition.input_arc_weight(*position) : transition.output_arc_weight(*position);
+        if (weight.magnitude != arc.weight || (weight.negative && weight.magnitude) != (arc.negative_weight && arc.weight))
+          throw std::invalid_argument("PNML ordinary weights do not match executable arc metadata");
+      } else if (arc.negative_weight && arc.weight)
+        throw std::invalid_argument("PNML signed arc has no matching executable weight metadata");
     } else if (arc.input && arc.type == PetriArcType::kReset) {
       endpoints = &transition.reset_inputs;
       position = &cursor.resets;
@@ -122,8 +144,9 @@ void for_each_document_arc(const PnmlDocument& document, Callback callback) {
   }
   for (std::size_t t = 0; t < document.net.transitions().size(); ++t) {
     const auto& transition = document.net.transitions()[t];
-    for (const auto& [place, weight] : weighted_endpoints(transition.inputs))
-      callback(PnmlArcOccurrence{place, t, true, PetriArcType::kNormal, weight, {}});
+    for_each_ordinary_arc(transition,true,[&](std::size_t place,PetriArcWeight weight) {
+      callback(PnmlArcOccurrence{place,t,true,PetriArcType::kNormal,static_cast<std::size_t>(weight.magnitude),{},weight.negative});
+    });
     for (std::size_t i = 0; i < transition.reset_inputs.size(); ++i) {
       const auto weight = transition.reset_arc_weight(i);
       callback(PnmlArcOccurrence{transition.reset_inputs[i], t, true, PetriArcType::kReset,
@@ -134,8 +157,9 @@ void for_each_document_arc(const PnmlDocument& document, Callback callback) {
       callback(PnmlArcOccurrence{transition.inhibitor_inputs[i], t, true, PetriArcType::kInhibitor,
                                  static_cast<std::size_t>(weight.magnitude), {}, weight.negative});
     }
-    for (const auto& [place, weight] : weighted_endpoints(transition.outputs))
-      callback(PnmlArcOccurrence{place, t, false, PetriArcType::kNormal, weight, {}});
+    for_each_ordinary_arc(transition,false,[&](std::size_t place,PetriArcWeight weight) {
+      callback(PnmlArcOccurrence{place,t,false,PetriArcType::kNormal,static_cast<std::size_t>(weight.magnitude),{},weight.negative});
+    });
   }
 }
 
@@ -336,8 +360,11 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
       write_arc(arc.place, arc.transition, arc.input, arc.type, arc.weight, arc.id, arc.negative_weight);
   } else for (std::size_t t = 0; t < transitions.size(); ++t) {
     const auto& transition = transitions[t];
-    for (const auto& [place, weight] : export_endpoints(transition.inputs))
-      write_arc(place, t, true, PetriArcType::kNormal, weight);
+    if (transition.input_weights.empty()) for (const auto& [place,weight] : export_endpoints(transition.inputs))
+      write_arc(place,t,true,PetriArcType::kNormal,weight);
+    else for_each_ordinary_arc(transition,true,[&](std::size_t place,PetriArcWeight weight) {
+      write_arc(place,t,true,PetriArcType::kNormal,static_cast<std::size_t>(weight.magnitude),{},weight.negative);
+    });
     for (std::size_t i = 0; i < transition.reset_inputs.size(); ++i) {
       const auto weight = transition.reset_arc_weight(i);
       write_arc(transition.reset_inputs[i], t, true, PetriArcType::kReset,
@@ -348,8 +375,11 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
       write_arc(transition.inhibitor_inputs[i], t, true, PetriArcType::kInhibitor,
                 static_cast<std::size_t>(weight.magnitude), {}, weight.negative);
     }
-    for (const auto& [place, weight] : export_endpoints(transition.outputs))
-      write_arc(place, t, false, PetriArcType::kNormal, weight);
+    if (transition.output_weights.empty()) for (const auto& [place,weight] : export_endpoints(transition.outputs))
+      write_arc(place,t,false,PetriArcType::kNormal,weight);
+    else for_each_ordinary_arc(transition,false,[&](std::size_t place,PetriArcWeight weight) {
+      write_arc(place,t,false,PetriArcType::kNormal,static_cast<std::size_t>(weight.magnitude),{},weight.negative);
+    });
   }
 
   out << "    </page>\n";
@@ -731,10 +761,24 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   std::vector<std::vector<std::size_t>> outputs(transitions.size());
   std::vector<std::vector<std::size_t>> reset_inputs(transitions.size());
   std::vector<std::vector<std::size_t>> inhibitor_inputs(transitions.size());
+  std::vector<std::vector<PetriArcWeight>> input_weights(transitions.size());
+  std::vector<std::vector<PetriArcWeight>> output_weights(transitions.size());
   std::vector<std::vector<PetriArcWeight>> reset_weights(transitions.size());
   std::vector<std::vector<PetriArcWeight>> inhibitor_weights(transitions.size());
   std::vector<bool> place_has_in(places.size(), false);
   std::vector<bool> place_has_out(places.size(), false);
+
+  // Preserve the historical small positive multiplicities. Any zero, signed or
+  // large ordinary arc switches its whole transition to occurrence weights.
+  constexpr std::size_t materialized_weight_limit = 1024;
+  std::vector<bool> compact(transitions.size(),false);
+  for (const auto& arc : arcs) if (arc.type == PetriArcType::kNormal &&
+      (!arc.weight || arc.negative_weight || arc.weight > materialized_weight_limit)) {
+    const auto source = transition_index.find(arc.source);
+    const auto target = transition_index.find(arc.target);
+    if (source != transition_index.end()) compact[source->second] = true;
+    if (target != transition_index.end()) compact[target->second] = true;
+  }
 
   std::vector<PnmlArcOccurrence> arc_occurrences;
   for (const auto& arc : arcs) {
@@ -745,9 +789,10 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     if (from_place != place_index.end() &&
         to_transition != transition_index.end()) {
       if (arc.type == PetriArcType::kNormal) {
-        if (arc.negative_weight)
-          throw std::runtime_error("PNML ordinary signed arcs have no primitive execution projection");
-        inputs[to_transition->second].insert(
+        if (compact[to_transition->second]) {
+          inputs[to_transition->second].push_back(from_place->second);
+          input_weights[to_transition->second].push_back({arc.weight,arc.negative_weight});
+        } else inputs[to_transition->second].insert(
             inputs[to_transition->second].end(), arc.weight,
             from_place->second);
       }
@@ -765,14 +810,15 @@ PnmlDocument parse_pnml_document(std::string_view xml,
                to_place != place_index.end()) {
       if (arc.type != PetriArcType::kNormal)
         throw std::runtime_error("PNML extended arc must enter a transition");
-      if (arc.negative_weight)
-        throw std::runtime_error("PNML ordinary signed arcs have no primitive execution projection");
-      outputs[from_transition->second].insert(
+      if (compact[from_transition->second]) {
+        outputs[from_transition->second].push_back(to_place->second);
+        output_weights[from_transition->second].push_back({arc.weight,arc.negative_weight});
+      } else outputs[from_transition->second].insert(
           outputs[from_transition->second].end(), arc.weight,
           to_place->second);
       place_has_in[to_place->second] = true;
       arc_occurrences.push_back({to_place->second, from_transition->second, false,
-                                 arc.type, arc.weight, arc.id});
+                                 arc.type, arc.weight, arc.id,arc.negative_weight});
     } else {
       throw std::runtime_error("PNML arc '" + arc.source + "' -> '" +
                                arc.target +
@@ -790,6 +836,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       activity = it->second;
     }
     net.add_transition(activity, std::move(inputs[t]), std::move(outputs[t]));
+    if (compact[t]) net.set_ordinary_arc_weights(t,std::move(input_weights[t]),std::move(output_weights[t]));
     for (std::size_t i = 0; i < reset_inputs[t].size(); ++i)
       net.add_reset_arc(t, reset_inputs[t][i], reset_weights[t][i].magnitude, reset_weights[t][i].negative);
     for (std::size_t i = 0; i < inhibitor_inputs[t].size(); ++i)
