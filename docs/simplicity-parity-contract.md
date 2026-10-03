@@ -299,9 +299,10 @@ executable net keeps its existing summed-input semantics.
 entries keyed by presented place IDs. It overrides the marking vector, including
 an explicitly empty optional marking. Untouched zero keys survive, consumed
 nonpositive entries disappear, and invalid or duplicate keys reject explicitly.
-Existing vector/default initialization remains available. Ordinary PNML arc
-occurrences use the full presentation; extended-arc documents retain their
-existing executable route. Stale arc metadata still rejects explicitly.
+Existing vector/default initialization remains available. At this checkpoint,
+ordinary PNML arc occurrences use the full presentation and extended-arc documents
+retain their executable route. The following section extends the document and
+executable defaults to decoded extended arcs. Stale metadata rejects explicitly.
 
 Marking names follow captured public repr/normalization behavior: Python-style
 quoting and Unicode 14 alphanumeric characters plus underscore. The owned
@@ -388,3 +389,114 @@ not established. Broader evaluation/conformance, composite log/graph/marking,
 PNML metadata, exporter bytes/IDs and full application wire precision remain
 open. The catalogue stays at 46/86 packages, 199/387 modules and
 228 incomplete units. Full module/package parity is not established.
+
+## PNML arc types and default cyclomatic semantics
+
+PNML import and export now use `<arctype><text>reset|inhibitor</text></arctype>`.
+The pinned public importer recognizes exactly the lowercase, unpadded values.
+It ignores the old `<type>` annotation. An unknown, uppercase, padded or empty
+arctype value leaves an ordinary arc; when both tags occur, arctype determines
+the type. Native import preserves the decoded arc occurrence type and executable
+input category. Export writes the interoperable arctype annotation. Ten new
+wire regressions check those cases and native import/export round trips.
+
+The public default cyclomatic metric applies classic weighted enabling and
+weak firing to reset/inhibitor arcs. A gate with zero tokens blocks an otherwise
+enabled transition for this default metric. Document evaluation now validates
+and retains all presented arc occurrences on that route. Direct executable
+extended nets project their grouped ordinary weights and unit reset/inhibitor
+inputs through the same presented calculation. Other execution consumers retain
+reset/inhibitor behavior. Regression controls check zero/positive gate markings
+and stale extended-arc metadata rejection.
+
+Fresh public captures contain 1,056 actual PNML imports, 3,168 simplicity calls,
+1,056 independent reachability graphs, 48 public exports and 656 calls each to
+is_enabled and weak_execute. The 304-model matrix covers ordinary, reset,
+inhibitor and combined classes; three parallel ordinary guard presets; source
+tokens zero through four; gate tokens zero through three; and two-transition
+sequences. Twenty-four tag controls and 24 independent reimports of exact public
+export bytes complete the 352 original carriers. A separate 352-case capture
+measures every executable projection independently, including the 160 controls
+whose ordinary parallel endpoints aggregate. No projected reference scalar is
+synthesized or borrowed from a different carrier. Before/after opaque module
+proofs match the pin after recorded CRLF conversion only. Observed metric
+errors and input/marking/parameter mutations are zero. No upstream implementation
+or bytecode is inspected.
+
+Each corrected baseline, intermediate and final native bundle makes 352 imports,
+1,056 request parses and 4,224 actual metric calls across presentation, document,
+imported executable net and independently constructed executable-control routes.
+All 2,112 final presentation/document outcomes and all 1,056 executable-control
+outcomes match every checked scalar alias and metadata field: 19,008 fields.
+Cyclomatic metadata uses independently returned public graphs. Structural counts
+and arc-degree complexity derive from captured public input fields; zero SCC
+and zero structural executable edges remain local default metadata. Imported
+executable results are also retained without substituting them for a distinct
+public carrier oracle. Document, presentation, arc and option snapshots are
+unchanged.
+
+The expanded baseline retains arc types/weights on only 106/352 carriers and
+matches 346/352 document cyclomatic results. Its independently typed executable
+control matches 219/352 cyclomatic results. All three counts become 352 in the
+final bundle. All 810 structural/ordinary executable outcomes remain unchanged;
+133 extended cyclomatic outcomes change to the actual public result. The early
+304-model metric-only baseline had passed all scalar comparisons because the
+native parser ignored arctype and lost the extended types. Its 2,736 actual
+metric calls survive as evidence of that insufficient carrier check.
+
+The exact 352 native document exports are independently imported by the public
+runtime. All decoded arc types/weights and net subclasses, three metric scalars
+and positive semantic marking entries match. The final exports are byte-identical
+to those measured intermediate exports, and all 2,112 target metric outcomes
+remain identical. This proves the stated carrier comparisons, without proving
+general metadata or equality with public exporter bytes.
+
+The 80 accepted CLI results and 80 real loopback HTTP evaluations match their
+actual public scalars; all 161 recorded HTTP requests return 200. Baseline CLI
+matches 74/80. The completed intermediate applications also pass. The task-owned
+server is deliberately stopped after each HTTP run. Discovery internals and
+startup health requests are not added to instrumented producer counts; these
+finite integer scores do not establish broader application numeric precision.
+
+Both candidates compile all 652 frozen source/configuration inputs afresh with
+zero binary reuse and pass five assertion-enabled Release suites: core, request
+parameters, evaluation, evaluation contracts and extended Petri arcs. The 647
+unchanged parent inputs and five edited files are bound. Three final inputs
+differ from the successful wire/document intermediate candidate, which still
+had incorrect direct executable defaults. Release NDEBUG undefinition, retained
+new assertion text, actual process logs and all tested binary hashes are checked.
+
+An expanded probe initially prints multiline exports with std::quoted, which
+does not encode JSON control characters. Its wrapper fails after observing all
+4,224 metric, 1,056 parse and 352 import markers. Exact raw output, probe, helper,
+build logs and binary remain. Original command PIDs and wrapper exit one are
+retained; original process timestamps were not retained and are not reconstructed.
+The corrected producer escapes control characters and records process witnesses
+before adapter assertions. Zero-call preparation/comparison-schema corrections
+retain their original helpers and derivations; no executed producer is edited.
+
+The five archives retain 5,258 exact files in 5,328 verified chunk
+rows, including every accepted source, raw public/native/app capture, failed
+adapter and both new builds' core/test/application binaries. Each core is split
+across two archives. All five archives stay below 50 MiB; chunk and whole-file
+hashes pass exact base64 round-trip verification across the archive set. The
+preceding pushed archives bind unchanged baseline sources and binaries. No
+package/module catalogue promotion is inferred.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `pnml-arctype-checks.jsonl.gz` | `63f2087610c25a894b65f0273bccc3bae24cd64f534ac5b7159152ce573e3b52` | 42739189 |
+| `pnml-arctype-core-1.jsonl.gz` | `c4e630ea6f5f920b0fadd9022da565097e6765a6a825f9518bf3c8a0b091016c` | 23147401 |
+| `pnml-arctype-core-2.jsonl.gz` | `c676b0b512f0ddb2d890836f34f1a93d4c7bc59f0edefb1835dc0dd574155ccc` | 26733473 |
+| `pnml-arctype-core-3.jsonl.gz` | `a886bc8dd0713543a896243ddcc8059afb7157125c03a60ffa66127b7af18804` | 23158742 |
+| `pnml-arctype-core-4.jsonl.gz` | `13eaa7e5c43c8aaaa6c0986d4b47844e4b218210205b3ac7fe736b90ae01f9c3` | 26726709 |
+
+Supplied marking-name collisions and reference set/allocation order remain
+open. Additional nonunit, typed, huge or signed extended-arc weights and marking
+domains, foreign keys and exception identity are not established. Malformed or
+repeated PNML annotations, general metadata, IDs, zero-key/order behavior and
+exporter byte formats remain open. Unbounded graphs, time limits/state caps,
+broader evaluation/conformance/composite domains and full application numeric
+wire precision remain open. The catalogue stays at 46/86 packages,
+199/387 modules and 228 incomplete units. Full module/package parity is not
+established.

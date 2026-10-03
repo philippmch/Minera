@@ -8472,3 +8472,51 @@ not established. Broader evaluation/conformance, composite log/graph/marking,
 PNML metadata, exporter bytes/IDs and full application wire precision remain
 open. The catalogue stays at 46/86 packages, 199/387 modules and
 228 incomplete units. Full module/package parity is not established.
+
+## PNML arc types and default cyclomatic semantics (2026-10-03)
+
+Parent checkpoint: `331ae157c25c5ecf4ebd20626f8d93fa4ea8eab5`.
+PNML import/export now use the pinned public arctype annotation and exact type
+values. Reset/inhibitor documents and direct executable nets use classic
+weighted enabling and weak firing for the default cyclomatic metric. Decoded
+arc types survive; stale document arc metadata still rejects.
+
+Fresh captures retain 1,056 actual public imports, 3,168 metrics, 1,056 independent
+graphs, 48 exports and 656 calls each to enabling and weak firing. All 352 original
+carriers and all 352 independently measured executable projections are retained,
+including 160 aggregated parallel-endpoint controls. Every corrected native
+bundle makes 352 imports, 1,056 parses and 4,224 metrics. All 2,112 final target
+outcomes and all 1,056 executable-control outcomes match every checked field.
+Carrier type/weight matches improve from 106 to 352; document cyclomatic matches
+from 346 to 352; executable cyclomatic matches from 219 to 352. All 810 structural
+and ordinary controls stay unchanged. Independent public reimports match all
+352 native document exports, which remain byte-identical in the final build.
+
+All 80 final CLI and 80 HTTP results match; all 161 recorded requests return 200.
+Baseline CLI matches 74. Both fresh 652-input builds pass all five assertion-enabled
+Release suites with zero reuse. Five source files differ from the parent; three
+inputs change after the wire/document intermediate candidate. Original captures,
+the metric-only carrier-check insufficiency, malformed multiline JSON adapter
+failure and zero-call derivations remain retained. Missing original failed-probe
+process timestamps are explicitly disclosed. No upstream implementation/bytecode
+is inspected. The five sub-50-MiB archives retain 5,258 files/5,328
+round-trip-verified rows, including both new cores in split chunks.
+See `simplicity-parity-contract.md` and `pnml-arctype-validation.json`.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `pnml-arctype-checks.jsonl.gz` | `63f2087610c25a894b65f0273bccc3bae24cd64f534ac5b7159152ce573e3b52` | 42739189 |
+| `pnml-arctype-core-1.jsonl.gz` | `c4e630ea6f5f920b0fadd9022da565097e6765a6a825f9518bf3c8a0b091016c` | 23147401 |
+| `pnml-arctype-core-2.jsonl.gz` | `c676b0b512f0ddb2d890836f34f1a93d4c7bc59f0edefb1835dc0dd574155ccc` | 26733473 |
+| `pnml-arctype-core-3.jsonl.gz` | `a886bc8dd0713543a896243ddcc8059afb7157125c03a60ffa66127b7af18804` | 23158742 |
+| `pnml-arctype-core-4.jsonl.gz` | `13eaa7e5c43c8aaaa6c0986d4b47844e4b218210205b3ac7fe736b90ae01f9c3` | 26726709 |
+
+Supplied marking-name collisions and reference set/allocation order remain
+open. Additional nonunit, typed, huge or signed extended-arc weights and marking
+domains, foreign keys and exception identity are not established. Malformed or
+repeated PNML annotations, general metadata, IDs, zero-key/order behavior and
+exporter byte formats remain open. Unbounded graphs, time limits/state caps,
+broader evaluation/conformance/composite domains and full application numeric
+wire precision remain open. The catalogue stays at 46/86 packages,
+199/387 modules and 228 incomplete units. Full module/package parity is not
+established.

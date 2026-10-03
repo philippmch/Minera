@@ -304,9 +304,9 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
       if (weight != 1)
         out << "<inscription><text>" << weight << "</text></inscription>";
       if (type != PetriArcType::kNormal)
-        out << "<type><text>"
+        out << "<arctype><text>"
             << (type == PetriArcType::kReset ? "reset" : "inhibitor")
-            << "</text></type>";
+            << "</text></arctype>";
       out << "</arc>\n";
     }
   };
@@ -592,12 +592,11 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     } else if (stack_ends_with(stack, {"transition", "name", "text"}) &&
                !transitions.empty()) {
       transitions.back().label = value;
-    } else if (stack_ends_with(stack, {"arc", "type", "text"}) &&
+    } else if (stack_ends_with(stack, {"arc", "arctype", "text"}) &&
                !arcs.empty()) {
       if (value == "reset") arcs.back().type = PetriArcType::kReset;
       else if (value == "inhibitor") arcs.back().type = PetriArcType::kInhibitor;
-      else if (value == "normal" || value == "") arcs.back().type = PetriArcType::kNormal;
-      else throw std::runtime_error("PNML arc has an unknown type '" + value + "'");
+      else arcs.back().type = PetriArcType::kNormal;
     } else if (stack_ends_with(stack, {"arc", "inscription", "text"}) &&
                !arcs.empty()) {
       const auto weight = parse_token_count(value);

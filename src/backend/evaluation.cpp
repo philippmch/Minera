@@ -1632,6 +1632,11 @@ SimplicityResult evaluate_presented_cyclomatic(
 SimplicityResult evaluate_simplicity(const PetriNet& net,
                                      SimplicityVariant variant,
                                      const SimplicityOptions& options) {
+  if (variant == SimplicityVariant::EXTENDED_CYCLOMATIC && net.has_extended_arcs()) {
+    PnmlDocument projection;
+    projection.net = net;
+    return evaluate_simplicity(projection, variant, options);
+  }
   SimplicityResult out;
   out.variant = variant;
   if (variant == SimplicityVariant::ARC_DEGREE) {
@@ -1828,10 +1833,6 @@ SimplicityResult evaluate_simplicity(const PetriNetPresentation& net,
 SimplicityResult evaluate_simplicity(const PnmlDocument& document,
                                      SimplicityVariant variant,
                                      const SimplicityOptions& options) {
-  if (variant == SimplicityVariant::EXTENDED_CYCLOMATIC &&
-      std::any_of(document.net.transitions().begin(), document.net.transitions().end(),
-                  [](const auto& transition) { return transition.has_extended_arcs(); }))
-    return evaluate_simplicity(document.net, variant, options);
   try {
     return evaluate_simplicity(to_petri_net_presentation(document), variant, options);
   } catch (const std::invalid_argument& error) {

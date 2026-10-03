@@ -476,6 +476,8 @@ struct ModelEvaluation {
     const GeneralizationOptions& options = {}) {
   return evaluate_generalization(EventDataView(data), tree, variant, options);
 }
+// Default cyclomatic graph construction uses classic weighted arc behavior,
+// including on reset/inhibitor nets. Other execution consumers retain arc types.
 [[nodiscard]] SimplicityResult evaluate_simplicity(
     const PetriNet&, SimplicityVariant = SimplicityVariant::ARC_DEGREE,
     const SimplicityOptions& = {});
@@ -486,9 +488,9 @@ struct ModelEvaluation {
     const PetriNetPresentation&,
     SimplicityVariant = SimplicityVariant::ARC_DEGREE,
     const SimplicityOptions& = {});
-// Imported ordinary document arcs use the retained presentation for all variants.
-// Extended arcs keep their executable route for cyclomatic evaluation.
-// Stale ordinary arc metadata reports an uncomputed result.
+// Imported document arcs use the retained presentation for all variants.
+// Default cyclomatic graph construction treats reset/inhibitor arcs as ordinary
+// weighted arcs, as observed on the pinned public default. Stale metadata rejects.
 [[nodiscard]] SimplicityResult evaluate_simplicity(
     const PnmlDocument&,
     SimplicityVariant = SimplicityVariant::ARC_DEGREE,
