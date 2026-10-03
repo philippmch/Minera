@@ -8176,3 +8176,42 @@ bound, with 1,778 public calls in the chain. Broader type, metadata, identity,
 timestamp and routing gates remain open. PLUSPLUS and Alpha+ stay partial;
 coverage remains 46/86 packages and 199/387 modules, with 228 incomplete units
 and no promotion.
+
+### PLUSPLUS typed decoration parent routes (2026-10-03)
+
+Verified the 22 typed decoration values through parent PLUSPLUS HN/PN routes
+on EventLog, EventStream and DataFrame carriers. Evidence contains 134 fresh
+PM4Py calls: two exported carrier conversions and 132 discoveries. All nine
+options remain explicit and unchanged. EventLog/Stream inputs and DataFrame
+HN inputs stay unchanged; DataFrame Petri inputs retain the `@@diff` mutation.
+The 90 pandas grouping diagnostics and 66 returned-net key orders are counted
+separately. Installed/pinned opaque module hashes match before and after.
+
+All 132 native aliases match: 66 HN results, 3,498 assessed fields and
+connection domains, and 66 Petri presentations, including complete supported
+names, properties, labels, arc occurrences/weights and markings. Input-after,
+parameters, errors and mutations match. Separate file-only checks match all
+132 typed selectors before/after and 132 public parent/direct pairs across six
+groups. Those checks execute zero producers and preserve all original values.
+
+This evidence step reuses the unchanged production core, 650 exact compiled
+inputs, five assertion-enabled suites and 77 generic regressions. The new
+probe executes 132 discoveries and 66 presentations. No new production build,
+suite run or generic call is counted. The inherited preparation printout's 77
+generic label is corrected by the bound empty generic plan and actual records.
+
+The combined finite corpus has 1,468 matching aliases: 672 HN results,
+363 Petri presentations and 433 expected errors, with 34,452 assessed net
+fields. The public evidence chain contains 1,912 producer calls. Two archive
+segments retain 598 checkpoint members byte for byte and bind the
+preceding typed-value validation, exact sources, tested binaries and archives.
+`heuristic-plusplus-decoration-parent-validation.json` records the scope.
+
+| Evidence segment | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `heuristic-plusplus-decoration-parent-controls-checks.jsonl.gz` | `2d56b614cd8b0049b946e3a2fdd10d833d79b1f1dc6250cd5667e2a6866bb7a1` | 8189525 |
+| `heuristic-plusplus-decoration-parent-replay-checks.jsonl.gz` | `c00a832d2cad7152b169fa3b35c3962cb7e3662eba66e7331f0a1d452403f919` | 10117468 |
+
+Form-field typed routing and broader carrier/scalar, ordered metadata,
+identity and timestamp gates remain open. PLUSPLUS and Alpha+ remain partial;
+coverage stays 46/86 packages, 199/387 modules and 228 incomplete units.

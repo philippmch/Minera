@@ -301,7 +301,7 @@ input and parameter state before and after every actual call.
 | `AND_MEASURE_THRESH` | `and_threshold` | Positive scores 1.0, 0.8 and 0.5 match the finite native map projections, including distinct input/output sides. Saved next-down/equal/next-up controls for 1.0 and 0.5 now match native fields with escaped labels; complete AND Petri fields and broader domains remain open. |
 | `MIN_ACT_COUNT` | `min_activity_count` | Public controls remove incident relation maps and edges while preserving raw sojourn entries; the complete native field domains remain to be compared. |
 | `MIN_DFG_OCCURRENCES` | `min_frequency` | Public count 2 remains at minimum 2 and is removed at minimum 3, including the returned DFG and matrices. Compare native domains. |
-| `HEU_NET_DECORATION` | `decoration` and `plusplus_decoration_selector` | Saved frequency/performance field controls and the explicit `supplement-unfamiliar` selector match native presence and scalar types. Other unfamiliar strings, explicit null and non-string selectors remain unverified. |
+| `HEU_NET_DECORATION` | `decoration`, `plusplus_decoration_selector` and `plusplus_decoration_value` | Twenty-two actual typed values match native fields, parameters and mutations on exported pandas, direct EventLog and parent EventLog/EventStream/DataFrame HN/PN routes. Only the exact string `frequency` selects frequency; supplied null/bool/int/float/list/string-key objects select performance. Broader scalar classes, object key domains/order and form-field typed transport remain open. |
 
 ## Petri and completion gates
 
@@ -1687,3 +1687,60 @@ archive hashes remain bound, bringing the public evidence chain to 1,778 calls.
 Broader scalar/carrier types, ordered metadata, identity, timestamps and adapter
 routes remain open. PLUSPLUS and Alpha+ stay partial; coverage remains 46/86
 packages and 199/387 modules, with 228 incomplete units and no promotion.
+
+## Typed decoration parent carrier routes (2026-10-03)
+
+Executed 134 fresh pinned public calls: two exported conversions establish
+EventLog and EventStream origins, followed by 132 parent PLUSPLUS discoveries.
+All 22 original typed decoration values use both HN/PN routes on EventLog,
+EventStream and DataFrame inputs, with all nine parameters explicit. Every
+call succeeds without serialization errors. Independent copies preserve the
+actual converted public fields and carrier types. Parameters, EventLogs and
+EventStreams stay unchanged. DataFrame HN discovery preserves the input;
+DataFrame Petri discovery appends the retained `@@diff` column. The 90 public
+pandas grouping diagnostics and 66 returned-net key-order observations are
+counted separately. Opaque installed/pinned module proofs match before/after.
+
+All 132 actual native route checks match: 66 complete supported HN results,
+3,498 assessed net/node/edge fields and connection domains, and 66 complete
+supported Petri presentations. Input-after, option preservation, errors and
+carrier-specific mutations all match. A separate file-only typed decoder
+matches each actual native selector against the original public value before
+and after all 132 calls. No substituted strings or guessed defaults are used.
+
+A second file-only check matches 132 parent/direct public pairs across six
+groups for the 22 values. EventStream and DataFrame parent HN returns match
+the parent EventLog typed fields, which also match direct EventLog discovery.
+EventStream and parent/direct EventLog Petri fields match; parent DataFrame
+Petri fields match the exported pandas route. The existing public Petri view
+preserves names, properties, labels, weighted directed arc occurrences and
+sparse markings without claiming equality of cross-call runtime identities.
+Both file-only checks add zero producer calls.
+
+The production core and all 650 compilation inputs remain exactly unchanged.
+Its five assertion-enabled suites and prior 77 generic regressions are reused;
+this checkpoint compiles the route probe and executes 132 native discoveries
+and 66 presentations, with four shared data factories. It performs zero new
+production builds, suite runs, generic discoveries or generic conversions.
+The inherited preparation printout incorrectly labels 77 generic cases; the
+bound plan, actual results and command records prove zero new generic calls.
+
+Together with the preceding typed-value checkpoint, the retained finite corpus
+has 1,468 matching PLUSPLUS aliases: 672 HN results, 363 Petri presentations
+and 433 expected errors, covering 34,452 assessed net fields. The evidence
+chain contains 1,912 public producer calls. Two archives retain 598
+new checkpoint members byte for byte, including complete public/native returns,
+parameters and carriers, actual process logs, sources of the probes and OWN
+helpers, binary hashes, and the parent validation and archive bindings. Exact
+production sources remain recoverable through the pinned parent core archive.
+`heuristic-plusplus-decoration-parent-validation.json` records all accounting.
+
+| Evidence segment | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `heuristic-plusplus-decoration-parent-controls-checks.jsonl.gz` | `2d56b614cd8b0049b946e3a2fdd10d833d79b1f1dc6250cd5667e2a6866bb7a1` | 8189525 |
+| `heuristic-plusplus-decoration-parent-replay-checks.jsonl.gz` | `c00a832d2cad7152b169fa3b35c3962cb7e3662eba66e7331f0a1d452403f919` | 10117468 |
+
+The HTTP/form-field transport still exposes the string selector. Broader typed
+adapter routes, scalar and carrier classes, ordered metadata, identity and
+timestamp domains remain open. PLUSPLUS and Alpha+ stay partial. Coverage
+remains 46/86 packages and 199/387 modules, with 228 incomplete units.
