@@ -1,5 +1,6 @@
 #include "minera/dfg_precision.hpp"
 #include "minera/evaluation.hpp"
+#include "minera/pnml.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -556,6 +557,39 @@ void simplicity_extended_cardoso_contract() {
   assert(close_to(result.simplicity, 1.0));
 }
 
+void simplicity_imported_arc_occurrences_contract() {
+  const auto document = parse_pnml_document(R"(<pnml><net id="parallel">
+    <place id="start"><initialMarking><text>3</text></initialMarking></place>
+    <place id="finish"/><transition id="A"><name><text>A</text></name></transition>
+    <arc id="one" source="start" target="A"/>
+    <arc id="two" source="start" target="A"><inscription><text>2</text></inscription></arc>
+    <arc id="out" source="A" target="finish"/>
+    <finalmarkings><marking><place idref="finish"><text>1</text></place></marking></finalmarkings>
+  </net></pnml>)");
+  SimplicityOptions options;
+  options.arc_degree_k = 0.0;
+  const auto parallel = evaluate_simplicity(document, SimplicityVariant::ARC_DEGREE, options);
+  assert(parallel.computed && parallel.edges == 3 && parallel.vertices == 3);
+  assert(parallel.value == 1.0 / 3.0);
+  const auto executable = evaluate_simplicity(document.net, SimplicityVariant::ARC_DEGREE, options);
+  assert(executable.value == 1.0 / (1.0 + 4.0 / 3.0));
+  const auto restored = parse_pnml_document(to_pnml(document));
+  assert(evaluate_simplicity(restored, SimplicityVariant::ARC_DEGREE, options).value == parallel.value);
+  const auto cardoso = evaluate_simplicity(document, SimplicityVariant::EXTENDED_CARDOSO);
+  assert(cardoso.computed && cardoso.value == 1.0 && cardoso.edges == 3);
+  options.initial_marking = {3, 0};
+  options.final_marking = {0, 1};
+  const auto cyclomatic = evaluate_simplicity(document, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+  const auto native_cyclomatic = evaluate_simplicity(document.net, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+  assert(cyclomatic.computed == native_cyclomatic.computed && cyclomatic.value == native_cyclomatic.value);
+  auto stale = document;
+  stale.net.add_arc(0, 0);
+  const auto rejected = evaluate_simplicity(stale, SimplicityVariant::ARC_DEGREE, options);
+  assert(!rejected.computed && !rejected.error.empty());
+  stale.arc_occurrences.reset();
+  assert(evaluate_simplicity(stale, SimplicityVariant::ARC_DEGREE, options).computed);
+}
+
 void simplicity_presented_arc_occurrences_contract() {
   PetriNetPresentation net;
   // Node identities are local to each kind; names do not identify endpoints.
@@ -1092,6 +1126,7 @@ int main() {
   simplicity_arc_degree_contract();
   simplicity_extended_cardoso_contract();
   simplicity_presented_arc_occurrences_contract();
+  simplicity_imported_arc_occurrences_contract();
   simplicity_nonfinite_baseline_contract();
   simplicity_extended_cyclomatic_contract();
   composite_default_contract();

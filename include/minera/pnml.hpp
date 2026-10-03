@@ -12,6 +12,18 @@
 
 namespace minera {
 
+// One PNML arc object. Weight affects firing, while parallel occurrences remain
+// distinct for structural metrics and document export. Indices address net's
+// places/transitions; input selects place -> transition rather than the reverse.
+struct PnmlArcOccurrence {
+  std::size_t place;
+  std::size_t transition;
+  bool input = true;
+  PetriArcType type = PetriArcType::kNormal;
+  std::size_t weight = 1;
+  std::string id;  // Empty derives an export ID.
+};
+
 struct PnmlDocument {
   PetriNet net;
   std::vector<std::int64_t> initial_marking;
@@ -24,6 +36,12 @@ struct PnmlDocument {
   // any positive marking introduced by inference. Document export preserves keys.
   std::vector<bool> initial_marking_keys;
   std::vector<bool> final_marking_keys;
+  // Imported arc objects in XML order, including their weights, types and IDs.
+  // Missing metadata derives weighted arcs from net. Present metadata must
+  // exactly reproduce net's input/output order and multiplicities; update or
+  // reset it when editing executable arcs. An engaged empty vector is an empty
+  // graph, rather than a request to derive arcs.
+  std::optional<std::vector<PnmlArcOccurrence>> arc_occurrences;
 };
 
 struct PnmlImportOptions {
@@ -69,7 +87,8 @@ void write_pnml(std::ostream& out, const PetriNet& net,
     std::string_view name = "net");
 
 // Exports complete document markings and node IDs, including explicit zero keys.
-// Distinct arc endpoints retain first-occurrence order when weights are grouped.
+// Imported arc occurrences retain order, weights, types and nonempty arc IDs.
+// Without arc metadata, endpoints retain first-occurrence order when grouped.
 // Empty ID/key metadata derives pN/tN IDs and positive-token keys. Supplied
 // metadata must have exact dimensions; IDs must be nonempty and globally unique,
 // and supplied keys must include every positive token. Validation precedes output.
@@ -77,6 +96,12 @@ void write_pnml(std::ostream& out, const PnmlDocument& document,
                 std::string_view name = "net");
 [[nodiscard]] std::string to_pnml(const PnmlDocument& document,
                                   std::string_view name = "net");
+
+// Structural presentation using current node IDs/labels and distinct document
+// arc occurrences. Throws invalid_argument for stale or malformed arc metadata.
+// Markings and stochastic/other PNML annotations are not part of this projection.
+[[nodiscard]] PetriNetPresentation to_petri_net_presentation(
+    const PnmlDocument& document);
 
 // Parses a PNML workflow net, so a model discovered or drawn elsewhere can be
 // checked against a log. Reads the first <net>: places, transitions, and arcs

@@ -1099,7 +1099,7 @@ int usage(const char* program) {
                "  --generalization-variant <id> generalization_token\n"
                "  --simplicity-variant <id> arc_degree, extended_cardoso,\n"
                "                            or extended_cyclomatic\n"
-               "  --simplicity-arc-degree-k <f> Finite arc-degree target\n"
+               "  --simplicity-arc-degree-k <f> Arc-degree target (allows nan/inf)\n"
                "  --simplicity-max-states <n> Positive simplicity search limit\n"
                "  --simplicity-initial-marking <n,...> Initial place marking\n"
                "  --simplicity-final-marking <n,...> Final place marking\n"
@@ -7631,9 +7631,13 @@ int main(int argc, char** argv) {
                 model_evaluation.generalization_options);
             break;
           case minera::EvaluationFamily::kSimplicity:
-            result.simplicity = minera::evaluate_simplicity(
-                *petri, model_evaluation.simplicity_variant,
-                model_evaluation.simplicity_options);
+            result.simplicity = miner == "imported" && imported_document
+                ? minera::evaluate_simplicity(
+                      *imported_document, model_evaluation.simplicity_variant,
+                      model_evaluation.simplicity_options)
+                : minera::evaluate_simplicity(
+                      *petri, model_evaluation.simplicity_variant,
+                      model_evaluation.simplicity_options);
             break;
           case minera::EvaluationFamily::kComposite:
             result.composite = minera::evaluate_composite(

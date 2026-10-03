@@ -42,6 +42,86 @@ void write_xml_escaped(std::ostream& out, std::string_view value,
 
 }  // namespace
 
+namespace {
+
+std::vector<std::pair<std::size_t, std::size_t>> weighted_endpoints(
+    const std::vector<std::size_t>& endpoints) {
+  std::vector<std::pair<std::size_t, std::size_t>> weights;
+  std::unordered_map<std::size_t, std::size_t> positions;
+  for (const auto place : endpoints) {
+    const auto [it, inserted] = positions.emplace(place, weights.size());
+    if (inserted) weights.emplace_back(place, 1);
+    else ++weights[it->second].second;
+  }
+  return weights;
+}
+
+void validate_arc_occurrences(const PnmlDocument& document) {
+  if (!document.arc_occurrences) return;
+  // Compare directly against executable vectors without expanding untrusted
+  // weights into allocations. Each transition has an independent cursor per
+  // arc side/type, so XML may interleave transitions while retaining order.
+  struct Cursors { std::size_t inputs = 0, outputs = 0, resets = 0, inhibitors = 0; };
+  std::vector<Cursors> cursors(document.net.transitions().size());
+  for (const auto& arc : *document.arc_occurrences) {
+    if (arc.place >= document.net.place_count() ||
+        arc.transition >= document.net.transitions().size() || arc.weight == 0)
+      throw std::invalid_argument("PNML arc occurrence has an invalid endpoint or weight");
+    const auto& transition = document.net.transitions()[arc.transition];
+    auto& cursor = cursors[arc.transition];
+    const std::vector<std::size_t>* endpoints = nullptr;
+    std::size_t* position = nullptr;
+    if (arc.type == PetriArcType::kNormal) {
+      endpoints = arc.input ? &transition.inputs : &transition.outputs;
+      position = arc.input ? &cursor.inputs : &cursor.outputs;
+    } else if (arc.input && arc.weight == 1 && arc.type == PetriArcType::kReset) {
+      endpoints = &transition.reset_inputs;
+      position = &cursor.resets;
+    } else if (arc.input && arc.weight == 1 && arc.type == PetriArcType::kInhibitor) {
+      endpoints = &transition.inhibitor_inputs;
+      position = &cursor.inhibitors;
+    } else {
+      throw std::invalid_argument("PNML arc occurrence has an invalid type or direction");
+    }
+    if (arc.weight > endpoints->size() - *position)
+      throw std::invalid_argument("PNML arc occurrences do not match executable arcs");
+    for (std::size_t n = 0; n < arc.weight; ++n)
+      if ((*endpoints)[(*position)++] != arc.place)
+        throw std::invalid_argument("PNML arc occurrences do not match executable arc order");
+  }
+  for (std::size_t t = 0; t < cursors.size(); ++t) {
+    const auto& transition = document.net.transitions()[t];
+    const auto& cursor = cursors[t];
+    if (cursor.inputs != transition.inputs.size() ||
+        cursor.outputs != transition.outputs.size() ||
+        cursor.resets != transition.reset_inputs.size() ||
+        cursor.inhibitors != transition.inhibitor_inputs.size())
+      throw std::invalid_argument("PNML arc occurrences omit executable arcs");
+  }
+}
+
+template <class Callback>
+void for_each_document_arc(const PnmlDocument& document, Callback callback) {
+  validate_arc_occurrences(document);
+  if (document.arc_occurrences) {
+    for (const auto& arc : *document.arc_occurrences) callback(arc);
+    return;
+  }
+  for (std::size_t t = 0; t < document.net.transitions().size(); ++t) {
+    const auto& transition = document.net.transitions()[t];
+    for (const auto& [place, weight] : weighted_endpoints(transition.inputs))
+      callback(PnmlArcOccurrence{place, t, true, PetriArcType::kNormal, weight, {}});
+    for (const auto place : transition.reset_inputs)
+      callback(PnmlArcOccurrence{place, t, true, PetriArcType::kReset, 1, {}});
+    for (const auto place : transition.inhibitor_inputs)
+      callback(PnmlArcOccurrence{place, t, true, PetriArcType::kInhibitor, 1, {}});
+    for (const auto& [place, weight] : weighted_endpoints(transition.outputs))
+      callback(PnmlArcOccurrence{place, t, false, PetriArcType::kNormal, weight, {}});
+  }
+}
+
+}  // namespace
+
 void write_pnml_impl(std::ostream& out, const PetriNet& net,
                      const std::vector<std::int64_t>& initial_marking,
                      const std::vector<std::int64_t>& final_marking,
@@ -90,6 +170,11 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
   if (document) {
     validate_keys(document->initial_marking_keys, initial_marking);
     validate_keys(document->final_marking_keys, final_marking);
+    validate_arc_occurrences(*document);
+    if (document->arc_occurrences)
+      for (const auto& arc : *document->arc_occurrences)
+        if (!arc.id.empty() && !used_ids.insert(arc.id).second)
+          throw std::invalid_argument("PNML arc IDs must be unique across nodes and arcs");
   }
   for (const auto& transition : net.transitions()) {
     if (transition.activity && *transition.activity >= net.activities().size())
@@ -195,25 +280,22 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
   // unique across the whole net.
   // Document export retains first-occurrence endpoint order: equal-length
   // silent routes can depend on it. Legacy net overloads retain sorted arcs.
-  const auto weighted_endpoints = [&](const std::vector<std::size_t>& endpoints) {
-    std::vector<std::pair<std::size_t, std::size_t>> weights;
-    std::unordered_map<std::size_t, std::size_t> positions;
-    for (const auto place : endpoints) {
-      const auto [it, inserted] = positions.emplace(place, weights.size());
-      if (inserted) weights.emplace_back(place, 1);
-      else ++weights[it->second].second;
-    }
+  const auto export_endpoints = [&](const std::vector<std::size_t>& endpoints) {
+    auto weights = weighted_endpoints(endpoints);
     if (!document) std::sort(weights.begin(), weights.end());
     return weights;
   };
   std::size_t arc_id = 0;
-  const auto write_input_arc = [&](std::size_t place, std::size_t t,
-                                   PetriArcType type, std::size_t weight = 1) {
-    out << "      <arc id=\"" << unique_id("a" + std::to_string(arc_id++))
-        << "\" source=\"";
-    write_xml_escaped(out, place_ids[place], true);
+  const auto write_arc = [&](std::size_t place, std::size_t t, bool input,
+                             PetriArcType type, std::size_t weight,
+                             const std::string& original_id = {}) {
+    out << "      <arc id=\"";
+    write_xml_escaped(out, original_id.empty()
+        ? unique_id("a" + std::to_string(arc_id++)) : original_id, true);
+    out << "\" source=\"";
+    write_xml_escaped(out, input ? place_ids[place] : transition_ids[t], true);
     out << "\" target=\"";
-    write_xml_escaped(out, transition_ids[t], true);
+    write_xml_escaped(out, input ? transition_ids[t] : place_ids[place], true);
     out << "\"";
     if (type == PetriArcType::kNormal && weight == 1) {
       out << "/>\n";
@@ -228,25 +310,19 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
       out << "</arc>\n";
     }
   };
-  for (std::size_t t = 0; t < transitions.size(); ++t) {
+  if (document && document->arc_occurrences) {
+    for (const auto& arc : *document->arc_occurrences)
+      write_arc(arc.place, arc.transition, arc.input, arc.type, arc.weight, arc.id);
+  } else for (std::size_t t = 0; t < transitions.size(); ++t) {
     const auto& transition = transitions[t];
-    for (const auto& [place, weight] : weighted_endpoints(transition.inputs))
-      write_input_arc(place, t, PetriArcType::kNormal, weight);
+    for (const auto& [place, weight] : export_endpoints(transition.inputs))
+      write_arc(place, t, true, PetriArcType::kNormal, weight);
     for (const auto place : transition.reset_inputs)
-      write_input_arc(place, t, PetriArcType::kReset);
+      write_arc(place, t, true, PetriArcType::kReset, 1);
     for (const auto place : transition.inhibitor_inputs)
-      write_input_arc(place, t, PetriArcType::kInhibitor);
-    for (const auto& [place, weight] : weighted_endpoints(transition.outputs)) {
-      out << "      <arc id=\"" << unique_id("a" + std::to_string(arc_id++))
-          << "\" source=\"";
-      write_xml_escaped(out, transition_ids[t], true);
-      out << "\" target=\"";
-      write_xml_escaped(out, place_ids[place], true);
-      out << "\"";
-      if (weight == 1) out << "/>\n";
-      else out << "><inscription><text>" << weight
-               << "</text></inscription></arc>\n";
-    }
+      write_arc(place, t, true, PetriArcType::kInhibitor, 1);
+    for (const auto& [place, weight] : export_endpoints(transition.outputs))
+      write_arc(place, t, false, PetriArcType::kNormal, weight);
   }
 
   out << "    </page>\n";
@@ -313,6 +389,36 @@ std::string to_pnml(const PnmlDocument& document, std::string_view name) {
   return out.str();
 }
 
+PetriNetPresentation to_petri_net_presentation(const PnmlDocument& document) {
+  PetriNetPresentation result;
+  if ((!document.place_ids.empty() && document.place_ids.size() != document.net.place_count()) ||
+      (!document.transition_ids.empty() && document.transition_ids.size() != document.net.transitions().size()))
+    throw std::invalid_argument("PNML ID count must match the node count");
+  for (std::size_t p = 0; p < document.net.place_count(); ++p)
+    result.places.push_back({p, document.place_ids.empty()
+        ? "p" + std::to_string(p) : document.place_ids[p], {}});
+  for (std::size_t t = 0; t < document.net.transitions().size(); ++t) {
+    const auto& transition = document.net.transitions()[t];
+    std::optional<std::string> label;
+    if (transition.activity) {
+      if (*transition.activity >= document.net.activities().size())
+        throw std::invalid_argument("PNML transition activity index is invalid");
+      label = document.net.activities()[*transition.activity];
+    }
+    result.transitions.push_back({t, document.transition_ids.empty()
+        ? "t" + std::to_string(t) : document.transition_ids[t], std::move(label), {}});
+  }
+  for_each_document_arc(document, [&](const PnmlArcOccurrence& arc) {
+    if (arc.place >= result.places.size() || arc.transition >= result.transitions.size())
+      throw std::invalid_argument("PNML arc place index is invalid");
+    const PetriNodeRef place{PetriNodeKind::kPlace, arc.place};
+    const PetriNodeRef transition{PetriNodeKind::kTransition, arc.transition};
+    result.arcs.push_back({arc.input ? place : transition,
+                           arc.input ? transition : place, arc.weight, {}});
+  });
+  return result;
+}
+
 std::string to_pnml(const PetriNet& net, std::string_view name) {
   std::ostringstream out;
   write_pnml(out, net, name);
@@ -363,6 +469,7 @@ struct ParsedArc {
   std::string target;
   PetriArcType type = PetriArcType::kNormal;
   std::size_t weight = 1;
+  std::string id;
 };
 
 std::uint64_t parse_token_count(const std::string& text) {
@@ -462,6 +569,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
         throw std::runtime_error("PNML arc is missing its source or target");
       }
       arcs.push_back({*source, *target, PetriArcType::kNormal});
+      if (const auto* id = detail::attribute(token.attributes, "id")) arcs.back().id = *id;
     } else if (token.name == "toolspecific" &&
                stack_ends_with(stack, {"transition"})) {
       const auto* activity = detail::attribute(token.attributes, "activity");
@@ -575,6 +683,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   std::vector<bool> place_has_in(places.size(), false);
   std::vector<bool> place_has_out(places.size(), false);
 
+  std::vector<PnmlArcOccurrence> arc_occurrences;
   for (const auto& arc : arcs) {
     const auto from_place = place_index.find(arc.source);
     const auto to_place = place_index.find(arc.target);
@@ -594,6 +703,8 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       if (arc.type != PetriArcType::kNormal && arc.weight != 1)
         throw std::runtime_error("PNML extended arcs cannot have multiplicity");
       place_has_out[from_place->second] = true;
+      arc_occurrences.push_back({from_place->second, to_transition->second, true,
+                                 arc.type, arc.weight, arc.id});
     } else if (from_transition != transition_index.end() &&
                to_place != place_index.end()) {
       if (arc.type != PetriArcType::kNormal)
@@ -602,6 +713,8 @@ PnmlDocument parse_pnml_document(std::string_view xml,
           outputs[from_transition->second].end(), arc.weight,
           to_place->second);
       place_has_in[to_place->second] = true;
+      arc_occurrences.push_back({to_place->second, from_transition->second, false,
+                                 arc.type, arc.weight, arc.id});
     } else {
       throw std::runtime_error("PNML arc '" + arc.source + "' -> '" +
                                arc.target +
@@ -625,6 +738,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   net.set_activities(std::move(activities));
 
   PnmlDocument document;
+  document.arc_occurrences = std::move(arc_occurrences);
   for (const auto& place : places) document.place_ids.push_back(place.id);
   for (const auto& transition : transitions) document.transition_ids.push_back(transition.id);
   document.initial_marking.assign(places.size(), 0);
