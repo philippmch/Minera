@@ -952,3 +952,19 @@ See [token-replay-parity-contract.md](token-replay-parity-contract.md) and
 Supplied-cache adapter transports, broader foreign/alias domains and prior
 forward/backwards acceptance gates remain open. This step promotes no catalogue
 rows; the totals remain 46/86 packages, 199/387 modules and 228 incomplete units.
+
+## Minimized forward-choice and cleaning oracle
+
+An independent input-derived oracle now explains all 1152 complete public
+results on twelve minimized acyclic silent-choice controls. It enumerates every
+global silent order consistently across repeated events and rejects mixed-path
+fields and per-event order changes. The evidence exposes and corrects 60
+whole-result comparisons where cleaned underfed places also gained overfed
+membership. Underfed membership now retains precedence, with token counts
+preserved. All corrected controls and the retained full-carrier regressions
+match, and the fresh 152-suite build passes. See
+[token-replay-parity-contract.md](token-replay-parity-contract.md) and
+[forward-choice-oracle-validation.json](forward-choice-oracle-validation.json).
+The original seventeen larger choice/flood fixtures and broader acceptance
+contracts remain unresolved. No catalogue row is promoted; totals remain 46/86
+packages, 199/387 modules and 228 incomplete units.

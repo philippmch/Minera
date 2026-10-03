@@ -989,3 +989,75 @@ choice/flood-cleaning and backwards acceptance contracts, weighted
 aggregate/composite gates, bounded carriers and general PNML/precision gates
 still apply. The catalogue remains 46/86 packages, 199/387 modules and 228
 incomplete units, with no promotions or full parity claim.
+
+## Minimized silent-choice oracle and underfed-place precedence
+
+Twelve new acyclic controls isolate the competing `p0 -> t3 -> p3` and
+`p0 + p1 -> t6 -> p3` silent paths from retained flood case 62. They rename the
+places to source/guard/gate/sink, remove unrelated routing and visible-input
+deficits, and independently vary initial source tokens (1 or 3), visible input
+weight (1 or 2), one/two/three repeated events, cleaning and PLTR reporting.
+Good-only and blocked-only nets provide deterministic controls; the choice
+nets preserve both silent alternatives. This isolation does not claim to
+preserve every outcome of the original larger fixture.
+
+A fresh public capture imports all twelve exact PNMLs and makes 1152 actual
+direct/parent calls across 48 profiles per net. Automatic, good-first,
+blocked-first and empty caches keep each supplied matrix fixed throughout a
+trace. All 1152 calls return complete carriers, with no errors or serialization
+failures. All 576 route pairs agree. The seven opaque module pin proofs and all
+actual input, marking, log and parameter snapshots remain unchanged.
+
+The independent oracle reads only the owned inputs. The guard has no producer,
+all transitions have one output and a topological ranking certifies acyclicity.
+The oracle enumerates the sole global silent order in each of eight deterministic
+fixtures and both global orders in each of four choice fixtures. Automatic
+routing uses one order consistently across repeated events; explicit caches
+select the declared fixed path or suppress routing. The oracle derives ordered
+firings, every reached marking and token counter, fitness, full PLTR membership,
+Trace/Place/Transition carrier values and ordered context occurrence lists.
+It explains every whole public carrier. Negative controls reject both a replay
+that switches global order between events and a carrier assembled from one
+path's trace fields and another path's PLTR fields.
+
+The unchanged parent core has 30 unique whole native results that no oracle
+path explains, corresponding to 60 direct/parent comparisons. Each difference
+is in PLTR membership after cleaning a partially available visible input:
+the gate has both missing and cleared tokens, but native reporting adds that
+trace to both underfed and overfed sets. Actual public reporting gives event
+underfed membership precedence. The correction applies that precedence to
+cleaned places as well as reached residual places, preserving all counters.
+The new native contract test exercises a weighted gate that is repaired and
+then cleared; it must appear only in the underfed set.
+
+The corrected core matches all 1152 complete public outcomes exactly, and all
+576 unique native outcomes belong to complete oracle paths. A scope review
+checks every actual public topology/label/marking snapshot against the oracle's
+constraints, verifies that its only import is `itertools`, and confirms that
+expected carriers remain identical before and after the production correction.
+This is a recorded self-review of the bounded assumptions, not a claim of
+independent human or subagent review.
+
+The retained parameter, visible/invisible-path, typed and 95-model regressions
+match all 26338 complete carriers and 7862 measured error behaviors. Together
+with the new controls, accepted native comparisons match 27490 complete returns
+and 30792 independent Trace equality matrices. The 95-model checks preserve
+2032 tuple carriers and 2280 legacy native records. One fresh build freezes 660
+inputs, with two edited and 658 unchanged, and passes all 152 assertion-enabled
+Release suites. Seven actual probe builds retain the baseline and corrected
+results; the completed parent production build is reused only for the baseline.
+Parent public captures are reused with exact hashes and are not fresh calls.
+The 1140 positional CLI processes retain 1108 successful results and 32 expected
+overflow failures, matching 2216 complete carriers, 2032 tuple carriers and 64
+error behaviors through the retained public routes. All 162 fresh full-build
+and probe binaries are retained. Every chunk and all 3699 whole files
+round-trip across 18 evidence archives.
+
+Evidence and archive byte hashes are in
+[forward-choice-oracle-validation.json](forward-choice-oracle-validation.json).
+This oracle establishes complete support only for the declared twelve minimized
+fixtures. The original seventeen differing weighted fixtures still require
+globally consistent full-path enumeration and reconciliation with every
+diagnostic field. Broader forward/backwards, supported adapter, cache/alias and
+distinct catalogue acceptance gates remain open. No catalogue row is promoted;
+totals remain 46/86 packages, 199/387 modules and 228 incomplete units.

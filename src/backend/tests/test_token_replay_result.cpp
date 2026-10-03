@@ -245,6 +245,26 @@ void supplied_hidden_paths() {
   catch (const std::invalid_argument& error) { rejected = std::string(error.what()) == "null transition PLTR key"; }
   assert(rejected);
 }
+
+void cleaned_underfed_place_precedence() {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto source = net.add_place(), gate = net.add_place(), sink = net.add_place();
+  net.set_source(source); net.set_sink(sink);
+  net.add_transition(std::nullopt, {source}, {gate});
+  net.add_transition(0, {gate, gate}, {sink});
+  EventLog log;
+  log.traces = {trace("known", {event("A")})};
+  TokenReplayOptions policy;
+  policy.enable_pltr_fitness = true;
+  policy.cleaning_token_flood = true;
+  const auto result = replay_token_result(log, net, policy);
+  const auto& places = result.pltr_fitness->places;
+  assert(result.traces[0].cleaned_place_indices == std::vector<std::size_t>{gate});
+  assert(places[gate].missing == 1 && places[gate].remaining == 1);
+  assert(places[gate].underfed_traces.size() == 1);
+  assert(places[gate].overfed_traces.empty());
+}
 }  // namespace
 int main() {
   variants_and_keys();
@@ -252,5 +272,6 @@ int main() {
   rejection_and_transport();
   typed_variant_and_null_contracts();
   supplied_hidden_paths();
+  cleaned_underfed_place_precedence();
   std::cout << "full forward token replay result contracts passed\n";
 }
