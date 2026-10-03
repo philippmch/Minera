@@ -512,6 +512,77 @@ void pnml_document_export_preserves_xml_whitespace() {
   assert(restored.net.transitions()[1].outputs == std::vector<std::size_t>({3}));
 }
 
+void pnml_document_preserves_arc_occurrences() {
+  const auto document = parse_pnml_document(R"(<pnml><net id="parallel"><page id="page">
+    <place id="p0"><initialMarking><text>3</text></initialMarking></place>
+    <place id="p1"/><place id="p2"/><place id="p3"/>
+    <transition id="t0"><name><text>A</text></name></transition>
+    <transition id="t1"/>
+    <arc id="first&#10;&amp;" source="p0" target="t0"/>
+    <arc id="out1" source="t0" target="p1"><inscription><text>2</text></inscription></arc>
+    <arc id="second" source="p0" target="t0"><inscription><text>2</text></inscription></arc>
+    <arc id="inhibit" source="p2" target="t1"><type><text>inhibitor</text></type></arc>
+    <arc id="reset" source="p3" target="t1"><type><text>reset</text></type></arc>
+    <arc id="out2" source="t0" target="p1"/>
+    <arc source="t1" target="p3"/>
+  </page><finalmarkings><marking><place idref="p1"><text>3</text></place></marking></finalmarkings>
+  </net></pnml>)");
+  assert(document.arc_occurrences && document.arc_occurrences->size() == 7);
+  assert(document.net.transitions()[0].inputs == std::vector<std::size_t>({0, 0, 0}));
+  assert(document.net.transitions()[0].outputs == std::vector<std::size_t>({1, 1, 1}));
+  const auto graph = to_petri_net_presentation(document);
+  assert(graph.arcs.size() == 7 && graph.arcs[1].weight == 2 && graph.arcs[2].weight == 2);
+  assert(graph.transitions[0].label == "A" && !graph.transitions[1].label);
+  const auto xml = to_pnml(document);
+  assert(xml.find("id=\"first&#10;&amp;\"") != std::string::npos);
+  assert(xml.find("id=\"second\"") != std::string::npos);
+  const auto restored = parse_pnml_document(xml);
+  assert(restored.arc_occurrences && restored.arc_occurrences->size() == 7);
+  for (std::size_t a = 0; a < document.arc_occurrences->size(); ++a) {
+    const auto& before = (*document.arc_occurrences)[a];
+    const auto& after = (*restored.arc_occurrences)[a];
+    assert(before.place == after.place && before.transition == after.transition);
+    assert(before.input == after.input && before.type == after.type && before.weight == after.weight);
+    if (!before.id.empty()) assert(before.id == after.id);
+  }
+  TokenReplayOptions replay;
+  replay.initial_marking = {3, 0, 0, 0};
+  replay.final_marking = {0, 3, 0, 0};
+  const auto original_trace = replay_token_traces(log_of({{"A"}}), document.net, replay).front();
+  const auto restored_trace = replay_token_traces(log_of({{"A"}}), restored.net, replay).front();
+  assert(original_trace.missing == 0 && original_trace.reached_marking == std::vector<int>({0, 3, 0, 0}));
+  assert(restored_trace.reached_marking == original_trace.reached_marking);
+  assert(restored_trace.activated_transitions == original_trace.activated_transitions);
+
+  const auto rejects = [](const PnmlDocument& invalid) {
+    std::ostringstream out;
+    out << "unchanged";
+    bool rejected = false;
+    try { write_pnml(out, invalid); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected && out.str() == "unchanged");
+  };
+  auto invalid = document; invalid.arc_occurrences->pop_back(); rejects(invalid);
+  invalid = document; (*invalid.arc_occurrences)[0].weight = 0; rejects(invalid);
+  invalid = document; (*invalid.arc_occurrences)[0].weight = std::numeric_limits<std::size_t>::max(); rejects(invalid);
+  invalid = document; (*invalid.arc_occurrences)[0].place = 99; rejects(invalid);
+  invalid = document; (*invalid.arc_occurrences)[0].transition = 99; rejects(invalid);
+  invalid = document; (*invalid.arc_occurrences)[0].input = false; rejects(invalid);
+  invalid = document; (*invalid.arc_occurrences)[3].weight = 2; rejects(invalid);
+  invalid = document; (*invalid.arc_occurrences)[3].type = static_cast<PetriArcType>(99); rejects(invalid);
+  invalid = document; (*invalid.arc_occurrences)[3].id = "second"; rejects(invalid);
+  invalid = document; (*invalid.arc_occurrences)[3].id = "p0"; rejects(invalid);
+  invalid = document; invalid.net.add_transition(0, {0}, {1}); rejects(invalid);
+  invalid = document; invalid.arc_occurrences->clear(); rejects(invalid);
+  invalid.arc_occurrences.reset();
+  assert(!to_pnml(invalid).empty());
+
+  PnmlDocument empty;
+  empty.arc_occurrences.emplace();
+  assert(to_petri_net_presentation(empty).arcs.empty());
+  assert(to_pnml(empty) == to_pnml(PnmlDocument{}));
+}
+
 void pnml_document_export_rejects_atomically() {
   PnmlDocument valid;
   valid.net.add_place(); valid.net.add_place();
@@ -567,6 +638,7 @@ int main() {
   pnml_document_export_rejects_atomically();
   pnml_document_export_retains_routing_order();
   pnml_document_export_preserves_xml_whitespace();
+  pnml_document_preserves_arc_occurrences();
   equation_guard_and_workflow_topology();
   normal_alignment_smoke();
 }

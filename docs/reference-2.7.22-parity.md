@@ -8294,3 +8294,42 @@ source bytes. See `simplicity-parity-contract.md` and
 PNML/CLI/server retention of parallel arc occurrences, extended cyclomatic
 and broader evaluation/conformance gates remain open. No catalogue promotion:
 coverage remains 46/86 packages, 199/387 modules and 228 incomplete units.
+
+## Imported PNML simplicity arc occurrences (2026-10-03)
+
+Parent checkpoint: `d0da926e070586622891ae291efcc3f79c517f08`.
+Imported PNML documents now retain distinct arc objects, XML order, weights,
+types and IDs. The native document simplicity overload and imported CLI/server
+routes use these objects for arc-degree and Cardoso. Export/reimport retains
+them; stale metadata is checked against executable firing multiplicities/order
+and rejected atomically. Cyclomatic stays on executable reachability.
+
+Fresh pinned evidence contains 264 public imports and 1,320 public metric
+calls. Each native before/after probe makes 528 imports and 2,640 metric calls.
+The baseline has two scalar differences and loses one parallel inventory;
+the accepted probe matches all 2,640 scalars exactly and all 264 inventories,
+including weights/IDs/order across roundtrip. The parallel K=0 score changes
+from baseline 3/7 to public/accepted 1/3. Twelve accepted CLI runs and 14 real
+HTTP metric results pass, including nonfinite and exported-model controls.
+
+All five assertion-enabled Release suites pass on the bound 650-input source
+bundle. The accepted build reuses seven byte-verified binaries after a single
+test-only statement correction; all other 649 inputs are unchanged and all
+suites run again. The archive retains 1,686 exact files/1,721 verified chunk
+rows, both failed build/test attempts and the corrected helpers. One initial
+failed adapter's successful CLI process lacks retained PID/timestamps; exact
+argv/output and the limitation remain recorded. Separate native double and
+six-significant-digit/null wire comparisons are explicit. See
+`simplicity-parity-contract.md` and `simplicity-pnml-validation.json`.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `simplicity-pnml-checks.jsonl.gz` | `bd84b9c898c79133607c330d3efa53aa2834e045f0d3dd569490495310771180` | 69762434 |
+
+Extended cyclomatic reachability/parameters, composite evaluation and broader
+evaluation/conformance dependencies remain open. General PNML metadata,
+marking keys, malformed/extended-arc and additional carrier domains are outside
+these finite comparisons. Public PNML imports omit explicit zero-token keys
+that native documents preserve; public exporter byte/ID formatting is not
+claimed equivalent. The catalogue remains 46/86 packages, 199/387 modules and
+228 incomplete units. Full module/package parity is not established.

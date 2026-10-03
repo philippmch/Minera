@@ -1,5 +1,6 @@
 #include "minera/evaluation.hpp"
 #include "minera/log_conversion.hpp"
+#include "minera/pnml.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1647,6 +1648,22 @@ SimplicityResult evaluate_simplicity(const PetriNetPresentation& net,
     out.complexity = out.simplicity = out.value = double(total);
   }
   return out;
+}
+
+SimplicityResult evaluate_simplicity(const PnmlDocument& document,
+                                     SimplicityVariant variant,
+                                     const SimplicityOptions& options) {
+  if (variant == SimplicityVariant::EXTENDED_CYCLOMATIC)
+    return evaluate_simplicity(document.net, variant, options);
+  try {
+    return evaluate_simplicity(to_petri_net_presentation(document), variant, options);
+  } catch (const std::invalid_argument& error) {
+    SimplicityResult out;
+    out.variant = variant;
+    out.computed = false;
+    out.error = error.what();
+    return out;
+  }
 }
 
 SimplicityResult evaluate_simplicity(const ProcessTree& tree,

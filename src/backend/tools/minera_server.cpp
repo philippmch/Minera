@@ -5373,8 +5373,12 @@ void handle_evaluate(const httplib::Request& request,
             params.generalization_options);
         break;
       case minera::EvaluationFamily::kSimplicity:
-        result.simplicity = minera::evaluate_simplicity(
-            selected, params.simplicity_variant, params.simplicity_options);
+        result.simplicity = miner == "imported" && session->imported_document && !converted
+            ? minera::evaluate_simplicity(
+                  *session->imported_document, params.simplicity_variant,
+                  params.simplicity_options)
+            : minera::evaluate_simplicity(
+                  selected, params.simplicity_variant, params.simplicity_options);
         break;
       case minera::EvaluationFamily::kComposite:
         result.composite = minera::evaluate_composite(

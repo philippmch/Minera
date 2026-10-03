@@ -16,6 +16,8 @@
 
 namespace minera {
 
+struct PnmlDocument;
+
 // Native evaluation variants. Upper-case enumerators are retained for
 // compatibility with the public evaluator vocabulary.
 enum class ReplayFitnessVariant { AUTO, TOKEN_BASED, ALIGNMENT_BASED,
@@ -473,6 +475,13 @@ struct ModelEvaluation {
 // complexity requires the executable PetriNet overload and its reachability.
 [[nodiscard]] SimplicityResult evaluate_simplicity(
     const PetriNetPresentation&,
+    SimplicityVariant = SimplicityVariant::ARC_DEGREE,
+    const SimplicityOptions& = {});
+// Imported document graph metrics retain parallel arcs; cyclomatic complexity
+// uses document.net's executable behavior and the supplied marking options.
+// Stale arc metadata reports an uncomputed result for graph-only metrics.
+[[nodiscard]] SimplicityResult evaluate_simplicity(
+    const PnmlDocument&,
     SimplicityVariant = SimplicityVariant::ARC_DEGREE,
     const SimplicityOptions& = {});
 
