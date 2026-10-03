@@ -8333,3 +8333,48 @@ these finite comparisons. Public PNML imports omit explicit zero-token keys
 that native documents preserve; public exporter byte/ID formatting is not
 claimed equivalent. The catalogue remains 46/86 packages, 199/387 modules and
 228 incomplete units. Full module/package parity is not established.
+
+## Imported PNML composite structure and weight domains (2026-10-03)
+
+Parent checkpoint: `dbabb667be72f5c60365ed22fc4c0e4b3879ab2a`.
+Composite evaluation now accepts retained PNML documents across native carriers
+and imported CLI/server routes. Replay metrics keep executable multiplicities;
+the simplicity component uses the original arc occurrences. Complete stored
+markings are inherited unless explicit vectors override them. Negative,
+nonfinite and overflowed coefficient totals follow the observed normalization;
+zero totals parse and yield an explicit uncomputed result.
+
+Fresh pinned evidence contains 784 public imports and 784 parent composite
+calls: 688 successful results and 96 zero-total exceptions. Each actual native
+before/after probe makes 784 imports, 784 parses and 1,960 composite calls.
+The baseline parses 400 requests, matches 740 outcomes, leaves 720 valid aliases
+uncomputed and has 500 simplicity plus 320 aggregate scalar differences. The
+accepted probe parses all 784 requests and matches all 1,960 outcomes, including
+17,200 exact scalar comparisons and 240 projected zero-total errors. Public
+EventLog and DataFrame empty-trace semantics remain distinct; each lazy
+materialization occurs once and input/parameter snapshots remain unchanged.
+
+All 196 accepted CLI runs and 196 real HTTP evaluations match. All 228 recorded
+HTTP requests succeed, including empty CSV and nonfinite/null controls. Wire
+numbers retain existing six-significant-digit precision, while native doubles
+are verified exactly. The server is deliberately stopped after validation.
+All five assertion-enabled Release suites pass on the fresh 650-input build.
+The archive retains 2,827 exact files/2,864 verified chunk rows,
+tested binaries, process records and original failed helper derivations; failed
+metadata/probe/comparison attempts add no metric calls. Sixteen opaque reference
+module proofs match the pin with recorded newline normalization. See
+`simplicity-parity-contract.md` and `composite-pnml-validation.json`.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `composite-pnml-checks.jsonl.gz` | `e2914a4d7a7dc5ba5bfd6faf471c26ee3179250e47af6992b57bc53e4b04711e` | 74739515 |
+
+Extended cyclomatic reachability/parameters and broader evaluation/conformance
+dependencies remain open. Additional composite graph/log/marking, typed or
+nonnumeric parameter domains and exception-class/stack identity are outside
+these finite comparisons. General PNML metadata, marking keys,
+malformed/extended-arc and additional carrier domains remain open. Public PNML
+imports omit explicit zero-token keys that native documents preserve; public
+exporter byte/ID formatting and full application wire precision are not claimed
+equivalent. The catalogue remains 46/86 packages, 199/387 modules and
+228 incomplete units. Full module/package parity is not established.

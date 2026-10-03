@@ -304,7 +304,7 @@ double parse_finite_double(std::string_view value, std::string_view name) {
   return parsed;
 }
 
-double parse_arc_degree_k(std::string_view value, std::string_view name) {
+double parse_ieee_double(std::string_view value, std::string_view name) {
   std::string owned(value);
   char* end = nullptr;
   errno = 0;
@@ -1542,7 +1542,7 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
   }
   if (supplied("simplicity_arc_degree_k")) {
     params.simplicity_options.arc_degree_k =
-        parse_arc_degree_k(require("simplicity_arc_degree_k"),
+        parse_ieee_double(require("simplicity_arc_degree_k"),
                            "simplicity_arc_degree_k");
   }
   if (supplied("simplicity_max_states")) {
@@ -1563,11 +1563,7 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
   const auto parse_composite_weight = [&](std::string_view name,
                                           double& destination) {
     if (!supplied(name)) return;
-    destination = parse_finite_double(require(name), name);
-    if (destination < 0.0) {
-      throw std::invalid_argument(std::string(name) +
-                                  ": expected a non-negative number");
-    }
+    destination = parse_ieee_double(require(name), name);
   };
   parse_composite_weight("fitness_weight",
                          params.composite_options.fitness_weight);
@@ -1577,17 +1573,6 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
                          params.composite_options.simplicity_weight);
   parse_composite_weight("generalization_weight",
                          params.composite_options.generalization_weight);
-  if (supplied("fitness_weight") || supplied("precision_weight") ||
-      supplied("simplicity_weight") || supplied("generalization_weight")) {
-    const double total = params.composite_options.fitness_weight +
-                         params.composite_options.precision_weight +
-                         params.composite_options.simplicity_weight +
-                         params.composite_options.generalization_weight;
-    if (!std::isfinite(total) || total <= 0.0) {
-      throw std::invalid_argument(
-          "composite weights must have a positive total");
-    }
-  }
   return params;
 }
 

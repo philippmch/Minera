@@ -3152,9 +3152,9 @@ void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
     assert(threw);
   }
 
-  for (const auto& item : {std::pair{"fitness_weight", "-1"},
-                           std::pair{"precision_weight", "nan"},
-                           std::pair{"simplicity_weight", "inf"}}) {
+  for (const auto& item : {std::pair{"fitness_weight", "1tail"},
+                           std::pair{"precision_weight", "not-a-number"},
+                           std::pair{"simplicity_weight", "1e999"}}) {
     bool threw = false;
     try {
       (void)minera::parse_evaluation_params(fields({item}));
@@ -3163,16 +3163,26 @@ void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
     }
     assert(threw);
   }
-  bool zero_weights_threw = false;
-  try {
-    (void)minera::parse_evaluation_params(fields({
+  const auto zero_weights = minera::parse_evaluation_params(fields({
         {"evaluation_family", "composite"}, {"fitness_weight", "0"},
         {"precision_weight", "0"}, {"simplicity_weight", "0"},
         {"generalization_weight", "0"}}));
-  } catch (const std::invalid_argument&) {
-    zero_weights_threw = true;
-  }
-  assert(zero_weights_threw);
+  assert(zero_weights.composite_options.fitness_weight == 0.0 &&
+         zero_weights.composite_options.precision_weight == 0.0 &&
+         zero_weights.composite_options.simplicity_weight == 0.0 &&
+         zero_weights.composite_options.generalization_weight == 0.0);
+  const auto signed_weights = minera::parse_evaluation_params(fields({
+      {"fitness_weight", "-1"}, {"precision_weight", "-1"},
+      {"simplicity_weight", "-1"}, {"generalization_weight", "-1"}}));
+  assert(signed_weights.composite_options.fitness_weight == -1.0 &&
+         signed_weights.composite_options.simplicity_weight == -1.0);
+  const auto nonfinite_weights = minera::parse_evaluation_params(fields({
+      {"fitness_weight", "nan"}, {"precision_weight", "inf"},
+      {"simplicity_weight", "-Infinity"}, {"generalization_weight", "-0"}}));
+  assert(std::isnan(nonfinite_weights.composite_options.fitness_weight));
+  assert(nonfinite_weights.composite_options.precision_weight == std::numeric_limits<double>::infinity());
+  assert(nonfinite_weights.composite_options.simplicity_weight == -std::numeric_limits<double>::infinity());
+  assert(std::signbit(nonfinite_weights.composite_options.generalization_weight));
 
   for (const auto& field_name : {"evaluation_family",
                                  "evaluation_activity_attribute",
@@ -3181,7 +3191,9 @@ void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
                                  "evaluation_token_replay_variant",
                                  "precision_use_task_ids",
                                  "simplicity_initial_marking",
-                                 "simplicity_arc_degree_k"}) {
+                                 "simplicity_arc_degree_k", "fitness_weight",
+                                 "precision_weight", "simplicity_weight",
+                                 "generalization_weight"}) {
     const std::map<std::string, std::string> explicit_empty = {
         {field_name, ""}};
     const auto lookup = [&explicit_empty](std::string_view key) -> std::string {

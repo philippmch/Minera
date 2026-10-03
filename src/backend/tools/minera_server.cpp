@@ -5381,8 +5381,11 @@ void handle_evaluate(const httplib::Request& request,
                   selected, params.simplicity_variant, params.simplicity_options);
         break;
       case minera::EvaluationFamily::kComposite:
-        result.composite = minera::evaluate_composite(
-            *evaluation_log, selected, params.composite_options);
+        result.composite = miner == "imported" && session->imported_document && !converted
+            ? minera::evaluate_composite(
+                  *evaluation_log, *session->imported_document, params.composite_options)
+            : minera::evaluate_composite(
+                  *evaluation_log, selected, params.composite_options);
         break;
     }
     response.set_content(
