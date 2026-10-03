@@ -13,6 +13,7 @@
 #include "minera/petri_net.hpp"
 #include "minera/process_tree.hpp"
 #include "minera/root_cause.hpp"
+#include "minera/token_integer.hpp"
 
 namespace minera {
 
@@ -28,10 +29,10 @@ struct VariantConformance {
 
 // Per-place counters include the final-marking check.
 struct TokenReplayPlaceDiagnostics {
-  std::uint64_t missing = 0;
-  std::uint64_t remaining = 0;
-  std::uint64_t consumed = 0;
-  std::uint64_t produced = 0;
+  TokenInteger missing = 0;
+  TokenInteger remaining = 0;
+  TokenInteger consumed = 0;
+  TokenInteger produced = 0;
 };
 
 // Transitions examined for one source event. Silent pre-event routing precedes
@@ -47,10 +48,10 @@ struct TokenReplayTraceDiagnostics {
   std::string case_id;
   bool trace_is_fit = true;
   double trace_fitness = 1.0;
-  std::uint64_t produced = 0;
-  std::uint64_t consumed = 0;
-  std::uint64_t missing = 0;
-  std::uint64_t remaining = 0;
+  TokenInteger produced = 0;
+  TokenInteger consumed = 0;
+  TokenInteger missing = 0;
+  TokenInteger remaining = 0;
   std::vector<std::size_t> activated_transitions;
   // Weak-fired visible transitions, or the blocked transition when forward
   // immediate-stop prevents firing. Repeated problems retain replay order.
@@ -60,7 +61,7 @@ struct TokenReplayTraceDiagnostics {
   std::vector<std::string> unknown_activities;
   std::vector<bool> unknown_activity_is_null;
   // State after optional final routing, before final tokens are consumed.
-  std::vector<int> reached_marking;
+  TokenMarking reached_marking;
   std::vector<TokenReplayPlaceDiagnostics> places;
   bool replay_stopped = false;
   // Examined events, including an event that causes immediate stopping.
@@ -158,10 +159,10 @@ struct ConformanceResult {
   std::uint64_t trace_count = 0;
 
   // Aggregate token-replay bookkeeping, summed over all traces.
-  std::uint64_t produced = 0;
-  std::uint64_t consumed = 0;
-  std::uint64_t missing = 0;
-  std::uint64_t remaining = 0;
+  TokenInteger produced = 0;
+  TokenInteger consumed = 0;
+  TokenInteger missing = 0;
+  TokenInteger remaining = 0;
   std::vector<std::uint64_t> transition_frequencies;
 
   std::vector<VariantConformance> variants;  // worst-fitting first
@@ -231,6 +232,10 @@ struct TokenReplayOptions {
   // Forward pre-event routing policy. The public exhaustive mode limits
   // recursive dependency exploration to the outer invocation.
   bool exhaustive_invisible_exploration = false;
+  // Optional exact markings take precedence over the legacy integer vectors.
+  // Dimensions, non-negative input counts and membership validation are shared.
+  std::optional<TokenMarking> exact_initial_marking;
+  std::optional<TokenMarking> exact_final_marking;
 };
 
 [[nodiscard]] std::vector<TokenReplayTransitionRootCauseDiagnostics>

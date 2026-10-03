@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "minera/petri_net.hpp"
+#include "minera/token_integer.hpp"
 
 namespace minera {
 
@@ -299,10 +300,10 @@ struct OcpnDiscoveryOptions {
 };
 
 struct OcpnTokenReplayPlaceDiagnostics {
-  std::uint64_t missing = 0;
-  std::uint64_t remaining = 0;
-  std::uint64_t consumed = 0;
-  std::uint64_t produced = 0;
+  TokenInteger missing = 0;
+  TokenInteger remaining = 0;
+  TokenInteger consumed = 0;
+  TokenInteger produced = 0;
 };
 
 struct OcpnTokenReplayDiagnostics {

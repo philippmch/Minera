@@ -75,14 +75,16 @@ Marking resolve_workflow_marking(const PetriNet& net,
   return requested;
 }
 
-bool marking_covers(const Marking& marking, const Marking& target) {
+template <class MarkingType>
+bool marking_covers(const MarkingType& marking, const MarkingType& target) {
   for (std::size_t place = 0; place < marking.size(); ++place) {
     if (marking[place] < target[place]) return false;
   }
   return true;
 }
 
-bool marking_has_final_places(const Marking& marking, const Marking& target) {
+template <class MarkingType>
+bool marking_has_final_places(const MarkingType& marking, const MarkingType& target) {
   for (std::size_t place = 0; place < marking.size(); ++place) {
     if (target[place] > 0 && marking[place] <= 0) return false;
   }
@@ -141,6 +143,10 @@ bool valid_alignment_cost_profile(AlignmentCostProfile profile) {
 // Holds the net plus the lookups token replay needs and drives both the
 // fitness and precision passes over a single shared translation.
 class Replayer {
+ public:
+  using Marking = TokenMarking;
+  using MarkingHash = TokenMarkingHash;
+ private:
   struct ForwardConfiguration {
     detail::ReplayMarkingKeys initial_keys;
     detail::ReplayMarkingKeys final_keys;
@@ -149,12 +155,16 @@ class Replayer {
     detail::CleaningComponents components;
   };
  public:
-  explicit Replayer(const PetriNet& net, const Marking& initial = {},
-                    const Marking& final = {},
+  explicit Replayer(const PetriNet& net, const std::vector<int>& initial = {},
+                    const std::vector<int>& final = {},
                     const TokenReplayOptions* replay_options = nullptr)
       : net_(net),
-        initial_(resolve_workflow_marking(net, initial, true)),
-        final_(resolve_workflow_marking(net, final, false)) {
+        initial_(replay_options && replay_options->exact_initial_marking
+          ? resolve_exact_marking(net, *replay_options->exact_initial_marking, true)
+          : Marking(resolve_workflow_marking(net, initial, true))),
+        final_(replay_options && replay_options->exact_final_marking
+          ? resolve_exact_marking(net, *replay_options->exact_final_marking, false)
+          : Marking(resolve_workflow_marking(net, final, false))) {
     for (std::size_t i = 0; i < net_.activities().size(); ++i) {
       name_to_activity_.emplace(net_.activities()[i], i);
     }
@@ -181,11 +191,11 @@ class Replayer {
 
   // Token-replay bookkeeping for one trace.
   struct Counts {
-    std::uint64_t produced = 0;
-    std::uint64_t consumed = 0;
-    std::uint64_t missing = 0;
-    std::uint64_t remaining = 0;
-    std::uint64_t missing_before_final_check = 0;
+    TokenInteger produced = 0;
+    TokenInteger consumed = 0;
+    TokenInteger missing = 0;
+    TokenInteger remaining = 0;
+    TokenInteger missing_before_final_check = 0;
     bool has_unknown_activity = false;
     bool forward_replay = false;
     std::vector<TokenReplayPlaceDiagnostics> places;
@@ -197,7 +207,7 @@ class Replayer {
     }
 
     [[nodiscard]] double fitness() const {
-      if (forward_replay && (consumed == 0 || produced == 0)) return 1.0;
+      if (forward_replay && (consumed <= 0 || produced <= 0)) return 1.0;
       if (!forward_replay && (consumed == 0 || produced == 0)) {
         throw std::domain_error(
             "backwards token-replay fitness is undefined when consumed or "
@@ -232,12 +242,12 @@ class Replayer {
     counts.forward_replay = true;
     counts.places.resize(net_.place_count());
     for (std::size_t place = 0; place < initial_.size(); ++place) {
-      const auto tokens = static_cast<std::uint64_t>(initial_[place]);
+      const auto tokens = TokenInteger(initial_[place]);
       counts.produced += tokens;
       counts.places[place].produced += tokens;
     }
     const auto emit = [&](std::size_t transition, bool event) {
-      forward_fire(marking, keys, transition, counts);
+      if (!forward_fire(marking, keys, transition, counts)) return;
       if (executions) ++(*executions)[transition];
       if (diagnostics) {
         diagnostics->activated_transitions.push_back(transition);
@@ -335,19 +345,21 @@ class Replayer {
       diagnostics->reached_marking_keys = keys;
     }
     for (std::size_t place = 0; place < marking.size(); ++place) {
-      const auto required = static_cast<std::uint64_t>(final_[place]);
+      const auto required = TokenInteger(final_[place]);
       counts.consumed += required;
       counts.places[place].consumed += required;
-      if (marking[place] >= final_[place]) {
-        marking[place] -= final_[place];
-      } else {
-        const auto missing = static_cast<std::uint64_t>(final_[place] - marking[place]);
-        counts.missing += missing;
-        counts.places[place].missing += missing;
-        marking[place] = 0;
+      if (final_keys[place]) {
+        if (marking[place] >= final_[place]) {
+          marking[place] -= final_[place];
+        } else {
+          const auto missing = TokenInteger(final_[place] - marking[place]);
+          counts.missing += missing;
+          counts.places[place].missing += missing;
+          marking[place] = 0;
+        }
       }
-      if (marking[place] > 0) {
-        const auto tokens = static_cast<std::uint64_t>(marking[place]);
+      if (marking[place] != 0) {
+        const auto tokens = TokenInteger(marking[place]);
         counts.remaining += tokens;
         counts.places[place].remaining += tokens;
       }
@@ -375,7 +387,7 @@ class Replayer {
     auto& counts = outcome.counts;
     counts.places.resize(net_.place_count());
     for (std::size_t place = 0; place < initial_.size(); ++place) {
-      const auto tokens = static_cast<std::uint64_t>(initial_[place]);
+      const auto tokens = TokenInteger(initial_[place]);
       counts.produced += tokens;
       counts.places[place].produced += tokens;
     }
@@ -457,18 +469,18 @@ class Replayer {
     // Compare the exact requested final marking, with no end routing in the
     // legacy variation.
     for (std::size_t p = 0; p < marking.size(); ++p) {
-      const int target = final_[p];
+      const auto& target = final_[p];
       if (target > 0 && marking[p] > 0) {
-        const auto available = static_cast<std::uint64_t>(marking[p]);
+        const auto available = TokenInteger(marking[p]);
         counts.consumed += available;
         counts.places[p].consumed += available;
       }
       if (marking[p] > target) {
-        const auto value = static_cast<std::uint64_t>(marking[p] - target);
+        const auto value = TokenInteger(marking[p] - target);
         counts.remaining += value;
         counts.places[p].remaining += value;
       } else if (marking[p] < target) {
-        const auto value = static_cast<std::uint64_t>(target - marking[p]);
+        const auto value = TokenInteger(target - marking[p]);
         counts.missing += value;
         counts.places[p].missing += value;
       }
@@ -508,7 +520,7 @@ class Replayer {
     for (std::size_t place = 0; place < marking.size(); ++place) {
       marking[place] -= final_[place];
     }
-    for (const int tokens : marking) {
+    for (const auto& tokens : marking) {
       if (tokens > 0) return std::nullopt;
     }
     steps.push_back(finish.fired);
@@ -698,6 +710,25 @@ class Replayer {
   }
 
  private:
+  static Marking resolve_exact_marking(const PetriNet& net, const Marking& requested, bool initial) {
+    if (requested.empty()) return Marking(resolve_workflow_marking(net, {}, initial));
+    if (requested.size() != net.place_count()) throw std::invalid_argument("exact marking dimension does not match net");
+    if (std::any_of(requested.begin(), requested.end(), [](const auto& count) { return count < 0; }))
+      throw std::invalid_argument("exact input marking contains a negative token count");
+    return requested;
+  }
+  static TokenInteger arc_tokens(PetriArcWeight weight) {
+    TokenInteger result(weight.magnitude); return weight.negative ? -result : result;
+  }
+  static Marking input_requirements(const PetriTransition& transition, std::size_t places) {
+    Marking result(places, 0);
+    for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
+      const auto place = transition.inputs[index];
+      if (place >= places) throw std::invalid_argument("token replay arc place is outside marking");
+      result[place] += arc_tokens(transition.input_arc_weight(index));
+    }
+    return result;
+  }
   ForwardConfiguration prepare_forward(const TokenReplayOptions& options) const {
     ForwardConfiguration result;
     result.initial_keys = detail::resolve_replay_marking_keys(options.initial_marking_keys, initial_, "initial_marking_keys");
@@ -709,30 +740,43 @@ class Replayer {
     return result;
   }
 
-  void forward_fire(Marking& marking, detail::ReplayMarkingKeys& keys,
+  bool forward_fire(Marking& marking, detail::ReplayMarkingKeys& keys,
                     std::size_t transition, Counts& counts) const {
-    Marking required(marking.size(), 0);
-    for (const auto place : net_.transitions()[transition].inputs) {
-      if (required[place] == std::numeric_limits<int>::max())
-        throw std::overflow_error("token replay input multiplicity exceeds signed range");
-      ++required[place];
-    }
+    counts.forward_replay = true;
+    const auto& fired = net_.transitions()[transition];
+    const auto required = input_requirements(fired, marking.size());
+    std::vector<bool> input_places(marking.size(), false);
+    for (const auto place : fired.inputs) input_places[place] = true;
     for (std::size_t place = 0; place < marking.size(); ++place) {
+      if (!input_places[place]) continue;
       if (marking[place] >= required[place]) continue;
-      const auto missing = static_cast<std::uint64_t>(required[place] - marking[place]);
+      const auto missing = TokenInteger(required[place] - marking[place]);
       counts.missing += missing;
       counts.places[place].missing += missing;
       // Public forward repair adds the full input weight before consumption,
       // retaining any partially available tokens after the firing.
-      if (required[place] > std::numeric_limits<int>::max() - marking[place])
-        throw std::overflow_error("token replay marking exceeds signed range");
       marking[place] += required[place];
+      keys[place] = true;
+    }
+    // Signed input state can remain below its required weight even after the
+    // public full-weight repair. Bookkeeping records the attempted transition,
+    // but activation and token movement occur only when repair enables it.
+    if (!enabled(marking, transition)) {
+      for (std::size_t index = 0; index < fired.inputs.size(); ++index) {
+        const auto weight = arc_tokens(fired.input_arc_weight(index));
+        counts.consumed += weight; counts.places[fired.inputs[index]].consumed += weight;
+      }
+      for (std::size_t index = 0; index < fired.outputs.size(); ++index) {
+        const auto weight = arc_tokens(fired.output_arc_weight(index));
+        counts.produced += weight; counts.places[fired.outputs[index]].produced += weight;
+      }
+      return false;
     }
     fire(marking, transition, counts);
-    const auto& fired = net_.transitions()[transition];
     for (const auto place : fired.inputs) keys[place] = marking[place] != 0;
     for (const auto place : fired.reset_inputs) keys[place] = marking[place] != 0;
-    for (const auto place : fired.outputs) keys[place] = marking[place] != 0;
+    for (const auto place : fired.outputs) keys[place] = true;
+    return true;
   }
 
   template <class Emit>
@@ -742,12 +786,7 @@ class Replayer {
                             bool exhaustive,
                             const Emit& emit) const {
     const auto required = [&](std::size_t selected) {
-      Marking needed(marking.size(), 0);
-      for (const auto place : net_.transitions()[selected].inputs) {
-        if (needed[place] == std::numeric_limits<int>::max())
-          throw std::overflow_error("token replay input multiplicity exceeds signed range");
-        ++needed[place];
-      }
+      auto needed = input_requirements(net_.transitions()[selected], marking.size());
       for (std::size_t place = 0; place < needed.size(); ++place)
         if (marking[place] >= needed[place]) needed[place] = 0;
       return detail::resolve_replay_marking_keys({}, needed, "required");
@@ -791,9 +830,9 @@ class Replayer {
   // forward diagnostics path also retains incomplete routing and cleaning.
   struct Step {
     Marking marking;
-    std::uint64_t produced = 0;
-    std::uint64_t consumed = 0;
-    std::uint64_t missing = 0;
+    TokenInteger produced = 0;
+    TokenInteger consumed = 0;
+    TokenInteger missing = 0;
     std::vector<TokenReplayPlaceDiagnostics> places;
     std::vector<std::size_t> fired;  // transitions fired, silent routing included
   };
@@ -852,7 +891,7 @@ class Replayer {
   void build_place_closure() {
     for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
       const auto& transition = net_.transitions()[t];
-      const bool ok = !transition.has_extended_arcs() &&
+      const bool ok = !transition.has_extended_arcs() && !transition.has_compact_ordinary_arcs() &&
                       (transition.silent()
                           ? transition.inputs.size() == 1 &&
                                 transition.outputs.size() == 1
@@ -930,14 +969,28 @@ class Replayer {
 
   [[nodiscard]] bool relaxed_enables(const std::vector<char>& reachable,
                                      std::size_t t) const {
-    for (const std::size_t place : net_.transitions()[t].inputs) {
-      if (!reachable[place]) return false;
+    const auto& transition = net_.transitions()[t];
+    for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
+      if (arc_tokens(transition.input_arc_weight(index)) <= 0) continue;
+      if (!reachable[transition.inputs[index]]) return false;
     }
     return true;
   }
 
   [[nodiscard]] bool enabled(const Marking& marking, std::size_t t) const {
-    return petri_transition_enabled(net_.transitions()[t], marking);
+    const auto& transition = net_.transitions()[t];
+    if (transition.has_compact_ordinary_arcs()) {
+      for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
+        const auto place = transition.inputs[index];
+        if (place >= marking.size() || marking[place] < arc_tokens(transition.input_arc_weight(index))) return false;
+      }
+    } else {
+      const auto required = input_requirements(transition, marking.size());
+      for (const auto place : transition.inputs) if (marking[place] < required[place]) return false;
+    }
+    for (const auto place : transition.inhibitor_inputs)
+      if (place >= marking.size() || marking[place] != 0) return false;
+    return true;
   }
 
   [[nodiscard]] bool any_enabled(const Marking& marking,
@@ -958,30 +1011,30 @@ class Replayer {
     if (counts.places.size() < marking.size())
       counts.places.resize(marking.size());
     const auto& transition = net_.transitions()[t];
-    for (const std::size_t place : transition.inputs) {
-      if (marking[place] > 0) {
-        --marking[place];
-      } else {
-        ++counts.missing;  // token had to be created to fire
-        ++counts.places[place].missing;
+    for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
+      const auto place = transition.inputs[index];
+      const auto weight = arc_tokens(transition.input_arc_weight(index));
+      if (counts.forward_replay || marking[place] >= weight) marking[place] -= weight;
+      else {
+        const auto missing = weight - marking[place];
+        counts.missing += missing; counts.places[place].missing += missing;
+        marking[place] = 0;
       }
-      ++counts.consumed;
-      ++counts.places[place].consumed;
+      counts.consumed += weight; counts.places[place].consumed += weight;
     }
     for (const std::size_t place : transition.reset_inputs) {
       if (marking[place] > 0) {
-        const auto value = static_cast<std::uint64_t>(marking[place]);
+        const auto value = TokenInteger(marking[place]);
         counts.consumed += value;
         counts.places[place].consumed += value;
         marking[place] = 0;
       }
     }
-    for (const std::size_t place : transition.outputs) {
-      if (marking[place] == std::numeric_limits<int>::max())
-        throw std::overflow_error("token replay marking exceeds signed range");
-      ++marking[place];
-      ++counts.produced;
-      ++counts.places[place].produced;
+    for (std::size_t index = 0; index < transition.outputs.size(); ++index) {
+      const auto place = transition.outputs[index];
+      const auto weight = arc_tokens(transition.output_arc_weight(index));
+      marking[place] += weight;
+      counts.produced += weight; counts.places[place].produced += weight;
     }
   }
 
@@ -1059,7 +1112,8 @@ class Replayer {
     const auto& target = net_.transitions()[visible];
     if (target.has_extended_arcs()) return std::nullopt;
     Marking required(marking.size(), 0);
-    for (const std::size_t p : target.inputs) ++required[p];
+    for (std::size_t index = 0; index < target.inputs.size(); ++index)
+      required[target.inputs[index]] += arc_tokens(target.input_arc_weight(index));
     const auto covers = [](const Marking& have, const Marking& need) {
       for (std::size_t p = 0; p < have.size(); ++p) {
         if (have[p] < need[p]) return false;
@@ -1101,7 +1155,8 @@ class Replayer {
         if (transition.has_extended_arcs()) continue;
         bool output_covers = true;
         Marking output_count(marking.size(), 0);
-        for (const std::size_t p : transition.outputs) ++output_count[p];
+        for (std::size_t index = 0; index < transition.outputs.size(); ++index)
+          output_count[transition.outputs[index]] += arc_tokens(transition.output_arc_weight(index));
         for (std::size_t p = 0; p < current.size(); ++p) {
           if (output_count[p] < current[p]) {
             output_covers = false;
@@ -1121,7 +1176,8 @@ class Replayer {
             predecessor[p] -= output_count[p];
           }
         }
-        for (const std::size_t p : transition.inputs) ++predecessor[p];
+        for (std::size_t index = 0; index < transition.inputs.size(); ++index)
+          predecessor[transition.inputs[index]] += arc_tokens(transition.input_arc_weight(index));
         if (!seen.insert(predecessor).second) continue;
         arena.push_back(Visited{predecessor, s, index});
         const std::size_t found = arena.size() - 1;
@@ -1413,6 +1469,8 @@ double compute_precision(const std::vector<Variant>& variants,
                          TokenReplayVariant replay_variant,
                          bool stop_immediately_unfit,
                          bool walk_through_hidden_transitions) {
+  using Marking = TokenMarking;
+  using MarkingHash = TokenMarkingHash;
   // Prefix automaton as a trie: each node is a distinct prefix and records how
   // many traces pass through it and which activities they go on to take.
   // Activities absent from the model all collapse onto one edge key, matching

@@ -103,7 +103,8 @@ void consistent(const EventLog& log, const PetriNet& net, TokenReplayOptions opt
   const auto aggregate = check_conformance(log, net, options);
   const auto places = replay_token_diagnostics(log, net, options);
   assert(!aggregate.trace_diagnostics);
-  std::uint64_t produced = 0, consumed = 0, missing = 0, remaining = 0, fitting = 0;
+  minera::TokenInteger produced = 0, consumed = 0, missing = 0, remaining = 0;
+  std::uint64_t fitting = 0;
   std::vector<std::uint64_t> fired(net.transitions().size());
   std::vector<TokenReplayPlaceDiagnostics> totals(net.place_count());
   for (const auto& row : rows) {
@@ -2036,7 +2037,12 @@ void supplied_marking_firing_overflow() {
   TokenReplayOptions replay;
   replay.initial_marking = initial;
   replay.final_marking = {0, 0};
-  rejects_overflow([&] { (void)replay_token_traces(log_of({{"a"}}), net, replay); });
+  const auto exact_replay = replay_token_traces(log_of({{"a"}}), net, replay);
+  assert(exact_replay.size() == 1);
+  const TokenInteger wide = TokenInteger(std::numeric_limits<int>::max()) + 1;
+  assert(exact_replay[0].reached_marking == TokenMarking({wide, 0}));
+  assert(exact_replay[0].produced == wide + 1 && exact_replay[0].consumed == 1);
+  assert(exact_replay[0].missing == 0 && exact_replay[0].remaining == wide);
   AlignmentOptions alignment;
   alignment.initial_marking = initial;
   alignment.final_marking = {0, 0};

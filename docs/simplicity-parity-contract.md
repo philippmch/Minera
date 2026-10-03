@@ -854,3 +854,13 @@ namespace combinations, exporter formatting and metadata, empty place IDs,
 foreign IDs/keys, set/order dependence and broader markings remain unverified.
 The catalogue stays at 46/86 packages, 199/387 modules and 228 incomplete units.
 No package/module promotion or full parity is claimed.
+
+## Weighted forward replay follow-up
+
+The separate signed ordinary-weight forward replay correction now matches all
+1098 supported public trace outcomes and 1544 measured place counter fields.
+Its declared scope, exact source/binary provenance and remaining carrier/method
+gates are recorded in [token-replay-parity-contract.md](token-replay-parity-contract.md)
+and [weighted-token-replay-validation.json](weighted-token-replay-validation.json).
+Weighted aggregate/composite conformance remains gated; the catalogue is unchanged
+at 46/86 packages, 199/387 modules and 228 incomplete units.

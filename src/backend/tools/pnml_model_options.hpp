@@ -98,8 +98,19 @@ inline PnmlImportOptions pnml_model_import_options() {
 
 [[nodiscard]] inline TokenReplayOptions pnml_replay_options(
     const PnmlDocument& document, TokenReplayOptions base = {}) {
-  base.initial_marking = pnml_marking<int>(document.initial_marking);
-  base.final_marking = pnml_marking<int>(document.final_marking);
+  base.exact_initial_marking = TokenMarking(document.initial_marking);
+  base.exact_final_marking = TokenMarking(document.final_marking);
+  // Keep legacy vectors available to callers for representable PNML inputs.
+  // Exact vectors carry larger counts directly into replay.
+  const auto fits_legacy = [](const auto& marking) {
+    return std::all_of(marking.begin(), marking.end(), [](const auto value) {
+      return value >= 0 && value <= std::numeric_limits<int>::max();
+    });
+  };
+  base.initial_marking = fits_legacy(document.initial_marking)
+      ? pnml_marking<int>(document.initial_marking) : std::vector<int>{};
+  base.final_marking = fits_legacy(document.final_marking)
+      ? pnml_marking<int>(document.final_marking) : std::vector<int>{};
   base.initial_marking_keys = document.initial_marking_keys;
   base.final_marking_keys = document.final_marking_keys;
   base.place_names = document.place_ids;
@@ -122,6 +133,7 @@ inline PnmlImportOptions pnml_model_import_options() {
   if (document) base = pnml_replay_options(*document, std::move(base));
   if (!initial_marking.empty()) {
     base.initial_marking.clear();
+    base.exact_initial_marking.reset();
     base.initial_marking.reserve(initial_marking.size());
     for (const auto tokens : initial_marking) {
       if (tokens > static_cast<std::uint32_t>(std::numeric_limits<int>::max()))
