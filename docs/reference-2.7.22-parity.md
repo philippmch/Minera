@@ -9394,3 +9394,43 @@ legacy bounded precomputed aliases, Python result-carrier/parameter domains,
 composite/precision/application conformance and exact frontend presentation.
 Catalogue totals remain 46/86 packages, 199/387 modules and 228 incomplete
 units. No catalogue promotion or full parity claim is made.
+
+### Exact log-based fitness through C++, CLI and HTTP
+
+Token fitness now replays grouped logs and aggregates exact signed token
+counts. Native exact markings preserve sparse zero keys and signed
+initial/final counts. The PNML overload supplies document markings and IDs;
+the PNML parser retains its separate nonnegative int64 marking limit.
+Per-trace and aggregate rounding remain distinct as observed near 2^53.
+The standalone CLI and cold multipart HTTP endpoint emit all four public
+fields with integer/float carriers and exact float hex. Fitness-only details
+leave precision, generalization and simplicity null. The frontend transports
+the forward cleaning control.
+
+3264 fresh pinned fitness calls, 90 marked-model full replay calls and 88
+imports are retained. Native replay makes 3264 fitness and 90 marked replay
+calls. All 4584 whole public comparisons in the declared native domain and
+all 86 successful marked trace projections match, alongside the expected
+errors. All 1632 native carrier pairs and 1632 public route pairs agree.
+1632 actual CLI processes and 1632 HTTP requests make 4460 matching whole
+public comparisons in the declared wire domain. Every CLI/HTTP pair and
+native wire outcome agrees; 70 PNML carrier-error checks remain separate.
+
+The final 660-source freeze changes 16 inputs and produces 155 linked
+production/test artifacts. All 152 assertion-enabled Release suites pass,
+as do TypeScript and 87 targeted frontend tests. Failed frontend/native/
+diagnostic comparisons and both C1001 compiler failures are preserved with
+derived corrections and unchanged-source compiler continuations. This is a
+source/build/process/archive self-review, without independent-review or
+pre-public-oracle claims. All 11185 files round-trip across 18
+archives; [weighted-fitness-apply-validation.json](weighted-fitness-apply-validation.json)
+contains the bindings and counts.
+
+The broader original automatic-choice cohort remains open: 312 whole
+dictionary differences are retained for each native and wire comparison,
+outside the earlier fixed-cache proof. The raw PNML initial-zero-key mismatch
+for path model 5 and signed/above-int64 marking transport also remain open.
+AUTO, composite/precision/application conformance, precomputed aliases and
+broader Python carrier/parameter acceptance are separate gates. Catalogue
+totals remain 46/86 packages, 199/387 modules and 228 incomplete units. No
+catalogue promotion or full parity claim is made.

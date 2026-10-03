@@ -61,6 +61,8 @@ struct ReplayFitnessResult {
   // The exact token-result aggregate retains the public evaluator's integer
   // zero when either aggregate denominator is nonpositive or input is empty.
   bool log_fitness_is_integer_zero = false;
+  // Fitness-only replay does not evaluate the bundle's other quality scores.
+  bool token_result_is_fitness_only = false;
 };
 
 // Evaluator-only replay controls. Alignment evaluation uses standard move
@@ -86,6 +88,15 @@ struct ReplayFitnessOptions {
   // Optional hard cap for grouped or flat input materialization. Exceeding it
   // is a deterministic length error rather than silent truncation.
   std::optional<std::size_t> max_rows_to_materialize;
+  bool cleaning_token_flood = false;
+  // Exact forward token markings override the legacy vectors. Sparse key
+  // membership retains explicit zero entries; names identify supplied models.
+  std::optional<TokenMarking> exact_initial_marking;
+  std::optional<TokenMarking> exact_final_marking;
+  std::vector<bool> initial_marking_keys;
+  std::vector<bool> final_marking_keys;
+  std::vector<std::string> place_names;
+  std::vector<std::string> transition_names;
 };
 
 struct PrecisionResult {
@@ -313,6 +324,10 @@ struct ModelEvaluation {
 [[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
     const EventLog&, const ProcessTree&, ReplayFitnessVariant,
     const ReplayFitnessOptions&);
+[[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
+    const EventLog&, const PnmlDocument&,
+    ReplayFitnessVariant = ReplayFitnessVariant::TOKEN_BASED,
+    const ReplayFitnessOptions& = {});
 
 // Flat event-data adapters. EventStream, EventTable, LazyEventTable, and the
 // tagged EventDataView all preserve the grouped EventLog contract after

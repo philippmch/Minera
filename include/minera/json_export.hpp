@@ -95,6 +95,9 @@ namespace minera {
 // Tagged object codec preserves tuple/list/set, object dictionary keys, exact
 // integers, declared floats and source/generated Trace references in JSON.
 [[nodiscard]] std::string token_replay_result_json(const TokenReplayResult& result);
+// Exact four-field public token-fitness projection, including float hex and
+// the integer-zero log fitness of empty/nonpositive aggregate denominators.
+[[nodiscard]] std::string token_replay_fitness_result_json(const ReplayFitnessResult& result);
 
 // Serializes an analysis (the imported event log plus its discovered
 // directly-follows graph) into the JSON document consumed by the frontend.

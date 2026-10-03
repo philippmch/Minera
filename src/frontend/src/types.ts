@@ -4956,6 +4956,7 @@ export interface EvaluationOptions {
   evaluation_token_replay_variant?: EvaluationTokenReplayVariant;
   /** Applies to forward token replay; the backwards variation ignores unknown labels. */
   fitness_consider_unknown_activities?: boolean;
+  fitness_cleaning_token_flood?: boolean;
   evaluation_alignment_variant?: EvaluationAlignmentVariant;
   evaluation_alignment_max_states?: number;
   evaluation_alignment_max_total_states?: number;
@@ -5869,7 +5870,11 @@ export interface ReplayFitnessEvaluation {
   fitting_traces: number;
   trace_count: number;
   total_cost: EvaluationMetric;
-  token_replay?: Conformance;
+  token_replay?: Conformance | (Omit<Conformance, "precision" | "generalization" | "simplicity"> & {
+    precision: null;
+    generalization: null;
+    simplicity: null;
+  });
   alignments?: Alignments | DecomposedAlignmentResult;
 }
 export interface PrecisionEvaluation {

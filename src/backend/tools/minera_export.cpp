@@ -1065,6 +1065,8 @@ int usage(const char* program) {
                "  --edit-anti              Use farthest (anti) alignment\n"
                "  --edit-deviation-cost <n>  Positive edit deviation cost\n"
                "  --edit-projection <mode>  none or log\n"
+               "  --replay-fitness-model <file> Standalone token fitness for a PNML model.\n"
+               "  --fitness-cleaning-token-flood <bool> Clean flooding in token fitness.\n"
                "  --evaluation-family <id> Model evaluation: replay_fitness,\n"
                "                            precision, generalization, simplicity,\n"
                "                            or composite\n"
@@ -1867,6 +1869,7 @@ int main(int argc, char** argv) {
   std::filesystem::path compare_petri_model;
   std::filesystem::path token_replay_model;
   bool token_replay_result_requested = false;
+  bool replay_fitness_result_requested = false;
   std::string compare_petri_miner = "inductive";
   bool compare_petri_miner_used = false;
   std::string compare_petri_activity_attribute;
@@ -3647,6 +3650,7 @@ int main(int argc, char** argv) {
         arg == "--evaluation-final-marking" ||
         arg == "--evaluation-token-replay-variant" ||
         arg == "--fitness-consider-unknown-activities" ||
+        arg == "--fitness-cleaning-token-flood" ||
         arg == "--evaluation-alignment-variant" ||
         arg == "--evaluation-alignment-max-states" ||
         arg == "--evaluation-alignment-max-total-states" ||
@@ -3723,10 +3727,14 @@ int main(int argc, char** argv) {
       compare_petri_reference = value;
       continue;
     }
-    if (arg == "--token-replay-model") {
+    if (arg == "--token-replay-model" || arg == "--replay-fitness-model") {
       const auto* value = next();
       if (!value || *value == '\0') return usage(argv[0]);
       token_replay_model = value;
+      if (arg == "--replay-fitness-model") {
+        replay_fitness_result_requested = true;
+        evaluation_requested = true;
+      }
       continue;
     }
     if (arg == "--compare-petri-model") {
@@ -5474,6 +5482,10 @@ int main(int argc, char** argv) {
     std::cerr << "error: --token-replay-result requires --token-replay-model\n";
     return 2;
   }
+  if (token_replay_result_requested && replay_fitness_result_requested) {
+    std::cerr << "error: choose a token replay result or replay fitness result\n";
+    return 2;
+  }
   if (!token_replay_model.empty() &&
       (!compare_petri_reference.empty() || !compare_petri_model.empty() ||
        compare_petri_miner_used || compare_petri_replay_option_used ||
@@ -6291,10 +6303,20 @@ int main(int argc, char** argv) {
       const auto document = minera::import_pnml_document(token_replay_model, model_options);
       const auto replay_options = minera::tools::pnml_replay_options(
           document, token_replay_options);
-      const auto body = token_replay_result_requested
-          ? minera::token_replay_result_json(minera::replay_token_result(log, document.net, replay_options))
-          : minera::token_replay_traces_json(
-              minera::replay_token_traces(log, document.net, replay_options), replay_options.variant);
+      std::string body;
+      if (replay_fitness_result_requested) {
+        if (evaluation_fields.contains("fitness_variant") &&
+            evaluation_params->replay_fitness_variant != minera::ReplayFitnessVariant::TOKEN_BASED)
+          throw std::invalid_argument("standalone replay fitness supports token-based fitness");
+        body = minera::token_replay_fitness_result_json(minera::evaluate_replay_fitness(
+            log, document, minera::ReplayFitnessVariant::TOKEN_BASED,
+            evaluation_params->replay_fitness_options));
+      } else if (token_replay_result_requested) {
+        body = minera::token_replay_result_json(minera::replay_token_result(log, document.net, replay_options));
+      } else {
+        body = minera::token_replay_traces_json(
+            minera::replay_token_traces(log, document.net, replay_options), replay_options.variant);
+      }
       if (output.empty()) std::cout << body << '\n';
       else {
         std::ofstream file(output);

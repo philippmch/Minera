@@ -1370,6 +1370,11 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
         parse_boolean(require("fitness_consider_unknown_activities"),
                       "fitness_consider_unknown_activities");
   }
+  if (supplied("fitness_cleaning_token_flood")) {
+    params.replay_fitness_options.cleaning_token_flood =
+        parse_boolean(require("fitness_cleaning_token_flood"),
+                      "fitness_cleaning_token_flood");
+  }
 
   const auto alignment_wire_name = [](std::string_view name) {
     if (name == "alignment_activity_attribute")

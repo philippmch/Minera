@@ -4119,6 +4119,45 @@ void handle_token_replay(const httplib::Request& request,
   }
 }
 
+void handle_replay_fitness(const httplib::Request& request,
+                           httplib::Response& response) {
+  try {
+    if (!request.is_multipart_form_data() || !request.has_file("log") ||
+        !request.has_file("model"))
+      throw std::invalid_argument("replay fitness requires multipart fields log and model");
+    const auto lookup = [&](std::string_view name) {
+      const std::string key(name);
+      return request.has_file(key) ? form_field(request, key)
+             : request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      const std::string key(name);
+      return request.has_file(key) || request.has_param(key);
+    };
+    const auto imports = minera::parse_mine_params(lookup, present);
+    const auto params = minera::parse_evaluation_params(lookup, present);
+    if (present("fitness_variant") &&
+        params.replay_fitness_variant != minera::ReplayFitnessVariant::TOKEN_BASED)
+      throw std::invalid_argument("standalone replay fitness supports token-based fitness");
+    const auto& file = request.get_file_value("log");
+    std::istringstream input(file.content);
+    const auto log = looks_like_xes(file.filename, file.content)
+        ? minera::import_xes_event_log(input, imports.xes)
+        : minera::import_csv_event_log(input, imports.csv);
+    auto model_options = minera::tools::pnml_model_import_options();
+    model_options.import_stochastic_map = false;
+    const auto document = minera::parse_pnml_document(
+        request.get_file_value("model").content, model_options);
+    response.set_content(minera::token_replay_fitness_result_json(
+        minera::evaluate_replay_fitness(log, document,
+            minera::ReplayFitnessVariant::TOKEN_BASED, params.replay_fitness_options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_check_model(const httplib::Request& request,
                         httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -7802,6 +7841,7 @@ int main(int argc, char** argv) {
   server.Options("/api/data-petri-net", preflight);
   server.Options("/api/check-model", preflight);
   server.Options("/api/token-replay", preflight);
+  server.Options("/api/replay-fitness", preflight);
   server.Options("/api/process-tree-petri", preflight);
   server.Options("/api/playout", preflight);
   server.Options("/api/monte-carlo", preflight);
@@ -7906,6 +7946,7 @@ int main(int argc, char** argv) {
   server.Post("/api/data-petri-net", handle_data_petri_net);
   server.Post("/api/check-model", handle_check_model);
   server.Post("/api/token-replay", handle_token_replay);
+  server.Post("/api/replay-fitness", handle_replay_fitness);
   server.Get("/api/pnml", handle_pnml);
   server.Get("/api/process-tree-petri", handle_process_tree_petri);
   server.Get("/api/bpmn", handle_bpmn);

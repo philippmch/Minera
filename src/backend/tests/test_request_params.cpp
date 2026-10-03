@@ -2983,6 +2983,7 @@ void parse_evaluation_params_defaults_and_variants() {
       {"evaluation_final_marking", "0,0,2"},
       {"evaluation_token_replay_variant", "forward"},
       {"fitness_consider_unknown_activities", "true"},
+      {"fitness_cleaning_token_flood", "true"},
       {"evaluation_alignment_variant", "discounted_a_star"},
       {"evaluation_alignment_max_states", "23"},
       {"evaluation_alignment_max_time", "1.5"},
@@ -3006,6 +3007,7 @@ void parse_evaluation_params_defaults_and_variants() {
       {"fitness_weight", "2"}, {"precision_weight", "1"},
       {"simplicity_weight", "0"}, {"generalization_weight", "0"}}));
   assert(all.precision_options.use_task_ids && all.precision_options.max_states == 1);
+  assert(all.replay_fitness_options.cleaning_token_flood);
   assert(all.replay_fitness_options.activity_attribute == "phase" &&
          all.precision_options.activity_attribute == "phase" &&
          all.generalization_options.activity_attribute == "phase" &&
