@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <compare>
 #include <concepts>
 #include <cstddef>
@@ -173,6 +174,57 @@ class TokenInteger {
     normalize();
   }
 };
+
+// Divide exact integers with binary64 round-to-nearest, ties-to-even. Converting
+// the operands first loses low bits and can overflow even for a finite ratio.
+[[nodiscard]] inline double token_integer_ratio(TokenInteger numerator,
+                                               TokenInteger denominator) {
+  if (denominator == 0) throw std::domain_error("division by zero");
+  const bool negative = (numerator < 0) != (denominator < 0);
+  if (numerator < 0) numerator = -numerator;
+  if (denominator < 0) denominator = -denominator;
+  if (numerator == 0) return negative ? -0.0 : 0.0;
+
+  int exponent = 0;
+  if (numerator >= denominator) {
+    auto boundary = denominator;
+    while (boundary * 2 <= numerator) {
+      boundary *= 2;
+      if (++exponent > 1023)
+        throw std::overflow_error("integer division result too large for a float");
+    }
+  } else {
+    auto boundary = numerator;
+    while (boundary < denominator) {
+      boundary *= 2;
+      if (--exponent < -1075) return negative ? -0.0 : 0.0;
+    }
+  }
+  const int shift = exponent >= -1022 ? 52 - exponent : 1074;
+  if (shift >= 0) {
+    for (int i = 0; i < shift; ++i) numerator *= 2;
+  } else {
+    for (int i = 0; i < -shift; ++i) denominator *= 2;
+  }
+  std::vector<TokenInteger> bits;
+  bits.reserve(53);
+  bits.push_back(denominator);
+  for (int i = 1; i <= 52; ++i) bits.push_back(bits.back() * 2);
+  std::uint64_t significand = 0;
+  for (int i = 52; i >= 0; --i) {
+    if (numerator >= bits[static_cast<std::size_t>(i)]) {
+      numerator -= bits[static_cast<std::size_t>(i)];
+      significand |= std::uint64_t{1} << i;
+    }
+  }
+  const auto twice_remainder = numerator * 2;
+  if (twice_remainder > denominator ||
+      (twice_remainder == denominator && (significand & 1))) ++significand;
+  const double result = std::ldexp(static_cast<double>(significand), -shift);
+  if (!std::isfinite(result))
+    throw std::overflow_error("integer division result too large for a float");
+  return negative ? -result : result;
+}
 
 // Retains normal vector access and exact values while allowing equality with
 // existing integer-vector callers. No implicit narrowing of token values.

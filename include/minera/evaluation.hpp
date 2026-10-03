@@ -58,6 +58,9 @@ struct ReplayFitnessResult {
   ConformanceResult token_result;
   AlignmentResult alignment_result;
   std::optional<DecomposedAlignmentResult> decomposed_alignment_result;
+  // The exact token-result aggregate retains the public evaluator's integer
+  // zero when either aggregate denominator is nonpositive or input is empty.
+  bool log_fitness_is_integer_zero = false;
 };
 
 // Evaluator-only replay controls. Alignment evaluation uses standard move
@@ -359,6 +362,15 @@ struct ModelEvaluation {
 }
 [[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
     const std::vector<PrecomputedTokenReplay>&,
+    ReplayFitnessVariant = ReplayFitnessVariant::TOKEN_BASED);
+// Aggregate full replay rows without narrowing signed/arbitrary-size counts.
+// Trace fitness is used as supplied, including values outside [0, 1], NaN and
+// infinities. Fit classification comes from trace_is_fit, independently.
+[[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
+    const std::vector<TokenReplayTraceDiagnostics>&,
+    ReplayFitnessVariant = ReplayFitnessVariant::TOKEN_BASED);
+[[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
+    const TokenReplayResult&,
     ReplayFitnessVariant = ReplayFitnessVariant::TOKEN_BASED);
 [[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
     const std::vector<PrecomputedAlignmentReplay>&,

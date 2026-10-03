@@ -746,6 +746,58 @@ ReplayFitnessResult evaluate_replay_fitness(
 }
 
 ReplayFitnessResult evaluate_replay_fitness(
+    const std::vector<TokenReplayTraceDiagnostics>& results,
+    ReplayFitnessVariant variant) {
+  ReplayFitnessResult output;
+  output.variant = variant;
+  output.log_fitness_is_integer_zero = true;
+  output.token_result.fitness = 0.0;
+  output.token_result.precision = 0.0;
+  output.token_result.generalization = 0.0;
+  output.token_result.simplicity = 0.0;
+  if (variant != ReplayFitnessVariant::TOKEN_BASED) {
+    output.computed = false;
+    output.error = "precomputed token results require token-based replay";
+    return output;
+  }
+  output.trace_count = results.size();
+  output.token_result.trace_count = output.trace_count;
+  double fitness_sum = 0.0;
+  for (const auto& result : results) {
+    output.fitting_traces += result.trace_is_fit ? 1 : 0;
+    fitness_sum += result.trace_fitness;
+    output.token_result.produced += result.produced;
+    output.token_result.consumed += result.consumed;
+    output.token_result.missing += result.missing;
+    output.token_result.remaining += result.remaining;
+    output.token_result.variants.push_back(
+        VariantConformance{{}, 1, result.trace_fitness});
+  }
+  output.token_result.fitting_traces = output.fitting_traces;
+  output.token_result.trace_diagnostics = results;
+  if (output.trace_count > 0 && output.token_result.consumed > 0 &&
+      output.token_result.produced > 0) {
+    output.average_trace_fitness = fitness_sum / double(output.trace_count);
+    output.percentage_fit_traces =
+        100.0 * double(output.fitting_traces) / double(output.trace_count);
+    output.fitness =
+        0.5 * (1.0 - token_integer_ratio(output.token_result.missing,
+                                        output.token_result.consumed)) +
+        0.5 * (1.0 - token_integer_ratio(output.token_result.remaining,
+                                        output.token_result.produced));
+    output.log_fitness_is_integer_zero = false;
+  }
+  output.log_fitness = output.fitness;
+  output.token_result.fitness = output.fitness;
+  return output;
+}
+
+ReplayFitnessResult evaluate_replay_fitness(const TokenReplayResult& results,
+                                           ReplayFitnessVariant variant) {
+  return evaluate_replay_fitness(results.traces, variant);
+}
+
+ReplayFitnessResult evaluate_replay_fitness(
     const std::vector<PrecomputedTokenReplay>& results,
     ReplayFitnessVariant variant) {
   ReplayFitnessResult output;

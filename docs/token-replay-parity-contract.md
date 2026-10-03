@@ -1250,3 +1250,68 @@ catalogue acceptance remain open. Weighted aggregate/composite conformance,
 general PNML carrier limits and exact frontend numeric presentation also remain
 open. Catalogue totals stay at 46/86 packages, 199/387 modules and 228 incomplete
 units, with no promotions or full parity claim.
+
+## Exact aggregation of weighted replay results
+
+`evaluate_replay_fitness` now accepts `std::vector<TokenReplayTraceDiagnostics>`
+and `TokenReplayResult` directly. These aggregate routes retain exact signed
+`TokenInteger` counters and the input rows, so callers can evaluate the full
+weighted replay result without converting its counts to unsigned integers.
+`trace_is_fit` determines fitting classification independently of the supplied
+trace fitness. Fitness outside [0, 1], NaN and infinities propagate through
+sequential double summation as observed on the pinned public evaluator.
+
+For nonempty input with positive aggregate consumed and produced totals, the
+public log fitness uses exact integer ratios and the average uses all input
+trace fitness values. Otherwise all four public aggregate scores are zero,
+including the fitting percentage. `log_fitness_is_integer_zero` distinguishes
+the public integer-zero carrier in that branch from a calculated floating zero.
+Native trace/fitting counts and signed token totals remain available in either
+branch. The four-field public projection retains `perc_fit_traces`,
+`average_trace_fitness`, `log_fitness` and `percentage_of_fitting_traces`, including
+their observed types and exact double hexadecimal values. This contract concerns
+the new C++ aggregate overloads; existing application serializers remain a
+separate transport/presentation gate.
+
+`token_integer_ratio` rounds an exact integer quotient to binary64 using
+round-to-nearest, ties-to-even. It finds the binary exponent without converting
+either operand to double, extracts the significand using exact arithmetic and
+rounds from the exact remainder. The subnormal branch rounds in units of
+2^-1074, preserving signed zero. Overflow and a zero divisor retain explicit
+errors. This handles finite ratios even when both integer operands exceed the
+floating-point range. Existing trace replay arithmetic is unchanged.
+
+The accepted cohort makes 2486 fresh pinned public aggregate calls on 1243
+frozen inputs through both direct and parent routes. It includes all 162 signed
+small-counter/classification combinations, outside-unit/nonfinite fitness,
+large comparable integers through 401 decimal digits, mixed/cancelling totals,
+1040 retained weighted replay observations and four aggregate prefixes. The
+reused weighted observations are byte-bound to their committed evidence; no new
+public replay calls are claimed. Both exact native carriers make 2486 actual
+aggregate calls. Every one of the 4972 whole public-route comparisons matches,
+as do 4972 comparisons against independent aggregate calculations, 2486
+exact-counter checks and
+7458 input/retained-row checks. All 1243 native carrier pairs and all 1243 public
+route pairs agree. Separately, 2315 native exact integer-division calls match
+actual Python division observations, including rounding ties, signed zero,
+subnormal underflow, finite ratios of huge operands and expected errors.
+
+One fresh build freezes 660 inputs (four edits, 656 unchanged), produces 155
+linked production/test artifacts and passes all 152 assertion-enabled Release
+suites. The first comparison helper cannot parse MSVC's indeterminate-NaN
+display. Its terminal failure is retained; a derived helper recognizes that
+display as the public float.hex NaN class. Production inputs, native probe,
+observations and finite/signed-zero comparisons remain unchanged. The recorded
+source/build/process/archive self-review claims neither an independent reviewer
+nor a pre-public oracle.
+
+Evidence is in
+[weighted-fitness-aggregate-validation.json](weighted-fitness-aggregate-validation.json).
+All 1026 files round-trip across 12 lossless archives. Log-based and
+CLI/HTTP weighted fitness dispatch, full PNML marking carriers, composite/
+precision/application conformance and exact frontend presentation remain open.
+The legacy bounded `PrecomputedTokenReplay` validation/alias API remains
+separate; arbitrary Python result dictionaries, parameter/alias behavior and
+broader evaluator module acceptance are also open. Catalogue totals stay at
+46/86 packages, 199/387 modules and 228 incomplete units, with no promotions or
+full parity claim.
