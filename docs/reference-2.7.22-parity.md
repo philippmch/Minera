@@ -9115,3 +9115,63 @@ specialized bounded carriers, large frontend JSON precision and general PNML
 lexical/marking/export behavior remain gated or unresolved. The catalogue remains
 46/86 packages, 199/387 modules and 228 incomplete units. No module/package
 promotion or full parity is claimed.
+
+
+## Forward supplied variants and hidden-cache parameter checkpoint
+
+Two new public workers each import the same six exact weighted PNML models.
+Together they execute 13440 actual calls through the direct forward and parent
+dispatcher routes, retaining 11348 complete returned carriers and 2092 actual
+errors with zero serialization gaps. Every direct/dispatcher pair has an equal
+whole outcome. Model/marking/log/parameter snapshots and seven opaque pinned
+module proofs remain unchanged before and after. The five EventLog cohorts cover
+duplicate source traces and case IDs, equal numeric activity keys, mixed null
+activities, enum/string custom activity selectors and an empty log. Four full
+result policies include grouped/source PLTR and named carriers.
+
+The supplied-variant worker makes 5280 calls across 18 forms. Omitted/None/empty
+maps, inferred and reordered maps, subsets, extra foreign Trace values, zero
+frequencies, index/string/integer/None values, tuple/string/bytes/scalar keys,
+custom delimiters and a raw list all retain the complete omitted-parameter
+outcomes on these inputs: 4488 returns and 792 errors. This is an observed
+no-effect for these exact EventLog controls, including contradictory carriers;
+it does not establish a universal result for other input adapters or domains.
+
+The other worker makes 8160 calls across 27 controls for CASE_ID_KEY, delimiter,
+IS_REDUCTION, THREAD_MAX_EX_TIME, PLACES_SHORTEST_PATH_BY_HIDDEN and progress.
+Case selectors, reduction settings, zero/negative/tiny/None/text/long time limits,
+delimiters and progress settings preserve the measured return/error outcomes.
+Progress console bytes are retained separately and are not claimed to be equal.
+Hidden-cache matrices are owned constructions from public Petri-net arc
+endpoints, with actual Place and Transition keys/values. An actual single-hidden
+path matrix and source-only cache preserve these controls, while empty,
+identity-only, reversed and empty-list caches alter 260 complete outcomes.
+A non-iterable integer cache adds 174 observed TypeErrors. There are 434
+differences from omitted-cache behavior; no input mutations are observed.
+
+One freshly compiled native probe binds the existing accepted core and all 660
+unchanged source inputs. It makes six imports and 6720 actual full API/codec
+calls. Both public routes compare all 13440 complete outcomes. The probe matches
+11088 of 11348 complete returns, 1918 of 2092 error behaviors and every Trace
+equality matrix. All 434 differences belong to explicit hidden-cache controls.
+The current native option has no supplied-cache carrier; those cache arguments
+are explicitly unmapped in this baseline. The other measured no-effect
+parameters map to the existing EventLog options. This does not claim support for
+unmeasured values or adapters. Native output fields are never synthesized.
+
+The first native preparation fails on one stale capture label before copying
+its first fixture or invoking CMake. Its helper and incomplete preparation are
+retained, with zero native calls. A derived helper corrects that label, compiles
+the probe and completes all three actual processes with exit zero. The public
+captures, raw native carriers, process witnesses, helpers, failed preparation
+and probe binary are archived, with every chunk and whole file round-tripping.
+The earlier accepted production build and test evidence are reused; this step
+does not claim a fresh full build or another 152-suite run.
+
+The next production requirement is an explicit hidden-path-cache override,
+including empty-cache routing and the measured rejection timing. Broader cache
+paths, cyclic/choice/cleanup behavior, foreign key carriers, input adapters and
+alias graphs remain open. The prior forward/backwards acceptance contracts and
+weighted aggregate/composite gates still apply. The catalogue stays at 46/86
+packages, 199/387 modules and 228 incomplete units, with no promotions or full
+parity claim. Evidence: [forward-controls-validation.json](forward-controls-validation.json).
