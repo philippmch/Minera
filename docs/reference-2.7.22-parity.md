@@ -8856,3 +8856,98 @@ at 46/86 packages, 199/387 modules and 228 incomplete units. No module/package
 promotion or full parity is claimed.
 
 Evidence: [unbounded-ordinary-weight-validation.json](unbounded-ordinary-weight-validation.json).
+
+## Full forward diagnostic carrier controls
+
+This checkpoint preserves actual public evidence for the complete forward result
+carrier and an independently derived carrier prototype. It does not add a native
+full-result API. The pushed exact-weight implementation remains unchanged.
+
+The same 95 actual PNML carriers are exercised through both public routes across
+twelve profiles: PLTR with stop/clean/names combinations, explicit variants enabled
+and disabled, unknown-activity fitness, and names without PLTR. Nine source traces
+cover empty cases, repeated activities/unknowns, different event contexts, repeated
+variants and equal traces with equal or different case attributes. Public Trace
+value equality is measured explicitly. Source Trace indices and generated Trace
+keys retain their actual full attributes/events; generated keys use a null source
+index. No source identity is invented for them.
+
+The first ten-trace capture adds a null activity to the string-activity log. Its
+95 actual imports and 2280 actual API calls all complete with the measured public
+TypeError: '<' not supported between instances of 'str' and 'NoneType'. The current
+native APIs instead return traces on 2216 corresponding public rejection outcomes
+and encounter checked float overflow on the other 64. No mixed-null rejection
+parity is inferred. The exact rejection and native outputs remain retained.
+
+The first nine-trace capture makes another 95 imports/2280 calls and packs 2032
+complete returns. It records 64 float errors and 184 KeyErrors from its packer,
+which assumes every Trace key belongs to the source log. Those KeyErrors are
+serialization failures, not reference API errors. The immutable corrected worker
+separates API and serialization exceptions and retains generated Trace keys.
+It makes 95 actual imports/2280 calls: 2216 complete returns, 64 float-overflow
+errors and zero serialization failures. Across the three captures, all 285 imports
+and 6840 attempted public calls are actual; reused/derived values are not counted
+as fresh calls. All seven opaque module pin proofs match before and after each
+worker. Net, initial/final marking, log and parameter snapshots remain unchanged.
+No upstream implementation, private globals or bytecode is inspected.
+
+The fresh owned probe binds the pushed parent's exact core and all 657 frozen
+inputs, then makes 95 actual imports, 2280 trace replay calls and 2090 count-only
+accounting calls. It compiles one probe afresh. The parent core, 154 production/
+test binaries and 151 passing assertion-enabled suites are reused evidence;
+there is no fresh full build or fresh 151-suite claim here.
+
+All 19944 returned public trace outcomes match ten exact native trace fields
+(199440 fields). Both complete public routes match for all 2280 paired controls;
+all 4560 measured native/public Trace equality matrices match. All 64 measured
+public float failures match the native checked-conversion behavior, without an
+exception class/message identity claim. Of 25264 aggregate place m/r/c/p fields,
+25194 match. All 70 differences are missing counters under DISABLE_VARIANTS=false:
+the public PLTR result counts event repair missing tokens once per variant while
+weighing final-marking missing tokens by frequency. The generic native count-only
+API still accounts for each source trace; it is not a full public PLTR carrier.
+
+The independently written prototype derives one whole packed result from each
+native path record and the immutable owned inputs. It retains all source traces
+or generates activity-only variant traces as observed. Place underfed membership
+comes from event repair, excluding final-marking deficits. That membership takes
+precedence over the same place's overfed set. Remaining marking keys matter:
+stopped signed/zero output controls retain negative or zero-token keys in overfed
+cohorts when no input repair occurs. Transition fit/underfed lists retain occurrence
+counts and the final merged context of examined known events, including a blocked
+event's context. Unknown-activity dictionaries use that context without unknown
+events updating it. Equal Trace keys retain one representative and combine their
+context occurrence lists. Named traces retain names, labels and marking dictionary
+carriers; unnamed results retain their object/set/Marking carriers.
+
+The first prototype records zero complete matches because native JSON loses the
+declared double type when integral fitness values print without a decimal point.
+The typed correction preserves actual values and matches 1844 complete carriers.
+All remaining 372 differences are place cohorts; traces, transition contexts and
+unknown maps already match. Cohort precedence/nonzero signed state corrects all
+but eight stopped zero-output controls. Marking-key preservation resolves those.
+The final prototype matches all 2216 complete returned carriers, including every
+one of the 2032 PLTR tuples and 184 named results without PLTR. Each comparison
+uses a whole result, not a combination of fields from competing paths. Only
+dictionary/Marking/set order and paired enabled name/label order are canonicalized;
+activation, problem and context lists remain ordered. This is a derived prototype,
+not an implemented native carrier or another public producer.
+
+Two analysis attempts fail on incorrect error-count and stale helper-hash guards;
+their executed helpers and correction derivations remain retained. Their outer
+PIDs/raw process logs were not recorded and are not reconstructed. All three raw
+captures, generated Trace values, actual native logs/process witnesses, all four
+prototype stages and every rejected complete candidate are archived. Every chunk
+and entire file passes exact archive round-trip verification.
+
+Required next implementation: add a native forward result API and transport that
+retain these complete place/transition/unknown and RETURN_NAMES carriers, with the
+observed variant counting and case/context rules. Preserve the separate generic
+per-trace accounting API. Validate mixed null/string error behavior independently,
+then reconcile broader parameters, scalar/foreign keys, variant ordering, silent
+topologies, imported markings and the existing choice/cleanup acceptance contract.
+Weighted aggregate/composite conformance remains gated. The catalogue remains
+46/86 packages, 199/387 modules and 228 incomplete units. No module/package
+promotion or full parity is claimed.
+
+Evidence: [forward-pltr-carrier-validation.json](forward-pltr-carrier-validation.json).

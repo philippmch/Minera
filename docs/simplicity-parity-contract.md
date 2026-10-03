@@ -882,3 +882,15 @@ are in [token-replay-parity-contract.md](token-replay-parity-contract.md) and
 [unbounded-ordinary-weight-validation.json](unbounded-ordinary-weight-validation.json).
 Weighted aggregate/composite conformance remains gated. The catalogue is
 unchanged at 46/86 packages, 199/387 modules and 228 incomplete units.
+
+## Full forward diagnostic carrier follow-up
+
+The next forward replay evidence now retains complete public PLTR and name-return
+carriers for the same 95 weighted models across multiple source traces. The
+independent carrier prototype matches all 2216 complete returned results, including
+2032 PLTR tuples. The native full-result API remains to be implemented, and the
+mixed null/string rejection remains a measured gap. This evidence does not change
+the generic metric/counting APIs or weighted aggregate conformance gates.
+See [token-replay-parity-contract.md](token-replay-parity-contract.md) and
+[forward-pltr-carrier-validation.json](forward-pltr-carrier-validation.json).
+The catalogue stays at 46/86 packages, 199/387 modules and 228 incomplete units.
