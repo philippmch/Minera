@@ -1525,18 +1525,15 @@ SimplicityResult evaluate_presented_cyclomatic(
       (!options.presentation_initial_marking && !options.initial_marking.empty() && options.initial_marking.size() != net.places.size()) ||
       (!options.final_marking.empty() && options.final_marking.size() != net.places.size()))
     return reject("invalid marking dimension or max_states");
-  using WeightedEndpoint = std::pair<std::size_t, std::int64_t>;
+  struct WeightedEndpoint { std::size_t place; std::uint64_t magnitude; bool negative; };
   std::vector<std::vector<WeightedEndpoint>> inputs(net.transitions.size()), outputs(net.transitions.size());
   std::vector<char> has_preset(net.places.size(), 0);
   for (const auto& arc : net.arcs) {
-    if (arc.weight > std::uint64_t(std::numeric_limits<std::int64_t>::max()))
-      return reject("presented arc weight exceeds signed reachability range");
-    const auto weight = static_cast<std::int64_t>(arc.weight);
     if (arc.source.kind == PetriNodeKind::kPlace)
-      inputs[transitions.at(arc.target.id)].push_back({places.at(arc.source.id), weight});
+      inputs[transitions.at(arc.target.id)].push_back({places.at(arc.source.id), arc.weight, arc.negative_weight});
     else {
       const auto place = places.at(arc.target.id);
-      outputs[transitions.at(arc.source.id)].push_back({place, weight});
+      outputs[transitions.at(arc.source.id)].push_back({place, arc.weight, arc.negative_weight});
       has_preset[place] = 1;
     }
   }
@@ -1567,6 +1564,39 @@ SimplicityResult evaluate_presented_cyclomatic(
     else if (found == marking.end()) marking.emplace_back(place, value);
     else found->second = value;
   };
+  const auto adjust = [](std::int64_t value, std::uint64_t magnitude,
+                          bool negative, std::int64_t& result) {
+    constexpr auto limit = std::uint64_t{1} << 63;
+    const auto absolute = [](std::int64_t number) {
+      return number < 0 ? std::uint64_t(-(number + 1)) + 1 : std::uint64_t(number);
+    };
+    if (!negative) {
+      if (value >= 0) {
+        if (magnitude > std::uint64_t(std::numeric_limits<std::int64_t>::max() - value)) return false;
+        result = value + static_cast<std::int64_t>(magnitude);
+      } else if (magnitude >= absolute(value)) {
+        const auto remaining = magnitude - absolute(value);
+        if (remaining >= limit) return false;
+        result = static_cast<std::int64_t>(remaining);
+      } else {
+        const auto remaining = absolute(value) - magnitude;
+        result = remaining == limit ? std::numeric_limits<std::int64_t>::min() : -static_cast<std::int64_t>(remaining);
+      }
+    } else {
+      if (value <= 0) {
+        if (magnitude > limit - absolute(value)) return false;
+        const auto remaining = absolute(value) + magnitude;
+        result = remaining == limit ? std::numeric_limits<std::int64_t>::min() : -static_cast<std::int64_t>(remaining);
+      } else if (magnitude <= std::uint64_t(value)) {
+        result = value - static_cast<std::int64_t>(magnitude);
+      } else {
+        const auto remaining = magnitude - std::uint64_t(value);
+        if (remaining > limit) return false;
+        result = remaining == limit ? std::numeric_limits<std::int64_t>::min() : -static_cast<std::int64_t>(remaining);
+      }
+    }
+    return true;
+  };
   std::vector<PresentedMarking> states{start};
   std::map<PresentedMarking, std::size_t> ids{{key(start), 0}};
   std::vector<std::size_t> state_names;
@@ -1587,22 +1617,29 @@ SimplicityResult evaluate_presented_cyclomatic(
     const auto source = pending.front(); pending.pop();
     std::set<std::string> enabled_names;
     for (std::size_t t = 0; t < net.transitions.size(); ++t) {
-      if (std::any_of(inputs[t].begin(), inputs[t].end(), [&](const auto& arc) { return tokens(states[source], arc.first) < arc.second; })) continue;
+      if (std::any_of(inputs[t].begin(), inputs[t].end(), [&](const auto& arc) {
+            const auto value = tokens(states[source], arc.place);
+            if (arc.negative) {
+              if (arc.magnitude >= (std::uint64_t{1} << 63)) return false;
+              return value < -static_cast<std::int64_t>(arc.magnitude);
+            }
+            return value < 0 || std::uint64_t(value) < arc.magnitude;
+          })) continue;
       enabled_names.insert(net.transitions[t].name);
       auto next = states[source];
       // Public reachability uses weak firing: consumed places are removed when
       // depleted, including oversubscription by separately enabled input arcs.
-      for (const auto& [place, weight] : inputs[t]) {
-        const auto value = tokens(next, place);
-        if (value < std::numeric_limits<std::int64_t>::min() + weight)
+      for (const auto& arc : inputs[t]) {
+        std::int64_t following;
+        if (!adjust(tokens(next, arc.place), arc.magnitude, !arc.negative, following))
           return reject("presented firing exceeds signed reachability range");
-        assign(next, place, value - weight, true);
+        assign(next, arc.place, following, true);
       }
-      for (const auto& [place, weight] : outputs[t]) {
-        const auto value = tokens(next, place);
-        if (value > std::numeric_limits<std::int64_t>::max() - weight)
+      for (const auto& arc : outputs[t]) {
+        std::int64_t following;
+        if (!adjust(tokens(next, arc.place), arc.magnitude, arc.negative, following))
           return reject("presented firing exceeds signed reachability range");
-        assign(next, place, value + weight, false);
+        assign(next, arc.place, following, false);
       }
       const auto [found, inserted] = ids.emplace(key(next), states.size());
       if (inserted) {

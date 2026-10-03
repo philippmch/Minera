@@ -8520,3 +8520,63 @@ broader evaluation/conformance/composite domains and full application numeric
 wire precision remain open. The catalogue stays at 46/86 packages,
 199/387 modules and 228 incomplete units. Full module/package parity is not
 established.
+
+## PNML arc weights and XML annotation text (2026-10-03)
+
+Parent checkpoint: `2dc5821fb1457df638b09f29242e62ea3e2d0407`.
+Reset/inhibitor input arcs now retain nonunit, zero and signed weights across
+document, extended primitive metadata, presentation and native export routes.
+An owned Unicode 14 integer parser handles measured sign/underscore/decimal
+lexemes; repeated/empty/CDATA/comment/child/PI/prefix text follows the captured
+public behavior. Direct presented cyclomatic weights use checked signed64
+marking arithmetic. Other execution consumers retain their arc-type behavior.
+
+The original 262 public imports retain 172 successes and all 90 errors. Final
+native evidence makes 248 safe imports and 1,392 actual metric calls; all 150
+successful carriers retain weights/types and all 90 public rejections align as
+booleans. All 450 document outcomes match six checked fields. Presentations
+match 489/492 and primitive nets 449/450, with explicit range/structural gates.
+Every exact native export is independently reimported: all 150 carriers, net
+subclasses, actual metric triplets and semantic marking checks match. Combined
+public totals are 412 imports, 966 metrics and 322 graphs/exports/enabling/weak
+calls. All 150 CLI and 150 HTTP results match; all 301 requests return 200. The
+old 352-case matrix retains identical snapshots/exports and all 4,224 metrics.
+
+All production/test/application binaries compile afresh from 655 frozen inputs.
+Four suites pass before an obsolete ordinary-zero rejection assertion fails.
+The accepted correction changes only that assertion, preserves 654 inputs and
+recompiles the Petri suite against seven exact hash-guarded compiled binaries.
+All five assertion-enabled suites then pass. Original zero-call preparation and
+probe compile failures, the failed candidate/test binary and all derivations
+remain. Unicode generation checks 1,114,112 standard-library classifications,
+660 decimal codepoints and 58 whitespace calls separately from PM4Py counts.
+Opaque 11-module pin proofs match; no upstream implementation/bytecode is read.
+Three sub-50-MiB archives retain 4,315 files/4,350 round-trip-verified
+rows, including the fresh core in two archives and all 655 accepted inputs.
+See `simplicity-parity-contract.md` and
+`pnml-extended-annotations-validation.json`.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `pnml-extended-annotations-checks.jsonl.gz` | `3f3ba6d32f20d266cde3e91917e5c55786ee72338c12bcb4b51712a4412182a7` | 24426111 |
+| `pnml-extended-annotations-core-1.jsonl.gz` | `e48213b907f80854a0ef812603f8056e690a3835ef8b2ae20e4d55b59431b090` | 23224772 |
+| `pnml-extended-annotations-core-2.jsonl.gz` | `25e1baf9ccb82fc3fc2a29154b3be94e12fbb81fbec8b11b023dfb5d1fc67ecd` | 26838333 |
+
+The retained matrix still has 14 ordinary positive weights whose native
+imports are deliberately unattempted because primitive multiplicity expands
+into vector slots; the smallest of these weights is 2,147,483,647. Eight public
+successes exceed uint64 weight magnitude. Four signed ordinary PNML cases lack
+a primitive execution projection. Three directly presented output weights
+exceed signed64 reachable marking range and report uncomputed. One ordinary
+zero-input case loses primitive structural adjacency: direct executable Cardoso
+is 1, while the actual public, document and presentation results are 2. These
+are explicit remaining gates, with their original public rows retained.
+
+Exception class/message equality, additional malformed/repeated/namespace
+annotations, combinations of typed inputs and outputs, supplied marking-name
+collisions and set/allocation-order dependence remain open. General metadata,
+foreign keys, IDs, zero-key/order behavior, public exporter byte formats,
+unbounded graphs, time limits/state caps, full application numeric precision
+and broader evaluation/conformance/composite domains remain open. The catalogue
+stays at 46/86 packages, 199/387 modules and 228 incomplete units. Full
+module/package parity is not established.

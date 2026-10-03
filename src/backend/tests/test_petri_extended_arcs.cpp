@@ -182,21 +182,18 @@ void weighted_arc_round_trip() {
   assert(spaced.final_marking[1] == 3);
   assert(spaced.net.transitions()[0].inputs.size() == 2);
 
-  bool rejected = false;
-  try {
-    (void)parse_pnml_document(R"(<pnml><net id="n"><page id="p">
+  const auto zero_weight = parse_pnml_document(R"(<pnml><net id="n"><page id="p">
       <place id="p0"><initialMarking><text>1</text></initialMarking></place>
       <place id="p1"/><transition id="t0"/>
       <arc id="a0" source="p0" target="t0"><inscription><text>0</text></inscription></arc>
       <arc id="a1" source="t0" target="p1"/>
       <finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings>
     </page></net></pnml>)");
-  } catch (const std::runtime_error&) {
-    rejected = true;
-  }
-  assert(rejected);
+  assert(zero_weight.arc_occurrences->front().weight == 0);
+  assert(zero_weight.net.transitions().front().inputs.empty());
+  assert(parse_pnml_document(to_pnml(zero_weight)).arc_occurrences->front().weight == 0);
 
-  rejected = false;
+  bool rejected = false;
   try {
     (void)parse_pnml_document(R"(<pnml><net id="n"><page id="p">
       <place id="p0"><initialMarking><text>-1</text></initialMarking></place>
@@ -659,6 +656,63 @@ void pnml_arc_type_wire_contract() {
   }
 }
 
+void pnml_extended_weight_and_text_contract() {
+  struct Weight { std::string text; std::uint64_t magnitude; bool negative; };
+  const std::vector<Weight> weights = {
+    {"2",2,false},{"0",0,false},{"-1",1,true},{"-2",2,true},{"+2",2,false},
+    {"1_0",10,false},{"٢",2,false},{"１２",12,false},
+    {"18446744073709551615",std::numeric_limits<std::uint64_t>::max(),false}};
+  const auto xml = [](const std::string& annotation) {
+    return "<pnml><net id=\"weights\"><place id=\"source\"><initialMarking><text>2</text></initialMarking></place>"
+      "<place id=\"gate\"><initialMarking><text>3</text></initialMarking></place><place id=\"sink\"/><transition id=\"move\"/>"
+      "<arc source=\"source\" target=\"move\"/><arc source=\"gate\" target=\"move\">" + annotation + "</arc>"
+      "<arc source=\"move\" target=\"sink\"/><finalmarkings><marking><place idref=\"sink\"><text>1</text></place></marking></finalmarkings></net></pnml>";
+  };
+  for (const auto type : {"reset", "inhibitor"}) for (const auto& weight : weights) {
+    const auto document = parse_pnml_document(xml("<inscription><text>" + weight.text + "</text></inscription><arctype><text>" + type + "</text></arctype>"));
+    const auto& arc = document.arc_occurrences->at(1);
+    assert(arc.weight == weight.magnitude && arc.negative_weight == weight.negative);
+    const auto& transition = document.net.transitions().front();
+    const auto retained = arc.type == PetriArcType::kReset ? transition.reset_arc_weight(0) : transition.inhibitor_arc_weight(0);
+    assert(retained.magnitude == weight.magnitude && retained.negative == weight.negative);
+    const auto round_trip = parse_pnml_document(to_pnml(document));
+    assert(round_trip.arc_occurrences->at(1).weight == weight.magnitude);
+    assert(round_trip.arc_occurrences->at(1).negative_weight == weight.negative);
+    auto derived = document; derived.arc_occurrences.reset();
+    const auto projection = to_petri_net_presentation(derived);
+    assert(projection.arcs.at(1).weight == weight.magnitude && projection.arcs.at(1).negative_weight == weight.negative);
+    const auto primitive_round_trip = parse_pnml_document(to_pnml(document.net, document.initial_marking, document.final_marking));
+    assert(primitive_round_trip.arc_occurrences->at(1).weight == weight.magnitude);
+    assert(primitive_round_trip.arc_occurrences->at(1).negative_weight == weight.negative);
+  }
+  for (const auto& [annotation, type] : std::vector<std::pair<std::string,PetriArcType>>{
+      {"<arctype><text>re<![CDATA[set]]></text></arctype>",PetriArcType::kReset},
+      {"<arctype><text>re<!--owned-->set</text></arctype>",PetriArcType::kReset},
+      {"<arctype><text>reset<b/>inhibitor</text></arctype>",PetriArcType::kReset},
+      {"<arctype><text>re<?owned test?>set</text></arctype>",PetriArcType::kNormal},
+      {"<arctype><text>reset</text></arctype><arctype><text/></arctype>",PetriArcType::kNormal},
+      {"<arctype><text>reset</text><text/></arctype>",PetriArcType::kNormal},
+      {"<x:arctype xmlns:x=\"urn:owned\"><x:text>inhibitor</x:text></x:arctype>",PetriArcType::kInhibitor}}) {
+    assert(parse_pnml_document(xml(annotation)).arc_occurrences->at(1).type == type);
+  }
+  for (const auto& [annotation, weight] : std::vector<std::pair<std::string,std::size_t>>{
+      {"<inscription><text>1<![CDATA[0]]></text></inscription>",10},
+      {"<inscription><text>1<!--owned-->0</text></inscription>",10},
+      {"<inscription><text>2<b/>3</text></inscription>",2},
+      {"<inscription><text>1<?owned test?>0</text></inscription>",1}}) {
+    assert(parse_pnml_document(xml(annotation)).arc_occurrences->at(1).weight == weight);
+  }
+  bool rejected = false;
+  try { (void)parse_pnml_document(xml("<inscription><text>2</text></inscription><inscription><text/></inscription>")); }
+  catch (const std::runtime_error&) { rejected = true; }
+  assert(rejected);
+  auto stale = parse_pnml_document(xml("<inscription><text>2</text></inscription><arctype><text>reset</text></arctype>"));
+  stale.arc_occurrences->at(1).weight = 3;
+  rejected = false;
+  try { (void)to_pnml(stale); } catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+}
+
 }  // namespace
 
 int main() {
@@ -676,4 +730,5 @@ int main() {
   equation_guard_and_workflow_topology();
   normal_alignment_smoke();
   pnml_arc_type_wire_contract();
+  pnml_extended_weight_and_text_contract();
 }
