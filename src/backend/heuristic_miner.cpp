@@ -150,6 +150,7 @@ struct PlusAbstraction {
   // DataFrame means exclude missing durations while occurrence counts keep
   // those rows. Generic discovery retains its existing sum/count projection.
   std::map<std::string, double> sojourn_means;
+  bool pandas_sojourn_statistics = false;
   std::map<NamePair, std::uint64_t> concurrency;
 };
 
@@ -671,6 +672,63 @@ double pandas_elapsed(const ParsedExactTimestamp& end,
   return result;
 }
 
+char32_t pandas_string_codepoint(std::string_view text, std::size_t& position) {
+  const auto first = static_cast<unsigned char>(text[position++]);
+  char32_t ch = first;
+  int continuation = 0;
+  if (first >= 0xc2 && first <= 0xdf) {
+    ch = first & 0x1f; continuation = 1;
+  } else if (first >= 0xe0 && first <= 0xef) {
+    ch = first & 0x0f; continuation = 2;
+  } else if (first >= 0xf0 && first <= 0xf4) {
+    ch = first & 0x07; continuation = 3;
+  } else if (first >= 0x80) {
+    throw std::invalid_argument("heuristics pandas: invalid UTF-8 selector");
+  }
+  for (int i = 0; i < continuation; ++i) {
+    if (position == text.size())
+      throw std::invalid_argument("heuristics pandas: invalid UTF-8 selector");
+    const auto next = static_cast<unsigned char>(text[position++]);
+    if ((next & 0xc0) != 0x80)
+      throw std::invalid_argument("heuristics pandas: invalid UTF-8 selector");
+    ch = (ch << 6) | (next & 0x3f);
+  }
+  if ((continuation == 1 && ch < 0x80) ||
+      (continuation == 2 && ch < 0x800) ||
+      (continuation == 3 && ch < 0x10000) || ch > 0x10ffff)
+    throw std::invalid_argument("heuristics pandas: invalid UTF-8 selector");
+  return ch;
+}
+
+bool pandas_string_has_surrogate(const std::string& value) {
+  for (std::size_t position = 0; position < value.size();) {
+    const auto ch = pandas_string_codepoint(value, position);
+    if (ch >= 0xd800 && ch <= 0xdfff) return true;
+  }
+  return false;
+}
+
+bool pandas_string_column(const EventTable& table, std::size_t column) {
+  if ((!table.dtypes.empty() && table.dtypes[column] == "category") ||
+      (!table.categorical_dtypes.empty() && table.categorical_dtypes[column]))
+    return false;
+  return std::all_of(table.rows.begin(), table.rows.end(), [&](const auto& row) {
+    return row[column] && !row[column]->is_null &&
+           row[column]->kind == AttributeKind::kString;
+  });
+}
+
+struct PandasStringGroups {
+  explicit PandasStringGroups(bool merge) : enabled(merge) {}
+  bool enabled;
+  std::optional<std::string> first_surrogate;
+  const std::string& group(const std::string& value) {
+    if (!enabled || !pandas_string_has_surrogate(value)) return value;
+    if (!first_surrogate) first_surrogate = value;
+    return *first_surrogate;
+  }
+};
+
 struct PandasInterval {
   std::string activity;
   PandasTimestamp start;
@@ -684,8 +742,15 @@ PlusAbstraction build_pandas_plus_abstraction(
     std::int64_t start_units, std::int64_t complete_units,
     const EventTable& projection) {
   PlusAbstraction out;
+  out.pandas_sojourn_statistics = true;
   std::set<std::string> known;
   std::map<NamePair, std::uint64_t> directional_concurrency;
+  const bool string_cases = pandas_string_column(projection, 0);
+  const bool string_activities = pandas_string_column(projection, 1);
+  PandasStringGroups means(string_activities), efg_sources(string_activities),
+      efg_targets(string_activities), concurrency_sources(string_activities),
+      concurrency_targets(string_activities), wait_sources(string_activities),
+      wait_targets(string_activities);
   struct Mean {
     double sum = 0.0;
     double correction = 0.0;
@@ -717,12 +782,39 @@ PlusAbstraction build_pandas_plus_abstraction(
     const auto* number = std::get_if<double>(&duration->typed_value);
     if (number == nullptr)
       throw std::logic_error("Heuristics Miner pandas duration is not a float");
-    sojourn[activity].add(*number);
+    sojourn[means.group(activity)].add(*number);
+  }
+  if (!projection.categorical_dtypes.empty() && projection.categorical_dtypes[1]) {
+    std::vector<std::string> ordered;
+    std::set<std::string> seen;
+    for (const auto& category : projection.categorical_dtypes[1]->categories)
+      if (category.kind == AttributeKind::kString && known.contains(category.value) &&
+          seen.insert(category.value).second)
+        ordered.push_back(category.value);
+    for (const auto& activity : out.activity_order)
+      if (seen.insert(activity).second) ordered.push_back(activity);
+    out.activity_order = std::move(ordered);
+  }
+  // Boundary grouping uses original rows. Interval case identities remain
+  // separate, and each grouped string column has its own first representative.
+  if (string_cases) {
+    PandasStringGroups cases(true);
+    std::map<std::string, NamePair> boundaries;
+    for (const auto& row : projection.rows) {
+      const auto& key = cases.group(row[0]->value);
+      const auto& activity = row[1]->value;
+      auto [found, inserted] = boundaries.try_emplace(key, NamePair{activity, activity});
+      if (!inserted) found->second.second = activity;
+    }
+    for (const auto& [key, boundary] : boundaries) {
+      ++out.starts[boundary.first];
+      ++out.ends[boundary.second];
+    }
   }
   for (const auto& trace : log.traces) {
     if (trace.events.empty()) continue;
     const bool missing_case = trace.case_id_state == FirstClassAttributeState::kNull;
-    if (!missing_case) {
+    if (!missing_case && !string_cases) {
       ++out.starts[required_activity(trace.events.front(), options)];
       ++out.ends[required_activity(trace.events.back(), options)];
     }
@@ -759,7 +851,8 @@ PlusAbstraction build_pandas_plus_abstraction(
         const auto& second = intervals[j];
         if (first.complete && second.start &&
             pandas_instant(*first.complete) <= pandas_instant(*second.start)) {
-          ++out.eventually_follows[{first.activity, second.activity}];
+          ++out.eventually_follows[{efg_sources.group(first.activity),
+                                    efg_targets.group(second.activity)}];
           break;
         }
       }
@@ -770,18 +863,21 @@ PlusAbstraction build_pandas_plus_abstraction(
             std::max(*first.concurrency_start, *second.concurrency_start) <=
                 std::min(*first.concurrency_complete,
                          *second.concurrency_complete))
-          ++directional_concurrency[{first.activity, second.activity}];
+          ++directional_concurrency[{concurrency_sources.group(first.activity),
+                                     concurrency_targets.group(second.activity)}];
       }
     }
     // Pandas performance adjacency follows sorted nonmissing starts. A missing
     // completion preserves its row but contributes no outgoing wait sample.
     // Missing case groups still supply intervals, but no performance waits.
-    if (missing_case) continue;
+    if (missing_case ||
+        (string_cases && pandas_string_has_surrogate(trace.case_id))) continue;
     const PandasInterval* previous = nullptr;
     for (const auto& current : intervals) {
       if (!current.start) continue;
       if (previous != nullptr) {
-        const NamePair pair{previous->activity, current.activity};
+        const NamePair pair{wait_sources.group(previous->activity),
+                            wait_targets.group(current.activity)};
         ++out.direct_adjacency[pair];
         if (previous->complete) {
           const auto wait = std::max(
@@ -811,6 +907,9 @@ PlusAbstraction build_pandas_plus_abstraction(
 double plus_sojourn_mean(const PlusAbstraction& abstraction,
                          const std::string& activity) {
   const auto pandas = abstraction.sojourn_means.find(activity);
+  if (abstraction.pandas_sojourn_statistics)
+    return pandas != abstraction.sojourn_means.end()
+        ? pandas->second : std::numeric_limits<double>::quiet_NaN();
   return pandas != abstraction.sojourn_means.end()
              ? pandas->second
              : abstraction.sojourn_sums.at(activity) /
@@ -1914,7 +2013,9 @@ HeuristicsNet discover_plus_plus_from_abstraction(
     const double mean_sojourn = plus_sojourn_mean(abstraction, activity);
     net.raw_activity_statistics.push_back(
         {activity, abstraction.occurrences.at(activity), mean_sojourn});
-    net.sojourn_times->emplace(activity, mean_sojourn);
+    if (!abstraction.pandas_sojourn_statistics ||
+        abstraction.sojourn_means.contains(activity))
+      net.sojourn_times->emplace(activity, mean_sojourn);
   }
 
   for (const auto& [pair, frequency] : abstraction.eventually_follows) {
@@ -2058,30 +2159,7 @@ HeuristicsNet discover_plus_plus_pandas(
     constexpr char hex[] = "0123456789abcdef";
     for (std::size_t position = 0; position < text.size();) {
       const auto start = position;
-      const auto first = static_cast<unsigned char>(text[position++]);
-      char32_t ch = first;
-      int continuation = 0;
-      if (first >= 0xc2 && first <= 0xdf) {
-        ch = first & 0x1f; continuation = 1;
-      } else if (first >= 0xe0 && first <= 0xef) {
-        ch = first & 0x0f; continuation = 2;
-      } else if (first >= 0xf0 && first <= 0xf4) {
-        ch = first & 0x07; continuation = 3;
-      } else if (first >= 0x80) {
-        throw std::invalid_argument("heuristics pandas: invalid UTF-8 selector");
-      }
-      for (int i = 0; i < continuation; ++i) {
-        if (position == text.size())
-          throw std::invalid_argument("heuristics pandas: invalid UTF-8 selector");
-        const auto next = static_cast<unsigned char>(text[position++]);
-        if ((next & 0xc0) != 0x80)
-          throw std::invalid_argument("heuristics pandas: invalid UTF-8 selector");
-        ch = (ch << 6) | (next & 0x3f);
-      }
-      if ((continuation == 1 && ch < 0x80) ||
-          (continuation == 2 && ch < 0x800) ||
-          (continuation == 3 && ch < 0x10000) || ch > 0x10ffff)
-        throw std::invalid_argument("heuristics pandas: invalid UTF-8 selector");
+      const auto ch = pandas_string_codepoint(text, position);
       // Python strings can contain lone surrogates. Preserve those code points
       // in WTF-8 input long enough to render their explicit Unicode escapes.
       if (ch == quote || ch == '\\') {
@@ -2171,6 +2249,32 @@ HeuristicsNet discover_plus_plus_pandas(
   if (selected.activity_attribute == selected.case_id_attribute)
     throw HeuristicPandasError(
         "builtins.KeyError", repr(selected.activity_attribute + "_2"));
+  if (!data.categorical_dtypes.empty() && data.categorical_dtypes[*case_column]) {
+    for (const auto& category : data.categorical_dtypes[*case_column]->categories) {
+      if (category.kind != AttributeKind::kString) continue;
+      std::optional<std::size_t> first, last;
+      std::string character;
+      std::size_t codepoint_index = 0;
+      for (std::size_t position = 0; position < category.value.size(); ++codepoint_index) {
+        const auto start = position;
+        const auto ch = pandas_string_codepoint(category.value, position);
+        if (ch >= 0xd800 && ch <= 0xdfff) {
+          if (!first) {
+            first = codepoint_index;
+            character = category.value.substr(start, position - start);
+          }
+          last = codepoint_index;
+        } else if (first) break;
+      }
+      if (first) {
+        const auto detail = first == last
+            ? "character " + repr(character) + " in position " + std::to_string(*first)
+            : "characters in position " + std::to_string(*first) + "-" + std::to_string(*last);
+        throw HeuristicPandasError("builtins.UnicodeEncodeError",
+            "'utf-8' codec can't encode " + detail + ": surrogates not allowed");
+      }
+    }
+  }
   const auto unit = [&](std::size_t index) -> std::int64_t {
     if (!data.dtypes.empty()) {
       const std::string_view dtype = data.dtypes[index];
@@ -2212,9 +2316,11 @@ HeuristicsNet discover_plus_plus_pandas(
     const auto* number = std::get_if<double>(&cell->typed_value);
     return number != nullptr && std::isnan(*number);
   };
+  const bool string_cases = pandas_string_column(data, *case_column);
   if (!data.rows.empty() && timezone_aware(completed) &&
       std::all_of(data.rows.begin(), data.rows.end(), [&](const auto& row) {
-        return missing_case(row[*case_column]);
+        return missing_case(row[*case_column]) ||
+               (string_cases && pandas_string_has_surrogate(row[*case_column]->value));
       }))
     throw HeuristicPandasError(
         "builtins.TypeError", "cannot subtract DatetimeArray from ndarray[object]");
@@ -2272,6 +2378,9 @@ HeuristicsNet discover_plus_plus_pandas(
   if (!data.dtypes.empty())
     for (const auto index : source_columns)
       projection.dtypes.push_back(data.dtypes[index]);
+  if (!data.categorical_dtypes.empty())
+    for (const auto index : source_columns)
+      projection.categorical_dtypes.push_back(data.categorical_dtypes[index]);
   projection.rows.reserve(data.rows.size());
   for (const auto& row : data.rows) {
     EventTable::Row projected;
