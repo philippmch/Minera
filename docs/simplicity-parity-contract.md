@@ -3,7 +3,8 @@
 The target is PM4Py 2.7.22, pinned to
 `0715c31f3f1d85924107d6aa5329806db69df899`. The simplicity package remains
 **partial**. The sections below record graph-only arc-degree/Cardoso
-observations, imported PNML/composite paths and executable cyclomatic comparisons.
+observations, imported PNML/composite paths and executable/presentation
+cyclomatic comparisons.
 
 `evaluate_simplicity(const PetriNetPresentation&, ...)` preserves distinct
 place/transition identities and separate arc occurrences. Names do not identify
@@ -11,8 +12,9 @@ nodes. Arc-degree counts each arc object once; its weight does not multiply its
 structural degree. Cardoso counts distinct successor-place sets for each place's
 outgoing transition choices, including the empty set. Parallel arcs and weights
 do not multiply identical Cardoso choices. Invalid identities or endpoints
-produce an explicit uncomputed result. Cyclomatic evaluation retains its
-executable-net entry point because it requires reachability.
+produce an explicit uncomputed result. Cyclomatic evaluation supports both
+executable and full-presentation reachability, with their distinct input semantics
+described below.
 
 Arc-degree now accepts every double baseline on both native graph carriers.
 `NaN` yields NaN, positive infinity yields 1, and negative infinity yields 0.
@@ -207,7 +209,8 @@ that occurrence count. The native value, simplicity and complexity aliases
 report it; strongly connected components remain separate graph metadata.
 Default empty-preset initialization, explicit marking vectors and the native
 state cap keep their existing behavior. Document forwarding uses the corrected
-executable route; full-presentation cyclomatic support remains open.
+executable route at that checkpoint; the following section extends ordinary
+documents and full presentations.
 
 Two alternatives from one marking to the same next marking now give 2 rather
 than 1. A two-state cycle with one token gives 2 rather than the previous 1;
@@ -280,12 +283,108 @@ do not establish full cyclomatic, simplicity or dependency/package parity.
 | --- | --- | ---: |
 | `cyclomatic-reachability-checks.jsonl.gz` | `7f1700b8c466591d4cb885d0c314fb4a5e90ebf7bb3d586e9ce82cad99d0e48c` | 74628422 |
 
-Cyclomatic presentation and marking-name collisions, distinct parallel
-input-arc enabling, typed/huge weights and markings, extended arc semantics,
-caps and unbounded graphs remain open. Broader evaluation/conformance and
-additional composite graph/log/marking, nonnumeric parameter and exception
-identity domains are not established. General PNML metadata, explicit marking
-keys, malformed/extended-arc carriers, public exporter byte/ID formatting and
-full application wire precision remain open. The catalogue stays at
-46/86 packages, 199/387 modules and 228 incomplete units.
-Full module/package parity is not established.
+## Cyclomatic presentation reachability
+
+The full-presentation and ordinary imported-document overloads now retain
+individual weighted input arcs, supplied place/transition names and sparse
+marking keys during cyclomatic reachability. Each input arc enables against
+the original marking at its individual weight. The observed public graph uses
+weak firing: consumed place entries disappear when depleted or oversubscribed,
+then output arcs add tokens. Two weight-one inputs enable on one source token;
+consume-only reaches the empty marking, one output token to the source forms
+a loop, and two output tokens visit a second marking before looping. The
+executable net keeps its existing summed-input semantics.
+
+`SimplicityOptions::presentation_initial_marking` supplies ordered signed-token
+entries keyed by presented place IDs. It overrides the marking vector, including
+an explicitly empty optional marking. Untouched zero keys survive, consumed
+nonpositive entries disappear, and invalid or duplicate keys reject explicitly.
+Existing vector/default initialization remains available. Ordinary PNML arc
+occurrences use the full presentation; extended-arc documents retain their
+existing executable route. Stale arc metadata still rejects explicitly.
+
+Marking names follow captured public repr/normalization behavior: Python-style
+quoting and Unicode 14 alphanumeric characters plus underscore. The owned
+classifier generator verifies all 1,114,112 Unicode codepoints and 734 ranges
+against public Python character operations; it makes no PM4Py calls. Sparse
+key presence and supplied names affect graph projection. Distinct outgoing
+transition names are counted on the selected representative for each normalized
+marking name; graph edge identity includes source name, transition name and
+target name. Strongly connected components remain separate graph metadata.
+Native traversal chooses representatives deterministically. This does not
+establish reference set/allocation-order equivalence when names collide.
+
+Fresh pinned captures retain 2,832 actual public metric calls, 2,692 independent
+graph calls, 324 default-marking discoveries, 52 state-name normalization calls
+and 20 PNML imports. There are also 630 is_enabled, 630 regular execute and
+630 weak_execute calls. The main matrix replays every preceding 1,684 metric
+control and adds 378 weighted parallel-input cases. Separate firing controls
+cover 45 input/output fixtures with tokens zero through six and sparse/dense
+keys. All actual scalars equal the independently returned graph representative
+outgoing-name count on the 2,692 metric/graph pairs. Regular firing and weak
+firing have independently captured outputs; an owned weak-firing candidate
+matches all 630 actual weak outputs. No implementation or bytecode is inspected.
+Opaque before/after module hashes match the pin after recorded CRLF conversion.
+Metric errors and observed input/marking/parameter mutations are zero.
+
+The order experiment makes 120 real metric calls over eight new allocations
+per control. Twelve of fourteen previously differing supplied-name controls
+return more than one scalar; all results are retained, including stable controls.
+The main native matrix has 14 scalar and 23 full-result differences per target
+route, all in captured name-alias cases. These remain explicit gates. No public
+case is omitted, and neither a prototype nor a selected repeat replaces an
+actual metric oracle.
+
+Each accepted and baseline native bundle makes 2,692 request parses and 8,076
+metric calls across presentation, document and executable-control routes. Both
+accepted target routes compute every case. On the main 2,062 cases, each matches
+2,048 scalars and 2,039 complete six-field outcomes. All 3,934 target results
+without public name aliases match every field. The separate 630-case firing
+matrix matches all 1,260 target outcomes and all 7,560 scalar-alias/metadata
+fields. All 2,692 executable controls are unchanged. Baseline presentations are
+unsupported; baseline documents match 1,781 main and 434 firing full outcomes.
+Document, presentation and option snapshots remain unchanged.
+
+The 20 application fixtures use exact bytes from independent public PNML
+imports, with four input-weight pairs and five token counts. All 20 accepted
+CLI and 20 real loopback HTTP scalar results match; baseline CLI matches 13.
+All 41 recorded HTTP requests return 200. Startup health requests and discovery
+internals are not added to instrumented producer counts; the server is stopped
+after verification. These finite integer scores fit current application numeric
+precision, without establishing broader wire behavior.
+
+The original giant native initializer exits with Windows stack overflow
+0xC00000FD before main: zero metric calls and zero parses. Its exact helper,
+probe, build/execution logs and binary survive. A derivative partitions the
+same ordered fixtures into construction chunks of 32 and completes all calls.
+The first production candidate compiles all 652 frozen inputs and passes five
+assertion-enabled suites, but its regular firing fails 24 non-alias graph
+metadata comparisons. Fresh regular/weak firing captures identify the gap.
+The final source corrects weak firing and adds depletion/self-loop regressions;
+it builds all 652 inputs again with zero binary reuse. All five assertion-enabled
+Release suites pass. The 647 unchanged parent inputs, three changed inputs,
+two new files and final correction of two intermediate inputs are bound.
+Intermediate sources, binaries and all differing comparison rows survive
+separately. A copied comparison subtotal is corrected from 4,124 to 1,260 for
+the 630-case firing matrix without replaying calls; its original before output
+and corrected derivation remain retained.
+
+The two archives retain 1,197 exact files in 1,272 verified chunk
+rows, including all accepted sources, producer captures, failures, application
+records and both new builds' core/test/application binaries. The second archive
+holds the intermediate build; the preceding pushed archive binds unchanged
+baseline binaries and sources. Exact base64 chunk and whole-file hashes pass
+round-trip verification. The package/module catalogue is not promoted.
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `cyclomatic-presentation-checks.jsonl.gz` | `075f57dbdaad05289aca55f9373b66f21f4205ad06f31aa4ec0a8e2f11557a9d` | 82040213 |
+| `cyclomatic-presentation-intermediate-checks.jsonl.gz` | `c9e823477c9b6980ad50be9a139070b8e021a076ac039c356bc0696ff519b83c` | 64563737 |
+
+Supplied marking-name collisions and reference set/allocation order remain
+open. Additional typed/huge/signed arc-weight and marking domains, extended arcs,
+foreign keys and exception identity, caps/time limits and unbounded graphs are
+not established. Broader evaluation/conformance, composite log/graph/marking,
+PNML metadata, exporter bytes/IDs and full application wire precision remain
+open. The catalogue stays at 46/86 packages, 199/387 modules and
+228 incomplete units. Full module/package parity is not established.

@@ -1,6 +1,8 @@
 #include "minera/evaluation.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/pnml.hpp"
+#include "cyclomatic_unicode.hpp"
+#include "root_cause_unicode.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -11,6 +13,7 @@
 #include <set>
 #include <stdexcept>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -1405,6 +1408,227 @@ GeneralizationResult evaluate_generalization(
       tree, variant, options);
 }
 
+namespace {
+
+void finish_cyclomatic(SimplicityResult& out,
+                      const std::vector<std::vector<std::size_t>>& adjacency,
+                      std::optional<double> scalar = std::nullopt) {
+  out.vertices = adjacency.size();
+  for (const auto& edges : adjacency) out.edges += edges.size();
+  std::vector<std::vector<std::size_t>> reverse(out.vertices);
+  for (std::size_t source = 0; source < out.vertices; ++source)
+    for (const auto target : adjacency[source]) reverse[target].push_back(source);
+  std::vector<char> seen(out.vertices, 0);
+  std::vector<std::size_t> order;
+  order.reserve(out.vertices);
+  for (std::size_t root = 0; root < out.vertices; ++root) {
+    if (seen[root]) continue;
+    std::vector<std::pair<std::size_t, std::size_t>> stack{{root, 0}};
+    seen[root] = 1;
+    while (!stack.empty()) {
+      auto& [node, edge] = stack.back();
+      if (edge < adjacency[node].size()) {
+        const auto target = adjacency[node][edge++];
+        if (!seen[target]) { seen[target] = 1; stack.push_back({target, 0}); }
+      } else { order.push_back(node); stack.pop_back(); }
+    }
+  }
+  std::fill(seen.begin(), seen.end(), char{0});
+  for (auto it = order.rbegin(); it != order.rend(); ++it) {
+    if (seen[*it]) continue;
+    ++out.strongly_connected_components;
+    std::vector<std::size_t> stack{*it};
+    seen[*it] = 1;
+    while (!stack.empty()) {
+      const auto node = stack.back(); stack.pop_back();
+      for (const auto target : reverse[node]) {
+        if (!seen[target]) { seen[target] = 1; stack.push_back(target); }
+      }
+    }
+  }
+  out.complexity = out.value = out.simplicity = scalar.value_or(double(out.edges));
+}
+
+using PresentedMarking = std::vector<std::pair<std::size_t, std::int64_t>>;
+
+char32_t cyclomatic_codepoint(std::string_view value, std::size_t& position) {
+  const auto first = static_cast<unsigned char>(value[position++]);
+  char32_t codepoint = first;
+  int continuation = 0;
+  if (first >= 0xc2 && first <= 0xdf) { codepoint = first & 0x1f; continuation = 1; }
+  else if (first >= 0xe0 && first <= 0xef) { codepoint = first & 0x0f; continuation = 2; }
+  else if (first >= 0xf0 && first <= 0xf4) { codepoint = first & 0x07; continuation = 3; }
+  else if (first >= 0x80) throw std::invalid_argument("invalid UTF-8 presented place name");
+  for (int i = 0; i < continuation; ++i) {
+    if (position == value.size()) throw std::invalid_argument("invalid UTF-8 presented place name");
+    const auto next = static_cast<unsigned char>(value[position++]);
+    if ((next & 0xc0) != 0x80) throw std::invalid_argument("invalid UTF-8 presented place name");
+    codepoint = (codepoint << 6) | (next & 0x3f);
+  }
+  if ((continuation == 1 && codepoint < 0x80) ||
+      (continuation == 2 && codepoint < 0x800) ||
+      (continuation == 3 && codepoint < 0x10000) ||
+      codepoint > 0x10ffff || (codepoint >= 0xd800 && codepoint <= 0xdfff))
+    throw std::invalid_argument("invalid UTF-8 presented place name");
+  return codepoint;
+}
+
+std::string cyclomatic_quoted_text(const std::string& text) {
+  const char quote = text.find('\'') != std::string::npos && text.find('"') == std::string::npos ? '"' : '\'';
+  std::string result(1, quote);
+  constexpr char hex[] = "0123456789abcdef";
+  for (std::size_t position = 0; position < text.size();) {
+    const auto start = position;
+    const auto codepoint = cyclomatic_codepoint(text, position);
+    if (codepoint == '\\' || codepoint == static_cast<unsigned char>(quote)) {
+      result += '\\'; result += static_cast<char>(codepoint);
+    } else if (codepoint == '\n') result += "\\n";
+    else if (codepoint == '\r') result += "\\r";
+    else if (codepoint == '\t') result += "\\t";
+    else if (!root_cause_unicode_printable(codepoint)) {
+      const int digits = codepoint <= 0xff ? 2 : codepoint <= 0xffff ? 4 : 8;
+      result += digits == 2 ? "\\x" : digits == 4 ? "\\u" : "\\U";
+      for (int shift = (digits - 1) * 4; shift >= 0; shift -= 4)
+        result += hex[(codepoint >> shift) & 15];
+    } else result.append(text, start, position - start);
+  }
+  result += quote;
+  return result;
+}
+
+std::string cyclomatic_marking_name(const PetriNetPresentation& net,
+                                   PresentedMarking marking) {
+  std::stable_sort(marking.begin(), marking.end(), [&](const auto& left, const auto& right) {
+    return net.places[left.first].name < net.places[right.first].name;
+  });
+  std::string name;
+  for (const auto& [place, tokens] : marking) {
+    const auto text = cyclomatic_quoted_text(net.places[place].name + ':' + std::to_string(tokens));
+    for (std::size_t position = 0; position < text.size();) {
+      const auto start = position;
+      if (cyclomatic_unicode_word(cyclomatic_codepoint(text, position)))
+        name.append(text, start, position - start);
+    }
+  }
+  return name;
+}
+
+SimplicityResult evaluate_presented_cyclomatic(
+    const PetriNetPresentation& net,
+    const std::unordered_map<std::size_t, std::size_t>& places,
+    const std::unordered_map<std::size_t, std::size_t>& transitions,
+    const SimplicityOptions& options) {
+  SimplicityResult out;
+  out.variant = SimplicityVariant::EXTENDED_CYCLOMATIC;
+  const auto reject = [&](const char* error) { out.computed = false; out.error = error; return out; };
+  if (!options.max_states ||
+      (!options.presentation_initial_marking && !options.initial_marking.empty() && options.initial_marking.size() != net.places.size()) ||
+      (!options.final_marking.empty() && options.final_marking.size() != net.places.size()))
+    return reject("invalid marking dimension or max_states");
+  using WeightedEndpoint = std::pair<std::size_t, std::int64_t>;
+  std::vector<std::vector<WeightedEndpoint>> inputs(net.transitions.size()), outputs(net.transitions.size());
+  std::vector<char> has_preset(net.places.size(), 0);
+  for (const auto& arc : net.arcs) {
+    if (arc.weight > std::uint64_t(std::numeric_limits<std::int64_t>::max()))
+      return reject("presented arc weight exceeds signed reachability range");
+    const auto weight = static_cast<std::int64_t>(arc.weight);
+    if (arc.source.kind == PetriNodeKind::kPlace)
+      inputs[transitions.at(arc.target.id)].push_back({places.at(arc.source.id), weight});
+    else {
+      const auto place = places.at(arc.target.id);
+      outputs[transitions.at(arc.source.id)].push_back({place, weight});
+      has_preset[place] = 1;
+    }
+  }
+  PresentedMarking start;
+  if (options.presentation_initial_marking) {
+    std::unordered_set<std::size_t> keys;
+    for (const auto& entry : *options.presentation_initial_marking) {
+      const auto place = places.find(entry.place_id);
+      if (place == places.end()) return reject("presented marking refers to an absent place");
+      if (!keys.insert(entry.place_id).second) return reject("duplicate presented marking key");
+      start.emplace_back(place->second, entry.tokens);
+    }
+  } else if (!options.initial_marking.empty()) {
+    for (std::size_t i = 0; i < options.initial_marking.size(); ++i)
+      if (options.initial_marking[i]) start.emplace_back(i, options.initial_marking[i]);
+  } else {
+    for (std::size_t i = 0; i < net.places.size(); ++i)
+      if (!has_preset[i]) start.emplace_back(i, 1);
+  }
+  const auto key = [](PresentedMarking marking) { std::sort(marking.begin(), marking.end()); return marking; };
+  const auto tokens = [](const PresentedMarking& marking, std::size_t place) {
+    const auto found = std::find_if(marking.begin(), marking.end(), [place](const auto& entry) { return entry.first == place; });
+    return found == marking.end() ? std::int64_t{0} : found->second;
+  };
+  const auto assign = [](PresentedMarking& marking, std::size_t place, std::int64_t value, bool remove_nonpositive) {
+    const auto found = std::find_if(marking.begin(), marking.end(), [place](const auto& entry) { return entry.first == place; });
+    if (remove_nonpositive && value <= 0) { if (found != marking.end()) marking.erase(found); }
+    else if (found == marking.end()) marking.emplace_back(place, value);
+    else found->second = value;
+  };
+  std::vector<PresentedMarking> states{start};
+  std::map<PresentedMarking, std::size_t> ids{{key(start), 0}};
+  std::vector<std::size_t> state_names;
+  std::map<std::string, std::size_t> named_ids;
+  std::vector<std::size_t> representatives;
+  const auto name_state = [&](const PresentedMarking& marking, std::size_t index) {
+    const auto [found, inserted] = named_ids.emplace(cyclomatic_marking_name(net, marking), named_ids.size());
+    if (inserted) representatives.push_back(index);
+    state_names.push_back(found->second);
+  };
+  try { name_state(start, 0); }
+  catch (const std::invalid_argument& error) { return reject(error.what()); }
+  std::queue<std::size_t> pending;
+  pending.push(0);
+  std::set<std::tuple<std::size_t, std::string, std::size_t>> arcs;
+  double scalar = 0.0;
+  while (!pending.empty()) {
+    const auto source = pending.front(); pending.pop();
+    std::set<std::string> enabled_names;
+    for (std::size_t t = 0; t < net.transitions.size(); ++t) {
+      if (std::any_of(inputs[t].begin(), inputs[t].end(), [&](const auto& arc) { return tokens(states[source], arc.first) < arc.second; })) continue;
+      enabled_names.insert(net.transitions[t].name);
+      auto next = states[source];
+      // Public reachability uses weak firing: consumed places are removed when
+      // depleted, including oversubscription by separately enabled input arcs.
+      for (const auto& [place, weight] : inputs[t]) {
+        const auto value = tokens(next, place);
+        if (value < std::numeric_limits<std::int64_t>::min() + weight)
+          return reject("presented firing exceeds signed reachability range");
+        assign(next, place, value - weight, true);
+      }
+      for (const auto& [place, weight] : outputs[t]) {
+        const auto value = tokens(next, place);
+        if (value > std::numeric_limits<std::int64_t>::max() - weight)
+          return reject("presented firing exceeds signed reachability range");
+        assign(next, place, value + weight, false);
+      }
+      const auto [found, inserted] = ids.emplace(key(next), states.size());
+      if (inserted) {
+        if (states.size() >= options.max_states) {
+          out.exhausted = true;
+          return reject("reachable-marking state cap exceeded");
+        }
+        try { name_state(next, states.size()); }
+        catch (const std::invalid_argument& error) { return reject(error.what()); }
+        states.push_back(std::move(next));
+        pending.push(found->second);
+      }
+      arcs.emplace(state_names[source], net.transitions[t].name, state_names[found->second]);
+    }
+    // Equal displayed names select the first discovered representative. The
+    // ordered native traversal is deterministic; public set-order gates remain.
+    if (representatives[state_names[source]] == source) scalar += double(enabled_names.size());
+  }
+  std::vector<std::vector<std::size_t>> adjacency(named_ids.size());
+  for (const auto& [source, transition, target] : arcs) adjacency[source].push_back(target);
+  finish_cyclomatic(out, adjacency, scalar);
+  return out;
+}
+
+} // namespace
+
 SimplicityResult evaluate_simplicity(const PetriNet& net,
                                      SimplicityVariant variant,
                                      const SimplicityOptions& options) {
@@ -1530,58 +1754,7 @@ SimplicityResult evaluate_simplicity(const PetriNet& net,
     }
   }
 
-  out.vertices = states.size();
-  for (const auto& edges : adjacency) out.edges += edges.size();
-  std::vector<std::vector<std::size_t>> reverse(out.vertices);
-  for (std::size_t source = 0; source < out.vertices; ++source)
-    for (const auto target : adjacency[source]) reverse[target].push_back(source);
-
-  std::vector<char> seen(out.vertices, 0);
-  std::vector<std::size_t> order;
-  order.reserve(out.vertices);
-  for (std::size_t root = 0; root < out.vertices; ++root) {
-    if (seen[root]) continue;
-    std::vector<std::pair<std::size_t, std::size_t>> stack{{root, 0}};
-    seen[root] = 1;
-    while (!stack.empty()) {
-      auto& [node, edge] = stack.back();
-      if (edge < adjacency[node].size()) {
-        const auto target = adjacency[node][edge++];
-        if (!seen[target]) {
-          seen[target] = 1;
-          stack.push_back({target, 0});
-        }
-      } else {
-        order.push_back(node);
-        stack.pop_back();
-      }
-    }
-  }
-
-  std::fill(seen.begin(), seen.end(), char{0});
-  std::size_t components = 0;
-  for (auto it = order.rbegin(); it != order.rend(); ++it) {
-    if (seen[*it]) continue;
-    ++components;
-    std::vector<std::size_t> stack{*it};
-    seen[*it] = 1;
-    while (!stack.empty()) {
-      const auto node = stack.back();
-      stack.pop_back();
-      for (const auto target : reverse[node]) {
-        if (!seen[target]) {
-          seen[target] = 1;
-          stack.push_back(target);
-        }
-      }
-    }
-  }
-  out.strongly_connected_components = components;
-  // The pinned public scalar counts reachable transition occurrences on the
-  // executable carrier. SCCs remain separate graph metadata, including cycles.
-  out.complexity = double(out.edges);
-  out.value = out.complexity;
-  out.simplicity = out.value;
+  finish_cyclomatic(out, adjacency);
   return out;
 }
 
@@ -1596,8 +1769,9 @@ SimplicityResult evaluate_simplicity(const PetriNetPresentation& net,
     return out;
   };
   if (variant != SimplicityVariant::ARC_DEGREE &&
-      variant != SimplicityVariant::EXTENDED_CARDOSO)
-    return reject("presentation simplicity requires arc-degree or extended Cardoso");
+      variant != SimplicityVariant::EXTENDED_CARDOSO &&
+      variant != SimplicityVariant::EXTENDED_CYCLOMATIC)
+    return reject("unsupported simplicity variant");
 
   std::unordered_map<std::size_t, std::size_t> places, transitions;
   for (std::size_t i = 0; i < net.places.size(); ++i)
@@ -1628,6 +1802,8 @@ SimplicityResult evaluate_simplicity(const PetriNetPresentation& net,
       return reject("presented arc endpoints must be a place and a transition");
     }
   }
+  if (variant == SimplicityVariant::EXTENDED_CYCLOMATIC)
+    return evaluate_presented_cyclomatic(net, places, transitions, options);
   out.edges = net.arcs.size();
   if (variant == SimplicityVariant::ARC_DEGREE) {
     out.vertices = net.places.size() + net.transitions.size();
@@ -1652,7 +1828,9 @@ SimplicityResult evaluate_simplicity(const PetriNetPresentation& net,
 SimplicityResult evaluate_simplicity(const PnmlDocument& document,
                                      SimplicityVariant variant,
                                      const SimplicityOptions& options) {
-  if (variant == SimplicityVariant::EXTENDED_CYCLOMATIC)
+  if (variant == SimplicityVariant::EXTENDED_CYCLOMATIC &&
+      std::any_of(document.net.transitions().begin(), document.net.transitions().end(),
+                  [](const auto& transition) { return transition.has_extended_arcs(); }))
     return evaluate_simplicity(document.net, variant, options);
   try {
     return evaluate_simplicity(to_petri_net_presentation(document), variant, options);
