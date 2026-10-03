@@ -1045,6 +1045,79 @@ void plusplus_pandas_timestamp_ties_and_petri_counter_order() {
   assert(renamed_arc("intplace_Y", "hid_10") && renamed_arc("hid_10", "pre_W"));
 }
 
+void plusplus_pandas_missing_case_groups() {
+  for (const auto decoration : {HeuristicNetDecoration::kFrequency,
+                                HeuristicNetDecoration::kPerformance}) {
+    auto options = plus_options();
+    options.decoration = decoration;
+    auto table = pandas_interval_table(2);
+    const auto case_column = table.column_index("case:concept:name");
+    const auto activity = table.column_index("concept:name");
+    const auto set_missing = [&](std::size_t i, bool nan) {
+      auto& cell = *table.rows[i][case_column];
+      cell.value = nan ? "nan" : "";
+      cell.kind = nan ? AttributeKind::kFloat : AttributeKind::kString;
+      cell.is_null = !nan;
+      if (nan) cell.typed_value = std::numeric_limits<double>::quiet_NaN();
+      else cell.typed_value = std::monostate{};
+    };
+    set_missing(1, false);
+    auto net = discover_plus_plus_pandas(table, options);
+    assert((net.activities == std::vector<std::string>{"A", "B", "C", "D"}));
+    assert(activity_stat(net, "B").occurrences == 4);
+    assert(activity_stat(net, "B").start_occurrences == 0);
+    assert(activity_stat(net, "B").end_occurrences == 0);
+    assert(activity_stat(net, "A").start_occurrences == 4);
+    for (std::size_t i = 0; i < table.rows.size(); ++i)
+      if (table.rows[i][activity]->value == "B") set_missing(i, false);
+    net = discover_plus_plus_pandas(table, options);
+    assert((net.activities == std::vector<std::string>{"A", "B", "C", "D"}));
+    assert(activity_stat(net, "B").occurrences == 4);
+    assert(activity_stat(net, "B").start_occurrences == 0);
+    assert(activity_stat(net, "B").end_occurrences == 0);
+    assert(relation(net, "A", "C").eventually_follows_frequency == 4);
+    if (decoration == HeuristicNetDecoration::kPerformance)
+      assert(!net.plusplus_computed_performance_dfg->contains({"B", "B"}));
+
+    table = pandas_interval_table(2);
+    for (std::size_t i = 0; i < 4; ++i) set_missing(i, false);
+    for (std::size_t i = 12; i < 16; ++i) set_missing(i, true);
+    net = discover_plus_plus_pandas(table, options);
+    assert(activity_stat(net, "A").start_occurrences == 2);
+    assert(activity_stat(net, "D").end_occurrences == 2);
+    assert(relation(net, "A", "B").eventually_follows_frequency == 3);
+    table = pandas_interval_table(2);
+    for (std::size_t i = 0; i < table.rows.size(); ++i) set_missing(i, false);
+    const auto before = table;
+    bool matched = false;
+    try { (void)discover_plus_plus_pandas(table, options); }
+    catch (const HeuristicPandasError& error) {
+      matched = error.reference_type() == "builtins.TypeError" &&
+                std::string(error.what()) == "cannot subtract DatetimeArray from ndarray[object]";
+    }
+    assert(matched && table.rows == before.rows && table.columns == before.columns);
+
+    for (const auto& key : {"start_timestamp", "time:timestamp"}) {
+      const auto column = table.column_index(key);
+      table.dtypes[column] = "datetime64[us]";
+      for (auto& row : table.rows) {
+        auto& cell = *row[column];
+        cell.value.pop_back();
+        auto& date = std::get<NativeDate>(cell.typed_value);
+        date.value = cell.value;
+        date.timezone.reset();
+      }
+    }
+    net = discover_plus_plus_pandas(table, options);
+    assert(net.start_activities.empty() && net.end_activities.empty());
+    assert(activity_stat(net, "A").occurrences == 4);
+    assert(relation(net, "A", "B").eventually_follows_frequency == 4);
+    assert(net.sojourn_times->at("B") == 3.0);
+    if (decoration == HeuristicNetDecoration::kPerformance)
+      assert(net.plusplus_computed_performance_dfg->empty());
+  }
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -4940,6 +5013,7 @@ int main(int argc, char** argv) {
   plusplus_pandas_literal_selectors_and_error_order();
   plusplus_pandas_duration_selector_collisions();
   plusplus_pandas_timestamp_ties_and_petri_counter_order();
+  plusplus_pandas_missing_case_groups();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();

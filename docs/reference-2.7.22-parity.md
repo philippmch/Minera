@@ -7967,3 +7967,30 @@ verified members. Both pre-change replays and the preceding checkpoint remain bo
 parameter, carrier, error, metadata, identity, ordering and routing gates remain
 open. PLUSPLUS and Alpha+ stay partial; coverage remains 46/86 packages and
 199/387 modules, with 228 incomplete units and no promotion.
+
+### PLUSPLUS pandas missing-case implementation (2026-10-03)
+
+Pooled missing case scalars for interval relations while excluding those groups
+from boundaries and performance waits. Preserved global activity counts,
+sojourn values and original row ordering for frequency ties. Matched the
+all-missing aware subtraction error before @@diff mutation and the successful
+naive counterpart; copied-start mutation remains observable.
+
+All 72 new public aliases match: 42 HeuristicsNets on 2322 supported checks,
+eighteen supported Petri presentations and twelve errors, with matching
+input-after, mutation and option checks. Both complete pre-change replays and
+their differences remain retained. The wider replay matches 694 aliases on
+20844 net-field checks, 117 Petri presentations and 151 errors; all 77 generic
+regressions are unchanged. Actual replay execution makes 771 discoveries,
+117 presentations and 43 generic conversions without additional reference calls.
+Five assertion-enabled suites pass for 650 exact compilation inputs.
+
+Evidence is `heuristic-plusplus-pandas-case-checks.jsonl.gz` (SHA-256
+`77a0f23667f5909ad764a10513782423f300736e41b2a912f7fee027c3484f03`, 70230661 bytes), with
+`heuristic-plusplus-pandas-case-validation.json`. Every member round-trips.
+The earlier ordering checkpoint remains bound across its three archive segments.
+The initial FTK1011 configure failure made no native calls and remains retained
+alongside the successful retry at a shorter path. Broader type, error, metadata,
+identity, ordering and routing gates remain open. PLUSPLUS and Alpha+ stay
+partial; coverage remains 46/86 packages and 199/387 modules, with 228 incomplete
+units and no promotion.
