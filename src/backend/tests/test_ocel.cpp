@@ -690,7 +690,7 @@ int main() {
   assert(replay_diagnostics.trace_count == 1 &&
          replay_diagnostics.fitting_traces == 0 &&
          replay_diagnostics.transition_activations.size() == 2);
-  std::uint64_t total_missing = 0;
+  minera::TokenInteger total_missing = 0;
   for (const auto& place : replay_diagnostics.places)
     total_missing += place.missing;
   assert(total_missing > 0 && replay_diagnostics.transition_activations[1] == 1);

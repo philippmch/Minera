@@ -6241,23 +6241,8 @@ int main(int argc, char** argv) {
       model_options.infer_final_marking = false;
       model_options.require_workflow_boundaries = false;
       const auto document = minera::import_pnml_document(token_replay_model, model_options);
-      auto replay_options = token_replay_options;
-      const auto marking = [](const std::vector<std::int64_t>& source) {
-        std::vector<int> result;
-        result.reserve(source.size());
-        for (const auto count : source) {
-          if (count < 0 || count > std::numeric_limits<int>::max())
-            throw std::invalid_argument("PNML replay marking exceeds the supported token range");
-          result.push_back(static_cast<int>(count));
-        }
-        return result;
-      };
-      replay_options.initial_marking = marking(document.initial_marking);
-      replay_options.final_marking = marking(document.final_marking);
-      replay_options.initial_marking_keys = document.initial_marking_keys;
-      replay_options.final_marking_keys = document.final_marking_keys;
-      replay_options.place_names = document.place_ids;
-      replay_options.transition_names = document.transition_ids;
+      const auto replay_options = minera::tools::pnml_replay_options(
+          document, token_replay_options);
       const auto body = minera::token_replay_traces_json(
           minera::replay_token_traces(log, document.net, replay_options), replay_options.variant);
       if (output.empty()) std::cout << body << '\n';

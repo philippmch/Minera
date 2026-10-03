@@ -456,10 +456,11 @@ EventTable replay_dataframe_diagnostics(
       numeric ? "float64" : "object";
   result.columns = {"case_id", "is_fit", "trace_fitness", "missing", "remaining", "produced", "consumed"};
   result.dtypes = {case_dtype, "bool", "float64", "int64", "int64", "int64", "int64"};
-  const auto integer_cell = [](std::string key, std::uint64_t value) {
-    if (value > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
+  const auto integer_cell = [](std::string key, const TokenInteger& value) {
+    if (value < std::numeric_limits<std::int64_t>::min() ||
+        value > std::numeric_limits<std::int64_t>::max())
       throw std::overflow_error("token replay: diagnostic counter exceeds int64");
-    EventAttribute cell{std::move(key), std::to_string(value), AttributeKind::kInt};
+    EventAttribute cell{std::move(key), value.decimal(), AttributeKind::kInt};
     cell.typed_value = static_cast<std::int64_t>(value);
     return cell;
   };

@@ -249,3 +249,114 @@ claims. The token-replay dispatcher, forward variation and root-cause module
 remain partial. Stream/table grouping remains a native extension. The overall
 catalogue now has 198 complete and 189 partial modules, with 46 complete and 40
 partial dispatcher packages: 229 coverage units remain open.
+
+## Exact signed ordinary-weight forward replay
+
+Forward token replay now uses exact signed token integers for reached markings,
+trace/place diagnostics and aggregate token counters. Compact ordinary arcs
+contribute their measured input/output weights. Repair records the input deficit
+and adds the full input weight, preserving partially available tokens. Only actual
+input places are repaired. A signed input marking can remain insufficient after
+repair: that attempted transition contributes consumed/produced counts but does
+not activate or move tokens until enabled. Zero output keys are retained. Final
+missing checks apply to final-marking keys; signed remaining counts are retained.
+The observed fitness result is 1 when consumed or produced totals are nonpositive.
+
+TokenInteger owns signed decimal-limb arithmetic, canonical zero, add/subtract/
+multiply, hashing/comparison, checked bounded conversions and decimal JSON output.
+Independent Python arithmetic checks cover 545 boundary/random signed cases and
+match all 3270 fields, including float conversion. The first conversion attempt
+had 90 rounding mismatches; its original source, executable and actual results
+are retained. The corrected header matches the accepted frozen source exactly.
+Exact initial/final replay options take precedence over legacy integer vectors;
+the central PNML adapter supplies them and standalone CLI replay uses that adapter.
+
+The retained 58-model public capture has 1044 actual forward returns. Seven new
+finite genuinely silent models add seven actual imports and 126 actual direct/
+dispatcher returns. Their hidden output weights include negative uint64 magnitude,
+negative small weights, zero, unit, larger and uint64-limit weights. Each hidden
+transition consumes one source token, bounding silent exploration. All public net,
+marking, log and parameter snapshots remain unchanged. The reused public worker
+incorrectly declares 58 imports in this seven-model capture: original raw bytes
+are preserved and an audited copy changes only that count. Seven actual import
+markers and 126 actual call markers prove the corrected counts. Returned objects
+and scalar values are unchanged. Opaque before/after module pin proofs match
+PM4Py 2.7.22 commit 0715c31f3f1d85924107d6aa5329806db69df899 with recorded
+CRLF-to-LF normalization only; implementation and bytecode are not inspected.
+
+A derived binding combines these two actual captures, preserving returned objects
+and remapping only case/call indices. It is not a new public producer. The expanded
+before probe matches 736 of 1098 supported public trace outcomes. The accepted
+native probe makes 65 actual imports, 61 successful imports and 549 actual replay
+invocations across nine profiles. Each invocation maps to both independently
+captured public routes. All 1098 supported outcomes match all ten trace fields
+(10980 fields), including ordered transition/problem lists, enabled sets and exact
+reached-marking keys/counts. All 1544 measured PLTR place m/r/c/p fields also match.
+Four public weights exceed the native uint64 magnitude carrier, leaving 72 captured
+public outcomes behind explicit import gates. No success is inferred for them.
+
+CLI checks make 553 actual process invocations: all 549 supported model/profile
+runs match complete native replay JSON and four out-of-range imports reject.
+This preserves the native trace carrier; public PLTR tuple/set/dictionary and
+RETURN_NAMES formatting parity is not inferred. The 43 label controls still match
+all 624 public trace outcomes/6240 fields. The prior 352-model regression preserves
+all returned cases, 4224 metric outcomes, 1056 parameter parses and 352 exports.
+
+The frozen build contains 657 source inputs: nine existing changes, two additions
+and 646 unchanged parent inputs. Full compilation produces 154 fresh binaries.
+Its first CTest run passes 149 of 151 suites: Unicode test fixtures need the MSVC
+UTF-8 option and a forward test still expects obsolete int32 overflow. Both actual
+failures are retained. The corrected test asserts an exact postmarking and counters
+beyond int32; bounded reachability, footprints and alignment guards remain tested.
+The final snapshot freshly rebuilds both corrected suites and reuses 152 binaries
+whose source is unchanged. Their full generated compile/link projects match after
+only path and generated project/reference GUID normalization; actual binary hashes
+match the original full compilation. All 151 assertion-enabled suites now pass.
+No 154-fresh-output claim is made for this final test-only correction build.
+
+Four unsuccessful build snapshots, actual compiler/CTest logs, all linked artifacts,
+partial compiler inventories, the early failure and isolated successful diagnostics,
+before/candidate mismatches, zero-call preparation/audit failures and immutable
+helper correction chains are retained. Partial compiler objects remain at their
+recorded local paths; only linked artifacts are archived. Binary duplicates use
+exact aliases. The deterministic gzip archives round-trip every chunk and entire
+file; the validation JSON lists every file, alias, process and producer binding.
+The pushed parent validation/archives bind the original public oracle and baseline.
+
+Full forward method/module parity remains open: PLTR tuple case sets, transition/
+unknown dictionaries, RETURN_NAMES output formatting, other parameters, broader
+silent topologies, arbitrary imported markings and large floating-point ratios need
+further evidence. PNML weight magnitude is still uint64 and PNML markings are
+signed int64. Dataframe diagnostic integer cells retain explicit int64 range checks;
+large JSON numbers do not establish exact frontend presentation. Weighted aggregate
+fitness, precision, alignment, composite conformance and specialized transformations
+remain unverified, so the existing application computed=false/error gate remains.
+This forward matrix does not establish weighted backwards or broader extended-arc
+parity. The catalogue is unchanged: 46/86 packages, 199/387 modules and 228 incomplete
+units. No module/package promotion or full parity is claimed.
+
+Evidence: [weighted-token-replay-validation.json](weighted-token-replay-validation.json).
+
+| Archive | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `weighted-token-replay-evidence-01.jsonl.gz` | `7045fd754266ca99dc6c56c7c2c8830c06d0555fa1de9fe453646d5c3a0de149` | 8939263 |
+| `weighted-token-replay-evidence-02.jsonl.gz` | `3c5bf7a7e7ecc97a402103c1c41c1548fce96af70a6ff1d1a12518de6aeb833f` | 5885080 |
+| `weighted-token-replay-evidence-03.jsonl.gz` | `59bb524925a3db5ca91b801197f62f900dbe2645ef4e89f9f04540fb4c1c6840` | 3816674 |
+| `weighted-token-replay-evidence-04.jsonl.gz` | `36637fd6cf12c88f7e3d55c2611146fa23ed82a18f8f0a1b8b97976ebf5ab2cc` | 4971711 |
+| `weighted-token-replay-evidence-05.jsonl.gz` | `3de95c596f3648d99cc9f256d24e6705a6bd81f1a75aa97355f45eaaa14e2616` | 7596070 |
+| `weighted-token-replay-evidence-06.jsonl.gz` | `de0f2a93a24d5be2458899d50fa880ec1429c93e872deb804d57170c2c95d4d5` | 7117240 |
+| `weighted-token-replay-evidence-07.jsonl.gz` | `fd7d440c18b00580a64ea8ff06cc44f5831b1b86f55076c0ad09b887b06fb30e` | 6952163 |
+| `weighted-token-replay-evidence-08.jsonl.gz` | `b10ca7fb6a12fab98bc546e49941a72d85f3e9346254223e7f9e86b033f8528f` | 7521413 |
+| `weighted-token-replay-evidence-09.jsonl.gz` | `6eaeefc411cc2467669bc3b2002537cf7b265168c31fd5fff67afa119f848397` | 7089170 |
+| `weighted-token-replay-evidence-10.jsonl.gz` | `09449d18de3b9640822282e3f47a52f6417bcea0d2feaa82cdd0c85d7e729c93` | 7651108 |
+| `weighted-token-replay-evidence-11.jsonl.gz` | `422f5cbc7e1caaabe026a4491d71620531339e6cabca9a56d16ca8674a3834cd` | 17043565 |
+| `weighted-token-replay-evidence-12.jsonl.gz` | `03e379affa137915b673ac9c6ba834f35ca0254a70164130a9db08ffea905e0d` | 8022822 |
+| `weighted-token-replay-evidence-13.jsonl.gz` | `3eb08e765ad8f4a1780f4c776a1927fe7f36fa244125a6ec0e9e3dde88c1d805` | 7363149 |
+| `weighted-token-replay-evidence-14.jsonl.gz` | `def530402023a11f151a61415da830bc974cee05599e95e9471d4c5dfc9cf316` | 7238610 |
+| `weighted-token-replay-evidence-15.jsonl.gz` | `08adfa35347ccedcf091b93a4ea3fb1daaf60047706d12f46a880eefd5531aeb` | 6304991 |
+| `weighted-token-replay-evidence-16.jsonl.gz` | `88b993e2939e7457fada299085f5f724267e6448b11b2e4a027b47e31b4593e9` | 7857780 |
+| `weighted-token-replay-evidence-17.jsonl.gz` | `a9c6dd88595f0411be0f28130fc945f925faec816f122a816a986f4777d11051` | 7167983 |
+| `weighted-token-replay-evidence-18.jsonl.gz` | `bd59ab66a788935b1989fcc20b2ee2d5043f40e16426953c72a8c2275dd03ead` | 7968558 |
+| `weighted-token-replay-evidence-19.jsonl.gz` | `722d14bf564090d08ceb4bdebffd0b9569fdf435f7506016a9888931ca5ba173` | 13309668 |
+| `weighted-token-replay-evidence-20.jsonl.gz` | `f759000af2d6c39799c39d7e9c5906e1755a709552a43fda7c95d33c2f12b5ca` | 22982111 |
+| `weighted-token-replay-evidence-21.jsonl.gz` | `60fe66fbf406e1726f283a563b054c98e22c48cc442f4dc5807179fc0bed6b74` | 15820689 |
