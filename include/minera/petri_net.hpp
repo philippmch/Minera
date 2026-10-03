@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "minera/heuristic_miner.hpp"
+#include "minera/token_integer.hpp"
 #include "minera/process_tree.hpp"
 
 namespace minera {
@@ -22,10 +23,10 @@ namespace minera {
 // allow firing when their place is empty.
 enum class PetriArcType { kNormal, kReset, kInhibitor };
 
-// Retained arc weight for interchange and classic graph evaluation.
+// Exact nonnegative weight magnitude for interchange and graph evaluation.
 // Reset/inhibitor execution still follows the arc type, independent of weight.
 struct PetriArcWeight {
-  std::uint64_t magnitude = 1;
+  TokenInteger magnitude = 1;
   bool negative = false;
 };
 
@@ -48,12 +49,16 @@ struct PetriTransition {
     if (input_weights.empty()) return {};
     if (input_weights.size() != inputs.size())
       throw std::invalid_argument("Petri input weight dimensions are invalid");
+    if (input_weights.at(index).magnitude < 0)
+      throw std::invalid_argument("Petri weight magnitude must be nonnegative");
     return input_weights.at(index);
   }
   [[nodiscard]] PetriArcWeight output_arc_weight(std::size_t index) const {
     if (output_weights.empty()) return {};
     if (output_weights.size() != outputs.size())
       throw std::invalid_argument("Petri output weight dimensions are invalid");
+    if (output_weights.at(index).magnitude < 0)
+      throw std::invalid_argument("Petri weight magnitude must be nonnegative");
     return output_weights.at(index);
   }
   [[nodiscard]] bool has_compact_ordinary_arcs() const noexcept {
@@ -64,12 +69,16 @@ struct PetriTransition {
     if (reset_weights.empty()) return {};
     if (reset_weights.size() != reset_inputs.size())
       throw std::invalid_argument("Petri reset weight dimensions are invalid");
+    if (reset_weights.at(index).magnitude < 0)
+      throw std::invalid_argument("Petri weight magnitude must be nonnegative");
     return reset_weights.at(index);
   }
   [[nodiscard]] PetriArcWeight inhibitor_arc_weight(std::size_t index) const {
     if (inhibitor_weights.empty()) return {};
     if (inhibitor_weights.size() != inhibitor_inputs.size())
       throw std::invalid_argument("Petri inhibitor weight dimensions are invalid");
+    if (inhibitor_weights.at(index).magnitude < 0)
+      throw std::invalid_argument("Petri weight magnitude must be nonnegative");
     return inhibitor_weights.at(index);
   }
 
@@ -103,7 +112,7 @@ struct PetriNodeRef {
 struct PetriPresentedArc {
   PetriNodeRef source;
   PetriNodeRef target;
-  std::uint64_t weight = 1;
+  TokenInteger weight = 1;
   HeuristicStructuredValue::Object properties;
   // weight is the absolute magnitude; negative zero is equivalent to zero.
   bool negative_weight = false;
@@ -189,20 +198,28 @@ class PetriNet {
     if ((!inputs.empty() && inputs.size() != target.inputs.size()) ||
         (!outputs.empty() && outputs.size() != target.outputs.size()))
       throw std::invalid_argument("Petri ordinary weight dimensions are invalid");
-    for (auto& weight : inputs) weight.negative = weight.negative && weight.magnitude;
-    for (auto& weight : outputs) weight.negative = weight.negative && weight.magnitude;
+    for (auto& weight : inputs) {
+      if (weight.magnitude < 0) throw std::invalid_argument("Petri weight magnitude must be nonnegative");
+      weight.negative = weight.negative && weight.magnitude != 0;
+    }
+    for (auto& weight : outputs) {
+      if (weight.magnitude < 0) throw std::invalid_argument("Petri weight magnitude must be nonnegative");
+      weight.negative = weight.negative && weight.magnitude != 0;
+    }
     target.input_weights = std::move(inputs);
     target.output_weights = std::move(outputs);
   }
 
   void add_reset_arc(std::size_t transition, std::size_t place,
-                     std::uint64_t weight = 1, bool negative = false) {
+                     TokenInteger weight = 1, bool negative = false) {
+    if (weight < 0) throw std::invalid_argument("Petri weight magnitude must be nonnegative");
     add_arc(transition, place, PetriArcType::kReset);
     transitions_[transition].reset_weights.back() = {weight, negative && weight != 0};
   }
 
   void add_inhibitor_arc(std::size_t transition, std::size_t place,
-                         std::uint64_t weight = 1, bool negative = false) {
+                         TokenInteger weight = 1, bool negative = false) {
+    if (weight < 0) throw std::invalid_argument("Petri weight magnitude must be nonnegative");
     add_arc(transition, place, PetriArcType::kInhibitor);
     transitions_[transition].inhibitor_weights.back() = {weight, negative && weight != 0};
   }
@@ -297,23 +314,12 @@ template <typename Token>
     if (place >= marking.size()) return false;
     if (!transition.input_weights.empty()) {
       const auto weight = transition.input_arc_weight(index);
-      if (weight.negative) {
-        if constexpr (std::is_signed_v<Token>) {
-          constexpr auto limit = std::uint64_t{1} << std::numeric_limits<Token>::digits;
-          if (weight.magnitude < limit && marking[place] < -static_cast<Token>(weight.magnitude)) return false;
-        }
-      } else {
-        if constexpr (std::is_signed_v<Token>) if (marking[place] < 0) return false;
-        if (static_cast<std::uint64_t>(marking[place]) < weight.magnitude) return false;
-      }
+      const auto required_weight = weight.negative ? -weight.magnitude : weight.magnitude;
+      if (TokenInteger(marking[place]) < required_weight) return false;
       continue;
     }
-    if constexpr (std::is_signed_v<Token>) {
-      if (marking[place] < 0) return false;
-    }
     ++required[place];
-    if (required[place] > static_cast<std::make_unsigned_t<Token>>(marking[place]))
-      return false;
+    if (TokenInteger(marking[place]) < TokenInteger(required[place])) return false;
   }
   for (const auto place : transition.inhibitor_inputs) {
     if (place >= marking.size() || marking[place] != 0) return false;
@@ -368,6 +374,18 @@ template <typename Token>
 }
 
 template <typename Token>
+[[nodiscard]] bool petri_adjust_tokens(Token value, const TokenInteger& magnitude,
+                                       bool negative, Token& result) {
+  if (magnitude < 0) throw std::invalid_argument("Petri weight magnitude must be nonnegative");
+  const auto following = TokenInteger(value) + (negative ? -magnitude : magnitude);
+  if constexpr (std::is_same_v<Token, TokenInteger>) { result = following; return true; }
+  else {
+    try { result = static_cast<Token>(following); return true; }
+    catch (const std::overflow_error&) { return false; }
+  }
+}
+
+template <typename Token>
 void fire_petri_transition(const PetriTransition& transition,
                            std::vector<Token>& marking) {
   for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
@@ -375,7 +393,7 @@ void fire_petri_transition(const PetriTransition& transition,
     if (transition.input_weights.empty()) { --marking.at(place); continue; }
     const auto weight = transition.input_arc_weight(index);
     auto& value = marking.at(place);
-    if (!weight.negative && (value <= 0 || weight.magnitude >= static_cast<std::uint64_t>(value))) {
+    if (!weight.negative && (value <= 0 || weight.magnitude >= TokenInteger(value))) {
       value = 0; continue;
     }
     Token following;
@@ -393,8 +411,9 @@ void fire_petri_transition(const PetriTransition& transition,
         throw std::overflow_error("Petri firing exceeds supported token range");
       marking[place] = following; continue;
     }
-    if (marking[place] == std::numeric_limits<Token>::max())
-      throw std::overflow_error("Petri firing exceeds supported token range");
+    if constexpr (std::is_integral_v<Token>)
+      if (marking[place] == std::numeric_limits<Token>::max())
+        throw std::overflow_error("Petri firing exceeds supported token range");
     ++marking[place];
   }
 }

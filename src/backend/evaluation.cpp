@@ -1525,7 +1525,7 @@ SimplicityResult evaluate_presented_cyclomatic(
       (!options.presentation_initial_marking && !options.initial_marking.empty() && options.initial_marking.size() != net.places.size()) ||
       (!options.final_marking.empty() && options.final_marking.size() != net.places.size()))
     return reject("invalid marking dimension or max_states");
-  struct WeightedEndpoint { std::size_t place; std::uint64_t magnitude; bool negative; };
+  struct WeightedEndpoint { std::size_t place; TokenInteger magnitude; bool negative; };
   std::vector<std::vector<WeightedEndpoint>> inputs(net.transitions.size()), outputs(net.transitions.size());
   std::vector<char> has_preset(net.places.size(), 0);
   for (const auto& arc : net.arcs) {
@@ -1564,38 +1564,9 @@ SimplicityResult evaluate_presented_cyclomatic(
     else if (found == marking.end()) marking.emplace_back(place, value);
     else found->second = value;
   };
-  const auto adjust = [](std::int64_t value, std::uint64_t magnitude,
+  const auto adjust = [](std::int64_t value, const TokenInteger& magnitude,
                           bool negative, std::int64_t& result) {
-    constexpr auto limit = std::uint64_t{1} << 63;
-    const auto absolute = [](std::int64_t number) {
-      return number < 0 ? std::uint64_t(-(number + 1)) + 1 : std::uint64_t(number);
-    };
-    if (!negative) {
-      if (value >= 0) {
-        if (magnitude > std::uint64_t(std::numeric_limits<std::int64_t>::max() - value)) return false;
-        result = value + static_cast<std::int64_t>(magnitude);
-      } else if (magnitude >= absolute(value)) {
-        const auto remaining = magnitude - absolute(value);
-        if (remaining >= limit) return false;
-        result = static_cast<std::int64_t>(remaining);
-      } else {
-        const auto remaining = absolute(value) - magnitude;
-        result = remaining == limit ? std::numeric_limits<std::int64_t>::min() : -static_cast<std::int64_t>(remaining);
-      }
-    } else {
-      if (value <= 0) {
-        if (magnitude > limit - absolute(value)) return false;
-        const auto remaining = absolute(value) + magnitude;
-        result = remaining == limit ? std::numeric_limits<std::int64_t>::min() : -static_cast<std::int64_t>(remaining);
-      } else if (magnitude <= std::uint64_t(value)) {
-        result = value - static_cast<std::int64_t>(magnitude);
-      } else {
-        const auto remaining = magnitude - std::uint64_t(value);
-        if (remaining > limit) return false;
-        result = remaining == limit ? std::numeric_limits<std::int64_t>::min() : -static_cast<std::int64_t>(remaining);
-      }
-    }
-    return true;
+    return petri_adjust_tokens(value, magnitude, negative, result);
   };
   std::vector<PresentedMarking> states{start};
   std::map<PresentedMarking, std::size_t> ids{{key(start), 0}};

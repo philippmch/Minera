@@ -80,13 +80,13 @@ void validate_arc_occurrences(const PnmlDocument& document) {
   std::vector<Cursors> cursors(document.net.transitions().size());
   for (const auto& arc : *document.arc_occurrences) {
     if (arc.place >= document.net.place_count() ||
-        arc.transition >= document.net.transitions().size())
+        arc.transition >= document.net.transitions().size() || arc.weight < 0)
       throw std::invalid_argument("PNML arc occurrence has an invalid endpoint or weight");
     const auto& transition = document.net.transitions()[arc.transition];
     auto& cursor = cursors[arc.transition];
     const std::vector<std::size_t>* endpoints = nullptr;
     std::size_t* position = nullptr;
-    std::size_t multiplicity = arc.weight;
+    TokenInteger multiplicity = arc.weight;
     if (arc.type == PetriArcType::kNormal) {
       endpoints = arc.input ? &transition.inputs : &transition.outputs;
       position = arc.input ? &cursor.inputs : &cursor.outputs;
@@ -145,20 +145,20 @@ void for_each_document_arc(const PnmlDocument& document, Callback callback) {
   for (std::size_t t = 0; t < document.net.transitions().size(); ++t) {
     const auto& transition = document.net.transitions()[t];
     for_each_ordinary_arc(transition,true,[&](std::size_t place,PetriArcWeight weight) {
-      callback(PnmlArcOccurrence{place,t,true,PetriArcType::kNormal,static_cast<std::size_t>(weight.magnitude),{},weight.negative});
+      callback(PnmlArcOccurrence{place,t,true,PetriArcType::kNormal,weight.magnitude,{},weight.negative});
     });
     for (std::size_t i = 0; i < transition.reset_inputs.size(); ++i) {
       const auto weight = transition.reset_arc_weight(i);
       callback(PnmlArcOccurrence{transition.reset_inputs[i], t, true, PetriArcType::kReset,
-                                 static_cast<std::size_t>(weight.magnitude), {}, weight.negative});
+                                 weight.magnitude, {}, weight.negative});
     }
     for (std::size_t i = 0; i < transition.inhibitor_inputs.size(); ++i) {
       const auto weight = transition.inhibitor_arc_weight(i);
       callback(PnmlArcOccurrence{transition.inhibitor_inputs[i], t, true, PetriArcType::kInhibitor,
-                                 static_cast<std::size_t>(weight.magnitude), {}, weight.negative});
+                                 weight.magnitude, {}, weight.negative});
     }
     for_each_ordinary_arc(transition,false,[&](std::size_t place,PetriArcWeight weight) {
-      callback(PnmlArcOccurrence{place,t,false,PetriArcType::kNormal,static_cast<std::size_t>(weight.magnitude),{},weight.negative});
+      callback(PnmlArcOccurrence{place,t,false,PetriArcType::kNormal,weight.magnitude,{},weight.negative});
     });
   }
 }
@@ -330,7 +330,7 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
   };
   std::size_t arc_id = 0;
   const auto write_arc = [&](std::size_t place, std::size_t t, bool input,
-                             PetriArcType type, std::size_t weight,
+                             PetriArcType type, const TokenInteger& weight,
                              const std::string& original_id = {},
                              bool negative = false) {
     out << "      <arc id=\"";
@@ -363,22 +363,22 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
     if (transition.input_weights.empty()) for (const auto& [place,weight] : export_endpoints(transition.inputs))
       write_arc(place,t,true,PetriArcType::kNormal,weight);
     else for_each_ordinary_arc(transition,true,[&](std::size_t place,PetriArcWeight weight) {
-      write_arc(place,t,true,PetriArcType::kNormal,static_cast<std::size_t>(weight.magnitude),{},weight.negative);
+      write_arc(place,t,true,PetriArcType::kNormal,weight.magnitude,{},weight.negative);
     });
     for (std::size_t i = 0; i < transition.reset_inputs.size(); ++i) {
       const auto weight = transition.reset_arc_weight(i);
       write_arc(transition.reset_inputs[i], t, true, PetriArcType::kReset,
-                static_cast<std::size_t>(weight.magnitude), {}, weight.negative);
+                weight.magnitude, {}, weight.negative);
     }
     for (std::size_t i = 0; i < transition.inhibitor_inputs.size(); ++i) {
       const auto weight = transition.inhibitor_arc_weight(i);
       write_arc(transition.inhibitor_inputs[i], t, true, PetriArcType::kInhibitor,
-                static_cast<std::size_t>(weight.magnitude), {}, weight.negative);
+                weight.magnitude, {}, weight.negative);
     }
     if (transition.output_weights.empty()) for (const auto& [place,weight] : export_endpoints(transition.outputs))
       write_arc(place,t,false,PetriArcType::kNormal,weight);
     else for_each_ordinary_arc(transition,false,[&](std::size_t place,PetriArcWeight weight) {
-      write_arc(place,t,false,PetriArcType::kNormal,static_cast<std::size_t>(weight.magnitude),{},weight.negative);
+      write_arc(place,t,false,PetriArcType::kNormal,weight.magnitude,{},weight.negative);
     });
   }
 
@@ -526,7 +526,7 @@ struct ParsedArc {
   std::string source;
   std::string target;
   PetriArcType type = PetriArcType::kNormal;
-  std::size_t weight = 1;
+  TokenInteger weight = 1;
   std::string id;
   bool negative_weight = false;
 };
@@ -664,9 +664,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   const auto finish_arc_text = [&] {
     if (arc_text->inscription) {
       const auto weight = detail::parse_pnml_arc_weight(arc_text->value);
-      if (weight.magnitude > std::numeric_limits<std::size_t>::max())
-        throw std::runtime_error("PNML arc weight exceeds the native size range");
-      arcs.back().weight = static_cast<std::size_t>(weight.magnitude);
+      arcs.back().weight = weight.magnitude;
       arcs.back().negative_weight = weight.negative;
     } else {
       arcs.back().type = arc_text->value == "reset" ? PetriArcType::kReset
@@ -820,7 +818,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
           inputs[to_transition->second].push_back(from_place->second);
           input_weights[to_transition->second].push_back({arc.weight,arc.negative_weight});
         } else inputs[to_transition->second].insert(
-            inputs[to_transition->second].end(), arc.weight,
+            inputs[to_transition->second].end(), static_cast<std::size_t>(arc.weight),
             from_place->second);
       }
       else if (arc.type == PetriArcType::kReset) {
@@ -841,7 +839,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
         outputs[from_transition->second].push_back(to_place->second);
         output_weights[from_transition->second].push_back({arc.weight,arc.negative_weight});
       } else outputs[from_transition->second].insert(
-          outputs[from_transition->second].end(), arc.weight,
+          outputs[from_transition->second].end(), static_cast<std::size_t>(arc.weight),
           to_place->second);
       place_has_in[to_place->second] = true;
       arc_occurrences.push_back({to_place->second, from_transition->second, false,

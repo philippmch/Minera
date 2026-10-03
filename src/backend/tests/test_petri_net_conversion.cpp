@@ -511,7 +511,7 @@ void assert_automatic_public_fixture(const minera::PetriNetPresentation& actual,
       assert(arc.weight==1 && arc.properties.empty());
       assert(arc.source.kind!=arc.target.kind);
       const auto source=id(arc.source),target=id(arc.target);assert(source<size && target<size);
-      arcs[source][target]+=arc.weight;
+      arcs[source][target]+=static_cast<std::uint64_t>(arc.weight);
     }
     return arcs;
   };
