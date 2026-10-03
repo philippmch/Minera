@@ -521,8 +521,8 @@ void pnml_document_preserves_arc_occurrences() {
     <arc id="first&#10;&amp;" source="p0" target="t0"/>
     <arc id="out1" source="t0" target="p1"><inscription><text>2</text></inscription></arc>
     <arc id="second" source="p0" target="t0"><inscription><text>2</text></inscription></arc>
-    <arc id="inhibit" source="p2" target="t1"><type><text>inhibitor</text></type></arc>
-    <arc id="reset" source="p3" target="t1"><type><text>reset</text></type></arc>
+    <arc id="inhibit" source="p2" target="t1"><arctype><text>inhibitor</text></arctype></arc>
+    <arc id="reset" source="p3" target="t1"><arctype><text>reset</text></arctype></arc>
     <arc id="out2" source="t0" target="p1"/>
     <arc source="t1" target="p3"/>
   </page><finalmarkings><marking><place idref="p1"><text>3</text></place></marking></finalmarkings>
@@ -625,6 +625,40 @@ void normal_alignment_smoke() {
   assert(result.computed && result.fitness < 1.0);
 }
 
+void pnml_arc_type_wire_contract() {
+  const std::vector<std::pair<std::string, PetriArcType>> controls = {
+    {"<arctype><text>reset</text></arctype>", PetriArcType::kReset},
+    {"<arctype><text>inhibitor</text></arctype>", PetriArcType::kInhibitor},
+    {"<type><text>reset</text></type>", PetriArcType::kNormal},
+    {"<type><text>inhibitor</text></type>", PetriArcType::kNormal},
+    {"<arctype><text>reset</text></arctype><type><text>inhibitor</text></type>", PetriArcType::kReset},
+    {"<arctype><text>inhibitor</text></arctype><type><text>reset</text></type>", PetriArcType::kInhibitor},
+    {"<arctype><text>unknown</text></arctype>", PetriArcType::kNormal},
+    {"<arctype><text>RESET</text></arctype>", PetriArcType::kNormal},
+    {"<arctype><text> reset </text></arctype>", PetriArcType::kNormal},
+    {"<arctype><text/></arctype>", PetriArcType::kNormal}
+  };
+  for (const auto& [annotation, expected] : controls) {
+    const auto document = parse_pnml_document(
+      "<pnml><net id=\"typed\"><place id=\"source\"><initialMarking><text>1</text></initialMarking></place>"
+      "<place id=\"gate\"/><place id=\"sink\"/><transition id=\"move\"/>"
+      "<arc id=\"guard\" source=\"source\" target=\"move\"/>"
+      "<arc id=\"typed\" source=\"gate\" target=\"move\">" + annotation + "</arc>"
+      "<arc id=\"out\" source=\"move\" target=\"sink\"/>"
+      "<finalmarkings><marking><place idref=\"sink\"><text>1</text></place></marking></finalmarkings></net></pnml>");
+    assert(document.arc_occurrences->at(1).type == expected);
+    const auto& transition = document.net.transitions().front();
+    assert(transition.inputs.size() == (expected == PetriArcType::kNormal ? 2 : 1));
+    assert(transition.reset_inputs.size() == (expected == PetriArcType::kReset ? 1 : 0));
+    assert(transition.inhibitor_inputs.size() == (expected == PetriArcType::kInhibitor ? 1 : 0));
+    const auto exported = to_pnml(document);
+    assert(exported.find("<type>") == std::string::npos);
+    assert((exported.find("<arctype><text>reset</text></arctype>") != std::string::npos) == (expected == PetriArcType::kReset));
+    assert((exported.find("<arctype><text>inhibitor</text></arctype>") != std::string::npos) == (expected == PetriArcType::kInhibitor));
+    assert(parse_pnml_document(exported).arc_occurrences->at(1).type == expected);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -641,4 +675,5 @@ int main() {
   pnml_document_preserves_arc_occurrences();
   equation_guard_and_workflow_topology();
   normal_alignment_smoke();
+  pnml_arc_type_wire_contract();
 }

@@ -767,6 +767,31 @@ void simplicity_presented_reachability_contract() {
   assert(!evaluate_simplicity(stale, SimplicityVariant::EXTENDED_CYCLOMATIC, options).computed);
 }
 
+void simplicity_extended_document_cyclomatic_contract() {
+  for (const auto type : {"reset", "inhibitor"}) {
+    const auto document = parse_pnml_document(
+      "<pnml><net id=\"typed\"><place id=\"source\"><initialMarking><text>1</text></initialMarking></place>"
+      "<place id=\"gate\"/><place id=\"sink\"/><transition id=\"move\"/>"
+      "<arc id=\"guard\" source=\"source\" target=\"move\"/>"
+      "<arc id=\"typed\" source=\"gate\" target=\"move\"><arctype><text>" + std::string(type) + "</text></arctype></arc>"
+      "<arc id=\"out\" source=\"move\" target=\"sink\"/>"
+      "<finalmarkings><marking><place idref=\"sink\"><text>1</text></place></marking></finalmarkings></net></pnml>");
+    SimplicityOptions options;
+    options.initial_marking = {1, 0, 0};
+    const auto blocked = evaluate_simplicity(document, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+    assert(blocked.computed && blocked.vertices == 1 && blocked.value == 0.0);
+    assert(evaluate_simplicity(document.net, SimplicityVariant::EXTENDED_CYCLOMATIC, options).value == 0.0);
+    options.initial_marking = {2, 1, 0};
+    const auto once = evaluate_simplicity(document, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+    assert(once.computed && once.vertices == 2 && once.edges == 1 && once.value == 1.0);
+    const auto executable_once = evaluate_simplicity(document.net, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+    assert(executable_once.computed && executable_once.vertices == 2 && executable_once.edges == 1 && executable_once.value == 1.0);
+    auto stale = document;
+    stale.net.add_output_arc(0, 2);
+    assert(!evaluate_simplicity(stale, SimplicityVariant::EXTENDED_CYCLOMATIC, options).computed);
+  }
+}
+
 void composite_default_contract() {
   const auto events = log({{"A", "B"}, {"A"}});
   const auto net = sequence_net();
@@ -1289,6 +1314,7 @@ int main() {
   simplicity_extended_cyclomatic_contract();
   simplicity_reachable_transition_occurrences_contract();
   simplicity_presented_reachability_contract();
+  simplicity_extended_document_cyclomatic_contract();
   composite_default_contract();
   composite_document_and_weight_contract();
   evaluation_event_data_adapters_contract();
