@@ -9175,3 +9175,37 @@ alias graphs remain open. The prior forward/backwards acceptance contracts and
 weighted aggregate/composite gates still apply. The catalogue stays at 46/86
 packages, 199/387 modules and 228 incomplete units, with no promotions or full
 parity claim. Evidence: [forward-controls-validation.json](forward-controls-validation.json).
+
+## Supplied hidden-path cache and cleaned PLTR trace follow-up
+
+The forward C++ EventLog/PetriNet API now accepts supplied hidden-path matrices
+for pre-event and final routing, distinguishes empty from absent/null caches,
+and retains measured non-iterable-cache rejection timing. Cleared places now
+retain their PLTR overfed-trace membership after token-flood cleaning.
+
+The accepted core matches all 13440 retained parameter outcomes, closing 260
+complete-return and 174 error-behavior gaps. Two new actual public captures add
+8424 calls, 8016 complete returns and 408 errors; every complete direct/parent
+pair agrees. The first PNML capture has visible fallback labels and is retained
+as routing/cleaning evidence. A correction adds only explicit invisibility
+markers; actual public snapshots verify all intended silent transitions. Each
+capture matches 4008 whole native returns and 204 measured error behaviors.
+
+The initial compile failure precedes replay. The first compiled candidate passes
+all 152 suites but retains 144 whole PLTR cleanup differences; the final
+diagnostic tracking resolves them. Both complete fresh builds freeze 660 inputs
+and pass all 152 assertion-enabled suites. The typed regression matches 4758
+complete returns and 3018 errors; the 95-model regression preserves 2216 full
+carriers, 2032 tuple carriers, 2344 error behaviors and 2280 legacy records.
+All 1140 positional CLI processes complete with their expected results/errors.
+Frozen inputs, failed/candidate evidence, raw public/native outcomes, process
+witnesses, seven probe binaries and both sets of 155 full-build outputs are
+retained. Core witness snapshots and final build manifests are verified
+separately, and reused parent captures are not counted as new public calls.
+
+See [token-replay-parity-contract.md](token-replay-parity-contract.md) and
+[forward-hidden-cache-validation.json](forward-hidden-cache-validation.json).
+Supplied-cache CLI/HTTP transports, broader foreign cache/alias domains and
+prior forward/backwards acceptance contracts remain open. Weighted aggregate
+and composite conformance remain gated. The catalogue remains 46/86 packages,
+199/387 modules and 228 incomplete units, with no promotions or full parity claim.

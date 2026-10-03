@@ -934,3 +934,21 @@ No production code or catalogue rows change. See
 [token-replay-parity-contract.md](token-replay-parity-contract.md) and
 [forward-controls-validation.json](forward-controls-validation.json).
 The catalogue remains 46/86 packages, 199/387 modules and 228 incomplete units.
+
+## Supplied forward hidden-path cache implementation
+
+The C++ forward replay API now uses explicitly supplied place/transition path
+matrices before events and at final-marking routing. Empty matrices suppress
+automatic paths, null preserves structural computation and non-iterable native
+values retain measured lookup-time rejection. Token-flood cleaning retains the
+cleared places' PLTR overfed-trace membership. All 434 preceding parameter
+differences and 144 first-candidate cleanup differences are resolved on the
+retained complete carriers. Corrected PNML fixtures independently verify actual
+invisible transitions; the original visible-label capture remains separate.
+Two fresh builds pass all 152 assertion-enabled suites, and typed-key,
+95-model and 1140-process CLI regressions preserve their complete results.
+See [token-replay-parity-contract.md](token-replay-parity-contract.md) and
+[forward-hidden-cache-validation.json](forward-hidden-cache-validation.json).
+Supplied-cache adapter transports, broader foreign/alias domains and prior
+forward/backwards acceptance gates remain open. This step promotes no catalogue
+rows; the totals remain 46/86 packages, 199/387 modules and 228 incomplete units.

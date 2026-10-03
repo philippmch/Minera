@@ -183,11 +183,74 @@ void typed_variant_and_null_contracts() {
   catch (const std::overflow_error&) { rejected = true; }
   assert(rejected);
 }
+
+void supplied_hidden_paths() {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto source = net.add_place(), buffer = net.add_place(), sink = net.add_place();
+  net.set_source(source); net.set_sink(sink);
+  net.add_transition(std::nullopt, {source}, {buffer});
+  net.add_transition(0, {buffer}, {sink});
+  EventLog log;
+  log.traces = {trace("known", {event("A")})};
+  TokenReplayOptions policy;
+  policy.enable_pltr_fitness = true;
+  const auto automatic = replay_token_result(log, net, policy);
+  assert(automatic.traces[0].activated_transitions == (std::vector<std::size_t>{0, 1}));
+  assert(automatic.traces[0].trace_is_fit);
+  policy.places_shortest_path_by_hidden = TokenReplayHiddenPathMatrix{};
+  const auto empty = replay_token_result(log, net, policy);
+  assert(empty.traces[0].activated_transitions == std::vector<std::size_t>{1});
+  assert(empty.traces[0].missing == 1 && empty.traces[0].remaining == 1);
+  assert(empty.pltr_fitness->places[buffer].missing == 1);
+  assert(empty.pltr_fitness->places[source].overfed_traces.size() == 1);
+  policy.cleaning_token_flood = true;
+  const auto cleaned = replay_token_result(log, net, policy);
+  assert(cleaned.traces[0].cleaned_place_indices == std::vector<std::size_t>{source});
+  assert(!cleaned.traces[0].reached_marking_keys[source]);
+  assert(cleaned.pltr_fitness->places[source].overfed_traces.size() == 1);
+  policy.cleaning_token_flood = false;
+  TokenReplayHiddenPathMatrix supplied;
+  supplied[source][buffer] = {0};
+  policy.places_shortest_path_by_hidden = supplied;
+  assert(token_replay_result_json(replay_token_result(log, net, policy)) == token_replay_result_json(automatic));
+  EventAttribute list{"", ""};
+  list.container = AttributeContainerKind::kList;
+  policy.places_shortest_path_by_hidden = list;
+  assert(token_replay_result_json(replay_token_result(log, net, policy)) == token_replay_result_json(empty));
+
+  PetriNet final_net;
+  const auto start = final_net.add_place(), finish = final_net.add_place();
+  final_net.set_source(start); final_net.set_sink(finish);
+  final_net.add_transition(std::nullopt, {start}, {finish});
+  log.traces = {trace("empty", {})};
+  policy = {};
+  assert(replay_token_result(log, final_net, policy).traces[0].trace_is_fit);
+  policy.places_shortest_path_by_hidden = TokenReplayHiddenPathMatrix{};
+  const auto final_empty = replay_token_result(log, final_net, policy);
+  assert(final_empty.traces[0].activated_transitions.empty());
+  assert(final_empty.traces[0].missing == 1 && final_empty.traces[0].remaining == 1);
+  policy.places_shortest_path_by_hidden = EventAttribute{"", "7", AttributeKind::kInt};
+  assert(replay_token_result(EventLog{}, final_net, policy).traces.empty());
+  bool rejected = false;
+  try { (void)replay_token_result(log, final_net, policy); }
+  catch (const std::invalid_argument& error) { rejected = std::string(error.what()) == "hidden path cache is not iterable"; }
+  assert(rejected);
+  Event null;
+  null.activity_state = FirstClassAttributeState::kNull;
+  log.traces = {trace("null", {null})};
+  policy.enable_pltr_fitness = true;
+  rejected = false;
+  try { (void)replay_token_result(log, final_net, policy); }
+  catch (const std::invalid_argument& error) { rejected = std::string(error.what()) == "null transition PLTR key"; }
+  assert(rejected);
+}
 }  // namespace
 int main() {
   variants_and_keys();
   contexts_and_stop();
   rejection_and_transport();
   typed_variant_and_null_contracts();
+  supplied_hidden_paths();
   std::cout << "full forward token replay result contracts passed\n";
 }

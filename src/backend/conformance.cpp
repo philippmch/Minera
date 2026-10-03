@@ -284,12 +284,12 @@ class Replayer {
         if (enabled(marking, transition)) { chosen = transition; break; }
       }
       if (!enabled(marking, chosen) && options.walk_through_hidden_transitions) {
-        if (net_.has_extended_arcs()) {
+        if (net_.has_extended_arcs() && !has_supplied_hidden_paths(options)) {
           const auto path = silent_path(marking, [&](const Marking& candidate) { return enabled(candidate, chosen); });
           if (path) for (const auto transition : *path) emit(transition, true);
         } else {
           forward_route_hidden(marking, keys, chosen, place_names,
-                               options.exhaustive_invisible_exploration,
+                               options,
                                [&](auto transition) { emit(transition, true); });
         }
       }
@@ -321,6 +321,9 @@ class Replayer {
               keys[place] = false;
               ++counts.remaining;
               ++counts.places[place].remaining;
+              if (diagnostics && std::find(diagnostics->cleaned_place_indices.begin(),
+                  diagnostics->cleaned_place_indices.end(), place) == diagnostics->cleaned_place_indices.end())
+                diagnostics->cleaned_place_indices.push_back(place);
             }
           }
         }
@@ -332,7 +335,7 @@ class Replayer {
       return true;
     };
     if (options.try_to_reach_final_marking_through_hidden) {
-      if (net_.has_extended_arcs()) {
+      if (net_.has_extended_arcs() && !has_supplied_hidden_paths(options)) {
         // Inhibitor/reset-only transitions need not be reachable from a
         // marked ordinary input. Preserve enabled-state routing for these nets.
         const auto path = silent_path(marking, [&](const Marking& candidate) {
@@ -340,7 +343,7 @@ class Replayer {
         });
         if (path) for (const auto transition : *path) emit(transition, false);
       } else for (std::size_t pass = 0; pass < 6 && !final_present(); ++pass) {
-        const auto paths = detail::silent_place_paths(keys, final_keys, net_, place_names);
+        const auto paths = forward_place_paths(keys, final_keys, place_names, options);
         bool fired = false;
         for (const auto& path : paths) {
           for (const auto transition : path.transitions) {
@@ -793,11 +796,62 @@ class Replayer {
     return true;
   }
 
+  [[nodiscard]] static bool has_supplied_hidden_paths(const TokenReplayOptions& options) {
+    if (!options.places_shortest_path_by_hidden) return false;
+    const auto* value = std::get_if<EventAttribute>(&*options.places_shortest_path_by_hidden);
+    return !value || !value->is_null;
+  }
+
+  [[nodiscard]] std::vector<detail::HiddenPlacePath> forward_place_paths(
+      const detail::ReplayMarkingKeys& source_keys,
+      const detail::ReplayMarkingKeys& target_keys,
+      const std::vector<std::string>& place_names,
+      const TokenReplayOptions& options) const {
+    if (!has_supplied_hidden_paths(options))
+      return detail::silent_place_paths(source_keys, target_keys, net_, place_names);
+    std::vector<detail::HiddenPlacePath> result;
+    const auto* matrix = std::get_if<TokenReplayHiddenPathMatrix>(
+        &*options.places_shortest_path_by_hidden);
+    if (!matrix) {
+      // A native value carrier cannot contain model Place objects. Iterable
+      // value containers therefore have no matching source keys. Non-iterable
+      // scalars fail only when replay actually examines a marking key.
+      const auto& value = std::get<EventAttribute>(*options.places_shortest_path_by_hidden);
+      if (value.container != AttributeContainerKind::kScalar ||
+          value.kind == AttributeKind::kString || value.kind == AttributeKind::kBytes)
+        return result;
+      if (std::any_of(source_keys.begin(), source_keys.end(), [](bool present) { return present; }))
+        throw std::invalid_argument("hidden path cache is not iterable");
+      return result;
+    }
+    for (std::size_t source = 0; source < source_keys.size(); ++source) {
+      if (!source_keys[source]) continue;
+      const auto row = matrix->find(source);
+      if (row == matrix->end()) continue;
+      for (std::size_t target = 0; target < target_keys.size(); ++target) {
+        if (!target_keys[target]) continue;
+        const auto path = row->second.find(target);
+        if (path == row->second.end()) continue;
+        for (const auto transition : path->second)
+          if (transition >= net_.transitions().size())
+            throw std::invalid_argument("hidden path cache contains an invalid transition index");
+        result.push_back({source, target, path->second});
+      }
+    }
+    std::sort(result.begin(), result.end(), [&](const auto& left, const auto& right) {
+      return std::tuple{left.transitions.size(), std::string_view(place_names[left.source]),
+                        std::string_view(place_names[left.target]), left.source, left.target}
+           < std::tuple{right.transitions.size(), std::string_view(place_names[right.source]),
+                        std::string_view(place_names[right.target]), right.source, right.target};
+    });
+    return result;
+  }
+
   template <class Emit>
   void forward_route_hidden(Marking& marking, detail::ReplayMarkingKeys& keys,
                             std::size_t target,
                             const std::vector<std::string>& place_names,
-                            bool exhaustive,
+                            const TokenReplayOptions& options,
                             const Emit& emit) const {
     const auto required = [&](std::size_t selected) {
       auto needed = input_requirements(net_.transitions()[selected], marking.size());
@@ -807,7 +861,7 @@ class Replayer {
     };
     const auto candidates = [&](std::size_t /*selected*/,
                                 const detail::ReplayMarkingKeys& required_keys) {
-      return detail::silent_place_paths(keys, required_keys, net_, place_names);
+      return forward_place_paths(keys, required_keys, place_names, options);
     };
     const auto trial = [&](std::size_t selected,
                            const std::vector<detail::HiddenPlacePath>& paths,
@@ -829,7 +883,8 @@ class Replayer {
           },
           fire_trial);
     };
-    detail::route_hidden_dependencies(net_.transitions().size(), target, exhaustive,
+    detail::route_hidden_dependencies(net_.transitions().size(), target,
+        options.exhaustive_invisible_exploration,
         candidates, required,
         [&](auto transition) { return enabled(marking, transition); }, emit,
         trial);
@@ -3547,6 +3602,9 @@ TokenReplayResult replay_token_result(
       place.remaining += counts.remaining * frequency;
       place.consumed += counts.consumed * frequency;
       place.produced += counts.produced * frequency;
+      if (std::find(row.cleaned_place_indices.begin(), row.cleaned_place_indices.end(), p)
+          != row.cleaned_place_indices.end())
+        add_member(place.overfed_traces, reference);
       if (event_missing > 0) add_member(place.underfed_traces, reference);
       else if (row.reached_marking_keys[p] && (!final_keys[p] || counts.remaining != 0))
         add_member(place.overfed_traces, reference);
