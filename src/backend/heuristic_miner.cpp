@@ -6,6 +6,7 @@
 #include "exact_stdev.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
+#include "root_cause_unicode.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -2055,18 +2056,46 @@ HeuristicsNet discover_plus_plus_pandas(
                            ? '"' : '\'';
     std::string result(1, quote);
     constexpr char hex[] = "0123456789abcdef";
-    for (const unsigned char ch : text) {
+    for (std::size_t position = 0; position < text.size();) {
+      const auto start = position;
+      const auto first = static_cast<unsigned char>(text[position++]);
+      char32_t ch = first;
+      int continuation = 0;
+      if (first >= 0xc2 && first <= 0xdf) {
+        ch = first & 0x1f; continuation = 1;
+      } else if (first >= 0xe0 && first <= 0xef) {
+        ch = first & 0x0f; continuation = 2;
+      } else if (first >= 0xf0 && first <= 0xf4) {
+        ch = first & 0x07; continuation = 3;
+      } else if (first >= 0x80) {
+        throw std::invalid_argument("heuristics pandas: invalid UTF-8 selector");
+      }
+      for (int i = 0; i < continuation; ++i) {
+        if (position == text.size())
+          throw std::invalid_argument("heuristics pandas: invalid UTF-8 selector");
+        const auto next = static_cast<unsigned char>(text[position++]);
+        if ((next & 0xc0) != 0x80)
+          throw std::invalid_argument("heuristics pandas: invalid UTF-8 selector");
+        ch = (ch << 6) | (next & 0x3f);
+      }
+      if ((continuation == 1 && ch < 0x80) ||
+          (continuation == 2 && ch < 0x800) ||
+          (continuation == 3 && ch < 0x10000) || ch > 0x10ffff)
+        throw std::invalid_argument("heuristics pandas: invalid UTF-8 selector");
+      // Python strings can contain lone surrogates. Preserve those code points
+      // in WTF-8 input long enough to render their explicit Unicode escapes.
       if (ch == quote || ch == '\\') {
         result += '\\';
         result += static_cast<char>(ch);
       } else if (ch == '\n') result += "\\n";
       else if (ch == '\r') result += "\\r";
       else if (ch == '\t') result += "\\t";
-      else if (ch < 32 || ch == 127) {
-        result += "\\x";
-        result += hex[ch >> 4];
-        result += hex[ch & 15];
-      } else result += static_cast<char>(ch);
+      else if (!root_cause_unicode_printable(ch)) {
+        const int digits = ch <= 0xff ? 2 : ch <= 0xffff ? 4 : 8;
+        result += digits == 2 ? "\\x" : digits == 4 ? "\\u" : "\\U";
+        for (int shift = (digits - 1) * 4; shift >= 0; shift -= 4)
+          result += hex[(ch >> shift) & 15];
+      } else result.append(text, start, position - start);
     }
     result += quote;
     return result;

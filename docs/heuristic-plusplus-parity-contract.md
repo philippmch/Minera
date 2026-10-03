@@ -1307,3 +1307,80 @@ types, remaining collisions, Unicode errors, dictionary order, object identity,
 complete metadata, further timestamp/ordering domains and adapter routing remain
 open. PLUSPLUS and Alpha+ stay partial. Coverage remains 46/86 packages and
 199/387 modules, with 228 incomplete units and no catalogue promotion.
+
+## Pandas Unicode selector errors (2026-10-03)
+
+Executed a 234-call public matrix with both decorations and all nine options
+explicit. Twenty-one strings cover ASCII quotes and controls, printable Greek,
+combining and supplementary characters, nonbreaking space, C1 controls, format
+characters, unassigned/private/noncharacter code points, and lone surrogates.
+Each string selects a missing case, activity or completion column, with and
+without the start column, or overlapping case/activity selectors. The remaining
+24 calls return HeuristicsNets or Petri presentations for Unicode activity labels
+and literal column names, including embedded controls and lone surrogates.
+
+The first public capture succeeds at all 234 API calls but the OWN Petri
+serializer fails to encode two surrogate-label results while checking duplicate
+names. Those are actual serialization failures, not reference discovery errors.
+The original capture and all native baseline calls remain retained. An OWN-only
+ASCII JSON byte encoder repairs that serializer, and a fresh 234-call capture
+returns 24 serialized results and 210 reference errors without skips. Both
+captures count as 468 actual new public calls; the archive retains 1,175 public
+calls across 29 capture directories, including the preceding checkpoint's 707.
+
+The committed baseline has 140 mismatched selector errors. The formatter now
+decodes UTF-8 code points and consults the existing Unicode 14 printability table.
+Nonprintable values use Python's lowercase hexadecimal x/u/U escapes at widths
+two, four or eight. Printable text, combining characters and quote selection
+remain literal. Nested completion-column errors retain both layers of escaping.
+WTF-8 input preserves lone surrogate code points long enough to escape them;
+native probe output decoding uses surrogatepass without replacement. This is
+direct native API evidence and does not establish frontend JSON adapter parity.
+The original Petri comparison's two string-domain rejections remain retained.
+An OWN lossless string extension compares those code points, reporting two
+actual mismatches while leaving the other 127 Petri comparisons unchanged.
+
+An independent exhaustive control invokes native pandas discovery once for each
+code point from zero through 0x10ffff, including surrogates, with a missing case
+selector. All 1,114,112 error messages match Python 3.11.9 builtin KeyError bytes
+exactly under Unicode 14.0.0. The length-prefixed outputs contain 16,860,921 bytes
+and share SHA-256 `a8ef0a9a1b13cc42df5de4374e841126018be12f36230d9a9bc3742b7bdf1f41`. This control makes 1,114,112 Python
+builtin calls and zero PM4Py reference calls. Both complete output streams,
+the generating helper, compiled probe, process records and binary pins remain
+retained. No arbitrary multi-code-point or label-grouping completion claim follows
+from the scalar sweep.
+
+The complete replay executes 928 saved aliases and 77 generic regressions:
+1,005 native discoveries, 129 Petri presentations and 43 generic conversions.
+All 361 expected errors, input-after comparisons, option checks and mutation
+checks match. All generic regressions remain unchanged. The replay resolves 924
+aliases: 436 full supported HeuristicsNet results, 127 Petri presentations and
+361 errors. Its 21445 matching net/node/edge checks retain complete domains.
+
+Four aliases remain different: two HeuristicsNets and two Petri presentations
+with lone-surrogate activity labels. The public grouping of those labels differs
+from native exact string grouping. The net comparison retains seventeen actual
+mismatches and 24 unrepresentable edge-field occurrences where the actual public
+and native connection domains differ. These are open result obligations, not
+successful controls. Ordinary Unicode labels, control-containing labels and
+Unicode selector columns match. The original baseline also retains its two
+unserialized public Petri controls explicitly.
+
+All five assertion-enabled suites pass on 650 exact frozen compilation inputs.
+The accepted full replay and scalar sweep account for 1,115,117 native discovery
+calls; including the retained 234-call baseline gives 1,115,351. Test-suite calls
+are separate from these instrumented evidence counts. The shared replay uses
+429 data factories, each creating fresh data, with literal reconstruction checked.
+
+Evidence is `heuristic-plusplus-pandas-unicode-checks.jsonl.gz` (SHA-256
+`c02fddee386b7b5055c6102034c56e1cc8a55e92a0dece2d024672ba4c5f872b`, 103247692 bytes,
+5870 verified members), with
+`heuristic-plusplus-pandas-unicode-validation.json`. Actual returns, errors,
+mutations, public API metadata, opaque pinned-module proofs, helpers, probes,
+process logs, frozen source inputs and binary bindings round-trip byte for byte.
+The preceding missing-case checkpoint remains hash-bound.
+
+Unicode surrogate grouping, broader label/carrier/parameter types, dictionary
+ordering, metadata completeness, object identity, further timestamp and routing
+domains remain open. PLUSPLUS and Alpha+ stay partial. Coverage remains 46/86
+packages and 199/387 modules, with 228 incomplete units and no promotion.

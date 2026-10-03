@@ -1118,6 +1118,48 @@ void plusplus_pandas_missing_case_groups() {
   }
 }
 
+void plusplus_pandas_unicode_lookup_errors() {
+  const std::vector<std::pair<std::string, std::string>> selectors{
+      {"unicode:\302\240", "'unicode:\\xa0'"},
+      {"unicode:\302\205", "'unicode:\\x85'"},
+      {"unicode:\342\200\213", "'unicode:\\u200b'"},
+      {"unicode:\360\237\277\276", "'unicode:\\U0001fffe'"},
+      {"unicode:\364\217\277\277", "'unicode:\\U0010ffff'"},
+      {"unicode:\355\240\200", "'unicode:\\ud800'"},
+      {"unicode:\355\277\277", "'unicode:\\udfff'"},
+      {"unicode:\316\251", "'unicode:\316\251'"},
+      {"unicode:e\314\201", "'unicode:e\314\201'"},
+  };
+  for (const auto decoration : {HeuristicNetDecoration::kFrequency,
+                                HeuristicNetDecoration::kPerformance}) {
+    auto options = plus_options();
+    options.decoration = decoration;
+    const auto rejects_without_mutation = [&](const HeuristicMinerOptions& selected,
+                                               const std::string& message) {
+      auto table = pandas_interval_table(2);
+      const auto before = table;
+      bool matched = false;
+      try { (void)discover_plus_plus_pandas(table, selected); }
+      catch (const HeuristicPandasError& error) {
+        matched = error.reference_type() == "builtins.KeyError" &&
+                  std::string(error.what()) == message;
+      }
+      assert(matched && table.columns == before.columns && table.rows == before.rows);
+    };
+    for (const auto& [selector, message] : selectors) {
+      auto selected = options;
+      selected.case_id_attribute = selector;
+      rejects_without_mutation(selected, message);
+    }
+    auto selected = options;
+    selected.activity_attribute = "unicode:\342\200\213";
+    rejects_without_mutation(selected, "'Column not found: unicode:\\u200b'");
+    selected = options;
+    selected.timestamp_attribute = "unicode:\342\200\213";
+    rejects_without_mutation(selected, "\"['unicode:\\\\u200b'] not in index\"");
+  }
+}
+
 void interval_abstraction_and_strict_threshold() {
   auto a_start = event("A", "2026-01-01T00:00:00Z", "start");
   attr(a_start, "concept:instance", "a1");
@@ -5014,6 +5056,7 @@ int main(int argc, char** argv) {
   plusplus_pandas_duration_selector_collisions();
   plusplus_pandas_timestamp_ties_and_petri_counter_order();
   plusplus_pandas_missing_case_groups();
+  plusplus_pandas_unicode_lookup_errors();
   lifecycle_fifo_and_configurable_interval_attribute();
   lifecycle_input_shapes_defer_ignored_timestamp_parsing();
   plusplus_returned_object_fields_acceptance();
