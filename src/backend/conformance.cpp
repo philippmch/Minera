@@ -432,8 +432,24 @@ class Replayer {
       auto chosen = *std::max_element(targets.begin(), targets.end(), [&](auto left, auto right) {
         return std::tie(transition_names[left], left) < std::tie(transition_names[right], right);
       });
-      for (const auto transition : targets) {
-        if (enabled(marking, transition)) { chosen = transition; break; }
+      if (options.transition_identity_hashes && !net_.has_extended_arcs()) {
+        // The public enabled set includes every activity and silent transition.
+        // Filtering matching activities before constructing that set changes
+        // its iteration order when collisions or table growth are involved.
+        std::vector<std::size_t> enabled_candidates;
+        for (std::size_t transition = 0; transition < net_.transitions().size(); ++transition)
+          if (enabled(marking, transition)) enabled_candidates.push_back(transition);
+        for (const auto transition : replay_identity_set_order(
+                 enabled_candidates, *options.transition_identity_hashes)) {
+          if (std::find(targets.begin(), targets.end(), transition) != targets.end()) {
+            chosen = transition;
+            break;
+          }
+        }
+      } else {
+        for (const auto transition : targets) {
+          if (enabled(marking, transition)) { chosen = transition; break; }
+        }
       }
       if (!enabled(marking, chosen) && options.walk_through_hidden_transitions) {
         if (net_.has_extended_arcs() && !has_supplied_hidden_paths(options)) {

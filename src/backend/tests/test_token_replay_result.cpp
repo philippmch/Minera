@@ -201,6 +201,36 @@ void enabled_default_id_order_and_explicit_hash_order() {
          (std::vector<std::size_t>{9, 2}));
 }
 
+void activity_choice_from_all_enabled_identity_hashes() {
+  PetriNet net;
+  net.set_activities({"", "A", "B"});
+  net.add_place(); net.add_place();
+  net.set_source(0); net.set_sink(1);
+  const std::vector<std::optional<std::size_t>> activities = {0, 1, 1, 1, 2, std::nullopt};
+  for (const auto activity : activities)
+    net.add_transition(activity, {0}, {1});
+  net.set_transition_names({"", "a,b", "é", "A", "🙂", "u0"});
+  EventLog log; log.traces = {trace("twice", {event("A"), event("A")})};
+  TokenReplayOptions policy;
+  policy.initial_marking = {2, 0};
+  assert(replay_token_result(log, net, policy).traces[0].activated_transitions ==
+         (std::vector<std::size_t>{1, 1}));
+  // Actual public hashes and root enumeration from the retained six-transition
+  // witness: rebuilding the enabled set changes the first matching identity.
+  policy.transition_identity_hashes = std::vector<std::int64_t>{
+      1737893924048, 1737893923408, 1737893923664,
+      1737893492560, 1737893932240, 1737893489616};
+  const auto replayed = replay_token_result(log, net, policy);
+  assert(replayed.traces[0].activated_transitions == (std::vector<std::size_t>{2, 2}));
+  assert(replayed.traces[0].missing == 0);
+  // If no matching transition is enabled, the existing name/ID fallback applies.
+  net.set_transition_names({"", "same", "same", "same", "B", "u0"});
+  policy.initial_marking = {0, 0};
+  log.traces = {trace("forced", {event("A")})};
+  assert(replay_token_result(log, net, policy).traces[0].activated_transitions ==
+         std::vector<std::size_t>{3});
+}
+
 void supplied_hidden_paths() {
   PetriNet net;
   net.set_activities({"A"});
@@ -638,5 +668,6 @@ int main() {
   alpha_plus_default_nullable_name_metadata();
   enabled_identity_worklist_and_pair_markings();
   enabled_default_id_order_and_explicit_hash_order();
+  activity_choice_from_all_enabled_identity_hashes();
   std::cout << "full forward token replay result contracts passed\n";
 }
