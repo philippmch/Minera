@@ -2417,7 +2417,11 @@ export interface TransitionOccurrence {
 export interface TransitionSystemState {
   id: number;
   /** Sequence/set payloads are activity ids; multiset uses activity/count pairs. */
-  payload: number[] | Array<{ activity: number; count: number }>;
+  payload: Array<number | null> | Array<{ activity: number | null; count: number }>;
+  in_root: boolean;
+  name_order: Array<number | null>;
+  incoming: number[];
+  outgoing: number[];
   start_count: number;
   end_count: number;
   incoming_occurrences?: TransitionOccurrence[];
@@ -2426,11 +2430,12 @@ export interface TransitionSystemState {
 export interface TransitionSystemTransition {
   source: number;
   target: number;
-  activity: number;
+  activity: number | null;
   count: number;
   occurrences?: TransitionOccurrence[];
 }
 export interface TransitionSystemExport {
+  name: string;
   view: TransitionSystemView;
   direction: TransitionSystemDirection;
   window: number;

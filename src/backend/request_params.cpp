@@ -594,6 +594,14 @@ int parse_signed_int(std::string_view value, std::string_view name) {
   return parsed;
 }
 
+std::int64_t parse_transition_window(std::string_view value) {
+  std::int64_t parsed = 0;
+  const auto result = std::from_chars(value.data(), value.data() + value.size(), parsed);
+  if (value.empty() || result.ec != std::errc{} || result.ptr != value.data() + value.size())
+    throw std::invalid_argument("transition_window: expected a signed integer, got '" + std::string(value) + "'");
+  return parsed;
+}
+
 std::vector<std::size_t> parse_marking(std::string_view value,
                                        std::string_view name) {
   if (value.empty())
@@ -2793,7 +2801,7 @@ MineParams parse_mine_params(const FieldLookup& field,
     else throw std::invalid_argument("transition_direction: expected forward or backward, got '" + value + "'");
   }
   if (const auto value = field("transition_window"); !value.empty()) {
-    params.transition_system.window = parse_nonnegative_size(value, "transition_window");
+    params.transition_system.window = parse_transition_window(value);
   }
   if (const auto value = field("transition_include_data"); !value.empty()) {
     params.transition_system.include_data =

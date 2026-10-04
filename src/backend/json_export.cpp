@@ -3176,7 +3176,9 @@ void write_temporal_profile(
 }
 
 struct ResolvedTransitionSystem {
-  std::vector<std::vector<std::size_t>> payload;
+  std::vector<std::vector<std::optional<std::size_t>>> payload;
+  std::vector<std::vector<std::optional<std::size_t>>> name_order;
+  std::vector<std::optional<std::size_t>> labels;
 };
 
 const char* transition_view_name(TransitionView view) {
@@ -3202,14 +3204,20 @@ ResolvedTransitionSystem resolve_transition_system(
   (void)transition_view_name(system.options().view);
   (void)transition_direction_name(system.options().direction);
   ResolvedTransitionSystem resolved;
+  const auto resolve_activity = [&](const TransitionActivity& activity) -> std::optional<std::size_t> {
+    if (!activity) return std::nullopt;
+    const auto id = graph.activity_id(*activity);
+    if (!id) throw std::invalid_argument("transition system activity is not registered: " + *activity);
+    return *id;
+  };
   const auto& states = system.states();
   resolved.payload.reserve(states.size());
   for (std::size_t i = 0; i < states.size(); ++i) {
     const auto& state = states[i];
     if (state.id != i) throw std::invalid_argument("transition system state ids must be contiguous and ordered");
-    std::vector<std::size_t> ids;
+    std::vector<std::optional<std::size_t>> ids;
     ids.reserve(state.payload.size());
-    std::string previous;
+    TransitionActivity previous;
     bool first = true;
     for (const auto& activity : state.payload) {
       if (!first && (system.options().view == TransitionView::kSet ||
@@ -3222,11 +3230,12 @@ ResolvedTransitionSystem resolve_transition_system(
       }
       first = false;
       previous = activity;
-      const auto id = graph.activity_id(activity);
-      if (!id) throw std::invalid_argument("transition system activity is not registered: " + activity);
-      ids.push_back(*id);
+      ids.push_back(resolve_activity(activity));
     }
     resolved.payload.push_back(std::move(ids));
+    std::vector<std::optional<std::size_t>> name_order;
+    for (const auto& activity : state.name_order) name_order.push_back(resolve_activity(activity));
+    resolved.name_order.push_back(std::move(name_order));
     const auto validate_occurrence = [&](const TransitionOccurrence& occurrence) {
       if (occurrence.trace_index >= log.traces.size() ||
           occurrence.event_index >= log.traces[occurrence.trace_index].events.size()) {
@@ -3250,8 +3259,8 @@ ResolvedTransitionSystem resolve_transition_system(
     validate_occurrences(state.incoming_occurrences);
     validate_occurrences(state.outgoing_occurrences);
   }
-  std::set<std::tuple<std::size_t, std::size_t, std::string>> seen;
-  std::tuple<std::size_t, std::size_t, std::string> previous_transition;
+  std::set<std::tuple<std::size_t, std::size_t, TransitionActivity>> seen;
+  std::tuple<std::size_t, std::size_t, TransitionActivity> previous_transition;
   bool first_transition = true;
   for (const auto& transition : system.transitions()) {
     if (transition.source >= states.size() || transition.target >= states.size())
@@ -3265,15 +3274,16 @@ ResolvedTransitionSystem resolve_transition_system(
       throw std::invalid_argument("transition system transitions must be strictly sorted");
     first_transition = false;
     previous_transition = transition_key;
-    if (!graph.activity_id(transition.label))
-      throw std::invalid_argument("transition system transition activity is not registered: " + transition.label);
+    resolved.labels.push_back(resolve_activity(transition.label));
     TransitionOccurrence previous{};
     bool first_occurrence = true;
     for (const auto& occurrence : transition.occurrences) {
       if (occurrence.trace_index >= log.traces.size() ||
           occurrence.event_index >= log.traces[occurrence.trace_index].events.size())
         throw std::invalid_argument("transition system occurrence is outside the event log");
-      if (log.traces[occurrence.trace_index].events[occurrence.event_index].activity != transition.label)
+      const auto& selector = system.options().activity_attribute.empty()
+          ? system.options().activity_key : system.options().activity_attribute;
+      if (transition_system_event_activity(log.traces[occurrence.trace_index].events[occurrence.event_index], selector) != transition.label)
         throw std::invalid_argument("transition system occurrence activity does not match its transition label");
       if (!first_occurrence && (occurrence.trace_index < previous.trace_index ||
                                 (occurrence.trace_index == previous.trace_index &&
@@ -3284,6 +3294,16 @@ ResolvedTransitionSystem resolve_transition_system(
     }
     if (system.options().include_data && transition.occurrences.size() != transition.count)
       throw std::invalid_argument("transition system transition occurrences must match count when include_data is enabled");
+  }
+  for (const auto& state : states) {
+    for (const auto edge : state.incoming) {
+      if (edge >= system.transitions().size() || system.transitions()[edge].target != state.id)
+        throw std::invalid_argument("transition system incoming incidence references a different endpoint");
+    }
+    for (const auto edge : state.outgoing) {
+      if (edge >= system.transitions().size() || system.transitions()[edge].source != state.id)
+        throw std::invalid_argument("transition system outgoing incidence references a different endpoint");
+    }
   }
   return resolved;
 }
@@ -3302,8 +3322,17 @@ void write_transition_occurrences(std::ostream& out,
 void write_transition_system(std::ostream& out, const TransitionSystem& system,
                              const ResolvedTransitionSystem& resolved,
                              const DirectlyFollowsGraph& graph) {
+  (void)graph;
+  const auto write_activity = [&](const std::optional<std::size_t>& id) {
+    if (id) out << *id; else out << "null";
+  };
+  const auto write_incidence = [&](const std::vector<std::size_t>& values) {
+    out << '[';
+    for (std::size_t i = 0; i < values.size(); ++i) out << values[i] << (i + 1 < values.size() ? ", " : "");
+    out << ']';
+  };
   const auto& options = system.options();
-  out << "{\"view\": \"" << transition_view_name(options.view)
+  out << "{\"name\": \"\", \"view\": \"" << transition_view_name(options.view)
       << "\", \"direction\": \"" << transition_direction_name(options.direction)
       << "\", \"window\": " << options.window
       << ", \"include_data\": " << (options.include_data ? "true" : "false")
@@ -3316,17 +3345,26 @@ void write_transition_system(std::ostream& out, const TransitionSystem& system,
       for (std::size_t j = 0; j < resolved.payload[i].size();) {
         std::size_t k = j + 1;
         while (k < resolved.payload[i].size() && resolved.payload[i][k] == resolved.payload[i][j]) ++k;
-        out << "{\"activity\": " << resolved.payload[i][j] << ", \"count\": " << (k - j) << "}"
+        out << "{\"activity\": "; write_activity(resolved.payload[i][j]);
+        out << ", \"count\": " << (k - j) << "}"
             << (k < resolved.payload[i].size() ? ", " : "");
         j = k;
       }
       out << "]";
     } else {
       out << "[";
-      for (std::size_t j = 0; j < resolved.payload[i].size(); ++j)
-        out << resolved.payload[i][j] << (j + 1 < resolved.payload[i].size() ? ", " : "");
+      for (std::size_t j = 0; j < resolved.payload[i].size(); ++j) {
+        write_activity(resolved.payload[i][j]); out << (j + 1 < resolved.payload[i].size() ? ", " : "");
+      }
       out << "]";
     }
+    out << ", \"in_root\": " << (state.in_root ? "true" : "false") << ", \"name_order\": [";
+    for (std::size_t j = 0; j < resolved.name_order[i].size(); ++j) {
+      write_activity(resolved.name_order[i][j]); out << (j + 1 < resolved.name_order[i].size() ? ", " : "");
+    }
+    out << "]";
+    out << ", \"incoming\": "; write_incidence(state.incoming);
+    out << ", \"outgoing\": "; write_incidence(state.outgoing);
     out << ", \"start_count\": " << state.start_count
         << ", \"end_count\": " << state.end_count;
     if (options.include_data) {
@@ -3339,8 +3377,8 @@ void write_transition_system(std::ostream& out, const TransitionSystem& system,
   for (std::size_t i = 0; i < system.transitions().size(); ++i) {
     const auto& transition = system.transitions()[i];
     out << "{\"source\": " << transition.source << ", \"target\": " << transition.target
-        << ", \"activity\": " << *graph.activity_id(transition.label)
-        << ", \"count\": " << transition.count;
+        << ", \"activity\": "; write_activity(resolved.labels[i]);
+    out << ", \"count\": " << transition.count;
     if (options.include_data) {
       out << ", \"occurrences\": ";
       write_transition_occurrences(out, transition.occurrences);

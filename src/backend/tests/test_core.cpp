@@ -6399,19 +6399,19 @@ void transition_system_forward_backward_views() {
   const auto forward = minera::discover_transition_system(log);
   assert(forward.states().size() == 4);
   // States are sorted by canonical payload, not by first occurrence.
-  assert((forward.states()[0].payload == std::vector<std::string>{}));
-  assert((forward.states()[1].payload == std::vector<std::string>{"a"}));
-  assert((forward.states()[2].payload == std::vector<std::string>{"a", "b"}));
-  assert((forward.states()[3].payload == std::vector<std::string>{"b", "a"}));
+  assert((forward.states()[0].payload == minera::TransitionPayload{}));
+  assert((forward.states()[1].payload == minera::TransitionPayload{"a"}));
+  assert((forward.states()[2].payload == minera::TransitionPayload{"a", "b"}));
+  assert((forward.states()[3].payload == minera::TransitionPayload{"b", "a"}));
   assert(forward.transitions().size() == 3);
 
   minera::TransitionSystemOptions options;
   options.direction = minera::Direction::kBackward;
   const auto backward = minera::discover_transition_system(log, options);
-  assert((backward.states()[0].payload == std::vector<std::string>{}));
-  assert((backward.states()[1].payload == std::vector<std::string>{"a"}));
-  assert((backward.states()[2].payload == std::vector<std::string>{"a", "b"}));
-  assert((backward.states()[3].payload == std::vector<std::string>{"b", "a"}));
+  assert((backward.states()[0].payload == minera::TransitionPayload{}));
+  assert((backward.states()[1].payload == minera::TransitionPayload{"a"}));
+  assert((backward.states()[2].payload == minera::TransitionPayload{"a", "b"}));
+  assert((backward.states()[3].payload == minera::TransitionPayload{"b", "a"}));
   assert(backward.transitions().size() == 3);
   assert(backward.transitions()[0].source == 0);
   assert(backward.transitions()[0].target == 1);
@@ -6434,7 +6434,7 @@ void transition_system_views_counts_and_data() {
   const auto multiset = minera::discover_transition_system(log, multiset_options);
   assert(set.states().size() == multiset.states().size());
   const auto has_payload = [](const minera::TransitionSystem& system,
-                              const std::vector<std::string>& payload) {
+                              const minera::TransitionPayload& payload) {
     return std::any_of(
         system.states().begin(), system.states().end(),
         [&](const auto& state) { return state.payload == payload; });
@@ -6449,10 +6449,13 @@ void transition_system_views_counts_and_data() {
   data_options.include_data = true;
   const auto data = minera::discover_transition_system(
       transition_test_log({{"a", "a"}}), data_options);
-  assert(data.states().size() == 1 && data.transitions().size() == 1);
+  assert(data.states().size() == 2 && data.root_state_count() == 1 && data.transitions().size() == 1);
   assert(data.transitions()[0].count == 2);
   assert(data.transitions()[0].occurrences.size() == 2);
-  assert(data.states()[0].incoming_occurrences.size() == 2);
+  assert(data.states()[0].incoming_occurrences.size() == 1);
+  assert(data.states()[1].incoming_occurrences.size() == 1);
+  assert(!data.states()[1].in_root);
+  assert(data.transitions()[0].source == 0 && data.transitions()[0].target == 1);
   assert(data.states()[0].outgoing_occurrences.size() == 2);
   assert(data.states()[0].start_count == 1 && data.states()[0].end_count == 1);
 }

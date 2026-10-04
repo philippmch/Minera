@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -34,10 +35,13 @@ enum class TransitionView {
 using Direction = TransitionDirection;
 using View = TransitionView;
 
+using TransitionActivity = std::optional<std::string>;
+using TransitionPayload = std::vector<TransitionActivity>;
+
 struct TransitionSystemOptions {
   TransitionDirection direction = TransitionDirection::kForward;
   TransitionView view = TransitionView::kSequence;
-  std::size_t window = 2;
+  std::int64_t window = 2;
   bool include_data = false;
   // Selectors are used by flat event-data adapters. Canonical EventLog case
   // selectors retain enclosing trace boundaries; an explicit custom case
@@ -61,16 +65,22 @@ struct TransitionSystemState {
   std::size_t id = 0;
   // Canonical state payload. Sequence views retain order and duplicates;
   // set/multiset views are sorted (set additionally removes duplicates).
-  std::vector<std::string> payload;
+  TransitionPayload payload;
   std::size_t start_count = 0;
   std::size_t end_count = 0;
   std::vector<TransitionOccurrence> incoming_occurrences;
   std::vector<TransitionOccurrence> outgoing_occurrences;
+  // Equal-valued endpoint objects need not belong to the root state set.
+  bool in_root = true;
+  // First-seen key order for Counter names; sequence order for list names.
+  TransitionPayload name_order;
+  std::vector<std::size_t> incoming;
+  std::vector<std::size_t> outgoing;
 
-  [[nodiscard]] const std::vector<std::string>& view() const noexcept {
+  [[nodiscard]] const TransitionPayload& view() const noexcept {
     return payload;
   }
-  [[nodiscard]] const std::vector<std::string>& activities() const noexcept {
+  [[nodiscard]] const TransitionPayload& activities() const noexcept {
     return payload;
   }
 
@@ -81,11 +91,11 @@ struct TransitionSystemState {
 struct TransitionSystemTransition {
   std::size_t source = 0;
   std::size_t target = 0;
-  std::string label;
+  TransitionActivity label;
   std::size_t count = 0;
   std::vector<TransitionOccurrence> occurrences;
 
-  [[nodiscard]] const std::string& activity() const noexcept { return label; }
+  [[nodiscard]] const TransitionActivity& activity() const noexcept { return label; }
 
   friend bool operator==(const TransitionSystemTransition&,
                          const TransitionSystemTransition&) = default;
@@ -114,6 +124,12 @@ class TransitionSystem {
     return options_;
   }
   [[nodiscard]] std::size_t state_count() const noexcept { return states_.size(); }
+  [[nodiscard]] std::size_t root_state_count() const noexcept {
+    std::size_t count = 0;
+    for (const auto& state : states_) count += state.in_root;
+    return count;
+  }
+  [[nodiscard]] std::string_view name() const noexcept { return ""; }
   [[nodiscard]] std::size_t transition_count() const noexcept {
     return transitions_.size();
   }
@@ -172,7 +188,7 @@ struct TransitionSystemSelectorDescriptor {
 [[nodiscard]] TransitionSystem discover_transition_system(
     const EventLog& event_log,
     TransitionDirection direction,
-    std::size_t window = 2,
+    std::int64_t window = 2,
     TransitionView view = TransitionView::kSequence,
     bool include_data = false);
 
@@ -209,7 +225,7 @@ struct TransitionSystemSelectorDescriptor {
 [[nodiscard]] inline TransitionSystem discover_view_based_transition_system(
     const EventLog& event_log,
     TransitionDirection direction,
-    std::size_t window = 2,
+    std::int64_t window = 2,
     TransitionView view = TransitionView::kSequence,
     bool include_data = false) {
   return discover_transition_system(event_log, direction, window, view,
@@ -275,5 +291,9 @@ class TransitionSystemSelectorRegistry {
     TransitionSystemVariant selector);
 [[nodiscard]] TransitionSystemVariant parse_transition_system_variant(
     std::string_view name);
+
+// Resolve the selected value while distinguishing a present null from absence.
+[[nodiscard]] TransitionActivity transition_system_event_activity(
+    const Event& event, std::string_view activity_key);
 
 }  // namespace minera
