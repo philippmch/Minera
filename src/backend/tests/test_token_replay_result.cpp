@@ -1,4 +1,5 @@
 #include "minera/conformance.hpp"
+#include "minera/alpha_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/request_params.hpp"
 
@@ -265,6 +266,163 @@ void cleaned_underfed_place_precedence() {
   assert(places[gate].underfed_traces.size() == 1);
   assert(places[gate].overfed_traces.empty());
 }
+
+PetriNet detached_model(TokenInteger initial = 1, TokenInteger final = 1,
+                        bool shared = false) {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto live = net.add_place(), end = net.add_place();
+  // These flags deliberately disagree with discovery's initial place.
+  net.set_source(end); net.set_sink(end);
+  net.add_transition(0, {live}, {end});
+  PetriDiscoveryMarkings markings;
+  markings.detached_places.push_back({0, HeuristicStructuredValue{std::string("same")}});
+  markings.initial.push_back({{PetriMarkingPlaceKind::kDetached, 0}, initial});
+  markings.final.push_back({{shared ? PetriMarkingPlaceKind::kDetached : PetriMarkingPlaceKind::kRoot,
+                             shared ? 0u : end}, final});
+  net.set_discovery_markings(std::move(markings));
+  return net;
+}
+
+void discovery_marking_replay() {
+  EventLog log;
+  log.traces = {trace("empty", {})};
+  const auto discovered = discover_alpha_plus_result(log);
+  const auto& net = discovered.net;
+  assert(net.place_count() == 1 && !net.has_source());
+  auto result = replay_token_result(log, net);
+  const auto& row = result.traces[0];
+  assert(row.produced == 1 && row.consumed == 1 && row.missing == 1 && row.remaining == 1);
+  assert(!row.trace_is_fit && row.trace_fitness == 0.0);
+  assert(row.marking_domain && row.marking_domain->places.size() == 2);
+  assert(row.marking_domain->places[0] == (PetriMarkingPlace{PetriMarkingPlaceKind::kRoot, 0}));
+  assert(row.marking_domain->places[1].kind == PetriMarkingPlaceKind::kDetached);
+  assert(row.reached_marking_keys == (std::vector<bool>{false, true}));
+  assert(row.reached_marking == (TokenMarking{0, 1}));
+  assert(row.reached_marking_order == (std::vector<std::size_t>{1}));
+  const auto raw = token_replay_traces_json(result.traces);
+  assert(raw.find("\"marking_domain\"") != std::string::npos && raw.find("\"kind\":\"detached\"") != std::string::npos);
+  const auto full = token_replay_result_json(result);
+  assert(full.find("\"kind\":\"detached\"") != std::string::npos && full.find("artificial_start") != std::string::npos);
+  TokenReplayOptions policy;
+  policy.cleaning_token_flood = true;
+  assert(replay_token_result(log, net, policy).traces[0].remaining == 1);
+  policy.enable_pltr_fitness = true;
+  bool rejected = false;
+  try { (void)replay_token_result(log, net, policy); }
+  catch (const TokenReplayPlaceKeyError& error) {
+    rejected = error.place_key() == row.marking_domain->places[1];
+    assert(std::holds_alternative<HeuristicStructuredValue::Object>(error.place_name().value));
+  }
+  assert(rejected && net.place_count() == 1 && !net.has_source());
+}
+
+void detached_counts_keys_and_overrides() {
+  EventLog log;
+  log.traces = {trace("empty", {})};
+  auto net = detached_model();
+  TokenReplayOptions policy;
+  policy.place_names = {"same", "end"};
+  const auto result = replay_token_result(log, net, policy);
+  assert(result.place_names.size() == 2 && result.marking_domain->places.size() == 3);
+  const auto& row = result.traces[0];
+  assert(row.missing == 1 && row.remaining == 1 && row.produced == 1 && row.consumed == 1);
+  assert(row.marking_domain->places[0] == (PetriMarkingPlace{PetriMarkingPlaceKind::kRoot, 0}));
+  assert(row.marking_domain->places[2] == (PetriMarkingPlace{PetriMarkingPlaceKind::kDetached, 0}));
+  assert(row.reached_marking == (TokenMarking{0, 0, 1}));
+  const auto aggregate = replay_token_diagnostics(log, net, policy);
+  assert(aggregate.places.size() == 3 && aggregate.marking_domain);
+  assert(aggregate.places[2].produced == 1 && aggregate.places[2].remaining == 1);
+  policy.cleaning_token_flood = true;
+  log.traces = {trace("forced", {event("A")})};
+  const auto forced = replay_token_result(log, net, policy);
+  assert(forced.traces[0].missing == 1 && forced.traces[0].remaining == 1);
+  assert(forced.traces[0].cleaned_place_indices.empty());
+  policy.initial_marking = {1, 0}; policy.final_marking = {0, 1};
+  const auto explicit_root = replay_token_result(log, net, policy);
+  assert(explicit_root.traces[0].trace_is_fit && !explicit_root.marking_domain);
+  assert(explicit_root.traces[0].reached_marking.size() == net.place_count());
+  policy.exact_initial_marking = TokenMarking{}; policy.exact_final_marking = TokenMarking{};
+  assert(replay_token_result(log, net, policy).marking_domain);
+
+  log.traces = {trace("zero", {})};
+  net = detached_model(0, 0, true); policy = {};
+  const auto zero = replay_token_result(log, net, policy);
+  assert(zero.traces[0].trace_is_fit && zero.traces[0].reached_marking_keys[2]);
+  assert(zero.traces[0].reached_marking[2] == 0 && zero.traces[0].reached_marking_order == (std::vector<std::size_t>{2}));
+  policy.enable_pltr_fitness = true;
+  bool rejected = false;
+  try { (void)replay_token_result(log, net, policy); }
+  catch (const TokenReplayPlaceKeyError& error) { rejected = error.place_key().kind == PetriMarkingPlaceKind::kDetached && error.place_key().id == 0; }
+  assert(rejected);
+  auto invalid = detached_model();
+  invalid.add_transition(0, {invalid.place_count()}, {0});
+  rejected = false;
+  try { (void)replay_token_result(log, invalid); }
+  catch (const std::invalid_argument& error) {
+    rejected = std::string(error.what()) == "token replay arc place is outside root topology";
+  }
+  assert(rejected);
+  policy.initial_marking_keys = {false, false, false}; policy.final_marking_keys = {false, false, false};
+  assert(replay_token_result(log, net, policy).pltr_fitness);
+
+  const TokenInteger wide("1000000000000000000000000000000000000007");
+  net = detached_model(wide, wide, true); policy = {};
+  const auto shared = replay_token_result(log, net, policy);
+  assert(shared.traces[0].trace_is_fit && shared.traces[0].produced == wide && shared.traces[0].consumed == wide);
+  assert(shared.traces[0].missing == 0 && shared.traces[0].remaining == 0);
+  policy.variant = TokenReplayVariant::kBackwards;
+  const auto backwards = replay_token_traces(log, net, policy);
+  assert(backwards[0].trace_is_fit && backwards[0].produced == wide && backwards[0].consumed == wide);
+  assert(backwards[0].marking_domain->places[2].kind == PetriMarkingPlaceKind::kDetached);
+  PetriNet rootless;
+  rootless.set_discovery_markings({{{0, HeuristicStructuredValue{std::string("same")}}},
+      {{{PetriMarkingPlaceKind::kDetached, 0}, 1}}, {{{PetriMarkingPlaceKind::kDetached, 0}, 1}}});
+  assert(replay_token_traces(log, rootless, policy)[0].trace_is_fit && rootless.place_count() == 0);
+  policy.variant = TokenReplayVariant::kForward;
+  assert(replay_token_result(log, rootless, policy).traces[0].trace_is_fit);
+  net = detached_model(-1, 1, true); policy.variant = TokenReplayVariant::kBackwards;
+  const auto negative = replay_token_traces(log, net, policy);
+  assert(negative[0].produced == -1 && negative[0].consumed == -1 && negative[0].missing == 2);
+  assert(!negative[0].trace_is_fit && negative[0].trace_fitness == 2.0);
+}
+
+void detached_names_and_error_precedence() {
+  PetriNet net;
+  net.set_activities({"A"});
+  net.add_place(); net.add_transition(0, {0}, {0});
+  const TokenInteger wide("1000000000000000000000000000000000000007");
+  net.set_discovery_markings({{{0, HeuristicStructuredValue{std::string("same")}}},
+      {{{PetriMarkingPlaceKind::kDetached, 0}, wide}, {{PetriMarkingPlaceKind::kRoot, 0}, 1}},
+      {{{PetriMarkingPlaceKind::kDetached, 0}, wide}}});
+  EventLog log; log.traces = {trace("loop", {event("A")})};
+  TokenReplayOptions policy; policy.place_names = {"same"}; policy.transition_names = {"A"}; policy.return_names = true;
+  const auto result = replay_token_result(log, net, policy);
+  assert(result.traces[0].reached_marking_order == (std::vector<std::size_t>{1, 0}));
+  assert(result.traces[0].reached_marking[1] == wide && result.traces[0].reached_marking[0] == 1);
+  const auto encoded = token_replay_result_json(result);
+  const auto start = encoded.find("\"value\":\"reached_marking\"");
+  const auto end = encoded.find("\"value\":\"missing_tokens\"", start);
+  const auto marking = encoded.substr(start, end - start);
+  assert(marking.find("\"value\":\"same\"") != std::string::npos && marking.find("\"type\":\"int\",\"value\":1}") != std::string::npos);
+  assert(marking.find(wide.decimal()) == std::string::npos);
+  policy.return_names = false;
+  const auto identities = token_replay_result_json(replay_token_result(log, net, policy));
+  assert(identities.find("\"kind\":\"detached\",\"id\":0") != std::string::npos && identities.find(wide.decimal()) != std::string::npos);
+  net.set_activities({""});
+  auto blank = event("");
+  blank.activity_state = FirstClassAttributeState::kPresent;
+  blank.attributes.push_back(EventAttribute{"concept:name", ""});
+  log.traces = {trace("blank", {blank})}; policy.enable_pltr_fitness = true;
+  bool rejected = false;
+  try { (void)replay_token_result(log, net, policy); }
+  catch (const TokenReplayTransitionKeyError& error) { rejected = error.transition_index() == 0; }
+  assert(rejected);
+  log.traces = {trace("empty", {})}; rejected = false;
+  try { (void)replay_token_result(log, net, policy); }
+  catch (const TokenReplayPlaceKeyError& error) { rejected = error.place_key() == (PetriMarkingPlace{PetriMarkingPlaceKind::kDetached, 0}); }
+  assert(rejected);
+}
 }  // namespace
 int main() {
   variants_and_keys();
@@ -273,5 +431,8 @@ int main() {
   typed_variant_and_null_contracts();
   supplied_hidden_paths();
   cleaned_underfed_place_precedence();
+  discovery_marking_replay();
+  detached_counts_keys_and_overrides();
+  detached_names_and_error_precedence();
   std::cout << "full forward token replay result contracts passed\n";
 }

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <stdexcept>
 #include <unordered_map>
 #include <string>
 #include <type_traits>
@@ -44,6 +45,35 @@ struct TokenReplayEventDiagnostics {
   std::vector<std::size_t> transitions_with_problems;
 };
 
+// Token vectors can include isolated places retained only by discovery
+// markings. This mapping keeps their identity separate from root place IDs.
+// The optional domain is absent when every vector slot is a root place.
+struct TokenReplayMarkingDomain {
+  std::vector<PetriMarkingPlace> places;
+  std::vector<PetriDetachedMarkingPlace> detached_places;
+};
+
+// PLTR maps contain root places and truthy visible transitions. Their missing
+// keys are retained as model references, rather than aliased by display name.
+class TokenReplayPlaceKeyError final : public std::out_of_range {
+ public:
+  TokenReplayPlaceKeyError(PetriMarkingPlace key, HeuristicStructuredValue name)
+      : std::out_of_range("detached place PLTR key"), key_(key), name_(std::move(name)) {}
+  [[nodiscard]] const PetriMarkingPlace& place_key() const noexcept { return key_; }
+  [[nodiscard]] const HeuristicStructuredValue& place_name() const noexcept { return name_; }
+ private:
+  PetriMarkingPlace key_;
+  HeuristicStructuredValue name_;
+};
+class TokenReplayTransitionKeyError final : public std::out_of_range {
+ public:
+  explicit TokenReplayTransitionKeyError(std::size_t transition)
+      : std::out_of_range("blank transition PLTR key"), transition_(transition) {}
+  [[nodiscard]] std::size_t transition_index() const noexcept { return transition_; }
+ private:
+  std::size_t transition_;
+};
+
 struct TokenReplayTraceDiagnostics {
   std::size_t trace_index = 0;
   std::string case_id;
@@ -70,10 +100,14 @@ struct TokenReplayTraceDiagnostics {
   // One row per examined event, including unknown labels and blocked events.
   std::vector<TokenReplayEventDiagnostics> event_diagnostics;
   // Membership of the reached marking, including explicit zero-token keys.
-  // Forward replay supplies one entry per place; older/backwards rows may omit it.
+  // Forward replay supplies one entry per marking slot; backwards rows may omit it.
   std::vector<bool> reached_marking_keys;
   // Places removed by token-flood cleaning still contribute PLTR overfed traces.
   std::vector<std::size_t> cleaned_place_indices;
+  std::optional<TokenReplayMarkingDomain> marking_domain;
+  // Sparse insertion order for discovery-marking replay. In particular,
+  // name-return dictionaries can collapse distinct, equal-name place keys.
+  std::vector<std::size_t> reached_marking_order;
 };
 
 struct TokenReplayDurationComparison {
@@ -216,9 +250,9 @@ struct TokenReplayOptions {
   // The three policies above apply to forward replay. Backwards replay keeps
   // its legacy contract: unknown labels are ignored, no final routing occurs,
   // and remaining tokens always make the trace unfit.
-  // Empty vectors select the workflow-net defaults (one token at source and
-  // one token at sink). Explicit markings must match the net's place count
-  // and contain only non-negative token counts.
+  // Empty vectors select actual discovery markings when present, otherwise
+  // the workflow defaults (one token at source/sink). Explicit vectors override
+  // the corresponding role and contain one nonnegative count per root place.
   std::vector<int> initial_marking;
   std::vector<int> final_marking;
   // Controls routing before visible events in both variations. Final routing
@@ -241,16 +275,19 @@ struct TokenReplayOptions {
   std::vector<std::string> place_names;
   std::vector<std::string> transition_names;
   // Optional membership of initial/final markings, retaining zero-token keys.
-  // Empty derives membership from positive counts. Nonempty vectors must have
-  // one entry per place and include every positive-token place.
+  // Empty retains discovery's sparse keys, or derives membership from nonzero
+  // counts for explicit vectors and workflow defaults. Nonempty vectors have
+  // one entry per root place (retaining default detached keys), or per resolved
+  // marking slot, and include every nonzero-token place. Discovery defaults
+  // preserve their explicit zero-token keys when no override is supplied.
   std::vector<bool> initial_marking_keys;
   std::vector<bool> final_marking_keys;
   // Forward pre-event routing policy. The public exhaustive mode limits
   // recursive dependency exploration to the outer invocation.
   bool exhaustive_invisible_exploration = false;
   // Optional exact markings take precedence over the legacy integer vectors.
-  // Forward replay retains signed counts. Backwards input counts remain
-  // nonnegative. Dimensions and sparse membership are validated in both modes.
+  // Forward replay retains signed counts. Backwards explicit input vectors
+  // remain nonnegative. Empty exact vectors also select discovery defaults.
   std::optional<TokenMarking> exact_initial_marking;
   std::optional<TokenMarking> exact_final_marking;
   // Full forward result policies, applied by replay_token_result only.
@@ -306,6 +343,7 @@ struct TokenReplayResult {
   std::vector<std::string> place_names;
   std::vector<std::string> transition_names;
   std::vector<std::optional<std::string>> transition_labels;
+  std::optional<TokenReplayMarkingDomain> marking_domain;
 };
 
 [[nodiscard]] std::vector<TokenReplayTransitionRootCauseDiagnostics>
@@ -358,6 +396,7 @@ struct TokenReplayDiagnostics {
   std::uint64_t fitting_traces = 0;
   std::vector<TokenReplayPlaceDiagnostics> places;
   std::vector<std::uint64_t> transition_activations;
+  std::optional<TokenReplayMarkingDomain> marking_domain;
 };
 
 // Replays `event_log` against `tree` and reports all four quality dimensions.

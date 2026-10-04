@@ -142,6 +142,105 @@ bool valid_alignment_cost_profile(AlignmentCostProfile profile) {
   return false;
 }
 
+struct ResolvedReplayMarkings {
+  TokenMarking initial, final;
+  detail::ReplayMarkingKeys initial_keys, final_keys;
+  std::vector<std::size_t> initial_order;
+  std::optional<TokenReplayMarkingDomain> domain;
+};
+
+ResolvedReplayMarkings resolve_replay_markings(
+    const PetriNet& net, const std::vector<int>& initial,
+    const std::vector<int>& final, const TokenReplayOptions* options) {
+  const auto* exact_initial = options && options->exact_initial_marking
+      ? &*options->exact_initial_marking : nullptr;
+  const auto* exact_final = options && options->exact_final_marking
+      ? &*options->exact_final_marking : nullptr;
+  const bool default_initial = exact_initial ? exact_initial->empty() : initial.empty();
+  const bool default_final = exact_final ? exact_final->empty() : final.empty();
+  const auto& discovery = net.discovery_markings();
+  std::set<std::size_t> used_detached;
+  if (discovery) {
+    const auto collect = [&](const auto& entries) {
+      for (const auto& entry : entries)
+        if (entry.place.kind == PetriMarkingPlaceKind::kDetached)
+          used_detached.insert(entry.place.id);
+    };
+    if (default_initial) collect(discovery->initial);
+    if (default_final) collect(discovery->final);
+  }
+  ResolvedReplayMarkings result;
+  std::unordered_map<std::size_t, std::size_t> detached_slots;
+  if (!used_detached.empty()) {
+    for (const auto& transition : net.transitions()) {
+      const auto validate = [&](const auto& places) {
+        for (const auto place : places)
+          if (place >= net.place_count())
+            throw std::invalid_argument("token replay arc place is outside root topology");
+      };
+      validate(transition.inputs); validate(transition.outputs);
+      validate(transition.reset_inputs); validate(transition.inhibitor_inputs);
+    }
+    auto& domain = result.domain.emplace();
+    for (std::size_t p = 0; p < net.place_count(); ++p)
+      domain.places.push_back({PetriMarkingPlaceKind::kRoot, p});
+    for (const auto& place : discovery->detached_places) {
+      if (!used_detached.contains(place.id)) continue;
+      detached_slots.emplace(place.id, domain.places.size());
+      domain.places.push_back({PetriMarkingPlaceKind::kDetached, place.id});
+      domain.detached_places.push_back(place);
+    }
+  }
+  const auto size = result.domain ? result.domain->places.size() : net.place_count();
+  const auto resolve = [&](bool first, const auto& legacy, const TokenMarking* exact,
+                           bool use_default, auto& marking, auto& keys) {
+    marking.resize(size, 0);
+    keys.resize(size, false);
+    if (use_default && discovery) {
+      for (const auto& entry : first ? discovery->initial : discovery->final) {
+        const auto slot = entry.place.kind == PetriMarkingPlaceKind::kRoot
+            ? entry.place.id : detached_slots.at(entry.place.id);
+        marking[slot] = entry.tokens;
+        keys[slot] = true;
+        if (first) result.initial_order.push_back(slot);
+      }
+      return;
+    }
+    TokenMarking values;
+    if (exact && !use_default) {
+      if (exact->size() != net.place_count())
+        throw std::invalid_argument("exact marking dimension does not match net");
+      if (options->variant == TokenReplayVariant::kBackwards &&
+          std::any_of(exact->begin(), exact->end(), [](const auto& n) { return n < 0; }))
+        throw std::invalid_argument("exact input marking contains a negative token count");
+      values = *exact;
+    } else {
+      values = TokenMarking(resolve_workflow_marking(net, exact ? std::vector<int>{} : legacy, first));
+    }
+    std::copy(values.begin(), values.end(), marking.begin());
+    for (std::size_t p = 0; p < values.size(); ++p) {
+      keys[p] = values[p] != 0;
+      if (first && keys[p]) result.initial_order.push_back(p);
+    }
+  };
+  resolve(true, initial, exact_initial, default_initial, result.initial, result.initial_keys);
+  resolve(false, final, exact_final, default_final, result.final, result.final_keys);
+  return result;
+}
+
+detail::ReplayMarkingKeys resolve_domain_marking_keys(
+    const detail::ReplayMarkingKeys& configured,
+    const detail::ReplayMarkingKeys& defaults, const TokenMarking& marking,
+    std::size_t roots, std::string_view name) {
+  if (configured.empty()) return defaults;
+  auto keys = configured;
+  if (keys.size() == roots && roots < marking.size()) {
+    keys.resize(marking.size(), false);
+    for (std::size_t p = roots; p < keys.size(); ++p) keys[p] = defaults[p];
+  }
+  return detail::resolve_replay_marking_keys(keys, marking, name);
+}
+
 // Holds the net plus the lookups token replay needs and drives both the
 // fitness and precision passes over a single shared translation.
 class Replayer {
@@ -152,6 +251,7 @@ class Replayer {
   struct ForwardConfiguration {
     detail::ReplayMarkingKeys initial_keys;
     detail::ReplayMarkingKeys final_keys;
+    std::vector<std::size_t> initial_order;
     std::vector<std::string> place_names;
     std::vector<std::string> transition_names;
     detail::CleaningComponents components;
@@ -162,14 +262,15 @@ class Replayer {
                     const TokenReplayOptions* replay_options = nullptr,
                     bool match_null_activity = false)
       : net_(net),
-        initial_(replay_options && replay_options->exact_initial_marking
-          ? resolve_exact_marking(net, *replay_options->exact_initial_marking, true,
-                                  replay_options->variant == TokenReplayVariant::kForward)
-          : Marking(resolve_workflow_marking(net, initial, true))),
-        final_(replay_options && replay_options->exact_final_marking
-          ? resolve_exact_marking(net, *replay_options->exact_final_marking, false,
-                                  replay_options->variant == TokenReplayVariant::kForward)
-          : Marking(resolve_workflow_marking(net, final, false))) {
+        markings_(resolve_replay_markings(net, initial, final, replay_options)),
+        initial_(std::move(markings_.initial)), final_(std::move(markings_.final)),
+        full_result_(match_null_activity) {
+    if (replay_options && replay_options->variant == TokenReplayVariant::kBackwards) {
+      markings_.initial_keys = resolve_domain_marking_keys(replay_options->initial_marking_keys,
+          markings_.initial_keys, initial_, net_.place_count(), "initial_marking_keys");
+      markings_.final_keys = resolve_domain_marking_keys(replay_options->final_marking_keys,
+          markings_.final_keys, final_, net_.place_count(), "final_marking_keys");
+    }
     for (std::size_t i = 0; i < net_.activities().size(); ++i) {
       name_to_activity_.emplace(net_.activities()[i], i);
     }
@@ -246,20 +347,22 @@ class Replayer {
     if (!forward_configuration_) local_configuration = prepare_forward(options);
     const auto& configuration = forward_configuration_ ? *forward_configuration_ : *local_configuration;
     auto keys = configuration.initial_keys;
+    auto order = configuration.initial_order;
     const auto& final_keys = configuration.final_keys;
     const auto& place_names = configuration.place_names;
     const auto& transition_names = configuration.transition_names;
     const auto& components = configuration.components;
     Counts counts;
     counts.forward_replay = true;
-    counts.places.resize(net_.place_count());
+    counts.places.resize(initial_.size());
+    if (diagnostics) diagnostics->marking_domain = markings_.domain;
     for (std::size_t place = 0; place < initial_.size(); ++place) {
       const auto tokens = TokenInteger(initial_[place]);
       counts.produced += tokens;
       counts.places[place].produced += tokens;
     }
     const auto emit = [&](std::size_t transition, bool event) {
-      if (!forward_fire(marking, keys, transition, counts)) return;
+      if (!forward_fire(marking, keys, transition, counts, &order)) return;
       if (executions) ++(*executions)[transition];
       if (diagnostics) {
         diagnostics->activated_transitions.push_back(transition);
@@ -309,6 +412,10 @@ class Replayer {
       // rejection occurs during the event, before per-trace float conversion.
       if (options.enable_pltr_fitness && *step == net_.activities().size())
         throw std::invalid_argument("null transition PLTR key");
+      if (full_result_ && options.enable_pltr_fitness &&
+          net_.transitions()[chosen].activity &&
+          net_.activities()[*net_.transitions()[chosen].activity].empty())
+        throw TokenReplayTransitionKeyError(chosen);
       const auto before_cleaning = forced && !components.empty()
           ? keys : detail::ReplayMarkingKeys{};
       emit(chosen, true);
@@ -321,6 +428,7 @@ class Replayer {
             if (keys[place] && before_cleaning[place]) {
               marking[place] = 0;
               keys[place] = false;
+              std::erase(order, place);
               ++counts.remaining;
               ++counts.places[place].remaining;
               if (diagnostics && std::find(diagnostics->cleaned_place_indices.begin(),
@@ -362,6 +470,7 @@ class Replayer {
     if (diagnostics) {
       diagnostics->reached_marking = marking;
       diagnostics->reached_marking_keys = keys;
+      if (net_.discovery_markings()) diagnostics->reached_marking_order = order;
     }
     for (std::size_t place = 0; place < marking.size(); ++place) {
       const auto required = TokenInteger(final_[place]);
@@ -406,7 +515,8 @@ class Replayer {
     Marking marking = initial_marking();
     BackwardsOutcome outcome;
     auto& counts = outcome.counts;
-    counts.places.resize(net_.place_count());
+    counts.places.resize(initial_.size());
+    if (diagnostics) diagnostics->marking_domain = markings_.domain;
     for (std::size_t place = 0; place < initial_.size(); ++place) {
       const auto tokens = TokenInteger(initial_[place]);
       counts.produced += tokens;
@@ -491,7 +601,7 @@ class Replayer {
     // legacy variation.
     for (std::size_t p = 0; p < marking.size(); ++p) {
       const auto& target = final_[p];
-      if (target > 0 && marking[p] > 0) {
+      if (markings_.final_keys[p] && marking[p] != 0) {
         const auto available = TokenInteger(marking[p]);
         counts.consumed += available;
         counts.places[p].consumed += available;
@@ -549,6 +659,9 @@ class Replayer {
   }
 
   [[nodiscard]] Marking initial_marking() const { return initial_; }
+  [[nodiscard]] const std::optional<TokenReplayMarkingDomain>& marking_domain() const {
+    return markings_.domain;
+  }
 
   // Advances a precision prefix using its enabled-state routing cache. The
   // forward trace replay separately retains partial structural routes and
@@ -731,15 +844,6 @@ class Replayer {
   }
 
  private:
-  static Marking resolve_exact_marking(const PetriNet& net, const Marking& requested,
-                                     bool initial, bool allow_signed) {
-    if (requested.empty()) return Marking(resolve_workflow_marking(net, {}, initial));
-    if (requested.size() != net.place_count()) throw std::invalid_argument("exact marking dimension does not match net");
-    if (!allow_signed && std::any_of(requested.begin(), requested.end(),
-                                    [](const auto& count) { return count < 0; }))
-      throw std::invalid_argument("exact input marking contains a negative token count");
-    return requested;
-  }
   static TokenInteger arc_tokens(PetriArcWeight weight) {
     TokenInteger result(weight.magnitude); return weight.negative ? -result : result;
   }
@@ -754,9 +858,18 @@ class Replayer {
   }
   ForwardConfiguration prepare_forward(const TokenReplayOptions& options) const {
     ForwardConfiguration result;
-    result.initial_keys = detail::resolve_replay_marking_keys(options.initial_marking_keys, initial_, "initial_marking_keys");
-    result.final_keys = detail::resolve_replay_marking_keys(options.final_marking_keys, final_, "final_marking_keys");
+    result.initial_keys = resolve_domain_marking_keys(options.initial_marking_keys, markings_.initial_keys, initial_, net_.place_count(), "initial_marking_keys");
+    result.final_keys = resolve_domain_marking_keys(options.final_marking_keys, markings_.final_keys, final_, net_.place_count(), "final_marking_keys");
+    for (const auto p : markings_.initial_order)
+      if (result.initial_keys[p]) result.initial_order.push_back(p);
+    for (std::size_t p = 0; p < result.initial_keys.size(); ++p)
+      if (result.initial_keys[p] && std::find(result.initial_order.begin(), result.initial_order.end(), p) == result.initial_order.end())
+        result.initial_order.push_back(p);
     result.place_names = detail::replay_element_names(options.place_names, net_.place_count(), "p", "place_names");
+    if (markings_.domain) for (const auto& place : markings_.domain->detached_places) {
+      const auto* name = std::get_if<std::string>(&place.name.value);
+      result.place_names.push_back(name ? *name : "detached:" + std::to_string(place.id));
+    }
     result.transition_names = detail::replay_element_names(options.transition_names, net_.transitions().size(), "t", "transition_names");
     if (options.cleaning_token_flood)
       result.components = detail::cleaning_components(net_, result.initial_keys, result.final_keys);
@@ -764,7 +877,8 @@ class Replayer {
   }
 
   bool forward_fire(Marking& marking, detail::ReplayMarkingKeys& keys,
-                    std::size_t transition, Counts& counts) const {
+                    std::size_t transition, Counts& counts,
+                    std::vector<std::size_t>* order = nullptr) const {
     counts.forward_replay = true;
     const auto& fired = net_.transitions()[transition];
     const auto required = input_requirements(fired, marking.size());
@@ -779,6 +893,7 @@ class Replayer {
       // Public forward repair adds the full input weight before consumption,
       // retaining any partially available tokens after the firing.
       marking[place] += required[place];
+      if (order && !keys[place]) order->push_back(place);
       keys[place] = true;
     }
     // Signed input state can remain below its required weight even after the
@@ -794,6 +909,15 @@ class Replayer {
         counts.produced += weight; counts.places[fired.outputs[index]].produced += weight;
       }
       return false;
+    }
+    if (order) {
+      for (std::size_t place = 0; place < marking.size(); ++place)
+        if (input_places[place] && marking[place] - required[place] == 0)
+          std::erase(*order, place);
+      for (const auto place : fired.reset_inputs) std::erase(*order, place);
+      for (const auto place : fired.outputs)
+        if (std::find(order->begin(), order->end(), place) == order->end())
+          order->push_back(place);
     }
     fire(marking, transition, counts);
     for (const auto place : fired.inputs) keys[place] = marking[place] != 0;
@@ -1006,7 +1130,7 @@ class Replayer {
       if (!ok) return;  // fall back to the breadth-first closure
     }
 
-    const std::size_t places = net_.place_count();
+    const std::size_t places = initial_.size();
     std::vector<std::vector<std::size_t>> silent_out(places);
     for (const std::size_t s : silent_transitions_) {
       silent_out[net_.transitions()[s].inputs.front()].push_back(
@@ -1335,8 +1459,10 @@ class Replayer {
   }
 
   const PetriNet& net_;
+  ResolvedReplayMarkings markings_;
   Marking initial_;
   Marking final_;
+  bool full_result_ = false;
   std::optional<ForwardConfiguration> forward_configuration_;
   std::unordered_map<std::string, std::size_t> name_to_activity_;
   std::vector<std::vector<std::size_t>> transitions_by_activity_;
@@ -3335,7 +3461,8 @@ TokenReplayDiagnostics replay_token_diagnostics(
                                          : options.activity_attribute;
   TokenReplayDiagnostics result;
   result.trace_count = event_log.trace_count();
-  result.places.resize(net.place_count());
+  result.places.resize(replayer.initial_marking().size());
+  result.marking_domain = replayer.marking_domain();
   result.transition_activations.resize(net.transitions().size());
   for (const auto& trace : event_log.traces) {
     std::vector<std::optional<std::size_t>> ids;
@@ -3577,7 +3704,9 @@ TokenReplayResult replay_token_result(
     }
   }
   const auto rows = replay_token_trace_rows(replay_log, net, options, true, true);
+  const auto markings = resolve_replay_markings(net, options.initial_marking, options.final_marking, &options);
   TokenReplayResult result;
+  result.marking_domain = markings.domain;
   result.return_names = options.return_names;
   result.place_names = detail::replay_element_names(
       options.place_names, net.place_count(), "p", "place_names");
@@ -3604,14 +3733,11 @@ TokenReplayResult replay_token_result(
     entry.transition_index = t;
     fitness.transitions.push_back(std::move(entry));
   }
-  TokenMarking final_marking;
-  if (options.exact_final_marking && !options.exact_final_marking->empty())
-    final_marking = *options.exact_final_marking;
-  else for (const auto count : resolve_workflow_marking(net,
-      options.exact_final_marking ? std::vector<int>{} : options.final_marking, false))
-    final_marking.emplace_back(count);
-  const auto final_keys = detail::resolve_replay_marking_keys(
-      options.final_marking_keys, final_marking, "final_marking_keys");
+  const auto& final_marking = markings.final;
+  const auto final_keys = resolve_domain_marking_keys(
+      options.final_marking_keys, markings.final_keys, final_marking, net.place_count(), "final_marking_keys");
+  const auto initial_keys = resolve_domain_marking_keys(
+      options.initial_marking_keys, markings.initial_keys, markings.initial, net.place_count(), "initial_marking_keys");
   std::unordered_map<std::string, std::vector<std::size_t>> trace_buckets;
   const auto add_context = [](std::vector<TokenReplayTraceContexts>& entries,
                               std::size_t reference, const Event& context, bool replace) {
@@ -3646,6 +3772,13 @@ TokenReplayResult replay_token_result(
     const auto context = detail::token_replay_context(trace, row);
     const TokenInteger frequency(frequencies[group]);
     for (std::size_t p = 0; p < row.places.size(); ++p) {
+      if (p >= net.place_count()) {
+        if (!initial_keys[p] && !final_keys[p] && !row.reached_marking_keys[p]) continue;
+        const auto& key = markings.domain->places.at(p);
+        const auto found = std::find_if(markings.domain->detached_places.begin(),
+            markings.domain->detached_places.end(), [&](const auto& place) { return place.id == key.id; });
+        throw TokenReplayPlaceKeyError(key, found->name);
+      }
       const auto& counts = row.places[p];
       const auto final_missing = final_keys[p]
           ? std::max(TokenInteger(0), final_marking[p] - row.reached_marking[p])
