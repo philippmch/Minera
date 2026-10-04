@@ -55,6 +55,49 @@ struct MarkingHash {
   }
 };
 
+// Independently owned open addressing for an identity set: equality uses IDs,
+// while supplied public hashes determine collisions, growth and iteration.
+std::vector<std::size_t> replay_identity_set_order(
+    const std::vector<std::size_t>& values,
+    const std::vector<std::int64_t>& hashes) {
+  struct Entry { std::size_t id; std::uint64_t hash; };
+  const auto insert = [](Entry entry, auto& table) {
+    const auto mask = table.size() - 1;
+    std::size_t index = static_cast<std::size_t>(entry.hash & mask);
+    auto perturb = entry.hash;
+    for (;;) {
+      const std::size_t probes = index + 9 < table.size() ? 9 : 0;
+      for (std::size_t offset = 0; offset <= probes; ++offset) {
+        auto& slot = table[index + offset];
+        if (!slot) { slot = entry; return true; }
+        if (slot->id == entry.id) return false;
+      }
+      perturb >>= 5;
+      index = (index * 5 + 1 + static_cast<std::size_t>(perturb)) & mask;
+    }
+  };
+  std::vector<std::optional<Entry>> table(8);
+  std::size_t used = 0;
+  for (const auto id : values) {
+    if (!insert({id, static_cast<std::uint64_t>(hashes.at(id))}, table)) continue;
+    ++used;
+    if (used * 5 >= (table.size() - 1) * 3) {
+      std::size_t size = 8;
+      const auto factor = used > 50000 ? 2 : 4;
+      while (size <= used * factor) size *= 2;
+      auto old = std::move(table);
+      table = std::vector<std::optional<Entry>>(size);
+      for (const auto& slot : old)
+        if (slot) insert(*slot, table);
+    }
+  }
+  std::vector<std::size_t> ordered;
+  ordered.reserve(used);
+  for (const auto& slot : table)
+    if (slot) ordered.push_back(slot->id);
+  return ordered;
+}
+
 Marking resolve_workflow_marking(const PetriNet& net,
                                  const Marking& requested,
                                  bool initial) {
@@ -265,6 +308,9 @@ class Replayer {
         markings_(resolve_replay_markings(net, initial, final, replay_options)),
         initial_(std::move(markings_.initial)), final_(std::move(markings_.final)),
         full_result_(match_null_activity) {
+    if (replay_options && replay_options->transition_identity_hashes &&
+        replay_options->transition_identity_hashes->size() != net_.transitions().size())
+      throw std::invalid_argument("transition_identity_hashes must contain one entry per transition");
     if (replay_options && replay_options->variant == TokenReplayVariant::kBackwards) {
       (void)detail::replay_transition_names(replay_options->nullable_transition_names,
                                           replay_options->transition_names, net_);
@@ -772,6 +818,72 @@ class Replayer {
           result.push_back(t);
       }
       return result;
+    }
+
+    if (options.variant == TokenReplayVariant::kForward) {
+      const auto names = detail::replay_transition_names(
+          options.nullable_transition_names, options.transition_names, net_);
+      detail::validate_forward_transition_name_order(names);
+      std::vector<std::int64_t> hashes(net_.transitions().size());
+      if (options.transition_identity_hashes) hashes = *options.transition_identity_hashes;
+      else for (std::size_t t = 0; t < hashes.size(); ++t) hashes[t] = static_cast<std::int64_t>(t);
+      std::vector<std::size_t> order(hashes.size());
+      for (std::size_t t = 0; t < order.size(); ++t) order[t] = t;
+      std::stable_sort(order.begin(), order.end(), [&](const auto left, const auto right) {
+        return std::tie(names[left], hashes[left]) < std::tie(names[right], hashes[right]);
+      });
+
+      using Pair = std::pair<std::optional<std::string>, std::optional<std::string>>;
+      std::map<Pair, std::size_t> pairs;
+      std::vector<std::size_t> pair_ids(order.size());
+      for (const auto t : order) {
+        const auto& transition = net_.transitions()[t];
+        const auto label = transition.activity
+            ? std::optional<std::string>(net_.activities().at(*transition.activity)) : std::nullopt;
+        const auto [it, added] = pairs.emplace(Pair{names[t], label}, pairs.size());
+        (void)added;
+        pair_ids[t] = it->second;
+      }
+      std::vector<std::unordered_set<Marking, MarkingHash>> visited(pairs.size());
+      std::vector<std::optional<Marking>> latest(order.size());
+      std::queue<std::size_t> pending;
+      const auto transition_count = order.size();
+      const auto expansion_slots = kSilentSearchCap + 1;
+      const std::size_t worklist_cap = transition_count != 0 &&
+              expansion_slots > std::numeric_limits<std::size_t>::max() / transition_count
+          ? std::numeric_limits<std::size_t>::max() : expansion_slots * transition_count;
+      const auto discover = [&](const Marking& reached) {
+        for (const auto t : order) {
+          if (!enabled(reached, t)) continue;
+          if (pending.size() >= worklist_cap)
+            throw std::runtime_error("enabled transition diagnostic worklist exceeded limit");
+          latest[t] = reached;
+          pending.push(t);
+        }
+      };
+      discover(marking);
+      std::size_t expanded = 0;
+      std::vector<std::size_t> selected;
+      while (!pending.empty()) {
+        const auto t = pending.front(); pending.pop();
+        const auto& reached = *latest[t];
+        if (!visited[pair_ids[t]].insert(reached).second) continue;
+        if (!net_.transitions()[t].silent()) { selected.push_back(t); continue; }
+        if (expanded++ >= kSilentSearchCap)
+          throw std::runtime_error("enabled transition diagnostic search exceeded limit");
+        Marking next = reached;
+        Counts scratch;
+        fire(next, t, scratch);
+        discover(next);
+      }
+      if (!options.transition_identity_hashes) {
+        // Native IDs have an established presentation order. A foreign hash
+        // order is meaningful only when its actual public hashes are supplied.
+        std::sort(selected.begin(), selected.end());
+        selected.erase(std::unique(selected.begin(), selected.end()), selected.end());
+        return selected;
+      }
+      return replay_identity_set_order(selected, hashes);
     }
 
     const auto transition_names = detail::replay_transition_names(
