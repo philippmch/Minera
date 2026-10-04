@@ -288,19 +288,40 @@ void plus_reduced_self_loops_retain_degenerate_boundaries() {
   }
 }
 
-void plus_rejects_domains_with_no_valid_initial_marking() {
-  for (const auto& log : {make_log({}), make_log({{}}),
+void plus_keeps_detached_initial_markings_and_rejects_no_traces() {
+  for (const bool remove : {false, true}) {
+    bool rejected = false;
+    try { (void)discover_alpha_plus(make_log({}), {.remove_unconnected = remove}); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
+  for (const auto& log : {make_log({{}}),
                          make_log({{"L", "L"}}),
                          make_log({{"L", "L"}, {"M", "M"}}),
                          make_log({{"L", "L"}, {"a", "L", "L", "a"}})}) {
     for (const bool remove : {false, true}) {
-      bool rejected = false;
-      try {
-        (void)discover_alpha_plus(log, {.remove_unconnected = remove});
-      } catch (const std::invalid_argument&) {
-        rejected = true;
-      }
-      assert(rejected);
+      const auto raw = discover_alpha_plus_result(log, {.remove_unconnected = remove});
+      const auto net = discover_alpha_plus(log, {.remove_unconnected = remove});
+      assert(net.place_count() == raw.net.place_count());
+      assert(net.transitions().size() == raw.net.transitions().size());
+      assert(!net.has_source() && net.has_sink());
+      assert(raw.detached_initial_marking.size() == 1);
+      assert(net.discovery_markings() && raw.net.discovery_markings());
+      const auto& markings = *net.discovery_markings();
+      assert(markings.initial.size() == 1 && markings.final.size() == 1);
+      assert(markings.initial[0].place.kind == PetriMarkingPlaceKind::kDetached);
+      assert(markings.initial[0].tokens == 1);
+      assert(markings.final[0].place.kind == PetriMarkingPlaceKind::kRoot);
+      assert(markings.final[0].place.id == net.sink());
+      assert(markings.final[0].tokens == 1);
+      assert(markings.detached_places.size() == 1);
+      // A same-name loop place remains a distinct unmarked root identity.
+      for (std::size_t p = 0; p < raw.place_names.size(); ++p)
+        if (raw.place_names[p] == raw.detached_initial_marking[0].name) {
+          assert(raw.initial_marking[p] == 0);
+          assert((markings.initial[0].place != PetriMarkingPlace{
+              PetriMarkingPlaceKind::kRoot, p}));
+        }
     }
   }
 }
@@ -416,7 +437,7 @@ int main() {
   plus_sharp_preserves_boundary_outgoing_presence();
   plus_empty_trace_retains_both_boundaries();
   plus_reduced_self_loops_retain_degenerate_boundaries();
-  plus_rejects_domains_with_no_valid_initial_marking();
+  plus_keeps_detached_initial_markings_and_rejects_no_traces();
   plus_loop_context_changes_when_trace_order_changes();
   plus_two_loop_uses_bidirectional_causal_places();
   plus_empty_context_differences_create_one_loop_place_per_maximal_pair();
