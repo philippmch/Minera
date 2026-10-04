@@ -9881,3 +9881,80 @@ retain their independent native/compact marking limits. The original automatic
 fitness cohort retains 312 native and 312 wire whole-dictionary differences.
 Catalogue totals remain 46/86 packages, 199/387 modules and 228 incomplete units;
 no promotion or full parity is claimed.
+
+
+### Nullable activities through native inductive selection and ordinary entry points
+
+The EventLog activity selector retains a present null as kNull and copies the
+actual selected attribute metadata for both default and custom keys. Missing and
+empty-string fields remain distinct. Selecting a generic null no longer falls
+through as a missing field, or overwrites that presence state with a present empty
+string. None-only singleton events, optionally mixed with empty traces, return a
+silent root with no fabricated visible label. Mixed None/string alphabets and
+repeated None events reject, as observed through the pinned public miner.
+
+A fresh public capture makes 534 actual IM/IMf/IMd calls on 178 frozen fixtures:
+the preceding 90 ordered-tree/core fixtures, 54 controlled default/custom-key
+nullable cases, 32 seeded logs and two additional missing-key cases. All 303
+successful tree returns and 231 exceptions are retained with full public fields,
+typed labels, ordered children and parents. All log/parameter inputs remain equal
+after calls and opaque module proofs remain pinned before and after. The cohort
+contains 288 string/empty-log successes, 15 None-only singleton successes, nine
+missing-key errors, 12 repeated-None errors and 210 mixed None/string errors.
+The first-observed-type hypothesis for exact mixed error-message operand order
+has 63 actual counterexamples; those remain preserved. The revised acceptance
+rule records mixed message orientation as unpredicted, without normalizing away
+the earlier failures or inspecting upstream source, private fields or bytecode.
+
+Actual fresh native-library probes make 534 calls before and 534 after the change.
+The baseline contains 117 acceptance differences and nine ordered tree-field
+differences. The corrected source matches all 534 accept/reject decisions and all
+303 whole successful operator/typed label/ordered children/parent graphs, including
+the prior three None-label failures. Native log and parameters remain unchanged.
+Native regressions cover selected kNull/attribute metadata, independent default
+and custom fields, optional null singleton traces, repeated/mixed rejection,
+empty visible labels and EventDataView(EventLog). The 231 native exception classes
+remain distinct from their Python classes, and 219 exact messages remain different;
+the 12 repeated-None messages match. No Python identity parity is inferred.
+
+Ordinary application observations execute 534 full CLI exports and 534 HTTP
+`/api/mine` requests on the same faithful raw inputs and selected key/noise/variant
+options. The native XES codec's explicit `null="true"` marker carries the None
+values; this is a native transport representation, not a public XES importer
+claim. Each transport matches 525/534 acceptance decisions and all 294 returned
+ordered tree graphs. Nine successful public calls per transport remain blocked on
+default None singleton/optional fixtures 14, 90 and 94: minimum-self-distance
+analysis reports a missing activity before inductive discovery. All 18 failures
+remain actual entry gates, rather than being omitted or counted as successful
+mining. Custom-key None silent trees export successfully. Of the 231 rejections
+per transport, six repeated-None messages match and 225 messages differ; all 450
+application message differences remain retained. No unrelated bundled model-family
+values are equated with their public counterparts.
+
+Established string-log regressions still match all 36 ordered CLI tree graphs,
+24 whole typed skeleton models and 48 whole self-conformance projections. Fresh
+supplied-model smoke executes 84 CLI processes and 112 HTTP requests, including
+84 cached evaluations on three models and four default mining profiles. All 214
+whole public values, 67 CLI/HTTP pairs, 48 public direct/parent pairs, 50 expected
+error-message/status checks, 24 exact cached marking checks and 12 exported
+markings match. The preceding public PNML imports/quality/replays are reused
+through exact hashes in the committed parent archives. The parent's 22060 full
+transport comparisons remain historical for that source; they are not described
+as fresh coverage of this change.
+
+All 152 assertion-enabled Release suites and both focused suites pass on 660
+frozen inputs: two backend/source-test edits and 658 unchanged. All 155 production
+and test outputs are freshly built and bound with compiler projects and process
+logs. [nullable-inductive-validation.json](nullable-inductive-validation.json)
+binds all 4034 members, round-tripped across 19
+lossless archives, plus hashes of the 32 preceding ordering archives. This is
+source/build/process/archive self-review; no independent review is claimed.
+
+Default None application entry, exact exception identities/messages, nullable
+stream/table/lazy inputs, generic scalar labels, native alias/trace-fallback
+selectors, Python classes/properties/hash/repr/identities and insertion order,
+None/empty visible-label Petri-net conversion/replay/export and wider conformance
+remain open. AUTO/alignment/backward consumers retain independent native/compact
+marking limits. The original automatic-choice fitness cohort retains 312 native
+and 312 wire whole-dictionary differences. Catalogue totals remain 46/86 packages,
+199/387 modules and 228 incomplete units; no promotion or full parity is claimed.
