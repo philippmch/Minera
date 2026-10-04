@@ -303,9 +303,9 @@ struct TokenReplayOptions {
   // Otherwise nonempty string names override metadata, then t0, t1, ... apply.
   std::optional<PetriTransitionNameList> nullable_transition_names;
   // Optional public identity hashes in native transition-ID order. A value
-  // has one entry per transition and controls forward enabled diagnostics.
-  // Absence uses native transition IDs as identity hashes. Activity selection
-  // and transition identity equality remain independent of this ordering.
+  // has one entry per transition and controls forward ordinary-arc enabled
+  // activity choice and diagnostics. Absence preserves native activity order
+  // and uses native IDs for diagnostic ties. Identity equality is unchanged.
   std::optional<std::vector<std::int64_t>> transition_identity_hashes;
 };
 
