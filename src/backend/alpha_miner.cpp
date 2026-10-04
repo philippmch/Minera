@@ -839,16 +839,39 @@ AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
     result.final_marking[place_ids[1]] = 1;
   } else result.detached_final_marking.push_back({names[1], 1});
 
+  PetriDiscoveryMarkings markings;
+  const auto marking_place = [&](std::size_t original) {
+    if (live_places[original])
+      return PetriMarkingPlace{PetriMarkingPlaceKind::kRoot, place_ids[original]};
+    // Original removed IDs form a separate namespace. In particular, a live
+    // loop place with an equal structural name does not receive this token.
+    if (std::none_of(markings.detached_places.begin(), markings.detached_places.end(),
+                     [&](const auto& place) { return place.id == original; })) {
+      const auto members = [](const std::vector<std::optional<std::string>>& values) {
+        HeuristicStructuredValue::Array array;
+        for (const auto& value : values)
+          array.push_back(value ? HeuristicStructuredValue{*value}
+                                : HeuristicStructuredValue{nullptr});
+        return HeuristicStructuredValue{std::move(array)};
+      };
+      markings.detached_places.push_back({original, HeuristicStructuredValue{
+          HeuristicStructuredValue::Object{
+              {"boundary", HeuristicStructuredValue{names[original].boundary}},
+              {"before", members(names[original].before)},
+              {"after", members(names[original].after)}}}});
+    }
+    return PetriMarkingPlace{PetriMarkingPlaceKind::kDetached, original};
+  };
+  markings.initial.push_back({marking_place(initial), 1});
+  markings.final.push_back({marking_place(1), 1});
+  net.set_discovery_markings(std::move(markings));
+
   return result;
 }
 
 PetriNet discover_alpha_plus(const EventLog& log,
                              const AlphaMinerOptions& options) {
   auto result = discover_alpha_plus_result(log, options);
-  if (!result.detached_initial_marking.empty() ||
-      !result.detached_final_marking.empty())
-    throw std::invalid_argument(
-        "Alpha+: boundary cleanup leaves no valid initial marking");
   return std::move(result.net);
 }
 

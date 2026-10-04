@@ -95,16 +95,42 @@ void alpha_plus_boundary_loops_use_unmarked_separate_places() {
   }
 }
 
-void alpha_plus_rejects_all_loop_logs_with_no_valid_initial_marking() {
+void alpha_plus_keeps_removed_initial_places_in_convenience_results() {
   for (const auto& source : {log({trace({"only", "only"})}),
                              log({trace({"a", "a"}), trace({"b", "b"})})}) {
-    bool rejected = false;
-    try {
-      (void)discover_alpha_plus(source);
-    } catch (const std::invalid_argument&) {
-      rejected = true;
+    for (const bool cleanup : {false, true}) {
+      AlphaMinerOptions options;
+      options.short_loops = true;
+      options.remove_unconnected = cleanup;
+      for (const bool parent : {false, true}) {
+        const auto net = parent ? discover_petri_net(source, options)
+                                : discover_alpha_plus(source, options);
+        assert(!net.has_source() && net.has_sink());
+        assert(net.discovery_markings());
+        const auto& marking = *net.discovery_markings();
+        assert(marking.detached_places.size() == 1);
+        assert(marking.initial.size() == 1 && marking.final.size() == 1);
+        assert(marking.initial[0].place.kind == PetriMarkingPlaceKind::kDetached);
+        assert(marking.initial[0].place.id == marking.detached_places[0].id);
+        assert(marking.initial[0].tokens == 1);
+        assert(marking.final[0].place.kind == PetriMarkingPlaceKind::kRoot);
+        assert(marking.final[0].place.id == net.sink());
+        assert(marking.final[0].tokens == 1);
+        const auto& name = std::get<HeuristicStructuredValue::Object>(
+            marking.detached_places[0].name.value);
+        assert(std::get<std::string>(name.at("boundary").value).empty());
+        const auto& before = std::get<HeuristicStructuredValue::Array>(name.at("before").value);
+        const auto& after = std::get<HeuristicStructuredValue::Array>(name.at("after").value);
+        assert(before.size() == 1 && after.size() == 1);
+        assert(std::get<std::string>(before[0].value) == "artificial_start");
+        assert(std::get<std::string>(after[0].value) == "artificial_end");
+        // Every visible loop still refers exclusively to live, unmarked places.
+        for (const auto& transition : net.transitions()) {
+          for (const auto p : transition.inputs) assert(p < net.place_count());
+          for (const auto p : transition.outputs) assert(p < net.place_count());
+        }
+      }
     }
-    assert(rejected);
   }
 }
 
@@ -473,7 +499,7 @@ int main() {
   catch (const std::invalid_argument&) { no_traces_rejected = true; }
   assert(no_traces_rejected);
   alpha_plus_boundary_loops_use_unmarked_separate_places();
-  alpha_plus_rejects_all_loop_logs_with_no_valid_initial_marking();
+  alpha_plus_keeps_removed_initial_places_in_convenience_results();
   alpha_plus_creates_a_separate_interior_loop_place();
   alpha_plus_remove_unconnected_is_explicit();
   alpha_plus_uses_last_predecessor_and_aggregated_successors();

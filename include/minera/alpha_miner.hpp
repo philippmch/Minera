@@ -113,7 +113,8 @@ struct AlphaPlusDiscoveryResult {
 // Preserves markings on places removed by boundary cleanup. Marking vectors
 // index live net places; detached entries never identify live same-name places.
 // A detached initial marking leaves net.has_source() false.
-// discover_alpha_plus rejects results that lack live workflow markings.
+// Both this result's net and discover_alpha_plus retain the exact sparse
+// root/detached marking identities in PetriNet::discovery_markings().
 [[nodiscard]] AlphaPlusDiscoveryResult discover_alpha_plus_result(
     const EventLog& event_log, const AlphaMinerOptions& options = {});
 

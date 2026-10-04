@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -131,9 +132,32 @@ struct PetriNetPresentation {
   std::vector<PetriSparseMarkingEntry> final_marking;
 };
 
-// A workflow net with exactly one source and one sink place, produced from a
-// process tree. The initial marking puts one token on the source; the final
-// marking is one token on the sink.
+// Marking references have separate root and detached place namespaces. A
+// detached place survives only in discovery markings, outside the net's root
+// topology; its identity is never inferred from its name or a root place ID.
+enum class PetriMarkingPlaceKind { kRoot, kDetached };
+struct PetriMarkingPlace {
+  PetriMarkingPlaceKind kind;
+  std::size_t id;
+  bool operator==(const PetriMarkingPlace&) const = default;
+};
+struct PetriMarkingEntry {
+  PetriMarkingPlace place;
+  TokenInteger tokens;
+};
+struct PetriDetachedMarkingPlace {
+  std::size_t id;
+  HeuristicStructuredValue name;
+};
+struct PetriDiscoveryMarkings {
+  std::vector<PetriDetachedMarkingPlace> detached_places;
+  std::vector<PetriMarkingEntry> initial;
+  std::vector<PetriMarkingEntry> final;
+};
+
+// A labeled net with optional workflow boundaries and explicit discovery
+// markings. Process-tree conversion uses a single-token source/sink workflow;
+// discovery can retain markings outside the root topology instead.
 class PetriNet {
  public:
   std::size_t add_place() { return place_count_++; }
@@ -265,6 +289,41 @@ class PetriNet {
     activities_ = std::move(activities);
   }
 
+  // Sparse entries preserve signed, arbitrary-width counts and explicit zero
+  // keys. Both roles can refer to the same detached identity. Setting these
+  // markings does not create root places or change workflow boundary flags.
+  void set_discovery_markings(PetriDiscoveryMarkings markings) {
+    std::set<std::size_t> detached_ids;
+    for (const auto& place : markings.detached_places)
+      if (!detached_ids.insert(place.id).second)
+        throw std::invalid_argument("Petri detached marking place ID is duplicated");
+    const auto validate = [&](const std::vector<PetriMarkingEntry>& entries) {
+      std::set<std::pair<PetriMarkingPlaceKind, std::size_t>> keys;
+      for (const auto& entry : entries) {
+        const auto& place = entry.place;
+        if (place.kind == PetriMarkingPlaceKind::kRoot) {
+          if (place.id >= place_count_)
+            throw std::invalid_argument("Petri root marking place ID is invalid");
+        } else if (place.kind == PetriMarkingPlaceKind::kDetached) {
+          if (!detached_ids.contains(place.id))
+            throw std::invalid_argument("Petri detached marking place ID is invalid");
+        } else {
+          throw std::invalid_argument("Petri marking place kind is invalid");
+        }
+        if (!keys.emplace(place.kind, place.id).second)
+          throw std::invalid_argument("Petri marking place key is duplicated");
+      }
+    };
+    validate(markings.initial);
+    validate(markings.final);
+    discovery_markings_ = std::move(markings);
+  }
+
+  [[nodiscard]] const std::optional<PetriDiscoveryMarkings>&
+  discovery_markings() const noexcept {
+    return discovery_markings_;
+  }
+
   [[nodiscard]] std::size_t place_count() const noexcept { return place_count_; }
   [[nodiscard]] std::size_t source() const noexcept { return source_; }
   [[nodiscard]] std::size_t sink() const noexcept { return sink_; }
@@ -286,6 +345,7 @@ class PetriNet {
   bool sink_set_ = false;
   std::vector<PetriTransition> transitions_;
   std::vector<std::string> activities_;
+  std::optional<PetriDiscoveryMarkings> discovery_markings_;
 };
 
 // Process-tree Petri-net conversion variants.  The standard variant keeps

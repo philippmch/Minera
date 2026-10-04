@@ -18,6 +18,69 @@
 
 namespace {
 
+void discovery_markings_preserve_sparse_counts_and_detached_identity() {
+  using namespace minera;
+  PetriNet net;
+  assert(!net.discovery_markings());
+  net.add_place();
+  net.add_place();
+  const TokenInteger huge("1234567890123456789012345678901234567890");
+  PetriDiscoveryMarkings markings;
+  markings.detached_places = {{0, HeuristicStructuredValue{std::string("same")}},
+                             {7, HeuristicStructuredValue{std::string("same")}}};
+  markings.initial = {{{PetriMarkingPlaceKind::kRoot, 0}, 0},
+                      {{PetriMarkingPlaceKind::kDetached, 0}, huge},
+                      {{PetriMarkingPlaceKind::kDetached, 7}, -9}};
+  markings.final = {{{PetriMarkingPlaceKind::kDetached, 0}, -huge},
+                    {{PetriMarkingPlaceKind::kRoot, 1}, 1}};
+  net.set_discovery_markings(markings);
+  markings.initial.clear();  // The net owns its returned carrier.
+  auto copied = net;
+  auto moved = std::move(net);
+  for (const auto* value : {&copied, &moved}) {
+    assert(value->place_count() == 2 && !value->has_source() && !value->has_sink());
+    const auto& actual = *value->discovery_markings();
+    assert(actual.detached_places.size() == 2 && actual.initial.size() == 3);
+    assert(actual.initial[0].tokens == 0 && actual.initial[1].tokens == huge);
+    assert(actual.initial[2].tokens == -9 && actual.final[0].tokens == -huge);
+    assert(actual.initial[0].place != actual.initial[1].place);
+    assert(actual.initial[1].place == actual.final[0].place);
+    assert(actual.detached_places[0].id != actual.detached_places[1].id);
+    assert(std::get<std::string>(actual.detached_places[0].name.value) ==
+           std::get<std::string>(actual.detached_places[1].name.value));
+  }
+  const auto valid = *moved.discovery_markings();
+  const auto rejects_atomically = [&](PetriDiscoveryMarkings invalid) {
+    bool rejected = false;
+    try { moved.set_discovery_markings(std::move(invalid)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+    const auto& actual = *moved.discovery_markings();
+    assert(actual.initial.size() == 3 && actual.final.size() == 2);
+    assert(actual.initial[1].tokens == huge && actual.final[0].tokens == -huge);
+  };
+  auto invalid = valid;
+  invalid.detached_places.push_back(invalid.detached_places[0]);
+  rejects_atomically(invalid);
+  invalid = valid;
+  invalid.initial.push_back({{PetriMarkingPlaceKind::kRoot, 2}, 1});
+  rejects_atomically(invalid);
+  invalid = valid;
+  invalid.final.push_back({{PetriMarkingPlaceKind::kDetached, 8}, 1});
+  rejects_atomically(invalid);
+  invalid = valid;
+  invalid.initial.push_back(invalid.initial[0]);
+  rejects_atomically(invalid);
+  invalid = valid;
+  invalid.final.push_back(invalid.final[0]);
+  rejects_atomically(invalid);
+  invalid = valid;
+  invalid.final.push_back({{static_cast<PetriMarkingPlaceKind>(99), 0}, 1});
+  rejects_atomically(invalid);
+  moved.set_discovery_markings({});
+  assert(moved.discovery_markings() && moved.discovery_markings()->initial.empty());
+}
+
 using Marking = std::vector<std::size_t>;
 using Trace = std::vector<std::string>;
 
@@ -1339,6 +1402,7 @@ void automatic_presentation_bundle_collisions() {
 }  // namespace
 
 int main() {
+  discovery_markings_preserve_sparse_counts_and_detached_identity();
   leaf_and_tau_keep_labels_and_language();
   composite_fragments_have_silent_borders();
   binary_loop_preserves_language();
