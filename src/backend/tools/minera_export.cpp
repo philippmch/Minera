@@ -7189,7 +7189,7 @@ int main(int argc, char** argv) {
     // native activity graph; register them before the JSON adapter resolves
     // minimum-self-distance ids.
     for (const auto& result : minimum_self_distances) {
-      graph.ensure_activity(result.activity);
+      if (!result.activity_is_null) graph.ensure_activity(result.activity);
       for (const auto& witness : result.witnesses) {
         graph.ensure_activity(witness);
       }

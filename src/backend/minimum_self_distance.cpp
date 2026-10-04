@@ -17,11 +17,11 @@ namespace {
 
 struct ActivitySequence {
   std::string case_id;
-  std::vector<std::string> activities;
+  std::vector<MinimumSelfDistanceActivity> activities;
 };
 
 struct DistanceSegment {
-  std::string activity;
+  MinimumSelfDistanceActivity activity;
   std::size_t sequence_index = 0;
   std::size_t left = 0;
   std::size_t right = 0;
@@ -164,18 +164,36 @@ FirstClassAttributeRole selected_activity_role(const Event& event,
   return FirstClassAttributeRole::kNone;
 }
 
-std::string selected_activity(const Event& event, std::string_view key) {
+MinimumSelfDistanceActivity selected_activity(const Event& event,
+                                              std::string_view key) {
   const auto role = selected_activity_role(event, key);
+  const auto is_null = [&] {
+    switch (role) {
+      case FirstClassAttributeRole::kActivity:
+        return event.activity_state == FirstClassAttributeState::kNull;
+      case FirstClassAttributeRole::kResource:
+        return event.resource_state == FirstClassAttributeState::kNull;
+      case FirstClassAttributeRole::kLifecycle:
+        return event.lifecycle_state == FirstClassAttributeState::kNull;
+      case FirstClassAttributeRole::kTimestamp:
+        return event.timestamp_state == FirstClassAttributeState::kNull;
+      case FirstClassAttributeRole::kCaseId:
+      case FirstClassAttributeRole::kNone: return false;
+    }
+    return false;
+  }();
+  if (is_null) return std::nullopt;
   if (role != FirstClassAttributeRole::kNone) {
     if (const auto* value = selected_event_value(
             event, key, first_class_role_name(role)))
       return *value;
-  } else if (const auto* value = event.attribute(key)) {
-    return *value;
   }
-  throw std::invalid_argument(
-      "minimum self-distance event is missing activity attribute '" +
-      std::string(key) + "'");
+  for (const auto& attribute : event.attributes) {
+    if (attribute.key != key) continue;
+    if (attribute.is_null) return std::nullopt;
+    return attribute.value;
+  }
+  throw std::invalid_argument("'" + std::string(key) + "'");
 }
 
 bool canonical_case_selector(std::string_view key) {
@@ -481,11 +499,12 @@ std::vector<ActivitySequence> table_sequences(
 DiscoveryData discover_from_sequences(std::vector<ActivitySequence> sequences) {
   DiscoveryData data;
   data.sequences = std::move(sequences);
-  std::map<std::string, std::uint64_t> minima;
+  std::map<MinimumSelfDistanceActivity, std::uint64_t> minima;
   for (std::size_t sequence_index = 0; sequence_index < data.sequences.size();
        ++sequence_index) {
     const auto& activities = data.sequences[sequence_index].activities;
-    std::map<std::string, std::pair<std::size_t, std::size_t>> previous;
+    std::map<MinimumSelfDistanceActivity,
+             std::pair<std::size_t, std::size_t>> previous;
     for (std::size_t index = 0; index < activities.size(); ++index) {
       const auto& activity = activities[index];
       const auto found = previous.find(activity);
@@ -504,38 +523,63 @@ DiscoveryData discover_from_sequences(std::vector<ActivitySequence> sequences) {
 
   data.distances.reserve(minima.size());
   for (const auto& [activity, distance] : minima)
-    data.distances.push_back({activity, distance, {}});
+    data.distances.push_back(
+        {activity.value_or(""), distance, {}, !activity.has_value()});
   return data;
 }
 
+template <typename Distance>
 MinimumSelfDistanceWitnessMap derive_from_sequences(
     const DiscoveryData& data,
-    const std::map<std::string, std::uint64_t>& requested) {
-  std::map<std::string, std::uint64_t> observed;
-  for (const auto& distance : data.distances)
-    observed.emplace(distance.activity, distance.distance);
-
+    const std::map<MinimumSelfDistanceActivity, Distance>& requested) {
   MinimumSelfDistanceWitnessMap witnesses;
-  for (const auto& [activity, distance] : requested) {
-    auto& target = witnesses[activity];
-    if (distance == 0) continue;
-    const auto observed_it = observed.find(activity);
-    if (observed_it == observed.end() || observed_it->second != distance)
-      continue;
-    for (const auto& segment : data.segments) {
-      if (segment.activity != activity || segment.distance != distance)
-        continue;
-      const auto& activities = data.sequences[segment.sequence_index].activities;
-      for (std::size_t index = segment.left + 1; index < segment.right;
-           ++index)
-        target.insert(activities[index]);
+  for (const auto& sequence : data.sequences) {
+    for (const auto& activity : sequence.activities) {
+      const auto found = requested.find(activity);
+      if (found != requested.end() && found->second > 0)
+        witnesses.try_emplace(activity);
     }
+  }
+  for (const auto& segment : data.segments) {
+    const auto found = requested.find(segment.activity);
+    if (found == requested.end() || found->second <= 0 ||
+        segment.distance != static_cast<std::uint64_t>(found->second))
+      continue;
+    auto& target = witnesses.at(segment.activity);
+    const auto& activities = data.sequences[segment.sequence_index].activities;
+    for (std::size_t index = segment.left + 1; index < segment.right; ++index)
+      target.insert(activities[index]);
   }
   return witnesses;
 }
 
+MinimumSelfDistanceActivity activity_label(const MinimumSelfDistance& entry) {
+  return entry.activity_is_null ? MinimumSelfDistanceActivity{}
+                                : MinimumSelfDistanceActivity{entry.activity};
+}
+
+MinimumSelfDistances attach_witnesses(DiscoveryData data) {
+  std::map<MinimumSelfDistanceActivity, std::uint64_t> requested;
+  for (const auto& distance : data.distances)
+    requested.emplace(activity_label(distance), distance.distance);
+  const auto witnesses = derive_from_sequences(data, requested);
+  for (auto& distance : data.distances) {
+    const auto found = witnesses.find(activity_label(distance));
+    if (found == witnesses.end()) continue;
+    for (const auto& witness : found->second) {
+      if (witness)
+        distance.witnesses.push_back(*witness);
+      else
+        distance.witnesses_include_null = true;
+    }
+  }
+  return std::move(data.distances);
+}
+
+template <typename Distance>
 MinimumSelfDistanceWitnessMap derive_from_log(
-    const EventLog& log, const std::map<std::string, std::uint64_t>& requested,
+    const EventLog& log,
+    const std::map<MinimumSelfDistanceActivity, Distance>& requested,
     const MinimumSelfDistanceOptions& options) {
   return derive_from_sequences(
       discover_from_sequences(event_log_sequences(log, options)), requested);
@@ -560,20 +604,8 @@ void validate_variant(MinimumSelfDistanceVariant variant) {
 MinimumSelfDistances discover_minimum_self_distances(
     const EventLog& log, const MinimumSelfDistanceOptions& options) {
   validate_variant(options.variant);
-  auto data = discover_from_sequences(event_log_sequences(log, options));
-  const auto witnesses = derive_from_sequences(
-      data, [&] {
-        std::map<std::string, std::uint64_t> requested;
-        for (const auto& distance : data.distances)
-          requested.emplace(distance.activity, distance.distance);
-        return requested;
-      }());
-  for (auto& distance : data.distances) {
-    const auto found = witnesses.find(distance.activity);
-    if (found != witnesses.end() && distance.distance != 0)
-      distance.witnesses.assign(found->second.begin(), found->second.end());
-  }
-  return data.distances;
+  return attach_witnesses(
+      discover_from_sequences(event_log_sequences(log, options)));
 }
 
 MinimumSelfDistances discover_minimum_self_distances(
@@ -587,39 +619,15 @@ MinimumSelfDistances discover_minimum_self_distances(
 MinimumSelfDistances discover_minimum_self_distances(
     const EventStream& stream, const MinimumSelfDistanceOptions& options) {
   validate_variant(options.variant);
-  auto data = discover_from_sequences(stream_sequences(stream, options));
-  const auto witnesses = derive_from_sequences(
-      data, [&] {
-        std::map<std::string, std::uint64_t> requested;
-        for (const auto& distance : data.distances)
-          requested.emplace(distance.activity, distance.distance);
-        return requested;
-      }());
-  for (auto& distance : data.distances) {
-    const auto found = witnesses.find(distance.activity);
-    if (found != witnesses.end() && distance.distance != 0)
-      distance.witnesses.assign(found->second.begin(), found->second.end());
-  }
-  return data.distances;
+  return attach_witnesses(
+      discover_from_sequences(stream_sequences(stream, options)));
 }
 
 MinimumSelfDistances discover_minimum_self_distances(
     const EventTable& table, const MinimumSelfDistanceOptions& options) {
   validate_variant(options.variant);
-  auto data = discover_from_sequences(table_sequences(table, options));
-  const auto witnesses = derive_from_sequences(
-      data, [&] {
-        std::map<std::string, std::uint64_t> requested;
-        for (const auto& distance : data.distances)
-          requested.emplace(distance.activity, distance.distance);
-        return requested;
-      }());
-  for (auto& distance : data.distances) {
-    const auto found = witnesses.find(distance.activity);
-    if (found != witnesses.end() && distance.distance != 0)
-      distance.witnesses.assign(found->second.begin(), found->second.end());
-  }
-  return data.distances;
+  return attach_witnesses(
+      discover_from_sequences(table_sequences(table, options)));
 }
 
 MinimumSelfDistances discover_minimum_self_distances(
@@ -645,21 +653,27 @@ MinimumSelfDistances discover_minimum_self_distances(
 }
 
 MinimumSelfDistanceWitnessMap derive_msd_witnesses(
+    const EventLog& log, const MinimumSelfDistanceMap& msd,
+    const MinimumSelfDistanceOptions& options) {
+  validate_variant(options.variant);
+  return derive_from_log(log, msd, options);
+}
+
+MinimumSelfDistanceWitnessMap derive_msd_witnesses(
     const EventLog& log, const std::map<std::string, std::uint64_t>& msd,
     const MinimumSelfDistanceOptions& options) {
   validate_variant(options.variant);
   (void)effective_activity_key(options);
   (void)effective_case_id_key(options);
-  return derive_from_log(log, msd, options);
+  std::map<MinimumSelfDistanceActivity, std::uint64_t> requested;
+  for (const auto& [activity, distance] : msd)
+    requested.emplace(activity, distance);
+  return derive_from_log(log, requested, options);
 }
 
 MinimumSelfDistanceWitnessMap derive_msd_witnesses(
-    const EventLog& log, const MinimumSelfDistanceOptions& options) {
-  const auto distances = discover_minimum_self_distances(log, options);
-  std::map<std::string, std::uint64_t> msd;
-  for (const auto& distance : distances)
-    msd.emplace(distance.activity, distance.distance);
-  return derive_msd_witnesses(log, msd, options);
+    const EventLog&, const MinimumSelfDistanceOptions&) {
+  throw std::logic_error("'dict' object has no attribute 'apply'");
 }
 
 MinimumSelfDistanceWitnessMap derive_msd_witnesses(
@@ -679,10 +693,11 @@ MinimumSelfDistanceWitnessMap derive_msd_witnesses(
 MinimumSelfDistanceWitnessMap derive_minimum_self_distance_witnesses(
     const EventLog& log, const MinimumSelfDistances& distances,
     const MinimumSelfDistanceOptions& options) {
-  std::map<std::string, std::uint64_t> msd;
+  validate_variant(options.variant);
+  std::map<MinimumSelfDistanceActivity, std::uint64_t> msd;
   for (const auto& distance : distances)
-    msd.emplace(distance.activity, distance.distance);
-  return derive_msd_witnesses(log, msd, options);
+    msd.emplace(activity_label(distance), distance.distance);
+  return derive_from_log(log, msd, options);
 }
 
 MinimumSelfDistances MinimumSelfDistanceLogDiscovery::apply(

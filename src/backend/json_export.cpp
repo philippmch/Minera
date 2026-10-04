@@ -3008,45 +3008,63 @@ struct ResolvedTemporalProfileEntry {
 };
 
 struct ResolvedMinimumSelfDistance {
-  std::size_t activity = 0;
+  std::optional<std::size_t> activity;
   std::uint64_t distance = 0;
-  std::vector<std::size_t> witnesses;
+  std::vector<std::optional<std::size_t>> witnesses;
 };
 
 std::vector<ResolvedMinimumSelfDistance> resolve_minimum_self_distances(
     const MinimumSelfDistances& distances, const DirectlyFollowsGraph& graph) {
   std::vector<ResolvedMinimumSelfDistance> resolved;
   resolved.reserve(distances.size());
-  std::map<std::size_t, bool> seen_activities;
-  std::string previous_activity;
+  std::map<std::optional<std::size_t>, bool> seen_activities;
+  std::optional<std::string> previous_activity;
   bool first = true;
   for (const auto& entry : distances) {
-    if (!first && entry.activity <= previous_activity) {
+    if (entry.activity_is_null && !entry.activity.empty()) {
+      throw std::invalid_argument(
+          "minimum self-distance null activity must have empty text");
+    }
+    const auto label = entry.activity_is_null
+                           ? std::optional<std::string>{}
+                           : std::optional<std::string>{entry.activity};
+    if (!first && label <= previous_activity) {
       throw std::invalid_argument(
           "minimum self-distance JSON activities must be strictly sorted");
     }
     first = false;
-    previous_activity = entry.activity;
-    const auto activity = graph.activity_id(entry.activity);
-    if (!activity) {
+    previous_activity = label;
+    const auto activity = entry.activity_is_null
+                              ? std::optional<std::size_t>{}
+                              : graph.activity_id(entry.activity);
+    if (!entry.activity_is_null && !activity) {
       throw std::invalid_argument(
           "minimum self-distance activity is not registered in the directly-follows graph: " +
           entry.activity);
     }
-    if (!seen_activities.emplace(*activity, true).second) {
+    if (!seen_activities.emplace(activity, true).second) {
       throw std::invalid_argument(
           "minimum self-distance JSON contains a duplicate activity");
     }
-    if (entry.distance == 0 && !entry.witnesses.empty()) {
+    if (entry.distance == 0 &&
+        (!entry.witnesses.empty() || entry.witnesses_include_null)) {
       throw std::invalid_argument(
           "minimum self-distance zero entries must have empty witnesses");
     }
-    if (entry.distance > 0 && entry.witnesses.empty()) {
+    if (entry.distance > 0 && entry.witnesses.empty() &&
+        !entry.witnesses_include_null) {
       throw std::invalid_argument(
           "positive minimum self-distance entries must have witnesses");
     }
-    std::vector<std::size_t> witnesses;
-    witnesses.reserve(entry.witnesses.size());
+    std::vector<std::optional<std::size_t>> witnesses;
+    witnesses.reserve(entry.witnesses.size() + entry.witnesses_include_null);
+    if (entry.witnesses_include_null) {
+      if (entry.activity_is_null) {
+        throw std::invalid_argument(
+            "minimum self-distance witness cannot equal its activity");
+      }
+      witnesses.push_back(std::nullopt);
+    }
     std::string previous_witness;
     bool first_witness = true;
     for (const auto& witness_name : entry.witnesses) {
@@ -3062,13 +3080,13 @@ std::vector<ResolvedMinimumSelfDistance> resolve_minimum_self_distances(
             "minimum self-distance witness is not registered in the directly-follows graph: " +
             witness_name);
       }
-      if (*witness == *activity) {
+      if (activity && *witness == *activity) {
         throw std::invalid_argument(
             "minimum self-distance witness cannot equal its activity");
       }
       witnesses.push_back(*witness);
     }
-    resolved.push_back({*activity, entry.distance, std::move(witnesses)});
+    resolved.push_back({activity, entry.distance, std::move(witnesses)});
   }
   return resolved;
 }
@@ -3079,11 +3097,12 @@ void write_minimum_self_distances(
   out << '[';
   for (std::size_t i = 0; i < distances.size(); ++i) {
     const auto& entry = distances[i];
-    out << "{\"activity\": " << entry.activity
-        << ", \"distance\": " << entry.distance << ", \"witnesses\": [";
+    out << "{\"activity\": ";
+    if (entry.activity) out << *entry.activity; else out << "null";
+    out << ", \"distance\": " << entry.distance << ", \"witnesses\": [";
     for (std::size_t j = 0; j < entry.witnesses.size(); ++j) {
-      out << entry.witnesses[j]
-          << (j + 1 < entry.witnesses.size() ? ", " : "");
+      if (entry.witnesses[j]) out << *entry.witnesses[j]; else out << "null";
+      out << (j + 1 < entry.witnesses.size() ? ", " : "");
     }
     out << "]}" << (i + 1 < distances.size() ? ", " : "");
   }
