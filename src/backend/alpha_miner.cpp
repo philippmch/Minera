@@ -1,12 +1,15 @@
 #include "minera/alpha_miner.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <optional>
 #include <random>
 #include <set>
 #include <string>
+#include <string_view>
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
@@ -40,6 +43,121 @@ struct IdLog {
   std::vector<std::vector<std::size_t>> traces;
 };
 
+// Canonical zero-key SipHash13 over the narrowest Unicode code-point width.
+// This independently written policy is checked against public builtin hash
+// observations. Runtime-randomized keys and identity hashes remain separate.
+std::optional<std::uint64_t> alpha_string_hash(std::string_view text) {
+  if (text.empty()) return 0;
+  std::vector<std::uint32_t> points;
+  std::uint32_t largest = 0;
+  for (std::size_t i = 0; i < text.size();) {
+    const auto lead = static_cast<unsigned char>(text[i++]);
+    std::uint32_t point = lead;
+    std::size_t extra = 0;
+    std::uint32_t minimum = 0;
+    if (lead >= 0xc2 && lead <= 0xdf) {
+      point = lead & 0x1f; extra = 1; minimum = 0x80;
+    } else if (lead >= 0xe0 && lead <= 0xef) {
+      point = lead & 0x0f; extra = 2; minimum = 0x800;
+    } else if (lead >= 0xf0 && lead <= 0xf4) {
+      point = lead & 7; extra = 3; minimum = 0x10000;
+    } else if (lead >= 0x80) {
+      return std::nullopt;
+    }
+    if (extra > text.size() - i) return std::nullopt;
+    for (std::size_t j = 0; j < extra; ++j) {
+      const auto next = static_cast<unsigned char>(text[i++]);
+      if ((next & 0xc0) != 0x80) return std::nullopt;
+      point = (point << 6) | (next & 0x3f);
+    }
+    if (point < minimum || point > 0x10ffff ||
+        (point >= 0xd800 && point <= 0xdfff)) return std::nullopt;
+    points.push_back(point);
+    largest = std::max(largest, point);
+  }
+  const std::size_t width = largest <= 0xff ? 1 : largest <= 0xffff ? 2 : 4;
+  std::vector<unsigned char> bytes;
+  bytes.reserve(points.size() * width);
+  for (const auto point : points)
+    for (std::size_t j = 0; j < width; ++j)
+      bytes.push_back(static_cast<unsigned char>(point >> (8 * j)));
+  std::uint64_t a = 0x736f6d6570736575ULL, b = 0x646f72616e646f6dULL;
+  std::uint64_t c = 0x6c7967656e657261ULL, d = 0x7465646279746573ULL;
+  const auto round = [&] {
+    a += b; b = std::rotl(b, 13) ^ a; a = std::rotl(a, 32);
+    c += d; d = std::rotl(d, 16) ^ c;
+    a += d; d = std::rotl(d, 21) ^ a;
+    c += b; b = std::rotl(b, 17) ^ c; c = std::rotl(c, 32);
+  };
+  const auto consume = [&](std::uint64_t block) {
+    d ^= block; round(); a ^= block;
+  };
+  const std::size_t full = bytes.size() / 8 * 8;
+  for (std::size_t i = 0; i < full; i += 8) {
+    std::uint64_t block = 0;
+    for (std::size_t j = 0; j < 8; ++j)
+      block |= static_cast<std::uint64_t>(bytes[i + j]) << (8 * j);
+    consume(block);
+  }
+  std::uint64_t last = static_cast<std::uint64_t>(bytes.size() & 255) << 56;
+  for (std::size_t i = full; i < bytes.size(); ++i)
+    last |= static_cast<std::uint64_t>(bytes[i]) << (8 * (i - full));
+  consume(last); c ^= 255;
+  round(); round(); round();
+  const auto value = a ^ b ^ c ^ d;
+  return value == UINT64_MAX ? UINT64_MAX - 1 : value;
+}
+
+// Open addressing preserves the observed string-set iteration, including
+// collisions and growth. Unsupported identity hashes keep the prior order.
+ActivitySet alpha_string_set_order(
+    const ActivitySet& values,
+    const std::vector<std::optional<std::string>>& names) {
+  struct Entry { std::size_t id; std::uint64_t hash; };
+  std::vector<Entry> entries;
+  entries.reserve(values.size());
+  for (const auto id : values) {
+    if (!names[id]) return values;
+    const auto hash = alpha_string_hash(*names[id]);
+    if (!hash) return values;
+    entries.push_back({id, *hash});
+  }
+  const auto insert = [](Entry entry, auto& table) {
+    const auto mask = table.size() - 1;
+    std::size_t index = static_cast<std::size_t>(entry.hash & mask);
+    auto perturb = entry.hash;
+    for (;;) {
+      const std::size_t probes = index + 9 < table.size() ? 9 : 0;
+      for (std::size_t offset = 0; offset <= probes; ++offset) {
+        auto& slot = table[index + offset];
+        if (!slot) { slot = entry; return true; }
+        if (slot->id == entry.id) return false;
+      }
+      perturb >>= 5;
+      index = (index * 5 + 1 + static_cast<std::size_t>(perturb)) & mask;
+    }
+  };
+  std::vector<std::optional<Entry>> table(8);
+  std::size_t used = 0;
+  for (const auto entry : entries) {
+    if (!insert(entry, table)) continue;
+    ++used;
+    if (used * 5 >= (table.size() - 1) * 3) {
+      std::size_t size = 8;
+      while (size <= used * 4) size *= 2;
+      auto old = std::move(table);
+      table = std::vector<std::optional<Entry>>(size);
+      for (const auto& slot : old)
+        if (slot) insert(*slot, table);
+    }
+  }
+  ActivitySet ordered;
+  ordered.reserve(used);
+  for (const auto& slot : table)
+    if (slot) ordered.push_back(slot->id);
+  return ordered;
+}
+
 // The log footprint: which activities directly follow which, plus the start and
 // end activities. All higher-level relations derive from this matrix. With
 // short_loops set, "a b a" patterns are also recorded so that a length-two loop
@@ -49,6 +167,7 @@ struct Footprint {
   std::vector<std::vector<bool>> follows;   // follows[a][b]: a directly precedes b
   std::vector<std::size_t> follow_source_order;
   std::vector<std::vector<std::size_t>> follow_target_order;
+  std::vector<std::vector<std::size_t>> causal_target_order;
   std::vector<std::vector<bool>> two_loop;  // two_loop[a][b]: "a b a" occurs
   std::vector<std::vector<bool>> classic_causal;
   std::set<std::size_t> starts;
@@ -124,7 +243,17 @@ Footprint build_footprint(const IdLog& log, const std::vector<bool>* exclude,
       }
     }
   }
-  if (!short_loops) {
+  if (short_loops) {
+    fp.causal_target_order.resize(n);
+    for (const auto from : fp.follow_source_order) {
+      const auto ordered = alpha_string_set_order(fp.follow_target_order[from],
+                                                 log.names);
+      ActivitySet accepted;
+      for (const auto to : ordered)
+        if (fp.causal(from, to)) accepted.push_back(to);
+      fp.causal_target_order[from] = alpha_string_set_order(accepted, log.names);
+    }
+  } else {
     fp.classic_causal.assign(n, std::vector<bool>(n));
     for (std::size_t a = 0; a < n; ++a) {
       for (std::size_t b = 0; b < n; ++b)
@@ -328,14 +457,14 @@ Footprint footprint_from_graph(const DirectlyFollowsGraph& graph) {
 // Alpha+ expands the original causal seeds against the candidates accumulated
 // so far. A containment on either side permits growing both sides; it does not
 // require every newly introduced cross edge to be causal. Newly grown pairs
-// do not become outer seeds. The native relation order is first-seen order;
-// reference hash-set iteration remains a separate ordering gate.
+// do not become outer seeds. Sources retain first-seen order; string targets
+// use the separately constructed follows and causal set iteration.
 std::vector<Place> maximal_alpha_plus_places(const Footprint& fp) {
   std::vector<Place> candidates;
   std::set<Place> seen;
   for (const auto from : fp.follow_source_order) {
     if (fp.follows[from][from]) continue;
-    for (const auto to : fp.follow_target_order[from]) {
+    for (const auto to : fp.causal_target_order[from]) {
       if (fp.follows[to][to] || !fp.causal(from, to)) continue;
       Place seed{{from}, {to}};
       seen.insert(seed);

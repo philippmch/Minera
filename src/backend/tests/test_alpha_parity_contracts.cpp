@@ -384,6 +384,22 @@ void plus_uses_original_seeds_and_preserves_disjoint_branches() {
   assert(places(disjoint) == expected);
 }
 
+void plus_string_set_order_changes_overlapping_branch_closure() {
+  const auto overlapping = discover_alpha_plus_result(make_log(
+      {{"A", "z"}, {"B", "x"}, {"B", "z"}, {"C", "x"}, {"C", "y"}}));
+  const AlphaPlaceName first{"", {"A", "B", "C"}, {"x", "z"}};
+  const AlphaPlaceName second{"", {"B", "C"}, {"x", "y", "z"}};
+  assert(std::count(overlapping.place_names.begin(), overlapping.place_names.end(), first) == 1);
+  assert(std::count(overlapping.place_names.begin(), overlapping.place_names.end(), second) == 1);
+  assert(overlapping.net.place_count() == 4);
+
+  const auto combined = discover_alpha_plus_result(make_log(
+      {{"A", "z"}, {"B", "y"}, {"B", "z"}, {"C", "x"}, {"C", "y"}}));
+  const AlphaPlaceName all{"", {"A", "B", "C"}, {"x", "y", "z"}};
+  assert(std::count(combined.place_names.begin(), combined.place_names.end(), all) == 1);
+  assert(combined.net.place_count() == 3);
+}
+
 }  // namespace
 
 int main() {
@@ -406,4 +422,5 @@ int main() {
   plus_empty_context_differences_create_one_loop_place_per_maximal_pair();
   plus_expands_contained_branch_pairs_without_cross_causal_edges();
   plus_uses_original_seeds_and_preserves_disjoint_branches();
+  plus_string_set_order_changes_overlapping_branch_closure();
 }
