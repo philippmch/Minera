@@ -185,6 +185,22 @@ void typed_variant_and_null_contracts() {
   assert(rejected);
 }
 
+void enabled_default_id_order_and_explicit_hash_order() {
+  PetriNet net;
+  net.set_activities({"A"});
+  net.add_place(); net.add_place();
+  net.set_source(0); net.set_sink(1);
+  for (std::size_t t = 0; t < 10; ++t)
+    net.add_transition(0, {t == 2 || t == 9 ? 0u : 1u}, {1});
+  EventLog log; log.traces = {trace("empty", {})};
+  TokenReplayOptions policy;
+  assert(replay_token_result(log, net, policy).traces[0].enabled_transitions ==
+         (std::vector<std::size_t>{2, 9}));
+  policy.transition_identity_hashes = std::vector<std::int64_t>{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+  assert(replay_token_result(log, net, policy).traces[0].enabled_transitions ==
+         (std::vector<std::size_t>{9, 2}));
+}
+
 void supplied_hidden_paths() {
   PetriNet net;
   net.set_activities({"A"});
@@ -550,6 +566,61 @@ void alpha_plus_default_nullable_name_metadata() {
   const auto wire = token_replay_result_json(result);
   assert(wire.find("\"values\":[{\"type\":\"NoneType\",\"value\":null},{\"type\":\"NoneType\",\"value\":null}]") != std::string::npos);
 }
+
+void enabled_identity_worklist_and_pair_markings() {
+  PetriNet net;
+  net.set_activities({"A", "B"});
+  for (int i = 0; i < 4; ++i) net.add_place();
+  net.set_source(0); net.set_sink(3);
+  net.add_transition(0, {0}, {3});
+  net.add_transition(0, {1}, {3});
+  net.add_transition(std::nullopt, {0}, {1});
+  net.set_transition_names({"same", "same", "h0"});
+  TokenReplayOptions policy;
+  policy.initial_marking = {1, 0, 0, 0};
+  policy.transition_identity_hashes = std::vector<std::int64_t>{32, 16, 48};
+  EventLog log; log.traces = {trace("empty", {})};
+  auto result = replay_token_result(log, net, policy);
+  // Equal pairs at different reachable markings retain both identities.
+  assert(result.traces[0].enabled_transitions == (std::vector<std::size_t>{0, 1}));
+  policy.initial_marking = {1, 1, 0, 0};
+  result = replay_token_result(log, net, policy);
+  assert(result.traces[0].enabled_transitions == (std::vector<std::size_t>{1, 0}));
+  // With no hidden path, equal pairs at one marking collapse to the lower hash.
+  PetriNet parallel;
+  parallel.set_activities({"A", "B"});
+  parallel.add_place(); parallel.add_place();
+  parallel.set_source(0); parallel.set_sink(1);
+  parallel.add_transition(0, {0}, {1}); parallel.add_transition(0, {0}, {1});
+  parallel.set_transition_names({"same", "same"});
+  policy.initial_marking = {1, 0};
+  policy.transition_identity_hashes = std::vector<std::int64_t>{32, 16};
+  result = replay_token_result(log, parallel, policy);
+  assert(result.traces[0].enabled_transitions == (std::vector<std::size_t>{1}));
+  policy.return_names = true;
+  const auto wire = token_replay_result_json(replay_token_result(log, parallel, policy));
+  const auto start = wire.find("\"value\":\"enabled_transitions_in_marking\"");
+  const auto end = wire.find("\"value\":\"reached_marking\"", start);
+  const auto enabled = wire.substr(start, end - start);
+  assert(enabled.find("\"values\":[{\"type\":\"str\",\"value\":\"same\"}]") != std::string::npos);
+  assert(wire.find("\"value\":\"enabled_transitions_in_marking_labels\"},{\"type\":\"list\",\"values\":[{\"type\":\"str\",\"value\":\"A\"}]") != std::string::npos);
+  PetriNet different_labels;
+  different_labels.set_activities({"A", "B"});
+  different_labels.add_place(); different_labels.add_place();
+  different_labels.set_source(0); different_labels.set_sink(1);
+  different_labels.add_transition(0, {0}, {1}); different_labels.add_transition(1, {0}, {1});
+  different_labels.set_transition_names({"same", "same"});
+  policy.return_names = false;
+  assert(replay_token_result(log, different_labels, policy).traces[0].enabled_transitions ==
+         (std::vector<std::size_t>{1, 0}));
+  policy.transition_identity_hashes = std::vector<std::int64_t>{16};
+  bool rejected = false;
+  try { (void)replay_token_result(EventLog{}, parallel, policy); }
+  catch (const std::invalid_argument& error) {
+    rejected = std::string(error.what()) == "transition_identity_hashes must contain one entry per transition";
+  }
+  assert(rejected);
+}
 }  // namespace
 int main() {
   variants_and_keys();
@@ -565,5 +636,7 @@ int main() {
   nullable_name_failure_precedence_and_variants();
   enabled_transition_selection_and_disabled_fallback();
   alpha_plus_default_nullable_name_metadata();
+  enabled_identity_worklist_and_pair_markings();
+  enabled_default_id_order_and_explicit_hash_order();
   std::cout << "full forward token replay result contracts passed\n";
 }
