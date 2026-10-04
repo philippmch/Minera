@@ -5915,9 +5915,9 @@ int main(int argc, char** argv) {
       auto options = minera::parse_petri_net_reduction_params(lookup, present);
       auto document = minera::import_pnml_document(petri_reduction_input);
       if (!present("petri_reduction_initial_marking"))
-        options.initial_marking = document.initial_marking;
+        options.initial_marking = minera::tools::pnml_marking<std::int64_t>(document.initial_marking);
       if (!present("petri_reduction_final_marking"))
-        options.final_marking = document.final_marking;
+        options.final_marking = minera::tools::pnml_marking<std::int64_t>(document.final_marking);
       const auto result = minera::reduce_petri_net(document.net, options);
       std::cout << minera::petri_net_reduction_json(result) << '\n';
       return 0;
@@ -6300,6 +6300,7 @@ int main(int argc, char** argv) {
       model_options.infer_initial_marking = false;
       model_options.infer_final_marking = false;
       model_options.require_workflow_boundaries = false;
+      model_options.public_marking_semantics = replay_fitness_result_requested;
       const auto document = minera::import_pnml_document(token_replay_model, model_options);
       const auto replay_options = minera::tools::pnml_replay_options(
           document, token_replay_options);
@@ -7041,10 +7042,10 @@ int main(int argc, char** argv) {
           reference_options.activity_column = compare_petri_activity_attribute;
         return minera::import_csv_event_log(compare_petri_reference, reference_options);
       }();
-      const auto marking = [](const std::vector<std::int64_t>& source) {
+      const auto marking = [](const minera::TokenMarking& source) {
         std::vector<std::uint32_t> result;
         for (const auto count : source) {
-          if (count < 0 || static_cast<std::uint64_t>(count) > std::numeric_limits<std::uint32_t>::max())
+          if (count < 0 || count > std::numeric_limits<std::uint32_t>::max())
             throw std::invalid_argument("PNML comparison marking exceeds the supported token range");
           result.push_back(static_cast<std::uint32_t>(count));
         }

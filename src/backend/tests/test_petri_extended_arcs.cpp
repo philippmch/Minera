@@ -859,9 +859,71 @@ void pnml_transition_label_contract() {
   }
 }
 
+void pnml_exact_public_markings() {
+  const std::string prefix = "<pnml><net id=\"marked\"><place id=\"source\">";
+  const std::string graph = "</place><place id=\"spare\"/><place id=\"target\"/>"
+      "<transition id=\"move\"><name><text>A</text></name></transition>"
+      "<arc source=\"source\" target=\"move\"/><arc source=\"move\" target=\"target\"/>";
+  PnmlImportOptions observed;
+  observed.public_marking_semantics = true;
+  const auto sparse = parse_pnml_document(prefix +
+      "<initialMarking><text>2</text></initialMarking>"
+      "<initialMarking><text>-1</text></initialMarking>" + graph +
+      "<finalmarkings><marking><place idref=\"target\"><text>2</text></place>"
+      "<place idref=\"target\"><text>0</text></place></marking>"
+      "<marking><place idref=\"spare\"><text>3</text></place>"
+      "<place idref=\"target\"><text>-3</text></place></marking></finalmarkings></net></pnml>", observed);
+  assert((sparse.initial_marking == TokenMarking{0, 0, 0}));
+  assert((sparse.initial_marking_keys == std::vector<bool>{false, false, false}));
+  assert((sparse.final_marking == TokenMarking{0, 3, 2}));
+  assert((sparse.final_marking_keys == std::vector<bool>{false, true, true}));
+  const auto absent = parse_pnml_document(prefix + graph + "</net></pnml>", observed);
+  assert((absent.initial_marking == TokenMarking{0, 0, 0}));
+  assert((absent.final_marking == TokenMarking{0, 1, 1}));
+  const auto empty = parse_pnml_document(prefix + graph +
+      "<finalmarkings/></net></pnml>", observed);
+  assert((empty.final_marking == TokenMarking{0, 0, 0}));
+  const auto lexical = parse_pnml_document(prefix +
+      "<initialMarking><text>\xc2\xa0+\xd9\xa2_\xd9\xa3\xe2\x80\x83</text></initialMarking>" + graph +
+      "<finalmarkings><marking><place idref=\"target\"><text>1_024</text></place>"
+      "</marking></finalmarkings></net></pnml>", observed);
+  assert(lexical.initial_marking[0] == 23 && lexical.final_marking[2] == 1024);
+
+  const std::string huge = "1" + std::string(400, '0') + "1";
+  const auto exact = parse_pnml_document(prefix +
+      "<initialMarking><text>" + huge + "</text></initialMarking>" + graph +
+      "<finalmarkings><marking><place idref=\"target\"><text>" + huge +
+      "</text></place></marking></finalmarkings></net></pnml>", observed);
+  assert(exact.initial_marking[0] == TokenInteger(huge));
+  assert(exact.final_marking[2] == TokenInteger(huge));
+  const auto restored = parse_pnml_document(to_pnml(exact), observed);
+  assert(restored.initial_marking == exact.initial_marking && restored.final_marking == exact.final_marking);
+  bool bounded = false;
+  try { (void)minera::tools::pnml_marking<std::int64_t>(exact.initial_marking); }
+  catch (const std::invalid_argument& error) {
+    bounded = std::string(error.what()) == "PNML marking exceeds supported token range";
+  }
+  assert(bounded);
+  const auto no_traces = evaluate_replay_fitness(EventLog{}, exact, ReplayFitnessVariant::TOKEN_BASED);
+  assert(no_traces.computed && no_traces.log_fitness == 0.0 && no_traces.log_fitness_is_integer_zero);
+  bool overflow = false;
+  try { (void)evaluate_replay_fitness(log_of({{"A"}}), exact, ReplayFitnessVariant::TOKEN_BASED); }
+  catch (const std::overflow_error& error) {
+    overflow = std::string(error.what()) == "int too large to convert to float";
+  }
+  assert(overflow);
+  bool empty_text = false;
+  try { (void)parse_pnml_document(prefix + "<initialMarking><text/></initialMarking>" + graph + "</net></pnml>", observed); }
+  catch (const std::runtime_error& error) {
+    empty_text = std::string(error.what()) == "int() argument must be a string, a bytes-like object or a real number, not 'NoneType'";
+  }
+  assert(empty_text);
+}
+
 }  // namespace
 
 int main() {
+  pnml_exact_public_markings();
   reset_and_inhibitor_enablement();
   playout_and_pnml_round_trip();
   weighted_arc_round_trip();

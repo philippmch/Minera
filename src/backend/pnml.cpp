@@ -166,8 +166,8 @@ void for_each_document_arc(const PnmlDocument& document, Callback callback) {
 }  // namespace
 
 void write_pnml_impl(std::ostream& out, const PetriNet& net,
-                     const std::vector<std::int64_t>& initial_marking,
-                     const std::vector<std::int64_t>& final_marking,
+                     const TokenMarking& initial_marking,
+                     const TokenMarking& final_marking,
                      const StochasticMap* stochastic_map,
                      std::string_view name,
                      const PnmlDocument* document = nullptr) {
@@ -175,9 +175,9 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
       final_marking.size() != net.place_count())
     throw std::invalid_argument("PNML marking size must match the place count");
   if (std::any_of(initial_marking.begin(), initial_marking.end(),
-                  [](std::int64_t value) { return value < 0; }) ||
+                  [](const TokenInteger& value) { return value < 0; }) ||
       std::any_of(final_marking.begin(), final_marking.end(),
-                  [](std::int64_t value) { return value < 0; }))
+                  [](const TokenInteger& value) { return value < 0; }))
     throw std::invalid_argument("PNML markings must be non-negative");
   if (stochastic_map)
     validate_stochastic_map(*stochastic_map, net.transitions().size());
@@ -202,7 +202,7 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
   const auto transition_ids = resolve_ids(document ? document->transition_ids : no_ids,
                                           net.transitions().size(), "t");
   const auto validate_keys = [&](const std::vector<bool>& keys,
-                                  const std::vector<std::int64_t>& marking) {
+                                  const TokenMarking& marking) {
     if (keys.empty()) return;
     if (keys.size() != marking.size())
       throw std::invalid_argument("PNML marking key count must match the place count");
@@ -440,6 +440,19 @@ void write_pnml(std::ostream& out, const PnmlDocument& document,
   out << serialized.str();
 }
 
+void write_pnml(std::ostream& out, const PetriNet& net,
+                const TokenMarking& initial_marking,
+                const TokenMarking& final_marking, std::string_view name) {
+  write_pnml_impl(out, net, initial_marking, final_marking, nullptr, name);
+}
+
+void write_pnml(std::ostream& out, const PetriNet& net,
+                const TokenMarking& initial_marking,
+                const TokenMarking& final_marking,
+                const StochasticMap& stochastic_map, std::string_view name) {
+  write_pnml_impl(out, net, initial_marking, final_marking, &stochastic_map, name);
+}
+
 std::string to_pnml(const PnmlDocument& document, std::string_view name) {
   std::ostringstream out;
   write_pnml(out, document, name);
@@ -501,12 +514,29 @@ std::string to_pnml(const PetriNet& net,
   return out.str();
 }
 
+std::string to_pnml(const PetriNet& net,
+                    const TokenMarking& initial_marking,
+                    const TokenMarking& final_marking, std::string_view name) {
+  std::ostringstream out;
+  write_pnml(out, net, initial_marking, final_marking, name);
+  return out.str();
+}
+
+std::string to_pnml(const PetriNet& net,
+                    const TokenMarking& initial_marking,
+                    const TokenMarking& final_marking,
+                    const StochasticMap& stochastic_map, std::string_view name) {
+  std::ostringstream out;
+  write_pnml(out, net, initial_marking, final_marking, stochastic_map, name);
+  return out.str();
+}
+
 namespace {
 
 // What the first pass collects from the document before the net is assembled.
 struct ParsedPlace {
   std::string id;
-  std::uint64_t initial_tokens = 0;
+  TokenInteger initial_tokens = 0;
   bool has_initial_marking = false;
 };
 
@@ -531,20 +561,12 @@ struct ParsedArc {
   bool negative_weight = false;
 };
 
-std::uint64_t parse_token_count(const std::string& text) {
+TokenInteger parse_token_count(const std::string& text, bool allow_signed) {
   try {
-    const auto first = text.find_first_not_of(" \t\r\n");
-    const auto last = text.find_last_not_of(" \t\r\n");
-    if (first == std::string::npos)
-      throw std::runtime_error("empty PNML token count");
-    const auto trimmed = text.substr(first, last - first + 1);
-    if (!trimmed.empty() && trimmed.front() == '-')
+    const auto value = detail::parse_pnml_arc_weight(text);
+    if (value.negative && !allow_signed)
       throw std::runtime_error("negative PNML token count");
-    std::size_t consumed = 0;
-    const auto value = std::stoull(trimmed, &consumed);
-    if (consumed != trimmed.size())
-      throw std::runtime_error("PNML marking contains a non-integer token count");
-    return value;
+    return value.negative ? -value.magnitude : value.magnitude;
   } catch (const std::exception&) {
     throw std::runtime_error("PNML marking contains an invalid token count");
   }
@@ -575,10 +597,13 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   std::unordered_map<std::string, std::size_t> place_index;
   std::unordered_map<std::string, std::size_t> transition_index;
 
-  // The final marking recorded under <finalmarkings>; only the first <marking>
-  // is taken (alternative final markings don't fit a single-sink workflow net).
-  std::vector<std::pair<std::string, std::uint64_t>> final_marking;
+  // Native document mode takes the first marking. Public marking mode visits
+  // every alternative and replaces each place's last positive count.
+  std::vector<std::pair<std::string, TokenInteger>> final_marking;
   std::size_t markings_seen = 0;
+  bool final_markings_present = false;
+  const bool public_markings = options.public_marking_semantics;
+  const bool require_boundaries = options.require_workflow_boundaries && !public_markings;
 
   std::vector<std::string> stack;
   bool in_net = false;
@@ -603,12 +628,12 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       places.push_back({*id, 0});
     } else if (token.name == "place") {
       // A <place idref=…> inside <finalmarkings><marking>.
-      if (markings_seen == 1) {
+      if (markings_seen == 1 || public_markings) {
         const auto* idref = detail::attribute(token.attributes, "idref");
         if (idref) {
           final_place_ref = *idref;
           // A marking entry with no nested <text> means one token.
-          final_marking.emplace_back(*idref, 1);
+          final_marking.emplace_back(*idref, public_markings ? 0 : 1);
         }
       }
     } else if (token.name == "initialMarking" &&
@@ -642,6 +667,8 @@ PnmlDocument parse_pnml_document(std::string_view xml,
         if (activity->find("$invisible$") != std::string::npos && !transitions.empty())
           transitions.back().invisible = true;
       }
+    } else if (token.name == "finalmarkings") {
+      final_markings_present = true;
     } else if (token.name == "marking" &&
                stack_ends_with(stack, {"finalmarkings"})) {
       ++markings_seen;
@@ -654,6 +681,16 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   std::optional<ArcText> arc_text;
   struct LabelText { std::size_t depth; std::string value; bool first_segment = true; };
   std::optional<LabelText> label_text;
+  struct MarkingText { bool initial; std::size_t depth; std::string value; bool first_segment = true; };
+  std::optional<MarkingText> marking_text;
+  const auto finish_marking_text = [&] {
+    if (public_markings && marking_text->value.empty())
+      throw std::runtime_error("int() argument must be a string, a bytes-like object or a real number, not 'NoneType'");
+    const auto count = parse_token_count(marking_text->value, public_markings);
+    if (marking_text->initial) places.back().initial_tokens = count;
+    else final_marking.back().second = count;
+    marking_text.reset();
+  };
   const auto finish_label_text = [&] {
     if (!label_text->value.empty() && !transitions.back().has_named_label) {
       transitions.back().label = std::move(label_text->value);
@@ -676,7 +713,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     if (!in_net) return;
     if (stack_ends_with(stack, {"place", "initialMarking", "text"}) &&
         !places.empty()) {
-      places.back().initial_tokens = parse_token_count(value);
+      places.back().initial_tokens = parse_token_count(value, public_markings);
     } else if (stack_ends_with(stack, {"transition", "toolspecific", "property"}) &&
                !transitions.empty() && !stochastic_property_key.empty()) {
       auto& transition = transitions.back();
@@ -692,9 +729,9 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       else if (stochastic_property_key == "invisible" && value == "true")
         transition.invisible = true;
     } else if (stack_ends_with(stack, {"marking", "place", "text"}) &&
-               markings_seen == 1 && !final_marking.empty() &&
+               (markings_seen == 1 || public_markings) && !final_marking.empty() &&
                final_marking.back().first == final_place_ref) {
-      final_marking.back().second = parse_token_count(value);
+      final_marking.back().second = parse_token_count(value, public_markings);
     }
   };
 
@@ -704,6 +741,11 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       token.name.erase(0, colon + 1);
     if (token.kind == detail::XmlPullParser::Kind::EndOfInput) break;
     if (token.kind == detail::XmlPullParser::Kind::CharacterData) {
+      if (marking_text) {
+        if (marking_text->first_segment && stack.size() == marking_text->depth)
+          marking_text->value += token.text;
+        continue;
+      }
       if (label_text) {
         if (label_text->first_segment && stack.size() == label_text->depth)
           label_text->value += token.text;
@@ -718,11 +760,21 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       continue;
     }
     if (token.kind == detail::XmlPullParser::Kind::ProcessingInstruction) {
+      if (marking_text) marking_text->first_segment = false;
       if (arc_text) arc_text->first_segment = false;
       if (label_text) label_text->first_segment = false;
       continue;
     }
     if (token.kind == detail::XmlPullParser::Kind::StartElement) {
+      if (marking_text) marking_text->first_segment = false;
+      if (in_net && token.name == "text" &&
+          ((stack_ends_with(stack, {"place", "initialMarking"}) && !places.empty()) ||
+           (stack_ends_with(stack, {"marking", "place"}) &&
+            (markings_seen == 1 || public_markings) && !final_marking.empty() &&
+            final_marking.back().first == final_place_ref))) {
+        marking_text = MarkingText{stack.back() == "initialMarking", stack.size() + 1, {}};
+        if (token.self_closing) finish_marking_text();
+      }
       if (arc_text) arc_text->first_segment = false;
       if (label_text) label_text->first_segment = false;
       if (in_net && !transitions.empty() && !transitions.back().has_named_label &&
@@ -760,6 +812,8 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       continue;
     }
     // EndElement: unwind to the matching open element.
+    if (marking_text && token.name == "text" && stack.size() == marking_text->depth)
+      finish_marking_text();
     if (arc_text && token.name == "text" && stack.size() == arc_text->depth)
       finish_arc_text();
     if (label_text && token.name == "text" && stack.size() == label_text->depth)
@@ -770,7 +824,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     if (token.name == "net") in_net = false;
   }
 
-  if (!nets_seen || (options.require_workflow_boundaries &&
+  if (!nets_seen || (require_boundaries &&
                      (places.empty() || transitions.empty()))) {
     throw std::runtime_error("PNML input contains no net (or an empty one)");
   }
@@ -879,18 +933,15 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   document.final_marking_keys.assign(places.size(), false);
   std::vector<std::size_t> marked;
   for (std::size_t p = 0; p < places.size(); ++p) {
-    if (places[p].initial_tokens >
-        static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
-      throw std::runtime_error("PNML initial marking exceeds signed range");
-    }
-    document.initial_marking[p] =
-        static_cast<std::int64_t>(places[p].initial_tokens);
-    document.initial_marking_keys[p] = places[p].has_initial_marking;
+    document.initial_marking[p] = public_markings && places[p].initial_tokens <= 0
+        ? TokenInteger{0} : places[p].initial_tokens;
+    document.initial_marking_keys[p] = public_markings
+        ? places[p].initial_tokens > 0 : places[p].has_initial_marking;
     if (places[p].initial_tokens > 0) marked.push_back(p);
   }
   if (!marked.empty()) {
     net.set_source(marked.front());
-  } else if (options.infer_initial_marking) {
+  } else if (options.infer_initial_marking && !public_markings) {
     std::vector<std::size_t> sources;
     for (std::size_t p = 0; p < places.size(); ++p) {
       if (!place_has_in[p]) sources.push_back(p);
@@ -906,7 +957,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     std::vector<std::size_t> sources;
     for (std::size_t p = 0; p < places.size(); ++p)
       if (!place_has_in[p]) sources.push_back(p);
-    if (sources.size() != 1 && options.require_workflow_boundaries)
+    if (sources.size() != 1 && require_boundaries)
       throw std::runtime_error("PNML has no unique structural source place");
     if (!sources.empty()) net.set_source(sources.front());
   }
@@ -918,26 +969,29 @@ PnmlDocument parse_pnml_document(std::string_view xml,
         throw std::runtime_error("PNML final marking references unknown place '" +
                                  id + "'");
       }
-      if (tokens >
-          static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
-        throw std::runtime_error("PNML final marking exceeds signed range");
-      }
-      const auto signed_tokens = static_cast<std::int64_t>(tokens);
-      if (document.final_marking[it->second] >
-          std::numeric_limits<std::int64_t>::max() - signed_tokens) {
-        throw std::runtime_error("PNML final marking exceeds signed range");
-      }
-      document.final_marking[it->second] += signed_tokens;
+      if (public_markings && tokens <= 0) continue;
+      if (public_markings) document.final_marking[it->second] = tokens;
+      else document.final_marking[it->second] += tokens;
       document.final_marking_keys[it->second] = true;
     }
     const auto first = std::find_if(
         document.final_marking.begin(), document.final_marking.end(),
-        [](std::int64_t tokens) { return tokens > 0; });
-    if (first == document.final_marking.end() && options.require_workflow_boundaries) {
+        [](const TokenInteger& tokens) { return tokens > 0; });
+    if (first == document.final_marking.end() && require_boundaries) {
       throw std::runtime_error("PNML final marking contains no tokens");
     }
     if (first != document.final_marking.end())
       net.set_sink(static_cast<std::size_t>(first - document.final_marking.begin()));
+  } else if (public_markings) {
+    // A missing finalmarkings element infers all sinks, including isolated
+    // places. An explicitly empty element preserves an empty final marking.
+    for (std::size_t p = 0; p < places.size(); ++p) if (!place_has_out[p]) {
+      if (!final_markings_present) {
+        document.final_marking[p] = 1;
+        document.final_marking_keys[p] = true;
+      }
+      net.set_sink(p);
+    }
   } else if (options.infer_final_marking) {
     std::vector<std::size_t> sinks;
     for (std::size_t p = 0; p < places.size(); ++p) {
@@ -954,7 +1008,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     std::vector<std::size_t> sinks;
     for (std::size_t p = 0; p < places.size(); ++p)
       if (!place_has_out[p]) sinks.push_back(p);
-    if (sinks.size() != 1 && options.require_workflow_boundaries)
+    if (sinks.size() != 1 && require_boundaries)
       throw std::runtime_error("PNML has no unique structural sink place");
     if (!sinks.empty()) net.set_sink(sinks.front());
   }
@@ -1020,10 +1074,10 @@ PetriNet parse_pnml(std::string_view xml) {
   auto document = parse_pnml_document(xml);
   const auto initial_tokens = std::accumulate(document.initial_marking.begin(),
                                               document.initial_marking.end(),
-                                              std::int64_t{0});
+                                              TokenInteger{0});
   const auto final_tokens = std::accumulate(document.final_marking.begin(),
                                             document.final_marking.end(),
-                                            std::int64_t{0});
+                                            TokenInteger{0});
   if (initial_tokens != 1 || document.initial_marking[document.net.source()] != 1) {
     throw std::runtime_error(
         "PNML initial marking is not a single token on one place; only "
@@ -1057,10 +1111,10 @@ PetriNet import_pnml(const std::filesystem::path& path) {
   auto document = import_pnml_document(path);
   const auto initial_tokens = std::accumulate(document.initial_marking.begin(),
                                               document.initial_marking.end(),
-                                              std::int64_t{0});
+                                              TokenInteger{0});
   const auto final_tokens = std::accumulate(document.final_marking.begin(),
                                             document.final_marking.end(),
-                                            std::int64_t{0});
+                                            TokenInteger{0});
   if (initial_tokens != 1 || document.initial_marking[document.net.source()] != 1 ||
       final_tokens != 1 || document.final_marking[document.net.sink()] != 1) {
     throw std::runtime_error(

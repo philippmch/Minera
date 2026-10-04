@@ -28,14 +28,12 @@ namespace minera::tools {
 
 template <typename Integer>
 [[nodiscard]] std::vector<Integer> pnml_marking(
-    const std::vector<std::int64_t>& marking) {
+    const TokenMarking& marking) {
   static_assert(std::is_integral_v<Integer> && !std::is_same_v<Integer, bool>);
   std::vector<Integer> result;
   result.reserve(marking.size());
   for (const auto tokens : marking) {
-    if (tokens < 0 || static_cast<std::uint64_t>(tokens) >
-                          static_cast<std::uint64_t>(
-                              std::numeric_limits<Integer>::max())) {
+    if (tokens < 0 || tokens > std::numeric_limits<Integer>::max()) {
       throw std::invalid_argument("PNML marking exceeds supported token range");
     }
     result.push_back(static_cast<Integer>(tokens));
@@ -55,7 +53,7 @@ inline PnmlDocument resolve_pnml_model(PnmlDocument document) {
     for (const auto place : transition.reset_inputs) outgoing.at(place) = true;
     for (const auto place : transition.inhibitor_inputs) outgoing.at(place) = true;
   }
-  const auto infer = [&](std::vector<std::int64_t>& marking,
+  const auto infer = [&](TokenMarking& marking,
                          std::vector<bool>& keys,
                          const std::vector<bool>& connected, bool initial) {
     if (std::any_of(keys.begin(), keys.end(), [](bool key) { return key; }))
