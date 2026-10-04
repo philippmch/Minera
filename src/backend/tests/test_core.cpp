@@ -5704,6 +5704,49 @@ void json_export_carries_log_skeleton_contract() {
   expect_rejected(model, unknown_constraint);
 }
 
+void json_export_keeps_registered_empty_skeleton_activities() {
+  auto log = transition_test_log({{"", "b"}, {"", "b"}});
+  for (auto& trace : log.traces) {
+    for (auto& event : trace.events) {
+      event.activity_state = minera::FirstClassAttributeState::kPresent;
+    }
+  }
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto empty_id = std::to_string(*graph.activity_id(""));
+  auto model = minera::discover_log_skeleton(log);
+  assert(model.activ_freq.at("") == std::vector<std::size_t>{1});
+  model.activ_freq[""] = {2};
+  model.never_together = {{"", "b"}, {"b", ""}};
+  const auto conformance = minera::check_log_skeleton_conformance(log, model);
+  const auto encode = [&](const auto& skeleton, const auto& results) {
+    return minera::analysis_json(
+        "test", log, graph, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        &skeleton, &results);
+  };
+  const auto json = encode(model, conformance);
+  assert(json.find("\"activ_freq\": {\"" + empty_id + "\": [2]") !=
+         std::string::npos);
+  assert(json.find("\"constraint\": \"activ_freq\", \"activity\": " +
+                   empty_id + ", \"observed_frequency\": 1") !=
+         std::string::npos);
+  assert(json.find("\"source\": " + empty_id + ", \"target\": 1") !=
+         std::string::npos);
+  assert(json.find("\"source\": 1, \"target\": " + empty_id) !=
+         std::string::npos);
+
+  auto unknown_model = model;
+  unknown_model.equivalence.push_back({"", "unregistered"});
+  bool rejected = false;
+  try {
+    (void)encode(unknown_model, conformance);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void json_export_carries_declare_contract() {
   auto log = transition_test_log({{"a", "b"}, {"b"}});
   log.traces[0].case_id = "duplicate";
@@ -6962,6 +7005,7 @@ int main() {
   json_export_carries_the_petri_net_contract();
   json_export_carries_recursive_powl_contract();
   json_export_carries_log_skeleton_contract();
+  json_export_keeps_registered_empty_skeleton_activities();
   json_export_carries_dfg_and_edit_alignment_contract();
   conformance_is_perfect_on_the_discovery_log();
   conformance_is_perfect_for_every_operator();
