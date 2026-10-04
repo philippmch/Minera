@@ -4,6 +4,7 @@
 #include <cassert>
 #include <initializer_list>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -160,6 +161,82 @@ void transition_system_view_based_selector_contract() {
              .state_count() == 5);
 }
 
+EventLog nullable_log(std::initializer_list<TransitionActivity> activities) {
+  EventLog log;
+  Trace trace;
+  for (const auto& activity : activities) {
+    Event event;
+    event.activity_state = activity ? FirstClassAttributeState::kPresent : FirstClassAttributeState::kNull;
+    event.activity_source_key = "concept:name";
+    event.activity = activity.value_or("");
+    trace.events.push_back(std::move(event));
+  }
+  log.traces.push_back(std::move(trace));
+  return log;
+}
+
+void transition_system_nullable_and_missing_contract() {
+  auto options = TransitionSystemOptions{};
+  options.include_data = true;
+  const auto singleton = discover_transition_system(nullable_log({std::nullopt}), options);
+  assert(singleton.states().size() == 2 && singleton.root_state_count() == 2);
+  assert(singleton.transitions().size() == 1 && !singleton.transitions()[0].label);
+  assert(singleton.states()[singleton.transitions()[0].source].payload == TransitionPayload{std::nullopt});
+  assert(singleton.states()[singleton.transitions()[0].target].payload.empty());
+  const auto distinct = discover_transition_system(nullable_log({std::nullopt, "", "None", "null", std::nullopt}), options);
+  assert(std::any_of(distinct.transitions().begin(), distinct.transitions().end(), [](const auto& e) { return e.label == TransitionActivity{""}; }));
+  assert(std::any_of(distinct.transitions().begin(), distinct.transitions().end(), [](const auto& e) { return e.label == TransitionActivity{"None"}; }));
+  assert(std::any_of(distinct.transitions().begin(), distinct.transitions().end(), [](const auto& e) { return e.label == TransitionActivity{"null"}; }));
+  auto phase = nullable_log({"ignored"});
+  EventAttribute attribute;
+  attribute.key = "phase";
+  attribute.is_null = true;
+  phase.traces[0].events[0].attributes.push_back(attribute);
+  options.activity_key = "phase";
+  assert(!discover_transition_system(phase, options).transitions()[0].label);
+  phase.traces[0].events[0].attributes.clear();
+  bool missing = false;
+  try { (void)discover_transition_system(phase, options); }
+  catch (const std::invalid_argument& error) { missing = std::string(error.what()) == "'phase'"; }
+  assert(missing);
+}
+
+void transition_system_endpoint_data_and_counter_contract() {
+  auto options = TransitionSystemOptions{};
+  options.window = 0;
+  options.include_data = true;
+  const auto zero = discover_transition_system(nullable_log({"A", "A", "A"}), options);
+  assert(zero.states().size() == 2 && zero.root_state_count() == 1);
+  assert(zero.states()[0].in_root && !zero.states()[1].in_root);
+  assert(zero.transitions().size() == 1 && zero.transitions()[0].source == 0 && zero.transitions()[0].target == 1);
+  assert(zero.states()[0].incoming.empty() && zero.states()[0].outgoing == std::vector<std::size_t>{0});
+  assert(zero.states()[1].incoming == std::vector<std::size_t>{0} && zero.states()[1].outgoing.empty());
+  assert((zero.states()[0].incoming_occurrences == std::vector<TransitionOccurrence>{{0, 1}, {0, 2}}));
+  assert((zero.states()[1].incoming_occurrences == std::vector<TransitionOccurrence>{{0, 0}}));
+  assert(zero.transitions()[0].occurrences.size() == 3);
+  options.window = 2;
+  options.view = TransitionView::kMultiset;
+  const auto counter = discover_transition_system(nullable_log({"A", "B", "A"}), options);
+  assert(counter.states().size() == 4 && counter.root_state_count() == 4);
+  std::vector<TransitionPayload> orders;
+  for (const auto& state : counter.states()) if (state.payload == TransitionPayload{"A", "B"}) orders.push_back(state.name_order);
+  assert(orders.size() == 2 && orders[0] != orders[1]);
+}
+
+void transition_system_signed_window_contract() {
+  auto options = TransitionSystemOptions{};
+  options.window = -1;
+  options.include_data = true;
+  const auto forward = discover_transition_system(nullable_log({"A", std::nullopt, "A"}), options);
+  assert(forward.states().size() == 2 && forward.root_state_count() == 2);
+  assert(std::any_of(forward.states().begin(), forward.states().end(), [](const auto& state) { return state.payload == TransitionPayload{"A", std::nullopt}; }));
+  options.direction = TransitionDirection::kBackward;
+  const auto backward = discover_transition_system(nullable_log({"A", std::nullopt, "A"}), options);
+  assert(backward.states().size() == 2 && backward.root_state_count() == 1);
+  assert(backward.transitions().size() == 2);
+  assert(std::all_of(backward.states().begin(), backward.states().end(), [](const auto& state) { return state.payload.empty(); }));
+}
+
 }  // namespace
 
 int main() {
@@ -167,5 +244,8 @@ int main() {
   transition_system_flat_adapter_contract();
   transition_system_first_class_selector_contract();
   transition_system_view_based_selector_contract();
+  transition_system_nullable_and_missing_contract();
+  transition_system_endpoint_data_and_counter_contract();
+  transition_system_signed_window_contract();
   return 0;
 }

@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <map>
+#include <numeric>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -12,15 +13,15 @@
 namespace minera {
 namespace {
 
-using Payload = std::vector<std::string>;
+using Payload = TransitionPayload;
 
 struct TraceSequence {
   std::size_t occurrence_trace_index = 0;
-  std::vector<std::string> activities;
+  TransitionPayload activities;
   std::vector<std::size_t> event_indices;
 };
 
-Payload make_payload(const std::vector<std::string>& activities,
+Payload make_payload(const TransitionPayload& activities,
                      std::size_t begin, std::size_t end,
                      TransitionView view) {
   Payload payload(activities.begin() + static_cast<std::ptrdiff_t>(begin),
@@ -33,14 +34,26 @@ Payload make_payload(const std::vector<std::string>& activities,
   return payload;
 }
 
+struct StateKey {
+  Payload payload;
+  Payload representation_order;
+
+  friend bool operator<(const StateKey& left, const StateKey& right) {
+    if (left.payload != right.payload) return left.payload < right.payload;
+    return left.representation_order < right.representation_order;
+  }
+};
+
 struct EdgeKey {
-  Payload source;
-  Payload target;
-  std::string label;
+  StateKey source;
+  StateKey target;
+  TransitionActivity label;
 
   friend bool operator<(const EdgeKey& left, const EdgeKey& right) {
-    if (left.source != right.source) return left.source < right.source;
-    if (left.target != right.target) return left.target < right.target;
+    if (left.source < right.source) return true;
+    if (right.source < left.source) return false;
+    if (left.target < right.target) return true;
+    if (right.target < left.target) return false;
     return left.label < right.label;
   }
 };
@@ -95,16 +108,32 @@ const std::string* selected_event_value(const Event& event,
   return event.attribute(key);
 }
 
-std::string selected_activity(const Event& event, std::string_view key) {
+TransitionActivity selected_activity(const Event& event, std::string_view key) {
+  const auto role_is_null = [&](FirstClassAttributeState state,
+                                std::string_view source,
+                                std::initializer_list<std::string_view> aliases) {
+    return state == FirstClassAttributeState::kNull &&
+           (matches_source(source, key) ||
+            std::find(aliases.begin(), aliases.end(), key) != aliases.end());
+  };
+  if (role_is_null(event.activity_state, event.activity_source_key,
+                   {"activity", "concept:name"}) ||
+      role_is_null(event.resource_state, event.resource_source_key,
+                   {"resource", "org:resource"}) ||
+      role_is_null(event.lifecycle_state, event.lifecycle_source_key,
+                   {"lifecycle", "lifecycle:transition"}))
+    return std::nullopt;
   if (const auto* value = selected_event_value(event, key, "activity"))
     return *value;
   if (const auto* value = selected_event_value(event, key, "resource"))
     return *value;
   if (const auto* value = selected_event_value(event, key, "lifecycle"))
     return *value;
-  throw std::invalid_argument(
-      "transition system event is missing activity attribute '" +
-      std::string(key) + "'");
+  for (const auto& attribute : event.attributes) {
+    if (attribute.key != key) continue;
+    return attribute.is_null ? TransitionActivity{} : TransitionActivity{attribute.value};
+  }
+  throw std::invalid_argument("'" + std::string(key) + "'");
 }
 
 const EventAttribute* find_stream_field(
@@ -373,6 +402,49 @@ std::vector<TraceSequence> table_sequences(
                         });
 }
 
+std::pair<std::size_t, std::size_t> window_bounds(
+    std::size_t index, std::size_t size, const TransitionSystemOptions& options) {
+  if (options.window >= 0) {
+    const auto width = static_cast<std::uint64_t>(options.window);
+    if (options.direction == TransitionDirection::kForward)
+      return {index, index + static_cast<std::size_t>(std::min<std::uint64_t>(width, size - index))};
+    return {width > index ? 0 : index - static_cast<std::size_t>(width), index};
+  }
+  const auto magnitude = static_cast<std::uint64_t>(-(options.window + 1)) + 1;
+  if (options.direction == TransitionDirection::kBackward) return {index, index};
+  // Python slice endpoints below zero are relative to the trace end.
+  const auto end = magnitude > index
+      ? (magnitude - index > size ? 0 : size - static_cast<std::size_t>(magnitude - index))
+      : index - static_cast<std::size_t>(magnitude);
+  return {index, std::max(index, end)};
+}
+
+std::pair<StateKey, TransitionSystemState> window_state(
+    const TransitionPayload& activities, std::size_t index,
+    const TransitionSystemOptions& options) {
+  const auto [begin, end] = window_bounds(index, activities.size(), options);
+  TransitionSystemState state;
+  state.payload = make_payload(activities, begin, end, options.view);
+  if (options.view == TransitionView::kSequence) {
+    state.name_order = state.payload;
+  } else if (options.view == TransitionView::kSet) {
+    state.name_order = state.payload;
+  } else {
+    for (auto position = begin; position < end; ++position) {
+      if (std::find(state.name_order.begin(), state.name_order.end(), activities[position]) == state.name_order.end())
+        state.name_order.push_back(activities[position]);
+    }
+  }
+  auto representation_order = state.name_order;
+  if (options.view == TransitionView::kMultiset) {
+    std::map<TransitionActivity, std::size_t> counts;
+    for (const auto& value : state.payload) ++counts[value];
+    std::stable_sort(representation_order.begin(), representation_order.end(),
+                     [&](const auto& left, const auto& right) { return counts.at(left) > counts.at(right); });
+  }
+  return {StateKey{state.payload, std::move(representation_order)}, std::move(state)};
+}
+
 template <typename Builder>
 TransitionSystem build_transition_system(
     const std::vector<TraceSequence>& sequences,
@@ -386,69 +458,82 @@ TransitionSystem build_transition_system(
       options.view != TransitionView::kMultiset) {
     throw std::invalid_argument("transition-system view is invalid");
   }
-
-  std::map<Payload, TransitionSystemState> states;
-  std::map<EdgeKey, TransitionSystemTransition> edges;
+  std::map<StateKey, std::size_t> roots;
+  std::map<EdgeKey, std::size_t> edges;
+  std::vector<TransitionSystemState> result_states;
+  std::vector<StateKey> state_keys;
+  std::vector<TransitionSystemTransition> result_transitions;
+  const auto lookup_state = [&](const StateKey& key, TransitionSystemState state) {
+    if (const auto found = roots.find(key); found != roots.end()) return found->second;
+    const auto identity = result_states.size();
+    state.in_root = false;
+    state.id = identity;
+    result_states.push_back(std::move(state));
+    state_keys.push_back(key);
+    return identity;
+  };
   for (const auto& sequence : sequences) {
     const auto& activities = sequence.activities;
-    const std::size_t n = activities.size();
-    if (n == 0) continue;
-
-    std::vector<Payload> trace_states;
-    trace_states.reserve(n + 1);
-    for (std::size_t index = 0; index <= n; ++index) {
-      std::size_t begin = 0;
-      std::size_t end = 0;
-      if (options.direction == TransitionDirection::kForward) {
-        begin = index;
-        const auto remaining = n - index;
-        end = index + std::min(options.window, remaining);
-      } else {
-        end = index;
-        begin = index > options.window ? index - options.window : 0;
+    for (std::size_t index = 0; index < activities.size(); ++index) {
+      auto [source_key, source_state] = window_state(activities, index, options);
+      auto [target_key, target_state] = window_state(activities, index + 1, options);
+      // Both lookups precede registration. A new equal-valued target remains
+      // a distinct endpoint object when the source takes the root-set slot.
+      const auto source = lookup_state(source_key, std::move(source_state));
+      const auto target = lookup_state(target_key, std::move(target_state));
+      if (roots.emplace(source_key, source).second) result_states[source].in_root = true;
+      if (roots.emplace(target_key, target).second) result_states[target].in_root = true;
+      if (index == 0) ++result_states[source].start_count;
+      if (index + 1 == activities.size()) ++result_states[target].end_count;
+      EdgeKey key{source_key, target_key, activities[index]};
+      const auto [found, inserted] = edges.emplace(key, result_transitions.size());
+      if (inserted) {
+        TransitionSystemTransition edge;
+        edge.source = source;
+        edge.target = target;
+        edge.label = activities[index];
+        result_transitions.push_back(std::move(edge));
       }
-      trace_states.push_back(
-          make_payload(activities, begin, end, options.view));
-      auto& state = states[trace_states.back()];
-      if (index == 0) ++state.start_count;
-      if (index == n) ++state.end_count;
-    }
-
-    for (std::size_t index = 0; index < n; ++index) {
-      const auto occurrence = occurrence_builder(sequence, index);
-      auto& source = states[trace_states[index]];
-      auto& target = states[trace_states[index + 1]];
-      if (options.include_data) {
-        source.outgoing_occurrences.push_back(occurrence);
-        target.incoming_occurrences.push_back(occurrence);
-      }
-      EdgeKey key{trace_states[index], trace_states[index + 1],
-                  activities[index]};
-      auto& edge = edges[key];
+      auto& edge = result_transitions[found->second];
       ++edge.count;
-      if (options.include_data) edge.occurrences.push_back(occurrence);
+      if (options.include_data) {
+        const auto occurrence = occurrence_builder(sequence, index);
+        result_states[source].outgoing_occurrences.push_back(occurrence);
+        result_states[target].incoming_occurrences.push_back(occurrence);
+        edge.occurrences.push_back(occurrence);
+      }
     }
   }
-
-  std::vector<TransitionSystemState> result_states;
-  result_states.reserve(states.size());
-  std::map<Payload, std::size_t> ids;
-  for (auto& [payload, state] : states) {
-    state.id = result_states.size();
-    ids.emplace(payload, state.id);
-    state.payload = payload;
-    result_states.push_back(std::move(state));
+  std::vector<std::size_t> order(result_states.size());
+  std::iota(order.begin(), order.end(), 0);
+  std::stable_sort(order.begin(), order.end(), [&](auto left, auto right) {
+    if (state_keys[left] < state_keys[right]) return true;
+    if (state_keys[right] < state_keys[left]) return false;
+    return result_states[left].in_root && !result_states[right].in_root;
+  });
+  std::vector<std::size_t> remap(order.size());
+  std::vector<TransitionSystemState> ordered_states;
+  ordered_states.reserve(order.size());
+  for (const auto previous : order) {
+    remap[previous] = ordered_states.size();
+    result_states[previous].id = ordered_states.size();
+    ordered_states.push_back(std::move(result_states[previous]));
   }
-  std::vector<TransitionSystemTransition> result_transitions;
-  result_transitions.reserve(edges.size());
-  for (auto& [key, edge] : edges) {
-    edge.source = ids.at(key.source);
-    edge.target = ids.at(key.target);
-    edge.label = key.label;
-    result_transitions.push_back(std::move(edge));
+  for (auto& edge : result_transitions) {
+    edge.source = remap[edge.source];
+    edge.target = remap[edge.target];
   }
-  return TransitionSystem(std::move(options), std::move(result_states),
-                          std::move(result_transitions));
+  std::sort(result_transitions.begin(), result_transitions.end(), [](const auto& left, const auto& right) {
+    if (left.source != right.source) return left.source < right.source;
+    if (left.target != right.target) return left.target < right.target;
+    return left.label < right.label;
+  });
+  for (std::size_t index = 0; index < result_transitions.size(); ++index) {
+    const auto& edge = result_transitions[index];
+    ordered_states[edge.source].outgoing.push_back(index);
+    ordered_states[edge.target].incoming.push_back(index);
+  }
+  return TransitionSystem(options, std::move(ordered_states), std::move(result_transitions));
 }
 
 TransitionSystem build_event_log_system(
@@ -480,6 +565,11 @@ TransitionSystem build_flat_system(
 }
 
 }  // namespace
+
+TransitionActivity transition_system_event_activity(
+    const Event& event, std::string_view activity_key) {
+  return selected_activity(event, activity_key);
+}
 
 TransitionSystem discover_transition_system(
     const EventLog& event_log, const TransitionSystemOptions& options) {
@@ -521,7 +611,7 @@ TransitionSystem discover_transition_system(
 
 TransitionSystem discover_transition_system(
     const EventLog& event_log, TransitionDirection direction,
-    std::size_t window, TransitionView view, bool include_data) {
+    std::int64_t window, TransitionView view, bool include_data) {
   TransitionSystemOptions options;
   options.direction = direction;
   options.view = view;

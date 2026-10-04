@@ -1807,6 +1807,8 @@ void parse_mine_params_maps_transition_system_options() {
   assert(params.transition_system.include_data);
   assert(params.transition_system.activity_attribute == "phase");
   assert(params.transition_system.case_id_attribute == "case_ref");
+  const auto signed_params = minera::parse_mine_params(fields({{"transition_window", "-8"}}));
+  assert(signed_params.transition_system.window == -8);
 }
 
 void parse_mine_params_maps_powl_options() {
@@ -1885,7 +1887,7 @@ void parse_mine_params_rejects_explicit_blank_powl_scalars() {
 void parse_mine_params_rejects_invalid_transition_fields() {
   for (const auto& item : {std::pair{"transition_view", "bad"},
                            std::pair{"transition_direction", "bad"},
-                           std::pair{"transition_window", "-1"},
+                           std::pair{"transition_window", "9223372036854775808"},
                            std::pair{"transition_window", "2x"},
                            std::pair{"transition_include_data", "yes"}}) {
     bool threw = false;

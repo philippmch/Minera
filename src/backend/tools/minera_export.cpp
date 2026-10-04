@@ -739,7 +739,7 @@ int usage(const char* program) {
                "                            sequence (default), set, or multiset\n"
                "  --transition-direction <id>  Window direction: forward\n"
                "                            (default) or backward\n"
-               "  --transition-window <n>   Non-negative state-window size\n"
+               "  --transition-window <n>   Signed state-window size\n"
                "                            (default: 2; 0 collapses all states)\n"
                "  --transition-include-data Include stable trace/event occurrence\n"
                "                            references in the transition system\n"
@@ -2098,6 +2098,14 @@ int main(int argc, char** argv) {
     if (result.ec != std::errc{} || result.ptr != end)
       throw std::invalid_argument(std::string(option) +
                                   " expects a non-negative integer");
+    return parsed;
+  };
+  const auto parse_transition_window = [](const char* value) {
+    std::int64_t parsed = 0;
+    const auto end = value + std::strlen(value);
+    const auto result = std::from_chars(value, end, parsed);
+    if (value == end || result.ec != std::errc{} || result.ptr != end)
+      throw std::invalid_argument("--transition-window expects a signed integer");
     return parsed;
   };
   const auto parse_uint32_marking = [&](const char* value,
@@ -5005,8 +5013,7 @@ int main(int argc, char** argv) {
     } else if (arg == "--transition-window") {
       const auto* value = next(); if (!value) return usage(argv[0]);
       try {
-        transition_options.window =
-            parse_nonnegative_size(value, "--transition-window");
+        transition_options.window = parse_transition_window(value);
       }
       catch (const std::exception& error) { std::cerr << "error: " << error.what() << "\n"; return 2; }
     } else if (arg == "--transition-include-data") {
