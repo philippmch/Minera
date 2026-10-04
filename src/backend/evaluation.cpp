@@ -908,117 +908,38 @@ ReplayFitnessResult evaluate_replay_fitness(const TokenReplayResult& results,
 ReplayFitnessResult evaluate_replay_fitness(
     const std::vector<PrecomputedTokenReplay>& results,
     ReplayFitnessVariant variant) {
-  ReplayFitnessResult output;
-  output.variant = variant;
-  output.token_result.activity_attribute = "concept:name";
-  if (variant != ReplayFitnessVariant::TOKEN_BASED) {
-    output.computed = false;
-    output.error = "precomputed token results require token-based replay";
-    output.token_result.fitness = 0.0;
-    return output;
-  }
-
-  double fitness_sum = 0.0;
-  std::uint64_t trace_count = 0;
-  std::uint64_t fitting_traces = 0;
-  std::uint64_t produced = 0;
-  std::uint64_t consumed = 0;
-  std::uint64_t missing = 0;
-  std::uint64_t remaining = 0;
-  std::vector<std::uint64_t> transition_frequencies;
-  std::vector<VariantConformance> variants;
-  const auto add_counter = [](std::uint64_t& destination,
-                              std::uint64_t value) {
-    if (value > std::numeric_limits<std::uint64_t>::max() - destination)
-      return false;
-    destination += value;
-    return true;
-  };
-  const auto supplied_counter = [](std::uint64_t primary,
-                                   std::uint64_t alias) {
-    return primary != 0 ? primary : alias;
-  };
+  std::vector<TokenReplayTraceDiagnostics> rows;
+  rows.reserve(results.size());
+  std::vector<TokenInteger> transition_frequencies;
+  bool exhausted = false;
   for (const auto& result : results) {
-    if (!result.computed) {
-      // A caller may provide an unfinished trace alongside completed traces.
-      // Treat it like a missing result: it contributes neither to the
-      // denominator nor to the aggregate counters.
-      continue;
-    }
-    output.exhausted = output.exhausted || result.exhausted;
-    if (!std::isfinite(result.trace_fitness) || result.trace_fitness < 0.0 ||
-        result.trace_fitness > 1.0) {
-      output.computed = false;
-      output.error = "invalid precomputed trace fitness";
-      return output;
-    }
-    const auto result_produced =
-        supplied_counter(result.produced_tokens, result.produced);
-    const auto result_consumed =
-        supplied_counter(result.consumed_tokens, result.consumed);
-    const auto result_missing =
-        supplied_counter(result.missing_tokens, result.missing);
-    const auto result_remaining =
-        supplied_counter(result.remaining_tokens, result.remaining);
-    if (!add_counter(trace_count, 1) ||
-        !add_counter(produced, result_produced) ||
-        !add_counter(consumed, result_consumed) ||
-        !add_counter(missing, result_missing) ||
-        !add_counter(remaining, result_remaining)) {
-      output.computed = false;
-      output.error = "precomputed token counter overflow";
-      return output;
-    }
-    if (result.trace_is_fit && !add_counter(fitting_traces, 1)) {
-      output.computed = false;
-      output.error = "precomputed token counter overflow";
-      return output;
-    }
-    fitness_sum += result.trace_fitness;
-    if (!std::isfinite(fitness_sum)) {
-      output.computed = false;
-      output.error = "precomputed token fitness overflow";
-      return output;
-    }
-    if (transition_frequencies.size() < result.transition_activations.size()) {
-      transition_frequencies.resize(result.transition_activations.size(), 0);
-    }
-    for (std::size_t i = 0; i < result.transition_activations.size(); ++i) {
-      if (!add_counter(transition_frequencies[i],
-                       result.transition_activations[i])) {
-        output.computed = false;
-        output.error = "precomputed token counter overflow";
-        return output;
-      }
-    }
-    variants.push_back(VariantConformance{{}, 1, result.trace_fitness});
+    TokenReplayTraceDiagnostics row;
+    row.trace_index = rows.size();
+    row.trace_is_fit = result.trace_is_fit;
+    row.trace_fitness = result.trace_fitness;
+    row.missing = result.missing_tokens.value_or(result.missing);
+    row.consumed = result.consumed_tokens.value_or(result.consumed);
+    row.remaining = result.remaining_tokens.value_or(result.remaining);
+    row.produced = result.produced_tokens.value_or(result.produced);
+    rows.push_back(std::move(row));
+    exhausted = exhausted || result.exhausted;
+    if (transition_frequencies.size() < result.transition_activations.size())
+      transition_frequencies.resize(result.transition_activations.size());
+    for (std::size_t i = 0; i < result.transition_activations.size(); ++i)
+      transition_frequencies[i] += result.transition_activations[i];
   }
-
-  output.trace_count = trace_count;
-  output.fitting_traces = fitting_traces;
-  output.token_result.trace_count = trace_count;
-  output.token_result.fitting_traces = fitting_traces;
-  output.token_result.produced = produced;
-  output.token_result.consumed = consumed;
-  output.token_result.missing = missing;
-  output.token_result.remaining = remaining;
-  output.token_result.transition_frequencies = std::move(transition_frequencies);
-  output.token_result.variants = std::move(variants);
-  if (output.trace_count > 0 && consumed > 0 && produced > 0) {
-    output.average_trace_fitness = fitness_sum / output.trace_count;
-    output.percentage_fit_traces =
-        100.0 * output.fitting_traces / output.trace_count;
-    const double consumed_deviation =
-        static_cast<double>(missing) / static_cast<double>(consumed);
-    const double produced_deviation =
-        static_cast<double>(remaining) / static_cast<double>(produced);
-    output.fitness = 0.5 * (1.0 - consumed_deviation) +
-                     0.5 * (1.0 - produced_deviation);
+  auto output = evaluate_replay_fitness(rows, variant);
+  output.exhausted = exhausted;
+  // Activation details are optional native metadata. Their bounded legacy
+  // projection must never prevent the exact public fitness calculation.
+  for (const auto& frequency : transition_frequencies) {
+    if (frequency > std::numeric_limits<std::uint64_t>::max()) {
+      output.token_result.transition_frequencies.clear();
+      break;
+    }
+    output.token_result.transition_frequencies.push_back(
+        static_cast<std::uint64_t>(frequency));
   }
-  output.log_fitness = output.fitness;
-  output.token_result.fitness = output.fitness;
-  output.token_result.precision = 0.0;
-  output.total_cost = 0.0;
   return output;
 }
 

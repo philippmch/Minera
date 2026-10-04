@@ -1236,8 +1236,38 @@ void precomputed_replay_aggregation_contract() {
   overflow_tail.trace_fitness = 1.0;
   const auto overflow = evaluate_replay_fitness(
       std::vector<PrecomputedTokenReplay>{near_overflow, overflow_tail});
-  assert(!overflow.computed && overflow.token_result.produced == 0 &&
-         overflow.token_result.trace_count == 0);
+  assert(overflow.computed && overflow.token_result.produced ==
+         TokenInteger(std::numeric_limits<std::uint64_t>::max()) + 1 &&
+         overflow.token_result.trace_count == 2 && overflow.log_fitness == 1.0);
+  token_aliases.consumed_tokens = 0;
+  token_aliases.produced_tokens = 0;
+  const auto explicit_zero = evaluate_replay_fitness(
+      std::vector<PrecomputedTokenReplay>{token_aliases});
+  assert(explicit_zero.token_result.consumed == 0 &&
+         explicit_zero.token_result.produced == 0 &&
+         explicit_zero.log_fitness_is_integer_zero);
+  auto metadata = token_results;
+  metadata[0].computed = false;
+  metadata[0].error = "unfinished";
+  metadata[1].exhausted = true;
+  const auto unfiltered = evaluate_replay_fitness(metadata);
+  assert(unfiltered.computed && unfiltered.exhausted &&
+         unfiltered.trace_count == 2 && unfiltered.log_fitness == token.log_fitness);
+  metadata[0].trace_fitness = std::numeric_limits<double>::infinity();
+  assert(std::isinf(evaluate_replay_fitness(metadata).average_trace_fitness));
+  metadata[1].trace_fitness = -std::numeric_limits<double>::infinity();
+  assert(std::isnan(evaluate_replay_fitness(metadata).average_trace_fitness));
+  metadata[0].produced_tokens = TokenInteger("100000000000000000000000000000000000001");
+  metadata[0].consumed_tokens = -4;
+  const auto signed_counts = evaluate_replay_fitness(metadata);
+  assert(signed_counts.token_result.consumed == 0 &&
+         signed_counts.log_fitness_is_integer_zero);
+  near_overflow.transition_activations = {std::numeric_limits<std::uint64_t>::max()};
+  overflow_tail.transition_activations = {1};
+  const auto activation_overflow = evaluate_replay_fitness(
+      std::vector<PrecomputedTokenReplay>{near_overflow, overflow_tail});
+  assert(activation_overflow.computed && activation_overflow.log_fitness == 1.0 &&
+         activation_overflow.token_result.transition_frequencies.empty());
 
   const std::vector<PrecomputedAlignmentReplay> alignment_results{
       PrecomputedAlignmentReplay{true, false, false, 0.5, 2.0, 4.0, {}},

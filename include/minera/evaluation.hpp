@@ -260,26 +260,26 @@ struct EmdResult {
   bool use_fast_emd = true;
 };
 
-// One already-computed token replay record. `computed=false` represents a
-// failed/unfinished replay while retaining any counters the caller has.
+// One already-computed token replay record. Metrics use every supplied row;
+// computed/exhausted/error are compatibility metadata, not row filters.
 struct PrecomputedTokenReplay {
   bool computed = true;
   bool exhausted = false;
   bool trace_is_fit = false;
   double trace_fitness = 0.0;
-  std::uint64_t missing_tokens = 0;
-  std::uint64_t consumed_tokens = 0;
-  std::uint64_t remaining_tokens = 0;
-  std::uint64_t produced_tokens = 0;
+  std::optional<TokenInteger> missing_tokens;
+  std::optional<TokenInteger> consumed_tokens;
+  std::optional<TokenInteger> remaining_tokens;
+  std::optional<TokenInteger> produced_tokens;
   std::vector<std::uint64_t> transition_activations;
   std::string error;
   // Short aliases mirror the aggregate fields exposed by ConformanceResult.
-  // A zero *_tokens value is the unspecified sentinel for alias input;
-  // otherwise the descriptive *_tokens spelling takes precedence.
-  std::uint64_t missing = 0;
-  std::uint64_t consumed = 0;
-  std::uint64_t remaining = 0;
-  std::uint64_t produced = 0;
+  // An absent *_tokens value selects the short alias. An explicit zero (or
+  // negative value) always retains precedence over the alias.
+  TokenInteger missing = 0;
+  TokenInteger consumed = 0;
+  TokenInteger remaining = 0;
+  TokenInteger produced = 0;
 };
 
 // One already-computed alignment replay record. `best_worst_cost` is the

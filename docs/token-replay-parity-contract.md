@@ -1541,3 +1541,58 @@ The original automatic-choice fitness cohort retains its prior 312 native and
 conformance, bounded consumers, aliases and broader carrier/parameter domains
 remain open. Catalogue totals remain 46/86 packages, 199/387 modules and 228
 incomplete units. No whole-module promotion or full parity claim is made.
+
+### Exact precomputed token fitness through the compatibility carrier
+
+`PrecomputedTokenReplay` and its `TokenReplayEvaluationResult` alias now feed the
+same exact aggregate evaluator as full token results and trace diagnostics.
+Descriptive counters are optional exact signed `TokenInteger` values; absent
+values select the short native aliases. An explicit zero or negative descriptive
+counter retains precedence. This changes the old zero-as-unspecified sentinel
+and removes uint64 aggregate overflow and separate-double counter division.
+
+Every supplied record contributes to the calculation. `computed=false` and error
+metadata no longer remove a row, matching the public evaluator's treatment of
+extra fields. Trace fitness outside [0,1], NaN, infinity and overflowing double
+sums propagate through the observed arithmetic. Empty/nonpositive aggregate
+denominators retain the public integer-zero log-fitness type. The result retains
+the six-field trace diagnostics and marks its compatibility details as fitness
+only, leaving unevaluated quality scores null.
+
+Transition activations and exhausted flags remain native metadata. Representable
+activation totals retain their uint64 detail vector; an unrepresentable optional
+activation vector is omitted without preventing exact fitness. This bounded
+metadata projection is separate from the public four-field dictionary.
+
+Fresh pinned observations make 2614 actual direct/parent aggregate calls on 1307
+inputs, with no fresh replay calls. The cohort reobserves the preceding signed,
+large, zero-denominator and nonfinite fixtures and their retained weighted replay
+projections, plus 64 cases with extra status/alias fields. The 5228 native calls
+exercise diagnostics, full results, descriptive precomputed fields and explicit
+native alias translations. All 10456 complete public comparisons match every
+field, scalar type and float hex; all 7842 post-observation calculations agree.
+All 5228 exact-counter, native input, input-translation and retained six-field
+checks match. All 3921 native carrier pairs and 1307 public route pairs agree.
+The aliases are a native translation extension, not a claim that Python accepts
+short keys when descriptive keys are absent.
+
+All 152 assertion-enabled Release suites pass on 660 frozen inputs: three edits
+and 657 unchanged. All 155 production/test outputs are freshly linked. The first
+comparer expected an untagged metric map; the production codec emits a tagged
+dictionary. Its observed terminal failure and witnessed reproduction are retained
+with the original helper. A derived comparer reads the actual tagged dictionary;
+production sources, frozen inputs, probe and public results remain unchanged.
+
+Evidence is in [precomputed-fitness-validation.json](precomputed-fitness-validation.json).
+All 1027 members round-trip across 12 lossless
+archives, with bindings to prior PNML and original weighted replay evidence.
+This is source/build/process/archive self-review; no independent review or
+pre-public oracle is claimed. CLI/HTTP transports do not expose the precomputed
+API, so no fresh transport calls are claimed for this change.
+
+Python dictionary omissions, non-Boolean fit flags, non-double fitness carriers,
+arbitrary result objects and parameter/alias graphs remain unproven. The original
+automatic-choice fitness cohort retains its prior 312 native and 312 wire whole
+dictionary differences. AUTO/composite/precision/application conformance and
+other bounded consumers remain open. Catalogue totals remain 46/86 packages,
+199/387 modules and 228 incomplete units; no promotion or full parity claim is made.
