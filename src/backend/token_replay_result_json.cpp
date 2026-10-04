@@ -259,4 +259,31 @@ std::string token_replay_fitness_result_json(const ReplayFitnessResult& result) 
           ? integer(0) : real(result.log_fitness)},
       {string_value("percentage_of_fitting_traces"), real(result.percentage_fit_traces)}});
 }
+std::string token_precision_result_json(const PrecisionResult& result) {
+  if (result.variant != PrecisionVariant::ETCONFORMANCE_TOKEN || !result.computed)
+    throw std::invalid_argument(result.error.empty()
+        ? "token precision result requires computed token-based evaluation" : result.error);
+  return real(result.precision);
+}
+
+std::string token_generalization_result_json(const GeneralizationResult& result) {
+  if (result.variant != GeneralizationVariant::GENERALIZATION_TOKEN || !result.computed)
+    throw std::invalid_argument(result.error.empty()
+        ? "token generalization result requires computed token-based evaluation" : result.error);
+  return real(result.generalization);
+}
+
+std::string composite_evaluation_result_json(const CompositeEvaluationResult& result) {
+  if (!result.computed)
+    throw std::invalid_argument(result.error.empty()
+        ? "composite result requires computed evaluation" : result.error);
+  return dictionary({
+      {string_value("fitness"), token_replay_fitness_result_json(result.fitness_details)},
+      {string_value("precision"), real(result.precision)},
+      {string_value("generalization"), real(result.generalization)},
+      {string_value("simplicity"), real(result.simplicity)},
+      {string_value("metricsAverageWeight"), real(result.metrics_average_weight)},
+      {string_value("fscore"), real(result.fscore)}});
+}
+
 }  // namespace minera

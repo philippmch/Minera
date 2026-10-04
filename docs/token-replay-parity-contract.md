@@ -1596,3 +1596,90 @@ automatic-choice fitness cohort retains its prior 312 native and 312 wire whole
 dictionary differences. AUTO/composite/precision/application conformance and
 other bounded consumers remain open. Catalogue totals remain 46/86 packages,
 199/387 modules and 228 incomplete units; no promotion or full parity claim is made.
+
+### Exact markings for token precision, generalization and composite evaluation
+
+Token precision, token generalization and complete composite evaluation now
+accept exact signed marking options and sparse key/name metadata. Their PNML
+document overloads inherit exact markings directly, removing the int-range gate
+from composite evaluation. Legacy integer options retain their validation and
+explicit exact options take precedence. Public-mode PNML import continues to
+retain only positive imported marking entries; the default native document mode
+is separate. AUTO/alignment precision and interactive bounded PNML adapters are
+outside this change.
+
+Token precision replays only proper prefixes. Initial enabled choices are
+queried through hidden transitions without computing full-trace fitness. This
+preserves the observed distinction for a 401-digit marking: empty-log and
+one-event precision succeed, while nonempty generalization/composite evaluation
+and precision that needs a nonempty proper prefix raise the observed float
+conversion overflow. Precision compatibility JSON omits full-log token details
+that it has not evaluated.
+
+Actual public prefix-utility calls establish comma-joined keys, repeated splitting
+for replay, merged colliding keys and preserved empty fields. The evaluator now
+uses these keys in first-occurrence order and marks generated empty-string
+activities as present. Initial choices are scored separately from a proper prefix
+whose key happens to be empty. Distinct unknown labels remain distinct keys.
+
+Generalization counts activations from the full forward token replay with
+cleaning disabled, including activations in unfit traces. Composite evaluation
+propagates exact markings to all component evaluators and preserves the complete
+six-field public dictionary, including the whole four-field fitness dictionary.
+Production codecs retain scalar types and float hex for precision, generalization
+and the complete composite return, including integer-zero empty-log fitness.
+
+Three complete fresh public captures make 445 imports, 17430 quality calls and
+4980 separately observed full replay calls. The largest cohort contains all 65
+preceding weighted models, all 82 PNML marking boundary inputs and two graphs
+with no transitions. It covers eight log profiles, an alternate activity key,
+distinct unknown prefixes, comma/empty labels, colliding prefix keys and three
+composite weight sets. Sixteen actual public prefix-utility calls retain their
+returned dictionaries, counts and generated logs. Whole composite observations
+are captured directly, never reconstructed from separately observed components.
+
+The final 149 native imports reproduce 125 named marking/structure projections
+and all 24 rejection messages. All 10000 native document/net quality calls retain
+their inputs. All 34646 complete public return comparisons and 214 expected
+exception comparisons match every field, scalar type and float hex without
+tolerance or field stitching. All 5000 native carrier pairs and 4980 public
+scalar route pairs agree. All 1986 post-observation generalization activation
+frequency checks agree with separately observed full replay. This does not claim
+whole PNML object identity, property or insertion-order parity.
+
+All 152 assertion-enabled Release suites pass on 660 frozen inputs: nine edits
+and 651 unchanged. All 155 production/test outputs are freshly linked during this
+checkpoint. The full build initially passes 151/152; the remaining legacy test
+indexes full-log precision counts that are now deliberately omitted. Correcting
+that assertion changes only one test file: all production and other 659 source
+bindings remain identical. Its freshly compiled replacement is registered with
+the same other 151 fresh binaries, and the complete 152-suite run passes. A separate
+preflight recompiles the evaluator/contracts against a retained library whose
+other source bindings agree; its 10000 calls and whole comparisons also pass.
+The final comparison repeats those calls against the fresh complete build.
+
+Three failed frozen build/test runs are retained: an old int-range rejection assertion,
+then a generated empty-string event that lacked activity-presence metadata, and
+the legacy precision-count indexing crash in the full run. A
+named contract diagnostic retains the second exception. Two comparer failures
+assumed empty compatibility metadata arrays were always emitted; derived readers
+accept omitted arrays only at zero node count. The original native candidate's
+350 delimiter-related whole-result differences and witnessed reproduction are
+retained. One public observer failed to encode returned sets; its derived observer
+reruns the full capture with an explicit set codec. Executed helpers and frozen
+inputs remain unchanged.
+
+Evidence is in [exact-model-quality-validation.json](exact-model-quality-validation.json).
+All 4218 members round-trip across 78 lossless
+archives, with bindings to the preceding precomputed checkpoint, original weighted
+replay and PNML marking boundaries. This is source/build/process/archive
+self-review; no independent review or pre-public oracle is claimed. No new
+CLI/HTTP quality route or fresh transport parity is claimed.
+
+The original automatic-choice fitness cohort retains its prior 312 native and
+312 wire whole-dictionary differences. Wider choice/cache/model/log/property and
+parameter graphs, Python scalar/exception identities, AUTO/alignment precision,
+backward precision and application conformance remain unproven. Interactive
+supplied-PNML adapters and other bounded consumers still have separate range
+gates. Catalogue totals remain 46/86 packages, 199/387 modules and 228 incomplete
+units; no promotion or full parity claim is made.

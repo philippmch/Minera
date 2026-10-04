@@ -14,7 +14,14 @@
 
 #include "minera/petri_net.hpp"
 
+namespace minera { struct TokenReplayOptions; }
+
 namespace minera::detail {
+
+// Visible activities reachable from the exact initial marking through hidden
+// transitions. This query does not calculate trace fitness.
+std::vector<std::size_t> initial_enabled_token_activities(
+    const PetriNet& net, const TokenReplayOptions& options);
 
 using ReplayMarkingKeys = std::vector<bool>;
 using CleaningComponents = std::vector<std::vector<std::size_t>>;
