@@ -145,6 +145,39 @@ void grouped_alpha_materialization_cap_precedes_copy() {
   assert(normalize_alpha_event_log(make_log({{}, {}}), options).traces.size() == 2);
 }
 
+void classic_distinguishes_null_blank_and_missing_activities() {
+  auto log = make_log({{"", ""}});
+  log.traces.front().events.front().activity_state = FirstClassAttributeState::kNull;
+  const auto net = discover_alpha_classic(log);
+  assert(net.activities() == std::vector<std::string>{""});
+  assert(net.transitions().size() == 2 && net.place_count() == 3);
+  assert(net.transitions()[0].silent() && !net.transitions()[1].silent());
+  assert(net.transitions()[0].inputs == std::vector<std::size_t>{net.source()});
+  assert(net.transitions()[1].outputs == std::vector<std::size_t>{net.sink()});
+  assert(net.transitions()[0].outputs == net.transitions()[1].inputs);
+  assert(log.traces.front().events.front().activity_state == FirstClassAttributeState::kNull);
+
+  EventLog missing;
+  missing.traces.push_back(Trace{"case", {Event{}}});
+  const auto isolated = discover_petri_net(missing);
+  assert(isolated.transitions().empty() && isolated.place_count() == 2);
+  missing.traces.front().events.push_back(log.traces.front().events.back());
+  bool rejected = false;
+  try { (void)discover_alpha_classic(missing); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+
+  auto selected = make_log({{"ignored"}});
+  EventAttribute phase{"phase", ""};
+  phase.is_null = true;
+  selected.traces.front().events.front().attributes.push_back(phase);
+  const auto nullable = discover_alpha_classic(selected, {.activity_attribute = "phase"});
+  assert(nullable.activities().empty() && nullable.transitions().size() == 1);
+  assert(nullable.transitions().front().silent());
+  assert(nullable.transitions().front().inputs == std::vector<std::size_t>{nullable.source()});
+  assert(nullable.transitions().front().outputs == std::vector<std::size_t>{nullable.sink()});
+}
+
 void plus_interior_one_loop_has_a_fresh_self_only_place() {
   const auto source = make_log({{"a", "L", "L", "b"}, {"a", "b"}});
   const auto net = discover_alpha_plus(source);
@@ -294,6 +327,7 @@ int main() {
   sparse_classic_preserves_explicit_empty_and_zero_endpoints();
   sparse_classic_distinguishes_zero_frequency_from_missing_keys();
   grouped_alpha_materialization_cap_precedes_copy();
+  classic_distinguishes_null_blank_and_missing_activities();
   plus_interior_one_loop_has_a_fresh_self_only_place();
   plus_keeps_an_end_boundary_without_one_loops();
   plus_sharp_preserves_boundary_outgoing_presence();

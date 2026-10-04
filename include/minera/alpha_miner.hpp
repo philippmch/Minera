@@ -21,9 +21,10 @@ struct AlphaMinerOptions {
   bool short_loops = false;
 
   // Event field used as the activity label.  The default preserves the
-  // conventional Event::activity projection.  Non-default selectors are
-  // resolved strictly: every event in a non-empty trace must contain a
-  // non-null value for the selected field.
+  // conventional Event::activity projection. Classic grouped-log discovery
+  // preserves explicit null values as unlabeled transitions and accepts an
+  // isolated missing event. Missing selected fields in adjacent pairs fail.
+  // String normalization and Alpha+ require non-null selected values.
   std::string activity_attribute = "concept:name";
 
   // Alpha+ keeps transitions that the footprint cannot connect by default,
