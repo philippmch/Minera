@@ -382,11 +382,10 @@ class Replayer {
           diagnostics->unknown_event_indices.push_back(diagnostics->replayed_events - 1);
         continue;
       }
-      auto targets = transitions_by_activity_[*step];
-      std::sort(targets.begin(), targets.end(), [&](auto left, auto right) {
+      const auto& targets = transitions_by_activity_[*step];
+      auto chosen = *std::max_element(targets.begin(), targets.end(), [&](auto left, auto right) {
         return std::tie(transition_names[left], left) < std::tie(transition_names[right], right);
       });
-      auto chosen = targets.back();
       for (const auto transition : targets) {
         if (enabled(marking, transition)) { chosen = transition; break; }
       }

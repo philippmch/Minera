@@ -2209,3 +2209,36 @@ Matching outcomes and reduced projections do not establish runtime Python return
 Fresh validation freezes **660 inputs with seven source edits**, binds **155 native outputs/projects**, passes **five focused and152 assertion-enabled native suites**, and runs **534 complete CLI exports plus534 ordinary `/api/mine` requests**. Ordered public process-tree comparisons and existing bundled-miner acceptance/error gates are retained. A preparation syntax failure created no build or observations; a subsequent compiler failure used the wrong local name table identifier and created no replay observations. Both original helper/source bytes and terminal outcomes remain preserved. Recovery uses fresh helpers and fresh frozen build directories. Frontend source remains unchanged, with TypeScript compilation and164 frontend tests inherited and zero fresh frontend checks.
 
 `docs/nullable-replay-names-validation.json` binds all source/output/capture/probe/application measurements and **91 lossless evidence archives /4,328 round-tripped members**. This is a committed implementation checkpoint; full parity is still false. Catalogue totals remain **46/86 packages,199/387 modules and228 incomplete units**, without promotion.
+
+
+### Forward replay selects enabled matches in actual transition order
+
+Forward replay now scans matching transitions in native creation order and fires the first enabled match. The cleanroom native adapter constructs that order from the reference net's actual root transition-set enumeration. The disabled fallback retains the last transition in stable name-ascending order, with the last creation index breaking equal-name ties. For two enabled transitions with names `B,A` and the same activity, replay therefore fires the first constructed transition `B`; with neither enabled it uses the name-based fallback. Tests cover both enabled, only the second enabled by a join guard, neither enabled with reversed names, and equal-name enabled/fallback choices. This changes two source files and does not establish allocation-independent correspondence between separately created discovery nets.
+
+The new public capture makes **32,768 actual PM4Py replay calls** over **1,024 fixtures and32 profiles each**: four name patterns, four label assignments, four shared/split/join guards, four sparse initial markings, two activity values, and default/custom selectors. Logs contain an empty trace, repeated single-event traces, and a double-event trace. Both replay variants, parent/direct routes, cleaning, PLTR, and name/identity output are captured. There are **12,544 returns and20,224 errors**, **16,384 backwards model-mutation profiles**, zero serialization failures, and unchanged log/parameters and root/adjacency enumeration. All **1,792 first-visible-event observations** support root-first enabled choice followed by the name-based disabled fallback. Five opaque pinned module proofs agree before/after. Public APIs, signatures, enums, builtins and returned public fields are observed without reference implementation/source/bytecode/private-state/global inspection.
+
+Independent **32,768 builtin name-sort observations**, **32,768 transition equality observations** and **65,536 transition hashes** are counted separately from PM4Py calls. Every constructed transition pair remains unequal and distinct even when names and labels agree. A separate name/label analysis makes9,808 builtin pair-hash observations and confirms pair membership in25,088 named rows, while equal-name/different-label order defeats three simple sorted-pair recipes. The wider Alpha+ cohort also contradicts universal name sorting. Pair-set iteration, public-representation-string-set iteration and name-set iteration fail fixed-point checks on actual emitted outputs. These rejected hypotheses and complete witnesses remain retained; enabled-name deduplication/order is still a gate.
+
+The new controls make **32,768 native replay calls before and32,768 after**, using byte-identical probe source, descriptors, fixture logs and call tables with real nullable metadata enabled in both phases. The previous checkpoint's **31,616 current-source native measurements are reused as the regression baseline** and compared with **31,616 fresh after calls** on identical construction inputs. This is **64,384 fresh native after calls**. Acceptance matches every observed reference call in both groups. Every prior acceptance, raw trace, counter, declared scalar error and actual forward wire match is retained; lost-match index lists are zero. Raw trace projections retain their declared membership limits; a separate actual-wire verifier checks exact scalar types, ordered activated/problem/name lists, enabled identity membership, ordered sparse markings and equal-name dictionary collapse.
+
+| Cohort | Raw trace matches before -> after | Counter matches before -> after | Forward wire matches before -> after |
+| --- | ---: | ---: | ---: |
+| selection | 11,663 -> 11,823 | 12,448 -> 12,544 | 11,663 -> 11,823 |
+| alpha | 8,055 -> 8,055 | 8,500 -> 8,500 | 2,989 -> 2,989 |
+| controls | 3,168 -> 3,248 | 3,344 -> 3,344 | 1,632 -> 1,712 |
+| precedence | 848 -> 880 | 912 -> 912 | 464 -> 496 |
+
+Remaining measured gaps are preserved, including errors whose accept/reject outcome agrees while the declared semantic/message projection differs:
+
+| Cohort | Acceptance gaps | Raw trace gaps | Numeric gaps | Forward wire gaps | Untranslated error projections |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| alpha | 0 | 649 | 204 | 435 | 1,872 |
+| controls | 0 | 96 | 0 | 96 | 112 |
+| precedence | 0 | 32 | 0 | 32 | 1,392 |
+| selection | 0 | 721 | 0 | 721 | 3,840 |
+
+Full returned Python classes/aliases/properties/representations and dictionary field order, complete PLTR carriers, actual Python exception classes/argument objects, backwards marking mutations, returned set iteration, remaining hidden routing, non-optional-string names, wider conversion/export/alignment/quality propagation and allocation distributions remain open. The native constructor maps this finite public enumeration; no full-runtime or whole-family promotion follows from these comparisons.
+
+Validation freezes **660 inputs with two edits**, binds **155 fresh native outputs/projects**, and passes **five focused plus152 assertion-enabled native suites**. **534 fresh CLI exports and534 fresh ordinary `/api/mine` requests** retain the previous complete ordered-tree and bundled-miner gate measurements. Frontend sources are unchanged; TypeScript compilation and164 tests are inherited with zero fresh frontend checks. A failed public-analysis schema lookup and failed pure-text build-helper derivation produced no additional calls or builds, remain unchanged, and recover through fresh helpers. An inherited verifier scope sentence incorrectly describes placeholder names; the bound correction sidecar and actual source/preparations/records establish that both phases use real nullable metadata.
+
+`docs/replay-selection-validation.json` binds every source/output/capture/probe/application measurement and **87 lossless evidence archives /3,463 round-tripped members**, plus the reused parent evidence. This is an implementation checkpoint. Full parity remains false; the catalogue remains **46/86 packages,199/387 modules and228 incomplete units**, without promotion.
