@@ -205,6 +205,74 @@ void branch_order_follows_public_digest_keys() {
   }
 }
 
+void nullable_activities_preserve_presence_and_public_rejections() {
+  auto single = log_from_variants({{""}});
+  auto& source = single.traces.front().events.front();
+  source.activity_state = FirstClassAttributeState::kNull;
+  source.activity_source_key = "concept:name";
+  source.activity_attribute = field("concept:name", "", true);
+  source.attributes.push_back(*source.activity_attribute);
+
+  for (const auto variant : {InductiveMinerVariant::IM,
+                             InductiveMinerVariant::IMF,
+                             InductiveMinerVariant::IMD}) {
+    InductiveMinerOptions options;
+    options.variant = variant;
+    const auto projected = prepare_inductive_event_log(single, options);
+    const auto& event = projected.traces.front().events.front();
+    assert(event.has_activity());
+    assert(event.activity_state == FirstClassAttributeState::kNull);
+    assert(event.activity_attribute && event.activity_attribute->is_null);
+    const auto tree = discover_process_tree(single, options);
+    assert(tree.root().op == ProcessTreeOperator::kTau);
+    assert(tree.activities().empty());
+    assert(discover_process_tree(EventDataView(single), options).root().op ==
+           ProcessTreeOperator::kTau);
+
+    auto optional = single;
+    optional.traces.emplace_back();
+    assert(discover_process_tree(optional, options).root().op ==
+           ProcessTreeOperator::kTau);
+
+    auto repeated = single;
+    repeated.traces.front().events.push_back(source);
+    try {
+      (void)discover_process_tree(repeated, options);
+      assert(false);
+    } catch (const std::invalid_argument& error) {
+      assert(std::string(error.what()) == "None cannot be a node");
+    }
+
+    auto mixed = single;
+    mixed.traces.push_back(log_from_variants({{""}}).traces.front());
+    assert(throws([&] { (void)discover_process_tree(mixed, options); }));
+
+    auto selected = single;
+    auto& selected_source = selected.traces.front().events.front();
+    selected_source.activity = "ignored";
+    selected_source.activity_state = FirstClassAttributeState::kPresent;
+    selected_source.activity_attribute = field("concept:name", "ignored");
+    selected_source.attributes.front() = *selected_source.activity_attribute;
+    selected_source.attributes.push_back(field("phase", "", true));
+    const auto attributes_before = selected_source.attributes;
+    options.activity_key = "phase";
+    const auto custom_projection = prepare_inductive_event_log(selected, options);
+    const auto& custom = custom_projection.traces.front().events.front();
+    assert(custom.activity_state == FirstClassAttributeState::kNull);
+    assert(custom.activity_source_key == "phase");
+    assert(custom.activity_attribute && custom.activity_attribute->key == "phase" &&
+           custom.activity_attribute->is_null);
+    assert(discover_process_tree(selected, options).root().op ==
+           ProcessTreeOperator::kTau);
+    assert(selected_source.activity == "ignored");
+    assert(selected_source.activity_state == FirstClassAttributeState::kPresent);
+    assert(selected_source.attributes == attributes_before);
+    assert(throws([&] { (void)discover_process_tree(single, options); }));
+  }
+  assert(source.activity_state == FirstClassAttributeState::kNull);
+  assert(source.activity_attribute && source.activity_attribute->is_null);
+}
+
 void graph_self_loop_keeps_unknown_skip_behavior() {
   const auto repeated = log_from_variants({{"a", "a"}});
   InductiveMinerOptions options;
@@ -602,6 +670,7 @@ int main() {
   ordinary_variants_and_graph_input();
   present_empty_activity_is_a_visible_leaf();
   branch_order_follows_public_digest_keys();
+  nullable_activities_preserve_presence_and_public_rejections();
   graph_self_loop_keeps_unknown_skip_behavior();
   graph_registry_only_activities_do_not_create_behavior();
   graph_projection_preserves_boundaries_and_skips();

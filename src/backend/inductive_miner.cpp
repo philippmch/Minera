@@ -1831,6 +1831,66 @@ std::optional<std::string> event_value(const Event& event, const Trace& trace,
   return std::nullopt;
 }
 
+struct SelectedActivity {
+  std::string value;
+  bool is_null = false;
+  std::optional<EventAttribute> attribute;
+};
+
+std::optional<SelectedActivity> selected_event_activity(
+    const Event& event, const Trace& trace, std::string_view key) {
+  const auto native = [](const std::string& value,
+                         FirstClassAttributeState state, bool present,
+                         const std::optional<EventAttribute>& attribute)
+      -> std::optional<SelectedActivity> {
+    if (!present) return std::nullopt;
+    const bool is_null = state == FirstClassAttributeState::kNull;
+    return SelectedActivity{is_null ? std::string{} : value, is_null,
+                            attribute};
+  };
+  if (key == "concept:name" || key == "activity") {
+    return native(event.activity, event.activity_state, event.has_activity(),
+                  event.activity_attribute);
+  }
+  if (key == "time:timestamp" || key == "timestamp") {
+    return native(event.timestamp, event.timestamp_state, event.has_timestamp(),
+                  event.timestamp_attribute);
+  }
+  if (key == "org:resource" || key == "resource") {
+    return native(event.resource, event.resource_state, event.has_resource(),
+                  event.resource_attribute);
+  }
+  if (!event.activity_source_key.empty() && key == event.activity_source_key &&
+      event.has_activity()) {
+    return native(event.activity, event.activity_state, true,
+                  event.activity_attribute);
+  }
+  if (!event.timestamp_source_key.empty() && key == event.timestamp_source_key &&
+      event.has_timestamp()) {
+    return native(event.timestamp, event.timestamp_state, true,
+                  event.timestamp_attribute);
+  }
+  if (!event.resource_source_key.empty() && key == event.resource_source_key &&
+      event.has_resource()) {
+    return native(event.resource, event.resource_state, true,
+                  event.resource_attribute);
+  }
+  if (!trace.case_id_source_key.empty() && key == trace.case_id_source_key &&
+      trace.has_case_id()) {
+    return native(trace.case_id, trace.case_id_state, true,
+                  trace.case_id_attribute);
+  }
+  for (const auto* attributes : {&event.attributes, &trace.attributes}) {
+    for (const auto& attribute : *attributes) {
+      if (attribute.key == key)
+        return SelectedActivity{
+            attribute.is_null ? std::string{} : attribute.value,
+            attribute.is_null, attribute};
+    }
+  }
+  return std::nullopt;
+}
+
 TokenInteger activity_order_key(std::string_view label) {
   // RFC 1321 MD5 over the UTF-8 label bytes, interpreted as a digest integer.
   static constexpr std::array<std::uint32_t, 64> constants{
@@ -2042,7 +2102,8 @@ EventLog select_event_log_fields(const EventLog& input,
          ++event_index) {
       const auto& source_event = source_trace.events[event_index];
       auto activity =
-          event_value(source_event, source_trace, options.activity_key, true);
+          selected_event_activity(source_event, source_trace,
+                                  options.activity_key);
       if (!activity) {
         throw std::invalid_argument(
             "inductive miner: activity field '" + options.activity_key +
@@ -2051,9 +2112,12 @@ EventLog select_event_log_fields(const EventLog& input,
             std::to_string(event_index));
       }
       auto event = source_event;
-      event.activity = *activity;
-      event.activity_state = FirstClassAttributeState::kPresent;
+      event.activity = activity->value;
+      event.activity_state = activity->is_null
+                                 ? FirstClassAttributeState::kNull
+                                 : FirstClassAttributeState::kPresent;
       event.activity_source_key = options.activity_key;
+      event.activity_attribute = activity->attribute;
 
       if (project_timestamp) {
         const auto timestamp =
@@ -2299,6 +2363,28 @@ ProcessTree InductiveMinerFramework::discover(
 
 ProcessTree discover_from_event_log(const EventLog& event_log,
                                     const InductiveMinerOptions& options) {
+  bool has_null = false;
+  bool has_string = false;
+  bool repeated_null = false;
+  for (const auto& trace : event_log.traces) {
+    for (const auto& event : trace.events) {
+      if (event.activity_state == FirstClassAttributeState::kNull) {
+        has_null = true;
+        repeated_null = repeated_null || trace.events.size() > 1;
+      } else {
+        has_string = true;
+      }
+    }
+  }
+  if (has_null) {
+    // Null and string labels cannot share the ordered discovery alphabet.
+    if (has_string)
+      throw std::invalid_argument(
+          "inductive miner: null and string activity labels are not orderable");
+    if (repeated_null)
+      throw std::invalid_argument("None cannot be a node");
+    return ProcessTree({}, ProcessTreeNode::tau());
+  }
   std::set<std::string> alphabet;
   for (const auto& trace : event_log.traces)
     for (const auto& event : trace.events) alphabet.insert(event.activity);
