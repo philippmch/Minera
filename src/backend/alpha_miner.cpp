@@ -206,10 +206,52 @@ const std::string& selected_activity(const Event& event,
       std::string(selected) + "'");
 }
 
+struct SelectedAlphaActivity {
+  FirstClassAttributeState state;
+  std::string label;
+};
+
+SelectedAlphaActivity nullable_selected_activity(const Event& event,
+                                                 std::string_view selector) {
+  if (selector == "concept:name" || selector == "activity" ||
+      (!event.activity_source_key.empty() &&
+       event.activity_source_key == selector)) {
+    const auto state = event.activity_state == FirstClassAttributeState::kMissing &&
+                               !event.activity.empty()
+                           ? FirstClassAttributeState::kPresent
+                           : event.activity_state;
+    return {state, event.activity};
+  }
+  if (event.activity_attribute && event.activity_attribute->key == selector) {
+    return {event.activity_attribute->is_null ? FirstClassAttributeState::kNull
+                                              : FirstClassAttributeState::kPresent,
+            event.activity_attribute->value};
+  }
+  if (const auto* value = dfg_event_field_value(event, selector))
+    return {FirstClassAttributeState::kPresent, *value};
+  for (const auto& attribute : event.attributes) {
+    if (attribute.key == selector && attribute.is_null)
+      return {FirstClassAttributeState::kNull, {}};
+  }
+  return {FirstClassAttributeState::kMissing, {}};
+}
+
+void check_alpha_row_limit(const EventLog& log, const AlphaMinerOptions& options) {
+  if (!options.max_rows_to_materialize) return;
+  std::size_t rows = 0;
+  for (const auto& trace : log.traces) {
+    if (trace.events.size() > *options.max_rows_to_materialize - rows)
+      throw std::length_error("Alpha: event row materialization limit exceeded");
+    rows += trace.events.size();
+  }
+}
+
 std::vector<Place> maximal_places(const Footprint& fp);
 
 PetriNet build_classic_net(const std::vector<std::string>& names,
-                           const Footprint& fp, bool remove_unconnected) {
+                           const Footprint& fp, bool remove_unconnected,
+                           const std::vector<std::optional<std::size_t>>*
+                               transition_labels = nullptr) {
   PetriNet net;
   net.set_activities(names);
   const std::size_t source = net.add_place();
@@ -234,7 +276,9 @@ PetriNet build_classic_net(const std::vector<std::string>& names,
         outputs[activity].empty()) {
       continue;
     }
-    net.add_transition(activity, std::move(inputs[activity]),
+    net.add_transition(transition_labels ? transition_labels->at(activity)
+                                        : std::optional<std::size_t>(activity),
+                       std::move(inputs[activity]),
                        std::move(outputs[activity]));
   }
   return net;
@@ -317,14 +361,7 @@ std::vector<Place> maximal_places(const Footprint& fp) {
 
 EventLog normalize_alpha_event_log(const EventLog& event_log,
                                    const AlphaMinerOptions& options) {
-  if (options.max_rows_to_materialize) {
-    std::size_t rows = 0;
-    for (const auto& trace : event_log.traces) {
-      if (trace.events.size() > *options.max_rows_to_materialize - rows)
-        throw std::length_error("Alpha: event row materialization limit exceeded");
-      rows += trace.events.size();
-    }
-  }
+  check_alpha_row_limit(event_log, options);
   EventLog normalized = event_log;
   const std::string selector = options.activity_attribute.empty()
                                    ? "concept:name"
@@ -340,18 +377,64 @@ EventLog normalize_alpha_event_log(const EventLog& event_log,
 
 PetriNet discover_alpha_classic(const EventLog& log,
                                 const AlphaMinerOptions& options) {
-  const EventLog normalized = normalize_alpha_event_log(log, options);
-  const IdLog ids = intern_log(normalized);
-  const std::size_t n = ids.names.size();
-  Footprint footprint = build_footprint(ids, nullptr, false);
-  const auto endpoints = alpha_log_endpoints(normalized);
-  footprint.starts.clear();
-  footprint.ends.clear();
-  for (std::size_t activity = 0; activity < n; ++activity) {
-    if (endpoints.starts.contains(ids.names[activity])) footprint.starts.insert(activity);
-    if (endpoints.ends.contains(ids.names[activity])) footprint.ends.insert(activity);
+  check_alpha_row_limit(log, options);
+  const std::string selector = options.activity_attribute.empty()
+                                   ? "concept:name"
+                                   : options.activity_attribute;
+  // Null is an activity value with its own dense identity; missing fields
+  // remain absent positions, so they cannot create artificial adjacent edges.
+  std::vector<std::optional<std::string>> labels;
+  std::unordered_map<std::optional<std::string>, std::size_t> ids;
+  std::vector<std::vector<std::optional<std::size_t>>> traces;
+  for (const auto& trace : log.traces) {
+    std::vector<std::optional<std::size_t>> sequence;
+    sequence.reserve(trace.events.size());
+    for (const auto& event : trace.events) {
+      const auto value = nullable_selected_activity(event, selector);
+      if (value.state == FirstClassAttributeState::kMissing) {
+        sequence.push_back(std::nullopt);
+        continue;
+      }
+      const auto label = value.state == FirstClassAttributeState::kNull
+                             ? std::nullopt
+                             : std::optional<std::string>(value.label);
+      const auto [it, inserted] = ids.try_emplace(label, labels.size());
+      if (inserted) labels.push_back(label);
+      sequence.push_back(it->second);
+    }
+    traces.push_back(std::move(sequence));
   }
-  return build_classic_net(ids.names, footprint, false);
+  const auto n = labels.size();
+  Footprint footprint;
+  footprint.follows.assign(n, std::vector<bool>(n));
+  for (const auto& trace : traces) {
+    if (trace.empty()) continue;
+    if (trace.front()) footprint.starts.insert(*trace.front());
+    if (trace.back()) footprint.ends.insert(*trace.back());
+    for (std::size_t i = 1; i < trace.size(); ++i) {
+      if (!trace[i - 1] || !trace[i])
+        throw std::invalid_argument(
+            "Alpha: event is missing activity attribute '" + selector + "'");
+      footprint.follows[*trace[i - 1]][*trace[i]] = true;
+    }
+  }
+  footprint.classic_causal.assign(n, std::vector<bool>(n));
+  for (std::size_t a = 0; a < n; ++a) {
+    for (std::size_t b = 0; b < n; ++b)
+      footprint.classic_causal[a][b] =
+          footprint.follows[a][b] && !footprint.follows[b][a];
+  }
+  std::vector<std::string> activities;
+  std::vector<std::optional<std::size_t>> transition_labels;
+  for (const auto& label : labels) {
+    if (label) {
+      transition_labels.push_back(activities.size());
+      activities.push_back(*label);
+    } else {
+      transition_labels.push_back(std::nullopt);
+    }
+  }
+  return build_classic_net(activities, footprint, false, &transition_labels);
 }
 
 AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
