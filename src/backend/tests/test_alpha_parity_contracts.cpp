@@ -347,6 +347,43 @@ void plus_empty_context_differences_create_one_loop_place_per_maximal_pair() {
   assert(cleaned.transitions().size() == 3);
 }
 
+void plus_expands_contained_branch_pairs_without_cross_causal_edges() {
+  const auto source = make_log({{"A", "x"}, {"A", "y"}, {"B", "x"}});
+  const auto net = discover_alpha_plus(source);
+  const std::multiset<PlaceShape> expected{
+      {true, false, {}, {"A", "B"}}, {false, true, {"x", "y"}, {}},
+      {false, false, {"A", "B"}, {"x", "y"}}};
+  assert(places(net) == expected);
+  assert(places(discover_alpha_classic(source)) != expected);
+
+  auto nullable = make_log({{"value", ","}, {"value", "u1"}, {"", ","}});
+  for (std::size_t i = 0; i < 2; ++i) {
+    nullable.traces[i].events.front().activity.clear();
+    nullable.traces[i].events.front().activity_state =
+        FirstClassAttributeState::kNull;
+  }
+  const auto rich = discover_alpha_plus_result(nullable);
+  const AlphaPlaceName pair{"", {std::nullopt, ""}, {",", "u1"}};
+  assert(std::count(rich.place_names.begin(), rich.place_names.end(), pair) == 1);
+  assert(rich.net.place_count() == 3);
+}
+
+void plus_uses_original_seeds_and_preserves_disjoint_branches() {
+  const auto overlapping = discover_alpha_plus_result(
+      make_log({{"A", "y"}, {"A", "z"}, {"B", "x"}, {"B", "z"}}));
+  const AlphaPlaceName first{"", {"A", "B"}, {"y", "z"}};
+  const AlphaPlaceName second{"", {"A", "B"}, {"x", "z"}};
+  assert(std::count(overlapping.place_names.begin(), overlapping.place_names.end(), first) == 1);
+  assert(std::count(overlapping.place_names.begin(), overlapping.place_names.end(), second) == 1);
+  assert(overlapping.net.place_count() == 4);
+  const auto disjoint = discover_alpha_plus(
+      make_log({{"A", "x"}, {"B", "y"}}));
+  const std::multiset<PlaceShape> expected{
+      {true, false, {}, {"A", "B"}}, {false, true, {"x", "y"}, {}},
+      {false, false, {"A"}, {"x"}}, {false, false, {"B"}, {"y"}}};
+  assert(places(disjoint) == expected);
+}
+
 }  // namespace
 
 int main() {
@@ -367,4 +404,6 @@ int main() {
   plus_loop_context_changes_when_trace_order_changes();
   plus_two_loop_uses_bidirectional_causal_places();
   plus_empty_context_differences_create_one_loop_place_per_maximal_pair();
+  plus_expands_contained_branch_pairs_without_cross_causal_edges();
+  plus_uses_original_seeds_and_preserves_disjoint_branches();
 }

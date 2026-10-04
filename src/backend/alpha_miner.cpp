@@ -47,6 +47,8 @@ struct IdLog {
 // concurrency when reading causality.
 struct Footprint {
   std::vector<std::vector<bool>> follows;   // follows[a][b]: a directly precedes b
+  std::vector<std::size_t> follow_source_order;
+  std::vector<std::vector<std::size_t>> follow_target_order;
   std::vector<std::vector<bool>> two_loop;  // two_loop[a][b]: "a b a" occurs
   std::vector<std::vector<bool>> classic_causal;
   std::set<std::size_t> starts;
@@ -97,6 +99,7 @@ Footprint build_footprint(const IdLog& log, const std::vector<bool>* exclude,
   Footprint fp;
   fp.short_loops = short_loops;
   fp.follows.assign(n, std::vector<bool>(n, false));
+  fp.follow_target_order.resize(n);
   if (short_loops) fp.two_loop.assign(n, std::vector<bool>(n, false));
 
   std::vector<std::size_t> sequence;
@@ -109,6 +112,12 @@ Footprint build_footprint(const IdLog& log, const std::vector<bool>* exclude,
     fp.starts.insert(sequence.front());
     fp.ends.insert(sequence.back());
     for (std::size_t i = 1; i < sequence.size(); ++i) {
+      if (!fp.follows[sequence[i - 1]][sequence[i]]) {
+        auto& targets = fp.follow_target_order[sequence[i - 1]];
+        if (targets.empty())
+          fp.follow_source_order.push_back(sequence[i - 1]);
+        targets.push_back(sequence[i]);
+      }
       fp.follows[sequence[i - 1]][sequence[i]] = true;
       if (short_loops && i >= 2 && sequence[i - 2] == sequence[i]) {
         fp.two_loop[sequence[i]][sequence[i - 1]] = true;
@@ -316,11 +325,55 @@ Footprint footprint_from_graph(const DirectlyFollowsGraph& graph) {
   return fp;
 }
 
-// Enumerates the maximal place candidates (A, B). Seeds with singleton causal
-// pairs, then grows either side by union — keeping the other side fixed — until
-// no new admissible pair appears. Growing one side at a time reaches every
-// maximal pair, after which non-maximal pairs are dropped.
+// Alpha+ expands the original causal seeds against the candidates accumulated
+// so far. A containment on either side permits growing both sides; it does not
+// require every newly introduced cross edge to be causal. Newly grown pairs
+// do not become outer seeds. The native relation order is first-seen order;
+// reference hash-set iteration remains a separate ordering gate.
+std::vector<Place> maximal_alpha_plus_places(const Footprint& fp) {
+  std::vector<Place> candidates;
+  std::set<Place> seen;
+  for (const auto from : fp.follow_source_order) {
+    if (fp.follows[from][from]) continue;
+    for (const auto to : fp.follow_target_order[from]) {
+      if (fp.follows[to][to] || !fp.causal(from, to)) continue;
+      Place seed{{from}, {to}};
+      seen.insert(seed);
+      candidates.push_back(std::move(seed));
+    }
+  }
+  const auto seed_count = candidates.size();
+  for (std::size_t i = 0; i < seed_count; ++i) {
+    const auto seed = candidates[i];
+    const auto end = candidates.size();
+    for (std::size_t j = i + 1; j < end; ++j) {
+      const auto& other = candidates[j];
+      if (!is_subset(seed.first, other.first) &&
+          !is_subset(seed.second, other.second)) continue;
+      Place merged{unite(seed.first, other.first),
+                   unite(seed.second, other.second)};
+      if (admissible(merged.first, fp) && admissible(merged.second, fp) &&
+          seen.insert(merged).second)
+        candidates.push_back(std::move(merged));
+    }
+  }
+  const std::vector<Place> all(seen.begin(), seen.end());
+  std::vector<Place> maximal;
+  for (const auto& place : all) {
+    const bool dominated = std::any_of(
+        all.begin(), all.end(), [&](const Place& other) {
+          return other != place && is_subset(place.first, other.first) &&
+                 is_subset(place.second, other.second);
+        });
+    if (!dominated) maximal.push_back(place);
+  }
+  return maximal;
+}
+
+// Classic closure retains the complete cross-causality condition and grows
+// either side with the other fixed until no new admissible pair appears.
 std::vector<Place> maximal_places(const Footprint& fp) {
+  if (fp.short_loops) return maximal_alpha_plus_places(fp);
   std::set<Place> candidates;
   const std::size_t n = fp.size();
   for (std::size_t a = 0; a < n; ++a) {
