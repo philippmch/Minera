@@ -2008,11 +2008,13 @@ void write_footprints(std::ostream& out, const FootprintResult& footprints,
 // alignment result.
 void write_model_conformance(std::ostream& out, const ModelConformance& model,
                              const DirectlyFollowsGraph& graph) {
-  out << "{\"sound\": " << (model.sound ? "true" : "false");
   if (!model.computed) {
-    out << ", \"computed\": false, \"error\": ";
+    out << "{\"sound\": null, \"computed\": false, \"error\": ";
     write_json_string(out,model.error);
+    out << ", \"token_replay\": null, \"footprints\": null}";
+    return;
   }
+  out << "{\"sound\": " << (model.sound ? "true" : "false");
   out << ", \"token_replay\": ";
   write_conformance(out, model.token_replay, graph);
   out << ", \"footprints\": ";
@@ -2583,6 +2585,31 @@ void write_model_evaluation(std::ostream& out, const ModelEvaluation& result,
     field("composite", [&](std::ostream& stream) {
       write_composite(stream, *result.composite, graph);
     });
+  }
+  // Preserve the complete public value's types and float bits alongside the
+  // native diagnostic envelope. Exactly one family belongs to this request.
+  const auto families = static_cast<int>(result.replay_fitness.has_value()) +
+      static_cast<int>(result.precision.has_value()) +
+      static_cast<int>(result.generalization.has_value()) +
+      static_cast<int>(result.simplicity.has_value()) +
+      static_cast<int>(result.composite.has_value());
+  if (families == 1) {
+    std::optional<std::string> public_result;
+    if (result.replay_fitness && result.replay_fitness->computed &&
+        result.replay_fitness->variant == ReplayFitnessVariant::TOKEN_BASED)
+      public_result = token_replay_fitness_result_json(*result.replay_fitness);
+    else if (result.precision && result.precision->computed &&
+             result.precision->variant == PrecisionVariant::ETCONFORMANCE_TOKEN)
+      public_result = token_precision_result_json(*result.precision);
+    else if (result.generalization && result.generalization->computed)
+      public_result = token_generalization_result_json(*result.generalization);
+    else if (result.simplicity && result.simplicity->computed &&
+             result.simplicity->variant == SimplicityVariant::ARC_DEGREE)
+      public_result = simplicity_arc_degree_result_json(*result.simplicity);
+    else if (result.composite && result.composite->computed)
+      public_result = composite_evaluation_result_json(*result.composite);
+    if (public_result)
+      field("public_result", [&](std::ostream& stream) { stream << *public_result; });
   }
   out << '}';
 }

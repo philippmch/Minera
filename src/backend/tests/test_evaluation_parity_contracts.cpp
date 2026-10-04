@@ -2,6 +2,7 @@
 #include "minera/evaluation.hpp"
 #include "minera/json_export.hpp"
 #include "minera/pnml.hpp"
+#include "../tools/pnml_model_options.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -1216,6 +1217,51 @@ void exact_model_quality_marking_contract() {
   assert(evaluate_precision(collisions, weighted, variant).precision == 0x1.d1745d1745d17p-1);
 }
 
+void supplied_model_evaluation_transport_contract() {
+  const auto xml = std::string("<pnml><net id=\"adapter\">") +
+      "<place id=\"source\"><initialMarking><text>9007199254740992</text></initialMarking></place>"
+      "<place id=\"sink\"/><transition id=\"move\"><name><text>A</text></name></transition>"
+      "<arc source=\"source\" target=\"move\"/><arc source=\"move\" target=\"sink\"/>"
+      "<finalmarkings><marking/></finalmarkings></net></pnml>";
+  const auto document = minera::tools::parse_pnml_model(xml, true);
+  assert(document.initial_marking[0] == TokenInteger("9007199254740992"));
+  assert(!document.final_marking_keys[1] && document.final_marking[1] == 0);
+  const auto native = minera::tools::parse_pnml_model(xml);
+  assert(native.final_marking_keys[1] && native.final_marking[1] == 1);
+  const auto gated = minera::tools::pnml_conformance_gate(document.net, &document);
+  assert(gated && !gated->computed);
+  DirectlyFollowsGraph graph;
+  const auto unavailable = imported_model_json(*gated, graph);
+  assert(unavailable.find("\"sound\": null") != std::string::npos &&
+         unavailable.find("\"token_replay\": null") != std::string::npos &&
+         unavailable.find("\"fitness\"") == std::string::npos);
+
+  ModelEvaluation result;
+  result.miner = "imported";
+  const auto events = log({{"A"}});
+  ReplayFitnessOptions overrides;
+  overrides.initial_marking = {0, 0};
+  overrides.final_marking = {0, 1};
+  result.replay_fitness = evaluate_replay_fitness(
+      events, document, ReplayFitnessVariant::TOKEN_BASED, overrides);
+  assert(result.replay_fitness->computed && result.replay_fitness->fitness == 0.75);
+  const auto serialized = model_evaluation_json(result);
+  assert(serialized.find("\"public_result\": " +
+      token_replay_fitness_result_json(*result.replay_fitness)) != std::string::npos);
+  result.replay_fitness = evaluate_replay_fitness(
+      events, document, ReplayFitnessVariant::ALIGNMENT_BASED);
+  assert(!result.replay_fitness->computed &&
+         model_evaluation_json(result).find("public_result") == std::string::npos);
+  result.replay_fitness.reset();
+  result.precision = evaluate_precision(events, document, PrecisionVariant::ETCONFORMANCE_TOKEN);
+  assert(model_evaluation_json(result).find("\"public_result\": " +
+      token_precision_result_json(*result.precision)) != std::string::npos);
+  result.precision.reset();
+  result.simplicity = evaluate_simplicity(document);
+  assert(model_evaluation_json(result).find("\"public_result\": " +
+      simplicity_arc_degree_result_json(*result.simplicity)) != std::string::npos);
+}
+
 void exact_token_result_aggregation_contract() {
   TokenReplayTraceDiagnostics signed_row;
   signed_row.trace_is_fit = false;
@@ -1604,6 +1650,7 @@ int main() {
   exact_token_result_aggregation_contract();
   exact_log_fitness_marking_contract();
   exact_model_quality_marking_contract();
+  supplied_model_evaluation_transport_contract();
   emd_pyemd_contract();
   emd_encoding_and_mass_contract();
   process_tree_evaluation_overloads_contract();

@@ -766,6 +766,7 @@ int usage(const char* program) {
                "  --check-pnml <path>       Also check the log against the\n"
                "                            marked net in this PNML file\n"
                "                            (conformance id: imported)\n"
+               "  --pnml-public-markings   Use public positive-only PNML markings\n"
                "  --pnml-miner <id>         Which model to export as PNML:\n"
                "                            inductive (default), alpha, heuristic,\n"
                "                            powl, or imported\n"
@@ -1818,6 +1819,7 @@ int main(int argc, char** argv) {
   std::filesystem::path output;
   std::filesystem::path pnml_output;
   std::filesystem::path check_pnml;
+  bool pnml_public_markings = false;
   std::filesystem::path check_bpmn;
   std::filesystem::path bpmn_output;
   std::filesystem::path ptml_output;
@@ -4344,10 +4346,14 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       pnml_output = value;
-    } else if (arg == "--check-pnml") {
-      const auto* value = next();
-      if (!value) return usage(argv[0]);
-      check_pnml = value;
+    } else if (arg == "--check-pnml" || arg == "--pnml-public-markings") {
+      if (arg == "--pnml-public-markings") {
+        pnml_public_markings = true;
+      } else {
+        const auto* value = next();
+        if (!value) return usage(argv[0]);
+        check_pnml = value;
+      }
     } else if (arg == "--check-bpmn") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -7268,7 +7274,7 @@ int main(int argc, char** argv) {
     }
     const auto model = [&](std::string id, const minera::PetriNet& petri,
                            const minera::PnmlDocument* document = nullptr) {
-      if (auto gated = minera::tools::pnml_conformance_weight_gate(petri,id))
+      if (auto gated = minera::tools::pnml_conformance_gate(petri,document,id))
         return *gated;
       const bool is_powl = id == "powl";
       const bool is_inductive = id == "inductive";
@@ -7374,7 +7380,7 @@ int main(int argc, char** argv) {
     }
     if (check_flags == 1) {
       if (!check_pnml.empty()) {
-        imported_document = minera::tools::import_pnml_model(check_pnml);
+        imported_document = minera::tools::import_pnml_model(check_pnml, pnml_public_markings);
         imported_net = imported_document->net;
       } else {
         imported_net = !check_bpmn.empty() ? minera::import_bpmn(check_bpmn)
@@ -7665,27 +7671,40 @@ int main(int argc, char** argv) {
         minera::ModelEvaluation result;
         result.miner = miner;
         auto model_evaluation = *evaluation_params;
-        if (miner == "imported") {
-          apply_imported_markings(model_evaluation.replay_fitness_options);
-          apply_imported_markings(model_evaluation.precision_options);
-          apply_imported_markings(model_evaluation.generalization_options);
-          apply_imported_markings(model_evaluation.simplicity_options);
-          apply_imported_markings(model_evaluation.composite_options);
-        }
+        const auto* evaluation_document = miner == "imported" && imported_document
+            ? &*imported_document : nullptr;
         switch (model_evaluation.family) {
           case minera::EvaluationFamily::kReplayFitness:
-            result.replay_fitness = minera::evaluate_replay_fitness(
+            result.replay_fitness = evaluation_document
+                ? minera::evaluate_replay_fitness(
+                      evaluation_log, *evaluation_document,
+                      model_evaluation.replay_fitness_variant,
+                      model_evaluation.replay_fitness_options)
+                : minera::evaluate_replay_fitness(
                 evaluation_log, *petri,
                 model_evaluation.replay_fitness_variant,
                 model_evaluation.replay_fitness_options);
             break;
           case minera::EvaluationFamily::kPrecision:
-            result.precision = minera::evaluate_precision(
+            if (evaluation_document && model_evaluation.precision_variant !=
+                minera::PrecisionVariant::ETCONFORMANCE_TOKEN)
+              apply_imported_markings(model_evaluation.precision_options);
+            result.precision = evaluation_document && model_evaluation.precision_variant ==
+                minera::PrecisionVariant::ETCONFORMANCE_TOKEN
+                ? minera::evaluate_precision(
+                      evaluation_log, *evaluation_document, model_evaluation.precision_variant,
+                      model_evaluation.precision_options)
+                : minera::evaluate_precision(
                 evaluation_log, *petri, model_evaluation.precision_variant,
                 model_evaluation.precision_options);
             break;
           case minera::EvaluationFamily::kGeneralization:
-            result.generalization = minera::evaluate_generalization(
+            result.generalization = evaluation_document
+                ? minera::evaluate_generalization(
+                      evaluation_log, *evaluation_document,
+                      model_evaluation.generalization_variant,
+                      model_evaluation.generalization_options)
+                : minera::evaluate_generalization(
                 evaluation_log, *petri,
                 model_evaluation.generalization_variant,
                 model_evaluation.generalization_options);

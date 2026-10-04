@@ -1948,9 +1948,14 @@ void supplied_pnml_model_defaults_and_keys() {
   rejects([] { (void)tools::pnml_marking<int>({2147483648}); });
   rejects([] { (void)tools::pnml_marking<std::uint32_t>({-1}); });
   rejects([] { (void)tools::pnml_marking<std::uint32_t>({4294967296}); });
-  rejects([] { (void)tools::parse_pnml_model(
+  const auto large = tools::parse_pnml_model(
       "<pnml><net id=\"n\"><place id=\"x\"><initialMarking>"
-      "<text>2147483648</text></initialMarking></place></net></pnml>"); });
+      "<text>2147483648</text></initialMarking></place></net></pnml>");
+  assert(large.initial_marking.front() == TokenInteger("2147483648"));
+  assert(large.initial_marking_keys.front());
+  const auto gated = tools::pnml_conformance_gate(large.net, &large);
+  assert(gated && !gated->computed);
+  rejects([&] { (void)tools::pnml_alignment_options(large); });
 }
 
 void explicit_marking_conformance_queries() {

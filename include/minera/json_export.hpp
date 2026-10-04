@@ -101,6 +101,7 @@ namespace minera {
 // Exact typed scalar projections and the complete public composite dictionary.
 [[nodiscard]] std::string token_precision_result_json(const PrecisionResult& result);
 [[nodiscard]] std::string token_generalization_result_json(const GeneralizationResult& result);
+[[nodiscard]] std::string simplicity_arc_degree_result_json(const SimplicityResult& result);
 [[nodiscard]] std::string composite_evaluation_result_json(const CompositeEvaluationResult& result);
 
 // Serializes an analysis (the imported event log plus its discovered
