@@ -253,7 +253,7 @@ class Replayer {
     detail::ReplayMarkingKeys final_keys;
     std::vector<std::size_t> initial_order;
     std::vector<std::string> place_names;
-    std::vector<std::string> transition_names;
+    PetriTransitionNameList transition_names;
     detail::CleaningComponents components;
   };
  public:
@@ -266,6 +266,8 @@ class Replayer {
         initial_(std::move(markings_.initial)), final_(std::move(markings_.final)),
         full_result_(match_null_activity) {
     if (replay_options && replay_options->variant == TokenReplayVariant::kBackwards) {
+      (void)detail::replay_transition_names(replay_options->nullable_transition_names,
+                                          replay_options->transition_names, net_);
       markings_.initial_keys = resolve_domain_marking_keys(replay_options->initial_marking_keys,
           markings_.initial_keys, initial_, net_.place_count(), "initial_marking_keys");
       markings_.final_keys = resolve_domain_marking_keys(replay_options->final_marking_keys,
@@ -762,7 +764,7 @@ class Replayer {
 
   [[nodiscard]] std::vector<std::size_t> enabled_transition_ids(
       const Marking& marking,
-      const std::vector<std::string>& configured_transition_names) const {
+      const TokenReplayOptions& options) const {
     if (net_.has_extended_arcs()) {
       std::vector<std::size_t> result;
       for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
@@ -773,15 +775,16 @@ class Replayer {
       return result;
     }
 
-    const auto transition_names = detail::replay_element_names(
-        configured_transition_names, net_.transitions().size(), "t",
-        "transition_names");
+    const auto transition_names = detail::replay_transition_names(
+        options.nullable_transition_names, options.transition_names, net_);
     std::vector<std::size_t> order(net_.transitions().size());
     for (std::size_t t = 0; t < order.size(); ++t) order[t] = t;
-    std::sort(order.begin(), order.end(), [&](const auto left, const auto right) {
-      return std::tie(transition_names[left], left) <
-             std::tie(transition_names[right], right);
-    });
+    if (options.variant == TokenReplayVariant::kForward) {
+      detail::validate_forward_transition_name_order(transition_names);
+      std::stable_sort(order.begin(), order.end(), [&](const auto left, const auto right) {
+        return std::tie(transition_names[left], left) < std::tie(transition_names[right], right);
+      });
+    }
 
     std::vector<bool> visible_enabled(net_.transitions().size(), false);
     std::vector<std::optional<Marking>> latest_marking(net_.transitions().size());
@@ -870,7 +873,9 @@ class Replayer {
       const auto* name = std::get_if<std::string>(&place.name.value);
       result.place_names.push_back(name ? *name : "detached:" + std::to_string(place.id));
     }
-    result.transition_names = detail::replay_element_names(options.transition_names, net_.transitions().size(), "t", "transition_names");
+    result.transition_names = detail::replay_transition_names(
+        options.nullable_transition_names, options.transition_names, net_);
+    detail::validate_forward_transition_name_order(result.transition_names);
     if (options.cleaning_token_flood)
       result.components = detail::cleaning_components(net_, result.initial_keys, result.final_keys);
     return result;
@@ -945,8 +950,8 @@ class Replayer {
     const auto* named = std::get_if<TokenReplayNamedHiddenPathMatrix>(
         &*options.places_shortest_path_by_hidden);
     if (named) {
-      const auto transition_names = detail::replay_element_names(
-          options.transition_names, net_.transitions().size(), "t", "transition_names");
+      const auto transition_names = detail::replay_transition_names(
+          options.nullable_transition_names, options.transition_names, net_);
       for (std::size_t source = 0; source < source_keys.size(); ++source) {
         if (!source_keys[source]) continue;
         const auto row = named->find(place_names[source]);
@@ -3558,7 +3563,7 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
     row.remaining = counts.remaining;
     row.places = std::move(counts.places);
     row.enabled_transitions = replayer.enabled_transition_ids(
-        row.reached_marking, options.transition_names);
+        row.reached_marking, options);
     for (const auto index : row.unknown_event_indices) {
       row.unknown_activities.push_back(names[index].value_or(""));
       row.unknown_activity_is_null.push_back(!names[index]);
@@ -3580,6 +3585,9 @@ TokenReplayResult replay_token_result(
   if (options.variant != TokenReplayVariant::kForward)
     throw std::invalid_argument("full token replay result requires forward replay");
   validate_token_replay_event_limit(log, options);
+  const auto transition_name_values = detail::replay_transition_names(
+      options.nullable_transition_names, options.transition_names, net);
+  detail::validate_forward_transition_name_order(transition_name_values);
   const auto selector = options.activity_attribute.empty()
       ? std::string("concept:name") : options.activity_attribute;
   struct FullVariant {
@@ -3711,7 +3719,13 @@ TokenReplayResult replay_token_result(
   result.place_names = detail::replay_element_names(
       options.place_names, net.place_count(), "p", "place_names");
   result.transition_names = detail::replay_element_names(
-      options.transition_names, net.transitions().size(), "t", "transition_names");
+      options.nullable_transition_names ? std::vector<std::string>{} : options.transition_names,
+      net.transitions().size(), "t", "transition_names");
+  if (options.nullable_transition_names || (options.transition_names.empty() && net.transition_names())) {
+    result.nullable_transition_names = transition_name_values;
+    for (std::size_t t = 0; t < transition_name_values.size(); ++t)
+      if (transition_name_values[t]) result.transition_names[t] = *transition_name_values[t];
+  }
   for (const auto& transition : net.transitions())
     result.transition_labels.push_back(transition.activity
         ? std::optional<std::string>(net.activities().at(*transition.activity)) : std::nullopt);

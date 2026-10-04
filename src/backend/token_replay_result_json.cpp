@@ -151,7 +151,9 @@ std::string attributes(const std::vector<EventAttribute>& values) {
 class Codec {
  public:
   explicit Codec(const TokenReplayResult& value) : result(value) {
-    if (result.transition_names.size() != result.transition_labels.size())
+    if (result.nullable_transition_names
+            ? result.nullable_transition_names->size() != result.transition_labels.size()
+            : result.transition_names.size() != result.transition_labels.size())
       throw std::invalid_argument("token replay transition labels have the wrong size");
     auto names = result.place_names;
     if (result.marking_domain) {
@@ -171,7 +173,8 @@ class Codec {
       }
     }
     place_slots = slots(names);
-    transition_slots = slots(result.transition_names);
+    transition_slots = result.nullable_transition_names
+        ? slots(*result.nullable_transition_names) : slots(result.transition_names);
   }
   std::string encode() const {
     Values rows;
@@ -200,7 +203,8 @@ class Codec {
  private:
   const TokenReplayResult& result;
   std::vector<std::size_t> place_slots, transition_slots;
-  static std::vector<std::size_t> slots(const std::vector<std::string>& names) {
+  template<class Name>
+  static std::vector<std::size_t> slots(const std::vector<Name>& names) {
     std::vector<std::size_t> order(names.size()), positions(names.size());
     std::iota(order.begin(), order.end(), 0);
     std::stable_sort(order.begin(), order.end(), [&](auto left, auto right) { return names[left] < names[right]; });
@@ -237,8 +241,15 @@ class Codec {
   }
   std::string transition(std::size_t index) const {
     return "{\"type\":\"Transition\",\"index\":" + std::to_string(transition_slots.at(index))
-        + ",\"name\":" + string_value(result.transition_names.at(index))
+        + ",\"name\":" + transition_name(index)
         + ",\"label\":" + label(index) + '}';
+  }
+  std::string transition_name(std::size_t index) const {
+    if (result.nullable_transition_names) {
+      const auto& name = result.nullable_transition_names->at(index);
+      return name ? string_value(*name) : null_value();
+    }
+    return string_value(result.transition_names.at(index));
   }
   std::string trace(std::size_t reference) const {
     const auto& entry = result.pltr_fitness->trace_references.at(reference);
@@ -270,7 +281,7 @@ class Codec {
     const auto transitions = [&](const auto& indices, std::string_view type) {
       Values values;
       for (const auto t : indices) values.push_back(result.return_names
-          ? string_value(result.transition_names.at(t)) : transition(t));
+          ? transition_name(t) : transition(t));
       return sequence(values, type);
     };
     Items marking;

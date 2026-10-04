@@ -423,6 +423,95 @@ void detached_names_and_error_precedence() {
   catch (const TokenReplayPlaceKeyError& error) { rejected = error.place_key() == (PetriMarkingPlace{PetriMarkingPlaceKind::kDetached, 0}); }
   assert(rejected);
 }
+void nullable_transition_names_and_wire() {
+  PetriNet net;
+  net.set_activities({"A"});
+  net.add_place(); net.add_place(); net.set_source(0); net.set_sink(1);
+  net.add_transition(0, {0}, {1});
+  net.set_transition_names({std::nullopt});
+  auto copy = net;
+  net.set_transition_names({std::string("changed")});
+  auto owned = std::move(copy);
+  assert(owned.transition_names() && !owned.transition_names()->at(0));
+  bool invalid = false;
+  try { owned.set_transition_names({std::string("wrong"), std::nullopt}); }
+  catch (const std::invalid_argument&) { invalid = true; }
+  assert(invalid && !owned.transition_names()->at(0));
+  EventLog log; log.traces = {trace("named", {event("A")})};
+  TokenReplayOptions policy;
+  auto result = replay_token_result(log, owned, policy);
+  assert(result.traces[0].trace_is_fit && result.nullable_transition_names &&
+         !result.nullable_transition_names->at(0));
+  auto wire = token_replay_result_json(result);
+  assert(wire.find("\"name\":{\"type\":\"NoneType\",\"value\":null}") != std::string::npos);
+  policy.return_names = true;
+  wire = token_replay_result_json(replay_token_result(log, owned, policy));
+  assert(wire.find("\"value\":\"activated_transitions\"},{\"type\":\"list\",\"values\":[{\"type\":\"NoneType\",\"value\":null}]") != std::string::npos);
+  policy.enable_pltr_fitness = true;
+  assert(replay_token_result(log, owned, policy).pltr_fitness->transitions.size() == 1);
+  policy.transition_names = {"legacy"};
+  assert(replay_token_result(log, owned, policy).transition_names == std::vector<std::string>{"legacy"});
+  policy.transition_names = {"ignored", "invalid-size"};
+  policy.nullable_transition_names = PetriTransitionNameList{std::nullopt};
+  result = replay_token_result(log, owned, policy);
+  assert(result.nullable_transition_names && !result.nullable_transition_names->at(0));
+  policy.nullable_transition_names = PetriTransitionNameList{std::string("")};
+  result = replay_token_result(log, owned, policy);
+  assert(result.nullable_transition_names->at(0) == std::optional<std::string>(""));
+  wire = token_replay_result_json(result);
+  assert(wire.find("\"values\":[{\"type\":\"str\",\"value\":\"\"}]") != std::string::npos);
+  policy.nullable_transition_names = PetriTransitionNameList{}; invalid = false;
+  try { (void)replay_token_result(log, owned, policy); }
+  catch (const std::invalid_argument& e) { invalid = std::string(e.what()) == "nullable_transition_names must contain one entry per transition"; }
+  assert(invalid);
+  owned.add_transition(0, {1}, {1});
+  assert(owned.transition_names()->at(1) == std::optional<std::string>("t1"));
+}
+
+void nullable_name_failure_precedence_and_variants() {
+  PetriNet net;
+  net.set_activities({"A"});
+  net.add_place(); net.add_place(); net.set_source(0); net.set_sink(1);
+  net.add_transition(0, {0}, {1}); net.add_transition(0, {0}, {1});
+  const auto reject = [&](PetriTransitionNameList names, const std::string& message) {
+    net.set_transition_names(std::move(names));
+    for (const auto missing : {false, true}) {
+      EventLog log;
+      if (missing) log.traces = {trace("missing", {Event{}})};
+      bool rejected = false;
+      try { (void)replay_token_result(log, net, {}); }
+      catch (const std::invalid_argument& e) { rejected = std::string(e.what()) == message; }
+      assert(rejected);
+    }
+    TokenReplayOptions backwards; backwards.variant = TokenReplayVariant::kBackwards;
+    assert(replay_token_traces(EventLog{}, net, backwards).empty());
+    EventLog log; log.traces = {trace("backwards", {event("A")})};
+    const auto rows = replay_token_traces(log, net, backwards);
+    assert(rows[0].trace_is_fit && rows[0].activated_transitions == std::vector<std::size_t>{0});
+  };
+  reject({std::nullopt, std::string("A")}, "'<' not supported between instances of 'str' and 'NoneType'");
+  reject({std::string("A"), std::nullopt}, "'<' not supported between instances of 'NoneType' and 'str'");
+  reject({std::nullopt, std::nullopt}, "'<' not supported between instances of 'NoneType' and 'NoneType'");
+  net.set_transition_names({std::string("B"), std::string("A")});
+  EventLog log; log.traces = {trace("choice", {event("A")})};
+  const auto result = replay_token_result(log, net, {});
+  assert(result.traces[0].activated_transitions == std::vector<std::size_t>{1});
+}
+
+void alpha_plus_default_nullable_name_metadata() {
+  Event null;
+  null.activity_state = FirstClassAttributeState::kNull;
+  null.attributes.push_back(EventAttribute{"concept:name", "", AttributeKind::kString, true});
+  EventLog log; log.traces = {trace("null-loop", {null, null})};
+  auto discovered = discover_alpha_plus_result(log);
+  assert(discovered.net.transition_names() && discovered.net.transition_names()->size() == discovered.net.transitions().size());
+  assert(discovered.net.transitions().size() == 1 && !discovered.net.transition_names()->at(0));
+  TokenReplayOptions policy; policy.return_names = true;
+  const auto result = replay_token_result(log, discovered.net, policy);
+  assert(result.nullable_transition_names && !result.nullable_transition_names->at(0));
+  const auto wire = token_replay_result_json(result);
+  assert(wire.find("\"values\":[{\"type\":\"NoneType\",\"value\":null},{\"type\":\"NoneType\",\"value\":null}]") != std::string::npos);
+}
 }  // namespace
 int main() {
   variants_and_keys();
@@ -434,5 +523,8 @@ int main() {
   discovery_marking_replay();
   detached_counts_keys_and_overrides();
   detached_names_and_error_precedence();
+  nullable_transition_names_and_wire();
+  nullable_name_failure_precedence_and_variants();
+  alpha_plus_default_nullable_name_metadata();
   std::cout << "full forward token replay result contracts passed\n";
 }

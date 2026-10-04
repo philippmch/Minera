@@ -155,6 +155,10 @@ struct PetriDiscoveryMarkings {
   std::vector<PetriMarkingEntry> final;
 };
 
+// A transition's display name is independent of its activity label. Null and
+// an empty string are distinct names, including for silent transitions.
+using PetriTransitionNameList = std::vector<std::optional<std::string>>;
+
 // A labeled net with optional workflow boundaries and explicit discovery
 // markings. Process-tree conversion uses a single-token source/sink workflow;
 // discovery can retain markings outside the root topology instead.
@@ -167,6 +171,8 @@ class PetriNet {
                              std::vector<std::size_t> outputs) {
     transitions_.push_back(
         PetriTransition{activity, std::move(inputs), std::move(outputs), {}, {}, {}, {}, {}, {}});
+    if (transition_names_)
+      transition_names_->push_back("t" + std::to_string(transitions_.size() - 1));
     return transitions_.size() - 1;
   }
 
@@ -289,6 +295,17 @@ class PetriNet {
     activities_ = std::move(activities);
   }
 
+  void set_transition_names(PetriTransitionNameList names) {
+    if (names.size() != transitions_.size())
+      throw std::invalid_argument("Petri transition names must contain one entry per transition");
+    transition_names_ = std::move(names);
+  }
+
+  [[nodiscard]] const std::optional<PetriTransitionNameList>&
+  transition_names() const noexcept {
+    return transition_names_;
+  }
+
   // Sparse entries preserve signed, arbitrary-width counts and explicit zero
   // keys. Both roles can refer to the same detached identity. Setting these
   // markings does not create root places or change workflow boundary flags.
@@ -346,6 +363,7 @@ class PetriNet {
   std::vector<PetriTransition> transitions_;
   std::vector<std::string> activities_;
   std::optional<PetriDiscoveryMarkings> discovery_markings_;
+  std::optional<PetriTransitionNameList> transition_names_;
 };
 
 // Process-tree Petri-net conversion variants.  The standard variant keeps
