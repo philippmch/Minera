@@ -41,10 +41,33 @@ template <typename Integer>
   return result;
 }
 
+// Reachability and footprints in the interactive conformance bundle still
+// use bounded markings. Keep the document available to exact token evaluators.
+[[nodiscard]] inline std::optional<ModelConformance> pnml_conformance_gate(
+    const PetriNet& net, const PnmlDocument* document = nullptr,
+    std::string miner = "imported") {
+  if (auto gated = pnml_conformance_weight_gate(net, miner)) return gated;
+  if (!document) return std::nullopt;
+  const auto outside = [](const TokenMarking& marking) {
+    return std::any_of(marking.begin(), marking.end(), [](const auto value) {
+      return value < 0 || value > std::numeric_limits<int>::max();
+    });
+  };
+  if (!outside(document->initial_marking) && !outside(document->final_marking))
+    return std::nullopt;
+  ModelConformance result;
+  result.miner = std::move(miner);
+  result.computed = false;
+  result.error = "Conformance for markings outside the native int range is not available yet.";
+  return result;
+}
+
 // The interactive supplied-model adapters retain general markings. For older
 // documents without marking keys, keep the unique structural-boundary default.
 // A recorded zero is an explicit marking and must never trigger inference.
-inline PnmlDocument resolve_pnml_model(PnmlDocument document) {
+inline PnmlDocument resolve_pnml_model(PnmlDocument document,
+                                      bool infer_legacy_boundaries = true) {
+  if (!infer_legacy_boundaries) return document;
   const auto count = document.net.place_count();
   std::vector<bool> incoming(count, false), outgoing(count, false);
   for (const auto& transition : document.net.transitions()) {
@@ -70,28 +93,31 @@ inline PnmlDocument resolve_pnml_model(PnmlDocument document) {
   };
   infer(document.initial_marking, document.initial_marking_keys, incoming, true);
   infer(document.final_marking, document.final_marking_keys, outgoing, false);
-  // Check replay's signed range before publishing a supplied-model session.
-  (void)pnml_marking<int>(document.initial_marking);
-  (void)pnml_marking<int>(document.final_marking);
   return document;
 }
 
-inline PnmlImportOptions pnml_model_import_options() {
+inline PnmlImportOptions pnml_model_import_options(bool public_markings = false) {
   PnmlImportOptions options;
   options.infer_initial_marking = false;
   options.infer_final_marking = false;
   options.require_workflow_boundaries = false;
   options.import_stochastic_map = true;
+  options.public_marking_semantics = public_markings;
   return options;
 }
 
-[[nodiscard]] inline PnmlDocument parse_pnml_model(std::string_view xml) {
-  return resolve_pnml_model(parse_pnml_document(xml, pnml_model_import_options()));
+[[nodiscard]] inline PnmlDocument parse_pnml_model(std::string_view xml,
+                                                bool public_markings = false) {
+  return resolve_pnml_model(
+      parse_pnml_document(xml, pnml_model_import_options(public_markings)),
+      !public_markings);
 }
 
 [[nodiscard]] inline PnmlDocument import_pnml_model(
-    const std::filesystem::path& path) {
-  return resolve_pnml_model(import_pnml_document(path, pnml_model_import_options()));
+    const std::filesystem::path& path, bool public_markings = false) {
+  return resolve_pnml_model(
+      import_pnml_document(path, pnml_model_import_options(public_markings)),
+      !public_markings);
 }
 
 [[nodiscard]] inline TokenReplayOptions pnml_replay_options(

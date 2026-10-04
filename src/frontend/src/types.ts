@@ -4902,9 +4902,9 @@ export interface CorrelationVariantsAnalysis {
 }
 
 /** Conformance results for one discovered model. */
-export interface ModelConformance {
+export type ModelConformance = {
   /** False means the conformance bundle is unavailable; the model remains usable. */
-  computed?: boolean;
+  computed?: true;
   error?: string;
   /** Whether the model's final marking is reachable — the bar for alignment. */
   sound: boolean;
@@ -4913,7 +4913,14 @@ export interface ModelConformance {
   footprints?: Footprints;
   /** Present in CLI exports; the server omits it and serves it from /api/align. */
   alignments?: Alignments;
-}
+} | {
+  computed: false;
+  error: string;
+  sound: null;
+  token_replay: null;
+  footprints: null;
+  alignments?: never;
+};
 
 /** Per-miner conformance, keyed by discovered or imported model id. */
 export type ConformanceModels = Record<string, ModelConformance>;
@@ -5909,12 +5916,19 @@ export interface SimplicityEvaluation {
 }
 export interface ModelEvaluation {
   miner: string;
+  /** Complete typed public value; float hex retains exact bits and signed zero. */
+  public_result?: PublicEvaluationValue;
   replay_fitness?: ReplayFitnessEvaluation;
   precision?: PrecisionEvaluation;
   generalization?: GeneralizationEvaluation;
   simplicity?: SimplicityEvaluation;
   composite?: CompositeEvaluation;
 }
+
+export type PublicEvaluationValue =
+  | { type: "float"; hex: string }
+  | { type: "int"; value: number }
+  | { type: "dict"; items: [{ type: "str"; value: string }, PublicEvaluationValue][] };
 
 export interface EmdOptions {
   emd_variant?: EmdVariant;

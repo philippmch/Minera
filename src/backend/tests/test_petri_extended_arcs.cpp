@@ -737,6 +737,10 @@ void pnml_compact_ordinary_weight_contract() {
     DirectlyFollowsGraph registry;
     const auto unavailable = imported_model_json(*gate,registry);
     assert(unavailable.find("\"computed\": false") != std::string::npos);
+    assert(unavailable.find("\"sound\": null") != std::string::npos);
+    assert(unavailable.find("\"token_replay\": null") != std::string::npos);
+    assert(unavailable.find("\"footprints\": null") != std::string::npos);
+    assert(unavailable.find("\"fitness\"") == std::string::npos);
     const auto retained = input ? transition.input_arc_weight(1) : transition.output_arc_weight(0);
     assert(retained.magnitude == weight.magnitude && retained.negative == weight.negative);
     const auto round_trip = parse_pnml_document(to_pnml(document));

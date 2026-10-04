@@ -9650,3 +9650,86 @@ backward precision and application conformance remain unproven. Interactive
 supplied-PNML adapters and other bounded consumers still have separate range
 gates. Catalogue totals remain 46/86 packages, 199/387 modules and 228 incomplete
 units; no promotion or full parity claim is made.
+
+
+### Exact PNML evaluation through existing CLI and cached HTTP adapters
+
+The interactive supplied-PNML importer retains arbitrary integer markings. The
+existing CLI `--check-pnml` path accepts `--pnml-public-markings`; cached HTTP
+`/api/check-model` accepts `pnml_public_markings` in query or multipart fields.
+Public mode preserves the pinned importer's positive-only marking semantics,
+including explicit empty final markings. Omitted/false mode retains native zero
+keys and legacy unique-boundary inference. Invalid/empty boolean values fail
+deterministically. Model-quality dispatch inherits markings only for the selected
+family. Explicit nonempty caller vectors, including all-zero markings, win
+independently for initial and final markings. Token fitness, explicit ET token
+precision, token generalization and composite evaluation use the exact document
+overloads; structural simplicity uses the document presentation. Bounded precision
+and fitness variants keep their separate range checks.
+
+The native diagnostic envelopes now also expose `public_result` for a single
+computed supported family: the complete typed four-field token fitness dictionary,
+token precision/generalization or arc-degree scalar, or complete six-field
+composite dictionary with nested fitness. Float hex and integer zero retain their
+distinct types and exact bits. This projection is not field stitching. Uncomputed
+or unsupported variants have no public projection. Unsupported legacy conformance
+bundles retain the model but publish null soundness, token replay and footprints;
+they no longer publish placeholder scores as observations.
+
+Two fresh pinned public captures make 151 actual imports, 11110 quality calls
+and 2020 separate token replays. The main capture includes all 149 preceding
+weighted/marking/empty-graph inputs, eight log profiles, four direct/parent
+family pairs and three complete composite weight sets. The second captures
+independent initial/final overrides on two large-marking documents. Logs, parameters,
+markings and graphs are checked after calls; opaque public module proofs remain
+identical before and after. Public calls return actual whole values and exceptions.
+
+The accepted actual transport run uses the existing full CLI export and cached
+HTTP `/api/mine` -> `/api/check-model` -> `/api/evaluate` flow, rather than
+substituting the standalone fitness endpoint. It executes 5464 CLI processes,
+6995 HTTP requests including 5320 cached evaluations, on all 149 PNML inputs
+through six default mining profiles plus the five override profiles. All 16596
+whole public-value comparisons, 412 error-message/status comparisons, 5277 whole
+CLI/HTTP pairs, 3040 direct/parent public pairs, 1520 cached marking checks and
+2149 unavailable-bundle checks pass with zero differences and no tolerance.
+760 successful uploads retain their exact markings in cached PNML exports.
+Thirty additional checks across 32 HTTP requests verify public/native modes,
+strict flags, usable exact precision/simplicity after a 401-digit marking upload,
+and the separate AUTO/alignment consumer gates. HTTP transports do not preserve
+Python exception class identity, and no such identity parity is claimed.
+
+Both empty-activity profiles remain outside the accepted default full-mining
+transport cohort. An actual 63-process smoke run retains 35 differences: default
+inductive mining rejects an empty activity name before cached evaluation. A
+separate 63-process run with an explicit discovery selector retains 26 differences
+and exposes a log-skeleton activity registration gate. These failures are not
+reclassified as successful imported-model evaluations. The underlying exact
+native token evaluators' prior eight-profile evidence remains separate.
+
+All 152 assertion-enabled Release suites pass on 660 frozen inputs: 12 edits and
+648 unchanged. All 155 accepted production/test outputs were freshly linked
+during this checkpoint. The full producer passes 151/152; its remaining old
+assertion expects import-time rejection above native int range. The correction
+instead checks retained exact markings, truthful unavailable conformance and
+bounded alignment rejection. Only that test differs from the producer's other
+659 frozen inputs; its fresh replacement is run with the same other 151 fresh
+binaries against the same fresh core, and the complete inventory passes. The
+frontend build and 200 focused frontend tests pass with matching final frontend
+source bytes.
+
+The failed CLI parser build (MSVC nesting limit), obsolete range assertion,
+initial frontend nullability diagnosis, local HTTP observer name collision and
+prearchive schema error are retained under immutable helpers and frozen inputs.
+Corrected observers/builds use fresh filenames and directories. Evidence is in
+[pnml-cached-evaluation-validation.json](pnml-cached-evaluation-validation.json):
+all 29502 members round-trip across 35 lossless
+archives, with hashes binding all 78 preceding exact-model-quality archives.
+This is source/build/process/archive self-review; no independent review is claimed.
+
+Legacy conformance still gates compact zero/signed/large weights and markings
+outside native int range. Empty-name default mining, wider application conformance,
+AUTO/alignment precision, backward precision, Python scalar/exception identities,
+choice/cache/model/log/property graphs and insertion order remain unproven. The
+original automatic-choice fitness cohort still retains 312 native and 312 wire
+whole-dictionary differences. Catalogue totals remain 46/86 packages, 199/387
+modules and 228 incomplete units; no promotion or full parity claim is made.

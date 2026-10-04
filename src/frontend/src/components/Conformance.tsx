@@ -1464,7 +1464,7 @@ function TokenReplay({
   sound,
 }: {
   data: MineraExport;
-  conformance: NonNullable<MineraExport["conformance"]>[string]["token_replay"];
+  conformance: NonNullable<NonNullable<MineraExport["conformance"]>[string]["token_replay"]>;
   minerName: string;
   sound: boolean;
 }) {

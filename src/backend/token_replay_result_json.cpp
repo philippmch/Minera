@@ -273,6 +273,13 @@ std::string token_generalization_result_json(const GeneralizationResult& result)
   return real(result.generalization);
 }
 
+std::string simplicity_arc_degree_result_json(const SimplicityResult& result) {
+  if (result.variant != SimplicityVariant::ARC_DEGREE || !result.computed)
+    throw std::invalid_argument(result.error.empty()
+        ? "arc-degree result requires computed arc-degree evaluation" : result.error);
+  return real(result.simplicity);
+}
+
 std::string composite_evaluation_result_json(const CompositeEvaluationResult& result) {
   if (!result.computed)
     throw std::invalid_argument(result.error.empty()

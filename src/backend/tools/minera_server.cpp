@@ -4184,11 +4184,20 @@ void handle_check_model(const httplib::Request& request,
       return;
     }
     std::optional<minera::PnmlDocument> document;
+    bool public_markings = false;
+    if (request.has_param("pnml_public_markings") || request.has_file("pnml_public_markings")) {
+      const auto value = request.has_param("pnml_public_markings")
+          ? request.get_param_value("pnml_public_markings")
+          : form_field(request, "pnml_public_markings");
+      if (value == "true" || value == "1") public_markings = true;
+      else if (value != "false" && value != "0")
+        throw std::invalid_argument("pnml_public_markings expects true, false, 1, or 0");
+    }
     const auto imported =
         minera::looks_like_bpmn(model_xml) ? minera::parse_bpmn(model_xml)
         : minera::looks_like_ptml(model_xml)
             ? minera::to_petri_net(minera::parse_ptml(model_xml))
-            : (document = minera::tools::parse_pnml_model(model_xml),
+            : (document = minera::tools::parse_pnml_model(model_xml, public_markings),
                document->net);
 
     auto next_session = std::make_shared<MinedSession>(*session);
@@ -4200,7 +4209,8 @@ void handle_check_model(const httplib::Request& request,
     const auto replay_options = document
         ? minera::tools::pnml_replay_options(*document, session->token_replay)
         : session->token_replay;
-    const auto gated = minera::tools::pnml_conformance_weight_gate(imported);
+    const auto gated = minera::tools::pnml_conformance_gate(
+        imported, document ? &*document : nullptr);
     const minera::ModelConformance conformance = gated ? *gated : minera::ModelConformance{
         "imported", document
             ? minera::final_marking_reachable(imported,
@@ -5411,17 +5421,8 @@ void handle_evaluate(const httplib::Request& request,
       return request.has_param(std::string(name));
     };
     auto params = minera::parse_evaluation_params(lookup, present);
-    cached_imported_markings(request, *session, miner, params.replay_fitness_options,
-                             "evaluation_initial_marking", "evaluation_final_marking");
-    cached_imported_markings(request, *session, miner, params.precision_options,
-                             "evaluation_initial_marking", "evaluation_final_marking");
-    cached_imported_markings(request, *session, miner, params.generalization_options,
-                             "evaluation_initial_marking", "evaluation_final_marking");
-    cached_imported_markings(request, *session, miner, params.composite_options,
-                             "evaluation_initial_marking", "evaluation_final_marking");
-    cached_imported_markings(request, *session, miner, params.simplicity_options,
-                             present("simplicity_initial_marking") ? "simplicity_initial_marking" : "evaluation_initial_marking",
-                             present("simplicity_final_marking") ? "simplicity_final_marking" : "evaluation_final_marking");
+    const auto* evaluation_document = miner == "imported" && session->imported_document && !converted
+        ? &*session->imported_document : nullptr;
     std::optional<minera::EventLog> projected_powl_log;
     const minera::EventLog* evaluation_log =
         &cached_model_log(*session, miner);
@@ -5435,17 +5436,34 @@ void handle_evaluate(const httplib::Request& request,
     result.miner = miner;
     switch (params.family) {
       case minera::EvaluationFamily::kReplayFitness:
-        result.replay_fitness = minera::evaluate_replay_fitness(
+        result.replay_fitness = evaluation_document
+            ? minera::evaluate_replay_fitness(
+                  *evaluation_log, *evaluation_document, params.replay_fitness_variant,
+                  params.replay_fitness_options)
+            : minera::evaluate_replay_fitness(
             *evaluation_log, selected, params.replay_fitness_variant,
             params.replay_fitness_options);
         break;
       case minera::EvaluationFamily::kPrecision:
-        result.precision = minera::evaluate_precision(
+        if (evaluation_document && params.precision_variant !=
+            minera::PrecisionVariant::ETCONFORMANCE_TOKEN)
+          cached_imported_markings(request, *session, miner, params.precision_options,
+                                   "evaluation_initial_marking", "evaluation_final_marking");
+        result.precision = evaluation_document && params.precision_variant ==
+            minera::PrecisionVariant::ETCONFORMANCE_TOKEN
+            ? minera::evaluate_precision(
+                  *evaluation_log, *evaluation_document, params.precision_variant,
+                  params.precision_options)
+            : minera::evaluate_precision(
             *evaluation_log, selected, params.precision_variant,
             params.precision_options);
         break;
       case minera::EvaluationFamily::kGeneralization:
-        result.generalization = minera::evaluate_generalization(
+        result.generalization = evaluation_document
+            ? minera::evaluate_generalization(
+                  *evaluation_log, *evaluation_document, params.generalization_variant,
+                  params.generalization_options)
+            : minera::evaluate_generalization(
             *evaluation_log, selected, params.generalization_variant,
             params.generalization_options);
         break;
