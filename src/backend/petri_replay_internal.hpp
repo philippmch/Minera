@@ -73,7 +73,9 @@ inline CleaningComponents cleaning_components(const PetriNet& net,
     throw std::invalid_argument("Petri token-flood cleaning requires a non-empty initial marking");
   const auto root = static_cast<std::size_t>(
       std::find(initial_keys.begin(), initial_keys.end(), true) - initial_keys.begin());
-  std::vector<std::vector<std::size_t>> outgoing(net.place_count());
+  // Detached marking slots are isolated vertices in replay's marking domain;
+  // they are not added to the net's root topology.
+  std::vector<std::vector<std::size_t>> outgoing(initial_keys.size());
   std::vector<std::vector<std::size_t>> outputs(net.transitions().size());
   for (std::size_t t = 0; t < net.transitions().size(); ++t) {
     const auto& transition = net.transitions()[t];
@@ -232,7 +234,7 @@ inline std::vector<HiddenPlacePath> silent_place_paths(
     const ReplayMarkingKeys& source_keys, const ReplayMarkingKeys& target_keys, const PetriNet& net,
     const std::vector<std::string>& place_names,
     std::size_t max_path_length = 51) {
-  std::vector<std::vector<std::size_t>> outgoing(net.place_count());
+  std::vector<std::vector<std::size_t>> outgoing(source_keys.size());
   for (std::size_t t = 0; t < net.transitions().size(); ++t) {
     const auto& transition = net.transitions()[t];
     if (!transition.silent()) continue;

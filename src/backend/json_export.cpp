@@ -1564,11 +1564,32 @@ void write_heuristics_net(std::ostream& out,
   out << '}';
 }
 
+void write_token_replay_marking_domain(std::ostream& out,
+                                      const TokenReplayMarkingDomain& domain) {
+  out << "{\"places\":[";
+  for (std::size_t i = 0; i < domain.places.size(); ++i) {
+    if (i) out << ',';
+    const auto& p = domain.places[i];
+    out << "{\"kind\":\"" << (p.kind == PetriMarkingPlaceKind::kRoot ? "root" : "detached")
+        << "\",\"id\":" << p.id << '}';
+  }
+  out << "],\"detached_places\":[";
+  for (std::size_t i = 0; i < domain.detached_places.size(); ++i) {
+    if (i) out << ',';
+    out << "{\"id\":" << domain.detached_places[i].id << ",\"name\":";
+    write_heuristic_structured_value(out, domain.detached_places[i].name);
+    out << '}';
+  }
+  out << "]}";
+}
+
 void write_token_replay_trace(std::ostream& out,
                               const TokenReplayTraceDiagnostics& trace) {
   if (!trace.reached_marking_keys.empty() &&
       trace.reached_marking_keys.size() != trace.reached_marking.size())
     throw std::invalid_argument("reached marking key count must match marking size");
+  if (trace.marking_domain && trace.marking_domain->places.size() != trace.reached_marking.size())
+    throw std::invalid_argument("reached marking domain must match marking size");
   const auto previous_precision = out.precision(std::numeric_limits<double>::max_digits10);
   out << "{\"trace_index\": " << trace.trace_index << ", \"case_id\": ";
   write_json_string(out, trace.case_id);
@@ -1594,6 +1615,11 @@ void write_token_replay_trace(std::ostream& out,
   numbers("transitions_with_problems", trace.transitions_with_problems);
   numbers("enabled_transitions", trace.enabled_transitions);
   numbers("reached_marking", trace.reached_marking);
+  if (trace.marking_domain) {
+    out << ", \"marking_domain\": ";
+    write_token_replay_marking_domain(out, *trace.marking_domain);
+  }
+  if (!trace.reached_marking_order.empty()) numbers("reached_marking_order", trace.reached_marking_order);
   if (!trace.reached_marking_keys.empty()) {
     out << ", \"reached_marking_keys\": [";
     for (std::size_t i = 0; i < trace.reached_marking_keys.size(); ++i) {

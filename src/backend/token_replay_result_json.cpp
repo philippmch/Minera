@@ -73,6 +73,26 @@ std::string dictionary(const Items& items, std::string_view type = "dict") {
   return result + "]}";
 }
 
+std::string marking_name(const HeuristicStructuredValue& value) {
+  return std::visit([](const auto& item) -> std::string {
+    using T = std::decay_t<decltype(item)>;
+    if constexpr (std::is_same_v<T, std::nullptr_t>) return null_value();
+    else if constexpr (std::is_same_v<T, bool>) return boolean(item);
+    else if constexpr (std::is_same_v<T, std::int64_t> || std::is_same_v<T, std::uint64_t>) return integer(item);
+    else if constexpr (std::is_same_v<T, double>) return real(item);
+    else if constexpr (std::is_same_v<T, std::string>) return string_value(item);
+    else if constexpr (std::is_same_v<T, HeuristicStructuredValue::Array>) {
+      Values values;
+      for (const auto& child : item) values.push_back(marking_name(child));
+      return sequence(values);
+    } else {
+      Items items;
+      for (const auto& [key, child] : item) items.emplace_back(string_value(key), marking_name(child));
+      return dictionary(items);
+    }
+  }, value.value);
+}
+
 std::string attribute(const EventAttribute& value) {
   if (value.is_null || value.first_class_state == FirstClassAttributeState::kNull)
     return null_value();
@@ -133,7 +153,24 @@ class Codec {
   explicit Codec(const TokenReplayResult& value) : result(value) {
     if (result.transition_names.size() != result.transition_labels.size())
       throw std::invalid_argument("token replay transition labels have the wrong size");
-    place_slots = slots(result.place_names);
+    auto names = result.place_names;
+    if (result.marking_domain) {
+      if (result.marking_domain->places.size() < names.size())
+        throw std::invalid_argument("token replay marking domain is smaller than root places");
+      for (std::size_t p = 0; p < result.marking_domain->places.size(); ++p) {
+        const auto& ref = result.marking_domain->places[p];
+        if (p < names.size()) {
+          if (ref != PetriMarkingPlace{PetriMarkingPlaceKind::kRoot, p})
+            throw std::invalid_argument("token replay root marking mapping is invalid");
+        }
+      }
+      for (std::size_t p = result.place_names.size(); p < result.marking_domain->places.size(); ++p) {
+        const auto& name = detached(p).name;
+        const auto* text = std::get_if<std::string>(&name.value);
+        names.push_back(text ? *text : "detached:" + std::to_string(detached(p).id));
+      }
+    }
+    place_slots = slots(names);
     transition_slots = slots(result.transition_names);
   }
   std::string encode() const {
@@ -171,8 +208,28 @@ class Codec {
     return positions;
   }
   std::string place(std::size_t index) const {
+    if (index >= result.place_names.size()) {
+      const auto& value = detached(index);
+      return "{\"type\":\"Place\",\"index\":" + std::to_string(place_slots.at(index))
+          + ",\"kind\":\"detached\",\"id\":" + std::to_string(value.id)
+          + ",\"name\":" + marking_name(value.name) + '}';
+    }
     return "{\"type\":\"Place\",\"index\":" + std::to_string(place_slots.at(index))
         + ",\"name\":" + string_value(result.place_names.at(index)) + '}';
+  }
+  const PetriDetachedMarkingPlace& detached(std::size_t index) const {
+    if (!result.marking_domain) throw std::invalid_argument("token replay detached marking domain is absent");
+    const auto& ref = result.marking_domain->places.at(index);
+    if (ref.kind != PetriMarkingPlaceKind::kDetached)
+      throw std::invalid_argument("token replay detached marking mapping is invalid");
+    const auto& values = result.marking_domain->detached_places;
+    const auto found = std::find_if(values.begin(), values.end(), [&](const auto& p) { return p.id == ref.id; });
+    if (found == values.end()) throw std::invalid_argument("token replay detached marking name is absent");
+    return *found;
+  }
+  std::string place_name(std::size_t index) const {
+    return index < result.place_names.size() ? string_value(result.place_names[index])
+        : marking_name(detached(index).name);
   }
   std::string label(std::size_t index) const {
     const auto& value = result.transition_labels.at(index);
@@ -217,11 +274,23 @@ class Codec {
       return sequence(values, type);
     };
     Items marking;
-    for (std::size_t p = 0; p < row.reached_marking.size(); ++p) {
-      const bool present = row.reached_marking_keys.empty() ? row.reached_marking[p] != 0
+    auto order = row.reached_marking_order;
+    if (order.empty()) {
+      order.resize(row.reached_marking.size());
+      std::iota(order.begin(), order.end(), 0);
+    }
+    for (const auto p : order) {
+      const bool present = row.reached_marking_keys.empty() ? row.reached_marking.at(p) != 0
           : row.reached_marking_keys.at(p);
-      if (present) marking.emplace_back(result.return_names ? string_value(result.place_names.at(p))
-          : std::to_string(place_slots.at(p)), integer(row.reached_marking[p]));
+      if (!present) continue;
+      const auto key = result.return_names ? place_name(p)
+          : p < result.place_names.size() ? std::to_string(place_slots.at(p)) : place(p);
+      const auto value = integer(row.reached_marking.at(p));
+      if (result.return_names) {
+        const auto found = std::find_if(marking.begin(), marking.end(), [&](const auto& item) { return item.first == key; });
+        if (found != marking.end()) { found->second = value; continue; }
+      }
+      marking.emplace_back(key, value);
     }
     Items items{{string_value("trace_is_fit"), boolean(row.trace_is_fit)},
         {string_value("trace_fitness"), real(row.trace_fitness)},
