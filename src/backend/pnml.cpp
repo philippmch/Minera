@@ -18,6 +18,7 @@
 
 #include "xml_pull_parser.hpp"
 #include "pnml_arc_weight.hpp"
+#include "root_cause_unicode.hpp"
 
 namespace minera {
 namespace {
@@ -561,15 +562,75 @@ struct ParsedArc {
   bool negative_weight = false;
 };
 
-TokenInteger parse_token_count(const std::string& text, bool allow_signed) {
+// UTF-8 scalar decoding and literal rendering use the owned Unicode 14 table.
+// The integer error literal is truncated after rendering, by Unicode scalars.
+char32_t pnml_codepoint(const std::string& value, std::size_t& position) {
+  const auto first = static_cast<unsigned char>(value[position++]);
+  char32_t code = first;
+  unsigned count = 0;
+  if (first >= 0xc2 && first <= 0xdf) { code = first & 0x1f; count = 1; }
+  else if (first >= 0xe0 && first <= 0xef) { code = first & 0x0f; count = 2; }
+  else if (first >= 0xf0 && first <= 0xf4) { code = first & 0x07; count = 3; }
+  else if (first >= 0x80) throw std::runtime_error("PNML marking contains invalid UTF-8");
+  for (unsigned i = 0; i < count; ++i) {
+    if (position == value.size()) throw std::runtime_error("PNML marking contains invalid UTF-8");
+    const auto next = static_cast<unsigned char>(value[position++]);
+    if ((next & 0xc0) != 0x80) throw std::runtime_error("PNML marking contains invalid UTF-8");
+    code = (code << 6) | (next & 0x3f);
+  }
+  if ((count == 1 && code < 0x80) || (count == 2 && code < 0x800) ||
+      (count == 3 && code < 0x10000) || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff))
+    throw std::runtime_error("PNML marking contains invalid UTF-8");
+  return code;
+}
+
+std::string pnml_integer_literal(const std::string& value) {
+  const char quote = value.find('\'') != std::string::npos && value.find('"') == std::string::npos ? '"' : '\'';
+  std::string result(1, quote);
+  constexpr char hex[] = "0123456789abcdef";
+  for (std::size_t position = 0; position < value.size();) {
+    const auto start = position;
+    const auto code = pnml_codepoint(value, position);
+    if (code == '\\' || code == static_cast<unsigned char>(quote)) {
+      result += '\\'; result += static_cast<char>(code);
+    } else if (code == '\n') result += "\\n";
+    else if (code == '\r') result += "\\r";
+    else if (code == '\t') result += "\\t";
+    else if (!root_cause_unicode_printable(code)) {
+      const int digits = code <= 0xff ? 2 : code <= 0xffff ? 4 : 8;
+      result += digits == 2 ? "\\x" : digits == 4 ? "\\u" : "\\U";
+      for (int shift = (digits - 1) * 4; shift >= 0; shift -= 4)
+        result += hex[(code >> shift) & 15];
+    } else result.append(value, start, position - start);
+  }
+  result += quote;
+  std::size_t end = 0;
+  for (unsigned count = 0; end < result.size() && count < 200; ++count)
+    (void)pnml_codepoint(result, end);
+  result.resize(end);
+  return result;
+}
+
+TokenInteger parse_token_count(const std::string& text, bool public_markings) {
+  PetriArcWeight value;
   try {
-    const auto value = detail::parse_pnml_arc_weight(text);
-    if (value.negative && !allow_signed)
+    value = detail::parse_pnml_arc_weight(text);
+    if (value.negative && !public_markings)
       throw std::runtime_error("negative PNML token count");
-    return value.negative ? -value.magnitude : value.magnitude;
   } catch (const std::exception&) {
+    if (public_markings)
+      throw std::runtime_error("invalid literal for int() with base 10: " + pnml_integer_literal(text));
     throw std::runtime_error("PNML marking contains an invalid token count");
   }
+  if (public_markings) {
+    std::size_t digits = 0;
+    for (std::size_t position = 0; position < text.size();)
+      if (detail::pnml_decimal_digit(pnml_codepoint(text, position)) >= 0) ++digits;
+    if (digits > 4300)
+      throw std::runtime_error("Exceeds the limit (4300 digits) for integer string conversion: value has " +
+          std::to_string(digits) + " digits; use sys.set_int_max_str_digits() to increase the limit");
+  }
+  return value.negative ? -value.magnitude : value.magnitude;
 }
 
 // True when `stack` (element names from the document root down) ends with the
@@ -588,6 +649,19 @@ bool stack_ends_with(const std::vector<std::string>& stack,
 
 PnmlDocument parse_pnml_document(std::string_view xml,
                                  const PnmlImportOptions& options) {
+  // Normalize physical XML line endings before entity decoding. Character
+  // references to CR retain their value and their distinct error rendering.
+  std::string normalized_xml;
+  if (options.public_marking_semantics) {
+    normalized_xml.reserve(xml.size());
+    for (std::size_t i = 0; i < xml.size(); ++i) {
+      if (xml[i] == '\r') {
+        normalized_xml += '\n';
+        if (i + 1 < xml.size() && xml[i + 1] == '\n') ++i;
+      } else normalized_xml += xml[i];
+    }
+    xml = normalized_xml;
+  }
   detail::XmlPullParser parser(xml, /*emit_character_data=*/true,
                               /*coalesce_character_data=*/true);
 
@@ -684,8 +758,12 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   struct MarkingText { bool initial; std::size_t depth; std::string value; bool first_segment = true; };
   std::optional<MarkingText> marking_text;
   const auto finish_marking_text = [&] {
-    if (public_markings && marking_text->value.empty())
-      throw std::runtime_error("int() argument must be a string, a bytes-like object or a real number, not 'NoneType'");
+    if (marking_text->value.empty()) {
+      if (public_markings)
+        throw std::runtime_error("int() argument must be a string, a bytes-like object or a real number, not 'NoneType'");
+      marking_text.reset();
+      return;
+    }
     const auto count = parse_token_count(marking_text->value, public_markings);
     if (marking_text->initial) places.back().initial_tokens = count;
     else final_marking.back().second = count;

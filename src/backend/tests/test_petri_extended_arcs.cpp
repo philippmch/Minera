@@ -918,6 +918,28 @@ void pnml_exact_public_markings() {
     empty_text = std::string(error.what()) == "int() argument must be a string, a bytes-like object or a real number, not 'NoneType'";
   }
   assert(empty_text);
+  const auto invalid = [&](const std::string& text) {
+    try { (void)parse_pnml_document(prefix + "<initialMarking><text>" + text + "</text></initialMarking>" + graph + "</net></pnml>", observed); }
+    catch (const std::runtime_error& error) { return std::string(error.what()); }
+    return std::string{};
+  };
+  assert(invalid("1.0") == "invalid literal for int() with base 10: '1.0'");
+  assert(invalid("&apos;1") == "invalid literal for int() with base 10: \"'1\"");
+  assert(invalid("1&#13;X") == "invalid literal for int() with base 10: '1\\rX'");
+  assert(invalid("1\rX") == "invalid literal for int() with base 10: '1\\nX'");
+  assert(invalid(std::string(201, 'x')) == "invalid literal for int() with base 10: '" + std::string(199, 'x'));
+  assert(invalid(std::string(4301, '0')) == "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit");
+  const auto boundary = parse_pnml_document(prefix + "<initialMarking><text>" + std::string(4300, '0') + "</text></initialMarking>" + graph + "</net></pnml>", observed);
+  assert(boundary.initial_marking[0] == 0 && !boundary.initial_marking_keys[0]);
+  const auto joined = parse_pnml_document(prefix + "<initialMarking><text>1<!-- join --><![CDATA[2]]></text></initialMarking>" + graph + "</net></pnml>", observed);
+  assert(joined.initial_marking[0] == 12);
+  const auto first = parse_pnml_document(prefix + "<initialMarking><text>1<child/>2</text></initialMarking>" + graph + "</net></pnml>", observed);
+  assert(first.initial_marking[0] == 1);
+  PnmlImportOptions native;
+  native.infer_initial_marking = native.infer_final_marking = native.require_workflow_boundaries = false;
+  const auto native_empty = parse_pnml_document(prefix + "<initialMarking><text/></initialMarking>" + graph + "<finalmarkings><marking><place idref=\"target\"><text/></place></marking></finalmarkings></net></pnml>", native);
+  assert(native_empty.initial_marking[0] == 0 && native_empty.initial_marking_keys[0]);
+  assert(native_empty.final_marking[2] == 1 && native_empty.final_marking_keys[2]);
 }
 
 }  // namespace
