@@ -3218,6 +3218,13 @@ FootprintResult check_footprints(const EventLog& event_log,
   return check_footprints(event_log, to_petri_net(tree));
 }
 
+std::vector<std::size_t> detail::initial_enabled_token_activities(
+    const PetriNet& net, const TokenReplayOptions& options) {
+  const Replayer replayer(net, options.initial_marking, options.final_marking, &options);
+  const auto activities = replayer.enabled_activities(replayer.initial_marking());
+  return {activities.begin(), activities.end()};
+}
+
 ConformanceResult check_conformance(const EventLog& event_log,
                                     const PetriNet& net,
                                     TokenReplayOptions options) {

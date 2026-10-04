@@ -673,8 +673,9 @@ void token_precision_stops_at_an_unfit_prefix() {
       log({{"A"}, {"X", "B"}}), n,
       PrecisionVariant::ETCONFORMANCE_TOKEN);
   assert(result.computed && std::abs(result.precision - 1.0) < 1e-12);
-  assert(result.token_result.transition_frequencies[1] == 0);
-  assert(result.token_result.transition_frequencies[2] == 0);
+  // Prefix precision does not publish unevaluated full-log replay counts.
+  assert(result.token_result_is_precision_only);
+  assert(result.token_result.transition_frequencies.empty());
 }
 
 void precision_option_errors_preserve_variant_and_convert_trees() {

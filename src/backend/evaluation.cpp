@@ -3,6 +3,7 @@
 #include "minera/pnml.hpp"
 #include "cyclomatic_unicode.hpp"
 #include "root_cause_unicode.hpp"
+#include "petri_replay_internal.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -348,6 +349,48 @@ std::string validate_evaluation_markings(const PetriNet& net,
     return "marking contains a negative token count";
   }
   return {};
+}
+
+template <class Options>
+std::string validate_token_evaluation_markings(const PetriNet& net, const Options& options) {
+  if (const auto error = validate_evaluation_markings(net,
+          options.exact_initial_marking ? Marking{} : options.initial_marking,
+          options.exact_final_marking ? Marking{} : options.final_marking); !error.empty()) return error;
+  if ((options.exact_initial_marking && options.exact_initial_marking->size() != net.place_count()) ||
+      (options.exact_final_marking && options.exact_final_marking->size() != net.place_count()))
+    return "marking dimension does not match net";
+  return {};
+}
+
+template <class Source, class Target>
+void copy_token_markings(const Source& source, Target& target) {
+  target.initial_marking = source.initial_marking;
+  target.final_marking = source.final_marking;
+  target.exact_initial_marking = source.exact_initial_marking;
+  target.exact_final_marking = source.exact_final_marking;
+  target.initial_marking_keys = source.initial_marking_keys;
+  target.final_marking_keys = source.final_marking_keys;
+  target.place_names = source.place_names;
+  target.transition_names = source.transition_names;
+}
+
+template <class Options>
+bool inherit_document_token_markings(const PnmlDocument& document, Options& options) {
+  const auto inherit = [&](const TokenMarking& stored, const std::vector<bool>& keys,
+                           auto& legacy, auto& exact, auto& membership) {
+    if (exact || !legacy.empty()) return true;
+    if (stored.size() != document.net.place_count()) return false;
+    exact = stored;
+    if (membership.empty()) membership = keys;
+    return true;
+  };
+  if (!inherit(document.initial_marking, document.initial_marking_keys, options.initial_marking,
+               options.exact_initial_marking, options.initial_marking_keys) ||
+      !inherit(document.final_marking, document.final_marking_keys, options.final_marking,
+               options.exact_final_marking, options.final_marking_keys)) return false;
+  if (options.place_names.empty()) options.place_names = document.place_ids;
+  if (options.transition_names.empty()) options.transition_names = document.transition_ids;
+  return true;
 }
 
 Marking evaluation_initial_marking(const PetriNet& net,
@@ -1048,6 +1091,7 @@ namespace {
 struct PrefixInfo {
   std::uint64_t frequency = 0;
   std::set<std::string> observed;
+  Trace sample;
 };
 
 std::map<std::vector<std::string>, PrefixInfo> collect_prefixes(
@@ -1071,6 +1115,56 @@ std::map<std::vector<std::string>, PrefixInfo> collect_prefixes(
     }
   }
   return prefixes;
+}
+
+struct TokenPrefixes {
+  PrefixInfo initial;
+  std::vector<PrefixInfo> proper;
+};
+
+TokenPrefixes collect_token_prefixes(const EventLog& log,
+                                    const std::string& activity_attribute) {
+  TokenPrefixes result;
+  std::map<std::string, std::size_t> indices;
+  for (const auto& trace : log.traces) {
+    std::vector<std::string> activities;
+    for (const auto& event : trace.events)
+      activities.push_back(selected_evaluation_activity(event, activity_attribute));
+    ++result.initial.frequency;
+    if (!activities.empty()) result.initial.observed.insert(activities.front());
+    std::string key;
+    for (std::size_t i = 0; i + 1 < activities.size(); ++i) {
+      if (i) key += ',';
+      key += activities[i];
+      const auto [position, inserted] = indices.emplace(key, result.proper.size());
+      if (inserted) {
+        auto& prefix = result.proper.emplace_back();
+        prefix.sample.case_id = "prefix-" + std::to_string(position->second);
+        // The public prefix utility joins labels with commas and splits that
+        // key again for replay. Empty fields and colliding keys survive.
+        std::size_t begin = 0;
+        while (true) {
+          const auto end = key.find(',', begin);
+          const auto label = key.substr(begin, end == std::string::npos ? end : end - begin);
+          Event event;
+          event.case_id = prefix.sample.case_id;
+          event.activity = label;
+          event.activity_state = FirstClassAttributeState::kPresent;
+          event.activity_source_key = activity_attribute;
+          event.input_order = prefix.sample.events.size();
+          if (activity_attribute != "concept:name")
+            event.attributes.push_back({activity_attribute, label, AttributeKind::kString});
+          prefix.sample.events.push_back(std::move(event));
+          if (end == std::string::npos) break;
+          begin = end + 1;
+        }
+      }
+      auto& prefix = result.proper[position->second];
+      ++prefix.frequency;
+      prefix.observed.insert(activities[i + 1]);
+    }
+  }
+  return result;
 }
 
 struct StopAlignmentResult {
@@ -1191,18 +1285,21 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
       out.error = "unsupported precision variant";
       return out;
   }
-  if (const auto error = validate_evaluation_markings(
-          net, options.initial_marking, options.final_marking);
+  if (const auto error = validate_token_evaluation_markings(net, options);
       !error.empty()) {
     out.computed = false;
     out.error = error;
     return out;
   }
-  const Marking initial_marking =
-      evaluation_initial_marking(net, options.initial_marking);
   const std::string activity_attribute = options.activity_attribute.empty()
                                              ? "concept:name"
                                              : options.activity_attribute;
+  if (variant != PrecisionVariant::ETCONFORMANCE_TOKEN &&
+      (options.exact_initial_marking || options.exact_final_marking)) {
+    out.computed = false;
+    out.error = "exact markings require token-based precision";
+    return out;
+  }
   AlignmentOptions alignment_options{
       AlignmentVariant::kDijkstraLessMemory,
       AlignmentCostProfile::kStandard};
@@ -1235,12 +1332,46 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
     replay_options.try_to_reach_final_marking_through_hidden = false;
     replay_options.consider_activities_not_in_model_in_fitness = false;
     replay_options.activity_attribute = activity_attribute;
-    replay_options.initial_marking = options.initial_marking;
-    replay_options.final_marking = options.final_marking;
-    out.token_result = check_conformance(log, net, replay_options);
-    out.precision = out.token_result.precision;
+    copy_token_markings(options, replay_options);
+    const auto prefixes = collect_token_prefixes(log, activity_attribute);
+    EventLog prefix_log;
+    std::vector<const PrefixInfo*> scored;
+    for (const auto& info : prefixes.proper) {
+      prefix_log.traces.push_back(info.sample);
+      scored.push_back(&info);
+    }
+    const auto rows = options.token_replay_variant == TokenReplayVariant::kForward
+        ? replay_token_result(prefix_log, net, replay_options).traces
+        : replay_token_traces(prefix_log, net, replay_options);
+    TokenInteger enabled_total = 0, escaping_total = 0;
+    const auto score = [&](const PrefixInfo& prefix, const std::set<std::string>& labels) {
+      enabled_total += TokenInteger(prefix.frequency) * labels.size();
+      for (const auto& label : labels)
+        if (!prefix.observed.contains(label)) escaping_total += prefix.frequency;
+    };
+    if (prefixes.initial.frequency != 0) {
+      std::set<std::string> labels;
+      for (const auto activity : detail::initial_enabled_token_activities(net, replay_options))
+        labels.insert(net.activities().at(activity));
+      score(prefixes.initial, labels);
+    }
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+      if (!rows[i].trace_is_fit) continue;
+      std::set<std::string> labels;
+      for (const auto transition : rows[i].enabled_transitions) {
+        const auto& node = net.transitions().at(transition);
+        if (node.activity) labels.insert(net.activities().at(*node.activity));
+      }
+      score(*scored[i], labels);
+    }
+    out.precision = enabled_total == 0 ? 1.0 : 1.0 - token_integer_ratio(escaping_total, enabled_total);
+    out.token_result.precision = out.precision;
+    out.token_result.activity_attribute = activity_attribute;
+    out.token_result_is_precision_only = true;
     return out;
   }
+
+  const Marking initial_marking = evaluation_initial_marking(net, options.initial_marking);
 
   // Check model easy-soundness independently of the input log.  The legacy
   // alignment API intentionally treats an empty log as trivially computable,
@@ -1385,6 +1516,25 @@ PrecisionResult evaluate_precision(const EventLog& l, const PetriNet& n,
   return evaluate_precision_impl(l, n, v, o);
 }
 
+PrecisionResult evaluate_precision(const EventLog& log, const PnmlDocument& document,
+                                   PrecisionVariant variant, const PrecisionOptions& options) {
+  auto supplied = options;
+  if (!inherit_document_token_markings(document, supplied)) {
+    PrecisionResult out;
+    out.variant = variant;
+    out.computed = false;
+    out.error = "PNML marking dimension does not match net";
+    return out;
+  }
+  return evaluate_precision(log, document.net, variant, supplied);
+}
+
+PrecisionResult evaluate_precision(const EventDataView& data, const PnmlDocument& document,
+                                   PrecisionVariant variant, const PrecisionOptions& options) {
+  return evaluate_precision(evaluation_event_log(data, options.activity_attribute,
+      options.case_id_attribute, options.max_rows_to_materialize), document, variant, options);
+}
+
 PrecisionResult evaluate_precision(const EventDataView& data,
                                    const PetriNet& net,
                                    PrecisionVariant variant,
@@ -1425,8 +1575,7 @@ GeneralizationResult evaluate_generalization(
     out.error = "unsupported generalization variant";
     return out;
   }
-  if (const auto error = validate_evaluation_markings(
-          net, options.initial_marking, options.final_marking);
+  if (const auto error = validate_token_evaluation_markings(net, options);
       !error.empty()) {
     out.computed = false;
     out.error = error;
@@ -1441,10 +1590,11 @@ GeneralizationResult evaluate_generalization(
   replay_options.activity_attribute = options.activity_attribute.empty()
                                           ? "concept:name"
                                           : options.activity_attribute;
-  replay_options.initial_marking = options.initial_marking;
-  replay_options.final_marking = options.final_marking;
-  const auto replay = check_conformance(log, net, replay_options);
-  out.transition_frequencies = replay.transition_frequencies;
+  copy_token_markings(options, replay_options);
+  const auto replay = replay_token_result(log, net, replay_options);
+  for (const auto& row : replay.traces)
+    for (const auto transition : row.activated_transitions)
+      ++out.transition_frequencies.at(transition);
   if (out.transition_frequencies.size() < net.transitions().size())
     out.transition_frequencies.resize(net.transitions().size(), 0);
   for (const auto count : out.transition_frequencies)
@@ -1457,6 +1607,25 @@ GeneralizationResult evaluate_generalization(
                            : 1.0 - rarity / double(out.transition_frequencies.size());
   return out;
 }
+GeneralizationResult evaluate_generalization(const EventLog& log, const PnmlDocument& document,
+                                             GeneralizationVariant variant, const GeneralizationOptions& options) {
+  auto supplied = options;
+  if (!inherit_document_token_markings(document, supplied)) {
+    GeneralizationResult out;
+    out.variant = variant;
+    out.computed = false;
+    out.error = "PNML marking dimension does not match net";
+    return out;
+  }
+  return evaluate_generalization(log, document.net, variant, supplied);
+}
+
+GeneralizationResult evaluate_generalization(const EventDataView& data, const PnmlDocument& document,
+                                             GeneralizationVariant variant, const GeneralizationOptions& options) {
+  return evaluate_generalization(evaluation_event_log(data, options.activity_attribute,
+      options.case_id_attribute, options.max_rows_to_materialize), document, variant, options);
+}
+
 GeneralizationResult evaluate_generalization(
     const EventLog& log, const ProcessTree& tree,
     GeneralizationVariant variant) {
@@ -1949,8 +2118,7 @@ CompositeEvaluationResult evaluate_composite_impl(
   enforce_evaluation_event_log_cap(log, options.max_rows_to_materialize);
   CompositeEvaluationResult out;
   out.fitness_details.variant = ReplayFitnessVariant::TOKEN_BASED;
-  if (const auto error = validate_evaluation_markings(
-          net, options.initial_marking, options.final_marking);
+  if (const auto error = validate_token_evaluation_markings(net, options);
       !error.empty()) {
     out.computed = false;
     out.error = error;
@@ -1979,21 +2147,18 @@ CompositeEvaluationResult evaluate_composite_impl(
   fitness_options.activity_attribute = activity_attribute;
   fitness_options.case_id_attribute = options.case_id_attribute;
   fitness_options.max_rows_to_materialize = options.max_rows_to_materialize;
-  fitness_options.initial_marking = options.initial_marking;
-  fitness_options.final_marking = options.final_marking;
+  copy_token_markings(options, fitness_options);
   PrecisionOptions precision_options;
   precision_options.activity_attribute = activity_attribute;
   precision_options.case_id_attribute = options.case_id_attribute;
   precision_options.max_rows_to_materialize = options.max_rows_to_materialize;
-  precision_options.initial_marking = options.initial_marking;
-  precision_options.final_marking = options.final_marking;
+  copy_token_markings(options, precision_options);
   GeneralizationOptions generalization_options;
   generalization_options.activity_attribute = activity_attribute;
   generalization_options.case_id_attribute = options.case_id_attribute;
   generalization_options.max_rows_to_materialize =
       options.max_rows_to_materialize;
-  generalization_options.initial_marking = options.initial_marking;
-  generalization_options.final_marking = options.final_marking;
+  copy_token_markings(options, generalization_options);
   const auto fitness = evaluate_replay_fitness(
       log, net, ReplayFitnessVariant::TOKEN_BASED, fitness_options);
   const auto precision = evaluate_precision(
@@ -2042,21 +2207,10 @@ CompositeEvaluationResult evaluate_composite(
     const EventLog& log, const PnmlDocument& document,
     const CompositeEvaluationOptions& options) {
   auto selected = options;
-  const auto inherit_marking = [&](const TokenMarking& stored,
-                                   std::vector<int>& marking) {
-    if (!marking.empty() || stored.empty()) return true;
-    if (stored.size() != document.net.place_count()) return false;
-    for (const auto tokens : stored) {
-      if (tokens < 0 || tokens > std::numeric_limits<int>::max()) return false;
-      marking.push_back(static_cast<int>(tokens));
-    }
-    return true;
-  };
-  if (!inherit_marking(document.initial_marking, selected.initial_marking) ||
-      !inherit_marking(document.final_marking, selected.final_marking)) {
+  if (!inherit_document_token_markings(document, selected)) {
     CompositeEvaluationResult out;
     out.computed = out.fitness_details.computed = false;
-    out.error = out.fitness_details.error = "PNML markings must match the place count and fit the native int range";
+    out.error = out.fitness_details.error = "PNML marking dimension does not match net";
     return out;
   }
   return evaluate_composite_impl(log, document.net, selected, &document);

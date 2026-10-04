@@ -28,6 +28,7 @@ EventLog log(std::initializer_list<std::initializer_list<const char*>> traces) {
       Event event;
       event.case_id = trace.case_id;
       event.activity = activity;
+      event.activity_state = FirstClassAttributeState::kPresent;
       event.input_order = order++;
       trace.events.push_back(std::move(event));
     }
@@ -906,7 +907,7 @@ void composite_document_and_weight_contract() {
   explicit_marks.final_marking = {0, 3};
   stale = document;
   stale.initial_marking = {std::numeric_limits<std::int64_t>::max(), 0};
-  assert(!evaluate_composite(events, stale).computed);
+  assert(evaluate_composite(events, stale).computed);
   assert(evaluate_composite(events, stale, explicit_marks).fitness == 1.0);
 }
 
@@ -1129,6 +1130,90 @@ void exact_log_fitness_marking_contract() {
   try { (void)evaluate_replay_fitness(log({{}}), sequence_net(), ReplayFitnessVariant::TOKEN_BASED, backwards); }
   catch (const std::domain_error& error) { undefined = std::string(error.what()) == "float division by zero"; }
   assert(undefined);
+}
+
+void exact_model_quality_marking_contract() {
+  // A full replay cannot convert this marking to float. Precision only needs
+  // the initial choices for a one-event trace, so it still has a scalar result.
+  const std::string huge = "1" + std::string(399, '0') + "1";
+  PnmlImportOptions import;
+  import.public_marking_semantics = true;
+  const auto document = parse_pnml_document(
+      "<pnml><net id=\"marked\"><page id=\"page\">"
+      "<place id=\"source\"><initialMarking><text>" + huge +
+      "</text></initialMarking></place><place id=\"spare\"/><place id=\"target\"/>"
+      "<transition id=\"move\"><name><text>A</text></name></transition>"
+      "<arc id=\"input\" source=\"source\" target=\"move\"/>"
+      "<arc id=\"output\" source=\"move\" target=\"target\"/></page>"
+      "<finalmarkings><marking><place idref=\"target\"><text>" + huge +
+      "</text></place></marking></finalmarkings></net></pnml>", import);
+  const auto variant = PrecisionVariant::ETCONFORMANCE_TOKEN;
+  assert(evaluate_precision(EventLog{}, document, variant).precision == 1.0);
+  assert(evaluate_precision(log({{}}), document, variant).precision == 0.0);
+  const auto precision = evaluate_precision(log({{"A"}}), document, variant);
+  assert(precision.computed && precision.precision == 1.0 &&
+         precision.token_result_is_precision_only);
+  assert(token_precision_result_json(precision) ==
+         "{\"type\":\"float\",\"hex\":\"0x1.0000000000000p+0\"}");
+  const DirectlyFollowsGraph graph;
+  assert(precision_json(precision, &graph).find("\"token_replay\"") == std::string::npos);
+  const auto overflows = [](auto evaluate) {
+    bool observed = false;
+    try { evaluate(); }
+    catch (const std::overflow_error& error) {
+      observed = std::string(error.what()) == "int too large to convert to float";
+    }
+    assert(observed);
+  };
+  overflows([&] { (void)evaluate_precision(log({{"A", "A"}}), document, variant); });
+  overflows([&] { (void)evaluate_generalization(log({{"A"}}), document); });
+  overflows([&] { (void)evaluate_composite(log({{"A"}}), document); });
+  const auto empty = evaluate_composite(EventLog{}, document);
+  assert(empty.computed && empty.fitness_details.log_fitness_is_integer_zero &&
+         empty.metrics_average_weight == 0.5);
+
+  // Document markings and explicitly supplied exact markings select the same
+  // token evaluation even when their counts cannot fit a native int.
+  auto rounded = document;
+  const TokenInteger count("9007199254740992");
+  rounded.initial_marking = {count, 0, 0};
+  rounded.final_marking = {0, 0, count};
+  const auto composite = evaluate_composite(log({{"A"}}), rounded);
+  assert(composite.computed && composite.fitness == 0x1p-52 &&
+         composite.fitness_details.average_trace_fitness == 0x1p-53 &&
+         composite.precision == 1.0 && composite.generalization == 0.0 &&
+         composite.simplicity == 1.0);
+  CompositeEvaluationOptions explicit_markings;
+  explicit_markings.exact_initial_marking = rounded.initial_marking;
+  explicit_markings.exact_final_marking = rounded.final_marking;
+  explicit_markings.initial_marking_keys = rounded.initial_marking_keys;
+  explicit_markings.final_marking_keys = rounded.final_marking_keys;
+  explicit_markings.place_names = rounded.place_ids;
+  explicit_markings.transition_names = rounded.transition_ids;
+  assert(composite_evaluation_result_json(composite) == composite_evaluation_result_json(
+      evaluate_composite(log({{"A"}}), rounded.net, explicit_markings)));
+
+  const auto empty_document = parse_pnml_document("<pnml><net id=\"empty\"/></pnml>", import);
+  assert(evaluate_precision(log({{"A"}}), empty_document, variant).precision == 1.0);
+  const auto generalization = evaluate_generalization(log({{"A"}}), empty_document);
+  assert(generalization.computed && generalization.generalization == 1.0);
+  assert(token_generalization_result_json(generalization) ==
+         "{\"type\":\"float\",\"hex\":\"0x1.0000000000000p+0\"}");
+  const auto empty_composite = evaluate_composite(EventLog{}, empty_document);
+  assert(empty_composite.computed && empty_composite.metrics_average_weight == 0.75);
+
+  const auto weighted = parse_pnml_document(R"(<pnml><net id="weighted">
+    <place id="source"><initialMarking><text>2</text></initialMarking></place>
+    <place id="gate"><initialMarking><text>3</text></initialMarking></place><place id="sink"/>
+    <transition id="move"><name><text>A</text></name></transition>
+    <arc id="input" source="source" target="move"/><arc id="guard" source="gate" target="move"/>
+    <arc id="output" source="move" target="sink"/>
+    <finalmarkings><marking><place idref="sink"><text>1</text></place></marking></finalmarkings>
+  </net></pnml>)", import);
+  const auto delimiters = log({{"A", ",", "A"}, {"A", "", "u1"}, {"A", "A,B", "A"}});
+  assert(evaluate_precision(delimiters, weighted, variant).precision == 0.5);
+  const auto collisions = log({{"A,B", "A"}, {"A", "B", "u1"}, {"", "A"}, {"", "u2"}, {",", "A"}});
+  assert(evaluate_precision(collisions, weighted, variant).precision == 0x1.d1745d1745d17p-1);
 }
 
 void exact_token_result_aggregation_contract() {
@@ -1518,6 +1603,7 @@ int main() {
   precomputed_replay_aggregation_contract();
   exact_token_result_aggregation_contract();
   exact_log_fitness_marking_contract();
+  exact_model_quality_marking_contract();
   emd_pyemd_contract();
   emd_encoding_and_mass_contract();
   process_tree_evaluation_overloads_contract();

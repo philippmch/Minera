@@ -110,6 +110,7 @@ struct PrecisionResult {
   // ALIGN_ETCONFORMANCE computes prefix alignments only. In that variation
   // alignment_result is deliberately not an ordinary full-log payload.
   bool alignment_detail_present = false;
+  bool token_result_is_precision_only = false;
 };
 struct PrecisionOptions {
   bool use_task_ids = false;
@@ -122,6 +123,12 @@ struct PrecisionOptions {
   std::vector<int> final_marking;
   std::string case_id_attribute = "case:concept:name";
   std::optional<std::size_t> max_rows_to_materialize;
+  std::optional<TokenMarking> exact_initial_marking;
+  std::optional<TokenMarking> exact_final_marking;
+  std::vector<bool> initial_marking_keys;
+  std::vector<bool> final_marking_keys;
+  std::vector<std::string> place_names;
+  std::vector<std::string> transition_names;
 };
 
 struct GeneralizationOptions {
@@ -130,6 +137,12 @@ struct GeneralizationOptions {
   std::vector<int> final_marking;
   std::string case_id_attribute = "case:concept:name";
   std::optional<std::size_t> max_rows_to_materialize;
+  std::optional<TokenMarking> exact_initial_marking;
+  std::optional<TokenMarking> exact_final_marking;
+  std::vector<bool> initial_marking_keys;
+  std::vector<bool> final_marking_keys;
+  std::vector<std::string> place_names;
+  std::vector<std::string> transition_names;
 };
 
 struct GeneralizationResult {
@@ -184,6 +197,12 @@ struct CompositeEvaluationOptions {
   std::vector<int> final_marking;
   std::string case_id_attribute = "case:concept:name";
   std::optional<std::size_t> max_rows_to_materialize;
+  std::optional<TokenMarking> exact_initial_marking;
+  std::optional<TokenMarking> exact_final_marking;
+  std::vector<bool> initial_marking_keys;
+  std::vector<bool> final_marking_keys;
+  std::vector<std::string> place_names;
+  std::vector<std::string> transition_names;
 };
 
 struct CompositeEvaluationResult {
@@ -404,6 +423,12 @@ struct ModelEvaluation {
 [[nodiscard]] PrecisionResult evaluate_precision(
     const EventLog&, const PetriNet&, PrecisionVariant, const PrecisionOptions&);
 [[nodiscard]] PrecisionResult evaluate_precision(
+    const EventLog&, const PnmlDocument&, PrecisionVariant,
+    const PrecisionOptions& = {});
+[[nodiscard]] PrecisionResult evaluate_precision(
+    const EventDataView&, const PnmlDocument&, PrecisionVariant,
+    const PrecisionOptions& = {});
+[[nodiscard]] PrecisionResult evaluate_precision(
     const EventDataView&, const PetriNet&, PrecisionVariant = PrecisionVariant::AUTO,
     const PrecisionOptions& = {});
 [[nodiscard]] PrecisionResult evaluate_precision(
@@ -456,6 +481,14 @@ struct ModelEvaluation {
 [[nodiscard]] GeneralizationResult evaluate_generalization(
     const EventLog&, const PetriNet&, GeneralizationVariant,
     const GeneralizationOptions&);
+[[nodiscard]] GeneralizationResult evaluate_generalization(
+    const EventLog&, const PnmlDocument&,
+    GeneralizationVariant = GeneralizationVariant::GENERALIZATION_TOKEN,
+    const GeneralizationOptions& = {});
+[[nodiscard]] GeneralizationResult evaluate_generalization(
+    const EventDataView&, const PnmlDocument&,
+    GeneralizationVariant = GeneralizationVariant::GENERALIZATION_TOKEN,
+    const GeneralizationOptions& = {});
 [[nodiscard]] GeneralizationResult evaluate_generalization(
     const EventLog&, const ProcessTree&, GeneralizationVariant,
     const GeneralizationOptions&);

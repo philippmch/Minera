@@ -2433,7 +2433,8 @@ void write_precision(std::ostream& out, const PrecisionResult& result,
   out << ", \"precision\": ";
   write_finite_or_null(out, result.precision);
   if (graph != nullptr &&
-      result.variant == PrecisionVariant::ETCONFORMANCE_TOKEN) {
+      result.variant == PrecisionVariant::ETCONFORMANCE_TOKEN &&
+      !result.token_result_is_precision_only) {
     out << ", \"token_replay\": ";
     write_conformance(out, result.token_result, *graph);
   } else if (graph != nullptr &&

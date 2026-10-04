@@ -98,6 +98,10 @@ namespace minera {
 // Exact four-field public token-fitness projection, including float hex and
 // the integer-zero log fitness of empty/nonpositive aggregate denominators.
 [[nodiscard]] std::string token_replay_fitness_result_json(const ReplayFitnessResult& result);
+// Exact typed scalar projections and the complete public composite dictionary.
+[[nodiscard]] std::string token_precision_result_json(const PrecisionResult& result);
+[[nodiscard]] std::string token_generalization_result_json(const GeneralizationResult& result);
+[[nodiscard]] std::string composite_evaluation_result_json(const CompositeEvaluationResult& result);
 
 // Serializes an analysis (the imported event log plus its discovered
 // directly-follows graph) into the JSON document consumed by the frontend.
