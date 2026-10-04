@@ -819,6 +819,7 @@ AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
     place_ids[p] = net.add_place();
     result.place_names.push_back(names[p]);
   }
+  PetriTransitionNameList transition_names;
   for (std::size_t t = 0; t < n; ++t) {
     if (!live_transitions[t]) continue;
     if (options.remove_unconnected && inputs[t].empty() && outputs[t].empty()) continue;
@@ -827,7 +828,9 @@ AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
     const bool hidden = !loops[t] && (t == start_label || t == end_label);
     net.add_transition(hidden ? std::nullopt : visible_ids.at(t),
                        std::move(inputs[t]), std::move(outputs[t]));
+    transition_names.push_back(ids.names[t]);
   }
+  net.set_transition_names(std::move(transition_names));
   result.initial_marking.resize(net.place_count());
   result.final_marking.resize(net.place_count());
   if (live_places[initial]) {

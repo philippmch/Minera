@@ -298,6 +298,10 @@ struct TokenReplayOptions {
   // Forward pre-event and final routing use this cache when supplied. Absence
   // (or an explicit null native value) computes structural paths from the net.
   std::optional<TokenReplayHiddenPathCache> places_shortest_path_by_hidden;
+  // Takes precedence over string names and actual net name metadata. An
+  // explicit value has one entry per transition; null differs from "".
+  // Otherwise nonempty string names override metadata, then t0, t1, ... apply.
+  std::optional<PetriTransitionNameList> nullable_transition_names;
 };
 
 struct TokenReplayTraceReference {
@@ -344,6 +348,8 @@ struct TokenReplayResult {
   std::vector<std::string> transition_names;
   std::vector<std::optional<std::string>> transition_labels;
   std::optional<TokenReplayMarkingDomain> marking_domain;
+  // Authoritative names when discovery or explicit options retain nulls.
+  std::optional<PetriTransitionNameList> nullable_transition_names;
 };
 
 [[nodiscard]] std::vector<TokenReplayTransitionRootCauseDiagnostics>

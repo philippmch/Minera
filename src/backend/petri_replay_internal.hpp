@@ -59,6 +59,36 @@ inline std::vector<std::string> replay_element_names(
   return result;
 }
 
+inline PetriTransitionNameList replay_transition_names(
+    const std::optional<PetriTransitionNameList>& nullable_names,
+    const std::vector<std::string>& string_names, const PetriNet& net) {
+  if (nullable_names) {
+    if (nullable_names->size() != net.transitions().size())
+      throw std::invalid_argument("nullable_transition_names must contain one entry per transition");
+    return *nullable_names;
+  }
+  if (string_names.empty() && net.transition_names()) {
+    if (net.transition_names()->size() != net.transitions().size())
+      throw std::invalid_argument("Petri transition name metadata has the wrong size");
+    return *net.transition_names();
+  }
+  const auto strings = replay_element_names(string_names, net.transitions().size(), "t", "transition_names");
+  return PetriTransitionNameList(strings.begin(), strings.end());
+}
+
+inline void validate_forward_transition_name_order(const PetriTransitionNameList& names) {
+  if (names.size() < 2) return;
+  const auto first_null = std::find(names.begin(), names.end(), std::nullopt);
+  if (first_null == names.end()) return;
+  // Public stable sorting compares the second element against the first.
+  // A later first null necessarily compares against a preceding string.
+  const bool at_front = first_null == names.begin();
+  const auto left = at_front && names[1] ? "str" : "NoneType";
+  const auto right = at_front ? "NoneType" : "str";
+  throw std::invalid_argument(std::string("'<' not supported between instances of '")
+      + left + "' and '" + right + "'");
+}
+
 inline CleaningComponents cleaning_components(const PetriNet& net,
                                        const ReplayMarkingKeys& initial_keys,
                                        const ReplayMarkingKeys& final_keys) {
