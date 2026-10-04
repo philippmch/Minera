@@ -175,6 +175,36 @@ void present_empty_activity_is_a_visible_leaf() {
   assert(throws([&] { (void)discover_process_tree(missing); }));
 }
 
+void branch_order_follows_public_digest_keys() {
+  for (const auto variant : {InductiveMinerVariant::IM,
+                             InductiveMinerVariant::IMF,
+                             InductiveMinerVariant::IMD}) {
+    InductiveMinerOptions options;
+    options.variant = variant;
+    const auto alphabet = discover_process_tree(
+        log_from_variants({{"A"}, {"B"}, {"C"}}), options);
+    assert(alphabet.root().op == ProcessTreeOperator::kExclusive);
+    assert(render(alphabet, alphabet.root()) == "X(C,A,B)");
+
+    const auto labels = discover_process_tree(
+        log_from_variants({{""}, {" "}, {"ü"}}), options);
+    assert(labels.root().op == ProcessTreeOperator::kExclusive);
+    const std::vector<std::string> expected{" ", "ü", ""};
+    assert(labels.root().children.size() == expected.size());
+    for (std::size_t index = 0; index < expected.size(); ++index)
+      assert(labels.activities().at(labels.root().children[index].activity) ==
+             expected[index]);
+
+    const auto delimiter = discover_process_tree(
+        log_from_variants({{"A", ",", "A"}, {"A", "", "u1"},
+                           {"A", "A,B", "A"}}), options);
+    const auto& redo = delimiter.root().children.front().children[1];
+    assert(redo.op == ProcessTreeOperator::kExclusive);
+    assert(delimiter.activities().at(redo.children[0].activity) == "A,B");
+    assert(delimiter.activities().at(redo.children[1].activity) == ",");
+  }
+}
+
 void graph_self_loop_keeps_unknown_skip_behavior() {
   const auto repeated = log_from_variants({{"a", "a"}});
   InductiveMinerOptions options;
@@ -571,6 +601,7 @@ void filtered_cut_drops_activities_outside_the_filtered_alphabet() {
 int main() {
   ordinary_variants_and_graph_input();
   present_empty_activity_is_a_visible_leaf();
+  branch_order_follows_public_digest_keys();
   graph_self_loop_keeps_unknown_skip_behavior();
   graph_registry_only_activities_do_not_create_behavior();
   graph_projection_preserves_boundaries_and_skips();
