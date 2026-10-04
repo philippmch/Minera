@@ -24,7 +24,8 @@ struct AlphaMinerOptions {
   // conventional Event::activity projection. Classic grouped-log discovery
   // preserves explicit null values as unlabeled transitions and accepts an
   // isolated missing event. Missing selected fields in adjacent pairs fail.
-  // String normalization and Alpha+ require non-null selected values.
+  // Alpha+ also preserves null values, but requires every selected field.
+  // String normalization requires non-null selected values.
   std::string activity_attribute = "concept:name";
 
   // Alpha+ keeps transitions that the footprint cannot connect by default,
@@ -93,8 +94,8 @@ struct AlphaMinerOptions {
 // Names are structural: distinct places may carry the same maximal-pair name.
 struct AlphaPlaceName {
   std::string boundary;
-  std::vector<std::string> before;
-  std::vector<std::string> after;
+  std::vector<std::optional<std::string>> before;
+  std::vector<std::optional<std::string>> after;
   bool operator==(const AlphaPlaceName&) const = default;
 };
 struct AlphaDetachedMarking {

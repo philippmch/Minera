@@ -1,4 +1,4 @@
-export type AlphaPlaceName = { boundary: string } | { before: string[]; after: string[] };
+export type AlphaPlaceName = { boundary: string } | { before: (string | null)[]; after: (string | null)[] };
 export interface AlphaPlusResult {
   family: "ALPHA_PLUS";
   places: { id: number; name: AlphaPlaceName; initial: number; final: number }[];
@@ -16,13 +16,13 @@ const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 const count = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-const strings = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every(item => typeof item === "string");
+const activities = (value: unknown): value is (string | null)[] =>
+  Array.isArray(value) && value.every(item => item === null || typeof item === "string");
 function placeName(value: unknown): value is AlphaPlaceName {
   if (!record(value)) return false;
   if (typeof value.boundary === "string" && value.boundary.length > 0)
     return value.before === undefined && value.after === undefined;
-  return value.boundary === undefined && strings(value.before) && strings(value.after);
+  return value.boundary === undefined && activities(value.before) && activities(value.after);
 }
 export function isAlphaPlusResult(value: unknown): value is AlphaPlusResult {
   if (!record(value) || value.family !== "ALPHA_PLUS" || !Array.isArray(value.places) || !Array.isArray(value.transitions)) return false;

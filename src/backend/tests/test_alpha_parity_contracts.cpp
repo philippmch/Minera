@@ -178,6 +178,35 @@ void classic_distinguishes_null_blank_and_missing_activities() {
   assert(nullable.transitions().front().outputs == std::vector<std::size_t>{nullable.sink()});
 }
 
+void plus_preserves_null_labels_and_structural_names() {
+  auto log = make_log({{"ignored"}});
+  auto& event = log.traces.front().events.front();
+  event.activity.clear();
+  event.activity_state = FirstClassAttributeState::kNull;
+  const auto result = discover_alpha_plus_result(log);
+  assert(result.net.activities().empty() && result.net.transitions().size() == 1);
+  const auto& transition = result.net.transitions().front();
+  assert(transition.silent());
+  assert(transition.inputs == std::vector<std::size_t>{result.net.source()});
+  assert(transition.outputs == std::vector<std::size_t>{result.net.sink()});
+  assert(result.initial_marking[result.net.source()] == 1);
+  assert(result.final_marking[result.net.sink()] == 1);
+  assert(result.place_names[result.net.source()].after ==
+         std::vector<std::optional<std::string>>{std::nullopt});
+  assert(event.activity_state == FirstClassAttributeState::kNull);
+
+  EventAttribute phase{"phase", ""};
+  phase.is_null = true;
+  event.attributes.push_back(phase);
+  const auto selected = discover_alpha_plus_result(log, {.activity_attribute = "phase"});
+  assert(selected.net.activities().empty() && selected.net.transitions().front().silent());
+  event.attributes.clear();
+  bool rejected = false;
+  try { (void)discover_alpha_plus_result(log, {.activity_attribute = "phase"}); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+}
+
 void plus_interior_one_loop_has_a_fresh_self_only_place() {
   const auto source = make_log({{"a", "L", "L", "b"}, {"a", "b"}});
   const auto net = discover_alpha_plus(source);
@@ -328,6 +357,7 @@ int main() {
   sparse_classic_distinguishes_zero_frequency_from_missing_keys();
   grouped_alpha_materialization_cap_precedes_copy();
   classic_distinguishes_null_blank_and_missing_activities();
+  plus_preserves_null_labels_and_structural_names();
   plus_interior_one_loop_has_a_fresh_self_only_place();
   plus_keeps_an_end_boundary_without_one_loops();
   plus_sharp_preserves_boundary_outgoing_presence();

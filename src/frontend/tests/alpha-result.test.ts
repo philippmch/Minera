@@ -24,4 +24,14 @@ describe("Alpha+ explicit markings", () => {
     expect(() => alphaPlusResultQuery({ activity_attribute: " " })).toThrow();
     expect(() => alphaPlusResultQuery({ max_rows_to_materialize: 0.5 })).toThrow();
   });
+  it("retains null and blank place-name members in live and detached markings", () => {
+    const name = { before: [null, "", "None"], after: [null, "a"] };
+    const nullable = { ...result, places: [{ ...result.places[0], name }],
+      transitions: [{ id: 0, label: null, inputs: [0], outputs: [0] }],
+      detached_initial_marking: [{ name, tokens: 1 }] };
+    expect(isAlphaPlusResult(nullable)).toBe(true);
+    expect(nullable.places[0].name.before).toEqual([null, "", "None"]);
+    expect(isAlphaPlusResult({ ...nullable, detached_initial_marking: [{ name: { before: [0], after: [] }, tokens: 1 }] })).toBe(false);
+    expect(isAlphaPlusResult({ ...nullable, places: [{ ...nullable.places[0], name: { before: [], after: [false] } }] })).toBe(false);
+  });
 });
