@@ -452,6 +452,20 @@ void minimum_self_distance_json_resolves_ids_and_validates_before_writing() {
   expect_rejected({{"A", 1, {"missing"}}});
 }
 
+void minimum_self_distance_json_preserves_null_values() {
+  minera::EventLog log;
+  auto graph = minera::discover_directly_follows_graph(log);
+  graph.ensure_activity("");
+  graph.ensure_activity("A");
+  const minera::MinimumSelfDistances distances{
+      {"", 1, {""}, true, false}, {"A", 1, {}, false, true}};
+  const auto json = minera::analysis_json(
+      "null-msd", log, graph, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, &distances);
+  assert(json.find("\"minimum_self_distances\": [{\"activity\": null, \"distance\": 1, \"witnesses\": [0]}, {\"activity\": 1, \"distance\": 1, \"witnesses\": [null]}]") != std::string::npos);
+}
+
 void temporal_profile_scales_to_many_activities() {
   minera::EventLog log;
   minera::Trace trace;
@@ -6963,6 +6977,7 @@ int main() {
   minimum_self_distance_discovers_distances_and_witnesses();
   minimum_self_distance_supports_custom_activity_and_case_columns();
   minimum_self_distance_json_resolves_ids_and_validates_before_writing();
+  minimum_self_distance_json_preserves_null_values();
   temporal_profile_scales_to_many_activities();
   temporal_profile_rejects_or_skips_bad_timestamps_and_checks_deviations();
   temporal_profile_supports_attributes_business_hours_and_validation();

@@ -248,18 +248,97 @@ void minimum_self_distance_witness_utility_contract() {
                                                         {"MISSING", 2},
                                                         {"ZERO", 0}};
   const auto witnesses = derive_msd_witnesses(log, requested);
-  assert((witnesses.at("A") == std::set<std::string>{"B"}));
-  assert(witnesses.at("MISSING").empty());
-  assert(witnesses.at("ZERO").empty());
+  assert((witnesses.at("A") == MinimumSelfDistanceWitnessMap::mapped_type{"B"}));
+  assert(!witnesses.contains("MISSING"));
+  assert(!witnesses.contains("ZERO"));
   const auto discovered = discover_minimum_self_distances(log);
   const auto discovered_witnesses =
       derive_minimum_self_distance_witnesses(log, discovered);
-  assert(discovered_witnesses.at("A") == std::set<std::string>{"B"});
+  assert(discovered_witnesses.at("A") ==
+         MinimumSelfDistanceWitnessMap::mapped_type{"B"});
   assert(MinimumSelfDistanceWitnessDerivation::derive(log, requested) ==
          witnesses);
   const auto class_witnesses =
       MinimumSelfDistanceWitnesses::derive(log, discovered);
-  assert(class_witnesses.at("A") == std::set<std::string>{"B"});
+  assert(class_witnesses.at("A") ==
+         MinimumSelfDistanceWitnessMap::mapped_type{"B"});
+}
+
+Event nullable_event(MinimumSelfDistanceActivity label,
+                     const std::string& key = "concept:name") {
+  Event event;
+  EventAttribute attribute;
+  attribute.key = key;
+  attribute.value = label.value_or("");
+  attribute.is_null = !label.has_value();
+  event.attributes.push_back(attribute);
+  if (key == "concept:name") {
+    event.activity = attribute.value;
+    event.activity_state = attribute.is_null ? FirstClassAttributeState::kNull
+                                             : FirstClassAttributeState::kPresent;
+    event.activity_source_key = key;
+    event.activity_attribute = attribute;
+  } else {
+    event.activity = "ignored";
+    event.activity_state = FirstClassAttributeState::kPresent;
+  }
+  return event;
+}
+
+void minimum_self_distance_nullable_and_supplied_witness_contract() {
+  for (const auto& key : {std::string{"concept:name"}, std::string{"phase"}}) {
+    EventLog log;
+    Trace first;
+    first.events = {nullable_event(std::nullopt, key), nullable_event("", key),
+                    nullable_event(std::nullopt, key)};
+    Trace second;
+    second.events = {nullable_event("A", key), nullable_event(std::nullopt, key),
+                     nullable_event("A", key)};
+    log.traces = {first, second};
+    const auto before = log;
+    MinimumSelfDistanceOptions options;
+    options.activity_key = key;
+    const auto distances = discover_minimum_self_distances(log, options);
+    assert(distances.size() == 2);
+    assert(distances[0].activity_is_null && distances[0].activity.empty());
+    assert(distances[0].distance == 1 && !distances[0].witnesses_include_null);
+    assert((distances[0].witnesses == std::vector<std::string>{""}));
+    assert(!distances[1].activity_is_null && distances[1].activity == "A");
+    assert(distances[1].distance == 1 && distances[1].witnesses.empty());
+    assert(distances[1].witnesses_include_null);
+    const MinimumSelfDistanceMap requested{{std::nullopt, 1}, {"", 1},
+                                            {"A", 1}, {"unobserved", 1}};
+    const auto witnesses = derive_msd_witnesses(log, requested, options);
+    assert(witnesses.size() == 3 && witnesses.at("").empty());
+    assert(witnesses.at(std::nullopt) ==
+           MinimumSelfDistanceWitnessMap::mapped_type{""});
+    assert(witnesses.at("A") ==
+           MinimumSelfDistanceWitnessMap::mapped_type{std::nullopt});
+    assert(!witnesses.contains("unobserved"));
+    assert(derive_minimum_self_distance_witnesses(log, distances, options).size() == 2);
+    const MinimumSelfDistanceMap omitted{{std::nullopt, 0}, {"", -1}, {"A", 0}};
+    assert(derive_msd_witnesses(log, omitted, options).empty());
+    assert(derive_msd_witnesses(log, MinimumSelfDistanceMap{}, options).empty());
+    assert(log.traces[0].events[0].activity_state == before.traces[0].events[0].activity_state);
+    assert(log.traces[0].events[0].attributes == before.traces[0].events[0].attributes);
+    bool automatic_rejected = false;
+    try {
+      (void)derive_msd_witnesses(log, options);
+    } catch (const std::logic_error& error) {
+      automatic_rejected = std::string(error.what()) == "'dict' object has no attribute 'apply'";
+    }
+    assert(automatic_rejected);
+  }
+
+  EventLog log;
+  Trace trace;
+  trace.events = {nullable_event("A"), nullable_event("A"),
+                  nullable_event("B"), nullable_event("C"), nullable_event("A")};
+  log.traces.push_back(trace);
+  assert(discover_minimum_self_distances(log).front().distance == 0);
+  const auto witnesses = derive_msd_witnesses(log, MinimumSelfDistanceMap{{"A", 2}});
+  assert((witnesses.at("A") == MinimumSelfDistanceWitnessMap::mapped_type{"B", "C"}));
+  assert(derive_msd_witnesses(EventLog{}, MinimumSelfDistanceMap{{"A", 1}}).empty());
 }
 
 void minimum_self_distance_selector_contract() {
@@ -294,6 +373,7 @@ int main() {
   minimum_self_distance_flat_role_mismatch_contract();
   minimum_self_distance_generic_dispatch_contract();
   minimum_self_distance_witness_utility_contract();
+  minimum_self_distance_nullable_and_supplied_witness_contract();
   minimum_self_distance_selector_contract();
   return 0;
 }

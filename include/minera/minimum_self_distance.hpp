@@ -35,6 +35,9 @@ struct MinimumSelfDistance {
   std::string activity;
   std::uint64_t distance = 0;
   std::vector<std::string> witnesses;
+  // Null is a distinct activity value, including when the text is empty.
+  bool activity_is_null = false;
+  bool witnesses_include_null = false;
 
   friend bool operator==(const MinimumSelfDistance&,
                          const MinimumSelfDistance&) = default;
@@ -42,8 +45,12 @@ struct MinimumSelfDistance {
 
 using MinimumSelfDistances = std::vector<MinimumSelfDistance>;
 
+using MinimumSelfDistanceActivity = std::optional<std::string>;
+using MinimumSelfDistanceMap =
+    std::map<MinimumSelfDistanceActivity, std::int64_t>;
 using MinimumSelfDistanceWitnessMap =
-    std::map<std::string, std::set<std::string>>;
+    std::map<MinimumSelfDistanceActivity,
+             std::set<MinimumSelfDistanceActivity>>;
 
 // Discovers the minimum number of events strictly between consecutive
 // occurrences of each repeated activity, across all traces. Activities that
@@ -72,9 +79,14 @@ using MinimumSelfDistanceWitnessMap =
     const EventDataView& data,
     const MinimumSelfDistanceOptions& options = {});
 
-// Derives the activity witnesses for a supplied minimum-distance map. Entries
-// with distance zero, negative values, or no observed distance have no
-// witnesses. When the map is omitted, distances are discovered first.
+// A supplied map includes only observed keys whose supplied distance is
+// positive. Matching consecutive-occurrence gaps contribute their witnesses;
+// a key with no matching gap still has an empty set. Null keys/members are
+// represented by std::nullopt. The omitted-map route preserves the observed
+// public utility error; pass discovered distances explicitly to derive them.
+[[nodiscard]] MinimumSelfDistanceWitnessMap derive_msd_witnesses(
+    const EventLog& log, const MinimumSelfDistanceMap& msd,
+    const MinimumSelfDistanceOptions& options = {});
 [[nodiscard]] MinimumSelfDistanceWitnessMap derive_msd_witnesses(
     const EventLog& log, const std::map<std::string, std::uint64_t>& msd,
     const MinimumSelfDistanceOptions& options = {});
@@ -95,6 +107,11 @@ derive_minimum_self_distance_witnesses(
 
 class MinimumSelfDistanceWitnessDerivation {
  public:
+  [[nodiscard]] static MinimumSelfDistanceWitnessMap derive(
+      const EventLog& log, const MinimumSelfDistanceMap& msd,
+      const MinimumSelfDistanceOptions& options = {}) {
+    return derive_msd_witnesses(log, msd, options);
+  }
   [[nodiscard]] static MinimumSelfDistanceWitnessMap derive(
       const EventLog& log, const std::map<std::string, std::uint64_t>& msd,
       const MinimumSelfDistanceOptions& options = {}) {
