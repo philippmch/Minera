@@ -1,0 +1,2697 @@
+{
+  "archive_members": {
+    "cached-public/actual-call-journal.jsonl": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 1219781,
+      "chunks": 1,
+      "sha256": "b8a1f7558c45965e379e059ea1803ca1d30b891677af91a5db688ac349faad00",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-cached-witness-public-28f370f360f24a5aa323b3cb950c3d14\\actual-call-journal.jsonl"
+    },
+    "cached-public/execution.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 661,
+      "chunks": 1,
+      "sha256": "756ac15d34de8a5292a7c1e254220c5ab31bbdba6d1dbb25e0739041182fc26d",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-cached-witness-public-28f370f360f24a5aa323b3cb950c3d14\\execution.json"
+    },
+    "cached-public/fixtures.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 204474,
+      "chunks": 1,
+      "sha256": "0cf18392743f7b8a29c77fae016702bc4cd53e6c93c21ada786e83802ab5fdbd",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-cached-witness-public-28f370f360f24a5aa323b3cb950c3d14\\fixtures.json"
+    },
+    "cached-public/maps.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 57648,
+      "chunks": 1,
+      "sha256": "be2d64c13c593e08cf085fa9017ed779eb24c33ca685b7bdf88da3fe7913c6bc",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-cached-witness-public-28f370f360f24a5aa323b3cb950c3d14\\maps.json"
+    },
+    "cached-public/preparation.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 1334,
+      "chunks": 1,
+      "sha256": "0ae07397517690a08dbe3a8d856c2ebd26400a395c52e9a0ac374ee91ace8f73",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-cached-witness-public-28f370f360f24a5aa323b3cb950c3d14\\preparation.json"
+    },
+    "cached-public/public-returned-values.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 4260663,
+      "chunks": 1,
+      "sha256": "394b8c86439d5c382797e84df6cdc892de53e4c9f528e09f81aedab112152571",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-cached-witness-public-28f370f360f24a5aa323b3cb950c3d14\\public-returned-values.json"
+    },
+    "cached-public/stderr.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 0,
+      "chunks": 1,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-cached-witness-public-28f370f360f24a5aa323b3cb950c3d14\\stderr.txt"
+    },
+    "cached-public/stdout.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 80,
+      "chunks": 1,
+      "sha256": "8cbae6d78875518f78a5cac2f5bbe140dd98e352b52c9e489113a7cb9e56a35d",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-cached-witness-public-28f370f360f24a5aa323b3cb950c3d14\\stdout.txt"
+    },
+    "helpers/capture-nullable-msd-cached-witness-public.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 7520,
+      "chunks": 1,
+      "sha256": "53cb82c6614a84edd82de79cfbf037129dfe5f6fdb681a7c8982d84a55d55a6b",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-nullable-msd-cached-witness-public.py"
+    },
+    "helpers/capture-nullable-msd-public.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 10772,
+      "chunks": 1,
+      "sha256": "f2d9d908c7817f9abcfcb648af54ca296ed9c16691c3af721c65d7c637b1b9b7",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-nullable-msd-public.py"
+    },
+    "helpers/capture-simplicity-structure-reference-retry.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 13849,
+      "chunks": 1,
+      "sha256": "c3a6a5adf4c7d6e94928272e8fdfcc3887dd7ad13b03dd7c6210430f0f4490fc",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-simplicity-structure-reference-retry.py"
+    },
+    "helpers/check-nullable-inductive-native-after.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 13590,
+      "chunks": 1,
+      "sha256": "bd367b1e880e2df37fbb74b16dad2be68aaf0d9121ca9c89cebde8559b1ecaea",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\check-nullable-inductive-native-after.py"
+    },
+    "helpers/check-nullable-msd-native-baseline.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 13308,
+      "chunks": 1,
+      "sha256": "d84843bf0e13804c1778aa33eaabf4f5e2fdac59e7a8f841482874600ec3aaa8",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\check-nullable-msd-native-baseline.py"
+    },
+    "helpers/compare-nullable-msd-baseline.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 9451,
+      "chunks": 1,
+      "sha256": "2952564960996d52f21cb576571b850dc4f051c5d01a6fcda398fe74d41f050d",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\compare-nullable-msd-baseline.py"
+    },
+    "helpers/compare-nullable-msd-corrected-policy.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 10554,
+      "chunks": 1,
+      "sha256": "77c7639e95ef967a9c9c5457ecce702d5f4449e3c0eaba9145a446bc365b1df5",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\compare-nullable-msd-corrected-policy.py"
+    },
+    "helpers/derive-nullable-msd-evidence-retry.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 3230,
+      "chunks": 1,
+      "sha256": "a8c2446357d715e3d1169932cb9948d38be7c0d43f95edb7a23dbce254a23a4f",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\derive-nullable-msd-evidence-retry.py"
+    },
+    "helpers/derive-nullable-msd-native-baseline.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 5596,
+      "chunks": 1,
+      "sha256": "55f6449cb49701c586fa10284045c0f7095c721ce62a7bed2d2f46bf30190cc0",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\derive-nullable-msd-native-baseline.py"
+    },
+    "helpers/derive-nullable-msd-policy.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 2252,
+      "chunks": 1,
+      "sha256": "c6b1514a6d582583cabf51a3738a40758b502b8856358eb6e2834f344bcb5457",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\derive-nullable-msd-policy.py"
+    },
+    "helpers/document-nullable-msd-baseline.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 5712,
+      "chunks": 1,
+      "sha256": "06a13957aa06e9a4d37aac58a707cbeb977aaa81cf91b5437a4a07e3ee7ea2c1",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\document-nullable-msd-baseline.py"
+    },
+    "helpers/nullable-msd-checkpoint-support.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 3619,
+      "chunks": 1,
+      "sha256": "bcce5b0fcbda055f44ec37c4cd6e3f62956766cdff7465ef791d1524bae88068",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-checkpoint-support.py"
+    },
+    "helpers/nullable-msd-save-first-failure.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 858,
+      "chunks": 1,
+      "sha256": "38a5407b997bca1ba2a29140f0e79d5dd3b86ee61282fa4eeee16eb92cfd0a02",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-save-first-failure.json"
+    },
+    "helpers/nullable-msd-stage-baseline.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 16722,
+      "chunks": 1,
+      "sha256": "85c79e23934e80668fd828768bb2759f539d4c092de7057966bfe579ff769c40",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-stage-baseline.json"
+    },
+    "helpers/save-empty-activity-mining-evidence.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 16839,
+      "chunks": 1,
+      "sha256": "24280675400d5e644d448fd328264fcb3a022f79ebe09fac4891f88033e7bae0",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\save-empty-activity-mining-evidence.py"
+    },
+    "helpers/save-nullable-msd-baseline-evidence-retry.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 14261,
+      "chunks": 1,
+      "sha256": "7555484e7cba1e7dd8d9e65c2f14cf4205ee247e1f4cbbca81ebc5af7b2ad16b",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\save-nullable-msd-baseline-evidence-retry.py"
+    },
+    "helpers/save-nullable-msd-baseline-evidence.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 13545,
+      "chunks": 1,
+      "sha256": "3ed3bc4fcea525b723d672d712e700285702f51bf2744c8ae3a3682b25201e93",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\save-nullable-msd-baseline-evidence.py"
+    },
+    "helpers/stage-heuristic-subsecond-doc.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 654,
+      "chunks": 1,
+      "sha256": "abb80e08c6624e8e0217925cd27774459d56049bea56e3ef9bb74bf2cdd6247b",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\stage-heuristic-subsecond-doc.py"
+    },
+    "helpers/stage-nullable-msd-baseline-checkpoint.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 2187,
+      "chunks": 1,
+      "sha256": "b63b964f37d7ce4b933e2cd3cb00c488fdad289c8cd56caedba2e2cbec2b22e4",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\stage-nullable-msd-baseline-checkpoint.py"
+    },
+    "helpers/verify-nullable-msd-baseline-postcommit.py": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 2828,
+      "chunks": 1,
+      "sha256": "0eaab7602175c91419a355b15388ac958b9f5a0410220f6afb705f64b0115100",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\verify-nullable-msd-baseline-postcommit.py"
+    },
+    "native-baseline/CMakeCache.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 13397,
+      "chunks": 1,
+      "sha256": "21f683da48def20e8c35f961808b20648a077dcab15ab724e4f11f1355208a53",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\native-build\\CMakeCache.txt"
+    },
+    "native-baseline/CMakeLists.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 661,
+      "chunks": 1,
+      "sha256": "3080dfdaa934766e9d40d40f0928536236fa14198c5cffe435f8018dca1c8365",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\CMakeLists.txt"
+    },
+    "native-baseline/command-0.stderr.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 0,
+      "chunks": 1,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\command-0.stderr.txt"
+    },
+    "native-baseline/command-0.stdout.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 645,
+      "chunks": 1,
+      "sha256": "ed911fd4f9a94ad251fe90220b696940f5ea0794378a01e68b5c6bf99cf0dbca",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\command-0.stdout.txt"
+    },
+    "native-baseline/command-1.stderr.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 0,
+      "chunks": 1,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\command-1.stderr.txt"
+    },
+    "native-baseline/command-1.stdout.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 767,
+      "chunks": 1,
+      "sha256": "d010266beb0635e4ecffccae8a939afbbe587a6ab3e17ef533c25b221fcd42fd",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\command-1.stdout.txt"
+    },
+    "native-baseline/command-2.stderr.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 0,
+      "chunks": 1,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\command-2.stderr.txt"
+    },
+    "native-baseline/command-2.stdout.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 161357,
+      "chunks": 1,
+      "sha256": "65e7cd3846e5bbeb1bf8f932ef84fed89ed152051f2ba8ced1a9b76c98677c6c",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\command-2.stdout.txt"
+    },
+    "native-baseline/comparison-corrected-policy.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 622617,
+      "chunks": 1,
+      "sha256": "087e053ecbeb0f863d6419076b46a9e0382da5c71344c1524b0cb1d9e602eb08",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\comparison-corrected-policy.json"
+    },
+    "native-baseline/comparison.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 1986081,
+      "chunks": 1,
+      "sha256": "17020f877715e45355c0a48acad80dfdb96b2c8bba3135aaad5745c46813b58b",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\comparison.json"
+    },
+    "native-baseline/execution.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 2143,
+      "chunks": 1,
+      "sha256": "784a86901d8ff877eb0f67190c0404c492d1b1e649371fe8f29fb08dd6ca337f",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\execution.json"
+    },
+    "native-baseline/fixtures.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 204474,
+      "chunks": 1,
+      "sha256": "0cf18392743f7b8a29c77fae016702bc4cd53e6c93c21ada786e83802ab5fdbd",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\fixtures.json"
+    },
+    "native-baseline/preparation.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 77225,
+      "chunks": 1,
+      "sha256": "a2203b6ce27fa6377f56e4e353af848dcf0923ced92adfeac604b7728b5b21cc",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\preparation.json"
+    },
+    "native-baseline/probe.cpp": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 1657210,
+      "chunks": 1,
+      "sha256": "882f86ff482f1f1dc61df4b19cc78b1749f81c3eb3d5333b6aa5bd50ecf7cf05",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\probe.cpp"
+    },
+    "native-baseline/probe.exe": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 2950144,
+      "chunks": 1,
+      "sha256": "e4df898eb1353f0b07d052197d89a335395f3023f192ab81c1d5a2642f1f845e",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\native-build\\Release\\nullable_msd_probe.exe"
+    },
+    "native-baseline/probe.vcxproj": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 60127,
+      "chunks": 1,
+      "sha256": "f1e43289952e891c5106e18c993c7a50f4ee62fd8bf9ddec0e913dbc15836d2b",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\native-build\\nullable_msd_probe.vcxproj"
+    },
+    "owned-source/include/minera/minimum_self_distance.hpp": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 7455,
+      "chunks": 1,
+      "sha256": "2af231ddd541ccf369f34b743ecd7b864435abcd0d2cc92132f16d84ffd4196b",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\include\\minera\\minimum_self_distance.hpp"
+    },
+    "owned-source/src/backend/json_export.cpp": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 304314,
+      "chunks": 1,
+      "sha256": "010e90b2d7903b899af3818e0b386f0a6730c63f60072de155f5159b76106b80",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\src\\backend\\json_export.cpp"
+    },
+    "owned-source/src/backend/minimum_self_distance.cpp": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 33978,
+      "chunks": 1,
+      "sha256": "c1d3164e23e2bd0664fdd3a863cb8628945fda563f8f593f3f615cd2089b6a03",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\src\\backend\\minimum_self_distance.cpp"
+    },
+    "owned-source/src/backend/tests/minimum_self_distance_parity_contracts.cpp": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 11746,
+      "chunks": 1,
+      "sha256": "f803bb9748f6d5098ad2a3cb055e388c27906085ef06ef602adcb4d827e493c1",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\src\\backend\\tests\\minimum_self_distance_parity_contracts.cpp"
+    },
+    "owned-source/src/backend/tools/minera_server.cpp": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 386558,
+      "chunks": 1,
+      "sha256": "a2f31f6471204282f08e65540e9209b19905f7334c18685d73516e72e6ee7c14",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\src\\backend\\tools\\minera_server.cpp"
+    },
+    "public/actual-call-journal.jsonl": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 9979707,
+      "chunks": 2,
+      "sha256": "eabce4c33495914fc78253647d5f54f34215f57fd778206b0c3282d490b1d8dc",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-public-0ab380aec58849eba6692b2116f74138\\actual-call-journal.jsonl"
+    },
+    "public/execution.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 631,
+      "chunks": 1,
+      "sha256": "480f91408cf37348ee8a610b6704085e28ecb04b56a4910cc94ded1409aec12a",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-public-0ab380aec58849eba6692b2116f74138\\execution.json"
+    },
+    "public/fixtures.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 204474,
+      "chunks": 1,
+      "sha256": "0cf18392743f7b8a29c77fae016702bc4cd53e6c93c21ada786e83802ab5fdbd",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-public-0ab380aec58849eba6692b2116f74138\\fixtures.json"
+    },
+    "public/preparation.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 1527,
+      "chunks": 1,
+      "sha256": "344285400acad4431b92c4d88d994db0f19b7b37ab227aa9fcf4ede11fb5bd77",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-public-0ab380aec58849eba6692b2116f74138\\preparation.json"
+    },
+    "public/profiles.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-01.jsonl.gz"
+      ],
+      "bytes": 915,
+      "chunks": 1,
+      "sha256": "b724f1f452ae77d5e3ef4d83674b5b5e22a66f53865b97db4607257fa848bc43",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-public-0ab380aec58849eba6692b2116f74138\\profiles.json"
+    },
+    "public/public-returned-values.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-02.jsonl.gz",
+        "nullable-msd-baseline-evidence-03.jsonl.gz"
+      ],
+      "bytes": 34671247,
+      "chunks": 5,
+      "sha256": "4ad5f9700d99fa654b8146ca0d7b3c6e8a8102e5e68efff6d34dfd1d0a7bcd3c",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-public-0ab380aec58849eba6692b2116f74138\\public-returned-values.json"
+    },
+    "public/public-signatures.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-03.jsonl.gz"
+      ],
+      "bytes": 960,
+      "chunks": 1,
+      "sha256": "2382cbd50b01d5c56883abbcabc6c62c1d00b1e457d7976c2b2b002ad41abfee",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-public-0ab380aec58849eba6692b2116f74138\\public-signatures.json"
+    },
+    "public/stderr.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-03.jsonl.gz"
+      ],
+      "bytes": 0,
+      "chunks": 1,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-public-0ab380aec58849eba6692b2116f74138\\stderr.txt"
+    },
+    "public/stdout.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-03.jsonl.gz"
+      ],
+      "bytes": 83,
+      "chunks": 1,
+      "sha256": "6410a807695a492489dcd6f465c213042665155ad945b56f2412c956ac50bf05",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-public-0ab380aec58849eba6692b2116f74138\\stdout.txt"
+    },
+    "unchanged-parent/152-tests.stdout.txt": {
+      "archives": [
+        "nullable-msd-baseline-evidence-03.jsonl.gz"
+      ],
+      "bytes": 22440,
+      "chunks": 1,
+      "sha256": "3084501f008913a1bfed31a58d0d81e0541c2969ab042cf722c7054a40aa84e1",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\command-4.stdout.txt"
+    },
+    "unchanged-parent/application-comparison.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-03.jsonl.gz"
+      ],
+      "bytes": 420881,
+      "chunks": 1,
+      "sha256": "e773e618bd3cfb8fa80796ce58ce085badc264f7482bcfb5bda76bf0062c206b",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-applications-0dcaad4e64fd4b1ab48d6ce7c938ee9d\\comparison.json"
+    },
+    "unchanged-parent/binary-bindings.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-03.jsonl.gz"
+      ],
+      "bytes": 140535,
+      "chunks": 1,
+      "sha256": "7df9e1bc6b51fbc6a2a1fe0b21b2e465d375a99967e49b1ed1b387d8777eed73",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\binary-bindings.json"
+    },
+    "unchanged-parent/build-manifest.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-03.jsonl.gz"
+      ],
+      "bytes": 126318,
+      "chunks": 1,
+      "sha256": "d412712d5bfd4ad4812995bb5c03c1cbf49844f7f160359f9b94323b23df9a80",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\build-manifest.json"
+    },
+    "unchanged-parent/parent-postcommit-proof.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-03.jsonl.gz"
+      ],
+      "bytes": 1116,
+      "chunks": 1,
+      "sha256": "e927c5bbfe75fd922a067afc7aec3d888fa8fa2f8c46f4f7effd7a457d5c39a3",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-postcommit-verification.json"
+    },
+    "unchanged-parent/parent-validation.json": {
+      "archives": [
+        "nullable-msd-baseline-evidence-03.jsonl.gz"
+      ],
+      "bytes": 1937280,
+      "chunks": 1,
+      "sha256": "fad5adcddfbad2da76a81ce1661d86ffa02d86bf294ea06b9db3ef502d7ad731",
+      "source_path": "C:\\Users\\pmoch\\Documents\\Minera\\docs\\nullable-inductive-validation.json"
+    }
+  },
+  "archives": [
+    {
+      "bytes": 2244049,
+      "file": "nullable-msd-baseline-evidence-01.jsonl.gz",
+      "sha256": "d21a66a750d20018e1a7ea3418cb9553f61a6d9eb7dd7bc7dddd4ab4e763c8ab"
+    },
+    {
+      "bytes": 855863,
+      "file": "nullable-msd-baseline-evidence-02.jsonl.gz",
+      "sha256": "f20af4167f0e278e61329f8b1d13dc32920335e1f6b8d581819dfa09ea4c189e"
+    },
+    {
+      "bytes": 770293,
+      "file": "nullable-msd-baseline-evidence-03.jsonl.gz",
+      "sha256": "ba5ca8f30d2e980d7aede4e4e936f002fc16ccbd191fc4d4e1e3a3964fc95a5f"
+    }
+  ],
+  "binary_bindings": {
+    "minera_activity_split_tests": {
+      "bytes": 176640,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_activity_split_tests.exe",
+      "project_sha256": "c4e86ee04851d98d52c56183f37ab502b2a8486e7ebeeb13d5f3d30b4b27685d",
+      "sha256": "e2eed0807f9ba0db91e00efb85f6822fa9398be1175413dce68286cb627bbc41"
+    },
+    "minera_alignment_variants_tests": {
+      "bytes": 817152,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_alignment_variants_tests.exe",
+      "project_sha256": "ec82d4f600017d76fdc6110c2ae684f6f685e2cd2a33e9630ab1529763564cbb",
+      "sha256": "3ffd5cf17ab8b878b84bfe30de6421ce42030f9bef01c72e6eb4ace042978423"
+    },
+    "minera_alpha_event_data_tests": {
+      "bytes": 490496,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_alpha_event_data_tests.exe",
+      "project_sha256": "ec3f8d8c8fe1d9fe3c005e7694ed65fa602135244c48559d3bad634d1391cd92",
+      "sha256": "e1f4e30a27efa5114d7906abe0da54bdb05fefe577cf846f7f19e57512752daf"
+    },
+    "minera_alpha_miner_tests": {
+      "bytes": 767488,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_alpha_miner_tests.exe",
+      "project_sha256": "778cd3a9adad5194744738393cd9bf337ed0af86978fb070fc7c46d48260d2e3",
+      "sha256": "0c90938f0770dfefc89a8eed08eb4c7953ac06026af65cb7752f1ac0b9f6e76b"
+    },
+    "minera_alpha_parity_contracts_tests": {
+      "bytes": 211968,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_alpha_parity_contracts_tests.exe",
+      "project_sha256": "edc5b60d8ad4cb044ce2bc0e59d6dd779b3ad3635965207c56ca7eb47781a373",
+      "sha256": "f71ccfade3e6e87a02745f4aa88cf22ec181129568bab37f0746ec778a3ac373"
+    },
+    "minera_alpha_result_json_tests": {
+      "bytes": 137728,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_alpha_result_json_tests.exe",
+      "project_sha256": "8f3c6337c6aa43721ef9f2d18cd0b286833fb5e413505102b3f14ca107cf8258",
+      "sha256": "87e8e03870e63ab3204c68fe25c17c36537d3fda3638baeb5cde3c82a5ce6e3a"
+    },
+    "minera_analysis_parity_contracts_tests": {
+      "bytes": 224768,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_analysis_parity_contracts_tests.exe",
+      "project_sha256": "da89667e9376ed85d72e17ecf7d3893ebfcd9722ea8bc938f3456dbaa85ea6af",
+      "sha256": "5d8cfa5b7da969f313fb406d691a80bee6b889777a562513f0675507ef71fe60"
+    },
+    "minera_attribute_distribution_tests": {
+      "bytes": 195072,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_attribute_distribution_tests.exe",
+      "project_sha256": "08c0b118d129e58911bad5f2f1428e36dfdcb8ef5dc7fdc4d6709f5801a43d32",
+      "sha256": "b7e242d26116d50d4b7e03a90cf9fc8e5d72ffdf5e6c11d7384d30413dfd1d03"
+    },
+    "minera_attribute_kde_tests": {
+      "bytes": 201216,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_attribute_kde_tests.exe",
+      "project_sha256": "841b71510149f82afe3ff2fd80e10a1925f563fdca970e68a1f498b0fd718fb0",
+      "sha256": "378341b6cbca263837bb9aefd66348d6d9a458427b13b4c07f0ba9538c786c69"
+    },
+    "minera_attribute_statistics_tests": {
+      "bytes": 196608,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_attribute_statistics_tests.exe",
+      "project_sha256": "fdcee1c77c509346af0a5bbc563c8a5309564e8ed9163f0159a0db5115049a40",
+      "sha256": "c32c6a6000f0b7fb5378301b41d91da2a39bac65069338ee10d451313c9dd365"
+    },
+    "minera_attribute_value_repetition_tests": {
+      "bytes": 166912,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_attribute_value_repetition_tests.exe",
+      "project_sha256": "3a4522505f13a675aa7bb26e0b67594e3cacf95b3dffb29afb99e1483dd8d57c",
+      "sha256": "21a41af40fcdec4d95a1091b0a95ba7cf26064e439d607f108fc375493d9ed3d"
+    },
+    "minera_batches_parity_contracts_tests": {
+      "bytes": 722432,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_batches_parity_contracts_tests.exe",
+      "project_sha256": "d918108515ba18263c1ddb9d05b1035544d4d4c4f3cb89ea14a300f237f9984d",
+      "sha256": "077344210acdc658ecd858f912b4ffead75f7e8c82e53b405327db0f62e367dd"
+    },
+    "minera_bose_parity_contract_tests": {
+      "bytes": 551424,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_bose_parity_contract_tests.exe",
+      "project_sha256": "22e0bf453032443dc1e3208ae3faca747e72cbedfa520174db028fa7f4f4756c",
+      "sha256": "252a41e0926cb11e486c4fc6bb0ba9fc09a78b04e0e4c88514fc4b59e56b30f3"
+    },
+    "minera_boundary_activities_tests": {
+      "bytes": 198144,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_boundary_activities_tests.exe",
+      "project_sha256": "b5e8a85583d6cbd8aca2f5fed7b990276eac830c27192073a64c221cbcd3c4a7",
+      "sha256": "46f87f7297cb7519713e2869f8b58bd084022cd44a43bc9c7c8c959e8cb59401"
+    },
+    "minera_browser_history_tests": {
+      "bytes": 148480,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_browser_history_tests.exe",
+      "project_sha256": "edea2ea561f71035235dff23dc57a51512a1d62b3f017ee5fcb840f641a776ad",
+      "sha256": "2d201771946ab929fe0ff8f42fc7e96abe67bddc337f106d4212b09e06b3be22"
+    },
+    "minera_case_arrival_tests": {
+      "bytes": 209920,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_case_arrival_tests.exe",
+      "project_sha256": "0b387364d71c05488430cb52014bfa51c0f8daca8c60bc5801aefdc96726d37d",
+      "sha256": "f0740d3ea8fb374119aa1adcedc9d0e4adc4831358d19efcd34c7d56450db329"
+    },
+    "minera_case_grouping_tests": {
+      "bytes": 595968,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_case_grouping_tests.exe",
+      "project_sha256": "658d05ba215d5537b970f97ff9ec22ea66778d770de610ac04df9344fa04de1b",
+      "sha256": "5ca860be271f358d5e23303aafe5e9690ce3a182c3e17bed9e9c77daa7247227"
+    },
+    "minera_case_relations_tests": {
+      "bytes": 5499392,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_case_relations_tests.exe",
+      "project_sha256": "27b8e93f7af28356592f4be1d22363e197d4a1a2500b3c5c282a3f1233c39c77",
+      "sha256": "01e7c0f4b40ab3a86eba7242fef0d6bb243876207fd6490bbb825cfafb303281"
+    },
+    "minera_case_statistics_tests": {
+      "bytes": 217088,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_case_statistics_tests.exe",
+      "project_sha256": "be7a6e4b506a62333481af5168ed2f881eedb80a92cdc7e493d72564013594e9",
+      "sha256": "14234d9ce57bbf7e5572540c2a615b8c8cd0d0b92e737dbc1450e82b13f02591"
+    },
+    "minera_chaotic_activities_tests": {
+      "bytes": 215040,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_chaotic_activities_tests.exe",
+      "project_sha256": "5bb7c0d6c345c389f895a0742b3b549fbf58b8568d2336d5a9c546c87fe29500",
+      "sha256": "d6416d479c4b3b406650ea088a8fc4ee68e2951eb670875de615f683b701a0b0"
+    },
+    "minera_clustering_tests": {
+      "bytes": 236032,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_clustering_tests.exe",
+      "project_sha256": "1a1fdac9b84bed61a9e6bc4b339690b8b84ba930c7b0c8766e7aa0718996f094",
+      "sha256": "ea67f09ba908a4a35359dbfdf449d1eae8a5fc724288074f52377e8399741c80"
+    },
+    "minera_communication_history_tests": {
+      "bytes": 105984,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_communication_history_tests.exe",
+      "project_sha256": "135b123a48dda7febd02a479ce9412402398d363291191127402b7e854943b8d",
+      "sha256": "20441763b5cff043613a6409f7c9d16683b2a728815e4e840d0e7d087df0de8e"
+    },
+    "minera_concept_drift_tests": {
+      "bytes": 947200,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_concept_drift_tests.exe",
+      "project_sha256": "cc1301643ced694f30ecfda7d1694536c4178d3374da45f8615287963b19fdd2",
+      "sha256": "ea7c157dbc7b98875e32307f07c3170aed4668f5ace3d5c834fc0632b4eddb9c"
+    },
+    "minera_core": {
+      "bytes": 318733416,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_core.lib",
+      "project_sha256": "afb534d5270857baf51aa67c2f3a7d1754c8d4e85971b774d8af35edfc86050f",
+      "sha256": "57c8e40f731b752ebdfd047d40599f990708b9bf5acdac579880733ba720ddbf"
+    },
+    "minera_core_tests": {
+      "bytes": 4051456,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_core_tests.exe",
+      "project_sha256": "170c2536d60f47d54858e42955571b8c0ba5bd0d727692f9eea6f628624e204d",
+      "sha256": "a65dc046b554d93a6db8a63a73106c6c47e9db40a11bb5aef077716908e621ed"
+    },
+    "minera_correlation_miner_tests": {
+      "bytes": 266240,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_correlation_miner_tests.exe",
+      "project_sha256": "6534242777954baee288ed209c20f24ae0390f305709438138b86c42beb4083c",
+      "sha256": "4a3d9ddd4f630cc09ece9381b16898a4b6e1798a230d7659075153fcd6276a02"
+    },
+    "minera_correlation_mining_parity_contracts_tests": {
+      "bytes": 477184,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_correlation_mining_parity_contracts_tests.exe",
+      "project_sha256": "df0f1336824f8648cf87934369a7b9e284e9e1e1c867a903df4e73c4681e09d7",
+      "sha256": "d2e21f9cdbcf133066b07a33bd41de4a26e02617c1f8b71a50438de92e4cccdd"
+    },
+    "minera_cycle_time_tests": {
+      "bytes": 199168,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_cycle_time_tests.exe",
+      "project_sha256": "b9ab9b53faa190914b6c1f54faee6137b0693948ec1de897d5fa3967857f1bc2",
+      "sha256": "133d83b1138928d697c39572b9529384bd98a208f1ef20b6b107f223f3d99bc6"
+    },
+    "minera_data_petri_net_tests": {
+      "bytes": 566272,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_data_petri_net_tests.exe",
+      "project_sha256": "2c005c7044bf69d2dbb4b6b2aed871dbd132952482990c747dc9c099fa4a0f64",
+      "sha256": "4cfa96e7cc5cf4815cee8a17b8159e231d4091ae26cfef265bb22e2d7c1004d3"
+    },
+    "minera_dataframe_format_json_tests": {
+      "bytes": 391680,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dataframe_format_json_tests.exe",
+      "project_sha256": "d0c3ab26b20e13e199056ad55850c73d9c85168bab28aa86a765a6309824cc48",
+      "sha256": "55ce882a73c1c261d286893b4651e05eb8c66566242a3cbf5bf251a4b2dafe2c"
+    },
+    "minera_dataframe_format_tests": {
+      "bytes": 2944512,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dataframe_format_tests.exe",
+      "project_sha256": "df68a1b66ec5baaa7aec23e63eb5395133f40a5f499b775f42ff4343cc0a32fd",
+      "sha256": "77b3c41d031539487c0af629a15cd3736e1f16e05310e3fca874583ca8980e1f"
+    },
+    "minera_dataframe_validation_tests": {
+      "bytes": 1269248,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dataframe_validation_tests.exe",
+      "project_sha256": "d433ab8f59f10d3e913b4c838224373b623f8cd3ffe98edf7b78f70f5e0eee7d",
+      "sha256": "d0aae86a26ebde881935831138e1f4cb733bb090f237e1002e3bfc6bccc7fcde"
+    },
+    "minera_decision_table_tests": {
+      "bytes": 535552,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_decision_table_tests.exe",
+      "project_sha256": "634d1bf554c0a89ed339bf0f697355d6a2a5c2e548985ec85abe668b5eb94858",
+      "sha256": "2cb7040807cacc6b6aa1e04c998cbf04c62a7ef9e864d9cb3bb7eb24dcb8d44b"
+    },
+    "minera_declare_tests": {
+      "bytes": 535552,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_declare_tests.exe",
+      "project_sha256": "35601a7d3909debf77f5f5ddc04de2337e3116b1309fa809ac1b33e5a6345344",
+      "sha256": "7697b787f6fc4de2ee26c493b8b668d250cf54586cb79564e6281cd6b0973ad2"
+    },
+    "minera_declare_variants_tests": {
+      "bytes": 254976,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_declare_variants_tests.exe",
+      "project_sha256": "91a0f2340dd3382851d433419b6bb58ef3904d40da6f997ce1ba6dafabfd2845",
+      "sha256": "86cfbd39f122f5076075e0c73f63bf6bdc7ad253231bf4ef0bc81c06f0bf03c8"
+    },
+    "minera_decomposed_alignment_tests": {
+      "bytes": 199680,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_decomposed_alignment_tests.exe",
+      "project_sha256": "5d43f79eb1a3f4821306b44495037aeeab53cd9d61ac1a622eddc6ca52089777",
+      "sha256": "d6c7f19949d16521ebc6b2d0411f0ecfbadd531d243637d0a1b6b1f9a3decf33"
+    },
+    "minera_dfg_alignment_tests": {
+      "bytes": 261120,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dfg_alignment_tests.exe",
+      "project_sha256": "ec334bdd532bf9af22a87b13da3f1a57f00fc64e473fed80d173c116673ff3ea",
+      "sha256": "668addf0c136b816c330d4a3d54fd9fffaf5c60687048aa97514c72b9e39596c"
+    },
+    "minera_dfg_conversion_tests": {
+      "bytes": 109056,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dfg_conversion_tests.exe",
+      "project_sha256": "05357150f3e8c91eb62c626340c006689b5bb827f2ffe7475fda7dd1a5cc895b",
+      "sha256": "090bbb96a787738dfbf369f18f92a84cc135b13c932f3870c35dad73139ad364"
+    },
+    "minera_dfg_dataframe_json_tests": {
+      "bytes": 82432,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dfg_dataframe_json_tests.exe",
+      "project_sha256": "1b292cdd521820f985b2038263d67303055107506d93245d26bd18657536aca4",
+      "sha256": "222cb4f068e302038cb6b154929185b6e38d4dbe15a71ae6ce58bb313b512265"
+    },
+    "minera_dfg_dataframe_tests": {
+      "bytes": 443392,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dfg_dataframe_tests.exe",
+      "project_sha256": "96eea0c2d7a5360587c3c0e7d4cb6901183ce53512473098a19b5cdf7775eb01",
+      "sha256": "4b3cd0fb97f8a91cbac0e704ba6eb129ee68309900a3a6169a9bcb99372c7a63"
+    },
+    "minera_dfg_filter_tests": {
+      "bytes": 137216,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dfg_filter_tests.exe",
+      "project_sha256": "c464b17d9d2d23193d69c5b9755b285be033ea0321dc2600ddb5273924b1e7f6",
+      "sha256": "a45858362ab6612d6a8d511e8acfc0216b110f03efe0d6da1993968d35278ead"
+    },
+    "minera_dfg_io_tests": {
+      "bytes": 140800,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dfg_io_tests.exe",
+      "project_sha256": "dde17284e4b3fa3c237427e48b7ffd346468da10ae32c419872b18ebc8946864",
+      "sha256": "7c0f58c10cf7a0442e0e8f408a6869d5a9866332db7f67f0f024c7592080f6a8"
+    },
+    "minera_dfg_parity_contracts_tests": {
+      "bytes": 177152,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dfg_parity_contracts_tests.exe",
+      "project_sha256": "876c4ae93ca5f228ccaf4ae50e65bf1a9526460eef80267677593c7b1fcf806c",
+      "sha256": "e72dff83d6496373f13b32d77b2b376b31243d2c9c4358691017da34643f3b6e"
+    },
+    "minera_dfg_playout_tests": {
+      "bytes": 145408,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dfg_playout_tests.exe",
+      "project_sha256": "06525b01a317970205f0c1f5d8fa6d6ef81179dadaca86224481baa4b59d3e0c",
+      "sha256": "d07cece2616c2a17a919d87b146722b46e3ed0e79587b4d666ed6548dbfc8284"
+    },
+    "minera_dfg_precision_tests": {
+      "bytes": 347648,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dfg_precision_tests.exe",
+      "project_sha256": "615686f022ee78a1ad2241ed4ef9d2b806a1c8be34572ea9648b5168031db642",
+      "sha256": "02ebe4ca4f3e423cdbd9b02261e3136d9469c227705224f94bfef33bcb8ec1ac"
+    },
+    "minera_dfg_utils_tests": {
+      "bytes": 148992,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dfg_utils_tests.exe",
+      "project_sha256": "300ca3b2e6567bdc1ef22bd804b3930d560b15199e68ecdbcb22e47a60424142",
+      "sha256": "f874818381e1a0c1d7ae2148f66ce418a747bdcf3013d6202977089238f04577"
+    },
+    "minera_dfg_variants_tests": {
+      "bytes": 182272,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_dfg_variants_tests.exe",
+      "project_sha256": "9d13d968aac6341215155102150bb8ade265944339681cde44ead5b0578f3e93",
+      "sha256": "3a3d0f4260ff4924e8494b043805709f2b92819bdab9a434efe04f4f7b0a83b5"
+    },
+    "minera_edit_distance_alignment_tests": {
+      "bytes": 930816,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_edit_distance_alignment_tests.exe",
+      "project_sha256": "4c2e6e91aae2c10cbfd1c996af76ec54f5d173ca7585e30431c229fe65e50f4b",
+      "sha256": "e578d3892f94708775b119fe42e11e9a93805bfec27bfecc7c0cf9ec059fd107"
+    },
+    "minera_embedding_runtime_tests": {
+      "bytes": 388608,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_embedding_runtime_tests.exe",
+      "project_sha256": "c85254ca7f241a2cd6c6ba6d79dcb30aa0f18c1609e4178cf31042c691112559",
+      "sha256": "32d5ca9d03be7d0e5ae92ef9113c0acad8963bb01b5a7c8a550bf27546fcd6ce"
+    },
+    "minera_embeddings_tests": {
+      "bytes": 148480,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_embeddings_tests.exe",
+      "project_sha256": "4668efe47eb44f4b7d511ef9121ceced1f2d93cbe1537e6f1049b77def82b996",
+      "sha256": "24d12f0c143b3e1358b46c00e5f8e1309eaf9e8129142964a8baa2ae220d35ba"
+    },
+    "minera_enterprise_history_tests": {
+      "bytes": 89600,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_enterprise_history_tests.exe",
+      "project_sha256": "6221e48511818e72baec6583c92a52e6a2f7962726bbc0eed51720737fe35a40",
+      "sha256": "e058167dc5ebbab29995005d0fd58c71ad79f0e15c28a86b202ce824277b820f"
+    },
+    "minera_evaluation_parity_contracts_tests": {
+      "bytes": 1551360,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_evaluation_parity_contracts_tests.exe",
+      "project_sha256": "33178cdec6295375bf7188dced0c92bc7ce29474a6dc509b8b9283d7d691f9bd",
+      "sha256": "bb3826ad78c8849ec0b71dc4a5a76073f59caae6b17185fb77d2d17991dcf478"
+    },
+    "minera_evaluation_tests": {
+      "bytes": 1349632,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_evaluation_tests.exe",
+      "project_sha256": "d0fad427ff5d65964715355f709df22113372502eb38378afe99a4e8b9737ca6",
+      "sha256": "4b3acf834597dabfbf1fbba2a6d5ea3ffaeaaebb8b167e6b55a6125d32e12018"
+    },
+    "minera_event_data_tests": {
+      "bytes": 359936,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_event_data_tests.exe",
+      "project_sha256": "a7974f02df4c1a8b31d3eebecc79abb4854ec4f54a8ae926f0e8db2e1ba01a76",
+      "sha256": "8f9835bfed8bcf12b1a10e36ca0bc5b63c86254f241740f106e06c16defe42c2"
+    },
+    "minera_export": {
+      "bytes": 8224768,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_export.exe",
+      "project_sha256": "68b2422a5bc40deebc1161128858f4df9dfcffa0e07e71d110a1a9399ff186f3",
+      "sha256": "8395327ad0fe45dac6ba7f287fb248f4796f36ef39f1f895a6f497c086b67765"
+    },
+    "minera_footprints_conformance_parity_contracts_tests": {
+      "bytes": 241664,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_footprints_conformance_parity_contracts_tests.exe",
+      "project_sha256": "1a169b61f36eea636d2019b03ea989d40a820bfc2eb744e0e4fe2a5d9945c9c6",
+      "sha256": "9d34bf44a2d950f02d87b250e7ee3e8b8040c1398b2d1b843fbb374b1414c701"
+    },
+    "minera_footprints_discovery_parity_contracts_tests": {
+      "bytes": 558592,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_footprints_discovery_parity_contracts_tests.exe",
+      "project_sha256": "00819c150317222b47d6e5e9f5d216469afb4e8ef95641ec2e289dcb289531a8",
+      "sha256": "6e59d043069b25e7ec0121bf27551f7c85e73640a6cf557836ff8fb8a6d9b51c"
+    },
+    "minera_footprints_models_tests": {
+      "bytes": 157184,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_footprints_models_tests.exe",
+      "project_sha256": "a461e2a749c09750bc9d953de2f978b8d75bb87e5e41c0fd9cc292726c2fdba3",
+      "sha256": "dd5532db350a56394cde494952bfbd5f88ae7021e2392be8be989d27451f6be6"
+    },
+    "minera_footprints_tests": {
+      "bytes": 408064,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_footprints_tests.exe",
+      "project_sha256": "23da9ffbb86cfd0c28851c10ff90d6f30dd61feac32b7940e63900a786a1d2d9",
+      "sha256": "f0113e5b599e6a9c861a4911f7149f2ff1bdf4f0607e8b2a2ac80a85a80a2ce6"
+    },
+    "minera_genetic_matrix_conversion_tests": {
+      "bytes": 808448,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_genetic_matrix_conversion_tests.exe",
+      "project_sha256": "ee37d49597dc2714af421ac2da54b98aa8345fb6b551c889fdb4f737f81f8e0b",
+      "sha256": "1c25b42c248b95e8b8fe3a37be6fcfb628b524b82857ef60ddc32aed6ed3ee01"
+    },
+    "minera_genetic_miner_tests": {
+      "bytes": 816640,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_genetic_miner_tests.exe",
+      "project_sha256": "ca6b0e31328b34b6f45069cde842f091d2061dd513781d583cc4fbc50ed6a151",
+      "sha256": "cc75327a45c39718cd1319d0f23529d7be56536b5fe70448da1705d40fa69ad4"
+    },
+    "minera_heuristic_variants_tests": {
+      "bytes": 1784320,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_heuristic_variants_tests.exe",
+      "project_sha256": "e56033b5e2cf2c1a33add1bb93fed4ab155a98c7ee2bdd8d12e87c9ecb0ecb49",
+      "sha256": "3f9805b34e94463abe5edffd131b5fdf813e576e186f7a3af7acfc6226669d2d"
+    },
+    "minera_ilp_miner_tests": {
+      "bytes": 768000,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ilp_miner_tests.exe",
+      "project_sha256": "5d29c2be282861e54cd9f9ab4cd03c16dee4ab9024c26cecbf1e2412b21c09f7",
+      "sha256": "9439fc1adff6c5bb8469b12a9aa1df68b95eb4b75104f1bac9871eaacac618ef"
+    },
+    "minera_inductive_miner_tests": {
+      "bytes": 550912,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_inductive_miner_tests.exe",
+      "project_sha256": "3a96df29750495a2e7f76cc154aba54c4401927c35a8bb2db6d7d76f96c3543a",
+      "sha256": "3384ba838d8659d965ec8fc64ccd3a08cda965ad6a9cf60c67bef7b6d4f8f517"
+    },
+    "minera_inductive_parity_contracts_tests": {
+      "bytes": 398848,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_inductive_parity_contracts_tests.exe",
+      "project_sha256": "d5fc048904e7dda9abb29ccca41e0e9ae103f3861051bd89329afde064ca89cd",
+      "sha256": "d9a2d094d777b2ca526559b05c4891b8869acbcd008a2221d9cffed8ecf42601"
+    },
+    "minera_interval_tree_tests": {
+      "bytes": 213504,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_interval_tree_tests.exe",
+      "project_sha256": "4bf1e26d3aabedfd20d504caf5a95ea17c712d03a97e83cd96478d20d604e65e",
+      "sha256": "ca16a38e6a80bf7a5ff750d5ad8237cd41169508f347266f419520059d1e1e0e"
+    },
+    "minera_knowledge_injection_tests": {
+      "bytes": 54784,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_knowledge_injection_tests.exe",
+      "project_sha256": "594b931d43e214f65b513f95b75b1a2e23a78be66bad3c4df864a605d0ce735e",
+      "sha256": "72f3e33bdd6d6f48ac70073f114b279ff099222c952443b92528f04a2b2abdc8"
+    },
+    "minera_label_splitting_tests": {
+      "bytes": 161280,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_label_splitting_tests.exe",
+      "project_sha256": "e5053e0514fbbbf5928259790558b7180ff5e5563fcca1201ebc64e7580d43a4",
+      "sha256": "59f43d02dbd938e3edaa53821160f0562aa7d8d417e4a00b4b07a6076dc0ade5"
+    },
+    "minera_link_analysis_tests": {
+      "bytes": 101376,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_link_analysis_tests.exe",
+      "project_sha256": "5bd6771637b0c1ed0097f7f7ccbb940db5817b1015bea14a11cb0bbf3e0556df",
+      "sha256": "da705bb71b133ab997f0c7ccab0fa90a58966d6dd40bdeeaca66b0615eff51f8"
+    },
+    "minera_live_stream_tests": {
+      "bytes": 54784,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_live_stream_tests.exe",
+      "project_sha256": "4214d12d6499a8a01cec14daa9341a8cf571e51466f6e7c5394292bce93b38b5",
+      "sha256": "7cdfcc8d9ce71b09fe116f2ac47e7241887cdde662cae91728bfa15fbf96fa0f"
+    },
+    "minera_local_diagnostics_tests": {
+      "bytes": 228864,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_local_diagnostics_tests.exe",
+      "project_sha256": "0d159216d650c2490aac3a9f550c64bc7b20af322f378d78739f142c39e12e25",
+      "sha256": "f0c7a121fe15d16ac3264f9e6b25272f959289cc4f72fab4fce56b962d304204"
+    },
+    "minera_log_conversion_tests": {
+      "bytes": 1497600,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_log_conversion_tests.exe",
+      "project_sha256": "084353068bccd5517eea2253438629e54f8e52db3d93ef01d300a145de643c27",
+      "sha256": "0a536458fef7d65a900492a21dc4f09c94ef5b95db72facbb6358ac706ffac1e"
+    },
+    "minera_log_skeleton_tests": {
+      "bytes": 494080,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_log_skeleton_tests.exe",
+      "project_sha256": "0f2f096c45c8d8808b3ecbfd90ffc094fc359dc7e0959bc838877efbbb27ddba",
+      "sha256": "02ab35d4dcffe79a5fe2329f69efeb7115b9c80ef7b61ad8dc71ed2c1310abee"
+    },
+    "minera_log_to_features_tests": {
+      "bytes": 5422080,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_log_to_features_tests.exe",
+      "project_sha256": "55c9c62dc051f1e0b2434ef8e1c7a72cb2e43262edd6e4ad6db66046f8d90145",
+      "sha256": "4ed3d2cecde371dc6a71d92b8a25b82bf9677bd3d364867d290cc5192bd1790c"
+    },
+    "minera_log_to_target_tests": {
+      "bytes": 229376,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_log_to_target_tests.exe",
+      "project_sha256": "94b831614ed61e554205fb661ff3b040839b85a3c3d26dc72fa1014e0ea4d940",
+      "sha256": "5743e8b50a118f436e24ad9dd246a2c8c2be36302b750fad2b15786de1d6ea10"
+    },
+    "minera_log_util_tests": {
+      "bytes": 148480,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_log_util_tests.exe",
+      "project_sha256": "ec37f98a09317838d878c39395166d92f6b13742710fcac6382334b4e0e06659",
+      "sha256": "b91b0ffdc31a9dd624447f167748db61aa3ac2d1e9a430b4fc589ff54742f6ff"
+    },
+    "minera_ltl_filter_tests": {
+      "bytes": 77312,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ltl_filter_tests.exe",
+      "project_sha256": "9ffa60aedbf5980abc4d4ab5caee42309dc7a51fd48d514bdb10e2d8aa365ee5",
+      "sha256": "5bcdd49025329a7673253440de4af9a82a0bd8c5a86c54384ee4648a976cd178"
+    },
+    "minera_minimum_self_distance_parity_contracts_tests": {
+      "bytes": 396800,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_minimum_self_distance_parity_contracts_tests.exe",
+      "project_sha256": "b7b7eaa32ae538d7ce78dc3a996e9e5710eb2cfb521b75d7c2201913140ab9db",
+      "sha256": "52736c59d1a81dec2ee744251dbf29e75b2f39f94ac337547265362deebe59cf"
+    },
+    "minera_monte_carlo_tests": {
+      "bytes": 1027584,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_monte_carlo_tests.exe",
+      "project_sha256": "5a544c15255630173d19306f4fa5aae0e37500a119a0526d9628ec353afbae88",
+      "sha256": "2b37443daea83f94896f83b75061fb135c4f51e64a28371e9f25ea237073e2b1"
+    },
+    "minera_native_na_tests": {
+      "bytes": 580096,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_native_na_tests.exe",
+      "project_sha256": "5ff668fcd9666631eb30cb784826973e599ef0df82b93b2f29541ebb76252c2b",
+      "sha256": "2c94afe449d9dd28755ad8a8cdff05bce05c04d188d6c039d6530f2d985aeece"
+    },
+    "minera_network_analysis_tests": {
+      "bytes": 242688,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_network_analysis_tests.exe",
+      "project_sha256": "04df803a010c2e8f186b1e2fd2f3e5a89859b34d0361a99b25d56c602e5049b8",
+      "sha256": "48f27cbef2191ce934c8b2e80aa0e53ae17c7dd58bf1ca7c6a80e59ec65467fd"
+    },
+    "minera_oc_causal_net_tests": {
+      "bytes": 1068544,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_oc_causal_net_tests.exe",
+      "project_sha256": "8da4733e2f2d2002f1ad68220b76aa0f45ca1f062721070e1670446b77640df1",
+      "sha256": "d8c8bd7fdf9eadb5645b6833a5ef53590daba23ffdc4b13e4ae864bbc6968de6"
+    },
+    "minera_ocel_csv_tests": {
+      "bytes": 190464,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ocel_csv_tests.exe",
+      "project_sha256": "0b5e6a9345930724204ecbf6ca6585b9699863d89d3c2171e6f48cf8242180a7",
+      "sha256": "7403e2e709a9df4f00dd58e1f1a6d4705730c9133bae0a76c05ca4e6edf7ad7d"
+    },
+    "minera_ocel_feature_components_tests": {
+      "bytes": 334848,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ocel_feature_components_tests.exe",
+      "project_sha256": "eb12ea34a2959d13bd85a52225e3e1d4c986c8b742af6651bb5b7c9b923e42cf",
+      "sha256": "d9ae7cf1396a7d63b66ce457117eaf71606ccd2d837ae66611e0ba93f5e097f3"
+    },
+    "minera_ocel_features_tests": {
+      "bytes": 406528,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ocel_features_tests.exe",
+      "project_sha256": "1097d7b5f39f1efb02c90a3f34c7598a3be5b887329ba955d3a1c055af10ff5d",
+      "sha256": "e473cd1c3207988278e9ca60f1ecc3b982e61cd81d0c96403fd9f284493706cb"
+    },
+    "minera_ocel_filter_tests": {
+      "bytes": 133632,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ocel_filter_tests.exe",
+      "project_sha256": "feccfd55e17160469638ab942f2f9a33b5a04c082d6b94179e1643dc09d83d84",
+      "sha256": "49d45b87bf9cd06fa00b895f51c600befbe1a0b8374e7548e318e5c889acb010"
+    },
+    "minera_ocel_playout_tests": {
+      "bytes": 461312,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ocel_playout_tests.exe",
+      "project_sha256": "0e70cfeb1835763c49fadaba23b3163b43b94e9e93b959c494f59004358b48c2",
+      "sha256": "158403cc65d2da093bd83ee05d6e9bb153f4324f2ddbf9795ce1b7ae8d4ec668"
+    },
+    "minera_ocel_query_tests": {
+      "bytes": 23040,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ocel_query_tests.exe",
+      "project_sha256": "dcb8e04783290457f208bafc8f2a63078db0718afe0d886d3194324430e3dd99",
+      "sha256": "8708443172d63096b763e1f4c9e7e16603228245bc7b42ff68d01e381f6d55e3"
+    },
+    "minera_ocel_sqlite_tests": {
+      "bytes": 215552,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ocel_sqlite_tests.exe",
+      "project_sha256": "99036e75af9e1b7ad618aae61e25238033816474f41fe663b727b837fc3e5da5",
+      "sha256": "177752cd18b608ba41bf7b474f710dfeab9bcfc8c868445f1d04b22afa0fc830"
+    },
+    "minera_ocel_statistics_tests": {
+      "bytes": 167936,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ocel_statistics_tests.exe",
+      "project_sha256": "cc9c0799b6660b9ca3508fc0db4997f402ec2abdd032cf8a9581299d68a0d500",
+      "sha256": "8f9683831314b132418dc962cdf8899504d2b26522b575b928880515b39828bb"
+    },
+    "minera_ocel_tests": {
+      "bytes": 1065472,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ocel_tests.exe",
+      "project_sha256": "ef30f33f6b0511140b021c484add2b5e4a860c899211f13a575e6ec212bcbf94",
+      "sha256": "714e4ddbade5dc0e06b176810b53a5036a49228a385fb373ef3cfadf4a192521"
+    },
+    "minera_ocel_transform_tests": {
+      "bytes": 525312,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ocel_transform_tests.exe",
+      "project_sha256": "a4449b668754c3267465578ef1f5097ac298f014538f3b680c58201eeae0f140",
+      "sha256": "844314b1f756e949d9a2cfe7aee40fac967b181f98f1d43e082673f356df11ae"
+    },
+    "minera_ocel_xml_tests": {
+      "bytes": 200192,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_ocel_xml_tests.exe",
+      "project_sha256": "16eba999cb7c525b6ba1a2d73523405e1ae8cb94685f80336bb43a820d3d6dc9",
+      "sha256": "37406663c2378f71b26dd7a4ce25b89f2777309e7a87f867b9665ae356687509"
+    },
+    "minera_organizational_mining_tests": {
+      "bytes": 225792,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_organizational_mining_tests.exe",
+      "project_sha256": "a548f63fd3a476ff9b3e83fed9e67c72fbb9c51f1916281d780e7293ca481259",
+      "sha256": "8e9af16c58b0c06c301a88af07e7d396e00dba8f42b78716a459b624d12943fe"
+    },
+    "minera_organizational_parity_contracts_tests": {
+      "bytes": 254976,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_organizational_parity_contracts_tests.exe",
+      "project_sha256": "eae7eb4cb0dca8b05dd34221ce507285fde4a4a8fb89fffad699b350b1fc5532",
+      "sha256": "2d670f7f1575fe7c0bd06818669588148d1c561c25e0fc3bfcf62e6e87f82397"
+    },
+    "minera_overlap_json_tests": {
+      "bytes": 467968,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_overlap_json_tests.exe",
+      "project_sha256": "1e89bf41772087a934933a778911f4132ba027619bb9991ee4e197d3ed661ded",
+      "sha256": "443e38d303d2454edf69e4a95fb66b0529903bcd261465fb790115e0999e8e66"
+    },
+    "minera_overlap_tests": {
+      "bytes": 76288,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_overlap_tests.exe",
+      "project_sha256": "2e1ef95109f095c6b780cee95d7fd64dff73f696988f0b3116a53409740b2a3a",
+      "sha256": "3879d08b19dd6b3074c5d1f44b1a3a9fed4ad20bc5ca6570ba21a1c758ab2a9d"
+    },
+    "minera_passed_time_tests": {
+      "bytes": 234496,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_passed_time_tests.exe",
+      "project_sha256": "0b62d208deadeff40c03e8bd27141a956b09eb7295fb0e3335cd099fa2db0701",
+      "sha256": "f0b9c4fc33914e40cbbdc3c68f2146480454e419c1df16f64847030f92eaf96c"
+    },
+    "minera_path_filter_tests": {
+      "bytes": 71680,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_path_filter_tests.exe",
+      "project_sha256": "f6d3265acd86892be7b208875a968f31a92162c33792ffb0cf44df1b1bf9104a",
+      "sha256": "3dc5ed60a397555c936480ff4f0aea73e144020317cdfce33fc3c33b996d6301"
+    },
+    "minera_performance_spectrum_parity_contracts_tests": {
+      "bytes": 457728,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_performance_spectrum_parity_contracts_tests.exe",
+      "project_sha256": "ebca57cd77f2848d8a9beded01b6c4c68b0938b564dbe0a62f0408d21d835d81",
+      "sha256": "c2113f451168dec5d573acea2ec4e7ea88851484a79c009dc71ca076eacbbbbd"
+    },
+    "minera_perspective_tests": {
+      "bytes": 1188864,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_perspective_tests.exe",
+      "project_sha256": "f8073dffcf5e505dcc4d7ef12fcea4b2da720783f46b6130de1305abeef50b42",
+      "sha256": "073a03236165277ca2f3fd6874189ed27c8d8235fa1b3de4804d424ba51cf255"
+    },
+    "minera_petri_analysis_tests": {
+      "bytes": 344064,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_petri_analysis_tests.exe",
+      "project_sha256": "0df1ca958ca6aa409628ee5107ca1459dd35189c133260b2b7aa9a2adc9a15fb",
+      "sha256": "05ec3f611862f77d25d6c2ebf9b13bea75a85f7f36e8a7ca7b06b47dd5827c1e"
+    },
+    "minera_petri_anti_multi_alignment_tests": {
+      "bytes": 136704,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_petri_anti_multi_alignment_tests.exe",
+      "project_sha256": "a78b07395c6fb6e834616eb248e45bac2dcd05e3541cb244435d60f176754771",
+      "sha256": "d71847a88c9bc4a9319986472850503dfddf85ae2da90655d6949d634a9e5eb5"
+    },
+    "minera_petri_extended_arcs_tests": {
+      "bytes": 1419264,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_petri_extended_arcs_tests.exe",
+      "project_sha256": "a6338e1e16d8285c0cdc103ceae5f6f73cbaa2c97bdf160c917728a0686fb917",
+      "sha256": "963b4f92b72214dc4c1becc6d7f1eeb2b46d6dc4baa5cec92b9a8b900cf4ba62"
+    },
+    "minera_petri_net_conversion_tests": {
+      "bytes": 602112,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_petri_net_conversion_tests.exe",
+      "project_sha256": "ce819f06f0610b9790578f889eaeee9578dabd13c82bfcb8cc9fff9849fc9e78",
+      "sha256": "7598700c25ffb013561a6d95bb777ea188f933cff6423ba0cc32b3f92eb72ac9"
+    },
+    "minera_petri_net_reduction_tests": {
+      "bytes": 336896,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_petri_net_reduction_tests.exe",
+      "project_sha256": "7b9864ed3b07dd9bb706a43efff1089b563de8481e5bcd504e9a226c0223bbd5",
+      "sha256": "4eec4d976dbd27bd6275a0ccdfc3fa32929c8e0ab4c6b4f5a64c10117b0fc8c2"
+    },
+    "minera_petri_usage_comparison_tests": {
+      "bytes": 795648,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_petri_usage_comparison_tests.exe",
+      "project_sha256": "89f8741fb36d73caea61bd4eada33f933a9e16a001acf169f03f50214c47099f",
+      "sha256": "716bbe43a5223883626fff14dd7666e66c807863e8c21688f8fd8e76b8ec49e2"
+    },
+    "minera_playout_tests": {
+      "bytes": 321536,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_playout_tests.exe",
+      "project_sha256": "a00a16d1e392efd034b9f5e4f2104667ff40257a326a24e52f42b8f641b37ef7",
+      "sha256": "b2ed0754b6b08806367c5821880bbce2056ab1be474fe0ed7583c41a77eb50cc"
+    },
+    "minera_powl_conversion_tests": {
+      "bytes": 430080,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_powl_conversion_tests.exe",
+      "project_sha256": "66e6efd5dac617e2890991a919f2e5053f14e6fd1d791cc55418db82f9eb66ef",
+      "sha256": "5cd8e43054015361228ce36461c475c7e74b85b46cf3b54314d594b1d4926171"
+    },
+    "minera_powl_discovery_tests": {
+      "bytes": 567808,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_powl_discovery_tests.exe",
+      "project_sha256": "3c0d7fee8519b8dfd622894af8e3aeabe779d362cf059fa8a86b57c5ad2b1974",
+      "sha256": "c178be18aa70d5c59c3982ba50f680eb3255ca2bf6239fc85fc6d19363bdabbd"
+    },
+    "minera_powl_parity_contracts_tests": {
+      "bytes": 208896,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_powl_parity_contracts_tests.exe",
+      "project_sha256": "73e6bf919cf994e9cef7fa7eb6b97501786e923bf2a86548dff30716131ebaf3",
+      "sha256": "4ae301a2949c4f9588393619737725c72757b019c9f717ada30295e8dbcbc010"
+    },
+    "minera_powl_tests": {
+      "bytes": 106496,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_powl_tests.exe",
+      "project_sha256": "783a3502a3833724a900b8860e1fa5319aaadeb95cc4ef27bf8b863732519ff6",
+      "sha256": "ec4dec6c058fa374bd5f6996570e8d76e0ff2e34e0dfa87f42e35af1b077786c"
+    },
+    "minera_pripel_tests": {
+      "bytes": 244736,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_pripel_tests.exe",
+      "project_sha256": "a625d4e0035c5cabeebdd0a5d5cbe4c986790c9a68600a5d7727c4537a4b4cb1",
+      "sha256": "23aebc78803b15d50d616734566cc0727519e9e308577cdfc25e556b5d53a0e0"
+    },
+    "minera_process_cube_tests": {
+      "bytes": 135680,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_process_cube_tests.exe",
+      "project_sha256": "f71785f161dde9cfdb8de17b03dc0c5a67b36383575f29271d632459745605a2",
+      "sha256": "b9c0703c0b51949630319da9675284275a53e90bfd1c9c9503ce90492376662e"
+    },
+    "minera_process_tree_alignment_tests": {
+      "bytes": 223232,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_process_tree_alignment_tests.exe",
+      "project_sha256": "cd451d517ba3d3f8ab5777095fc912f5eef80524b22fffca891dc2c626717b96",
+      "sha256": "0c698cbc45aa37e4b62b1c7974518fc2f9b5543ceb719da89c5dafe84367b9e5"
+    },
+    "minera_process_tree_playout_tests": {
+      "bytes": 993280,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_process_tree_playout_tests.exe",
+      "project_sha256": "9076f71f81acbb7233012aeb5b1e362448a45b419719459741c0f9461fd1143a",
+      "sha256": "ffd7ddd503871585deb6d0fb6606c24f2c463c2b7d162768cfc2d21c3f6c506c"
+    },
+    "minera_process_tree_reduction_tests": {
+      "bytes": 67584,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_process_tree_reduction_tests.exe",
+      "project_sha256": "4e284d6ada11209f139f9bb5a8ee4b260bb50370e662a875a2a400d910f94c76",
+      "sha256": "c0ef1a7bc83c0b34162d2116b0f9f7ede74b08c26ef6150a90c777c66e18ca8d"
+    },
+    "minera_random_tree_tests": {
+      "bytes": 209920,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_random_tree_tests.exe",
+      "project_sha256": "986ab43a3b04673c507e651b9c11d5cf6cf1e0636c8e6181217b0df609ecab76",
+      "sha256": "9a3e3316198d97d4a244a84934b1a0e44fb4b4607c73d6cb36bee6a6aebffe60"
+    },
+    "minera_repository_history_tests": {
+      "bytes": 156160,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_repository_history_tests.exe",
+      "project_sha256": "a216750dbdc258dee4c1942396c09e46bb01d1de1707c9721c7d8158a5a4f98f",
+      "sha256": "84f4f2213cbde75c3b282b05ca51a39853823525109ff88d5db099ae3613cbe1"
+    },
+    "minera_request_params_tests": {
+      "bytes": 2077696,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_request_params_tests.exe",
+      "project_sha256": "010feab2f053db35dfae822f94b772b7009752745679200284a1f8ca7552c55f",
+      "sha256": "e569571b0c076d7e1a59803963303f07c2fd3974e8f0b5fe09bd0014246cf369"
+    },
+    "minera_resource_profiles_tests": {
+      "bytes": 141312,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_resource_profiles_tests.exe",
+      "project_sha256": "240bbce235df285344d0cf5642973191db20739595088585fb5de9035d2f920b",
+      "sha256": "0d1f41e601d04cbe2c6ac7affb21497807116e74d0c23dfc7ff7987a2b68513f"
+    },
+    "minera_rework_tests": {
+      "bytes": 190976,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_rework_tests.exe",
+      "project_sha256": "f7887362adccd86fe96a64dfbaaf05915a0a49a7d52cea7714b8ed70aff90417",
+      "sha256": "cc0c761d8f151bbf72c38cab03edf711240480a255bbbcc3708b60ffbafa7206"
+    },
+    "minera_role_discovery_tests": {
+      "bytes": 223744,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_role_discovery_tests.exe",
+      "project_sha256": "c380f7afe07f784bac433e8d344fabbe196cabe7a799d3bf2b3f9ee2791d4361",
+      "sha256": "6b4bda5a7b86b57e95ed1db07872478711b3f25b19175943128a6bc95288d32a"
+    },
+    "minera_root_cause_tests": {
+      "bytes": 601600,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_root_cause_tests.exe",
+      "project_sha256": "72f81f456db244f1cfb39de10c772d458decc2673758e486c61604e46ad73371",
+      "sha256": "abb0efc77188944a870cffe46c415239e3566b0ba05464a216ad312f2962aad3"
+    },
+    "minera_saw_nets_tests": {
+      "bytes": 748544,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_saw_nets_tests.exe",
+      "project_sha256": "502dff2209a34202ed6ece9afb416ccdc0d26e9fcceada403ba881687994908f",
+      "sha256": "28aeab6ccc8359e7699fc45b1b16f9969eeefc8cb9a84bf2234ecf08b1f524a1"
+    },
+    "minera_segment_filter_tests": {
+      "bytes": 85504,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_segment_filter_tests.exe",
+      "project_sha256": "78f11b85d4e884ad83c2c5724ddd79dfcd9c3e821b87b43b9486df1ad0b75f70",
+      "sha256": "b5b250aa71d6c323fef861bc6fbd312932e978e7711ad6b8942efe32c18a73a7"
+    },
+    "minera_server": {
+      "bytes": 8527872,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_server.exe",
+      "project_sha256": "7054469752d0f922a8fcc116d23dbe9c8748b90c500a989f5bb4bdf98fa12d5a",
+      "sha256": "6bbef897baf5cdfe66aa6bc9abf4ee036665d7ccf9bff02d31330e7db523be51"
+    },
+    "minera_service_time_tests": {
+      "bytes": 212480,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_service_time_tests.exe",
+      "project_sha256": "21d543ad7551ecf1e8474e40d3f9c466047463a05f82dae04267bdbb86f18940",
+      "sha256": "b5f48ee88523ee81cf5d8ae689b84abc8f7e09cd4d7ff009d04b2260e432deca"
+    },
+    "minera_stochastic_map_tests": {
+      "bytes": 528896,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_stochastic_map_tests.exe",
+      "project_sha256": "db0551e477f6c70c4689b11b646b344d83bb2fa27e116844ee56deeb96ebe594",
+      "sha256": "3f4252fca13c0c252717f2e7c2d570a423796ed9d43dfc6734f86aa7df4db2c9"
+    },
+    "minera_stochastic_petri_tests": {
+      "bytes": 279040,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_stochastic_petri_tests.exe",
+      "project_sha256": "54ec15bddae0e6257a0c741cc27248465afd1083ebb44af580cd0ea4ee664cf8",
+      "sha256": "fde588928130e20ddc83fec650c93c0dc70de9f9514c281fbe47c26e85b91400"
+    },
+    "minera_streaming_dfg_tests": {
+      "bytes": 59392,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_streaming_dfg_tests.exe",
+      "project_sha256": "13fd13179a9a860cb01a56c6e5d9376ae965c4efdb5fd3433b685dce9f0c11db",
+      "sha256": "23dd1957f3bbb8b23546128940d097be6f7af9326cd7891eaa7222bddc9efa4a"
+    },
+    "minera_streaming_footprints_tests": {
+      "bytes": 65536,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_streaming_footprints_tests.exe",
+      "project_sha256": "da396e0c54c5df358e4b089dc354eaac27a10a03cc45f690e30a92cecc648fab",
+      "sha256": "cfab51150480acf88dfa87a19579ad43efe160f1457ad97050e02784fa28e751"
+    },
+    "minera_streaming_import_tests": {
+      "bytes": 558592,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_streaming_import_tests.exe",
+      "project_sha256": "e3d11b315b39867941c0f116d07a062c15da11fadf3004385d64cedc407f9c3c",
+      "sha256": "522080d5cf039f19d2cea3f8d4c96c75e5396711c8054a608aa1c5d3ecb56f98"
+    },
+    "minera_streaming_store_tests": {
+      "bytes": 146432,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_streaming_store_tests.exe",
+      "project_sha256": "f1c32ed0b2e6147690444b5b1be160db9dda33d0840f48bdacdc92b8ed8086b7",
+      "sha256": "604ae75c1c407f041f469ba401a439e8e25d8c7c5c1990b6023c658ac48830c0"
+    },
+    "minera_streaming_tbr_tests": {
+      "bytes": 61952,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_streaming_tbr_tests.exe",
+      "project_sha256": "a1364a4044bf44573aeb129d0efa4483586895050e79a0ded8d9651c5647583a",
+      "sha256": "abbbe0efed182b70e978ef4caadeb99d607c32a6bb2bf8cf9cdc27e2e2fb5955"
+    },
+    "minera_streaming_temporal_tests": {
+      "bytes": 76800,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_streaming_temporal_tests.exe",
+      "project_sha256": "00fb0eb21dbc1c1c8f004a0582783ace3e856e9e969c642940afab9fd4ac667c",
+      "sha256": "45db2cea3d55dea2834ff5b4213ccb3bd20ffc80855a20db0d8c2729df3c8904"
+    },
+    "minera_temporal_behavioral_tests": {
+      "bytes": 342016,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_temporal_behavioral_tests.exe",
+      "project_sha256": "d8006d010063117ed99c1d6f349b121fe542837b02f2c2cd73d9981c7ee846ee",
+      "sha256": "5209b074830b89bb293ee24e724d83a0dd19d4caef1f6bf8eb98c04b4d6b27b0"
+    },
+    "minera_temporal_profile_parity_contracts_tests": {
+      "bytes": 338432,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_temporal_profile_parity_contracts_tests.exe",
+      "project_sha256": "536412055abf05bd712bbb16bc11dda13ce2b45a9893a36f79970ba620be212e",
+      "sha256": "abaf64a07c790bce71fbaa438ee2ca8e93371fb600598254f7fe7f4dee2f5d4a"
+    },
+    "minera_timestamp_interleavings_tests": {
+      "bytes": 107520,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_timestamp_interleavings_tests.exe",
+      "project_sha256": "5a09b59529033531b57b9a545e9fb6d9daae203ac7a99551a43b9d0605a711a9",
+      "sha256": "257864e2ca7f3b326fbe0e097e2825cd2d5c14e06680399c2675a51a3fc5eddd"
+    },
+    "minera_token_replay_dataframe_diagnostics_tests": {
+      "bytes": 1293824,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_token_replay_dataframe_diagnostics_tests.exe",
+      "project_sha256": "11b9a5ee4d4dda4030cdf9d4e28e22e75653f16434eb1342f807fea7a3ec0f0c",
+      "sha256": "98532c67868a4889e607d6c1c5f18b18ee01d0e7fafe7e8b7880ed0d16b9d825"
+    },
+    "minera_token_replay_diagnostics_tests": {
+      "bytes": 1380352,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_token_replay_diagnostics_tests.exe",
+      "project_sha256": "eac3fba42be902802733481b8bdb92ab1556e319740599bedef4952a835dfad2",
+      "sha256": "7c317c7c42f6594f917cef3b25ca2d4e9f98c31ec9f1d70b6b63789d8455c6bb"
+    },
+    "minera_token_replay_duration_tests": {
+      "bytes": 680960,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_token_replay_duration_tests.exe",
+      "project_sha256": "c3e07e1dae1f1e42282ce1ff176d7b4e7ebf606c615720e78fcc255986aa4767",
+      "sha256": "cd073f756471b004de437a971ea44656001331e7fac810db1c4a3c4475c0309f"
+    },
+    "minera_token_replay_event_data_tests": {
+      "bytes": 1213440,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_token_replay_event_data_tests.exe",
+      "project_sha256": "a34a27cf260b9278d3ad95ae1f14c14eb4f83ba99806b623ef9639e1c90161e3",
+      "sha256": "10c07078e3bc796fb355b3cba5b6f8b839143e9ae784b8b3d95f12b6ded0be34"
+    },
+    "minera_token_replay_result_tests": {
+      "bytes": 675328,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_token_replay_result_tests.exe",
+      "project_sha256": "403b01cd4ad74ed801f3c07863829e28f8ccbaca3cf68c1dd58a28f58c6cee95",
+      "sha256": "e5d8886cd63c50463136cc2720fa83c88f5501e9645ba1393b4a4acb156a66b9"
+    },
+    "minera_token_replay_root_cause_tests": {
+      "bytes": 1079296,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_token_replay_root_cause_tests.exe",
+      "project_sha256": "e0724456310c43c8a8d3bf5eb9323e4bead3653ef5d874376931d289bce0bb38",
+      "sha256": "317e9600c2d0a955730c6c5840c4ef1c317d98a7d316e93c778c4ac435d71eff"
+    },
+    "minera_token_replay_transport_tests": {
+      "bytes": 1032192,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_token_replay_transport_tests.exe",
+      "project_sha256": "2cc5a8de608d57fb1789f3e0251e2006e1ac40be75434ea756300f34c76ffc1f",
+      "sha256": "b78977363c261ed4114f79a9b22ae38302b7953b71e5d4f16798805f5c9acff4"
+    },
+    "minera_trace_variant_query_tests": {
+      "bytes": 280064,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_trace_variant_query_tests.exe",
+      "project_sha256": "0ee34a508335ba7de50c2c79aeb84f05342b878b8d61fb75e28fc93becdd8d22",
+      "sha256": "078c880f032f81ac9add2fd3974c6b511572cee815c735dc307e36c57a3f2998"
+    },
+    "minera_transition_system_parity_contracts_tests": {
+      "bytes": 297984,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_transition_system_parity_contracts_tests.exe",
+      "project_sha256": "b55f842677f0e1f1065e10c40c1d6a61508ccd2fb4fa74ac6eb882c733251c09",
+      "sha256": "3a2ca1a9ad903d8b8e2cc020258a1fb336ea97fd636cabb5e3d730065e5f251d"
+    },
+    "minera_trie_conversion_tests": {
+      "bytes": 90624,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_trie_conversion_tests.exe",
+      "project_sha256": "78ea089f9bfdc746de9dc8f79b3b8c9fce392d7326d66c3f2977a8326fb2c776",
+      "sha256": "f6c9f562163c383f674a60c1bdc1b7982b583c6829394671b183696cb70b3cd9"
+    },
+    "minera_trie_tests": {
+      "bytes": 196608,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_trie_tests.exe",
+      "project_sha256": "153cede5111acd3eccfb88c55b5c5ff521f9801cf2850bc6cb7b01dbe677e9c3",
+      "sha256": "636b0992ce71fefb2b5eac41f27e993d32245330593bf0e094eca48b3c5d50c5"
+    },
+    "minera_variant_statistics_tests": {
+      "bytes": 201216,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_variant_statistics_tests.exe",
+      "project_sha256": "6d8ce667428c3d90a19e94c7344f9bdfa101c0dc710b97b6e7c53d3d7b1a593f",
+      "sha256": "49876ed6889619d71d264f53b317f7bfbb0a1f3614bf83ee64507660b0f2b0f1"
+    },
+    "minera_weighted_token_replay_tests": {
+      "bytes": 1228800,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_weighted_token_replay_tests.exe",
+      "project_sha256": "74f31019d29c37ca18bda944ba252dabd5b9398ee7fe4625189f57ed130c4e33",
+      "sha256": "0b629d26b8e66d4dc9640c809ae510f6f39bbea83a666d600f65d4458e851f8e"
+    },
+    "minera_windows_event_log_tests": {
+      "bytes": 147968,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_windows_event_log_tests.exe",
+      "project_sha256": "d78cfb10ce27eeec748b4e52131af656decf79895f9741b51bb286c14886bd3e",
+      "sha256": "72f1f1a15d1f403c2a51775e10bad1742bad359d3ea7f24afa46e9501a9942a1"
+    },
+    "minera_workflow_history_tests": {
+      "bytes": 99328,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_workflow_history_tests.exe",
+      "project_sha256": "fff003130e9822932c792a81502083034ba000c52f49883e16ad54c674f848ff",
+      "sha256": "4e116cd5ebbd0969b60bfeaea224376e7c57208a92daf9a93256d0c0c53bd320"
+    },
+    "minera_xes_io_tests": {
+      "bytes": 1056256,
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da\\native-build\\Release\\minera_xes_io_tests.exe",
+      "project_sha256": "9fa77b2a1228ae9b3ea56ed069ef15fd96b0976fa4ea27a7bec79358f2ddfd2c",
+      "sha256": "a51ab255df94ec86a929f4b4ec391e04559c487890f317d4bce62b1de522e4c9"
+    }
+  },
+  "build_directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-inductive-build-a7b8e7e97b26499b8729f4dab45759da",
+  "cached_public_directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-cached-witness-public-28f370f360f24a5aa323b3cb950c3d14",
+  "cached_public_returned_sha256": "394b8c86439d5c382797e84df6cdc892de53e4c9f528e09f81aedab112152571",
+  "catalogue_promoted": false,
+  "comparison_sha256": "087e053ecbeb0f863d6419076b46a9e0382da5c71344c1524b0cb1d9e602eb08",
+  "edited": [],
+  "full_parity": false,
+  "inferred_policy": "Distances use the minimum consecutive occurrence gap across trace boundaries. A supplied witness map yields keys only for observed activities with a supplied strictly positive distance, including empty sets where no matching segment exists. Matching consecutive gap segments contribute their intervening activities independently of the global minimum. Automatic public witness derivation raises the observed AttributeError on all 208 tested logs. This finite EventLog None/string cohort does not prove a universal rule.",
+  "member_count": 64,
+  "native_commands": [
+    {
+      "argv": [
+        "cmake",
+        "-S",
+        "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f",
+        "-B",
+        "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\native-build",
+        "-G",
+        "Visual Studio 17 2022",
+        "-A",
+        "x64",
+        "-DCMAKE_GENERATOR_INSTANCE=C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools"
+      ],
+      "exit_code": 0,
+      "finished": 1791095504.8443794,
+      "pid": 22012,
+      "started": 1791095503.477402,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "ed911fd4f9a94ad251fe90220b696940f5ea0794378a01e68b5c6bf99cf0dbca"
+    },
+    {
+      "argv": [
+        "cmake",
+        "--build",
+        "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\native-build",
+        "--config",
+        "Release",
+        "--parallel",
+        "1"
+      ],
+      "exit_code": 0,
+      "finished": 1791095508.7349434,
+      "pid": 7660,
+      "started": 1791095504.8493776,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "d010266beb0635e4ecffccae8a939afbbe587a6ab3e17ef533c25b221fcd42fd"
+    },
+    {
+      "argv": [
+        "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\native-build\\Release\\nullable_msd_probe.exe"
+      ],
+      "exit_code": 0,
+      "finished": 1791095508.866347,
+      "pid": 21280,
+      "started": 1791095508.7399435,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "65e7cd3846e5bbeb1bf8f932ef84fed89ed152051f2ba8ced1a9b76c98677c6c"
+    }
+  ],
+  "native_core_sha256": "57c8e40f731b752ebdfd047d40599f990708b9bf5acdac579880733ba720ddbf",
+  "native_directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f",
+  "native_probe_sha256": "e4df898eb1353f0b07d052197d89a335395f3023f192ab81c1d5a2642f1f845e",
+  "owned_helpers": {
+    "capture-nullable-msd-cached-witness-public.py": "53cb82c6614a84edd82de79cfbf037129dfe5f6fdb681a7c8982d84a55d55a6b",
+    "capture-nullable-msd-public.py": "f2d9d908c7817f9abcfcb648af54ca296ed9c16691c3af721c65d7c637b1b9b7",
+    "capture-simplicity-structure-reference-retry.py": "c3a6a5adf4c7d6e94928272e8fdfcc3887dd7ad13b03dd7c6210430f0f4490fc",
+    "check-nullable-inductive-native-after.py": "bd367b1e880e2df37fbb74b16dad2be68aaf0d9121ca9c89cebde8559b1ecaea",
+    "check-nullable-msd-native-baseline.py": "d84843bf0e13804c1778aa33eaabf4f5e2fdac59e7a8f841482874600ec3aaa8",
+    "compare-nullable-msd-baseline.py": "2952564960996d52f21cb576571b850dc4f051c5d01a6fcda398fe74d41f050d",
+    "compare-nullable-msd-corrected-policy.py": "77c7639e95ef967a9c9c5457ecce702d5f4449e3c0eaba9145a446bc365b1df5",
+    "derive-nullable-msd-evidence-retry.py": "a8c2446357d715e3d1169932cb9948d38be7c0d43f95edb7a23dbce254a23a4f",
+    "derive-nullable-msd-native-baseline.py": "55f6449cb49701c586fa10284045c0f7095c721ce62a7bed2d2f46bf30190cc0",
+    "derive-nullable-msd-policy.py": "c6b1514a6d582583cabf51a3738a40758b502b8856358eb6e2834f344bcb5457",
+    "document-nullable-msd-baseline.py": "06a13957aa06e9a4d37aac58a707cbeb977aaa81cf91b5437a4a07e3ee7ea2c1",
+    "nullable-msd-checkpoint-support.py": "bcce5b0fcbda055f44ec37c4cd6e3f62956766cdff7465ef791d1524bae88068",
+    "save-empty-activity-mining-evidence.py": "24280675400d5e644d448fd328264fcb3a022f79ebe09fac4891f88033e7bae0",
+    "save-nullable-msd-baseline-evidence-retry.py": "7555484e7cba1e7dd8d9e65c2f14cf4205ee247e1f4cbbca81ebc5af7b2ad16b",
+    "save-nullable-msd-baseline-evidence.py": "3ed3bc4fcea525b723d672d712e700285702f51bf2744c8ae3a3682b25201e93",
+    "stage-heuristic-subsecond-doc.py": "abb80e08c6624e8e0217925cd27774459d56049bea56e3ef9bb74bf2cdd6247b",
+    "stage-nullable-msd-baseline-checkpoint.py": "b63b964f37d7ce4b933e2cd3cb00c488fdad289c8cd56caedba2e2cbec2b22e4",
+    "verify-nullable-msd-baseline-postcommit.py": "0eaab7602175c91419a355b15388ac958b9f5a0410220f6afb705f64b0115100"
+  },
+  "parent_head": "81b6d12311536a121d6e09cec6ed1c36d316501d",
+  "parent_native_suites_reused": 152,
+  "parent_postcommit_proof_sha256": "e927c5bbfe75fd922a067afc7aec3d888fa8fa2f8c46f4f7effd7a457d5c39a3",
+  "parent_validation": {
+    "archives": [
+      {
+        "bytes": 4978878,
+        "file": "nullable-inductive-evidence-01.jsonl.gz",
+        "sha256": "49dd48a6d308983bdd4aba739c490648cf9d35a8892b457f0befb0fcb836b726"
+      },
+      {
+        "bytes": 8663031,
+        "file": "nullable-inductive-evidence-02.jsonl.gz",
+        "sha256": "a937a8b86537e6f387cadae1bf05f704a2de5f7475a51f71bdabd26716e59952"
+      },
+      {
+        "bytes": 2398673,
+        "file": "nullable-inductive-evidence-03.jsonl.gz",
+        "sha256": "b2a179eb1dfa343e8fce0ab67658ce37f8319ec6499049f7a62b99460dee88d4"
+      },
+      {
+        "bytes": 5033849,
+        "file": "nullable-inductive-evidence-04.jsonl.gz",
+        "sha256": "3bb2438f94ccea5badafdbc387d56025e291b1ddda9b6881faad4c19e2de24bf"
+      },
+      {
+        "bytes": 3979871,
+        "file": "nullable-inductive-evidence-05.jsonl.gz",
+        "sha256": "ac52b9384803ff4e243792a846e25f1bbdd74563136059273bbcbe8984ea35f3"
+      },
+      {
+        "bytes": 4537698,
+        "file": "nullable-inductive-evidence-06.jsonl.gz",
+        "sha256": "188af40fe09b4c03073446c8a174b881eed7a35216ab59c8d29e4e51253dce83"
+      },
+      {
+        "bytes": 3866705,
+        "file": "nullable-inductive-evidence-07.jsonl.gz",
+        "sha256": "91a966c4641179a3094715da3fd60a37c8ea3909ba6e4687443d164ca6376ff7"
+      },
+      {
+        "bytes": 3700015,
+        "file": "nullable-inductive-evidence-08.jsonl.gz",
+        "sha256": "78d1a05dc4bf2abb20bfd1ac96466d894f18933d5b6ede583263db74a8f5f90e"
+      },
+      {
+        "bytes": 5031083,
+        "file": "nullable-inductive-evidence-09.jsonl.gz",
+        "sha256": "60e735e82209c6b8fbadc3e102b4da473e4578c2c21aeb18f672a1ad14853ae4"
+      },
+      {
+        "bytes": 4298593,
+        "file": "nullable-inductive-evidence-10.jsonl.gz",
+        "sha256": "49052e0243cdc281cc256df4ef3f4e406b945dff441d767ef0edd85af05ac8a1"
+      },
+      {
+        "bytes": 4271835,
+        "file": "nullable-inductive-evidence-11.jsonl.gz",
+        "sha256": "568587b58a6a1c65e90dba814cfac07a7b9f41d199745cd28e578ac22e6d1ae3"
+      },
+      {
+        "bytes": 4303833,
+        "file": "nullable-inductive-evidence-12.jsonl.gz",
+        "sha256": "ba965101bec093d449a6a404d8f4807f4b63f7ef96e4b8db301f92417e17da0c"
+      },
+      {
+        "bytes": 4497831,
+        "file": "nullable-inductive-evidence-13.jsonl.gz",
+        "sha256": "a26cc9489545ec15876240a47d343d13838685ef3c24b477ed92fd680ac8f30e"
+      },
+      {
+        "bytes": 4225100,
+        "file": "nullable-inductive-evidence-14.jsonl.gz",
+        "sha256": "e18d321e712dd28f9497faf3ff4389d1898e428e970b5d38945bea4486936167"
+      },
+      {
+        "bytes": 11932370,
+        "file": "nullable-inductive-evidence-15.jsonl.gz",
+        "sha256": "84335d7c7b95100ab12ac5911e102a7f9d18aa5db250ff41157cbefb07aac799"
+      },
+      {
+        "bytes": 17145741,
+        "file": "nullable-inductive-evidence-16.jsonl.gz",
+        "sha256": "de3158c3b5fd4a0d6467f0f71d8c07adb94717578a52a8abf151dbbc45df3199"
+      },
+      {
+        "bytes": 18103108,
+        "file": "nullable-inductive-evidence-17.jsonl.gz",
+        "sha256": "1725a4f1e0fb28e7c7721e983db4f7d5b8d93593eb99512069eb59afd7c0eb03"
+      },
+      {
+        "bytes": 8049432,
+        "file": "nullable-inductive-evidence-18.jsonl.gz",
+        "sha256": "2f07ab95337ce58aa9d0fb86d0375e1f582fa3ba48bc97cca4fb39e5650e6bf4"
+      },
+      {
+        "bytes": 1610997,
+        "file": "nullable-inductive-evidence-19.jsonl.gz",
+        "sha256": "78bd930e62d1003043fee9b52b057408d7d72c9c76bd7628e898c1d3e8333b67"
+      }
+    ],
+    "file": "nullable-inductive-validation.json",
+    "sha256": "fad5adcddfbad2da76a81ce1661d86ffa02d86bf294ea06b9db3ef502d7ad731"
+  },
+  "prior_hypothesis": {
+    "counterexamples": 1064,
+    "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-native-baseline-761759de2b234bb88d5c3ff99033967f\\comparison.json",
+    "prior_supplied_map_bookkeeping_corrected": true,
+    "sha256": "17020f877715e45355c0a48acad80dfdb96b2c8bba3135aaad5745c46813b58b"
+  },
+  "public_directory": "C:\\Users\\pmoch\\Documents\\Minera\\build\\nullable-msd-public-0ab380aec58849eba6692b2116f74138",
+  "public_returned_sha256": "4ad5f9700d99fa654b8146ca0d7b3c6e8a8102e5e68efff6d34dfd1d0a7bcd3c",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "remaining_gates": [
+    "107 nullable EventLog distance acceptance gaps on each direct/LOG-registry route, 98 automatic witness acceptance gaps and all measured exception class/message differences remain.",
+    "35 complete embedded/cached-public witness map differences retain extra native zero-distance keys. The original failed hypothesis and its incorrect five-profile nullable bookkeeping remain archived, with a separate corrected policy record.",
+    "Four supplied-map profiles contain None keys (832 public calls), including a signed-negative profile. Native string/uint map carriers cannot preserve those exact parameters. The separate empty-map profile has 208 public calls but has not been called natively here.",
+    "No production source or consumer behavior changed; the preceding 18 CLI/HTTP entry gates remain. No fresh application calls or full test build are claimed; source/output/152-suite parent evidence is explicitly reused.",
+    "Stream/table/lazy inputs, broader scalar labels, aliases, dict iteration order/container identities, nullable model conversion/replay/export and wider application conformance remain unproven. Coverage is unchanged at 46/86 packages, 199/387 modules and 228 incomplete units."
+  ],
+  "retained_archive_precheck_failure": {
+    "archives_written_before_failure": 0,
+    "cause": "CMake translates /UNDEBUG into UndefinePreprocessorDefinitions=NDEBUG in the VS project rather than retaining the literal flag.",
+    "correction": "A separately named immutable retry verifies the actual Release|x64 XML compile node: NDEBUG is undefined and /utf-8 is present. It reuses and verifies the unchanged initial stage baseline instead of overwriting it.",
+    "failed_helper_sha256": "3ed3bc4fcea525b723d672d712e700285702f51bf2744c8ae3a3682b25201e93",
+    "kind": "evidence compiler-metadata precheck assumption",
+    "native_build_and_probe_failed": false,
+    "observed_command": "py -3 -B -X utf8 build/save-nullable-msd-baseline-evidence.py",
+    "observed_exit_code": 1,
+    "observed_failure": "AssertionError at line 93: assert '/UNDEBUG' in project.read_text() and '/utf-8' in project.read_text()"
+  },
+  "round_trip_members_verified": 64,
+  "scope": "Whole typed mappings and sets compare by value; dict insertion order, Python container identity/type versus native vector/map and exception class identity are not claimed. All original order, types, values and exceptions remain raw evidence. Native embedded witness fields are paired with 205 separate actual public utility calls; they are not additional native calls. No faithful native parameter carrier exists for the four None-key supplied-map profiles (832 public calls); the separate empty supplied-map profile (208 public calls) has a faithful carrier but has not been called natively in this baseline, so no projected native calls are substituted. The observed automatic public utility exception is retained on all 208 fixtures.",
+  "source_bindings": {
+    "CMakeLists.txt": "1763d9e8af8ca50d2a1b12b971cac8703b2fcfe6e7cb6938bc1a9f7103fd1d33",
+    "include/minera/activity_split.hpp": "778076205f850e43fdbfe0860f5dabfaeb06f40cb68291bd38293567c7a14df2",
+    "include/minera/alpha_miner.hpp": "86e134dc3a321253410e0d8b287064aaf5789a47471e0c489d60dd0bad12567e",
+    "include/minera/alpha_relations.hpp": "8ccf8040bc0d6824290d0d1e2b6eb0403e1e707634b8e56f910620774fb77176",
+    "include/minera/alpha_result_json.hpp": "4d731af151a64a00e34557223c80934dccfdbd2bfcf988d29c70072b1033dfef",
+    "include/minera/attribute_distribution.hpp": "32e3477ebadc433ced9c7ab9573b6f515b771ad910b9bcb5ee8fc82a09899fc8",
+    "include/minera/attribute_kde.hpp": "84834f65b9018cb4c5e91d9c07e925de3a9f605531f9b5fa169c33c1d2dc97ee",
+    "include/minera/attribute_statistics.hpp": "12f85e22acb823adf5993ce9f1fbc34879f26b79dc50a042293c858ce9edb69d",
+    "include/minera/attribute_value_repetition.hpp": "9f8d7cf71e08495dc484a0213a2089c78366cf7dd8ef11d786c38dc167987446",
+    "include/minera/batches.hpp": "abd249e1fbabd9b76ff973d4cf6d030de87e7fff1f315d670ac85c8353470dc3",
+    "include/minera/boundary_activities.hpp": "03e9f714cd1c0b3b78ffd8c715fcccb78ac826777b1598515b886310c4539f48",
+    "include/minera/bpmn.hpp": "7a10544194f47dd1dca5456814e6a215c1bd43667a1f38a9184c6219159ac241",
+    "include/minera/browser_history.hpp": "154334f15754143c22d1c2bec135fc80c09fa08a8f52ad27887287e4db3ee59d",
+    "include/minera/case_arrival.hpp": "d01092c8bc7e2b537e9363403ae77d551dbef5f86b3afbfceb1e0ddc6f0d2e8c",
+    "include/minera/case_grouping.hpp": "cf1cd6f37944ca7a51c6b5f23bf6226ca7afdccab700140ce5d9a4103c41cef4",
+    "include/minera/case_relations.hpp": "5f1437c6ffbab88eec5c59995fa80f2c3d0bc01bc36321f61b2313e7ea622865",
+    "include/minera/case_statistics.hpp": "e8b260413af0b5d4fe1a6769a0a86a96a30b60a1cc62bca526bcbaa3d7dd58ff",
+    "include/minera/chaotic_activities.hpp": "7c0db254de697f9c4ae404b1e99891737304ae147902fa69d01e8ad39a49c99b",
+    "include/minera/clustering.hpp": "784064d9a8de85f3c34e5e6a41e5e15c66ab864654ea98d6b3643970d9a35c08",
+    "include/minera/communication_history.hpp": "958ec85c2122f4caa44db9bb4a9ab2e752ed0818f37e7fd9ff3b312be01ecdd7",
+    "include/minera/concept_drift.hpp": "d504eacc7dad920c94b239a15c72611d558f8b247deec284d9f7726c8e0669f0",
+    "include/minera/conformance.hpp": "26b188fa1e4ca367a6dbf9a718423d4b0b52129f81a11f290973e5ef40d67ede",
+    "include/minera/correlation_miner.hpp": "bfe30d3da70f1681b197beaa4f5042776ec60aa58769a09addd2fdbe21150f19",
+    "include/minera/csv_event_log_importer.hpp": "70358c4134b5b371a614428e9fc2543c21ff0d06f0baf416fbd8fe0411940e9c",
+    "include/minera/cycle_time.hpp": "b3e9e46ba7b92cb3e295d719a7534f3b05a7cd6259ce1e637ef34c2af3f6e5de",
+    "include/minera/data_petri_net.hpp": "212293155f321788d4e1ff4ec031532f1e24b7ee971dfee2f528c4dbfe6a9a3b",
+    "include/minera/dataframe_format.hpp": "e7209a1836d6531cf80b5a0992b4c9a5ec8e64caefb6189efdf3a60923f75878",
+    "include/minera/dataframe_format_json.hpp": "d71be6525f6db2235c9fbebdde8dd4a0bc705343bf2520e0147c1b3db932aff9",
+    "include/minera/dataframe_validation.hpp": "c3f1eb98940be179ca0db670192f821b1c31559cfe08e0a3a0fd6ebdd8dffb71",
+    "include/minera/decision_mining.hpp": "9f5a78d647a45eeb0ac59b08c160002e2c2139934dc4d58c2195cfd4cbc6cef9",
+    "include/minera/decision_table.hpp": "a5eea51efd220862e05dc841af66f23e715119c8bb094ce37db2e85ba19f40f3",
+    "include/minera/declare.hpp": "b48382220a4440380248987e84ddf0e4e540f69209c13bacde9102ff6e32ead6",
+    "include/minera/declare_playout.hpp": "169a99e76451d988832eca068eaff3865f311fc8ae2db479543eef193cd24be0",
+    "include/minera/declare_streaming.hpp": "45a0df0afe42704df32ca35e5105a3d1f9e88eeb000d1f2d6eac9c4287d8edca",
+    "include/minera/decomposed_alignment.hpp": "c6f69ecb32ddc0c447d3496c5aa651bbf3a7d6a23f85c02515b03c8aedddbdf2",
+    "include/minera/dfg_alignment.hpp": "c69abf31bcae80c101840f9ccf190603f2ebe7419dd20e45ee090496443e6d91",
+    "include/minera/dfg_conversion.hpp": "43ad90b7bc7f7f07c6c5a3524b9aabd9b146f7b0b8c030789cd5001fca11b228",
+    "include/minera/dfg_dataframe.hpp": "c4d5d7889a4fa610759ae6f85861f81016ba730e2858948c743b102009d7b3b5",
+    "include/minera/dfg_dataframe_json.hpp": "9918388f0c028f311e04ef224357e138094077728389888a9e3675f1c0a70dc8",
+    "include/minera/dfg_filter.hpp": "afa79d96a5c29c795e7d74a72850dd5ab359696b5f9a3d70899942c5103cbffd",
+    "include/minera/dfg_io.hpp": "2fcf541a54ec84e13cfa8029949fc7de32f69f5c22b5abb875e79b589913108a",
+    "include/minera/dfg_playout.hpp": "cbe82c3097336d8c7dfedc9f4bdf7c16139843ae9b1af1e8bfa8ef13cce84ad5",
+    "include/minera/dfg_precision.hpp": "deb1462274745b0cea3501834cb9a1a5b7f0139be954514741ab257c21cc4e79",
+    "include/minera/dfg_utils.hpp": "6ebf45532268526da01f4ac305438a15aa29949b163653c5dfbb44337360f6d4",
+    "include/minera/dfg_variants.hpp": "eb0944cfdeca4eebb5017bff9d48ca0efe2e7a6e9a1998de7ad33ff1ed212d3f",
+    "include/minera/directly_follows_graph.hpp": "d82f57986c2b2befbaef0cff3f10a869f6232337f4d2204539ef91443dbe4eb1",
+    "include/minera/edit_distance_alignment.hpp": "422f8980e4e1c47630589a19d578930f1b0456508b2d5134414e13d09c8fa33d",
+    "include/minera/embeddings.hpp": "9d7a83b14677b5f20452d996613cb9d812bcbea941e73a839e414abd86dc5f24",
+    "include/minera/enterprise_history.hpp": "cd07320d29887cf8ec5bb94fc0de94744b48c96c87fec9055603470bd83afc29",
+    "include/minera/evaluation.hpp": "934469977014238578a479461e5445047fdd6c05b6c558a066d8b1b05a996f7b",
+    "include/minera/event_data.hpp": "7d4af705cba85bdbe12af31bc4a7f1d87668430f99e08591cd0e177c7598c0df",
+    "include/minera/event_log.hpp": "dc43e1ef5264ec7d18b091cdd24b190511da44f20d1ed032777338e6e2299d7e",
+    "include/minera/event_table_json.hpp": "589fa0b630a4ce5496506450ce35e3bbef2cb768193098a570b57567316d7abf",
+    "include/minera/eventually_follows.hpp": "41dcd5ec0311fd4a33c441821abfa1349d0d2b414f644ff5857c6213eb4cce34",
+    "include/minera/footprints.hpp": "c0e8234b3b4d332d7dfc99e57cd202f0b076831fda8f6f10d72be1bb53d80c67",
+    "include/minera/genetic_matrix_conversion.hpp": "9c1d5f860c2cee07315b945e9a7961f72462b22d8aba7ed180836157dd8dbb70",
+    "include/minera/genetic_miner.hpp": "16118f43cadf8b2d50d7db2381b4a5a800a5eab088bfab73e7e579091ea468c9",
+    "include/minera/heuristic_count.hpp": "08033a0ea6bebbb65b3038cdb1331c31e50c7ec8e1d7d7748ac86790f113a454",
+    "include/minera/heuristic_miner.hpp": "ffd187ca5c4f149ec240fbc6956fb427f9eed9e53b348c9e659bd617cd8946df",
+    "include/minera/ilp_miner.hpp": "90a924f4dd46e34fa8afdfe9fcf6ae21893feac1b261a4954a574d64337aeb1a",
+    "include/minera/inductive_miner.hpp": "475f9ed8b1119f4b99c284db9b53ca0165f64cb5a5671cf2ac580b9b0fba1571",
+    "include/minera/interval_tree.hpp": "f9c318fb2771412011ffc0a9f6eedd245d837b837fe04a7122768b310168b086",
+    "include/minera/json_export.hpp": "b2249a626dedfd42d6eed57ceed7dd5cf494969a2465f27f0767870d899ac0ac",
+    "include/minera/knowledge_injection.hpp": "82bc6fba8e16745209282d5fe4ac384d289ffef08657355f932f1485df8c27d7",
+    "include/minera/label_splitting.hpp": "e5c8b60860673c5ba792683aff120415bacabb424d05ea2910b716617e093e7a",
+    "include/minera/link_analysis.hpp": "6ebd9dbe0878d1793700fb037710530ab026bd3963b54894369a38403923d6cf",
+    "include/minera/live_stream.hpp": "2a7fd67685f32a10b6b9a28877454b8593c67ba74a3861e64efe5b0d24362d84",
+    "include/minera/local_diagnostics.hpp": "77e648ecf87602aa9b0c1f7874f9796919c6dc081bc0178174bf6c823df648a2",
+    "include/minera/log_conversion.hpp": "b20b18cd00d5f117b0352bdb57aa2e5917a35ad8775ec45012b07ead4b4c08ca",
+    "include/minera/log_filter.hpp": "f6121e97490c5990e1f4868fe9c0868363c55334f4398a2c4015b6755b4f4a42",
+    "include/minera/log_skeleton.hpp": "0b7ec05d9e4cb5b715bab831078fb9648ed3c9eae6fc6f69c80526b867dcfbe4",
+    "include/minera/log_to_features.hpp": "ac91f437ec84a68102555f13839aca5d2c33e6addc6274c6050427a7b2fad1b7",
+    "include/minera/log_to_target.hpp": "3ac2a933e044dd914c9ad150c595986e9a623a2cfb9884c69d173c79aa3abfcf",
+    "include/minera/log_util.hpp": "022392cd61733787b6c541eb8f0161ba68a76865831a93061c4159b89dd753a2",
+    "include/minera/log_util_json.hpp": "293442c8a34a1ccd2508c5241f7a13ed05858b4de4292bacbbf90eced65d2c13",
+    "include/minera/ltl_filter.hpp": "8f386542e3e1d374388c2bad6032ad22ab33ed09a38d25751afb2dd7ef676d76",
+    "include/minera/minimum_self_distance.hpp": "2af231ddd541ccf369f34b743ecd7b864435abcd0d2cc92132f16d84ffd4196b",
+    "include/minera/model_decoration.hpp": "6a626ef8d2e6d4e7d38b0cba1638b76c34f236177468ca01a690ca8825073b76",
+    "include/minera/monte_carlo.hpp": "ecbc99aad9bba3f3019f8f504ee4258641ba93d73c10897d609d0ef3dc756271",
+    "include/minera/network_analysis.hpp": "9b84bbf64a83fb329c5ea08b57cb0791d590343707b347efbe3ccd5903733c21",
+    "include/minera/oc_causal_net.hpp": "cee637fafe8b82f7f484663804e46d9946532ff0bab8e2918efef42608319dcf",
+    "include/minera/ocel.hpp": "a9b0a045f6bc541729dcfad2f98f72a48702e383e3662c222bb9fa3e50b39dd2",
+    "include/minera/ocel_csv.hpp": "4d3c71f8007c3ea1f7a8f2d415c8685c67bb33d292d4fa152a7cbca7f16583b8",
+    "include/minera/ocel_features.hpp": "b7f4766de2599b233b9b970f743b82f05c5dda744f92da4c21f1b8357aa4190b",
+    "include/minera/ocel_filter.hpp": "fd9b93e03d62558ca96039cd707d5093be3580c14c2f4edb8b2cd6ee7da44cd9",
+    "include/minera/ocel_playout.hpp": "c6198965364be8f0a05315ebc43fe3cdc5ff9450753a8fe10b33f699cc2b0d7b",
+    "include/minera/ocel_query.hpp": "b1d45db217bcc5579ef628ac43db4c83a5cf29f28c01d5d702bd5d835455e482",
+    "include/minera/ocel_sqlite.hpp": "8cbfa5db2e959943576332326327f1ce213b4526f6a57fe6078c84736f9eeedc",
+    "include/minera/ocel_statistics.hpp": "7a75e0adad2cba9cf996d7df3aaf06a0c8258ace00265eb81c980e9b404a36c8",
+    "include/minera/ocel_transform.hpp": "ea094f0ac598624d4287cedf77381b6da90836cc361b29f61e59c6b521484a56",
+    "include/minera/ocel_xml.hpp": "fb3013480fec67d0a5954395e182d75cda335a938a71f3ce326301bc571c99a7",
+    "include/minera/organizational_mining.hpp": "6701b52c69e34d395203049e99bd90fb838b47fe0e7deeb62859f50e51ee93ce",
+    "include/minera/overlap.hpp": "c01aaa25a3fd5de1059d447122cff8cbf06d0cfa6b67b3e79df93b39a2b63c15",
+    "include/minera/passed_time.hpp": "64eec159bc39dbda6302bb0232eff9b5f5f138e366e1bf51faf293a2966d0c3d",
+    "include/minera/path_filter.hpp": "a7ecea288720c8f763326b10636f39be03f13e4f2b6f3fb2559d420c78d6bff0",
+    "include/minera/performance.hpp": "b264629ddab6e32da4cb7320cd4e3325099eaabbdb3745825f5cc41fe5207074",
+    "include/minera/performance_spectrum.hpp": "38c5ec67484ae4559b09e5a566951fb189ac9d5b5a13bf62f165405ef24b38ff",
+    "include/minera/petri_analysis.hpp": "6e9e9b24316a4ac0308c2e64e8e9041bbd019b60760307b33b3657ff3678acee",
+    "include/minera/petri_analysis_json.hpp": "3cbf72584f8d112c9661ee79d01c7414092428a4c3dcc82b8f75acdf21e230d0",
+    "include/minera/petri_anti_alignment.hpp": "cba14f09cf7ec7937734ebcc74cb7dc360c37682b195c9ee3758d5a8de78e53b",
+    "include/minera/petri_multi_alignment.hpp": "3b2a4be215a174b497f4e1604bc9cf0b0ff0f4a18b0539389b6d9335eb3e27be",
+    "include/minera/petri_net.hpp": "7293af391239e5520d109ae34d58213c0d601147aaca114f5e595094d9077d0d",
+    "include/minera/petri_net_reduction.hpp": "020ef335bd0199486b1a6235f3fc092e3ce3903ddb631b5edd377f02cbf60da3",
+    "include/minera/petri_usage_comparison.hpp": "983e8e2a931377dfb8ddccd001ed654990a9db7cb9210bb002d9cf4f0ba1c3bd",
+    "include/minera/playout.hpp": "5c1a76e75b577e028c857d090693895fd07393dd807dfee03dde5ae14799b5c2",
+    "include/minera/pnml.hpp": "e5c51f9e6a9f678f94a44b32522b15b20484fe839f08587cb770cb7b3755dccb",
+    "include/minera/powl.hpp": "0e8942650cb18a46cd1dc79449c863704a67d7bc8abdfb23beb4396b40cc785c",
+    "include/minera/powl_conversion.hpp": "95c7d83b6f07e8711f1f4a7a966833bcce7daeb1dd0c59cf892715a5f30a9714",
+    "include/minera/powl_discovery.hpp": "fbd56bdbbeea32d9d47bcc1994d3cbc6b4c8fa9a0d9be8634c31ad910e9a3c2a",
+    "include/minera/pripel.hpp": "e23ed7a81c6eb09a2526dc89a7a82c20ea7187b34bc9d168edbb1b3ea24fae05",
+    "include/minera/process_cube.hpp": "f64822a164b1e7e020835be98cd016846e4f5b6e495d565db68106835a7cad91",
+    "include/minera/process_tree.hpp": "1c39d78e03dbcdd5383f27f929e2bf77bd291393a0216e8332340db9d9b68c9e",
+    "include/minera/process_tree_alignment.hpp": "a875271cbfce42210734087bfbb66d9d1e9f3e345ba34b7be29bb480760745a3",
+    "include/minera/process_tree_playout.hpp": "2fe7fe1e43daa2cff83e3512981a7fbac1418e40de79961840b925d9d7775cf3",
+    "include/minera/process_tree_reduction.hpp": "bc6b9929dec5cb202e1b77a4d9276e0bdaca9bd111e71665d4d43ea8733f8897",
+    "include/minera/ptml.hpp": "97460780a643b63cf3e16e78792fa19612ac5d98ec2c264661d9f1531e8c443e",
+    "include/minera/random_tree.hpp": "cad5b41653c2db0dade6bb864796e960f58d0212511f311c11509bed277dcdf6",
+    "include/minera/repository_history.hpp": "399215343984d568e60b6c82c5ff610af02c1c721af03b2ca89aadc43c3c82d2",
+    "include/minera/request_params.hpp": "302ad261e30484365c49dec05f65a8fc37874bcc07c027a2e15f07dc7a73d942",
+    "include/minera/resource_analysis.hpp": "6ede4e591d6d3d33f334cfe0318b4dcc9ae1174e03bb92ef9195a4b8e4dc7719",
+    "include/minera/resource_profiles.hpp": "9a63b3c031a74922ae394388d4a241b136e5c7356ef6f7581a5b886d1e758e88",
+    "include/minera/rework.hpp": "6e13b7b6a59586615047bc0c27a836ce79b26e926fe30ae4b1d85a9ab6df4c10",
+    "include/minera/role_discovery.hpp": "2a0c0718867a0cbbe52e66d1c864fb3117955ad1cfb05a6052db265db913e879",
+    "include/minera/root_cause.hpp": "ef8f2bd534cac044f2c72a9e89185150f945f9b6b21daade41389dc45b76bbe7",
+    "include/minera/saw_nets.hpp": "321f34ec4cb6618396ec16d7b676a2b4a3748d68c488cb33b986594afea31a04",
+    "include/minera/secure_random.hpp": "2121756e79ab6b03f737c53a996708744560f870483046ac63d3745b34e052f0",
+    "include/minera/segment_filter.hpp": "3d42fcf03e7cb892bbb2d53010969459bdaf08f9c72cfc94223ba9e9bf2c6a04",
+    "include/minera/service_time.hpp": "9c7040a92325fa0877cd1d89ec532cda139a187566d15d6063c679d2907b2245",
+    "include/minera/stochastic_map.hpp": "d0887c542e322a3438780004a7b59504022d7bc4d475fa6db826352f26b86216",
+    "include/minera/stochastic_petri.hpp": "196c61f5e88215543f001d3317c63049ab75680308a31a30ea4b3a8d2950577b",
+    "include/minera/streaming_dfg.hpp": "2062497cfa3ab3c08992aeeda8099682d7ecf850395a91ea220410262d330942",
+    "include/minera/streaming_footprints.hpp": "ab8f0822fce3d35da38d51eb1c46e14aa672f5295e5b484083c649d300360260",
+    "include/minera/streaming_import.hpp": "92f19a3b8c909332313b772922281d5047208d7099fe6609ef16cdedc0fedf62",
+    "include/minera/streaming_store.hpp": "5c08db13930b48b1627144bd04ad542eb3d4176816dfc936fe0f2b0eb8a83004",
+    "include/minera/streaming_tbr.hpp": "1c044bca491d0cdb3e70ecf136c3775019e0bc9ace452ce69f05a16666bd2e5c",
+    "include/minera/streaming_temporal.hpp": "1b298193bc25b3698d2bb1426c0a6d985db7538c0d29ee988d3a65b5192b2a96",
+    "include/minera/temporal_profile.hpp": "b869aa8c3594d17b02c0f405467320d1683753a35a9693c1a395e84e96af98e2",
+    "include/minera/timestamp.hpp": "2f4e0f4fe61814be71b2b4ea1d4c8522b55b8041bd9c31364c22d67fbbd0bb28",
+    "include/minera/timestamp_interleavings.hpp": "c854eb6ff69f22f2d9b37df1dac7b8a2e1ab32013719ceac2df157152f985b7a",
+    "include/minera/token_integer.hpp": "d25f6a5b9d0b4e5f6444c2cc622093e9def0d61483576f52070788a3e1d61675",
+    "include/minera/trace_variant_query.hpp": "7adc509b46ccf3e95d38de7a364ee7750044baf533a493e968bd37c4d0cb1e85",
+    "include/minera/transition_system.hpp": "9e40fc6a877e22b61332cc2b5e579b0fdf0c7376306f90449735102671dfb36e",
+    "include/minera/trie.hpp": "6cfa3a43a74cc91034c78d1c51b509d5e88e64093f0c23bd927e2d14f521280b",
+    "include/minera/trie_conversion.hpp": "48421250495fa29dcd17ad62334ec1906c920fabbfb4349a4c72968b60aa5c2d",
+    "include/minera/variant_statistics.hpp": "20e187a48fecc903d14b25ee290f62447fbd20583e5d9c7f542b3fe3a036e734",
+    "include/minera/version.hpp": "fc956d6b3d0546fa8a91a7966249f8172718d904a23652af650b0926e9dd58a1",
+    "include/minera/windows_event_log.hpp": "f2de3135e09f35378a8e6ffa477b7b38200101426d4a5e50ef4070bfc74c1fc6",
+    "include/minera/workflow_history.hpp": "7b1c658ebc7a84d50cd0a13b8b19974fa9a18ba65f5b426cda8f3edbabc9a929",
+    "include/minera/xes_event_log_importer.hpp": "e05194df04c4920550eb99a0e8cdf9251c044600ee36e4a9f01027624c1b1384",
+    "include/minera/xes_export.hpp": "eba266e1d5f6af06b064ecffbd97d31d7771f5b60b920231bef9b2a82b4a3fa6",
+    "scripts/generate-cyclomatic-unicode.py": "67201f1bf77c8a960b38553ea49c78d3095aedad8042f96f9aac9e1d9de82209",
+    "scripts/generate-pnml-decimal.py": "43d13855b4bdefbe3f0060ac1ddbe675f08719192781aeddb62d12581b053c1f",
+    "src/README.md": "cadd1f011e5b505bc591a9ae6bbb41c15aa3ade660ca567179a4b524ab2fa802",
+    "src/backend/activity_split.cpp": "890b526938327fe727c5e76d1ad67c67d9cd0adccff8aeda5adb31262431a549",
+    "src/backend/alpha_event_data.cpp": "27673b148231f31ca6ab9f5b789cfa5d927e71e5741ffb49da66ef27134066bc",
+    "src/backend/alpha_miner.cpp": "05b392bae30209a2bb5638e1b9f3a21620d440805fc4f3cbcb1b6650215cb693",
+    "src/backend/alpha_relations.cpp": "b1a7addd0532af034bdc76d6232ba7571539a0aaac2033e3f3cb9d52ec61cb2c",
+    "src/backend/alpha_result_json.cpp": "7689d21f6e67576f3b6a849fec0c8d071d426d9c3e1202c131c7fe60c3151453",
+    "src/backend/attribute_distribution.cpp": "cd09536690b5d880e15a7dd8a927ac5bd2a7736071882b5925cf2154d7fae621",
+    "src/backend/attribute_kde.cpp": "e7532224382ff90dd7f8e21177134a48b93ce0c4f19b097a0455799ddad58d0b",
+    "src/backend/attribute_statistics.cpp": "b3a4a4b07c55065fe6c597392395bc3f4b4f297f31810c33e3ddd24f39fc9bc0",
+    "src/backend/attribute_value_repetition.cpp": "cad857c405a0dc3d60becf108945cf55c7ba548ba643bcccc9ed0d4be8340429",
+    "src/backend/batches.cpp": "7c39a2dd5c3c204fb1082f7ed8584ba9aa412031f0642b32047c2574bbc1f16a",
+    "src/backend/batches/discovery_registry.cpp": "4a1f01a2428e3c1d9a71d826d1f02054c1cc5250fc477a51aef3bcff023ec266",
+    "src/backend/batches/discovery_registry.hpp": "2f634603b92536ce4572c1ff43674bb9003dd56078c59b3dc413b98b6f79a1a5",
+    "src/backend/boundary_activities.cpp": "e56aff09df2b4241835d6edd33d9196a860cc4c2ed1d63851e6b91487485171b",
+    "src/backend/bpmn.cpp": "ecff2511af35e858612512b3b846ae5cd84168444765ef323b16e79751ae0113",
+    "src/backend/browser_history.cpp": "d2cf502a43a5514366fc6596348ac79d98ee1ce6165177e6dac982a8a4a6903b",
+    "src/backend/business_hours.hpp": "e1194c03b16dfeaaf9b4243c83202819a7588dc332f0218e1170302c2dc520e3",
+    "src/backend/case_arrival.cpp": "c64c4aaa1ed13f936fed2101324f032541231b3385014a41e4fe046274988489",
+    "src/backend/case_grouping.cpp": "63bbeb53783be6e1564584bab27c74906ee033c8b423246cb28320b97290d12b",
+    "src/backend/case_relations.cpp": "548c3973dc4c2b9879c6961b3b7e685ae3454be1f09406009f2e53af69930b09",
+    "src/backend/case_statistics.cpp": "831c4dea777daff85f6f72fe7ec0f46a19c63c4b8ac10f4e3d43da2141c418ea",
+    "src/backend/chaotic_activities.cpp": "6a3ac48955e694481130e2354d403180cf0601a85df24f26bc361882641c11fa",
+    "src/backend/clustering.cpp": "48eb4b4a03229753c417bd5252ce1c0e1f20588cb7a462e0ebb8402cfa07e318",
+    "src/backend/communication_history.cpp": "281b261e9029bbf46297d1a23cd9773665b2454b917deb6f9e2ec04ab8bf18e1",
+    "src/backend/concept_drift.cpp": "a0b0d3a07406bcd2e08563a020f76a2bd31e8a83b18c5fec676d77e63cac9f62",
+    "src/backend/concept_drift_table.cpp": "ed409c3a5a997bc52a4fa60e693773d696544aed191ead2e8a396afc9653f927",
+    "src/backend/concept_drift_table_limits.hpp": "84b334a3f9186e9412921c7b047116719d76d35010d7bdc43514f0c147ca29c0",
+    "src/backend/concept_drift_table_output.hpp": "3461bebe6851860d1696ecdd394e35b1512227f5e59c7e6705584879a1f9ce6f",
+    "src/backend/conformance.cpp": "5671fd4644cefec04150d480b2b7ca1df3a464390e3047788c6ca563571421b9",
+    "src/backend/correlation_miner.cpp": "891f26b4adf8990b1d72eeac90ec3a094affa0d46f9192ff057e704939daf8eb",
+    "src/backend/csv_event_log_importer.cpp": "b4a60f7b8558afbbbeb94f31a12c7366322e68b0743768d4d0a1987b1965c21a",
+    "src/backend/cycle_time.cpp": "21fa9c28e7c7f13f79cb3555e95cdca7b346c4de5a87f07f19ca555851468c34",
+    "src/backend/cyclomatic_unicode.hpp": "f2962ed0e21dc4c854633327ffb7162917b43f47ba1bdbd2e3797743aa2583ee",
+    "src/backend/data_petri_net.cpp": "cd8d28600d5141399bbe150371b5783833ecfda34c761c3bb3dd9883c5ae69d4",
+    "src/backend/dataframe_format.cpp": "2fe17fa5f2cbddf449deef65487c4ff9edaa275d2967b1822f519456c4f75265",
+    "src/backend/dataframe_format_json.cpp": "830d557550f45597940cd5ba75bfb9572e2647764c0ec9bac3503abd2b50d5ec",
+    "src/backend/dataframe_validation.cpp": "05505a4d251572268164c87133e9f16212facc7a8577d1cd9c04381ad3887043",
+    "src/backend/decision_mining.cpp": "04098790079019ae34e019028853c77955a1c952bf8f40d191dd08fc472fc453",
+    "src/backend/decision_replay.cpp": "c3fe5b1e2177d70cb7327b8ed597e9f8eedf0283217434976802892ed11f3e68",
+    "src/backend/decision_replay.hpp": "87ec7d7d375c0164f86cca7bdb291749dc7a9b937f4dcb538c396ef94687bf55",
+    "src/backend/decision_table.cpp": "a42afcf49f514b959f791dccb403108916a77e5669d07b4597e4df91ed89f54e",
+    "src/backend/declare.cpp": "e4208ffffe245746c1305e35033e39f3be183bd30a27153762e72456981fbe80",
+    "src/backend/declare_playout.cpp": "8266d849ef03df79ed22d5334171d51364860629df3170cde5b97d80b58c81c7",
+    "src/backend/declare_streaming.cpp": "6190033a578f5b09136bd5360fce459e946b3c87e8ed09011b7a0f5781ed1adb",
+    "src/backend/decomposed_alignment.cpp": "75fa9f53490b1a8e3baf2024552ad9e2d50b78f84aadf1a79e737665901131c8",
+    "src/backend/dfg_alignment.cpp": "1c7573a8ae885f7d19e90cf714d2c4e753c7b51c69458e27c17d1d4d4e56c896",
+    "src/backend/dfg_conversion.cpp": "574d8f4e348b7c692b7006a6771f59a218c8b24c80ddcef4fb85e42452181d20",
+    "src/backend/dfg_dataframe.cpp": "c76e19304a4161df8f2c6ca7e50defc463aa89ab3ba5d07fb556103510755611",
+    "src/backend/dfg_dataframe_json.cpp": "c8fed02dfd5f1b59156b7e53583311b70df399810c64b9f9fe87db98a8e93f11",
+    "src/backend/dfg_filter.cpp": "9e93bcfcee2d67688898c3c70a78e24e415dc48e96985c50d1d6009f863e2fd5",
+    "src/backend/dfg_io.cpp": "a8de74a6e33dadfb2beea7f433816d032d21d59889601807fa4f058f2fdedd90",
+    "src/backend/dfg_playout.cpp": "97b6f47bed20eaf3b684cf731e9241c065f9322c30dc3858a973c24e16d1a7a8",
+    "src/backend/dfg_precision.cpp": "a90763783a79a1b81de07c162f1b7c2e45d692a5ad952575531aba0d37bd52b4",
+    "src/backend/dfg_utils.cpp": "674edef9a0f017189a6e78932531844251bceced0d10b63596bc7de34b011b34",
+    "src/backend/dfg_variants.cpp": "679512b7fe5a132c7482e0f9d5c959bfe37c11316710c77eabccb54d58e504ee",
+    "src/backend/directly_follows_graph.cpp": "4069693c623f27ccefbdf03c6858c12dfffadc761a107c8f507fe065c2596135",
+    "src/backend/edit_distance_alignment.cpp": "32654a2b05536e5ebea850b3b192d57878bcaec458b6c839782cb289f6c09b30",
+    "src/backend/embeddings.cpp": "6b3ecf7170ce8d7cab730ec3187e32565fcc249b477e67d695b5848c13eaffab",
+    "src/backend/enterprise_history.cpp": "ff21bae2b4b9055742e9ee8e558a289f4d7644d1028013cb7319f93eea5a06a7",
+    "src/backend/evaluation.cpp": "91a1cc58a07b5c5aa251c8f287f434f43a0915f2f1920c0958838a0be6110b2b",
+    "src/backend/event_data.cpp": "1dc9f875b22abc18e212ee8fd83a532d878625cd025e8ac61b3bd3def863b483",
+    "src/backend/event_ordering.cpp": "cc8fd16360a071b57d06ce8026b8229d70ac5e57814794ea7b7ee29e1f85c4fd",
+    "src/backend/eventually_follows.cpp": "433d5157fb8cac4fedf16ff4c103ca5121d7d40d439d47e42e77f6731471be69",
+    "src/backend/exact_count_ratio.hpp": "9eb1363a5c0221e93d810abd2dc723478e27d5377db97b6a69fc5eed65e184b2",
+    "src/backend/exact_mean.hpp": "4e1bacd098dcf123ce3efa93d21bea9df6cae782c8cf10e776f9c848354a0be0",
+    "src/backend/exact_stdev.hpp": "6773caa96e83353a60f47f6fa41461b44dcfb9d884be74c44d43f1e23cb4e6a0",
+    "src/backend/footprints.cpp": "05fc8b878ff2a1ee30914c32ced202b011f89733173d0fe4064ae739a1c68730",
+    "src/backend/footprints/conformance_evaluation.cpp": "336b54f7a6a8b3537c733bfa2ae7f216087c1eeb42bc38f742185a9d0fc54988",
+    "src/backend/footprints/conformance_evaluation.hpp": "3fa41b2d698699d0abeffc2581ff761e0702362d81a872d57d1c5de8d1445e5c",
+    "src/backend/footprints/conformance_log_extensive.cpp": "76c3143d81b3b002dccad513391afbfe725ed066d5f40e674a5b8c37d6d9ec0d",
+    "src/backend/footprints/conformance_log_extensive.hpp": "cdf27903aceeb9f7afe1b4ac877ab536b51edc98e0c3018a347190e793e7548e",
+    "src/backend/footprints/conformance_log_model.cpp": "c070ad0b6adecda144c461195f32fdeee185d29cc1aaaaa3ae895f83886dffd4",
+    "src/backend/footprints/conformance_log_model.hpp": "75b55a5cf9266c6deadc92938667ee6fa21f3a2fc555d459f833fa9c443add08",
+    "src/backend/footprints/conformance_trace_extensive.cpp": "2468d6eb19059b70cf726c892d57012c5f579fd071185b2803edaba4f28a76c8",
+    "src/backend/footprints/conformance_trace_extensive.hpp": "748a6f630078fc46c4af7a9af10e7f1f4bdd8dbeec611837b49a1bcfa296cc47",
+    "src/backend/footprints/conformance_tree_visualization.cpp": "0eedc94cdd1c841c41a01bc681036c11ce04ddc4b6d6c2a8f76a3763328a4783",
+    "src/backend/footprints/conformance_tree_visualization.hpp": "f6483936c67e16ff2b5ea14b2f47c42c11d23c5251efa176f18dea3de80b21f3",
+    "src/backend/footprints/discovery_log.cpp": "75bac0d4d3be199f655d7cc1866d00ea4346d080a59b366d016a8c3f6908ce82",
+    "src/backend/footprints/discovery_models.cpp": "a585902b7202735cb115d90a09a5590276dad752706190bbd3f0d555c6180fb7",
+    "src/backend/footprints/discovery_registry.cpp": "1de6da0a2384bc8a07992abec401a3d2b102b40b07b931964ff44f415427aac3",
+    "src/backend/footprints/discovery_registry.hpp": "6e4705f5b56fa72ea1fcf09775d07d81b7e318ba3d849ee269a8986f83decf5f",
+    "src/backend/footprints_models.cpp": "fe51ee4b7f5842f11206b191c38a460b24435ad7cf91334b52c2937fe02a0186",
+    "src/backend/genetic_matrix_conversion.cpp": "0c0f93aa42692fc9ab9cc5316daab011bff5eb95431fbf9d0c8244f7df2b0483",
+    "src/backend/genetic_miner.cpp": "1695842cfb1967bd9ec9a038e4d31bf8b27e37daa87d5f11469ed80caa8a9bab",
+    "src/backend/gzip_codec.cpp": "125334e6d4fa8e70d785b62902d4ff5a8c4a5a417b6a68526a125ad0afaaef5a",
+    "src/backend/gzip_codec.hpp": "f39564b78aa7ddb08ae9d4bf96793d316757a549537424d276ef9bf550077660",
+    "src/backend/heuristic_miner.cpp": "9cdd847797fa4a6164caf0b4208ac9599d51b5d09b666cdb24cb0a2a4120bdb3",
+    "src/backend/ilp_miner.cpp": "b068cff777c6819128f6a6fd06627479ace39ca5d2dc47f64cf31339209a17f7",
+    "src/backend/inductive/semantics.hpp": "101d8b0b6648ace80738e1d7aa4a2c7870c39cf0e1f492039f9c16c28146080a",
+    "src/backend/inductive_miner.cpp": "70df4388e4067d2df0d9930ea004e9649fbcb72e52543ed114c6dca2373e404a",
+    "src/backend/interval_tree.cpp": "244563bcedf60adaf64f6d1b011356f49dcd0ab25e92302230a5114e43226c8a",
+    "src/backend/json_export.cpp": "010e90b2d7903b899af3818e0b386f0a6730c63f60072de155f5159b76106b80",
+    "src/backend/knowledge_injection.cpp": "99af437c0e9d7ffb5963e1dd8cabe8fa63722e96f17d1dd78b87e15ae3d9e539",
+    "src/backend/label_splitting.cpp": "a6547c3784e113c72cac404e645fa1943f105a941e45b2cb59e72b14aa3ba3eb",
+    "src/backend/link_analysis.cpp": "cc5836dec7b4e73629b26600b36ed16e347e3f36581bb126ebaa5ba68113d663",
+    "src/backend/live_stream.cpp": "a0dd78418754c6d0099afc94f8e1b3aa613a40df95261bea1896d4637fe8c661",
+    "src/backend/local_diagnostics.cpp": "7718fac8612d04a81bdd77c0e813fa238541f4e9e7ac780851e49ce4e0b9e83f",
+    "src/backend/log_conversion.cpp": "ffd9b16fe3e52a41c955ab928e0b807719987644e8d710968399ae7721371cb4",
+    "src/backend/log_filter.cpp": "a7e911a27e976406449623a13892b07a36326f15b19264a6b282a379bb24438f",
+    "src/backend/log_skeleton.cpp": "2e031e94757c048cb3817440925a210901a3483b4043edfb184cad109bd1d415",
+    "src/backend/log_to_features.cpp": "203610d7e032746b4f3d430e7e011979ea2d97cd739639161c37625ea1c14d1e",
+    "src/backend/log_to_target.cpp": "ab461f30b0ee1d90d2e0b9642ffc79624c0622faa669263b1dce8d0365403c1e",
+    "src/backend/log_util.cpp": "12b378137621dcff429cfc2964317dc7c710d0f198f2c3b1c00e43775253fddd",
+    "src/backend/log_util_json.cpp": "163d5bf174224e756afce56143c12d26d8b1ec9fc58f4b273abac12ab62ebee1",
+    "src/backend/ltl_filter.cpp": "1f06647faa3dfc9278e41abc92c19114cd76c2248640c3a951281ac730430584",
+    "src/backend/minimum_self_distance.cpp": "c1d3164e23e2bd0664fdd3a863cb8628945fda563f8f593f3f615cd2089b6a03",
+    "src/backend/model_decoration.cpp": "d259912de72567778731573fc44cd3d7fa8c0b0089bce07eeb1833ecc502068c",
+    "src/backend/monte_carlo.cpp": "363da13e7265f2eed10a87db55fa433073f40e6d9944644201816b33591a5ade",
+    "src/backend/monte_carlo_json.cpp": "d9fe07bd690e397147110869457781f311c95ca762ce049207bc9adefbf1fb10",
+    "src/backend/network_analysis.cpp": "9fda8f78438dbac67d07067a966ee3e6ac9ee8189c21654057b80b17808da518",
+    "src/backend/oc_causal_net.cpp": "35c2940e723c5ae1c2682cb66013e5525cb244ad79d73b8de39e51bec19afe1d",
+    "src/backend/ocel.cpp": "9724d0b65418ae80c4ff0adfcf1061dcaf6f28dd5718d39b88c23cf890bd23ed",
+    "src/backend/ocel_csv.cpp": "8496df221d7d97bb9c37a1ba7cd5b1908a293226b62caa461b5bb85ca942e770",
+    "src/backend/ocel_features.cpp": "08a092e91bb0cb978897443995d061922f1b9e25f79d137fc29101a516f23f61",
+    "src/backend/ocel_filter.cpp": "71904d742b5f688809afd1698bb3cd1ec0e9f7d3d3bd25ff64774e1f2665f8a5",
+    "src/backend/ocel_playout.cpp": "fc6927ad9777e70dc363077ec88b38ce8c87d51eed5e8823189593acd45fb639",
+    "src/backend/ocel_query.cpp": "c4cba77557df9e4d6517939d0ec51266914b6223739e510af4de5da588295ad0",
+    "src/backend/ocel_sqlite.cpp": "20f3b7942c7166cda8a12ffd54c8fd50b29f968270680c09fecb60d379b50096",
+    "src/backend/ocel_statistics.cpp": "ab9800b2526308e96383af3ea0afee8aedd646bf93955324fec0244a2984037c",
+    "src/backend/ocel_transform.cpp": "9e5317667db188c6ab8338ef54d4c2514626b1427c96040cba9df93355be04be",
+    "src/backend/ocel_xml.cpp": "8270531dd82417cd1b0d46e1d3a9119127912e24c4ab478b89eab6c88ba768d7",
+    "src/backend/ocpn_projection.hpp": "0045bfb3e7984dc609a724ac83cc5582da3dab45e7adfa100cb5638c52fe8b36",
+    "src/backend/organizational_mining.cpp": "419a16b6e6370b6ad3d0c76c5c8a05bd3db1a85d1dafb19996e1c56ca433ff81",
+    "src/backend/overlap.cpp": "ee871fc4d520d867f3560e80c55ce2fe00701705ca4ea1e3ac06020fd1828d25",
+    "src/backend/passed_time.cpp": "2c81c0cbae1cbfc82489d28b7033f7a4996d126e83889f5eaa5889fd9e1dd622",
+    "src/backend/path_filter.cpp": "1ff11efa6d6d21743a5c475206aa90107f77f7a31104e033c4c7ebc77ad44878",
+    "src/backend/performance.cpp": "b207b6f0550750a54c34b4a7fa78e6ffa6e3b75f6c2c83e70b547126c6a534eb",
+    "src/backend/performance_spectrum.cpp": "53cda6f4c7b7b710c4688f4a7a924d6ceea6b8769a0b9f832c57c0acd95cdb2a",
+    "src/backend/performance_spectrum/components.cpp": "39ecbba584049fe3ba7cb66ac50863684df832acc0b21ac4681b404725363480",
+    "src/backend/performance_spectrum/components.hpp": "06da813d9da886764489ca8ed51096999eb036fc2e6a51315bb662f4d2bdeb6b",
+    "src/backend/petri_analysis.cpp": "f7d2e4d540959c74f0591f0ec88cd0357c6c495d35d1cadac87b23e3c9af36a4",
+    "src/backend/petri_analysis_json.cpp": "e44040828350cd61c0e451085f390e79a23f2cec87bd687a72f499909fbb15e0",
+    "src/backend/petri_anti_alignment.cpp": "87d8f46ffe01855a78c1df21e7ad2b71aba11801daf87fa6e83e20f2255c4b90",
+    "src/backend/petri_multi_alignment.cpp": "2da3d17be38eab29ca98d32f05fb8ee99d459cd1af3e21f58500653b4153db8d",
+    "src/backend/petri_net.cpp": "851832ceb5e7540ac18a5d149992e54bf2e09c6933c506fd483de8c97eb83897",
+    "src/backend/petri_net_reduction.cpp": "a4f4b5b4ae5ae1290fb41f1bcc4ecb7a2eae1872eb7d8bddc112ef930341e7f5",
+    "src/backend/petri_replay_internal.hpp": "66a7f299b3b0f17a926fcc08150b0fc336dd23a9cd85f78957b83eabdfba0f04",
+    "src/backend/petri_usage_comparison.cpp": "2dae9ce3ee825e16e489198c8f3d65bb0f5462ce0447129aa5947e8a3e5c412f",
+    "src/backend/playout.cpp": "e8ca1c3aa17aea45773787c41d676ca82aa33dba871c2e105a9f23e8ddf1db15",
+    "src/backend/pnml.cpp": "9004f8b2044631eb46e6098eab8d87a39ffbe04c63ce00e590f67cbbcb326a1d",
+    "src/backend/pnml_arc_weight.hpp": "f19ae5e047711e91ad1816f1f8e30a98df491472d253e8658b7613159fe99f02",
+    "src/backend/pnml_decimal.hpp": "68c5b8b50b1e0a5df4e6e59d928d4962ace8fa94ad4e63f55a15f51eb26b7970",
+    "src/backend/powl.cpp": "d19f9745b9f6336858dafb9a050b23a13ca6803962550c786a83698ff6263060",
+    "src/backend/powl/semantics.hpp": "bfca9faf0f8cfc574c34c6b9d4bd43a360004ce6610892c6f3057ef446634aa3",
+    "src/backend/powl_conversion.cpp": "dea47f255e663738658411eb0744ab801957f1d800f4d50188e7f65057345d07",
+    "src/backend/powl_discovery.cpp": "c4240ecf265b9be742d2672e1fc1e6405c2d1acbb7642da262423c561f292840",
+    "src/backend/pripel.cpp": "a1f6b22878c864de1679d80c3e68d8f3b1c7a8c989ff56a5a7a4e3da1bf3942e",
+    "src/backend/process_cube.cpp": "2a4d73fd7e59ca413ef136c161a945ab8d5d54ae190a78ed115ee6842388f087",
+    "src/backend/process_tree_alignment.cpp": "52df9a2a0109fbde834682c85aba477674a2c7a6e9f1a8385ad8812d4b27646e",
+    "src/backend/process_tree_playout.cpp": "fda5a3ffc6f3d7e87fc49e89a6027643e85621861fa77efa854aa66254deb7f0",
+    "src/backend/process_tree_reduction.cpp": "21b23cd34c55735dd86e97681b69d15e084a8afeca53f0da06cb70906805d38b",
+    "src/backend/ptml.cpp": "96dfe706661d25abe6408c58400efc8392bd0ca25bf999b7b98ad667329d8c4b",
+    "src/backend/random_tree.cpp": "8af2a81614b2a8ae843d890fa3d7c50f72d029f4f88291c902bd8263fdd1f805",
+    "src/backend/repository_history.cpp": "af124f841994f60615705572188c358fb3e57bf043383dd31e31b424aa3c158d",
+    "src/backend/request_params.cpp": "27918605e9ffb81f7d49c34500e70f1118392f8d5356ff886c358bf039619bf0",
+    "src/backend/resource_analysis.cpp": "b8a512a6267fd75bc9b3d0a892f9d37d84e86b4d398f85113e94dc81daccbf3c",
+    "src/backend/resource_profiles.cpp": "357afd7686729ad18abb489f04111667f7d78363875cb52d4d0e5b5c834598ef",
+    "src/backend/rework.cpp": "f84f412a18fd7e2090c12bdf85dc502c6e0d5594f6544a01f9ba3668de8d4d56",
+    "src/backend/role_discovery.cpp": "1cbcdabee641dca5e038c6f9d01f30be11ea86eea88be2fa25741c666b75d8e2",
+    "src/backend/root_cause.cpp": "fc1b31ee753f1dd823862e5e2ae3ecd23a9d73afb629e284403fcae6c6a3a780",
+    "src/backend/root_cause_trace_key.cpp": "df7020188fd1e1d9ca6ed1574e0e619d6481f798fdae70f1025d7db227d5a89c",
+    "src/backend/root_cause_trace_key.hpp": "10a343c7de3d289ee98e273ddb0645a6fd1f021d6aab681152f1a88195cc4321",
+    "src/backend/root_cause_unicode.hpp": "624bf4b78912fc682a7f604ad12a5e2e350430b16f9bb2fe21c130de62dd23ba",
+    "src/backend/rust_xes_unicode.hpp": "7680c04371bc79e39f3bbf880ed4f7e3546093bb7d3265d7fad284f4b6562291",
+    "src/backend/saw_nets.cpp": "3708e32755b1452f94484052295fbb48745ce3d6422eec05e25e7cc7b775181f",
+    "src/backend/secure_random.cpp": "9b07d8e811b162e2fbbdbf6c216f0bc567b6e0610ec77c47a54c8cb74e02e230",
+    "src/backend/segment_filter.cpp": "8378a29abf150231817f61cc214509e18f146a6b51d579fbd0b8835516ecd359",
+    "src/backend/service_time.cpp": "1e4150b9bff9b1657c98ace516d691448672c042dd330227f8bf24ae703bc50d",
+    "src/backend/stochastic_map.cpp": "6e057dfe0f0d177cef20de49a3c2a91b438cb8ceeab5894b8b9da0fc9f96648f",
+    "src/backend/stochastic_petri.cpp": "fb31ca298eac5bf8c8893baf61f5aa4353c8295e4b70d1d6397fcd90a37cd0b7",
+    "src/backend/streaming_dfg.cpp": "8c249c47597964bd676a80872ed045a924110b75fb17d0b89602ee506e6b58c2",
+    "src/backend/streaming_footprints.cpp": "216eb91ca2864ae25a0f8c5e3bfa1045c8f69f2245541317d9471f239b477a0a",
+    "src/backend/streaming_import.cpp": "4fa6bc388b413bd23a0017a764a6aa5498d51ccd003821da9feb2c6215266914",
+    "src/backend/streaming_store.cpp": "a5886ed0a41a1eefc69f32549ca6933115245ccbca98e16eb088a830544289b6",
+    "src/backend/streaming_tbr.cpp": "5da9cc55cf4f5bd18df48e61ab8d5895994ecb06f254479a727e88a6973f025d",
+    "src/backend/streaming_temporal.cpp": "22086b8e9cd88db6abc579f815ff146b6b8bf1b16c161c9d3b9fa9383afc2ad4",
+    "src/backend/temporal_profile.cpp": "25e7d77ec6358714e0006a186326839f3a04a33b5a23c580a994242e970b2f6a",
+    "src/backend/tests/bose_dispatch_tests.hpp": "4852b4866d9b2dbc35d9ffb9d2346db7212a9b52dd4b712c92d01aa920a4e065",
+    "src/backend/tests/bose_follows_alphabet_tests.hpp": "56bcc85015d12dea204eccea878082ebda9b691bc1f42226a2c0c726599143f4",
+    "src/backend/tests/bose_frozenset_tests.hpp": "dd6bff80d0d46acce1c1f60a4d6f323da40ad2bce9115a25a9ff2e684d28e655",
+    "src/backend/tests/bose_log_apply_tests.hpp": "ca20f955e0fb6b32628fa2fae4a5feac6b595441205bc36ef06afc011d4f198d",
+    "src/backend/tests/bose_na_tests.hpp": "940fb449c6ea84d5515f5960de59a8fc40ee11c7e42353952472b5122ab598ba",
+    "src/backend/tests/bose_permutation_numeric_fixture.hpp": "c7b41c1b769d19b0853639068aded88f369c7bfd7d3dd6971e0b7a705878ade5",
+    "src/backend/tests/bose_table_activity_tests.hpp": "f8df89f751b1e5281df05c0ff452fe624b9d53a18e1e4798043617ecffbbdc2b",
+    "src/backend/tests/bose_table_extra_tests.hpp": "b571d0ceaaa5c882510537ab7d6cad3850bb3a14178629b64d7d7f4ba3982563",
+    "src/backend/tests/bose_table_order_tests.hpp": "9a56969ee93e578ea8bcbb98736362dd8097b6ab36f7ff1570237fc6b5d5b683",
+    "src/backend/tests/bose_table_timestamp_tests.hpp": "7fc16562057d5e7fb1cbfdc499d9ae8fe179ecf03328b723f6e9c3f2c49ea6cd",
+    "src/backend/tests/bose_typed_direct_tests.hpp": "95b4816175706c36947f4d165846f97c16c50d6514b833662e5fa2bb8a418182",
+    "src/backend/tests/bose_typed_helpers_tests.hpp": "c4752daeb18f312669be7988b1ef5488dd650e006c042aa398237b68087f7940",
+    "src/backend/tests/case_relations_dtype_reference_cases.hpp": "e47dfba37844ac648ae35c081b04fc185306bc9ee1199ea7261adf3fbefa8bd9",
+    "src/backend/tests/case_relations_index_reference_cases.hpp": "26bd9a66da05416cd58db9f878a57584a7dd5bd8a80fd1a1d9a053e65608a456",
+    "src/backend/tests/case_relations_reference_cases.hpp": "781c0cac7c8abe4f41016951c3cf74c5dbd98fcd31075a7aca28c30ad34e8599",
+    "src/backend/tests/container_case_grouping_reference_cases.hpp": "c8569550f6f1768d33484cedc444c2e62266b76827b6fcb6e1a34b84d8914c84",
+    "src/backend/tests/conversion_case_grouping_reference_cases.hpp": "bb9651d323ebc1f4e16f2444d1a7d7f65a615178baa66900d2d8fdfa4d1bd2d1",
+    "src/backend/tests/correlation_mining_parity_contracts.cpp": "5d7494bf5dbca91d229df858a85535fa039715ea139f226825802098f42b8a48",
+    "src/backend/tests/dataframe_column_validation_reference_cases.hpp": "0c14652693455d66f237fdc11bbcd7ed147c256339c6ec49118a8ef3e202f4bf",
+    "src/backend/tests/dataframe_conversion_metadata_reference_cases.hpp": "98b4412dc35b13c555a96d28405d9a3999789b09ee364574a3aa5d29e9a654cd",
+    "src/backend/tests/dataframe_format_reference_cases.hpp": "80069c6de241d6d3cf2c591c9255601560dfb53155098ed3e1c4feafa928acd3",
+    "src/backend/tests/dfg_alignment_probe.cpp": "b53fbe2387dfb143223abfa2d95328c6f64f724ee244294aa7a30a7fe79787ac",
+    "src/backend/tests/fixtures/case_relations.csv": "091c60eeea612699247d1cc3c3031e707537f3916583e8e12ef5f961601fb8f8",
+    "src/backend/tests/fixtures/correlation_blank_case.csv": "31b3835550715853b2930f36d8f8c55d2ce02bd49d39f6e961a4e47e9c464286",
+    "src/backend/tests/fixtures/correlation_case_activity.csv": "ecd7b17b1f7fb812ce792ac9a6038443997d228681e598f89ea64e979bdcebdf",
+    "src/backend/tests/fixtures/correlation_classic_split_source_order.csv": "bfafcf3fd9f2627d0159f9f62ddc00613c2307f20ed00638938a42d9024f5455",
+    "src/backend/tests/fixtures/correlation_custom_case.csv": "7396acb3ce92524de298ebe9fd915f54189891f785015548821bdb9eaa31c7ab",
+    "src/backend/tests/fixtures/dfg_causal_custom_activity.csv": "4c0654a12bef696ce3fd8db40462fbcf023e64963836367674d6d43d169972ce",
+    "src/backend/tests/fixtures/etot_empty_graph.json": "1ce4c9cceeda691652af1973984340cf5fd4a4631d8a1e3aaafc2c3492dd7580",
+    "src/backend/tests/fixtures/ocdfg_empty_graph.json": "f1269ddb2e6ad7323a329656717345590c055565c48ef2a1a6a58ffebdad72a6",
+    "src/backend/tests/fixtures/ocel_split.json": "a7e921347188c01470de9b875845fd6c35f1ae8678e0c0a64392a90adcae9fe9",
+    "src/backend/tests/fixtures/otg_empty_graph.json": "337d9a46befa017d553bb6fb64c4c5ffc633025e4090be5b815ae5a37cc3a5ea",
+    "src/backend/tests/fixtures/temporal_business_calendar.inc": "0b6382b864003ae55952e6ae3e98fbc72f462bc669de01a816aa1cbbd24dd898",
+    "src/backend/tests/fixtures/temporal_fiscal_calendar.inc": "247824a2a143a1913d3c02ba8eb8928f21a1ddacfa0c8c01a855c96d9e995362",
+    "src/backend/tests/fixtures/temporal_frozen_case_order.inc": "c02adab633ef06d432680576de2a201734dbd3b29599b439414a21812829dd26",
+    "src/backend/tests/fixtures/temporal_metric_destination_cases.inc": "cbe9f5e1cff335e65af25d7377b5a93354f272d030ab6a6cfa4119eae86bcf9b",
+    "src/backend/tests/fixtures/temporal_semi_wom_calendar.inc": "4d4804d0e11607799c187e2ee0c8993a2a47108bc3d237d357fd711c18eb2dc8",
+    "src/backend/tests/fixtures/timestamp_interleavings_left.csv": "f620adb666a8d3cc2fc25ed1ea311509a27e6036655da139049a83bffedb19bc",
+    "src/backend/tests/fixtures/timestamp_interleavings_relations.csv": "03edd77b3430b0554cd8d6a7de16d3147ea9bf87fddb66b11f87fea6f7845c97",
+    "src/backend/tests/fixtures/timestamp_interleavings_right.csv": "088ebd5738dde3b79e11c95c38ed275880a1cb2c504a47ecd31bb0f491816ecf",
+    "src/backend/tests/minimum_self_distance_parity_contracts.cpp": "f803bb9748f6d5098ad2a3cb055e388c27906085ef06ef602adcb4d827e493c1",
+    "src/backend/tests/native_na_model_tests.hpp": "b6d9e9b9c128c388c2158678b5cd7e71b50e696f5e2d2f6fda0cf49fe2d29a44",
+    "src/backend/tests/stochastic_fit_probe.cpp": "7ce50ca288ec38c5d381c001e1898f9e5a980f7899cf1b5ab6b29030088774ee",
+    "src/backend/tests/temporal_alias_expected.inc": "1f69b5eb940d5b231bad62e93f432cb566ef459cd688914643ffd2780a9c499a",
+    "src/backend/tests/temporal_frequency_boundaries_expected.inc": "978cefaa59729153335328e00d51ec53e7323317ecc968552de9e8a3c6183faf",
+    "src/backend/tests/temporal_subsecond_expected.inc": "bc51610609af4f8c13e25afbc55356c93120b116a323f247278de1094dbe7545",
+    "src/backend/tests/test_activity_split.cpp": "66c741133a8127dd743cce7e34a7b24b98714cfe2e80ee97ada8d9ac135f26be",
+    "src/backend/tests/test_alignment_variants.cpp": "63fb53c9679cc544d9dd4318f7b5d48225c562537d90b86ad069d8762963c17a",
+    "src/backend/tests/test_alpha_event_data.cpp": "7668709fc8bb1f5c0880d6eb1a664fff0cd050e35b406dc2383d8f7f9b7ba12c",
+    "src/backend/tests/test_alpha_miner.cpp": "1e8109d980fa4e8632655a0b1eb2523346b370b3941f53a4db4453772bb665b5",
+    "src/backend/tests/test_alpha_parity_contracts.cpp": "666b336fdace74b6f7d2ded8112c993641bf2fd3d504d50bcc716450bd97b940",
+    "src/backend/tests/test_alpha_result_json.cpp": "8a97ab44a4de92eb749cf040fa71bfb5517ebf2a504e063c9b78aaf186bc7e85",
+    "src/backend/tests/test_analysis_parity_contracts.cpp": "7cf2b6845a5a7f49adb75fa06c333b758422f48b97e586182a676f6ceb5f83f5",
+    "src/backend/tests/test_attribute_distribution.cpp": "1bde722632ff67b42bbc8e3d575408e97189d1c3c7aa30ef465154f5816920f3",
+    "src/backend/tests/test_attribute_kde.cpp": "5757605809b0cdf962f2c42367999f47fc6900776b9be062b40b404fbcbd78c2",
+    "src/backend/tests/test_attribute_statistics.cpp": "29d637ee6ce044ff157e94b229d099c154884de6f1193f3f0b49e3bcec6de90a",
+    "src/backend/tests/test_attribute_value_repetition.cpp": "3369d17b2a791322f97e594b3fcc54e325f693117277603c589ed7512cff5481",
+    "src/backend/tests/test_batches_parity_contracts.cpp": "7097d8776682d0236a133cc5cfd3943d7a9a068a929f31eae01c4126d2170baa",
+    "src/backend/tests/test_bose_parity_contracts.cpp": "61068e9d8247bd555d8d2ca9cc652ed9c81113f5e2cb1298964a56c2c5229f15",
+    "src/backend/tests/test_boundary_activities.cpp": "e28f23b74a0f018c067cf00dd7bde5b29c54c55a982bf567eb6fba3f5458a5e0",
+    "src/backend/tests/test_browser_history.cpp": "e484057b3dc62c16f3fb5105280c177eced91fd58d90b620bc35051bb1f7c316",
+    "src/backend/tests/test_case_arrival.cpp": "9989120fa7e8038932062e89ab30a4fea5509640b4512b1029e735ebaac087d2",
+    "src/backend/tests/test_case_grouping.cpp": "8e302ec93c5bb1995077b6d886e5c971b171767d552de25fec01e420fa5170a6",
+    "src/backend/tests/test_case_relations.cpp": "c54a93b8917674095aa41fe9231f7fca0d7925a81fe107915dbbfc176dc8a62a",
+    "src/backend/tests/test_case_statistics.cpp": "cbd119d64722a3e4138d4a1b705230a3897cce1c428e5c5fdf7e06145351f40e",
+    "src/backend/tests/test_chaotic_activities.cpp": "58b41fa6d1d4b962f633c005d523ed45db0d37c9ac133ebcb1151ae32d504ff2",
+    "src/backend/tests/test_clustering.cpp": "d7f0d64348f76eb80dcb58bbf7de9df1a48593e8c2e7398804850993fb8107ab",
+    "src/backend/tests/test_communication_history.cpp": "104b6b82b61f9fc03c3a5c3e8afc4fd9014bbccedbcf3cea41941229af7722ea",
+    "src/backend/tests/test_concept_drift.cpp": "6a3bf994f6d981a63db5acad55e96e8b3c83b8d77566787241a05a0adcde1238",
+    "src/backend/tests/test_core.cpp": "48e7efc2caff77021bb04f18ca1429c4e040461cded0a2705c24be998ce5790a",
+    "src/backend/tests/test_correlation_miner.cpp": "33da74c5e5c56101c01fd267ebf32662b1cb358a402f9b042a7e112bea13c8b3",
+    "src/backend/tests/test_cycle_time.cpp": "a27199fb1b00f79fa993deb208fec02b3c7e715a34f6819100ceff3212b3f163",
+    "src/backend/tests/test_data_petri_net.cpp": "ee3e60e424dd6ef3bc6b6a45e0e8e5e12416b9daa4e7615086293269d3067678",
+    "src/backend/tests/test_dataframe_format.cpp": "6b3ee7c521b08d550c5a5b378ee9c182fe5bbe971e6c0393270cfaf0c16a132c",
+    "src/backend/tests/test_dataframe_format_json.cpp": "a209dc3ce7bbc358347ebdbda6ddd630280f32aca85d2d01d718a5d80a53673b",
+    "src/backend/tests/test_dataframe_validation.cpp": "1db6bb97b8f8eba0f813562057751a5cd4bcc88107afdf35a4a34d6e857ac067",
+    "src/backend/tests/test_decision_table.cpp": "b18a4a6daf5c080d928a25915d9310c88a3f2243482ba117e1f21ae081600976",
+    "src/backend/tests/test_declare.cpp": "21356497523f9731fc74a55ce85b20b0b7267c61fc194e85639390e3e1508638",
+    "src/backend/tests/test_declare_variants.cpp": "0d3d4a105de4d74572b551e70dae28fdd9b4ae891aa639949c67ee20b35e4128",
+    "src/backend/tests/test_decomposed_alignment.cpp": "31df5a2e4bc1061ee998e3b1710b25e997fae71618e7e0ae622ac74cd8e4bef1",
+    "src/backend/tests/test_dfg_alignment.cpp": "7e34f8a3422a1db067f4a78390df37d0a1e5a6bfdb6cf9c1a1fe16380168b9eb",
+    "src/backend/tests/test_dfg_conversion.cpp": "9aa267e8bdb25afbc559c7b106d4c5510c01ce05996083d0d016139d9a18745f",
+    "src/backend/tests/test_dfg_dataframe.cpp": "4c41f68a2b9dbebc300f63ad534019c81068ed9476d5f6fd6313297d831ecf6e",
+    "src/backend/tests/test_dfg_dataframe_json.cpp": "5178f0b88285c710e560dfb486383b62bc15329b13341226bed584f03dcbcfd9",
+    "src/backend/tests/test_dfg_filter.cpp": "49ab0a6b77a7237befbf322a0440089b74c625e341fa805ba142e5532b3b9d33",
+    "src/backend/tests/test_dfg_io.cpp": "dc2b32e45a95ae5a44d6b2ddd6e8282a7d9ef6b14633cace273a6a39fda6e0f5",
+    "src/backend/tests/test_dfg_parity_contracts.cpp": "e54c9f5048b5584a0685b24f7b8c2dbb32050a69ce0077969f325d7fdf698c93",
+    "src/backend/tests/test_dfg_playout.cpp": "a95b8c0f9d5eb4070626b8f8cadd4550656a8db0dae312ab877a31181822dd5c",
+    "src/backend/tests/test_dfg_precision.cpp": "f805271693c1ab3ff7ee198a40cad1ddaae683f669665e6ae53786afcd4f6ce7",
+    "src/backend/tests/test_dfg_utils.cpp": "798615df38b3781b2388c2b463410fd52b3feeb07b42f9256233d4c3ed049ee6",
+    "src/backend/tests/test_dfg_variants.cpp": "f4368e68e5256e503a355838f207108682c76f6d46ae0543209f8d0f95a7cd96",
+    "src/backend/tests/test_edit_distance_alignment.cpp": "c44040863873eb6453513037a520eab994c2b8ee4638db40f2bc1ee518948f96",
+    "src/backend/tests/test_embedding_runtime.cpp": "6e7bae6f20972dc494112212328ebf75557c738163e232602e7006b5beb370f8",
+    "src/backend/tests/test_embeddings.cpp": "ba26d648527f488e872bfd49e0cc2b0c87da52678bfe2877a5ba9156940465d9",
+    "src/backend/tests/test_enterprise_history.cpp": "c2b06d4235d8250fa48543f6bae9bb2ab4141dc7e476c56390c21324ebf3be3f",
+    "src/backend/tests/test_evaluation.cpp": "b17b673095962780f6cb69992c788ae601e1c5127252ff020cdfc44f17049c4c",
+    "src/backend/tests/test_evaluation_parity_contracts.cpp": "3f1d1816c65b69d0a6ac87714431984f53e5dba07e191791f83f36b717d40056",
+    "src/backend/tests/test_event_data.cpp": "9191fb59d2a58d7badae8cc393c995ee2d1fae1231db1971bae9fce5f39ff1b2",
+    "src/backend/tests/test_footprints.cpp": "dfe08b06a103a31829c028006f85b5ed1bd9f5a55428f725ebd8f33e0a5a4f80",
+    "src/backend/tests/test_footprints_conformance_parity_contracts.cpp": "0767244f8e63eacdf57861a4ef6355de10d1b949221796d9ecb3769baf57c702",
+    "src/backend/tests/test_footprints_discovery_parity_contracts.cpp": "11a3ec7df9368506a85f49146b2b2072bba86b410f4dcf7ebafe50e09327723f",
+    "src/backend/tests/test_footprints_models.cpp": "c7dd26ab42dd92d8901191f38324b7fdd71064388f5b5bc0150f91b1e168f2c0",
+    "src/backend/tests/test_genetic_matrix_conversion.cpp": "243a45d22afe432a00221f43e66fce37bd006110453f370a45bf3f2684de891f",
+    "src/backend/tests/test_genetic_miner.cpp": "ef59bcdfeccd6d130183b9d21eb7887e6590eea448fa983a66a1474e9321bf98",
+    "src/backend/tests/test_heuristic_variants.cpp": "bb1def8df6c35d6f4f9a9f8d951794784b03a646fc0c82924227d553e68bbbcd",
+    "src/backend/tests/test_ilp_miner.cpp": "47703cb945cdcad56013b434b408b40499d73ba86b7c2c2bc00b73a5f9fcfc17",
+    "src/backend/tests/test_inductive_miner.cpp": "80d062af6d7010fbc9f3281a587eb29c8ed4b30407615a832ed8d0edf9849cbd",
+    "src/backend/tests/test_inductive_parity_contracts.cpp": "fb7553d8e68d7e6ce5fcbfaf0f38bf01fcf159f82e0ee55eb1ea736e10f41010",
+    "src/backend/tests/test_interval_tree.cpp": "7d73eddd0a93553c3c87ced96ecc80cd48db49b7e6e71ccf32ad3d56256e7df0",
+    "src/backend/tests/test_knowledge_injection.cpp": "c72b85396aa86df4d27dd1b2d4019edca6fe48ddf947255f2c378875e095dc80",
+    "src/backend/tests/test_label_splitting.cpp": "8cbeee4c9ff13757d2067b1864edb2b81b1bf98f237ffc7d8c635d652d4e4ab4",
+    "src/backend/tests/test_link_analysis.cpp": "e98a7a4150985fefd1e710895215dcebeba13d64ad2d0aa29cbaf7d3a4a73869",
+    "src/backend/tests/test_live_stream.cpp": "afc1379b28c441fddb9ecb67c41fb24e504de2f91f454882ae6f4add801518a2",
+    "src/backend/tests/test_local_diagnostics.cpp": "461df4223dd7fa1a264209493a02170d48eb562249ef7b606bcd0e0cd7962419",
+    "src/backend/tests/test_log_conversion.cpp": "094007acd468005006b5ecf61f0053a36b69dc74ab83660081947c79cbac836b",
+    "src/backend/tests/test_log_skeleton.cpp": "251cd819dff6e5edd59ef61b181a68c29413e05cd970a795f54f9332cb553dea",
+    "src/backend/tests/test_log_to_features.cpp": "3b51d9622271f0215ecad173677a9596c5e1e2a8ff7040e2dec75a79285ba3b6",
+    "src/backend/tests/test_log_to_target.cpp": "5bcb3f48117930057eedcd2094d2475dbbe5301c2ff8dfbc815acf3bff9bb1e5",
+    "src/backend/tests/test_log_util.cpp": "f7840a7cba88ca907df18ec93cf6198dc18c9b96ef06e2d61c37ba7d9f348066",
+    "src/backend/tests/test_ltl_filter.cpp": "694eeaef7620f3b1594dffa85ed27b18bc4f894708ef1912686c87ed109f0d5b",
+    "src/backend/tests/test_monte_carlo.cpp": "adee2d142aa068743d3346137a847579d5c8580dfeaae72e2aa9e6cbbd425791",
+    "src/backend/tests/test_native_na.cpp": "b6568e9049c56ddb2a5d7c29d64f6c4f4664de136c8b96912cb98dfe1097a7f8",
+    "src/backend/tests/test_network_analysis.cpp": "9f83fe37865c345708930b6cc166da41c69431f4e092cdc3aa14ea40abff8af7",
+    "src/backend/tests/test_oc_causal_net.cpp": "acdc1345600218fca12209f127b6e22db97e13eb34f69fc6d5eb4b9b66a207b7",
+    "src/backend/tests/test_ocel.cpp": "671d675210aff6413ba751a139d53f64f939f40a5d52aa67a673d9ca39d77e61",
+    "src/backend/tests/test_ocel_csv.cpp": "c332c534e336888aa97c7edb9cd1b63b8b11c8e9379cb48039f74f8ef3fe32e7",
+    "src/backend/tests/test_ocel_feature_components.cpp": "b7ad1112039c4b665c86327d5dc8e8af69e4e8e8a8766c68df011b21d2da97d1",
+    "src/backend/tests/test_ocel_features.cpp": "bfe68351148215586e7e9f80234fe97b2fdce6c9c8c270e92032a041e54fb884",
+    "src/backend/tests/test_ocel_filter.cpp": "e3c586a84173b0e82b948b0da4a4466e0141c07881f207f6ac29f90b67b0cad7",
+    "src/backend/tests/test_ocel_playout.cpp": "3c175f6876a39dc8954d37416be95797aedb92ecd502b819110670950a359afb",
+    "src/backend/tests/test_ocel_query.cpp": "4ff6dd83313ada9a2ce8c76a6f28f27ccfdb2e11735403d819d29ffa833e7355",
+    "src/backend/tests/test_ocel_sqlite.cpp": "ea565475a09d0b9eb21f420dd8366e0c5a6365a0f34cfba0bf86e78f3929c504",
+    "src/backend/tests/test_ocel_statistics.cpp": "5aec4136ff97f3631b175eab78c04b19a1db5a8eae752707b610e32e392b486b",
+    "src/backend/tests/test_ocel_transform.cpp": "d3bb10c214908c62c80a6330b43c2f85b4b2d1da9b4217f7de80c220cbfa0c2f",
+    "src/backend/tests/test_ocel_xml.cpp": "422535eb1422c6e70ff1460214ac4fe783ea7e0ba0a068d705dc0ad44bfc862a",
+    "src/backend/tests/test_organizational_mining.cpp": "20661a0cc45cd1649be516a4582a0ee032622838c8cbdc9aca4039b22e848137",
+    "src/backend/tests/test_organizational_parity_contracts.cpp": "0234016ebe3a19f9ed90e7922dec209c4e10c846e2ef0c9a02821f5377d525c1",
+    "src/backend/tests/test_overlap.cpp": "d878ef1eca257a540c72eb8e7f1fb77932642b6c1e8c1c46f4df71b8d13a1a1c",
+    "src/backend/tests/test_overlap_json.cpp": "0a042b4dd62934c0ead4ca7d37fabf29ab75e79527556bf1e84ec73d19b1749f",
+    "src/backend/tests/test_passed_time.cpp": "1a67f0e74ac6848bc9a87f1eef6c5d25745a434ab587e6361ee5042769cc02f7",
+    "src/backend/tests/test_path_filter.cpp": "b2e702259cb499c98b88033c0f0db798cf793305f15ce5717a8e8a6e259cf3ce",
+    "src/backend/tests/test_performance_spectrum_parity_contracts.cpp": "f04be048004c232a9b3615cb1f35a4af0e29df8bce152458d68d1140045d7696",
+    "src/backend/tests/test_perspectives.cpp": "00387865bdbd0052ece4e09de77676008724f64a47806539d06a71962da5b1c1",
+    "src/backend/tests/test_petri_analysis.cpp": "c325c418503a75dabe30625b1c9300a07444aec867bb25e129d7ed6017ab036c",
+    "src/backend/tests/test_petri_anti_multi_alignment.cpp": "c74f8eee0bf66eef53d48b786550e422cec3da5882b49addab51551d8d59b8d6",
+    "src/backend/tests/test_petri_extended_arcs.cpp": "872b57b1ede1def8150d13c0b200a71eaefc10cc4269dd915bafd13caf7e5433",
+    "src/backend/tests/test_petri_net_conversion.cpp": "23abf70b1af66367a09ba82b7095cd688c1713a8ebb2243f6f2731777817d25c",
+    "src/backend/tests/test_petri_net_reduction.cpp": "dc7e7e9b0dd0cbcc2c0baa10bbe48bc6d620343439bf8e4c0158d5202a5995cd",
+    "src/backend/tests/test_petri_usage_comparison.cpp": "e104339c0a49f15c903b34c8222f2d1d9343410263a71df0202d7a247767778e",
+    "src/backend/tests/test_playout.cpp": "fed5fcab8b0e48d79d25318a891eff60014bc52ccf4017b512146d54d45229a5",
+    "src/backend/tests/test_powl.cpp": "1194cc09c60e1f47fda9df28c9000b1ba5dca9c90d2d0b1ff4ee5302406d54c9",
+    "src/backend/tests/test_powl_conversion.cpp": "cba9d06843a0e95cf98ae0f7f264a3f4ab43b7990753ae0e0021f5512b2bb9e6",
+    "src/backend/tests/test_powl_discovery.cpp": "f3a7d4f0ed87b48f7c7bfa5cfba05d4e62f67e2edfaba6456910bd746cfe1a65",
+    "src/backend/tests/test_powl_parity_contracts.cpp": "8df88f4f4893629e93a329ded98e803c0657dca35d8d92c7d2be26b3e2785970",
+    "src/backend/tests/test_pripel.cpp": "51244da590307e756653aff64be42228101ffc61a2f19aa571139631b63f98d1",
+    "src/backend/tests/test_process_cube.cpp": "175560c708500fe154e1af64dd8af98aab32f3eba0a7766b9ab756226e410365",
+    "src/backend/tests/test_process_tree_alignment.cpp": "8e8effb2ed484af086fbd764ff6993a41a0fb5ae4f537b508d97f24a8215f8ce",
+    "src/backend/tests/test_process_tree_playout.cpp": "3d796156f9a85311def679fbb8c434a00f09eac99545abd5e1c7ddda6523fd0e",
+    "src/backend/tests/test_process_tree_reduction.cpp": "d45ee4fdb21404a8e1e5ce64e77f57516d71f50cfedce87b927d6cb1b7ebf3cb",
+    "src/backend/tests/test_random_tree.cpp": "ace421bde2f25441d51963207d9e663f3b07c51b0407ac9523399ae679bdb6e5",
+    "src/backend/tests/test_repository_history.cpp": "6d2d52f82b7b975a8d106b337c3b81be3dfd814865dd06a8d503eebde33f1dd8",
+    "src/backend/tests/test_request_params.cpp": "634d0d474104be4ed7d3ad6dae6e6c49531c52e9d6f97c67d6819e4f56fdf3d8",
+    "src/backend/tests/test_resource_profiles.cpp": "531b58004f4b0df30c86e35c701470a5dd6f2116357e278fca46e82fd4c62dda",
+    "src/backend/tests/test_rework.cpp": "5a104dc8a099ae77cd94ebe5383d2f599a8d4768339f37801f7af7e0e82ed70f",
+    "src/backend/tests/test_role_discovery.cpp": "e4c5f81dbbe463089ae2b2bd8a3a7be349b9a0f42aa4186c3887f8d59f4284ae",
+    "src/backend/tests/test_root_cause.cpp": "117aa2ae4d56579bc96cb7098ba9120871a8fd860cfef917b6af1135b676e53d",
+    "src/backend/tests/test_saw_nets.cpp": "8b24c36bfc3674a200de3845511afc7c4dd7983a4e4af36a42a6afb3824e9432",
+    "src/backend/tests/test_segment_filter.cpp": "a836f56bf9ebc3a4fd2daa36cbf296c9bf5c5ba91e1d7819acdb1eb29003e9d5",
+    "src/backend/tests/test_service_time.cpp": "45b216f463eccf65f3b99f2b6dca98b25e4ef5c99b71d514f5514b966ecbea4b",
+    "src/backend/tests/test_stochastic_map.cpp": "c589f1e29cc8688d21d30fe35c72d0a74b5d11c829b528b534d218466deb5355",
+    "src/backend/tests/test_stochastic_petri.cpp": "5854d8e7d0034e7b265e318093ed350b95301596ba91aaa1ec9c953a7e592cda",
+    "src/backend/tests/test_streaming_dfg.cpp": "03605161746ee63d2b9c7f614e004fe9ce1ee7e09a0be868080d55b4fba2b4ca",
+    "src/backend/tests/test_streaming_footprints.cpp": "12aa8322fbdfbb224d92470549881166c2fdbaa911eff3fcf89612f95a52853c",
+    "src/backend/tests/test_streaming_import.cpp": "b1644edd9ed8d7184570d21be0725fd433030784bb6c7a74ca6b5412bdafc61b",
+    "src/backend/tests/test_streaming_store.cpp": "7d2acc2c01bbbae9fea1f4e60303529880cdae816b3beb28aabc4a6444eb1292",
+    "src/backend/tests/test_streaming_tbr.cpp": "aa81cdbba5d4240bbe56b8ec4c90e0d4262511a0cc23b323953a59d3d9309a87",
+    "src/backend/tests/test_streaming_temporal.cpp": "9f0d4fd3a641c12d044882788b585611e7372eb8423ed7e48771c61c91f3a239",
+    "src/backend/tests/test_temporal_behavioral.cpp": "222e308e163d9fd8c0f5d1842d196a9527781a02f60ab865bc62df8902ff9145",
+    "src/backend/tests/test_temporal_profile_parity_contracts.cpp": "2a9eb244074e2acc993ec318db1693971a32b16bf025f4a647bbb2bbaefe6ffe",
+    "src/backend/tests/test_timestamp_interleavings.cpp": "e7a9d8e99aa7420e6814ecebad7f001d97c505aa174fc1e0837a4482ad0fbaf7",
+    "src/backend/tests/test_token_replay_dataframe_diagnostics.cpp": "b3639708ec9cb9336fae09bdffdd025ecc9636fa58a2d05f924ac879a3b780d8",
+    "src/backend/tests/test_token_replay_diagnostics.cpp": "604bf8c9744ce227ca15ecfabb2632162f93481790ef0044031c64856525327b",
+    "src/backend/tests/test_token_replay_duration.cpp": "18a88758c6037c68a6612032bee22a46ff2edf6e37116c396e79696a2ad6eb12",
+    "src/backend/tests/test_token_replay_event_data.cpp": "8f2d36e4fbccf2d9c55d15f5f24898d34a25f62b01ed3bd8f6f9496ed764ab9c",
+    "src/backend/tests/test_token_replay_result.cpp": "51d0b3ed2ba844fd6c7369b24b9e95d7c598c6aa526d099a7e31d48883405470",
+    "src/backend/tests/test_token_replay_root_cause.cpp": "1106d78935a5c1d14c3428ca213064ea2bb80af0d1b0e99fb11ef04deb0856ef",
+    "src/backend/tests/test_token_replay_transport.cpp": "e477289e39fddf28e4e8a9e0f4996b4678af4aac2b3f7571f7402c40bfb29c4d",
+    "src/backend/tests/test_trace_variant_query.cpp": "6bbd1a473782cbf49d02f48dcfa645fd035066c64586571d28329ede5ccf3e05",
+    "src/backend/tests/test_trie.cpp": "39b94aa169ebaf210c215759e4e8a8b61ada9de39a3de6bfcecbc16238937723",
+    "src/backend/tests/test_trie_conversion.cpp": "660f650bd3795e3144d025c17c739f25f2625963d1409252abf38062938be161",
+    "src/backend/tests/test_variant_statistics.cpp": "5972772b89c4fcfdf4c7a3901bed2140569b6a6a9d31eba7755cc102f1c9cf8f",
+    "src/backend/tests/test_weighted_token_replay.cpp": "ab246b4fc07baa7708b2d3872e3b2054a0ed35423aa926b3062c41b3b3eba4cb",
+    "src/backend/tests/test_windows_event_log.cpp": "cc2bfb000e2091e8adb29b1d51b5dc8bc2e72f246cad0bea23f6c56f0bf27f2c",
+    "src/backend/tests/test_workflow_history.cpp": "ad3ec60136a79d1180c55529866880ea9967e99c86410188a889d48eba99180a",
+    "src/backend/tests/test_xes_io.cpp": "10682a519262484558f841818a63995df1f3ac9126c0b3e88211cd705f8a8980",
+    "src/backend/tests/token_replay_dataframe_grouping_reference_cases.hpp": "1fa369f10a329278d0bd9e63ef15fd7266af30837e699fa5937c841ddd7c91d2",
+    "src/backend/tests/token_replay_diagnostics_dataframe_reference_cases.hpp": "559d8903394469109be9ab58569f14e2163968fec15bd1f118a051408e2584a0",
+    "src/backend/tests/transition_system_parity_contracts.cpp": "ece5a90930c1415bf618e912d4260196432aeb6451c6ce62588499e4a50b1d94",
+    "src/backend/tests/xes_nested_expected.inc": "657ade9f2bcc8977347bfc24042146a9a9a2f6f0a1c9aa61f5512c91463e8b62",
+    "src/backend/timestamp.cpp": "6fc5f471f3a8e6b2388087a4cb2fa23143f1d52a514a4e14dce03214e6caaaf5",
+    "src/backend/timestamp_interleavings.cpp": "d29f631d32c242ccd27fef2e4b1e24e987ebc685a107642706906a9732da0dee",
+    "src/backend/token_replay_context.hpp": "d940edc25c9f17fb441a157129f81622ec5b5f8bd18dfd070c54da898fc68f81",
+    "src/backend/token_replay_duration.cpp": "495af55bd8fc6a4627544576dd62425054b9606cdea599a3444d4d7657575a7d",
+    "src/backend/token_replay_event_data.cpp": "2d88e0a0e4631d8101dc300aeb13077670ec0799b6d462dfd86afbb955d7bc4a",
+    "src/backend/token_replay_result_json.cpp": "22211101cbf5b46ee9755cc9539fb1764fdda02916adea2279157f8ef5668596",
+    "src/backend/token_replay_root_cause.cpp": "5f4977c3bd9052abf15ec50d9146ca873e29addcfdbfcc941dac946776e4bfbe",
+    "src/backend/tools/case_relations_input.hpp": "17754e9643227d473aa372294fbfbde20d781ea0098fb276769b60946f3eb93b",
+    "src/backend/tools/embedding_runtime.hpp": "290697275e2ee1740c8dd6e66e25f1003a8bbb00e0754ef377da6a7fcb56b971",
+    "src/backend/tools/minera_data_petri.cpp": "1a757bdb7ef06503dbc0d755f0f62975dedf82b0910dca92689372bddb2f6dc1",
+    "src/backend/tools/minera_decision_table.cpp": "fd314c5dd21e7369df49b6427da1d251d843173f596aa1ec47418011d2ec9c75",
+    "src/backend/tools/minera_dfg.cpp": "6741b12cd493d256c2e92bd1103427e6293d8041cd24db9108dfc3e40c74b29b",
+    "src/backend/tools/minera_dfg_precision.cpp": "c5c3f2e1f88a7a827feda3a48ea2c8e0de8efb50d91bf716d677adf2df886f5e",
+    "src/backend/tools/minera_export.cpp": "364cedf80415f7c9389da1b6951ec28694a7d7a9d73ccccf31d9ef2425797a5c",
+    "src/backend/tools/minera_format_dataframe.cpp": "6eb907e1ef78a8eef48a8e2bb7f63b87ca9b1c7a4119407da3a6cf357209a2ba",
+    "src/backend/tools/minera_generate_sample.cpp": "2f6ebe9f9db1946cfbac2471e965f5b0c5f52a753c26bdc8005bc4693c7f2c47",
+    "src/backend/tools/minera_knowledge.cpp": "2f6b03d7f49f74d6f77fc63b65c71fe47d9420f16642195b3d236aafe672965a",
+    "src/backend/tools/minera_live_stream.cpp": "3914d41460276a19fef99a00a0379fc35b61b33c36f209b0edb88fcb5fe96974",
+    "src/backend/tools/minera_log_util.cpp": "1d72384a5f78195097a205c210987386cb6bac652160ed01325beaeef91732ae",
+    "src/backend/tools/minera_ocel.cpp": "11c3e9b9aea9800d70f97cd2c7a063db00350e1687754072afa93dc3712e9aa4",
+    "src/backend/tools/minera_playout.cpp": "71257fd528accbf8e4fe923ae81ffa6dc3184fac08868541d68e106de9544cfd",
+    "src/backend/tools/minera_process_cube.cpp": "854112ef0a9c2d558a6ffed679ad6c0c17b52826da98148202043b40d5d1e9f4",
+    "src/backend/tools/minera_server.cpp": "a2f31f6471204282f08e65540e9209b19905f7334c18685d73516e72e6ee7c14",
+    "src/backend/tools/minera_stream_import.cpp": "dd0d5ea2151cd88c9c3b7e9de1fe71ca85ca450b463ae714d4473e111faba519",
+    "src/backend/tools/minera_streaming_dfg.cpp": "b929a25cadeb489557bae44772aecbc903dc9ae03d3d73fe94661459554a2a77",
+    "src/backend/tools/minera_streaming_footprints.cpp": "f8314e9e55851b39f9068e3e557c4798d97aefdbabe436fe41a341f4f633ff7f",
+    "src/backend/tools/minera_streaming_store.cpp": "080df78907eae17f4ed7923df028d1e52b5f7f2da648ce3c067574b0e79a94c2",
+    "src/backend/tools/minera_streaming_tbr.cpp": "0be049f99b946fbefa1129518f0fc42b2308760b0dd01bf392d62c6516722521",
+    "src/backend/tools/minera_streaming_temporal.cpp": "2d3ecaeb12b1523b8012d28c57d2571dbcdc8e69ede0a1cafa5f0f462b46cac0",
+    "src/backend/tools/pnml_model_options.hpp": "d25b98258fb5bce2700cb9010ecb58fa45cc310d1f853f69c84ac860bc485ed7",
+    "src/backend/tools/repository_history_runtime.hpp": "31cbabab9a53f6add61c1c043a64337f3fae4c1b48c2ca5f1562a15bf3925d3a",
+    "src/backend/trace_variant_query.cpp": "8922bbef56e0c271e5e157ff6e594e49ebd3e3ad847bb940586f97e05c759e17",
+    "src/backend/transition_system.cpp": "8f2431c97eb665e012c6b364af600fed61bc65a7a2324fcd8a2d71b64e6c2188",
+    "src/backend/trie.cpp": "55b0c2520671bf5c54d965593a87bcb9757eace5a3b56439eba2f9d88b499e21",
+    "src/backend/trie_conversion.cpp": "5a0c43bdfaa86ce12f1f31b150f7d7b707e1f33a3317a6d5df11421d6035f90e",
+    "src/backend/variant_statistics.cpp": "d1e394729e179e09f5e4ca2a1789db26b6bc437255dd7fc5a89a4980dfa75c52",
+    "src/backend/windows_event_log.cpp": "4937022415147caaaa779b2e8d8deaef8cdb7d9dfc66802b5fb8d1d56e36df8d",
+    "src/backend/workflow_history.cpp": "508e87d8c4abb18b0ed536fc23ce3054d6a1a801c587724f91c0cbd39ad7575c",
+    "src/backend/xes_event_log_importer.cpp": "31241e5a37509d7f4ff9ec23cd6bec1f45a84240169a1190077c014655fdc5e6",
+    "src/backend/xes_export.cpp": "94a521a3381000bd58880e63ebf3b461c0fee2d3857451c4dbc1b96e42fb88c0",
+    "src/backend/xml_pull_parser.hpp": "065dea0501fcf2dc5c668affb7cefe062ff784fddef65e55aef03d94b095189c",
+    "src/frontend/index.html": "648efb9515b5bd4da2f4c04d8a6be2f0d8de5968617d091ea3ebd26c8f7d9cff",
+    "src/frontend/package-lock.json": "04ea239f18993b885208e519662bfd4e3e014545d38d952f84284f4cb8d6505d",
+    "src/frontend/package.json": "7f2361b0a98d18a5bd9df2a1c80187d77d791c0fc1e629e42d33f070625683a9",
+    "src/frontend/public/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+    "src/frontend/src/App.tsx": "6b2daa7b51b5389aca29c20e2d9c1d8b7201da2456a671cc12f3a144b0f08ef4",
+    "src/frontend/src/alpha-result.ts": "adfb045125d8de13dfc6e8fd1e9dfc10d29ed1947cb826e444e7f62052290a21",
+    "src/frontend/src/api.ts": "b5f52b43a8e826c4d2b0abe8a7a3de77991cd02b6b2da019ccfbb632fd94488b",
+    "src/frontend/src/app-logic.ts": "9c9b6f5e251d8be519836af5ae68a5200d9dd9bc9fbbcfbc3c0525e211a6c2a9",
+    "src/frontend/src/components/ActivityTable.tsx": "6513c9fda5f06b1cce89bb574f983846f1f6d6e177b39b31312cf246d3b832b1",
+    "src/frontend/src/components/Batches.tsx": "d130a5a54437a88665765c503c1e784352c7f02bd37e05eb78dbfa0193551572",
+    "src/frontend/src/components/Conformance.tsx": "e5c86c7c5d7f11ac2a7f42c230364b3d564342699585c25cb11c44651f659d8a",
+    "src/frontend/src/components/CorrelationMining.tsx": "efa6b26473f44247dfefd0d6707cc62a21cd8f2a8a188c7ed97451707cf611b6",
+    "src/frontend/src/components/DeclareModel.tsx": "fec6de33a480b529e5181248c753dc48933037d63b967c0316d9bd0b19b633cd",
+    "src/frontend/src/components/DependencyGraph.tsx": "22c98ddb5fe63cc38bb1632a1cf6ead957e11180bd0a3847b7ba034c91b54f7a",
+    "src/frontend/src/components/DfgDataframe.tsx": "5a84e0532f640f74e81be5bf8190abcd1596c4ba08ffe831451776ccc1119ec2",
+    "src/frontend/src/components/DfgVariants.tsx": "d72d9c66df17d64b9917023702aed7a12db40c659130d21fce475db84b9002ef",
+    "src/frontend/src/components/DottedChart.tsx": "9154fb731a669ab66380edd42239b13bb5a34ced046d92dac5af1e1575a0f280",
+    "src/frontend/src/components/EventLogView.tsx": "77f9d4f858b87070e7fe7ceb06651c08e9dc66460e9a01f0a3228338fd699022",
+    "src/frontend/src/components/EventuallyFollows.tsx": "2a545ea1ce24a252e2deb2c8ec59c8cde425e4fa2799030745f80d9151a267c8",
+    "src/frontend/src/components/Filters.tsx": "8e20151936e0c4d82ec2ea71cf003762691645a6c6c95cc19633c40cf0f43f3a",
+    "src/frontend/src/components/FootprintsModel.tsx": "b0e3f62d42e3f16dae80616b1a7b79ba778d68fa78e4dbea1ba7b35873dc147e",
+    "src/frontend/src/components/Kpis.tsx": "3205ae6a46c62d467c65af0d3499e71cd52c0cdb1809ace1322205b9ce2d051e",
+    "src/frontend/src/components/Landing.tsx": "05680bbdcaff35b6614f397e082b0672f08a3558633ce5baf378175d98a96e23",
+    "src/frontend/src/components/LogSkeletonModel.tsx": "769c40e8cbb25808465427a4fb08763e242a56ee996e43b05e0bae82b9919cff",
+    "src/frontend/src/components/OcdfgModel.tsx": "44787f74670eba47eb94e9bfeb85774f47f5f018c9f7499a0a528326470d8073",
+    "src/frontend/src/components/OcelExplorer.tsx": "213c8515979acd8d3c92585692f6c9b823728325fbdb37ad20a4d4a14a1bbbaa",
+    "src/frontend/src/components/OcelGraphModel.tsx": "ce287cf7de99517def09eaffa362083860e1e00c3c7b820879b87a455ca279ae",
+    "src/frontend/src/components/PerformanceSpectrum.tsx": "09bce5930511b72c5d8666b64aba251cd0f7b8207ca5e57d0f40d505e264fdae",
+    "src/frontend/src/components/PetriAnalysis.tsx": "fd402017b7b7c04e375a058ca81e0ab9438573bb9fe9ae5fb73ff85c9c78e19d",
+    "src/frontend/src/components/PetriNet.tsx": "d9e217f14cacf97340a87f04900334cd02b9cb56de9aadb924b5d6ab4aa1c0c3",
+    "src/frontend/src/components/PowlModel.tsx": "6a9faf9eed9c1e26da7ef88163890c148446cb9a9b520e1446037df86ac49efd",
+    "src/frontend/src/components/ProcessMap.tsx": "c98d5d04acc738f9b7d75a0c7f8d9ede8bf716efd4be6c462a274bba9d1437d3",
+    "src/frontend/src/components/ProcessModel.tsx": "8cf3c19afeaeeaba593c081a84e209b6e2afabebb238e45fbe66dd45e3ebd414",
+    "src/frontend/src/components/ProcessTree.tsx": "ffb83984b1baa52841009f532d2352013895c630255d15380da32de188fa523d",
+    "src/frontend/src/components/Resources.tsx": "3b66188d33def38ddd2fc52bc72ad93631512721876933ed1070286d425f9d24",
+    "src/frontend/src/components/TopBar.tsx": "fac8565c63a4bf8b5dad1c08565b04b28c9991421e5f0158be52f69eecd6b25a",
+    "src/frontend/src/components/VariantList.tsx": "49d3314d64e4dbc59602fde9c8643a812adceadc06df9bfc447772b783281271",
+    "src/frontend/src/conformance.ts": "a4e3d87b5e2208b1302e1d3341582428dc24bc7d0b2875a49099adc5e7150ab2",
+    "src/frontend/src/dependency-layout.ts": "eb3672b5743e4b12b111a2c4f4d29357ff8632bcbcdb528d501f435332da5932",
+    "src/frontend/src/dotted-chart.ts": "6745bb981c89d60ef8a19b2a0d1f39eccd6ea8abd4b225cb2d3e4bae19d4962d",
+    "src/frontend/src/eventually-follows.ts": "e567d87a06e47ca7b23f7c014e5253abb565ea2b1872b7be045f9fd580b5684f",
+    "src/frontend/src/heuristic-miner.ts": "32bd0911e3e3ec528c25c992acd843a3485c563ab369a439224fb851ee6aa555",
+    "src/frontend/src/layout.ts": "7f46d91718da9444c21b80035503abcd7b89a8daacc69e56ee57e7a001fdbeb4",
+    "src/frontend/src/main.tsx": "9f14840785035a7ad44d93177890861739412b4e21fe2778b5efa66a6eb24f67",
+    "src/frontend/src/miners.ts": "f57146a43493795d26fe88395c2b737c348c6b9e6bc6d2567aa8fa073c413a46",
+    "src/frontend/src/ocdfg-layout.ts": "58754e048c8e6a7f25a059c6eec2c5f494e21a50cad00155af3863a0e4dd0f70",
+    "src/frontend/src/ocel-graph-layout.ts": "aaecbda5b9151f27c359fbf789a8e2a967740e0351cce3cbc8cfe25d42e1a5e2",
+    "src/frontend/src/performance-spectrum.ts": "dcfd0899612ee9bc189bfdebe3788f888b7cc6eb867f0d414e4f7b59600f80c0",
+    "src/frontend/src/petri-decoration.ts": "b9c94e9237b7a3acc6469c0fa7c61fb13f1d2c3a9b2a47d7bcd66f360ad5fa51",
+    "src/frontend/src/petri-layout.ts": "e5da5a4b3f5cec29da956592e0e0c9f6be5964ba22508d948b74f2d92c10a6e7",
+    "src/frontend/src/styles.css": "c87a0c311a0b90b74ff9aa50b42b05c5bfc2e7a3faafccb687a8bc1a68d64114",
+    "src/frontend/src/tree-layout.ts": "07db583178e683676906f416d459f82e4acd56b14c54ac7e9e0050adbf270fdc",
+    "src/frontend/src/types.ts": "66a1d09736c72c61c168324fc4afcaea5b09aa8a54e5924b0cf6de9fab540e16",
+    "src/frontend/src/variant-insights.ts": "bcb95470d435e22ea5bb38f934a960444a21a50f348f4bad0c75c496cf0f6c37",
+    "src/frontend/src/vite-env.d.ts": "424faf9241dd699dda995b367ed36665732da1e6ec1f33b2fd40394488ecac92",
+    "src/frontend/test/setup.ts": "1b00d0a718ce4d8e3babd03ba0113d18dd1b74518b6526cfe67b7c3e69ffa21d",
+    "src/frontend/tests/alpha-result.test.ts": "57083c41c2f3c3072c3c175b5d394d08bba9ea4dc66e8587995bafdd439dfae0",
+    "src/frontend/tests/api.test.ts": "a883ada562be5a9085bc3f650365579790d230ab56266d1f8bd151687b7871d4",
+    "src/frontend/tests/app-logic.test.ts": "70e221e45586d1f0c3b6adbc558eb326ab16b46712c5108a6f1954f6aaa6557c",
+    "src/frontend/tests/components/Batches.test.ts": "db7d871579f3f0ca56bb6041b49769d3de9496e26c0d4f8c6f0fa371969a9887",
+    "src/frontend/tests/components/CorrelationMining.test.ts": "a38bf13d3e0803c4931f9b886130c0bacefc7e1dd3ae2d23b87299f55daa80c8",
+    "src/frontend/tests/components/EventLogView.test.ts": "23936dbd116176cbc357933c4fe7ec692e9c637d9e9a20f2f15ecfd5b3a446d2",
+    "src/frontend/tests/components/Filters.test.ts": "180a41ace29627c4afb67f64c07abee999725db832f56bbfdb3e9df939ca4846",
+    "src/frontend/tests/components/PerformanceSpectrum.test.ts": "4e0dbc77adbf798c316b385583ff66b418601c3c9d793e155e0bc3e5a8c616bf",
+    "src/frontend/tests/components/TokenReplayDiagnostics.test.ts": "2a4e8c8347f874f753dda3648234c42110c7ee8a0b2de2fe89b138aac0765c31",
+    "src/frontend/tests/conformance.test.ts": "158f05e81bc4780390078e3d87ac2cdd911127df6237a7fb9820778a85615353",
+    "src/frontend/tests/decision-tables-types.test.ts": "7c26616dceae3f158efd2665f315e609899246bad2158e57eb6138ce9fcfde5e",
+    "src/frontend/tests/decision-tables.test.ts": "eaf6a0f9f63afbf05d237d49d0b1cb386dd5708f7e4db655fc3b3aa5d1e8c9a7",
+    "src/frontend/tests/dependency-layout.test.ts": "6d489d9743823a95edbe374e4f82afc3205101eecbb7616cf6d16df1a00e54a4",
+    "src/frontend/tests/dfg-dataframe.test.ts": "4e9b78049e1d1a52667ec6683902f4132314ad37e15dfa3d47d1afeb365fab86",
+    "src/frontend/tests/dotted-chart.test.ts": "d8b1b411b47aa24c681dcb9d7def1c85bdd2bea02bd63d7eac95068adbdf0dcf",
+    "src/frontend/tests/eventually-follows.test.ts": "0022612250123d8f3527398f485a89f2417183d7bbd6bfd060d0021b921800e1",
+    "src/frontend/tests/filters-validation.test.ts": "4150abd99849d0655d057c24c73299830b65ed468028480ddf8e3f57d176f918",
+    "src/frontend/tests/first-class-attribute-contract.test.ts": "9ddb52e0abdff0d8fa88dc6a76e6b1c5fb5c262bacb6e3f86d634dbe69daaf0c",
+    "src/frontend/tests/heuristic-miner.test.ts": "bfaebbfc8fbca1602c51ad727aa766784da48e0ce4aacbb5e2fc96e7fb12d156",
+    "src/frontend/tests/layout.test.ts": "9153e408cc9ab16836acb0135d8ddff179b755c26ece8f7cb419565eaf0f045d",
+    "src/frontend/tests/log-conversion.test.ts": "2d7189213b8462eca54834e0a5e988bcd9fa950718cf46d27c2ab39e27b61b1d",
+    "src/frontend/tests/monte-carlo-scheduler.test.ts": "7ff31165acaab52355522e8c0de411c970e91e5594e14516e81201581fdbef42",
+    "src/frontend/tests/ocdfg-layout.test.ts": "315745bd728c055bba39930815363565586b01a44778c365490cfceed247da2c",
+    "src/frontend/tests/ocel-graph-layout.test.ts": "5a9e6ab6c4b3525f27031159c7a4879c8416e47850a4b4f4f7a6de9fe35c9805",
+    "src/frontend/tests/performance-spectrum.test.ts": "a42a50b52605f9f70e4ae59547dccaacc63636a7e8b49a1732cfe7b4da5dec83",
+    "src/frontend/tests/petri-decoration.test.ts": "8459e9dd4d6bb26d67cd4776f937af43d5b9c7937e7ae5ac9ff42833da157060",
+    "src/frontend/tests/petri-layout.test.ts": "f89629e8ca7a4b78a13e46f4b838a0258cc35b2546e14b558caadcf088679dae",
+    "src/frontend/tests/stochastic-map-sparse.test.ts": "0397d1b956b01536248fd790e3f48fc81426f4be77e2d9f579179859e58864ad",
+    "src/frontend/tests/tree-layout.test.ts": "2e32a66d0e928211a24bb1238355c3000cfc51a98a42a35bf0cc2a32f64ef9b3",
+    "src/frontend/tests/types.test.ts": "08fb0a1accf88b30034d58adb238821263b0dfdf71d102356004e36a87cab7e4",
+    "src/frontend/tests/variant-insights.test.ts": "f3f76ef479a9b6db64c0102ca95931297ad3974c2f05e5392679d20d4e5381b3",
+    "src/frontend/tsconfig.json": "8b035bceb545f9198f37dd48d4aa0d9176fcc52736933a03ffcaab3f6c2544cc",
+    "src/frontend/vite.config.ts": "735e1110ba08fc9f06003d0e673b882a4393f5d8e0144352e56d3ce5b7ee10b7",
+    "src/frontend/vitest.config.ts": "c967a837afa02495ff07816460ee50034adf9d48561af28e437bcf83ecfed0cd",
+    "third_party/httplib.h": "d47579b1d08cdc5eb9db17685502fcb7aff2cf869420053ebd1475d2e1ba90ac"
+  },
+  "summary": {
+    "all_inputs_and_parameters_preserved": true,
+    "application_entry_gates_closed": 0,
+    "application_entry_gates_retained": 18,
+    "cached_public_exceptions": 0,
+    "cached_public_returns": 205,
+    "catalogue_promoted": false,
+    "comparison_pairs": 829,
+    "comparison_routes": {
+      "direct_log": {
+        "acceptance_differences": 107,
+        "acceptance_matches": 101,
+        "both_reject": 3,
+        "exception_class_differences": 3,
+        "exception_message_differences": 3,
+        "pairs": 208,
+        "whole_mapping_matches": 98,
+        "whole_mapping_pairs": 98
+      },
+      "embedded_cached_witnesses": {
+        "acceptance_differences": 107,
+        "acceptance_matches": 98,
+        "pairs": 205,
+        "whole_mapping_differences": 35,
+        "whole_mapping_matches": 63,
+        "whole_mapping_pairs": 98
+      },
+      "registry_log": {
+        "acceptance_differences": 107,
+        "acceptance_matches": 101,
+        "both_reject": 3,
+        "exception_class_differences": 3,
+        "exception_message_differences": 3,
+        "pairs": 208,
+        "whole_mapping_matches": 98,
+        "whole_mapping_pairs": 98
+      },
+      "witness_auto": {
+        "acceptance_differences": 98,
+        "acceptance_matches": 110,
+        "both_reject": 110,
+        "exception_class_differences": 110,
+        "exception_message_differences": 110,
+        "pairs": 208
+      }
+    },
+    "empty_supplied_map_public_calls_not_yet_measured_natively": 208,
+    "fixtures": 208,
+    "full_parity": false,
+    "module_proofs_equal": true,
+    "native_actual_calls": 624,
+    "nullable_fixture_indices": [
+      14,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120,
+      121,
+      122,
+      123,
+      124,
+      125,
+      126,
+      127,
+      128,
+      129,
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147,
+      149,
+      150,
+      154,
+      155,
+      156,
+      157,
+      158,
+      161,
+      162,
+      163,
+      164,
+      165,
+      166,
+      167,
+      169,
+      170,
+      171,
+      172,
+      173,
+      174,
+      178,
+      179,
+      182,
+      183,
+      184,
+      185,
+      186,
+      187,
+      188,
+      189,
+      190,
+      191,
+      192,
+      193,
+      194,
+      195,
+      196,
+      197,
+      198,
+      199,
+      200,
+      201,
+      202,
+      203,
+      204,
+      205,
+      206,
+      207
+    ],
+    "nullable_selected_fixtures": 107,
+    "public_actual_calls": 1869,
+    "public_hypothesis_calls": 1869,
+    "public_hypothesis_differences": 0,
+    "public_primary_exception_counts": [
+      [
+        [
+          "witness_auto",
+          "builtins.AttributeError",
+          "'dict' object has no attribute 'apply'"
+        ],
+        208
+      ],
+      [
+        [
+          "parent_log",
+          "builtins.KeyError",
+          "'concept:name'"
+        ],
+        2
+      ],
+      [
+        [
+          "direct_log",
+          "builtins.KeyError",
+          "'concept:name'"
+        ],
+        2
+      ],
+      [
+        [
+          "witness_zero",
+          "builtins.KeyError",
+          "'concept:name'"
+        ],
+        2
+      ],
+      [
+        [
+          "witness_one",
+          "builtins.KeyError",
+          "'concept:name'"
+        ],
+        2
+      ],
+      [
+        [
+          "witness_two",
+          "builtins.KeyError",
+          "'concept:name'"
+        ],
+        2
+      ],
+      [
+        [
+          "witness_negative",
+          "builtins.KeyError",
+          "'concept:name'"
+        ],
+        2
+      ],
+      [
+        [
+          "witness_empty",
+          "builtins.KeyError",
+          "'concept:name'"
+        ],
+        2
+      ],
+      [
+        [
+          "parent_log",
+          "builtins.KeyError",
+          "'phase'"
+        ],
+        1
+      ],
+      [
+        [
+          "direct_log",
+          "builtins.KeyError",
+          "'phase'"
+        ],
+        1
+      ],
+      [
+        [
+          "witness_zero",
+          "builtins.KeyError",
+          "'phase'"
+        ],
+        1
+      ],
+      [
+        [
+          "witness_one",
+          "builtins.KeyError",
+          "'phase'"
+        ],
+        1
+      ],
+      [
+        [
+          "witness_two",
+          "builtins.KeyError",
+          "'phase'"
+        ],
+        1
+      ],
+      [
+        [
+          "witness_negative",
+          "builtins.KeyError",
+          "'phase'"
+        ],
+        1
+      ],
+      [
+        [
+          "witness_empty",
+          "builtins.KeyError",
+          "'phase'"
+        ],
+        1
+      ]
+    ],
+    "source_changed": false,
+    "typed_supplied_map_native_calls": 0,
+    "typed_supplied_map_unrepresented_public_calls": 832
+  }
+}
