@@ -905,6 +905,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     }
     const auto transition_system =
         minera::discover_transition_system(log, params.transition_system);
+    for (const auto& transition : transition_system.transitions()) {
+      if (transition.label) graph.ensure_activity(*transition.label);
+    }
     const auto inductive_log =
         minera::prepare_inductive_event_log(log, params.inductive);
     const auto tree = minera::discover_process_tree(log, params.inductive);

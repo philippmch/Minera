@@ -7203,6 +7203,9 @@ int main(int argc, char** argv) {
     }
     const auto transition_system =
         minera::discover_transition_system(log, transition_options);
+    for (const auto& transition : transition_system.transitions()) {
+      if (transition.label) graph.ensure_activity(*transition.label);
+    }
     const auto inductive_log =
         minera::prepare_inductive_event_log(log, inductive_options);
     const auto tree = minera::discover_process_tree(log, inductive_options);
