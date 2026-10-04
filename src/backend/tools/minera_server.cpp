@@ -4146,6 +4146,7 @@ void handle_replay_fitness(const httplib::Request& request,
         : minera::import_csv_event_log(input, imports.csv);
     auto model_options = minera::tools::pnml_model_import_options();
     model_options.import_stochastic_map = false;
+    model_options.public_marking_semantics = true;
     const auto document = minera::parse_pnml_document(
         request.get_file_value("model").content, model_options);
     response.set_content(minera::token_replay_fitness_result_json(
@@ -4313,9 +4314,9 @@ void handle_reduce_petri_net(const httplib::Request& request,
     auto options = minera::parse_petri_net_reduction_params(lookup, present);
     auto document = minera::parse_pnml_document(model_xml);
     if (!present("petri_reduction_initial_marking"))
-      options.initial_marking = document.initial_marking;
+      options.initial_marking = minera::tools::pnml_marking<std::int64_t>(document.initial_marking);
     if (!present("petri_reduction_final_marking"))
-      options.final_marking = document.final_marking;
+      options.final_marking = minera::tools::pnml_marking<std::int64_t>(document.final_marking);
     response.set_content(
         minera::petri_net_reduction_json(
             minera::reduce_petri_net(document.net, options)),

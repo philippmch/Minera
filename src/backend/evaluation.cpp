@@ -2121,7 +2121,7 @@ CompositeEvaluationResult evaluate_composite(
     const EventLog& log, const PnmlDocument& document,
     const CompositeEvaluationOptions& options) {
   auto selected = options;
-  const auto inherit_marking = [&](const std::vector<std::int64_t>& stored,
+  const auto inherit_marking = [&](const TokenMarking& stored,
                                    std::vector<int>& marking) {
     if (!marking.empty() || stored.empty()) return true;
     if (stored.size() != document.net.place_count()) return false;

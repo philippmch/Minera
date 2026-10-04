@@ -29,8 +29,8 @@ struct PnmlArcOccurrence {
 
 struct PnmlDocument {
   PetriNet net;
-  std::vector<std::int64_t> initial_marking;
-  std::vector<std::int64_t> final_marking;
+  TokenMarking initial_marking;
+  TokenMarking final_marking;
   std::optional<StochasticMap> stochastic_map;
   // Original PNML element IDs in the corresponding native index order.
   std::vector<std::string> place_ids;
@@ -55,6 +55,12 @@ struct PnmlImportOptions {
   // workflow source/sink places. Structural inference remains independently
   // controlled by the two options above.
   bool require_workflow_boundaries = true;
+  // Observed PM4Py PNML marking import: retain positive counts only, read all
+  // final alternatives with later positive entries replacing earlier ones,
+  // and infer one token on every structural sink only when finalmarkings is
+  // absent. This overrides marking inference and workflow-boundary checks.
+  // The default preserves native document keys and the first final marking.
+  bool public_marking_semantics = false;
 };
 
 // Serializes a workflow net as PNML (the Petri Net Markup Language, ISO/IEC
@@ -76,6 +82,15 @@ void write_pnml(std::ostream& out, const PetriNet& net,
                 const std::vector<std::int64_t>& final_marking,
                 const StochasticMap& stochastic_map,
                 std::string_view name = "net");
+void write_pnml(std::ostream& out, const PetriNet& net,
+                const TokenMarking& initial_marking,
+                const TokenMarking& final_marking,
+                std::string_view name = "net");
+void write_pnml(std::ostream& out, const PetriNet& net,
+                const TokenMarking& initial_marking,
+                const TokenMarking& final_marking,
+                const StochasticMap& stochastic_map,
+                std::string_view name = "net");
 
 [[nodiscard]] std::string to_pnml(const PetriNet& net,
                                   std::string_view name = "net");
@@ -87,6 +102,13 @@ void write_pnml(std::ostream& out, const PetriNet& net,
     const PetriNet& net, const std::vector<std::int64_t>& initial_marking,
     const std::vector<std::int64_t>& final_marking,
     const StochasticMap& stochastic_map,
+    std::string_view name = "net");
+[[nodiscard]] std::string to_pnml(
+    const PetriNet& net, const TokenMarking& initial_marking,
+    const TokenMarking& final_marking, std::string_view name = "net");
+[[nodiscard]] std::string to_pnml(
+    const PetriNet& net, const TokenMarking& initial_marking,
+    const TokenMarking& final_marking, const StochasticMap& stochastic_map,
     std::string_view name = "net");
 
 // Exports complete document markings and node IDs, including explicit zero keys.
@@ -121,7 +143,8 @@ void write_pnml(std::ostream& out, const PnmlDocument& document,
 [[nodiscard]] PetriNet parse_pnml(std::string_view xml);
 
 // Parses the first PNML net together with its complete nonnegative initial and
-// final markings. When a marking is omitted, the unique structural source or
+// final markings with exact token counts independent of machine integer width.
+// When a marking is omitted, the unique structural source or
 // sink receives one token. Unlike parse_pnml, this accepts markings spanning
 // multiple places and token counts greater than one.
 // Disable require_workflow_boundaries and both inference flags to accept

@@ -1407,3 +1407,74 @@ AUTO dispatch, composite/precision/application conformance, legacy bounded
 precomputed aliases, arbitrary Python result carriers and broader parameter
 domains remain open. Catalogue totals stay at 46/86 packages, 199/387 modules
 and 228 incomplete units, with no promotion or full parity claim.
+
+### Exact PNML marking import for log-based fitness
+
+`PnmlDocument` carries initial and final counts as exact `TokenMarking`
+integers. The document and explicit marking exporters preserve nonnegative
+counts beyond 64 bits. Bounded alignment, reduction, comparison and interactive
+adapters validate their integer ranges before conversion. Legacy document
+mode continues to preserve zero keys, the first final alternative and additive
+duplicate final entries.
+
+`PnmlImportOptions::public_marking_semantics` selects the observed pinned
+PM4Py marking import behavior: positive counts only, no initial inference,
+and later positive final entries replacing earlier ones across all alternatives.
+Later zero, negative or missing-text final entries leave an earlier positive
+entry present. The last parsed initial count determines its place's membership;
+an initialMarking without a text element does not replace a parsed count.
+When finalmarkings is absent, every structural sink receives one token,
+including isolated places. An explicitly empty finalmarkings element preserves
+an empty marking. Empty text elements raise the observed NoneType message.
+Decimal counts accept signs, leading zeros, Unicode decimal digits and whitespace,
+and single digit-separated underscores. Invalid integer literals are rejected;
+their exact Python error wording remains open.
+
+The standalone `--replay-fitness-model` CLI and cold `POST /api/replay-fitness`
+route use the public marking mode. Signed raw counts follow the observed dropping
+semantics; large positive counts reach exact token fitness. This closes the
+previous standalone marking-width and zero-key input gaps in the declared
+cohort. The native full-replay document route retains its existing key-preserving
+contract. Direct exact C++ markings can still carry signed counts independently
+of the public PNML import rule. At 401 digits, empty logs return the observed
+integer/float zeros; nonempty logs raise `int too large to convert to float`.
+
+Two fresh pinned captures make 304 actual imports,
+2080 fitness calls and 1040
+full-replay calls. These counts include the original 70-case capture and its
+82-case boundary extension. The final cohort contains 58 successfully imported
+models and 24 rejected models, each observed through file and deserialize routes.
+Five faithful grouped logs cover empty logs/traces, one/two firings and repeated,
+unknown-event mixed traces. All 116 native marking
+and named structural projections match. All 2288
+whole typed four-field fitness comparisons and 572
+six-field trace projections match, as do 24 expected
+overflow checks and all 580 document/net pairs.
+
+410 actual CLI processes and 410 HTTP
+requests make 1144 matching whole public
+fitness comparisons. Every CLI/HTTP pair and all 820 native
+wire checks agree. The 22 invalid-integer models retain 44
+native import wording differences and 110 CLI/HTTP
+command-pair wording differences; these are recorded and excluded from an exact
+error-parity claim.
+
+All 152 assertion-enabled Release suites
+pass against 660 frozen inputs (seven edits, 653 unchanged), with 155 fresh linked
+production/test artifacts. The first focused test failure is preserved: its
+Unicode fixture was compiled in code page 1252, with C4566 replacement warnings.
+Both UTF-8 diagnostic clones passed, and a fresh source freeze encoding those
+fixture bytes explicitly passed the full build. Executed helpers, original inputs
+and failure witnesses remain immutable. Source/build/process/archive self-review
+is not an independent review or a pre-public oracle.
+
+Evidence: [pnml-exact-markings-validation.json](pnml-exact-markings-validation.json).
+All 3727 archive members round-trip across 20 lossless
+archives, linked to the prior log-fitness evidence. Arbitrary PNML syntax and
+properties, marking insertion order, Python exception identities and complete
+importer/exporter parameter domains remain unproven. The original automatic-choice
+cohort retains its previous 312 native and 312 wire whole-dictionary differences.
+AUTO/composite/precision/application conformance, bounded consumers, aliases and
+broader Python carrier/parameter domains remain open. Catalogue totals stay at
+46/86 packages, 199/387 modules and 228 incomplete units; no promotion or full
+parity claim is made.

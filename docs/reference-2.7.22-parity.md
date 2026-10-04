@@ -9434,3 +9434,41 @@ AUTO, composite/precision/application conformance, precomputed aliases and
 broader Python carrier/parameter acceptance are separate gates. Catalogue
 totals remain 46/86 packages, 199/387 modules and 228 incomplete units. No
 catalogue promotion or full parity claim is made.
+
+### Exact PNML marking import for standalone token fitness
+
+PNML document counts now use exact integers beyond 64 bits. An explicit public
+marking import mode follows observed positive-only membership, duplicate and
+multiple-final replacement, Unicode integer syntax and missing/empty-final rules.
+The standalone fitness CLI and cold multipart HTTP endpoint use that mode;
+native key-preserving document replay and bounded consumer range checks remain
+explicit. Signed raw counts are dropped as observed, while large positive counts
+reach exact fitness, including the observed 401-digit overflow boundary.
+
+Two fresh public captures retain 304 imports,
+2080 fitness calls and 1040
+replay calls, including repeated observations in the 70-case and 82-case cohorts.
+The final 58 successful and 24 rejected models produce
+2288 matching whole native/public fitness
+comparisons, 572 matching trace projections, and
+116 exact marking/structural projections.
+410 CLI processes and 410 HTTP requests
+produce 1144 matching whole public fitness
+comparisons. Every native carrier and wire pair agrees. Exact invalid-integer
+error wording remains open for 22 models: 44
+native import differences and 110 wire command-pair
+differences are retained, alongside the matching NoneType and overflow messages.
+
+The 660-input freeze changes seven sources, links 155 artifacts and passes all
+152 assertion-enabled Release suites. The first test's code-page failure,
+C4566 warnings and two passing UTF-8 diagnostics are retained; the corrected
+fixture uses explicit UTF-8 bytes in a fresh build. All 3727 members
+round-trip across 20 archives.
+[pnml-exact-markings-validation.json](pnml-exact-markings-validation.json) records
+sources, binaries, raw API/process/wire outputs and prior evidence bindings.
+
+Full importer properties/syntax/order and Python exception identity remain
+unproven. The previous 312 native and 312 wire automatic-choice differences,
+AUTO/composite/precision/application conformance and broader carrier/parameter
+gates remain open. This is self-review, with no catalogue promotion or full
+parity claim. Totals remain 46/86 packages, 199/387 modules and 228 incomplete units.
