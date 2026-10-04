@@ -36,26 +36,9 @@ bool is_subset(const ActivitySet& sub, const ActivitySet& sup) {
 // The log with activity names interned to dense ids, so the full-log and
 // reduced-log footprints of the Alpha+ variant share one id space.
 struct IdLog {
-  std::vector<std::string> names;
+  std::vector<std::optional<std::string>> names;
   std::vector<std::vector<std::size_t>> traces;
 };
-
-IdLog intern_log(const EventLog& log) {
-  IdLog out;
-  std::unordered_map<std::string, std::size_t> ids;
-  for (const auto& trace : log.traces) {
-    std::vector<std::size_t> sequence;
-    sequence.reserve(trace.events.size());
-    for (const auto& event : trace.events) {
-      const auto [it, inserted] =
-          ids.try_emplace(event.activity, out.names.size());
-      if (inserted) out.names.push_back(event.activity);
-      sequence.push_back(it->second);
-    }
-    out.traces.push_back(std::move(sequence));
-  }
-  return out;
-}
 
 // The log footprint: which activities directly follow which, plus the start and
 // end activities. All higher-level relations derive from this matrix. With
@@ -117,7 +100,6 @@ Footprint build_footprint(const IdLog& log, const std::vector<bool>* exclude,
   if (short_loops) fp.two_loop.assign(n, std::vector<bool>(n, false));
 
   std::vector<std::size_t> sequence;
-  DfgFrequency graph;
   for (const auto& trace : log.traces) {
     sequence.clear();
     for (const auto id : trace) {
@@ -128,14 +110,18 @@ Footprint build_footprint(const IdLog& log, const std::vector<bool>* exclude,
     fp.ends.insert(sequence.back());
     for (std::size_t i = 1; i < sequence.size(); ++i) {
       fp.follows[sequence[i - 1]][sequence[i]] = true;
-      if (!short_loops)
-        graph[{log.names[sequence[i - 1]], log.names[sequence[i]]}] = 1;
       if (short_loops && i >= 2 && sequence[i - 2] == sequence[i]) {
         fp.two_loop[sequence[i]][sequence[i - 1]] = true;
       }
     }
   }
-  if (!short_loops) set_classic_relations(fp, log.names, graph);
+  if (!short_loops) {
+    fp.classic_causal.assign(n, std::vector<bool>(n));
+    for (std::size_t a = 0; a < n; ++a) {
+      for (std::size_t b = 0; b < n; ++b)
+        fp.classic_causal[a][b] = fp.follows[a][b] && !fp.follows[b][a];
+    }
+  }
   return fp;
 }
 
@@ -234,6 +220,30 @@ SelectedAlphaActivity nullable_selected_activity(const Event& event,
       return {FirstClassAttributeState::kNull, {}};
   }
   return {FirstClassAttributeState::kMissing, {}};
+}
+
+IdLog intern_alpha_plus_log(const EventLog& log, std::string_view selector) {
+  IdLog out;
+  std::unordered_map<std::optional<std::string>, std::size_t> ids;
+  for (const auto& trace : log.traces) {
+    std::vector<std::size_t> sequence;
+    sequence.reserve(trace.events.size());
+    for (const auto& event : trace.events) {
+      const auto value = nullable_selected_activity(event, selector);
+      if (value.state == FirstClassAttributeState::kMissing)
+        throw std::invalid_argument(
+            "Alpha: event is missing activity attribute '" +
+            std::string(selector) + "'");
+      const auto label = value.state == FirstClassAttributeState::kNull
+                             ? std::nullopt
+                             : std::optional<std::string>(value.label);
+      const auto [it, inserted] = ids.try_emplace(label, out.names.size());
+      if (inserted) out.names.push_back(label);
+      sequence.push_back(it->second);
+    }
+    out.traces.push_back(std::move(sequence));
+  }
+  return out;
 }
 
 void check_alpha_row_limit(const EventLog& log, const AlphaMinerOptions& options) {
@@ -439,9 +449,21 @@ PetriNet discover_alpha_classic(const EventLog& log,
 
 AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
                              const AlphaMinerOptions& options) {
-  const EventLog normalized = normalize_alpha_event_log(log, options);
-  IdLog ids = intern_log(normalized);
-  const auto visible_names = ids.names;
+  check_alpha_row_limit(log, options);
+  const std::string selector = options.activity_attribute.empty()
+                                   ? "concept:name"
+                                   : options.activity_attribute;
+  IdLog ids = intern_alpha_plus_log(log, selector);
+  std::vector<std::string> visible_names;
+  std::vector<std::optional<std::size_t>> visible_ids;
+  for (const auto& label : ids.names) {
+    if (label) {
+      visible_ids.push_back(visible_names.size());
+      visible_names.push_back(*label);
+    } else {
+      visible_ids.push_back(std::nullopt);
+    }
+  }
   if (ids.traces.empty())
     throw std::invalid_argument("Alpha+: a trace-bearing log is required");
   // Boundary labels participate in ordinary label identity and loop removal.
@@ -621,7 +643,7 @@ AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
     for (auto& p : inputs[t]) p = place_ids[p];
     for (auto& p : outputs[t]) p = place_ids[p];
     const bool hidden = !loops[t] && (t == start_label || t == end_label);
-    net.add_transition(hidden ? std::nullopt : std::optional<std::size_t>(t),
+    net.add_transition(hidden ? std::nullopt : visible_ids.at(t),
                        std::move(inputs[t]), std::move(outputs[t]));
   }
   result.initial_marking.resize(net.place_count());

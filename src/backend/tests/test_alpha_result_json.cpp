@@ -29,4 +29,11 @@ int main() {
   const auto ordinary = minera::alpha_plus_result_json(minera::discover_alpha_plus_result(log));
   assert(ordinary.find("\"detached_initial_marking\":[]") != std::string::npos);
   assert(ordinary.find("\"label\":\"a\"") != std::string::npos);
+  log.traces.front().events.front().activity_state = minera::FirstClassAttributeState::kNull;
+  const auto nullable = minera::alpha_plus_result_json(minera::discover_alpha_plus_result(log));
+  assert(nullable.find("\"after\":[null]") != std::string::npos);
+  assert(nullable.find("\"label\":null") != std::string::npos);
+  auto mixed = result;
+  mixed.detached_initial_marking.front().name.before = {std::nullopt, "", "None"};
+  assert(minera::alpha_plus_result_json(mixed).find("\"before\":[null,\"\",\"None\"]") != std::string::npos);
 }

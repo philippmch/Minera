@@ -16,11 +16,13 @@ void text(std::ostream& out, std::string_view value) {
   }
   out << '"';
 }
-void names(std::ostream& out, const std::vector<std::string>& values) {
+void names(std::ostream& out,
+           const std::vector<std::optional<std::string>>& values) {
   out << '[';
   for (std::size_t i = 0; i < values.size(); ++i) {
     if (i) out << ',';
-    text(out, values[i]);
+    if (values[i]) text(out, *values[i]);
+    else out << "null";
   }
   out << ']';
 }
