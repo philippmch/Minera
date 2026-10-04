@@ -495,7 +495,45 @@ void nullable_name_failure_precedence_and_variants() {
   net.set_transition_names({std::string("B"), std::string("A")});
   EventLog log; log.traces = {trace("choice", {event("A")})};
   const auto result = replay_token_result(log, net, {});
-  assert(result.traces[0].activated_transitions == std::vector<std::size_t>{1});
+  assert(result.traces[0].activated_transitions == std::vector<std::size_t>{0});
+}
+
+void enabled_transition_selection_and_disabled_fallback() {
+  const auto replay_choice = [](PetriTransitionNameList names,
+                                std::vector<std::size_t> first_inputs,
+                                std::vector<std::size_t> second_inputs,
+                                std::vector<PetriSparseMarkingEntry> initial) {
+    PetriNet net;
+    net.set_activities({"A"});
+    net.add_place(); net.add_place(); net.add_place();
+    net.set_source(0); net.set_sink(2);
+    net.add_transition(0, std::move(first_inputs), {2});
+    net.add_transition(0, std::move(second_inputs), {2});
+    net.set_transition_names(std::move(names));
+    PetriDiscoveryMarkings markings;
+    for (const auto& entry : initial)
+      markings.initial.push_back({{PetriMarkingPlaceKind::kRoot, entry.place_id}, entry.tokens});
+    markings.final.push_back({{PetriMarkingPlaceKind::kRoot, 2}, 1});
+    net.set_discovery_markings(std::move(markings));
+    EventLog log; log.traces = {trace("choice", {event("A")})};
+    return replay_token_result(log, net, {}).traces[0];
+  };
+  const auto both = replay_choice({std::string("B"), std::string("A")}, {0}, {0}, {{0, 1}});
+  assert(both.activated_transitions == std::vector<std::size_t>{0});
+  assert(both.trace_is_fit && both.missing == 0);
+  const auto second = replay_choice({std::string("B"), std::string("A")}, {0, 1}, {0}, {{0, 1}});
+  assert(second.activated_transitions == std::vector<std::size_t>{1});
+  assert(second.trace_is_fit && second.missing == 0);
+  const auto disabled = replay_choice({std::string("B"), std::string("A")}, {0}, {0}, {});
+  assert(disabled.activated_transitions == std::vector<std::size_t>{0});
+  assert(!disabled.trace_is_fit && disabled.missing == 1);
+  const auto disabled_reverse = replay_choice({std::string("A"), std::string("B")}, {0}, {0}, {});
+  assert(disabled_reverse.activated_transitions == std::vector<std::size_t>{1});
+  assert(disabled_reverse.missing == 1);
+  const auto equal_enabled = replay_choice({std::string("same"), std::string("same")}, {0}, {0}, {{0, 1}});
+  assert(equal_enabled.activated_transitions == std::vector<std::size_t>{0});
+  const auto equal_disabled = replay_choice({std::string("same"), std::string("same")}, {0}, {0}, {});
+  assert(equal_disabled.activated_transitions == std::vector<std::size_t>{1});
 }
 
 void alpha_plus_default_nullable_name_metadata() {
@@ -525,6 +563,7 @@ int main() {
   detached_names_and_error_precedence();
   nullable_transition_names_and_wire();
   nullable_name_failure_precedence_and_variants();
+  enabled_transition_selection_and_disabled_fallback();
   alpha_plus_default_nullable_name_metadata();
   std::cout << "full forward token replay result contracts passed\n";
 }
