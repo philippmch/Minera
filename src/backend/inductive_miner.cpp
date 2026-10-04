@@ -1,7 +1,9 @@
 #include "minera/inductive_miner.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <exception>
@@ -11,12 +13,14 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "minera/timestamp.hpp"
+#include "minera/token_integer.hpp"
 #include "inductive/semantics.hpp"
 
 namespace minera {
@@ -1827,52 +1831,99 @@ std::optional<std::string> event_value(const Event& event, const Trace& trace,
   return std::nullopt;
 }
 
-std::string tree_key(const ProcessTreeNode& node,
-                     const ActivityLabels& labels) {
-  switch (node.op) {
-    case ProcessTreeOperator::kTau:
-      return "0";
-    case ProcessTreeOperator::kActivity:
-      return node.activity < labels.size()
-                 ? std::string("1:") + labels[node.activity]
-                 : std::string("1:#") + std::to_string(node.activity);
-    case ProcessTreeOperator::kSequence:
-      break;
-    case ProcessTreeOperator::kExclusive:
-      break;
-    case ProcessTreeOperator::kParallel:
-      break;
-    case ProcessTreeOperator::kInclusiveChoice:
-      break;
-    case ProcessTreeOperator::kInterleaving:
-      break;
-    case ProcessTreeOperator::kLoop:
-      break;
-  }
-  const auto op_key = [](ProcessTreeOperator op) {
-    switch (op) {
-      case ProcessTreeOperator::kSequence: return "2";
-      case ProcessTreeOperator::kExclusive: return "3";
-      case ProcessTreeOperator::kParallel: return "4";
-      case ProcessTreeOperator::kInclusiveChoice: return "5";
-      case ProcessTreeOperator::kInterleaving: return "6";
-      case ProcessTreeOperator::kLoop: return "7";
-      case ProcessTreeOperator::kActivity: return "1";
-      case ProcessTreeOperator::kTau: return "0";
+TokenInteger activity_order_key(std::string_view label) {
+  // RFC 1321 MD5 over the UTF-8 label bytes, interpreted as a digest integer.
+  static constexpr std::array<std::uint32_t, 64> constants{
+      0xd76aa478u, 0xe8c7b756u, 0x242070dbu, 0xc1bdceeeu,
+      0xf57c0fafu, 0x4787c62au, 0xa8304613u, 0xfd469501u,
+      0x698098d8u, 0x8b44f7afu, 0xffff5bb1u, 0x895cd7beu,
+      0x6b901122u, 0xfd987193u, 0xa679438eu, 0x49b40821u,
+      0xf61e2562u, 0xc040b340u, 0x265e5a51u, 0xe9b6c7aau,
+      0xd62f105du, 0x02441453u, 0xd8a1e681u, 0xe7d3fbc8u,
+      0x21e1cde6u, 0xc33707d6u, 0xf4d50d87u, 0x455a14edu,
+      0xa9e3e905u, 0xfcefa3f8u, 0x676f02d9u, 0x8d2a4c8au,
+      0xfffa3942u, 0x8771f681u, 0x6d9d6122u, 0xfde5380cu,
+      0xa4beea44u, 0x4bdecfa9u, 0xf6bb4b60u, 0xbebfbc70u,
+      0x289b7ec6u, 0xeaa127fau, 0xd4ef3085u, 0x04881d05u,
+      0xd9d4d039u, 0xe6db99e5u, 0x1fa27cf8u, 0xc4ac5665u,
+      0xf4292244u, 0x432aff97u, 0xab9423a7u, 0xfc93a039u,
+      0x655b59c3u, 0x8f0ccc92u, 0xffeff47du, 0x85845dd1u,
+      0x6fa87e4fu, 0xfe2ce6e0u, 0xa3014314u, 0x4e0811a1u,
+      0xf7537e82u, 0xbd3af235u, 0x2ad7d2bbu, 0xeb86d391u};
+  static constexpr std::array<int, 64> shifts{
+      7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+      5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+      4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+      6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21};
+  std::vector<std::uint8_t> bytes;
+  bytes.reserve(label.size() + 72);
+  for (const char byte : label) bytes.push_back(static_cast<std::uint8_t>(byte));
+  bytes.push_back(0x80);
+  while (bytes.size() % 64 != 56) bytes.push_back(0);
+  const auto bits = static_cast<std::uint64_t>(label.size()) * 8;
+  for (unsigned index = 0; index < 8; ++index)
+    bytes.push_back(static_cast<std::uint8_t>(bits >> (index * 8)));
+  std::array<std::uint32_t, 4> state{
+      0x67452301u, 0xefcdab89u, 0x98badcfeu, 0x10325476u};
+  for (std::size_t offset = 0; offset < bytes.size(); offset += 64) {
+    std::array<std::uint32_t, 16> words{};
+    for (std::size_t index = 0; index < 16; ++index) {
+      for (unsigned byte = 0; byte < 4; ++byte)
+        words[index] |= std::uint32_t{bytes[offset + index * 4 + byte]}
+                        << (byte * 8);
     }
-    return "9";
-  };
-  std::string result = std::string(op_key(node.op)) + "(";
-  for (const auto& child : node.children) {
-    const std::string key = tree_key(child, labels);
-    result += std::to_string(key.size()) + ":" + key + ";";
+    auto [a, b, c, d] = state;
+    for (std::size_t index = 0; index < 64; ++index) {
+      std::uint32_t mixed;
+      std::size_t word;
+      if (index < 16) {
+        mixed = (b & c) | (~b & d);
+        word = index;
+      } else if (index < 32) {
+        mixed = (d & b) | (~d & c);
+        word = (5 * index + 1) % 16;
+      } else if (index < 48) {
+        mixed = b ^ c ^ d;
+        word = (3 * index + 5) % 16;
+      } else {
+        mixed = c ^ (b | ~d);
+        word = (7 * index) % 16;
+      }
+      const auto previous_d = d;
+      d = c;
+      c = b;
+      b += std::rotl(a + mixed + constants[index] + words[word], shifts[index]);
+      a = previous_d;
+    }
+    state[0] += a;
+    state[1] += b;
+    state[2] += c;
+    state[3] += d;
   }
-  result += ")";
+  TokenInteger result;
+  for (const auto word : state) {
+    for (unsigned byte = 0; byte < 4; ++byte) {
+      result *= 256;
+      result += static_cast<std::uint8_t>(word >> (byte * 8));
+    }
+  }
   return result;
 }
 
-void canonicalize_tree(ProcessTreeNode& node, const ActivityLabels& labels) {
-  for (auto& child : node.children) canonicalize_tree(child, labels);
+TokenInteger tree_key(const ProcessTreeNode& node,
+                      const std::vector<TokenInteger>& activity_keys) {
+  if (node.op == ProcessTreeOperator::kTau) return 0;
+  if (node.op == ProcessTreeOperator::kActivity)
+    return activity_keys.at(node.activity);
+  TokenInteger result;
+  for (const auto& child : node.children) result += tree_key(child, activity_keys);
+  return result;
+}
+
+void canonicalize_tree_children(
+    ProcessTreeNode& node, const std::vector<TokenInteger>& activity_keys) {
+  for (auto& child : node.children)
+    canonicalize_tree_children(child, activity_keys);
   if (node.op != ProcessTreeOperator::kExclusive &&
       node.op != ProcessTreeOperator::kParallel) {
     return;
@@ -1887,11 +1938,24 @@ void canonicalize_tree(ProcessTreeNode& node, const ActivityLabels& labels) {
       flattened.push_back(std::move(child));
     }
   }
-  std::sort(flattened.begin(), flattened.end(), [&](const auto& left,
-                                                   const auto& right) {
-    return tree_key(left, labels) < tree_key(right, labels);
+  std::vector<std::pair<TokenInteger, ProcessTreeNode>> keyed;
+  keyed.reserve(flattened.size());
+  for (auto& child : flattened)
+    keyed.emplace_back(tree_key(child, activity_keys), std::move(child));
+  std::stable_sort(keyed.begin(), keyed.end(), [](const auto& left,
+                                                const auto& right) {
+    return left.first < right.first;
   });
-  node.children = std::move(flattened);
+  node.children.clear();
+  node.children.reserve(keyed.size());
+  for (auto& entry : keyed) node.children.push_back(std::move(entry.second));
+}
+
+void canonicalize_tree(ProcessTreeNode& node, const ActivityLabels& labels) {
+  std::vector<TokenInteger> activity_keys;
+  activity_keys.reserve(labels.size());
+  for (const auto& label : labels) activity_keys.push_back(activity_order_key(label));
+  canonicalize_tree_children(node, activity_keys);
 }
 
 EventLog select_event_log_fields(const EventLog& input,

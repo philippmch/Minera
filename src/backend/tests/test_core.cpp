@@ -825,13 +825,13 @@ void inductive_miner_discovers_sequence() {
 void inductive_miner_discovers_exclusive_choice() {
   // a then either b or c then d.
   assert(mine_tree({{"a", "b", "d"}, {"a", "c", "d"}}) ==
-         "->(a, X(b, c), d)");
+         "->(a, X(c, b), d)");
 }
 
 void inductive_miner_discovers_parallel() {
   // b and c are concurrent between a and d.
   const auto tree = mine_tree({{"a", "b", "c", "d"}, {"a", "c", "b", "d"}});
-  assert(tree == "->(a, +(b, c), d)");
+  assert(tree == "->(a, +(c, b), d)");
 }
 
 void inductive_miner_discovers_loop() {
@@ -858,7 +858,7 @@ void inductive_miner_repairs_a_cycle_with_specialized_fallthroughs() {
   // optional b-then-c structure, so the activity-concurrent repair isolates a
   // as the other parallel branch.
   const auto tree = mine_tree({{"a", "b"}, {"b", "c"}, {"c", "a"}});
-  assert(tree == "+(->(X(tau, b), X(tau, c)), X(tau, a))");
+  assert(tree == "+(X(tau, a), ->(X(tau, b), X(tau, c)))");
 }
 
 void inductive_miner_infrequent_recovers_a_noisy_sequence() {
@@ -881,7 +881,7 @@ void inductive_miner_infrequent_leaves_a_clean_log_untouched() {
   // threshold yields exactly the same model as the classic miner.
   assert(mine_tree_imf({{"a", "b", "c"}}, 0.3) == "->(a, b, c)");
   assert(mine_tree_imf({{"a", "b", "d"}, {"a", "c", "d"}}, 0.3) ==
-         "->(a, X(b, c), d)");
+         "->(a, X(c, b), d)");
 }
 
 void inductive_miner_infrequent_filters_an_edge_at_the_cutoff() {
@@ -911,7 +911,7 @@ void inductive_miner_infrequent_terminates_on_a_filtered_exclusive_cut() {
   // recursed forever.
   std::vector<std::vector<std::string>> variants(10, {"a", "b"});
   variants.push_back({"a", "c"});
-  assert(mine_tree_imf(variants, 0.5) == "->(a, X(b, c))");
+  assert(mine_tree_imf(variants, 0.5) == "->(a, X(c, b))");
 }
 
 void inductive_miner_infrequent_keeps_structure_the_filter_would_destroy() {
@@ -940,14 +940,14 @@ void inductive_miner_dfg_matches_log_recursion_on_structured_logs() {
   // graph-projection recursion must find the same tree as the log recursion.
   assert(mine_tree_imd({{"a", "b", "c"}}) == "->(a, b, c)");
   assert(mine_tree_imd({{"a", "b", "d"}, {"a", "c", "d"}}) ==
-         "->(a, X(b, c), d)");
+         "->(a, X(c, b), d)");
   assert(mine_tree_imd({{"a", "b", "c", "d"}, {"a", "c", "b", "d"}}) ==
-         "->(a, +(b, c), d)");
+         "->(a, +(c, b), d)");
   assert(mine_tree_imd({{"a"}, {"a", "b", "a"}, {"a", "b", "a", "b", "a"}}) ==
          "*(a, b)");
   // The flower fall-through is shared too.
   assert(mine_tree_imd({{"a", "b"}, {"b", "c"}, {"c", "a"}}) ==
-         "*(tau, X(a, b, c))");
+         "*(tau, X(a, c, b))");
 }
 
 void inductive_miner_dfg_skips_empty_traces_at_the_root() {
@@ -1001,7 +1001,7 @@ void inductive_miner_infrequent_preserves_observed_end_activities() {
   variants.push_back({"a", "b"});
   // The rare b-ending trace remains an observed endpoint. The once-per-trace
   // repair isolates b in parallel with the repeated a behaviour.
-  assert(mine_tree_imf(variants, 0.5) == "+(b, *(a, tau))");
+  assert(mine_tree_imf(variants, 0.5) == "+(*(a, tau), b)");
 }
 
 void inductive_miner_infrequent_uses_total_trace_weight_for_empty_noise() {

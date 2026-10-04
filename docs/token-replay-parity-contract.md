@@ -1840,3 +1840,77 @@ AUTO/alignment consumers retain their separate native/compact marking limits.
 The original automatic-choice fitness cohort still retains 312 native and 312
 wire whole-dictionary differences. Catalogue totals remain 46/86 packages,
 199/387 modules and 228 incomplete units; no promotion or full parity is claimed.
+
+
+### Ordered inductive branches through native discovery and full export
+
+Inductive XOR and parallel branches follow the stable ascending sum of all
+descendant UTF-8 MD5 label digest integers, with tau contributing zero. Sequence
+and loop child order retain their existing semantics. The key uses exact integers
+for digest and subtree sums, including sums above 128 bits. Existing folding is
+retained. This rule is inferred from public constructor, `tree_sort` and mining
+return values; no upstream implementation, private fields or bytecode are read.
+The portable digest follows [RFC 1321](https://www.rfc-editor.org/rfc/rfc1321).
+
+Five fresh pinned public captures make 6701 actual calls. The
+final capture contains 1678 calls: 90 mining fixtures across
+IM/IMf/IMd and 1408 explicit sorting controls. Controls
+cover nested operators, equal keys, duplicate labels, tau, empty labels, spaces,
+delimiters, Unicode and UTF-8 padding boundaries. All 1408
+complete before/after control graphs and 797
+actual mining branch lists agree with the inferred key. Sequence/loop controls
+retain their order and existing public parents/object IDs. Mining log/parameter
+inputs remain equal after calls and opaque module proofs remain pinned before and
+after. Public IDs and str/repr/hash values are diagnostics, not native Python
+identity claims.
+
+Actual native-library probes make 525 calls. The final
+270 calls faithfully construct all 90 EventLog fixtures,
+including custom activity selectors and exact legacy core inputs with caller noise
+thresholds. Native log and parameters remain unchanged. Whole operator/typed
+label/ordered children/parent graphs match 264/267
+successful public returns. The three retained differences are actual public None
+labels versus native empty strings. Three missing-key calls reject on both sides;
+public KeyError identity/message differs from native invalid_argument. Those gaps
+remain explicit. The original generated observer fails with Windows
+STATUS_STACK_OVERFLOW before output; a fresh helper scopes each fixture factory
+separately and retains that failed process, source and binary.
+
+The preceding nine ordered-tree failures are closed for all three variants in
+both direct native calls and full CLI exports. All 36 ordered CLI field graphs,
+24 whole typed skeleton models and 48 whole self-conformance projections match
+without tolerance. Native relation/frequency vectors are projected to public sets
+and floating fitness retains exact hex. The supplied-model CLI/cached HTTP cohort
+again executes 7262 CLI processes, 9295 HTTP requests
+and 7070 cached evaluations across all 149 PNML models,
+all eight default mining profiles and five marking-override profiles on two large
+models. All 22060 whole public comparisons,
+7015 CLI/HTTP pairs, 4040 public
+direct/parent pairs, 544
+error-message/status comparisons and 2020 cached marking
+checks pass. All 1010 uploads preserve exported exact markings.
+The prior 151 public imports, 11110 quality calls and 2020 replays are reused through
+exact hashes bound by the preceding committed archives; they are not fresh public
+quality calls in this step.
+
+All 152 assertion-enabled Release suites and both focused suites pass on 660 frozen
+inputs: three backend/source-test edits and 657 unchanged. Production core,
+CLI/server and 151 suites are freshly built in the retained producer. Its original
+focused/full runs stop at an obsolete core ordering assertion; nine expectations
+are corrected only after capturing their exact public input results. The corrected
+core test is freshly compiled against the unchanged production core in a new
+frozen build, then all 152 suites pass together. The failed runs and all 155 accepted
+outputs are bound with their compiler projects, sources and process logs.
+[inductive-ordering-validation.json](inductive-ordering-validation.json) binds all
+35165 members, round-tripped across 32 lossless
+archives, plus hashes of the 27 preceding mining archives. This is source/build/
+process/archive self-review; no independent review is claimed.
+
+None labels, Python exception/class/property/identity semantics, arbitrary
+constructed-tree parity, custom-selector application transport graphs, empty
+visible-label behavior in mined Petri-net conversion/replay/export and wider
+discovery/application conformance remain open. AUTO/alignment/backward consumers
+retain their independent native/compact marking limits. The original automatic
+fitness cohort retains 312 native and 312 wire whole-dictionary differences.
+Catalogue totals remain 46/86 packages, 199/387 modules and 228 incomplete units;
+no promotion or full parity is claimed.
