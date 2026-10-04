@@ -9472,3 +9472,39 @@ unproven. The previous 312 native and 312 wire automatic-choice differences,
 AUTO/composite/precision/application conformance and broader carrier/parameter
 gates remain open. This is self-review, with no catalogue promotion or full
 parity claim. Totals remain 46/86 packages, 199/387 modules and 228 incomplete units.
+
+### Exact PNML integer errors and text boundaries
+
+Public PNML marking mode now reproduces invalid-literal quoting, Unicode 14
+escapes and the first 200 rendered Unicode scalars, including trailing spaces.
+It applies the observed default 4300-digit limit after validating the integer
+grammar. Physical XML newline normalization, character-reference distinctions,
+comment/CDATA joining and child/processing-instruction text boundaries match
+the fresh calls. Native empty-text defaults and unbounded counts are retained.
+
+The 334-case public capture and its 350-case extension retain
+1368 imports, 8400 fitness
+calls and 4200 full replays, including repeated cases.
+All 66 Unicode decimal blocks are observed at initial and final marking positions.
+The final 210 successful and 140 rejected models yield
+280 matching native import errors,
+8176 matching complete fitness dictionaries,
+2044 matching trace projections and 420 exact marking/
+structural projections. Every native carrier pair and expected overflow agrees.
+1750 CLI processes and 1750 HTTP requests
+produce 4088 matching whole public fitness
+comparisons. Every wire/native outcome and CLI/HTTP pair agrees, with exact
+truncated-error whitespace. The prior 22-model integer-wording gate is closed
+in these observations, with no remaining wording differences in the new cohort.
+
+All 152 assertion-enabled Release suites pass against 660 frozen inputs, with
+two edited sources and 155 fresh linked artifacts. All 9457 files
+round-trip across 15 archives.
+[pnml-integer-errors-validation.json](pnml-integer-errors-validation.json) contains
+the source, binary, public/runtime, transport and prior-evidence bindings.
+No independent review, pre-public oracle or catalogue promotion is claimed.
+Configured limits, Python exception identity and complete PNML syntax/properties/
+order remain unproven. The previous automatic-choice, AUTO, composite/precision/
+application and broader carrier/parameter gates remain open. Catalogue totals
+stay at 46/86 packages, 199/387 modules and 228 incomplete units; full parity
+remains unproven.

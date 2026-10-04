@@ -1478,3 +1478,66 @@ AUTO/composite/precision/application conformance, bounded consumers, aliases and
 broader Python carrier/parameter domains remain open. Catalogue totals stay at
 46/86 packages, 199/387 modules and 228 incomplete units; no promotion or full
 parity claim is made.
+
+### Exact PNML integer lexical errors and XML text
+
+The integer-wording gaps recorded in the preceding checkpoint are closed for
+the observed cohort. Public marking mode renders invalid integer literals with
+the observed quote selection, slash/quote escaping and Unicode 14 printability.
+The complete rendered literal is truncated to 200 Unicode scalars, preserving
+supplementary characters, partial escape sequences and trailing spaces.
+
+Valid integer grammar is checked before the pinned Python runtime's observed
+default limit of 4300 decimal digits. The count includes leading zeros and
+Unicode decimal digits, and excludes signs, underscores and outer whitespace.
+4301-digit values, including signed zero, raise the complete observed limit
+message; invalid strings retain their literal error. Native document mode keeps
+its unbounded integer carrier and generic invalid-count message.
+
+Public-mode PNML normalizes physical CR/CRLF before entity decoding; numeric
+references to CR retain their value and distinct error representation. Marking
+text joins comments and CDATA, while a child element or processing instruction
+ends the first segment. Missing initial/final text and empty text retain their
+observed separate behavior. Native empty text defaults are preserved: an initial
+zero key and a final entry's default one token.
+
+Two fresh public captures contain the original 82 fixtures, initial/final cases
+for all 66 Unicode decimal blocks, invalid printable/nonprintable literals,
+long literal truncation, 4299/4300/4301-digit boundaries, and XML text fragments.
+The first 334-case capture and 350-case whitespace extension make
+1368 imports, 8400 fitness
+calls and 4200 full-replay calls; counts include the
+repeated regression observations in both captures. The final 350 raw models
+contain 210 successful and 140 rejected models, each through file/deserialize.
+
+All 280 native import-error messages match.
+All 420 successful marking/structural projections,
+8176 complete typed four-field fitness
+comparisons, 2044 six-field trace projections and
+168 expected fitness/replay overflow checks match.
+All 2100 native document/net pairs and corresponding
+public direct/parent pairs agree. These are complete carrier comparisons within
+the declared cohort, with no tolerated score differences or field stitching.
+
+1750 CLI processes and 1750 cold-server
+HTTP requests make 4088 matching whole public
+fitness comparisons. All 1750 CLI/HTTP pairs and
+3500 wire/native checks agree, including every error message.
+The comparer removes only the process-ending newline, preserving trailing spaces
+in truncated errors. No invalid-integer wording differences remain in this cohort.
+
+All 152 assertion-enabled Release suites pass on 660 frozen inputs: two edits
+and 658 unchanged. All 155 production/test artifacts are freshly linked.
+[pnml-integer-errors-validation.json](pnml-integer-errors-validation.json) records
+the bindings, complete raw calls/process/wire data and prior evidence.
+All 9457 members round-trip across 15 lossless archives.
+This is source/build/process/archive self-review; no independent review or
+pre-public oracle is claimed.
+
+Configured Python integer digit limits, exception class identities, arbitrary
+PNML syntax/encoding/properties and marking insertion order remain unproven.
+The original automatic-choice fitness cohort retains its prior 312 native and
+312 wire whole-dictionary differences. AUTO/composite/precision/application
+conformance, bounded consumers, aliases and broader carrier/parameter domains
+remain open. Catalogue totals remain 46/86 packages, 199/387 modules and 228
+incomplete units. No whole-module promotion or full parity claim is made.
