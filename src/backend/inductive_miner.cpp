@@ -1979,7 +1979,7 @@ EventLog select_event_log_fields(const EventLog& input,
       const auto& source_event = source_trace.events[event_index];
       auto activity =
           event_value(source_event, source_trace, options.activity_key, true);
-      if (!activity || activity->empty()) {
+      if (!activity) {
         throw std::invalid_argument(
             "inductive miner: activity field '" + options.activity_key +
             "' is missing in EventLog trace " +

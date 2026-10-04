@@ -313,8 +313,7 @@ bool is_log_skeleton_pair_constraint(std::string_view constraint) {
 
 void validate_log_skeleton_pair(const LogSkeletonPair& pair,
                                 const DirectlyFollowsGraph& graph) {
-  if (pair.source.empty() || pair.target.empty() ||
-      !graph.activity_id(pair.source) || !graph.activity_id(pair.target)) {
+  if (!graph.activity_id(pair.source) || !graph.activity_id(pair.target)) {
     throw std::invalid_argument("log skeleton pair activity is not registered");
   }
 }
@@ -330,7 +329,7 @@ void validate_log_skeleton_model(const LogSkeletonModel& model,
   validate_pairs(model.never_together);
   validate_pairs(model.directly_follows);
   for (const auto& [activity, frequencies] : model.activ_freq) {
-    if (activity.empty() || !graph.activity_id(activity)) {
+    if (!graph.activity_id(activity)) {
       throw std::invalid_argument(
           "log skeleton activity is not registered: " + activity);
     }
@@ -348,8 +347,7 @@ void validate_log_skeleton_conformance(
   for (const auto& result : conformance) {
     for (const auto& deviation : result.deviations) {
       if (deviation.constraint == "activ_freq") {
-        if (deviation.activity.empty() ||
-            !graph.activity_id(deviation.activity)) {
+        if (!graph.activity_id(deviation.activity)) {
           throw std::invalid_argument(
               "log skeleton activity is not registered: " +
               deviation.activity);

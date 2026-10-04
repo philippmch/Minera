@@ -9733,3 +9733,77 @@ choice/cache/model/log/property graphs and insertion order remain unproven. The
 original automatic-choice fitness cohort still retains 312 native and 312 wire
 whole-dictionary differences. Catalogue totals remain 46/86 packages, 199/387
 modules and 228 incomplete units; no promotion or full parity claim is made.
+
+
+### Present empty activities through default mining and cached evaluation
+
+The inductive EventLog selector accepts a present empty activity value as a
+visible activity. It retains the missing-field guard and uses the same projection
+for the default and custom activity keys. IM, IMf and IMd keep the empty leaf
+distinct from tau, including a visible middle leaf in a three-activity sequence.
+Skeleton JSON validation checks graph registration for both endpoints and activity
+frequency keys/deviations; an already registered empty label is valid. Unknown
+activities and invalid conformance shapes retain their native validation.
+
+A fresh pinned public capture makes 131 actual calls across 15 frozen fixtures:
+empty logs/traces, single/repeated/optional empty labels, boundary positions,
+delimiter/prefix collisions, spaces/Unicode, a custom phase selector, and separate
+missing/None observations. It records the IM/IMf/IMd public tree fields and whole
+direct/parent classic skeleton discovery and conformance values. All log, parameter
+and model inputs are checked after calls; opaque pinned module proofs remain equal
+before and after. The five actual missing-key exceptions and successful None-label
+observations are retained, without claiming native Python exception or None-label
+identity parity. No upstream implementation or private fields are inspected.
+
+Thirty-six actual full CLI mining exports use 12 faithful default-key public logs
+across the three inductive variants. All 24 whole typed skeleton-model and 48 whole
+self-conformance projections match the direct/parent public values without
+tolerance. Native relation/frequency vectors are projected to the public sets;
+native double fitness is retained as exact float hex. This self-conformance cohort
+contains no deviations. Native regressions separately exercise empty frequency and
+both empty relation-endpoint deviation serialization, plus unregistered rejection.
+
+Ordered tree field graphs match 27/36. The nine failures on delimiter/prefix/Unicode
+fixtures remain explicit for all three variants. Their recursive graphs differ
+only in XOR/parallel child order. An unordered-shape diagnosis does not erase the
+ordered-field failures or establish Python object/class/property/insertion-order
+parity. The actual failed observer that assumed activity objects carried an id is
+retained; a new comparer uses their documented array positions against the same
+frozen CLI output. The earlier public observer's wrong direct conformance callable
+is likewise retained, with a corrected capture under a fresh helper and directory.
+
+The restored existing-flow transport cohort uses all 149 supplied PNML models and
+all eight default mining profiles, including both formerly rejected empty-name
+profiles, plus five independent marking-override profiles on two large-marking
+models. It executes 7262 full CLI processes and
+9295 HTTP requests, including 7070
+cached `/api/evaluate` calls after ordinary `/api/mine` and public-mode
+`/api/check-model`. All 22060 whole typed
+public-value comparisons pass with zero transport differences and no tolerance.
+All 7015 complete CLI/HTTP pairs,
+4040 public direct/parent pairs,
+544 error-message/status
+comparisons and 2020 cached marking checks pass.
+All 1010 successful uploads retain their exact exported
+initial/final markings. The preceding 151 public imports, 11110 quality calls and
+2020 replays are reused through exact returned/input hashes and the 35 committed
+parent archives; they are not described as fresh calls in this step.
+
+All 152 assertion-enabled Release suites and both focused suites pass on 660 fresh
+frozen inputs: four backend edits and 656 unchanged. All 155 production/test outputs
+are freshly linked and bound with their compiler projects and process logs. The
+frontend is unchanged; its preceding build/test evidence remains historical.
+[empty-activity-mining-validation.json](empty-activity-mining-validation.json) binds
+all 34967 members, round-tripped across
+27 lossless archives, and the hashes of all 35 preceding
+adapter archives. This is source/build/process/archive self-review; no independent
+review is claimed.
+
+The empty-name default-mining entry gates are closed for this cohort. Ordered
+process-tree graphs, None/class/property identities, custom-selector transport
+graphs, empty visible-label behavior in mined Petri-net conversion/replay/export,
+and wider discovery/application conformance remain open. Legacy conformance and
+AUTO/alignment consumers retain their separate native/compact marking limits.
+The original automatic-choice fitness cohort still retains 312 native and 312
+wire whole-dictionary differences. Catalogue totals remain 46/86 packages,
+199/387 modules and 228 incomplete units; no promotion or full parity is claimed.

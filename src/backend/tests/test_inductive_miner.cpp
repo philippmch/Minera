@@ -133,6 +133,48 @@ void ordinary_variants_and_graph_input() {
   assert(discover_process_tree(empty).root().op == ProcessTreeOperator::kTau);
 }
 
+void present_empty_activity_is_a_visible_leaf() {
+  const auto single = log_from_variants({{""}});
+  const auto sequence = log_from_variants({{"A", "", "B"}});
+  for (const auto variant : {InductiveMinerVariant::IM,
+                             InductiveMinerVariant::IMF,
+                             InductiveMinerVariant::IMD}) {
+    InductiveMinerOptions options;
+    options.variant = variant;
+    const auto leaf = discover_process_tree(single, options);
+    assert(leaf.root().op == ProcessTreeOperator::kActivity);
+    assert(leaf.activities().at(leaf.root().activity).empty());
+
+    const auto tree = discover_process_tree(sequence, options);
+    assert(tree.root().op == ProcessTreeOperator::kSequence);
+    assert(tree.root().children.size() == 3);
+    const std::vector<std::string> expected{"A", "", "B"};
+    for (std::size_t index = 0; index < expected.size(); ++index) {
+      const auto& child = tree.root().children[index];
+      assert(child.op == ProcessTreeOperator::kActivity);
+      assert(tree.activities().at(child.activity) == expected[index]);
+    }
+
+    auto selected = sequence;
+    for (auto& event : selected.traces.front().events) {
+      event.attributes.push_back(field("phase", event.activity));
+      event.activity = "ignored";
+    }
+    options.activity_key = "phase";
+    const auto projected = prepare_inductive_event_log(selected, options);
+    assert(projected.traces.front().events[1].has_activity());
+    assert(projected.traces.front().events[1].activity.empty());
+    assert(selected.traces.front().events[1].activity == "ignored");
+    const auto selected_tree = discover_process_tree(selected, options);
+    assert(render(selected_tree, selected_tree.root()) == "->(A,,B)");
+  }
+
+  auto missing = single;
+  missing.traces.front().events.front().activity_state =
+      FirstClassAttributeState::kMissing;
+  assert(throws([&] { (void)discover_process_tree(missing); }));
+}
+
 void graph_self_loop_keeps_unknown_skip_behavior() {
   const auto repeated = log_from_variants({{"a", "a"}});
   InductiveMinerOptions options;
@@ -528,6 +570,7 @@ void filtered_cut_drops_activities_outside_the_filtered_alphabet() {
 
 int main() {
   ordinary_variants_and_graph_input();
+  present_empty_activity_is_a_visible_leaf();
   graph_self_loop_keeps_unknown_skip_behavior();
   graph_registry_only_activities_do_not_create_behavior();
   graph_projection_preserves_boundaries_and_skips();
