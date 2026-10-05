@@ -4,17 +4,13 @@
 #include <map>
 #include <set>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 
 #include "minera/timestamp.hpp"
 
 namespace minera {
 namespace {
-
-void validate_selector(const std::string& selector) {
-  if (selector.empty())
-    throw std::invalid_argument("token replay duration: attribute selector must not be empty");
-}
 
 std::optional<std::string> selected_value(
     const Event& event, const std::string& selector, bool timestamp,
@@ -49,14 +45,16 @@ std::optional<std::string> selected_value(
     return selected->value;
   }
   const auto& source = timestamp ? event.timestamp_source_key : event.activity_source_key;
-  const bool standard = timestamp ? selector == "time:timestamp" || selector == "timestamp"
-                                  : selector == "concept:name" || selector == "activity";
-  if (standard || (!source.empty() && source == selector)) {
+  const auto& cell = timestamp ? event.timestamp_attribute : event.activity_attribute;
+  const std::string_view projected_key = !source.empty() ? std::string_view(source)
+      : cell ? !cell->first_class_source_key.empty()
+          ? std::string_view(cell->first_class_source_key) : std::string_view(cell->key)
+      : timestamp ? std::string_view("time:timestamp") : std::string_view("concept:name");
+  if (projected_key == selector) {
     const auto state = timestamp ? event.timestamp_state : event.activity_state;
     const auto& value = timestamp ? event.timestamp : event.activity;
     if (state == FirstClassAttributeState::kNull) return std::nullopt;
     if (state == FirstClassAttributeState::kPresent || !value.empty()) return value;
-    const auto& cell = timestamp ? event.timestamp_attribute : event.activity_attribute;
     if (cell) return cell->is_null ? std::nullopt : std::optional<std::string>(cell->value);
   }
   if (present) { *present = false; return std::nullopt; }
@@ -115,7 +113,6 @@ TokenReplayDurationComparison compare(
 
 double token_replay_case_duration(const Trace& trace,
                                  const std::string& timestamp_attribute) {
-  validate_selector(timestamp_attribute);
   if (trace.events.empty())
     throw std::invalid_argument("token replay duration: empty trace has no endpoints");
   const double first = instant(trace.events.front(), timestamp_attribute);
@@ -126,7 +123,6 @@ double token_replay_case_duration(const Trace& trace,
 double token_replay_median_case_duration(
     const EventLog& log, const std::vector<std::size_t>& trace_indices,
     const std::string& timestamp_attribute) {
-  validate_selector(timestamp_attribute);
   validate_indices(log, trace_indices);
   if (trace_indices.empty())
     throw std::invalid_argument("token replay duration: median requires at least one trace");
@@ -144,8 +140,6 @@ std::vector<TokenReplayTransitionDurationDiagnostics>
 token_replay_transition_duration_diagnostics(
     const EventLog& log, const std::vector<TokenReplayTransitionDurationCohort>& cohorts,
     const TokenReplayOptions& options) {
-  validate_selector(options.timestamp_attribute);
-  validate_selector(options.activity_attribute);
   std::vector<TokenReplayTransitionDurationDiagnostics> result;
   for (const auto& cohort : cohorts) {
     auto problem = unique_indices(log, cohort.problem_trace_indices);
@@ -170,8 +164,6 @@ std::vector<TokenReplayUnknownActivityDurationDiagnostics>
 token_replay_unknown_activity_duration_diagnostics(
     const EventLog& log, const std::vector<TokenReplayUnknownActivityDurationCohort>& cohorts,
     const TokenReplayOptions& options) {
-  validate_selector(options.timestamp_attribute);
-  validate_selector(options.activity_attribute);
   std::vector<std::optional<std::string>> activities;
   for (const auto& cohort : cohorts) {
     validate_indices(log, cohort.problem_trace_indices);
@@ -211,13 +203,9 @@ TokenReplayDurationDiagnostics compute_token_replay_duration_diagnostics(
     const EventLog& log, const PetriNet& net,
     const std::vector<TokenReplayTraceDiagnostics>& traces,
     const TokenReplayOptions& options) {
-  validate_selector(options.timestamp_attribute);
   std::map<std::size_t, std::vector<std::size_t>> transition_problems;
   std::map<std::optional<std::string>, std::vector<std::size_t>> activity_problems;
-  auto normalized_options = options;
-  if (normalized_options.activity_attribute.empty())
-    normalized_options.activity_attribute = "concept:name";
-  const auto& activity_selector = normalized_options.activity_attribute;
+  const auto& activity_selector = options.activity_attribute;
   for (const auto& trace : traces) {
     if (trace.trace_index >= log.traces.size())
       throw std::out_of_range("token replay duration: diagnostic trace index out of range");
@@ -251,9 +239,9 @@ TokenReplayDurationDiagnostics compute_token_replay_duration_diagnostics(
   TokenReplayDurationDiagnostics result;
   result.timestamp_attribute = options.timestamp_attribute;
   result.transitions = token_replay_transition_duration_diagnostics(
-      log, transition_cohorts, normalized_options);
+      log, transition_cohorts, options);
   result.unknown_activities = token_replay_unknown_activity_duration_diagnostics(
-      log, activity_cohorts, normalized_options);
+      log, activity_cohorts, options);
   return result;
 }
 
