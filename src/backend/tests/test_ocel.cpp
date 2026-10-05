@@ -576,6 +576,39 @@ int main() {
       unrestricted_ocdfg.gamma = unrestricted_ocdfg.delta = 0;
   assert(minera::compare_ocdfg(ocdfg_norm, ocdfg_norm, unrestricted_ocdfg).fitness == 1);
 
+  // Nonfinite weights also affect empty components through IEEE multiplication.
+  // OCDFG fitness clips the resulting NaN to positive zero while diagnostics
+  // continue to describe the original graph differences.
+  const minera::OcdfgGraph empty_ocdfg;
+  auto overflow_norm = ocdfg_norm;
+  overflow_norm.edges["order"][{"Ship", "Create"}].event_couples = {
+      {"e3", "e1"}};
+  for (const auto weight : {&minera::OcdfgConformanceOptions::alpha,
+                            &minera::OcdfgConformanceOptions::beta,
+                            &minera::OcdfgConformanceOptions::gamma,
+                            &minera::OcdfgConformanceOptions::delta}) {
+    for (const auto value : {std::numeric_limits<double>::quiet_NaN(),
+                             std::numeric_limits<double>::infinity(),
+                             -std::numeric_limits<double>::infinity()}) {
+      minera::OcdfgConformanceOptions options;
+      options.*weight = value;
+      const auto identical = minera::compare_ocdfg(ocdfg_norm, ocdfg_norm, options);
+      assert(identical.fitness == 0.0 && !std::signbit(identical.fitness));
+      assert(identical.missing_activities.empty() && identical.missing_flows.empty());
+      const auto missing = minera::compare_ocdfg(ocdfg_real, ocdfg_norm, options);
+      assert(missing.fitness == 0.0 && !std::signbit(missing.fitness));
+      assert(missing.missing_activities == ocdfg_bad.missing_activities);
+      assert(missing.activity_measure_differences == ocdfg_bad.activity_measure_differences);
+      assert(missing.flow_measure_differences == ocdfg_bad.flow_measure_differences);
+      assert(minera::compare_ocdfg(empty_ocdfg, empty_ocdfg, options).fitness == 0.0);
+    }
+    minera::OcdfgConformanceOptions options;
+    options.*weight = std::numeric_limits<double>::max();
+    const auto overflow = minera::compare_ocdfg(empty_ocdfg, overflow_norm, options);
+    assert(overflow.fitness == 0.0 && !std::signbit(overflow.fitness));
+    assert(minera::compare_ocdfg(overflow_norm, overflow_norm, options).fitness == 1.0);
+  }
+
   minera::OcpnDiscoveryOptions ocpn_options;
   ocpn_options.double_arc_threshold = 0.8;
   const auto ocpn = minera::discover_ocpn(log, ocpn_options);
