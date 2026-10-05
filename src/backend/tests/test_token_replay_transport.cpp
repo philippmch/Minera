@@ -301,7 +301,7 @@ void replay_duration_json_contract() {
     for (const auto& [activity, timestamp] : steps) {
       minera::Event event;
       event.activity = activity;
-      event.attributes.push_back({"finished", timestamp});
+      event.attributes.push_back({"finished", timestamp, minera::AttributeKind::kDate});
       trace.events.push_back(std::move(event));
     }
     log.traces.push_back(std::move(trace));
