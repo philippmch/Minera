@@ -448,6 +448,32 @@ int main() {
     one_norm.edges.front().frequency = 1;
     assert(minera::compare_etot(maximum_real, one_norm)
                .relative_frequency_delta.at({"A", "T"}) == 0x1p64);
+    // Serialized graph counters retain all unsigned bits across the wire.
+    for (const auto count : {std::uint64_t{1} << 63,
+                             (std::uint64_t{1} << 63) + 1,
+                             std::numeric_limits<std::uint64_t>::max()}) {
+      maximum_real.edges.front().frequency = count;
+      const auto json = minera::etot_json(maximum_real);
+      const auto round_trip = minera::parse_etot_json(json);
+      assert(round_trip.edges.front().frequency == count);
+      assert(minera::etot_json(round_trip) == json);
+    }
+    bool oversized_count = false;
+    try {
+      (void)minera::parse_etot_json(
+          R"({"activities":["A"],"object_types":["T"],"edges":[{"activity":"A","object_type":"T","frequency":18446744073709551616}]})");
+    } catch (const std::invalid_argument&) {
+      oversized_count = true;
+    }
+    assert(oversized_count);
+    bool ocel_scalar_unchanged = false;
+    try {
+      (void)minera::parse_ocel_json(
+          R"({"ocel:objects":{},"ocel:events":{},"ocel:global-log":{"counter":18446744073709551615}})");
+    } catch (const std::invalid_argument&) {
+      ocel_scalar_unchanged = true;
+    }
+    assert(ocel_scalar_unchanged);
   }
   assert(etot_direct.missing_edges.empty() &&
          etot_direct.additional_edges.empty());
@@ -499,6 +525,12 @@ int main() {
     assert(wide_result.non_conforming_edges.at({"T", "object_interaction", "U"}) ==
            0x1.fffffffffffffp-54);
     assert(wide_result.fitness == 0.75);
+    auto maximum_graph = wide_norm;
+    maximum_graph.edges.front().frequency = std::numeric_limits<std::size_t>::max();
+    const auto json = minera::otg_json(maximum_graph);
+    const auto round_trip = minera::parse_otg_json(json);
+    assert(round_trip.edges.front().frequency == maximum_graph.edges.front().frequency);
+    assert(minera::otg_json(round_trip) == json);
   }
   assert(otg_direct.missing_edges.empty() && otg_direct.additional_edges.empty());
 

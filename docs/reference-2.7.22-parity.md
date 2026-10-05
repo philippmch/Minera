@@ -10762,3 +10762,65 @@ remain separate gates, along with the 90 literal exception-message differences.
 Python physical API identity is outside the project's semantic parity goal.
 The catalogue remains 46/86 packages, 199/387 modules and 228 incomplete units;
 no whole package/module or full-parity promotion is claimed.
+
+
+### Graph-conformance input domains through CLI and HTTP
+
+Validated against the retained PM4Py 2.7.22 public graph captures at
+`0715c31f3f1d85924107d6aa5329806db69df899`. The checkpoint is recorded in
+`docs/ocel-conformance-input-validation.json` and its byte-verified evidence
+archives. No reference implementation, bytecode or private state is inspected.
+The 94,293 reference calls are retained from the preceding arithmetic
+checkpoint; they are not reported as fresh calls in this step.
+
+ETOT and OTG graph JSON now preserves integer frequencies through `UINT64_MAX`
+on the validated 64-bit build, including values above the signed JSON parser's
+former limit. Values above native capacity still fail. The extension is enabled
+only for these two graph parsers; OCEL scalar import and OCDFG parsing retain
+their existing integer domain. Assertion-enabled tests cover exact ETOT
+round trips at 2^63, 2^63+1 and UINT64_MAX, an OTG maximum-count round trip,
+oversized graph rejection and unchanged OCEL scalar rejection.
+
+The conformance CLI accepts signed and nonfinite numeric parameters. The
+conformance HTTP handler already accepted signed numbers and now also accepts
+nonfinite numbers. The dedicated parsers apply to the conformance weights,
+scalar thresholds and five named OTG relation thresholds; the original numeric
+validators for other operations remain unchanged. Empty or malformed numbers
+still fail.
+
+Identical selected inputs run through 1,998 actual CLI processes and 1,998 HTTP
+requests before and after the repair. Every final whole return/error matches
+the retained, pinned-validated native result: 3,996/3,996 observations, comprising
+3,158 successful returns and 838 errors. The repair corrects 1,620 whole
+observations, including 1,324 acceptance gaps and 296 error-message gaps caused
+by premature front-door rejection. All 2,376 previously correct observations
+remain unchanged. Wide counts cover all 11-by-11 pairs through UINT64_MAX;
+profiles include finite weights, negative alpha and negative/NaN/infinite
+thresholds. A further 11 CLI processes and 11 HTTP requests validate every named
+OTG relation threshold and effective per-relation overrides. All 22 complete
+outputs match, giving 4,018 final application matches across the two cohorts.
+The nonfinite JSON-result policy remains null serialization; actual IEEE
+values remain available in the native captures.
+
+A newly linked assertion-enabled native probe executes all 94,293 graph calls
+against the repaired core. Every complete emitted observation and all 343 graph
+snapshots remain byte-identical to the pushed arithmetic checkpoint. Its one
+reused probe object is bound to its original source, compiler project and
+tlog; it is not described as newly compiled.
+
+The final build binds 662 source inputs and four edited existing C++ files.
+Three units are freshly compiled, 316 verified objects reused and all 155 core,
+server, export and native-test outputs freshly linked. The edited CLI source is
+separately compiled and linked in the application cohort. Eleven focused OCEL
+suites and all 152 assertion-enabled native suites pass. Unchanged frontend
+bindings and the inherited 164-test result are verified. The failed comparison
+helper derivation, exact SyntaxError logs and repair using a fresh helper are
+retained; no executed helper or frozen input is edited.
+
+This closes the observed graph-counter and front-door parameter restrictions.
+Broader real OCEL inputs and selectors, alternate metrics/flows, malformed or
+decoupled graph components, nonfinite weights and arbitrary parameter mappings
+remain separate gates. The preceding 90 literal Python/native zero-division
+message differences remain recorded. The catalogue stays at 46/86 packages,
+199/387 modules and 228 incomplete units, with no whole-package, module or
+full-parity promotion.

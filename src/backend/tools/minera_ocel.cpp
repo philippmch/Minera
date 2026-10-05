@@ -110,6 +110,13 @@ int main(int argc, char** argv) {
         throw std::invalid_argument(std::string(option) + " expects a finite non-negative number");
       return result;
     };
+    const auto conformance_number = [](const std::string& value, const char* option) {
+      char* end = nullptr;
+      const double result = std::strtod(value.c_str(), &end);
+      if (end == value.c_str() || end != value.c_str() + value.size())
+        throw std::invalid_argument(std::string(option) + " expects a number");
+      return result;
+    };
     const auto boolean = [](const std::string& value, const char* option) {
       if (value == "true" || value == "1" || value == "yes" || value == "on")
         return true;
@@ -812,17 +819,17 @@ int main(int argc, char** argv) {
       } else if (option == "--real-graph-kind" && i + 1 < argc) {
         real_graph_kind = argv[++i];
       } else if (option == "--alpha" && i + 1 < argc) {
-        alpha = number(argv[++i], "--alpha");
+        alpha = conformance_number(argv[++i], "--alpha");
       } else if (option == "--beta" && i + 1 < argc) {
-        beta = number(argv[++i], "--beta");
+        beta = conformance_number(argv[++i], "--beta");
       } else if (option == "--gamma" && i + 1 < argc) {
-        gamma = number(argv[++i], "--gamma");
+        gamma = conformance_number(argv[++i], "--gamma");
       } else if (option == "--delta" && i + 1 < argc) {
-        delta = number(argv[++i], "--delta");
+        delta = conformance_number(argv[++i], "--delta");
       } else if (option == "--etot-theta" && i + 1 < argc) {
-        etot_theta = number(argv[++i], "--etot-theta");
+        etot_theta = conformance_number(argv[++i], "--etot-theta");
       } else if (option == "--otg-theta" && i + 1 < argc) {
-        otg_theta = number(argv[++i], "--otg-theta");
+        otg_theta = conformance_number(argv[++i], "--otg-theta");
       } else if ((option == "--otg-theta-interaction" ||
                   option == "--otg-theta-descendants" ||
                   option == "--otg-theta-inheritance" ||
@@ -838,11 +845,11 @@ int main(int argc, char** argv) {
                         : option == "--otg-theta-cobirth"
                             ? "object_cobirth"
                             : "object_codeath";
-        otg_theta_by_relation[relation] = number(argv[++i], option.c_str());
+        otg_theta_by_relation[relation] = conformance_number(argv[++i], option.c_str());
       } else if (option == "--ocdfg-theta-activity" && i + 1 < argc) {
-        ocdfg_theta_activity = number(argv[++i], "--ocdfg-theta-activity");
+        ocdfg_theta_activity = conformance_number(argv[++i], "--ocdfg-theta-activity");
       } else if (option == "--ocdfg-theta-flow" && i + 1 < argc) {
-        ocdfg_theta_flow = number(argv[++i], "--ocdfg-theta-flow");
+        ocdfg_theta_flow = conformance_number(argv[++i], "--ocdfg-theta-flow");
       } else if (option == "--ocpn-variant" && i + 1 < argc) {
         const std::string variant = argv[++i];
         if (variant == "im") {
