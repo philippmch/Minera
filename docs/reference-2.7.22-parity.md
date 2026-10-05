@@ -10704,3 +10704,61 @@ Raw wire surrogate handling, public mutation/order, legacy alignment selectors
 and every previous independent catalogue gate remain open. Catalogue totals stay
 46/86 packages, 199/387 modules and 228 incomplete units. No whole package/module
 or full-parity promotion is made.
+
+
+## Object-centric graph conformance arithmetic checkpoint
+
+ETOT and OTG now subtract frequency counts as integers and round their exact
+ratio once. Adjacent counts above 2^53 remain distinguishable, including
+full-width size_t counters. Undefined ETOT/OTG normalization raises a native
+std::domain_error instead of returning perfect fitness. An ETOT shared edge
+with zero normative frequency also raises that error; OTG retains its observed
+infinite delta. All three native comparators accept signed weights and negative,
+NaN or infinite thresholds, using the observed arithmetic/comparison behavior.
+The OCDFG measure aggregation and fitness formula remain unchanged.
+
+`docs/ocel-conformance-graph-validation.json` binds 94,293 fresh public calls
+against pinned PM4Py 2.7.22: 343 graphs, three helper/direct/parent routes, all
+ordered pairs of 81 edge/measure patterns and 16 vertex controls per family,
+wide count controls, six OTG relation labels, weight/threshold profiles and
+actual enum parameter keys. Complete returned containers, literal exceptions
+and before/after input/parameter snapshots are retained. Ten reference modules
+have matching opaque pinned-object proofs before and after execution; their
+implementation and private state were not inspected.
+
+The identical native probe body and inputs supply 94,293 actual calls per phase.
+Every final successful return matches all fields and numeric bits: 91,173 whole
+returns, including the complete missing/additional/measure/delta diagnostics.
+All 3,120 failure categories match. The baseline matched 89,751 semantic
+observations; 4,542 are corrected, comprising 1,134 parameter rejection gaps,
+288 numeric whole-return gaps and 3,120 error-category gaps. Every previously
+correct whole native row remains byte-identical and every prior true predicate
+survives. Literal observations match 94,203/94,293: 90 Python floating-weight
+failures spell the message "float division by zero", while the native
+std::domain_error spells it "division by zero". Both raw messages and their
+false literal-match predicates remain visible; semantic error-category matching
+does not erase that distinction.
+
+Each phase also executes 368 actual OCEL CLI processes and 368 HTTP requests.
+All 736 final complete application returns/errors match the updated native core,
+including 222 error responses. All 470 previously correct application
+observations remain unchanged; 266 whole observations are corrected. The CLI
+source is freshly compiled against each frozen core. These application controls
+use signed-JSON-range counts and finite, nonnegative front-door parameters;
+their broader parser restrictions are not promoted as native API parity.
+
+The final build binds the same 662 source inputs. Only `ocel.cpp` and its test
+are edited; existing headers and CMake files remain byte-identical. Two units
+are freshly compiled, 317 verified objects reused and all 155 outputs freshly
+linked. Eleven focused OCEL and all 152 assertion-enabled native suites pass.
+The unchanged frontend source bindings and inherited 164-test result are
+verified without claiming a fresh frontend run. The original interface-packer
+failure and unused-profile probe compilation failure remain in separate frozen
+captures; their repairs use fresh helpers and directories.
+
+This is a graph-conformance arithmetic checkpoint. Wider OCEL input/selector,
+malformed graph, arbitrary metric/container and front-door parameter domains
+remain separate gates, along with the 90 literal exception-message differences.
+Python physical API identity is outside the project's semantic parity goal.
+The catalogue remains 46/86 packages, 199/387 modules and 228 incomplete units;
+no whole package/module or full-parity promotion is claimed.

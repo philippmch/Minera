@@ -5,6 +5,7 @@
 #include "ocpn_projection.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <charconv>
 #include <cctype>
 #include <cmath>
@@ -2397,9 +2398,58 @@ std::string serialize_ocel_description_json(
 
 namespace {
 
-void validate_conformance_number(double value, const char* name) {
-  if (!std::isfinite(value) || value < 0.0)
-    throw std::invalid_argument(std::string(name) + " must be finite and non-negative");
+double conformance_count_ratio(std::size_t numerator, std::size_t denominator) {
+  if (denominator == 0) throw std::domain_error("division by zero");
+  constexpr std::uint64_t exact_double_limit = std::uint64_t{1} << 53;
+  if (numerator <= exact_double_limit && denominator <= exact_double_limit)
+    return static_cast<double>(numerator) / static_cast<double>(denominator);
+
+  // Round the integer quotient itself. Converting the operands separately
+  // can lose a one-event difference or change the last bit of the ratio.
+  const std::uint64_t divisor = denominator;
+  const std::uint64_t quotient = numerator / divisor;
+  std::uint64_t remainder = numerator % divisor;
+  const auto next_bit = [&]() {
+    // Double the remainder without overflowing a full-width counter.
+    const bool bit = remainder >= divisor - remainder;
+    remainder = bit ? remainder - (divisor - remainder) : remainder + remainder;
+    return bit;
+  };
+  int exponent;
+  std::uint64_t significand;
+  if (quotient != 0) {
+    exponent = static_cast<int>(std::bit_width(quotient)) - 1;
+    if (exponent > 52) {
+      const int shift = exponent - 52;
+      significand = quotient >> shift;
+      const auto discarded = quotient & ((std::uint64_t{1} << shift) - 1);
+      const auto halfway = std::uint64_t{1} << (shift - 1);
+      if (discarded > halfway ||
+          (discarded == halfway && (remainder != 0 || (significand & 1))))
+        ++significand;
+      return std::ldexp(static_cast<double>(significand), exponent - 52);
+    }
+    significand = quotient;
+    for (int i = exponent; i < 52; ++i)
+      significand = (significand << 1) | next_bit();
+  } else {
+    if (numerator == 0) return 0.0;
+    exponent = -1;
+    while (!next_bit()) --exponent;
+    significand = 1;
+    for (int i = 0; i < 52; ++i)
+      significand = (significand << 1) | next_bit();
+  }
+  if (remainder > divisor - remainder ||
+      (remainder == divisor - remainder && (significand & 1)))
+    ++significand;
+  return std::ldexp(static_cast<double>(significand), exponent - 52);
+}
+
+double conformance_count_delta(std::size_t real, std::size_t normative) {
+  return conformance_count_ratio(real >= normative ? real - normative
+                                                   : normative - real,
+                                 normative);
 }
 
 void write_conformance_number(std::ostringstream& out, double value) {
@@ -2470,10 +2520,6 @@ std::size_t ocdfg_flow_measure(const OcdfgGraph& graph,
 EtotConformanceResult compare_etot(const EtotGraph& real,
                                    const EtotGraph& normative,
                                    const EtotConformanceOptions& options) {
-  validate_conformance_number(options.alpha, "ETOT alpha");
-  validate_conformance_number(options.beta, "ETOT beta");
-  validate_conformance_number(options.gamma, "ETOT gamma");
-  validate_conformance_number(options.theta_relative, "ETOT theta_relative");
   const std::set<std::string> real_activities(real.activities.begin(),
                                                real.activities.end());
   const std::set<std::string> normative_activities(normative.activities.begin(),
@@ -2508,11 +2554,7 @@ EtotConformanceResult compare_etot(const EtotGraph& real,
     if (!real_edges.count(edge)) continue;
     const auto normative_count = normative_frequency.at(edge);
     const auto real_count = real_frequency.at(edge);
-    const double delta = normative_count == 0
-                             ? std::numeric_limits<double>::infinity()
-                             : std::abs(static_cast<double>(real_count) -
-                                        static_cast<double>(normative_count)) /
-                                   static_cast<double>(normative_count);
+    const double delta = conformance_count_delta(real_count, normative_count);
     result.relative_frequency_delta[edge] = delta;
     if (delta > options.theta_relative) ++relative_mismatches;
   }
@@ -2522,7 +2564,7 @@ EtotConformanceResult compare_etot(const EtotGraph& real,
       options.beta * static_cast<double>(normative_edges.size()) +
       options.gamma * static_cast<double>(normative_edges.size());
   if (normalizer == 0.0) {
-    result.fitness = 1.0;
+    throw std::domain_error("division by zero");
   } else {
     const double numerator =
         options.alpha * static_cast<double>(result.missing_activities.size() +
@@ -2543,14 +2585,6 @@ EtotConformanceResult compare_etot(const Ocel& real,
 OtgConformanceResult compare_otg(const OtgGraph& real,
                                   const OtgGraph& normative,
                                   const OtgConformanceOptions& options) {
-  validate_conformance_number(options.alpha, "OTG alpha");
-  validate_conformance_number(options.beta, "OTG beta");
-  validate_conformance_number(options.gamma, "OTG gamma");
-  validate_conformance_number(options.theta, "OTG theta");
-  for (const auto& [relation, theta] : options.theta_by_relation) {
-    (void)relation;
-    validate_conformance_number(theta, "OTG relation theta");
-  }
   const std::set<std::string> real_types(real.object_types.begin(),
                                          real.object_types.end());
   const std::set<std::string> normative_types(normative.object_types.begin(),
@@ -2580,9 +2614,7 @@ OtgConformanceResult compare_otg(const OtgGraph& real,
     const auto real_count = real_frequency.at(edge);
     const double delta = normative_count == 0
                              ? std::numeric_limits<double>::infinity()
-                             : std::abs(static_cast<double>(real_count) -
-                                        static_cast<double>(normative_count)) /
-                                   static_cast<double>(normative_count);
+                             : conformance_count_delta(real_count, normative_count);
     const auto relation = std::get<1>(edge);
     const auto theta_it = options.theta_by_relation.find(relation);
     const double theta = theta_it == options.theta_by_relation.end()
@@ -2598,7 +2630,7 @@ OtgConformanceResult compare_otg(const OtgGraph& real,
       options.beta * static_cast<double>(normative_edges.size()) +
       options.gamma * static_cast<double>(normative_edges.size());
   if (normalizer == 0.0) {
-    result.fitness = 1.0;
+    throw std::domain_error("division by zero");
   } else {
     const double numerator =
         options.alpha * static_cast<double>(result.missing_object_types.size()) +
@@ -2618,12 +2650,6 @@ OtgConformanceResult compare_otg(const Ocel& real,
 OcdfgConformanceResult compare_ocdfg(const OcdfgGraph& real,
                                      const OcdfgGraph& normative,
                                      const OcdfgConformanceOptions& options) {
-  validate_conformance_number(options.theta_activity, "OCDFG theta_activity");
-  validate_conformance_number(options.theta_flow, "OCDFG theta_flow");
-  validate_conformance_number(options.alpha, "OCDFG alpha");
-  validate_conformance_number(options.beta, "OCDFG beta");
-  validate_conformance_number(options.gamma, "OCDFG gamma");
-  validate_conformance_number(options.delta, "OCDFG delta");
   const std::set<std::string> real_activities(real.activities.begin(),
                                                real.activities.end());
   const std::set<std::string> normative_activities(normative.activities.begin(),
