@@ -10963,3 +10963,84 @@ and other parameter mappings remain independent gates. Prior floating-weight
 literal error differences and native numeric limits remain documented. The
 catalogue remains 46/86 packages, 199/387 modules and 228 incomplete units;
 no whole-package, module or full-parity promotion is made.
+
+
+## OCDFG real-OCEL discovery and conformance checkpoint (2026-10-05)
+
+Evidence: `docs/ocdfg-log-validation.json` and its byte-round-tripped
+`docs/ocdfg-log-evidence-*.jsonl.gz` parts. This is a normal commit/push step
+from `353e4091d1ff7afc23cfc6cf65f14f0961e716a2`. The reference remains PM4Py
+2.7.22 at `0715c31f3f1d85924107d6aa5329806db69df899`.
+
+The actual public log capture from that parent is now compared in full across
+all three families. It constructs 549 OCELs: all 512 three-event by three-object
+incidence matrices and 37 event/object/time-order, tied-time, duplicate-qualifier,
+empty/unused-record and separator/Unicode/quoted-label controls. Each native
+phase executes all 4,941 discovery and 138,348 actual real-OCEL conformance calls
+over direct/parent public routes, selector profiles, normative anchors and
+default/finite/NaN weights. All 32 public normative graphs are independently
+adapted and checked in full, including ordered association bags. Fifteen opaque
+pinned-module proofs agree before/after. No reference implementation, bytecode
+or private state is inspected.
+
+OCDFG discovery now retains duplicate event/object relation rows. Duplicate
+qualifiers can create self-flows; activity association lists preserve raw
+relation order and multiplicity, and boundary association lists preserve the
+object-group order. Events, unique objects and flow couples/triples retain their
+observed set semantics. Real-OCEL conformance uses canonical activity/type labels,
+matching the public wrapper's treatment of discovery selector keys, while
+explicitly selected graphs still use the graph overload.
+
+Missing-column checks now use declared table schemas. `OcelTableColumns` carries
+optional event/object/relation column lists; absent declarations infer columns
+from canonical fields, attributes and type catalogs. Empty declared lists remain
+distinct from absent declarations. The optional `minera:tableColumns` JSON
+extension round-trips through standard and classic serialization. Native inputs
+add only the column names actually captured from the public OCEL input tables;
+the original JSON records and attributes are retained. The old core ignores
+this extension and reproduces all original baseline result and snapshot bytes.
+After repair, all 1,647 public table bindings and native record orders agree;
+removing only the column extension restores every old input snapshot. Missing
+selectors raise native out_of_range, explicitly mapped to public KeyError, with
+literal messages checked separately.
+
+Before repair, 59,050/143,289 complete observations match semantically. After
+repair, all 143,289 match, closing 84,239 OCDFG observation gaps; the 59,050
+preceding correct native rows remain byte-identical and no prior true predicate
+is lost. All discovery fields, relation-list order/multiplicity, oriented flows,
+conformance diagnostics, fitness/delta bits and acceptance are checked separately.
+All 4,941 discovery parameter bindings and 138,348 conformance parameter bit
+bindings agree. Literal matches are 142,191/143,289: the 1,098 existing ETOT
+floating division-error wording differences remain visible, without being
+converted into matches. ETOT and OTG retain every preceding semantic match.
+
+Each application phase executes 2,961 real CLI processes and 2,961 multipart
+HTTP requests: 47 log controls, all nine discovery family/selector combinations,
+two conformance normative anchors per family, all OCDFG selector profiles and
+default/finite/NaN weights. All 5,922 final whole success/error envelopes match
+the pinned-checked native observations. 2,094 prior
+whole application mismatches are corrected and all
+3,828 previous whole matches are preserved.
+
+The public header change triggers a fresh compile of all 319 existing consumers
+from 662 frozen source bindings. The first compiled build's focused OCEL suite
+fails because an old assertion catches invalid_argument for a now-correct
+out_of_range; an actual diagnostic records the uncaught missing_type exception.
+That build and diagnostic remain retained. The final build recompiles the
+corrected test unit and reuses 318 verified first-build objects with identical
+headers, sources and original target settings, then relinks all 155 outputs.
+Eleven focused and all 152 full assertion-enabled native suites pass. Both log
+observation probes and both CLI units are freshly compiled. The original graph
+and weight probes are also freshly compiled against the new header; all 94,293
+graph and 333,120 weight observations, and both 343-graph snapshot sets, remain
+byte-identical. The inherited 164-test frontend result and unchanged source
+bindings are verified.
+
+This closes the captured OCDFG relation, selector-forwarding and missing-column
+gaps across discovery and real-OCEL conformance. Sparse/non-string selected
+attributes, arbitrary identifiers and constructor aliases, decoupled tables,
+larger lifetimes, performance/business-hour profiles, normative-OCEL application
+fallbacks and other parameter mappings remain independent gates. Prior literal
+floating-weight error wording and native numeric/string limits remain open.
+The catalogue remains 46/86 packages, 199/387 modules and 228 incomplete units;
+no whole-package, module or full-parity promotion is made.

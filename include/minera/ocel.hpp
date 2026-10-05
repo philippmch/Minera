@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -66,6 +67,14 @@ struct OcelObjectChange {
 using OcelTypeSchema = std::map<std::string, std::string>;
 using OcelTypeCatalog = std::map<std::string, OcelTypeSchema>;
 
+struct OcelTableColumns {
+  // Declared table schemas survive empty tables and row filtering. Absent
+  // declarations infer columns from the canonical fields and attributes.
+  std::optional<std::vector<std::string>> events;
+  std::optional<std::vector<std::string>> objects;
+  std::optional<std::vector<std::string>> relations;
+};
+
 struct Ocel {
   std::vector<OcelEvent> events;
   std::vector<OcelObject> objects;
@@ -76,6 +85,7 @@ struct Ocel {
   std::map<std::string, OcelValue> globals;
   OcelTypeCatalog event_type_attributes;
   OcelTypeCatalog object_type_attributes;
+  OcelTableColumns table_columns;
 };
 
 using OCEL = Ocel;
@@ -246,8 +256,9 @@ struct OcdfgConformanceOptions {
   double beta = 1.0;
   double gamma = 1.0;
   double delta = 1.0;
-  // Direct OCEL inputs use these selectors for the discovery projection.
-  // Empty selectors retain the canonical activity and object-type fields.
+  // Retained for source compatibility. Direct OCEL comparisons use canonical
+  // labels. To compare a selected projection, discover it with explicit
+  // options and pass that graph to the graph overload.
   std::string activity_attribute;
   std::string object_type_attribute;
 };
