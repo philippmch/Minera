@@ -10824,3 +10824,70 @@ remain separate gates. The preceding 90 literal Python/native zero-division
 message differences remain recorded. The catalogue stays at 46/86 packages,
 199/387 modules and 228 incomplete units, with no whole-package, module or
 full-parity promotion.
+
+
+### OCDFG fitness clipping for nonfinite and overflowing weights
+
+The fresh PM4Py 2.7.22 public capture is pinned to
+`0715c31f3f1d85924107d6aa5329806db69df899`. Complete observations, exact numeric
+bits, literal exceptions and before/after input snapshots are retained in
+`docs/ocel-conformance-weight-validation.json` and its byte-verified archives.
+Only public APIs, fields, enums, builtins and opaque installed-module hash proofs
+are used; no reference implementation, bytecode or private state is inspected.
+
+The capture executes 333,120 actual calls through the helper, direct variant and
+parent dispatcher routes. Each weight is tested with NaN, positive and negative
+infinity, a negative finite value, the maximum finite double and the minimum
+positive subnormal. Mixed infinities, negative weights, cancellation, weighted
+and default controls are also captured. Ordinary graphs are compared against
+five anchors in both directions, with all self-pairs, all sixteen vertex-control
+pairs and all eleven-by-eleven wide-count pairs. The frozen catalogue contains
+343 graph snapshots; 313 graphs participate in these weight comparisons. All
+input/parameter snapshots and ten opaque module proofs remain unchanged.
+
+The preceding core matches 275,679/333,120 observations semantically. Its 57,441
+mismatches are confined to OCDFG fitness: weighted arithmetic produces NaN and
+the native clamp preserves it, whereas the public result is positive zero.
+The repair clips that undefined result to the lower bound. Finite clipping and
+the zero-normalizer fallback remain intact. Assertion-enabled tests exercise
+each nonfinite weight on identical, missing and empty graphs, retain graph
+diagnostics, check positive zero, and cover finite-weight overflow with an
+identical-graph control.
+
+All 333,120 final observations match semantically: all 311,100 successful
+whole results match every returned field and exact fitness bits, and all 22,020
+errors match their category. Every previously correct whole native row is
+byte-identical; every prior true predicate survives. NaN class and raw bit
+identity are recorded separately rather than concealing payload differences;
+in this capture, every successful final fitness also matches its raw bits.
+Literal observations match 312,258/333,120. The remaining 20,862 differences
+are Python floating-weight errors spelling "float division by zero", while the
+native error spells "division by zero". These literal failures and both original
+messages stay visible. The earlier 90 message differences remain in their
+retained parent evidence.
+
+Both application phases execute 3,024 real CLI processes and 3,024 HTTP
+requests over all ordered pairs of six controls per family and every recorded
+weight profile. All 6,048 final complete outputs/errors match the repaired,
+pinned-validated native capture, including 5,460 returns and 588 errors.
+The repair corrects 1,126 whole application outputs; all 4,922 previously
+correct observations remain unchanged. JSON nonfinite results from ETOT/OTG
+retain the existing null serializer policy; their actual IEEE values remain
+separately available in the native observations.
+
+The final build binds 662 source inputs and two edited existing C++ files.
+Two units are freshly compiled, 317 verified objects reused and all 155 core,
+server, export and native-test outputs freshly linked. Eleven focused OCEL
+suites and all 152 assertion-enabled native suites pass. Native weight probes
+and the unchanged CLI source are freshly compiled in both phases. A separately
+relinked original assertion-enabled probe also replays all 94,293 preceding
+graph observations and all 343 graph snapshots byte-for-byte. The original
+probe object, source, project and tlog stay explicitly bound. Unchanged frontend
+bindings and the inherited 164-test result are verified.
+
+This closes the observed OCDFG nonfinite/overflow fitness-clipping gap. Wider
+real OCEL inputs and selectors, alternate flows and metric containers,
+malformed or decoupled graph components and arbitrary parameter mappings remain
+independent gates. Literal error-message differences are not promoted as exact
+diagnostic parity. The catalogue remains 46/86 packages, 199/387 modules and
+228 incomplete units; no whole-package, module or full-parity promotion is made.

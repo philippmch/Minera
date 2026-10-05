@@ -2727,7 +2727,8 @@ OcdfgConformanceResult compare_ocdfg(const OcdfgGraph& real,
         options.beta * static_cast<double>(result.missing_flows.size()) +
         options.gamma * static_cast<double>(non_conforming_activities) +
         options.delta * static_cast<double>(non_conforming_flows);
-    result.fitness = std::clamp(1.0 - numerator / normalizer, 0.0, 1.0);
+    // Undefined weighted arithmetic clips to the lower bound as well.
+    result.fitness = std::min(1.0, std::max(0.0, 1.0 - numerator / normalizer));
   }
   return result;
 }
