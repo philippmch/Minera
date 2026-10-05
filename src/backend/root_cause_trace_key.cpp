@@ -28,7 +28,7 @@ void project(Attributes& attributes, const std::string& text,
              const std::optional<EventAttribute>& stored, const char* canonical) {
   const auto key = !source.empty() ? source
       : stored && !stored->first_class_source_key.empty() ? stored->first_class_source_key
-      : stored && !stored->key.empty() ? stored->key : std::string(canonical);
+      : stored ? stored->key : std::string(canonical);
   if (state == FirstClassAttributeState::kMissing && (stored || text.empty())) return;
   EventAttribute value = stored ? normalized(*stored) : EventAttribute{key, text};
   if (state == FirstClassAttributeState::kNull) value.is_null = true;

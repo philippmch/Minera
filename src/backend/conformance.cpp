@@ -1757,7 +1757,6 @@ std::string selected_activity(const Event& event,
 
 ReplayActivity selected_replay_activity(
     const Event& event, std::string_view selector) {
-  if (selector.empty()) selector = "concept:name";
   const EventAttribute* selected = nullptr;
   int priority = 0;
   std::size_t matches = 0;
@@ -1779,13 +1778,16 @@ ReplayActivity selected_replay_activity(
   if (selected) {
     return replay_activity_from_attribute(*selected);
   }
-  const bool selected_first_class_activity =
-      standard_activity_attribute(selector) ||
-      (!event.activity_source_key.empty() &&
-       event.activity_source_key == selector) ||
-      (event.activity_attribute &&
-       (event.activity_attribute->key == selector ||
-        event.activity_attribute->first_class_source_key == selector));
+  // A first-class projection represents its source key. Only legacy text
+  // without source metadata represents the default concept:name key.
+  const std::string_view projected_key = !event.activity_source_key.empty()
+      ? std::string_view(event.activity_source_key)
+      : event.activity_attribute
+          ? !event.activity_attribute->first_class_source_key.empty()
+              ? std::string_view(event.activity_attribute->first_class_source_key)
+              : std::string_view(event.activity_attribute->key)
+          : std::string_view("concept:name");
+  const bool selected_first_class_activity = selector == projected_key;
   if (selected_first_class_activity) {
     if (event.activity_state == FirstClassAttributeState::kNull)
       return {std::nullopt, std::nullopt, "null"};
@@ -3518,9 +3520,7 @@ ConformanceResult check_conformance(const EventLog& event_log,
     throw std::invalid_argument("unsupported token replay variant");
   }
   const Replayer replayer(net, options.initial_marking, options.final_marking, &options);
-  const std::string activity_attribute =
-      options.activity_attribute.empty() ? "concept:name"
-                                         : options.activity_attribute;
+  const auto& activity_attribute = options.activity_attribute;
   const auto variants = collect_replay_variants(event_log, replayer,
                                           activity_attribute);
 
@@ -3615,9 +3615,7 @@ TokenReplayDiagnostics replay_token_diagnostics(
     throw std::invalid_argument("unsupported token replay variant");
   }
   const Replayer replayer(net, options.initial_marking, options.final_marking, &options);
-  const std::string activity_attribute =
-      options.activity_attribute.empty() ? "concept:name"
-                                         : options.activity_attribute;
+  const auto& activity_attribute = options.activity_attribute;
   TokenReplayDiagnostics result;
   result.trace_count = event_log.trace_count();
   result.places.resize(replayer.initial_marking().size());
@@ -3671,9 +3669,7 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
   if (!valid_token_replay_variant(options.variant))
     throw std::invalid_argument("unsupported token replay variant");
   const Replayer replayer(net, options.initial_marking, options.final_marking, &options, full_result);
-  const auto activity_attribute = options.activity_attribute.empty()
-                                      ? std::string("concept:name")
-                                      : options.activity_attribute;
+  const auto& activity_attribute = options.activity_attribute;
   if (options.variant == TokenReplayVariant::kBackwards) {
     // Resolve a whole trace before validating its variant key, and finish
     // validating the log before any trace can fail its fitness calculation.
@@ -3769,8 +3765,7 @@ TokenReplayResult replay_token_result(
       listed[place] = true;
     }
   }
-  const auto selector = options.activity_attribute.empty()
-      ? std::string("concept:name") : options.activity_attribute;
+  const auto& selector = options.activity_attribute;
   // Forward replay resolves selected keys across the complete log before
   // constructing hashable variants, including when grouping is disabled.
   for (const auto& trace : log.traces)

@@ -998,6 +998,12 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       const bool is_inductive = id == "inductive";
       const bool is_alpha = id == "alpha";
       auto replay_options = params.token_replay;
+      if (!params.token_replay_activity_attribute_supplied) {
+        if (is_inductive)
+          replay_options.activity_attribute = params.inductive.activity_key;
+        else if (is_alpha)
+          replay_options.activity_attribute = params.alpha.activity_attribute;
+      }
       if (id == "heuristic" &&
           replay_options.activity_attribute == "concept:name") {
         replay_options.activity_attribute = params.heuristic.activity_attribute;

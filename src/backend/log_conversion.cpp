@@ -139,7 +139,9 @@ std::vector<EventAttribute> event_fields(const Event& event) {
   add_projection(fields, event.activity_source_key, kActivityKey,
                  event.activity, AttributeKind::kString, event.activity_state,
                  FirstClassAttributeRole::kActivity,
-                 event.activity_attribute ? &*event.activity_attribute : nullptr);
+                 event.activity_attribute ? &*event.activity_attribute : nullptr,
+                 event.activity_source_key.empty() && event.activity_attribute &&
+                     event.activity_attribute->key.empty());
   add_projection(fields, event.timestamp_source_key, kTimestampKey,
                  event.timestamp, AttributeKind::kDate, event.timestamp_state,
                  FirstClassAttributeRole::kTimestamp,
@@ -604,7 +606,7 @@ Event record_to_event(const LogConversionRecord& record,
                                 std::string& source_key,
                                 std::string& selected_key,
                                 std::optional<EventAttribute>& metadata) {
-    if (key.empty() || !selected_key.empty()) return;
+    if (key.empty() || metadata) return;
     const auto found = std::find_if(
         record.fields.begin(), record.fields.end(), [&](const auto& field) {
           return field.first_class_role == FirstClassAttributeRole::kNone &&
@@ -635,7 +637,7 @@ Event record_to_event(const LogConversionRecord& record,
     // Empty selected keys are valid literal mapping keys. They also remain
     // empty when the corresponding first-class slot was not selected, so do
     // not mistake the sentinel for a match with every empty-key field.
-    if ((!selected_activity_key.empty() &&
+    if ((event.activity_attribute &&
          field.key == selected_activity_key) ||
         (!selected_timestamp_key.empty() &&
          field.key == selected_timestamp_key) ||
@@ -645,7 +647,7 @@ Event record_to_event(const LogConversionRecord& record,
          field.key == selected_lifecycle_key))
       continue;
     if ((field.key == kActivityKey || field.key == "activity") &&
-        selected_activity_key.empty()) {
+        !event.activity_attribute) {
       assign_first_class(field, event.activity, event.activity_state,
                          event.activity_source_key, selected_activity_key,
                          event.activity_attribute);
