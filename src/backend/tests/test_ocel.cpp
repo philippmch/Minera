@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <cmath>
+#include <limits>
+#include <stdexcept>
 #include <string>
 
 #include "minera/conformance.hpp"
@@ -397,6 +400,55 @@ int main() {
          std::string::npos);
   const auto etot_direct = minera::compare_etot(log, minera::discover_etot_classic(log));
   assert(etot_direct.fitness == 1.0);
+  // Undefined ETOT normalization and zero normative edge frequencies must
+  // remain errors rather than reporting a perfect comparison.
+  const auto expect_division_by_zero = [](const auto& compare) {
+    bool rejected = false;
+    try {
+      compare();
+    } catch (const std::domain_error& error) {
+      rejected = std::string(error.what()) == "division by zero";
+    }
+    assert(rejected);
+  };
+  expect_division_by_zero([] { (void)minera::compare_etot(
+      minera::EtotGraph{}, minera::EtotGraph{}); });
+  const minera::EtotGraph zero_frequency_etot{
+      {"A"}, {"T"}, {{"A", "T", 0}}};
+  expect_division_by_zero([&] { (void)minera::compare_etot(
+      zero_frequency_etot, zero_frequency_etot); });
+  minera::EtotConformanceOptions zero_weights_etot;
+  zero_weights_etot.alpha = zero_weights_etot.beta = zero_weights_etot.gamma = 0;
+  expect_division_by_zero([&] { (void)minera::compare_etot(
+      etot_equal, etot_norm, zero_weights_etot); });
+
+  // Signed weights and negative/NaN/infinite thresholds are accepted by
+  // the comparator. IEEE comparisons determine whether a delta is flagged.
+  auto unrestricted_etot = minera::EtotConformanceOptions{};
+  unrestricted_etot.alpha = -1;
+  unrestricted_etot.theta_relative = std::numeric_limits<double>::quiet_NaN();
+  assert(minera::compare_etot(etot_equal, etot_norm, unrestricted_etot).fitness == 1);
+  unrestricted_etot.theta_relative = -1;
+  assert(minera::compare_etot(etot_equal, etot_norm, unrestricted_etot).fitness == -1);
+  unrestricted_etot.theta_relative = std::numeric_limits<double>::infinity();
+  assert(minera::compare_etot(etot_equal, etot_norm, unrestricted_etot).fitness == 1);
+
+  if constexpr (std::numeric_limits<std::size_t>::digits >= 64) {
+    const std::size_t wide_count = std::uint64_t{1} << 53;
+    const minera::EtotGraph wide_real{{"A"}, {"T"}, {{"A", "T", wide_count}}};
+    const minera::EtotGraph wide_norm{{"A"}, {"T"}, {{"A", "T", wide_count + 1}}};
+    minera::EtotConformanceOptions exact_threshold;
+    exact_threshold.theta_relative = 0;
+    const auto wide_result = minera::compare_etot(wide_real, wide_norm, exact_threshold);
+    assert(wide_result.relative_frequency_delta.at({"A", "T"}) == 0x1.fffffffffffffp-54);
+    assert(wide_result.fitness == 0.75);
+    auto maximum_real = wide_real;
+    maximum_real.edges.front().frequency = std::numeric_limits<std::size_t>::max();
+    auto one_norm = wide_norm;
+    one_norm.edges.front().frequency = 1;
+    assert(minera::compare_etot(maximum_real, one_norm)
+               .relative_frequency_delta.at({"A", "T"}) == 0x1p64);
+  }
   assert(etot_direct.missing_edges.empty() &&
          etot_direct.additional_edges.empty());
 
@@ -424,6 +476,30 @@ int main() {
          std::string::npos);
   const auto otg_direct = minera::compare_otg(log, minera::discover_otg_classic(log));
   assert(otg_direct.fitness == 1.0);
+  expect_division_by_zero([] { (void)minera::compare_otg(
+      minera::OtgGraph{}, minera::OtgGraph{}); });
+  const minera::OtgGraph zero_frequency_otg{
+      {"T", "U"}, {{"T", "object_interaction", "U", 0}}};
+  const auto zero_otg_result = minera::compare_otg(zero_frequency_otg, zero_frequency_otg);
+  assert(zero_otg_result.fitness == 0.75);
+  assert(std::isinf(zero_otg_result.non_conforming_edges.at(
+      {"T", "object_interaction", "U"})));
+  auto unrestricted_otg = minera::OtgConformanceOptions{};
+  unrestricted_otg.theta_by_relation["object_interaction"] =
+      std::numeric_limits<double>::quiet_NaN();
+  assert(minera::compare_otg(zero_frequency_otg, zero_frequency_otg, unrestricted_otg)
+             .non_conforming_edges.empty());
+  if constexpr (std::numeric_limits<std::size_t>::digits >= 64) {
+    const std::size_t wide_count = std::uint64_t{1} << 53;
+    const minera::OtgGraph wide_real{{"T", "U"}, {{"T", "object_interaction", "U", wide_count}}};
+    const minera::OtgGraph wide_norm{{"T", "U"}, {{"T", "object_interaction", "U", wide_count + 1}}};
+    minera::OtgConformanceOptions exact_threshold;
+    exact_threshold.theta = 0;
+    const auto wide_result = minera::compare_otg(wide_real, wide_norm, exact_threshold);
+    assert(wide_result.non_conforming_edges.at({"T", "object_interaction", "U"}) ==
+           0x1.fffffffffffffp-54);
+    assert(wide_result.fitness == 0.75);
+  }
   assert(otg_direct.missing_edges.empty() && otg_direct.additional_edges.empty());
 
   minera::OcdfgGraph ocdfg_norm;
@@ -458,6 +534,15 @@ int main() {
   assert(ocdfg_direct.fitness == 1.0);
   assert(ocdfg_direct.missing_activities.empty() &&
          ocdfg_direct.missing_flows.empty());
+  minera::OcdfgConformanceOptions unrestricted_ocdfg;
+  unrestricted_ocdfg.theta_activity = -1;
+  unrestricted_ocdfg.theta_flow = std::numeric_limits<double>::quiet_NaN();
+  const auto signed_ocdfg = minera::compare_ocdfg(ocdfg_norm, ocdfg_norm, unrestricted_ocdfg);
+  assert(signed_ocdfg.non_conforming_activities_in_measure.size() == 2);
+  assert(signed_ocdfg.non_conforming_flows_in_measure.empty());
+  unrestricted_ocdfg.alpha = unrestricted_ocdfg.beta =
+      unrestricted_ocdfg.gamma = unrestricted_ocdfg.delta = 0;
+  assert(minera::compare_ocdfg(ocdfg_norm, ocdfg_norm, unrestricted_ocdfg).fitness == 1);
 
   minera::OcpnDiscoveryOptions ocpn_options;
   ocpn_options.double_arc_threshold = 0.8;
