@@ -491,6 +491,74 @@ void numeric_case_ordering_matches_inferred_index() {
             "inferred key collisions keep the later exact group");
   }
 }
+
+void activity_errors_precede_backwards_fitness() {
+  const auto net = to_petri_net(ProcessTree({"A"}, ProcessTreeNode::leaf(0)));
+  const auto expect_error = [&](const EventLog& log, TokenReplayOptions options,
+                                const std::string& expected) {
+    try {
+      if (options.variant == TokenReplayVariant::kBackwards)
+        (void)replay_token_traces(log, net, options);
+      else
+        (void)replay_token_result(log, net, options);
+    } catch (const std::invalid_argument& error) {
+      require(error.what() == expected, "selected activity error precedence");
+      return;
+    }
+    throw std::runtime_error("selected activity error must precede replay");
+  };
+  for (const auto selector : {"concept:name", "chosen"}) {
+    Event valid;
+    valid.attributes = {{selector, "A"}};
+    Event missing;
+    missing.attributes = {{selector == std::string("chosen") ? "concept:name" : "chosen", "A"}};
+    for (const auto container : {AttributeContainerKind::kList,
+                                AttributeContainerKind::kContainer}) {
+      Event unhashable;
+      EventAttribute cell{selector, ""};
+      cell.container = container;
+      cell.children = {{"x", "A"}};
+      unhashable.attributes.push_back(cell);
+      for (const auto variant : {TokenReplayVariant::kForward, TokenReplayVariant::kBackwards}) {
+        for (const auto disable : {std::optional<bool>{}, std::optional<bool>{false},
+                                   std::optional<bool>{true}}) {
+          TokenReplayOptions options;
+          options.variant = variant;
+          options.activity_attribute = selector;
+          options.disable_variants = disable;
+          const std::string missing_error =
+              "conformance: event is missing activity attribute '" + std::string(selector) + "'";
+          Trace valid_trace;
+          valid_trace.events = {valid};
+          Trace missing_trace;
+          missing_trace.events = {missing};
+          Trace mixed_trace;
+          mixed_trace.events = {unhashable, missing};
+          Trace unhashable_trace;
+          unhashable_trace.events = {unhashable};
+          EventLog log;
+          log.traces = {Trace{}, valid_trace, missing_trace};
+          expect_error(log, options, missing_error);
+          log.traces = {Trace{}, mixed_trace};
+          expect_error(log, options, missing_error);
+          log.traces = {Trace{}, missing_trace, unhashable_trace};
+          expect_error(log, options, missing_error);
+          log.traces = {Trace{}, unhashable_trace, missing_trace};
+          expect_error(log, options, variant == TokenReplayVariant::kForward
+              ? missing_error : "unhashable activity variant key");
+          log.traces = {Trace{}, unhashable_trace};
+          expect_error(log, options, "unhashable activity variant key");
+          if (variant == TokenReplayVariant::kBackwards) {
+            log.traces = {Trace{}, valid_trace};
+            rejects_undefined_backwards_fitness(
+                [&] { (void)replay_token_traces(log, net, options); },
+                "empty valid backwards trace still has undefined fitness");
+          }
+        }
+      }
+    }
+  }
+}
 }  // namespace
 
 int main() {
@@ -502,6 +570,7 @@ int main() {
     transported_nulls_and_ambiguity();
     null_cases_and_activities_keep_distinct_semantics();
     numeric_case_ordering_matches_inferred_index();
+    activity_errors_precede_backwards_fitness();
     std::cout << "Token replay event-data tests passed\n";
     return 0;
   } catch (const std::exception& error) {
