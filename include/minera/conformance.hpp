@@ -312,6 +312,10 @@ struct TokenReplayOptions {
   // IDs can represent parallel arcs. Automatic forward structural paths use
   // this order. Supplied path caches retain their explicit paths.
   std::optional<std::vector<std::vector<std::size_t>>> place_outgoing_transition_order;
+  // Root-place iteration for the full PLTR collection. When present, this must
+  // contain every root place exactly once; detached marking identities are not
+  // included. Absence retains native place index order.
+  std::optional<std::vector<std::size_t>> place_fitness_order;
 };
 
 struct TokenReplayTraceReference {
@@ -348,6 +352,8 @@ struct TokenReplayPltrFitness {
   // Visible transitions, including those never examined during replay.
   std::vector<TokenReplayTransitionFitness> transitions;
   std::vector<TokenReplayUnknownFitness> unknown_activities;
+  // Collection iteration; places remain addressed by their native indices.
+  std::optional<std::vector<std::size_t>> place_order;
 };
 
 struct TokenReplayResult {

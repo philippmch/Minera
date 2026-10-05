@@ -3740,6 +3740,16 @@ TokenReplayResult replay_token_result(
   const auto transition_name_values = detail::replay_transition_names(
       options.nullable_transition_names, options.transition_names, net);
   detail::validate_forward_transition_name_order(transition_name_values);
+  if (options.place_fitness_order) {
+    std::vector<bool> listed(net.place_count(), false);
+    if (options.place_fitness_order->size() != listed.size())
+      throw std::invalid_argument("place_fitness_order must contain every root place exactly once");
+    for (const auto place : *options.place_fitness_order) {
+      if (place >= listed.size() || listed[place])
+        throw std::invalid_argument("place_fitness_order must contain every root place exactly once");
+      listed[place] = true;
+    }
+  }
   const auto selector = options.activity_attribute.empty()
       ? std::string("concept:name") : options.activity_attribute;
   struct FullVariant {
@@ -3891,6 +3901,7 @@ TokenReplayResult replay_token_result(
 
   auto& fitness = result.pltr_fitness.emplace();
   fitness.places.resize(net.place_count());
+  fitness.place_order = options.place_fitness_order;
   std::vector<std::optional<std::size_t>> transition_slots(net.transitions().size());
   for (std::size_t t = 0; t < net.transitions().size(); ++t) {
     const auto& transition = net.transitions()[t];
@@ -3920,7 +3931,14 @@ TokenReplayResult replay_token_result(
     if (std::find(members.begin(), members.end(), reference) == members.end())
       members.push_back(reference);
   };
-  for (std::size_t group = 0; group < rows.size(); ++group) {
+  std::vector<std::size_t> fitness_groups;
+  fitness_groups.reserve(rows.size());
+  for (const auto variant : order) {
+    if (grouped) fitness_groups.push_back(variant);
+    else fitness_groups.insert(fitness_groups.end(), variants[variant].sources.begin(),
+                               variants[variant].sources.end());
+  }
+  for (const auto group : fitness_groups) {
     const auto& row = rows[group];
     const auto& trace = replay_log.traces[group];
     auto& bucket = trace_buckets[root_cause_trace_fingerprint(trace)];
