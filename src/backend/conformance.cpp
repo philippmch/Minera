@@ -3893,7 +3893,8 @@ TokenReplayResult replay_token_result(
   fitness.places.resize(net.place_count());
   std::vector<std::optional<std::size_t>> transition_slots(net.transitions().size());
   for (std::size_t t = 0; t < net.transitions().size(); ++t) {
-    if (net.transitions()[t].silent()) continue;
+    const auto& transition = net.transitions()[t];
+    if (transition.silent() || net.activities()[*transition.activity].empty()) continue;
     transition_slots[t] = fitness.transitions.size();
     TokenReplayTransitionFitness entry;
     entry.transition_index = t;
