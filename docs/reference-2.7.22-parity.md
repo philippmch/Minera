@@ -10498,3 +10498,63 @@ The first application run revealed36 losses: custom inductive selectors projecte
 Every failure stays in the evidence: the public fixture preparer initially performed redundant Unicode decoding; the first native output reader rejected actual WTF8 surrogate bytes from the product wire encoder; the first frozen build exposed the empty-key normalization sentinel; the second build's newly added private-header test include failed; the third full run exposed the obsolete duration integration expectation. A later read-only emitter audit confused escaped tool presentation with source bytes; its unnecessary deriver failed before creating any helper, followed by two missing-helper launch failures. A byte-level audit confirms the original emitter was already correct. The first evidence preparer rejected the36 application losses before writing an archive or ledger, and that failed helper is retained. Fresh helpers/namespaces preserve all inputs and actual outputs; no frozen helper or failed build is rewritten. Owned surrogatepass decoding retains actual product output but does not establish strict UTF8 wire parity.
 
 See [replay-literal-key-validation.json](replay-literal-key-validation.json) for 55 lossless archives and 9,143 byte-verified members. The clean-room procedure remains public APIs/signatures/enums/fields and builtins plus opaque pinned hash/CRLF-to-LF proofs, with no reference implementation/private-state inspection. Full parity remains active at 46/86 packages, 199/387 modules and 228 incomplete units. Duration cohort filtering, actual exception carriers, surrogate wire encoding, runtime classes/IDs/aliases, backwards mutations, mapping/set iteration, allocation distributions, broader models/containers and prior independent gates remain open. No catalogue coverage or full-parity gate is promoted.
+
+
+## Literal token-replay duration selectors checkpoint
+
+Duration filtering now resolves the supplied activity and timestamp keys
+literally, including empty keys and the spellings `activity` and `timestamp`.
+An exact generic field precedes transported first-class fields; projection
+metadata identifies its actual source key. Legacy text without metadata denotes
+the canonical field. A timestamp is read only when a comparison needs endpoints.
+Integrated replay passes its selected activity key into both duration helpers.
+Selector views borrow stable event strings rather than temporary conditional
+strings. The native test controls include a 257-byte projected key.
+
+`docs/replay-duration-literal-validation.json` binds the complete evidence.
+The pinned CPython 3.11.9 runtime supplied 940 fixtures and 2,260 actual direct
+duration calls: 1,843 returns and 417 errors. These cover 20 literal activity and
+timestamp selectors, canonical/selected/conflicting fields, missing/null/typed
+endpoints, ignored replay parameters versus the generic filter parameter,
+None labels and empty/unused cohorts. Three native field layouts supplied 6,780
+observations before and after. Acceptance improves from 6,504 to 6,780 and the
+complete scalar or five-field numeric projection improves from 5,183 to 5,529.
+Every successful reference projection now matches; all 5,183 previously matching
+whole native rows are unchanged. All 1,251 native errors remain separately
+retained: their Python class/message/argument equivalence is not claimed.
+
+Forty additional sequence-net fixtures produce 120 actual public calls: forward
+PLTR replay followed by both duration helpers using the actual returned cohorts.
+They contain fitted, underfed and unknown events, conflicting canonical fields,
+all 20 activity keys and canonical/empty timestamp keys. Three layouts produce
+120 integrated and 120 baseline native conformance calls per phase. Integrated
+acceptance improves from 60 to 120, and complete transition/unknown duration
+projections improve from 57 to 120. All 57 prior matching whole rows are unchanged;
+all 120 accepted final calls preserve numeric conformance when duration is added.
+The shared empty activity/timestamp field remains generic and contains actual
+public datetime activities; its duration comparisons are empty. No datetime
+versus string label class equivalence is promoted.
+
+All 160,064 retained replay observations compare as whole native rows to actual
+pushed `03bd067` results, including 73,504 successful rows and all errors,
+typed wire and PLTR fields. Eight assertion-enabled probe objects are explicitly
+reused and relinked with verified original compiler/source/object bindings.
+The 534 CLI and 534 HTTP mining calls preserve every prior application predicate
+and summary. Each transport retains nine inherited acceptance differences and
+213 error-message differences. Existing frontend source/run bindings and its
+164 tests are verified; no fresh frontend run is claimed.
+
+The final build binds 660 frozen inputs, two source edits and 155 freshly linked
+outputs. The repaired duration implementation/test units are freshly compiled;
+317 unchanged compiled core/consumer objects are reused with complete original
+bindings. All 154 tracked consumers were compiled during this step. Seven focused
+and all 152 full assertion-enabled native suites pass. The first frozen build's
+unrelated MSVC C1001 failure, the next snapshot's two focused failures, and a
+nested-project evidence-binder failure remain archived. Executed snapshots and
+helpers were retained; repairs use fresh namespaces.
+
+This closes the observed literal-key duration selection gap. Python exception
+class/message/args, broader datetime/container identity, wire encoding, public
+mutation/ordering behavior and the prior independent gates remain open.
+Catalogue totals remain 46/86 packages, 199/387 modules and 228 incomplete units.
+No whole-module/package promotion or full-parity claim is made.

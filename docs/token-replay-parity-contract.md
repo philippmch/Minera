@@ -2413,3 +2413,22 @@ The checkpoint retains 16,704 actual public calls, 159,488 actual native calls, 
 TokenReplayOptions.activity_attribute is literal, including activity and the empty string. Its default is concept:name. Exact generic fields precede transported fields; first-class metadata selects its actual source key, with canonical fallback only for legacy text without provenance. Empty selected metadata is distinct from an unselected sentinel and survives normalized log/stream round trips without a fabricated canonical key.
 
 The checkpoint retains 17,280 actual public replay calls, 160 public conversion calls, 177,344 validated native replay calls and 640 native normalization calls, plus the failed strict-decoder run and all three failed frozen builds. Acceptance gains 384, successful trace projections gain 240, and forward wire projections gain 144; all prior true predicates and every 142,784 retained whole native row survive. All 2,424 complete PLTR tuple contents/dictionary orders match. Duration cohort selector behavior, native C++ versus Python exceptions and args, embedded NUL detail, strict UTF8 surrogate wire encoding, public model mutations and broader runtime/container/allocation gates remain independent. See [replay-literal-key-validation.json](replay-literal-key-validation.json) for the exact inputs, comparisons, scopes and lossless evidence. Full parity and catalogue coverage remain unpromoted.
+
+
+## Literal duration-filter selector acceptance
+
+`docs/replay-duration-literal-validation.json` records 2,260 fresh direct public
+duration calls and 120 public replay/actual-PLTR duration calls. Every final
+6,780 direct native observation matches acceptance, and all 5,529 successful
+scalar/five-field numeric projections match. All 120 integrated projections
+match; duration leaves their native conformance metrics unchanged. Prior matching
+whole rows, every 160,064 retained whole replay observation and both application
+predicate arrays/summaries are preserved. All 152 native suites pass.
+
+Activity and timestamp keys are literal, including empty keys. Exact fields
+take priority; first-class provenance denotes the actual source. An unused key
+does not demand endpoint timestamps. Integrated replay retains its selector.
+This is bounded selection/summary evidence. Exact Python exception class/message/
+args and broader type/identity/order/mutation behavior remain independent gates;
+the shared empty-field datetime activity case returns no duration comparisons.
+No catalogue promotion or full-parity claim is made.

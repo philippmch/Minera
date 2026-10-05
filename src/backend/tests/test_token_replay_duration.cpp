@@ -83,6 +83,8 @@ void scalar_contracts() {
   for (auto& value : trace.events) value.timestamp_source_key = "source-time";
   require(token_replay_case_duration(trace, "source-time") == 10, "source timestamp alias");
   trace.events.front().attributes.push_back({"time:timestamp", "1970-01-01T00:00:05Z"});
+  rejects([&] { (void)token_replay_case_duration(trace); });
+  trace.events.back().attributes.push_back({"time:timestamp", "1970-01-01T00:00:10Z"});
   require(token_replay_case_duration(trace) == 5, "exact timestamp cell takes priority");
 
   EventLog log;
@@ -205,8 +207,82 @@ void unknown_contracts() {
   require(token_replay_unknown_activity_duration_diagnostics(log, {}).empty(), "no unknown keys");
   TokenReplayOptions options;
   options.timestamp_attribute.clear();
-  rejects([&] { (void)token_replay_unknown_activity_duration_diagnostics(log, {}, options); });
-  rejects([&] { (void)token_replay_transition_duration_diagnostics(log, {}, options); });
+  require(token_replay_unknown_activity_duration_diagnostics(log, {}, options).empty() &&
+          token_replay_transition_duration_diagnostics(log, {}, options).empty(),
+          "unused timestamp selector does not require an endpoint");
+}
+
+void literal_selector_contracts() {
+  const std::vector<std::string> keys = {
+      "concept:name", "chosen", "activity", "", "'", "\"", "'\"", "\\",
+      "\n", "\r", "\t", std::string(1, '\0'), "\x7f", "\xc2\xa0",
+      "\xe2\x80\x8b", "\xcd\xb8", "漢字", "🌿", "\xed\xa0\x80", "\xed\xbf\xbf",
+      std::string(257, 'k')};
+  for (const auto& key : keys) {
+    for (bool projected : {false, true}) {
+      EventLog log;
+      log.traces = {timed_trace(10), timed_trace(30), timed_trace(80)};
+      for (auto& trace : log.traces) {
+        for (auto& value : trace.events) {
+          EventAttribute selected{key, "b"};
+          if (projected) {
+            value.activity = "b";
+            value.activity_source_key = key;
+            value.activity_state = FirstClassAttributeState::kPresent;
+            selected.first_class_role = FirstClassAttributeRole::kActivity;
+            selected.first_class_state = FirstClassAttributeState::kPresent;
+            selected.first_class_source_key = key;
+            value.activity_attribute = selected;
+          } else {
+            value.activity.clear();
+            value.attributes.push_back(selected);
+          }
+        }
+      }
+      TokenReplayOptions options;
+      options.activity_attribute = key;
+      const auto rows = token_replay_transition_duration_diagnostics(log, {{7, "b", {2}}}, options);
+      require(rows.size() == 1 && rows[0].fit_count == 2 && rows[0].problem_count == 1 &&
+                  rows[0].fit_median_seconds == 20 && rows[0].problem_median_seconds == 80 &&
+                  rows[0].relative_throughput == 4,
+              "literal activity selectors preserve all duration summary fields");
+      if (key != "concept:name") {
+        options.activity_attribute = "concept:name";
+        require(token_replay_transition_duration_diagnostics(log, {{7, "b", {2}}}, options).empty(),
+                "custom projected activity is not a canonical field");
+      }
+
+      auto trace = timed_trace(10);
+      for (auto& value : trace.events) {
+        EventAttribute selected{key, value.timestamp};
+        if (projected) {
+          value.timestamp_source_key = key;
+          value.timestamp_state = FirstClassAttributeState::kPresent;
+          selected.first_class_role = FirstClassAttributeRole::kTimestamp;
+          selected.first_class_state = FirstClassAttributeState::kPresent;
+          selected.first_class_source_key = key;
+          value.timestamp_attribute = selected;
+        } else {
+          value.timestamp.clear();
+          value.attributes.push_back(selected);
+        }
+      }
+      require(token_replay_case_duration(trace, key) == 10,
+              "literal timestamp selectors preserve case duration");
+      rejects([&] { (void)token_replay_case_duration(trace, "time:timestamp"); });
+    }
+  }
+  auto canonical = timed_trace(10);
+  rejects([&] { (void)token_replay_case_duration(canonical, "timestamp"); });
+  EventLog log;
+  log.traces = {timed_trace(10), timed_trace(30), timed_trace(80)};
+  TokenReplayOptions alias;
+  alias.activity_attribute = "activity";
+  require(token_replay_transition_duration_diagnostics(log, {{7, "b", {2}}}, alias).empty(),
+          "activity does not select the canonical activity field");
+  const auto unknown = token_replay_unknown_activity_duration_diagnostics(log, {{"b", false, {2}}}, alias);
+  require(unknown.size() == 1 && unknown[0].fit_trace_indices == std::vector<std::size_t>({0, 1}),
+          "unknown baseline filtering uses the supplied literal key");
 }
 
 void integration_contracts() {
@@ -244,10 +320,18 @@ void integration_contracts() {
     for (auto& value : trace.events) value.attributes.push_back({"", value.activity});
   TokenReplayOptions literal_options;
   literal_options.activity_attribute.clear();
+  literal_options.include_duration_diagnostics = true;
   const auto literal_result = check_conformance(literal_log, net, literal_options);
   require(literal_result.activity_attribute.empty() && literal_result.fitness == plain.fitness &&
               literal_result.transition_frequencies == plain.transition_frequencies,
           "explicit empty activity keys replay with the supplied literal selector");
+  require(literal_result.duration_diagnostics->transitions.size() == duration.transitions.size() &&
+          literal_result.duration_diagnostics->transitions[0].fit_trace_indices == duration.transitions[0].fit_trace_indices &&
+          literal_result.duration_diagnostics->transitions[0].problem_median_seconds == duration.transitions[0].problem_median_seconds &&
+          literal_result.duration_diagnostics->unknown_activities.size() == duration.unknown_activities.size() &&
+          literal_result.duration_diagnostics->unknown_activities[0].fit_trace_indices == duration.unknown_activities[0].fit_trace_indices &&
+          literal_result.duration_diagnostics->unknown_activities[0].problem_median_seconds == duration.unknown_activities[0].problem_median_seconds,
+          "integrated empty selector retains transition and unknown duration cohorts");
   const auto empty_default = check_conformance(EventLog{}, net, options);
   const auto empty_normalized = check_conformance(EventLog{}, net, empty_selector);
   require(empty_normalized.activity_attribute.empty() &&
@@ -287,6 +371,7 @@ int main() {
     scalar_contracts();
     transition_contracts();
     unknown_contracts();
+    literal_selector_contracts();
     integration_contracts();
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
