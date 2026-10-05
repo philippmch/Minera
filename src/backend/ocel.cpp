@@ -974,12 +974,47 @@ Ocel parse_ocel_json(std::string_view json, const OcelJsonLimits& limits) {
   const Json root = Parser(json, limits).parse();
   if (!root.is_object()) throw std::invalid_argument("OCEL root must be object");
   const auto& r = root.object();
-  if (r.find("events") != r.end() || r.find("objects") != r.end()) return parse_standard(r);
-  return parse_classic(r);
+  Ocel result = r.find("events") != r.end() || r.find("objects") != r.end()
+                    ? parse_standard(r) : parse_classic(r);
+  if (const auto* raw = optional(r, "minera:tableColumns")) {
+    const auto& columns = obj(*raw, "minera:tableColumns");
+    const auto read = [&](const char* name,
+                          std::optional<std::vector<std::string>>& target) {
+      if (const auto* value = optional(columns, name))
+        target = string_array(value, name);
+    };
+    read("events", result.table_columns.events);
+    read("objects", result.table_columns.objects);
+    read("relations", result.table_columns.relations);
+  }
+  return result;
 }
 
 std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
   std::ostringstream out;
+  const auto write_table_columns = [&] {
+    const auto& columns = log.table_columns;
+    if (!columns.events && !columns.objects && !columns.relations) return;
+    out << ",\"minera:tableColumns\":{";
+    bool first = true;
+    const auto write = [&](const char* name,
+                            const std::optional<std::vector<std::string>>& values) {
+      if (!values) return;
+      if (!first) out << ',';
+      first = false;
+      write_string(out, name);
+      out << ":[";
+      for (std::size_t i = 0; i < values->size(); ++i) {
+        if (i) out << ',';
+        write_string(out, (*values)[i]);
+      }
+      out << ']';
+    };
+    write("events", columns.events);
+    write("objects", columns.objects);
+    write("relations", columns.relations);
+    out << '}';
+  };
   std::vector<const OcelEvent*> events;
   for (const auto& event : log.events) events.push_back(&event);
   std::sort(events.begin(), events.end(), [](const auto* left, const auto* right) {
@@ -1160,6 +1195,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
       }
       out << '}';
     }
+    write_table_columns();
     out << '}';
     return out.str();
   }
@@ -1231,6 +1267,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
   write_global_category(out, log, "ocel:global-event");
   out << ",\"ocel:global-object\":";
   write_global_category(out, log, "ocel:global-object");
+  write_table_columns();
   out << '}';
   return out.str();
 }
@@ -1385,6 +1422,39 @@ OcdfgGraph discover_ocdfg_classic(const Ocel& log, bool compute_edges_performanc
 
 OcdfgGraph discover_ocdfg_classic_with_options(
     const Ocel& log, const OcdfgDiscoveryOptions& options) {
+  const auto column = [](const std::string& selected, bool event) {
+    if (selected.empty() || (event && (selected == "activity" ||
+                                      selected == "concept:name")) ||
+        (!event && (selected == "type" || selected == "object_type")))
+      return std::string(event ? "ocel:activity" : "ocel:type");
+    return selected;
+  };
+  std::set<std::string> event_columns{"ocel:eid", "ocel:activity", "ocel:timestamp"};
+  std::set<std::string> object_columns{"ocel:oid", "ocel:type"};
+  for (const auto& event : log.events)
+    for (const auto& attribute : event.attributes) event_columns.insert(attribute.key);
+  for (const auto& object : log.objects)
+    for (const auto& attribute : object.attributes) object_columns.insert(attribute.key);
+  for (const auto& [type, schema] : log.event_type_attributes)
+    for (const auto& [name, value_type] : schema) event_columns.insert(name);
+  for (const auto& [type, schema] : log.object_type_attributes)
+    for (const auto& [name, value_type] : schema) object_columns.insert(name);
+  std::set<std::string> relation_columns = event_columns;
+  relation_columns.insert(object_columns.begin(), object_columns.end());
+  relation_columns.insert("ocel:qualifier");
+  const auto require_column = [](const auto& declared, const auto& inferred,
+                                  const std::string& name) {
+    const bool found = declared
+        ? std::find(declared->begin(), declared->end(), name) != declared->end()
+        : inferred.count(name) != 0;
+    if (!found) throw std::out_of_range("'" + name + "'");
+  };
+  const auto activity_column = column(options.activity_attribute, true);
+  const auto type_column = column(options.object_type_attribute, false);
+  require_column(log.table_columns.events, event_columns, activity_column);
+  require_column(log.table_columns.objects, object_columns, type_column);
+  require_column(log.table_columns.relations, relation_columns, activity_column);
+  require_column(log.table_columns.relations, relation_columns, type_column);
   const Ocel projected = project_ocel_labels(
       log, options.activity_attribute, options.object_type_attribute, "OCDFG");
   OcdfgGraph result;
@@ -1408,16 +1478,11 @@ OcdfgGraph discover_ocdfg_classic_with_options(
 
   struct Rel { std::string event; std::string object; std::size_t order; };
   std::vector<Rel> rels;
-  std::set<std::pair<std::string, std::string>> seen_event_objects;
   for (std::size_t i = 0; i < projected.relations.size(); ++i) {
     const auto& relation = projected.relations[i];
     const auto event_it = event_order.find(relation.event_id);
     const auto type_it = object_type.find(relation.object_id);
     if (event_it == event_order.end() || type_it == object_type.end()) continue;
-    // Qualifiers do not change the association metrics.  Collapse repeated
-    // rows for one event/object pair before deriving starts, ends, and flows.
-    if (!seen_event_objects.emplace(relation.event_id, relation.object_id).second)
-      continue;
     rels.push_back({relation.event_id, relation.object_id, event_it->second * (projected.relations.size() + 1) + i});
   }
   auto add_association = [&](std::map<std::string, OcdfgActivityMetric>& target,
@@ -1440,10 +1505,7 @@ OcdfgGraph discover_ocdfg_classic_with_options(
     metric.events.erase(std::unique(metric.events.begin(), metric.events.end()), metric.events.end());
     std::sort(metric.unique_objects.begin(), metric.unique_objects.end());
     metric.unique_objects.erase(std::unique(metric.unique_objects.begin(), metric.unique_objects.end()), metric.unique_objects.end());
-    std::sort(metric.event_objects.begin(), metric.event_objects.end());
-    metric.event_objects.erase(std::unique(metric.event_objects.begin(), metric.event_objects.end()), metric.event_objects.end());
-    std::sort(metric.total_objects.begin(), metric.total_objects.end());
-    metric.total_objects.erase(std::unique(metric.total_objects.begin(), metric.total_objects.end()), metric.total_objects.end());
+    // Association lists retain the relation-row multiplicity and order.
   };
   for (auto& [act, metric] : result.activities_indep) normalize_activity(metric);
   for (auto& [type, metrics] : result.activities_ot) for (auto& [act, metric] : metrics) normalize_activity(metric);
@@ -2778,8 +2840,6 @@ OcdfgConformanceResult compare_ocdfg(
     const OcdfgConformanceOptions& options) {
   OcdfgDiscoveryOptions discovery;
   discovery.compute_edges_performance = false;
-  discovery.activity_attribute = options.activity_attribute;
-  discovery.object_type_attribute = options.object_type_attribute;
   return compare_ocdfg(
       discover_ocdfg_classic_with_options(real, discovery), normative,
       options);

@@ -431,6 +431,15 @@ int main() {
   assert(activity_metric.unique_objects ==
          std::vector<std::string>({"o1", "o2"}));
   assert(activity_metric.event_objects == activity_metric.total_objects);
+  const std::vector<std::pair<std::string, std::string>> repeated_associations{
+      {"e1", "o1"}, {"e1", "o2"}, {"e1", "o2"}};
+  assert(activity_metric.total_objects == repeated_associations);
+  const auto& repeated_flow = metric_graph.edges.at("item").at({"A", "A"});
+  assert((repeated_flow.event_couples ==
+          std::vector<std::pair<std::string, std::string>>{{"e1", "e1"}}));
+  assert(repeated_flow.total_objects.size() == 1 &&
+         repeated_flow.unique_objects == std::vector<std::string>{"o2"});
+  assert(repeated_flow.performance_event_couples == std::vector<double>{0.0});
   const auto& metric_edge = metric_graph.edges.at("item").at({"A", "B"});
   const std::vector<std::pair<std::string, std::string>> expected_metric_couples{
       {"e1", "e2"}};
@@ -839,20 +848,63 @@ int main() {
   selected_conformance_options.object_type_attribute = "selected_type";
   const auto selected_conformance = minera::compare_ocdfg(
       selected_log, selected_ocdfg, selected_conformance_options);
-  assert(selected_conformance.fitness == 1.0);
-  assert(selected_conformance.missing_activities.empty() &&
-         selected_conformance.additional_activities.empty() &&
-         selected_conformance.missing_flows.empty() &&
-         selected_conformance.additional_flows.empty());
-  bool conformance_missing_selector_rejected = false;
-  try {
-    auto invalid = selected_conformance_options;
-    invalid.object_type_attribute = "missing_type";
-    (void)minera::compare_ocdfg(selected_log, selected_ocdfg, invalid);
-  } catch (const std::invalid_argument&) {
-    conformance_missing_selector_rejected = true;
+  assert(minera::ocdfg_conformance_json(selected_conformance) ==
+         minera::ocdfg_conformance_json(unselected_conformance));
+  const auto projected_conformance = minera::compare_ocdfg(
+      selected_ocdfg, selected_ocdfg, selected_conformance_options);
+  assert(projected_conformance.fitness == 1.0 &&
+         projected_conformance.missing_activities.empty() &&
+         projected_conformance.additional_activities.empty() &&
+         projected_conformance.missing_flows.empty() &&
+         projected_conformance.additional_flows.empty());
+  auto ignored_selector = selected_conformance_options;
+  ignored_selector.object_type_attribute = "missing_type";
+  assert(minera::ocdfg_conformance_json(minera::compare_ocdfg(
+             selected_log, selected_ocdfg, ignored_selector)) ==
+         minera::ocdfg_conformance_json(unselected_conformance));
+
+  {
+    minera::Ocel empty_tables;
+    empty_tables.table_columns.events = std::vector<std::string>{
+        "ocel:eid", "ocel:activity", "ocel:timestamp", "selected_activity"};
+    empty_tables.table_columns.objects = std::vector<std::string>{
+        "ocel:oid", "ocel:type", "selected_type"};
+    empty_tables.table_columns.relations = std::vector<std::string>{
+        "ocel:eid", "ocel:activity", "ocel:timestamp", "selected_activity",
+        "ocel:oid", "ocel:type", "selected_type", "ocel:qualifier"};
+    const auto empty_graph = minera::discover_ocdfg_classic_with_options(
+        empty_tables, ocdfg_selected_options);
+    assert(empty_graph.activities.empty() && empty_graph.edges.empty());
+    for (const auto format : {minera::OcelJsonFormat::kClassic,
+                              minera::OcelJsonFormat::kStandard}) {
+      const auto decoded = minera::parse_ocel_json(
+          minera::serialize_ocel_json(empty_tables, format));
+      assert(decoded.table_columns.events == empty_tables.table_columns.events &&
+             decoded.table_columns.objects == empty_tables.table_columns.objects &&
+             decoded.table_columns.relations == empty_tables.table_columns.relations);
+      assert(minera::discover_ocdfg_classic_with_options(decoded,
+                 ocdfg_selected_options).activities.empty());
+    }
+    const auto expect_missing_column = [&](const minera::Ocel& input,
+                                            const std::string& selector,
+                                            bool activity) {
+      auto options = ocdfg_selected_options;
+      if (activity) options.activity_attribute = selector;
+      else options.object_type_attribute = selector;
+      bool missing = false;
+      try { (void)minera::discover_ocdfg_classic_with_options(input, options); }
+      catch (const std::out_of_range& error) {
+        missing = error.what() == std::string("'") + selector + "'";
+      }
+      assert(missing);
+    };
+    expect_missing_column(empty_tables, "absent_activity", true);
+    expect_missing_column(empty_tables, "absent_type", false);
+    expect_missing_column(selected_log, "absent_activity", true);
+    expect_missing_column(selected_log, "absent_type", false);
+    empty_tables.table_columns.events = std::vector<std::string>{};
+    expect_missing_column(empty_tables, "selected_activity", true);
   }
-  assert(conformance_missing_selector_rejected);
   ocdfg_selected_options.compute_edges_performance = false;
   const auto selected_ocdfg_plain =
       minera::discover_ocdfg_classic_with_options(selected_log,
@@ -867,8 +919,8 @@ int main() {
     auto invalid = ocdfg_selected_options;
     invalid.object_type_attribute = "missing_type";
     (void)minera::discover_ocdfg_classic_with_options(selected_log, invalid);
-  } catch (const std::invalid_argument&) {
-    ocdfg_missing_selector_rejected = true;
+  } catch (const std::out_of_range& error) {
+    ocdfg_missing_selector_rejected = std::string(error.what()) == "'missing_type'";
   }
   assert(ocdfg_missing_selector_rejected);
 
