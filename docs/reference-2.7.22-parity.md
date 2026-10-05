@@ -10891,3 +10891,75 @@ malformed or decoupled graph components and arbitrary parameter mappings remain
 independent gates. Literal error-message differences are not promoted as exact
 diagnostic parity. The catalogue remains 46/86 packages, 199/387 modules and
 228 incomplete units; no whole-package, module or full-parity promotion is made.
+
+
+## OTG real-OCEL discovery and conformance checkpoint (2026-10-05)
+
+Evidence: `docs/otg-log-recovered-validation.json` and its byte-round-tripped
+`docs/otg-log-recovered-evidence-*.jsonl.gz` parts. This checkpoint continues
+normal commits and pushes from `c30b338c7ac693722d4555d2dfff0fd5b8cd539d`.
+The reference remains PM4Py 2.7.22 at
+`0715c31f3f1d85924107d6aa5329806db69df899`.
+
+The fresh public capture constructs 549 actual OCELs: all 512 three-event by
+three-object incidence matrices and 37 controls for event/object/time ordering,
+tied times, repeated and qualified relations, empty and unused records, and
+separator, Unicode/emoji and quoted/newline labels. It executes 4,941 classic
+discovery calls and 138,348 direct/parent conformance calls across ETOT, OTG and
+OCDFG. Full tables, parameter and normative snapshots, returned fields, numeric
+bits and literal exceptions are retained. Fifteen opaque pinned-module proofs
+match before and after; no reference implementation, bytecode or private state
+is inspected. The wider ETOT/OCDFG records remain independent native gates.
+
+The OTG partition executes 549 actual native discovery calls and 6,588 actual
+real-OCEL conformance calls in each phase. Before repair, 3,643/7,137 complete
+observations match. The gaps are repeated object co-occurrences inflating
+interaction frequencies, events without object links returning a graph instead
+of reporting the first missing event, and escaped supplementary Unicode labels
+decoding into invalid UTF-8. The repair counts each distinct object pair once
+across the log; distinct pairs sharing object types still aggregate separately.
+The missing-event diagnostic uses native out_of_range, explicitly mapped to the
+public KeyError category while checking literal messages separately. Valid
+UTF-16 escape pairs decode to one UTF-8 scalar in OCEL and graph JSON.
+
+All 7,137 final observations match both semantically and literally: all 374
+discovery graphs, all 4,488 conformance returns and all 2,275 errors. Every field,
+oriented edge frequency, conformance fitness/delta bit and literal error message
+matches. All 3,494 whole-observation gaps are corrected; the 3,643 preceding
+correct rows remain byte-identical and no prior true predicate is lost. Public
+weight bindings are independently checked for all 6,588 conformance calls.
+
+The first captures terminated during a strict UTF-8 audit after their native
+children completed. Their exact inputs, raw bytes, helpers and compiler artifacts
+remain retained. A fresh observer preserves invalid old UTF-8 through explicit
+surrogate-pass decoding, retaining validity as a false predicate rather than
+normalizing outputs. The first before-capture replays byte-identically. Compared
+with the first repaired core, the final decoder changes exactly the 13 output
+rows and one native input snapshot for the emoji fixture; other rows remain
+byte-identical. Unpaired surrogate escapes are rejected under the native UTF-8
+string contract and are not promoted as Python-container parity.
+
+Each application phase executes 282 actual CLI processes and 282 multipart
+HTTP log requests over ten incidence controls, all 37 extra controls, both
+normative anchors and default, finite and NaN weight profiles. All 564 final
+whole responses match the pinned-validated native observations, including 456
+returns and 108 error envelopes. The repair corrects 282 whole application
+observations and preserves all 282 previous matches.
+
+The final build binds 662 source inputs and two edited existing C++ files.
+Two units are freshly compiled, 317 verified objects reused and all 155 core,
+server, export and native-test outputs freshly linked. Eleven focused OCEL
+suites and all 152 assertion-enabled native suites pass. The probes and unchanged
+CLI source are freshly compiled per phase. Independently relinked original
+assertion-enabled probes replay all 94,293 graph and 333,120 weight observations
+byte-for-byte, with both 343-graph snapshot sets unchanged. Exact original
+object/source/project/tlog bindings are retained. The inherited 164-test frontend
+result and unchanged frontend source bindings are verified.
+
+This closes the observed OTG real-OCEL frequency, missing-event and escaped
+Unicode input gaps. Larger lifetimes, arbitrary identifiers, malformed or
+decoupled log tables, constructor field aliases, wider ETOT/OCDFG log semantics
+and other parameter mappings remain independent gates. Prior floating-weight
+literal error differences and native numeric limits remain documented. The
+catalogue remains 46/86 packages, 199/387 modules and 228 incomplete units;
+no whole-package, module or full-parity promotion is made.

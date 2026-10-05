@@ -121,6 +121,79 @@ int main() {
   }
   assert(saw_interaction && saw_descendant && saw_inheritance);
 
+  {
+    // Repeated co-occurrence and duplicate qualifiers retain one interaction
+    // per object pair, while distinct pairs sharing types still add up.
+    minera::Ocel repeated;
+    repeated.objects = {{"o0", "T", {}}, {"o1", "U", {}}, {"o2", "T", {}}};
+    for (int i = 0; i < 3; ++i) {
+      const auto id = "e" + std::to_string(i);
+      repeated.events.push_back({id, i == 1 ? "B" : "A", "", {}});
+      for (const auto& object : repeated.objects)
+        repeated.relations.push_back({id, object.id, ""});
+      repeated.relations.push_back({id, "o0", "other-role"});
+    }
+    const auto graph = minera::discover_otg_classic(repeated);
+    assert(graph.edges.size() == 9);
+    for (const auto& edge : graph.edges) assert(edge.frequency == 1);
+    const auto direct = minera::compare_otg(repeated, graph);
+    assert(direct.fitness == 1.0 && direct.non_conforming_edges.empty());
+
+    for (auto& object : repeated.objects) object.type = "T";
+    const auto same_type = minera::discover_otg_classic(repeated);
+    assert(same_type.edges.size() == 3);
+    for (const auto& edge : same_type.edges) assert(edge.frequency == 3);
+
+    repeated.events.push_back({"unlinked", "C", "", {}});
+    const auto expect_missing_event = [&](auto discover_or_compare) {
+      bool failed = false;
+      try {
+        discover_or_compare();
+      } catch (const std::out_of_range& error) {
+        failed = std::string(error.what()) == "'unlinked'";
+      }
+      assert(failed);
+    };
+    expect_missing_event([&] { (void)minera::discover_otg_classic(repeated); });
+    expect_missing_event([&] { (void)minera::compare_otg(repeated, same_type); });
+    const minera::Ocel empty;
+    assert(minera::discover_otg_classic(empty).object_types.empty());
+    auto objects_only = empty;
+    objects_only.objects = repeated.objects;
+    assert(minera::discover_otg_classic(objects_only).edges.empty());
+  }
+
+  {
+    const auto escaped = minera::parse_ocel_json(
+        R"({"events":[{"id":"e\ud83d\ude42","type":"A\ud83d\ude42","time":"2026-01-01T00:00:00Z","relationships":[{"objectId":"o\ud83d\ude42","qualifier":"q\ud83d\ude42"}]}],"objects":[{"id":"o\ud83d\ude42","type":"T\ud83d\ude42","attributes":[{"name":"label","value":"v\ud83d\ude42"}]}]})");
+    const auto utf8 = minera::parse_ocel_json(
+        R"({"events":[{"id":"e🙂","type":"A🙂","time":"2026-01-01T00:00:00Z","relationships":[{"objectId":"o🙂","qualifier":"q🙂"}]}],"objects":[{"id":"o🙂","type":"T🙂","attributes":[{"name":"label","value":"v🙂"}]}]})");
+    assert(escaped.events[0].id == "e🙂" &&
+           escaped.objects[0].type == "T🙂" &&
+           escaped.relations[0].qualifier == "q🙂" &&
+           std::get<std::string>(escaped.objects[0].attributes[0].value) == "v🙂");
+    assert(minera::serialize_ocel_json(escaped) == minera::serialize_ocel_json(utf8));
+    assert(minera::etot_json(minera::discover_etot_classic(escaped)) ==
+           minera::etot_json(minera::discover_etot_classic(utf8)));
+    assert(minera::otg_json(minera::discover_otg_classic(escaped)) ==
+           minera::otg_json(minera::discover_otg_classic(utf8)));
+    const auto boundaries = minera::parse_etot_json(
+        R"({"activities":["\ud800\udc00","\udbff\udfff"],"object_types":[],"edges":[]})");
+    assert(boundaries.activities[0] == "\xf0\x90\x80\x80" &&
+           boundaries.activities[1] == "\xf4\x8f\xbf\xbf");
+    for (const auto* invalid : {R"(\ud800)", R"(\ud800\u0041)",
+                                R"(\udc00)", R"(\ud800\ud800)"}) {
+      bool rejected = false;
+      try {
+        (void)minera::parse_etot_json(std::string("{\"activities\":[\"") +
+                                    invalid + "\"],\"object_types\":[],\"edges\":[]}");
+      } catch (const std::invalid_argument&) {
+        rejected = true;
+      }
+      assert(rejected);
+    }
+  }
+
   const auto round =
       minera::parse_ocel_json(minera::serialize_ocel_json(log));
   assert(round.events.size() == log.events.size() &&

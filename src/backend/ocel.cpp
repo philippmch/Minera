@@ -81,6 +81,19 @@ class Parser {
     else if (code <= 0xffff) { out.push_back(static_cast<char>(0xe0 | (code >> 12))); out.push_back(static_cast<char>(0x80 | ((code >> 6) & 0x3f))); out.push_back(static_cast<char>(0x80 | (code & 0x3f))); }
     else { out.push_back(static_cast<char>(0xf0 | (code >> 18))); out.push_back(static_cast<char>(0x80 | ((code >> 12) & 0x3f))); out.push_back(static_cast<char>(0x80 | ((code >> 6) & 0x3f))); out.push_back(static_cast<char>(0x80 | (code & 0x3f))); }
   }
+  unsigned unicode_escape() {
+    if (pos_ + 4 > input_.size()) fail("short unicode escape");
+    unsigned code = 0;
+    for (int i = 0; i < 4; ++i) {
+      const char h = input_[pos_++];
+      code <<= 4;
+      if (h >= '0' && h <= '9') code += h - '0';
+      else if (h >= 'a' && h <= 'f') code += h - 'a' + 10;
+      else if (h >= 'A' && h <= 'F') code += h - 'A' + 10;
+      else fail("bad unicode escape");
+    }
+    return code;
+  }
   std::string string_value() {
     expect('"');
     std::string out;
@@ -100,9 +113,17 @@ class Parser {
         case 'f': out.push_back('\f'); break; case 'n': out.push_back('\n'); break;
         case 'r': out.push_back('\r'); break; case 't': out.push_back('\t'); break;
         case 'u': {
-          if (pos_ + 4 > input_.size()) fail("short unicode escape");
-          unsigned code = 0;
-          for (int i = 0; i < 4; ++i) { const char h = input_[pos_++]; code <<= 4; if (h >= '0' && h <= '9') code += h - '0'; else if (h >= 'a' && h <= 'f') code += h - 'a' + 10; else if (h >= 'A' && h <= 'F') code += h - 'A' + 10; else fail("bad unicode escape"); }
+          unsigned code = unicode_escape();
+          if (code >= 0xd800 && code <= 0xdbff) {
+            if (input_.substr(pos_, 2) != "\\u")
+              fail("missing low surrogate");
+            pos_ += 2;
+            const unsigned low = unicode_escape();
+            if (low < 0xdc00 || low > 0xdfff) fail("bad low surrogate");
+            code = 0x10000 + ((code - 0xd800) << 10) + (low - 0xdc00);
+          } else if (code >= 0xdc00 && code <= 0xdfff) {
+            fail("unexpected low surrogate");
+          }
           append_utf8(out, code); break;
         }
         default: fail("unknown escape");
@@ -1220,9 +1241,28 @@ EtotGraph discover_etot_classic(const Ocel& log) {
 
 OtgGraph discover_otg_classic(const Ocel& log) {
   OtgGraph result; std::set<std::string> types; std::unordered_map<std::string, std::string> type; for (const auto& o : log.objects) { type[o.id] = o.type; types.insert(o.type); } result.object_types.assign(types.begin(), types.end());
-  std::unordered_map<std::string, std::vector<std::string>> by_event; for (const auto& r : log.relations) by_event[r.event_id].push_back(r.object_id); std::vector<std::string> order; for (const auto& e : log.events) { order.push_back(e.id); auto& v = by_event[e.id]; std::sort(v.begin(), v.end()); v.erase(std::unique(v.begin(), v.end()), v.end()); }
+  std::unordered_map<std::string, std::vector<std::string>> by_event;
+  for (const auto& r : log.relations)
+    by_event[r.event_id].push_back(r.object_id);
+  std::vector<std::string> order;
+  for (const auto& e : log.events) {
+    const auto it = by_event.find(e.id);
+    if (it == by_event.end()) throw std::out_of_range("'" + e.id + "'");
+    order.push_back(e.id);
+    auto& objects = it->second;
+    std::sort(objects.begin(), objects.end());
+    objects.erase(std::unique(objects.begin(), objects.end()), objects.end());
+  }
   std::map<std::tuple<std::string, std::string, std::string>, std::size_t> counts; auto add = [&](const std::string& a, const std::string& rel, const std::string& b) { if (type.count(a) && type.count(b)) ++counts[{type[a], rel, type[b]}]; };
-  for (const auto& ev : order) { auto v = by_event[ev]; for (std::size_t i = 0; i < v.size(); ++i) for (std::size_t j = i + 1; j < v.size(); ++j) add(v[i], "object_interaction", v[j]); }
+  std::set<std::pair<std::string, std::string>> interactions;
+  for (const auto& ev : order) {
+    const auto& objects = by_event.at(ev);
+    for (std::size_t i = 0; i < objects.size(); ++i)
+      for (std::size_t j = i + 1; j < objects.size(); ++j)
+        interactions.emplace(objects[i], objects[j]);
+  }
+  for (const auto& [source, target] : interactions)
+    add(source, "object_interaction", target);
   std::unordered_set<std::string> seen; for (const auto& ev : order) { std::unordered_set<std::string> old(seen.begin(), seen.end()); auto& v = by_event[ev]; for (const auto& a : v) if (old.count(a)) for (const auto& b : v) if (!old.count(b)) add(a, "object_descendants", b); for (const auto& a : v) seen.insert(a); }
   seen.clear(); for (const auto& ev : order) { auto& v = by_event[ev]; std::vector<std::string> fresh; for (const auto& a : v) if (!seen.count(a)) fresh.push_back(a); for (std::size_t i = 0; i < fresh.size(); ++i) for (std::size_t j = i + 1; j < fresh.size(); ++j) add(fresh[i], "object_cobirth", fresh[j]); for (const auto& a : fresh) seen.insert(a); }
   seen.clear(); for (auto it = order.rbegin(); it != order.rend(); ++it) { auto& v = by_event[*it]; std::vector<std::string> fresh; for (const auto& a : v) if (!seen.count(a)) fresh.push_back(a); for (std::size_t i = 0; i < fresh.size(); ++i) for (std::size_t j = i + 1; j < fresh.size(); ++j) add(fresh[i], "object_codeath", fresh[j]); for (const auto& a : fresh) seen.insert(a); }
