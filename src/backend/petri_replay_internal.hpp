@@ -263,7 +263,8 @@ std::vector<std::size_t> exhaustive_hidden_transition_trial(
 inline std::vector<HiddenPlacePath> silent_place_paths(
     const ReplayMarkingKeys& source_keys, const ReplayMarkingKeys& target_keys, const PetriNet& net,
     const std::vector<std::string>& place_names,
-    std::size_t max_path_length = 51) {
+    std::size_t max_path_length = 51,
+    const std::vector<std::vector<std::size_t>>* outgoing_order = nullptr) {
   std::vector<std::vector<std::size_t>> outgoing(source_keys.size());
   for (std::size_t t = 0; t < net.transitions().size(); ++t) {
     const auto& transition = net.transitions()[t];
@@ -273,6 +274,12 @@ inline std::vector<HiddenPlacePath> silent_place_paths(
     inputs.insert(transition.inhibitor_inputs.begin(), transition.inhibitor_inputs.end());
     for (const auto place : inputs) outgoing[place].push_back(t);
   }
+  if (outgoing_order) {
+    outgoing.assign(source_keys.size(), {});
+    for (std::size_t place = 0; place < outgoing_order->size(); ++place)
+      for (const auto transition : (*outgoing_order)[place])
+        if (net.transitions()[transition].silent()) outgoing[place].push_back(transition);
+  }
   const auto none = std::numeric_limits<std::size_t>::max();
   std::vector<HiddenPlacePath> result;
   std::size_t stored_steps = 0;
@@ -280,6 +287,7 @@ inline std::vector<HiddenPlacePath> silent_place_paths(
     if (!source_keys[source]) continue;
     std::vector<std::size_t> parent(source_keys.size(), none), via(source_keys.size(), none);
     std::vector<std::size_t> distance(source_keys.size(), 0);
+    std::size_t cycle_parent = none, cycle_transition = none;
     parent[source] = source;
     std::queue<std::size_t> pending;
     pending.push(source);
@@ -289,6 +297,12 @@ inline std::vector<HiddenPlacePath> silent_place_paths(
       if (distance[place] >= max_path_length) continue;
       for (const auto t : outgoing[place]) {
         for (const auto output : net.transitions()[t].outputs) {
+          // Retain the first nonempty source cycle without changing the empty
+          // BFS seed. Re-enqueuing the source would corrupt its other paths.
+          if (output == source && cycle_parent == none) {
+            cycle_parent = place;
+            cycle_transition = t;
+          }
           if (parent[output] != none) continue;
           if (++visited > kReplayStructuralSearchCap)
             throw std::runtime_error("Petri usage replay exceeded the silent place-path state limit");
@@ -300,9 +314,15 @@ inline std::vector<HiddenPlacePath> silent_place_paths(
       }
     }
     for (std::size_t target = 0; target < target_keys.size(); ++target) {
-      if (!target_keys[target] || target == source || parent[target] == none) continue;
+      if (!target_keys[target] || parent[target] == none ||
+          (target == source && cycle_parent == none)) continue;
       HiddenPlacePath path{source, target, {}};
-      for (auto place = target; place != source; place = parent[place]) path.transitions.push_back(via[place]);
+      auto place = target;
+      if (target == source) {
+        path.transitions.push_back(cycle_transition);
+        place = cycle_parent;
+      }
+      for (; place != source; place = parent[place]) path.transitions.push_back(via[place]);
       std::reverse(path.transitions.begin(), path.transitions.end());
       if (path.transitions.size() > 1'000'000 - stored_steps)
         throw std::runtime_error("Petri usage replay exceeded the silent place-path size limit");

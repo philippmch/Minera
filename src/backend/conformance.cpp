@@ -311,6 +311,30 @@ class Replayer {
     if (replay_options && replay_options->transition_identity_hashes &&
         replay_options->transition_identity_hashes->size() != net_.transitions().size())
       throw std::invalid_argument("transition_identity_hashes must contain one entry per transition");
+    if (replay_options && replay_options->place_outgoing_transition_order) {
+      const auto& outgoing = *replay_options->place_outgoing_transition_order;
+      if (outgoing.size() != initial_.size())
+        throw std::invalid_argument("place_outgoing_transition_order must contain one row per marking slot");
+      for (std::size_t place = 0; place < outgoing.size(); ++place) {
+        const auto adjacent = [&](std::size_t transition) {
+          const auto& t = net_.transitions()[transition];
+          return std::find(t.inputs.begin(), t.inputs.end(), place) != t.inputs.end() ||
+                 std::find(t.reset_inputs.begin(), t.reset_inputs.end(), place) != t.reset_inputs.end() ||
+                 std::find(t.inhibitor_inputs.begin(), t.inhibitor_inputs.end(), place) != t.inhibitor_inputs.end();
+        };
+        std::vector<bool> listed(net_.transitions().size(), false);
+        for (const auto transition : outgoing[place]) {
+          if (transition >= listed.size())
+            throw std::invalid_argument("place_outgoing_transition_order contains an invalid transition index");
+          if (!adjacent(transition))
+            throw std::invalid_argument("place_outgoing_transition_order contains a non-adjacent transition");
+          listed[transition] = true;
+        }
+        for (std::size_t transition = 0; transition < listed.size(); ++transition)
+          if (adjacent(transition) && !listed[transition])
+            throw std::invalid_argument("place_outgoing_transition_order must list every outgoing transition");
+      }
+    }
     if (replay_options && replay_options->variant == TokenReplayVariant::kBackwards) {
       (void)detail::replay_transition_names(replay_options->nullable_transition_names,
                                           replay_options->transition_names, net_);
@@ -1070,7 +1094,8 @@ class Replayer {
       const std::vector<std::string>& place_names,
       const TokenReplayOptions& options) const {
     if (!has_supplied_hidden_paths(options))
-      return detail::silent_place_paths(source_keys, target_keys, net_, place_names);
+      return detail::silent_place_paths(source_keys, target_keys, net_, place_names, 51,
+          options.place_outgoing_transition_order ? &*options.place_outgoing_transition_order : nullptr);
     std::vector<detail::HiddenPlacePath> result;
     const auto* matrix = std::get_if<TokenReplayHiddenPathMatrix>(
         &*options.places_shortest_path_by_hidden);
