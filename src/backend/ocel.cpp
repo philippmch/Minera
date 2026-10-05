@@ -26,12 +26,13 @@ namespace {
 struct Json {
   using Object = std::map<std::string, Json>;
   using Array = std::vector<Json>;
-  std::variant<std::nullptr_t, bool, std::int64_t, double, std::string, Array,
+  std::variant<std::nullptr_t, bool, std::int64_t, std::uint64_t, double, std::string, Array,
                Object>
       value;
   bool is_null() const { return std::holds_alternative<std::nullptr_t>(value); }
   bool is_bool() const { return std::holds_alternative<bool>(value); }
   bool is_int() const { return std::holds_alternative<std::int64_t>(value); }
+  bool is_uint() const { return std::holds_alternative<std::uint64_t>(value); }
   bool is_number() const { return is_int() || std::holds_alternative<double>(value); }
   bool is_string() const { return std::holds_alternative<std::string>(value); }
   bool is_scalar() const {
@@ -46,8 +47,9 @@ struct Json {
 
 class Parser {
  public:
-  Parser(std::string_view input, const OcelJsonLimits& limits)
-      : input_(input), limits_(limits) {
+  Parser(std::string_view input, const OcelJsonLimits& limits,
+         bool unsigned_graph_counts = false)
+      : input_(input), limits_(limits), unsigned_graph_counts_(unsigned_graph_counts) {
     if (input_.size() > limits_.max_bytes) fail("JSON exceeds size limit");
   }
   Json parse() {
@@ -146,9 +148,22 @@ class Parser {
     if (pos_ < input_.size() && (input_[pos_] == 'e' || input_[pos_] == 'E')) { real = true; ++pos_; if (pos_ < input_.size() && (input_[pos_] == '+' || input_[pos_] == '-')) ++pos_; if (pos_ >= input_.size() || input_[pos_] < '0' || input_[pos_] > '9') fail("bad exponent"); while (pos_ < input_.size() && input_[pos_] >= '0' && input_[pos_] <= '9') ++pos_; }
     const auto token = input_.substr(start, pos_ - start);
     if (real) { std::string text(token); char* end = nullptr; const double n = std::strtod(text.c_str(), &end); if (end != text.c_str() + text.size() || !std::isfinite(n)) fail("bad number"); return Json{n}; }
-    std::int64_t n = 0; const auto result = std::from_chars(token.data(), token.data() + token.size(), n); if (result.ec != std::errc() || result.ptr != token.data() + token.size()) fail("integer out of range"); return Json{n};
+    std::int64_t n = 0;
+    const auto result = std::from_chars(token.data(), token.data() + token.size(), n);
+    if (result.ec == std::errc() && result.ptr == token.data() + token.size())
+      return Json{n};
+    if (unsigned_graph_counts_ && token.front() != '-') {
+      std::uint64_t count = 0;
+      const auto unsigned_result =
+          std::from_chars(token.data(), token.data() + token.size(), count);
+      if (unsigned_result.ec == std::errc() &&
+          unsigned_result.ptr == token.data() + token.size())
+        return Json{count};
+    }
+    fail("integer out of range");
   }
   std::string_view input_; const OcelJsonLimits& limits_; std::size_t pos_ = 0; std::size_t nodes_ = 0;
+  bool unsigned_graph_counts_ = false;
 };
 
 const Json& required(const Json::Object& o, std::string_view key) {
@@ -166,6 +181,11 @@ void attrs(const Json* j, std::vector<OcelAttribute>& out, std::string_view fiel
 const Json::Object& obj(const Json& j, std::string_view field) { if (!j.is_object()) throw std::invalid_argument("OCEL field must be object: " + std::string(field)); return j.object(); }
 
 std::size_t size_value(const Json& value, std::string_view field) {
+  if (value.is_uint()) {
+    const auto count = std::get<std::uint64_t>(value.value);
+    if (count <= std::numeric_limits<std::size_t>::max())
+      return static_cast<std::size_t>(count);
+  }
   if (!value.is_int() || std::get<std::int64_t>(value.value) < 0 ||
       static_cast<std::uint64_t>(std::get<std::int64_t>(value.value)) >
           static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()))
@@ -1260,7 +1280,7 @@ std::string otg_json(const OtgGraph& graph) {
 }
 
 EtotGraph parse_etot_json(std::string_view json, const OcelJsonLimits& limits) {
-  const auto parsed = Parser(json, limits).parse();
+  const auto parsed = Parser(json, limits, true).parse();
   const auto& root = obj(parsed, "ETOT graph");
   if (root.find("activities_indep") != root.end() ||
       root.find("activities_ot") != root.end() ||
@@ -1289,7 +1309,7 @@ EtotGraph parse_etot_json(std::string_view json, const OcelJsonLimits& limits) {
 }
 
 OtgGraph parse_otg_json(std::string_view json, const OcelJsonLimits& limits) {
-  const auto parsed = Parser(json, limits).parse();
+  const auto parsed = Parser(json, limits, true).parse();
   const auto& root = obj(parsed, "OTG graph");
   if (root.find("activities") != root.end() ||
       root.find("activities_indep") != root.end() ||

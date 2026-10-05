@@ -1127,6 +1127,18 @@ double ocel_query_number(const httplib::Request& request,
   return parsed;
 }
 
+double ocel_conformance_query_number(const httplib::Request& request,
+                                     std::string_view name, double fallback) {
+  const auto key = std::string(name);
+  if (!request.has_param(key)) return fallback;
+  const auto value = request.get_param_value(key);
+  char* end = nullptr;
+  const auto parsed = std::strtod(value.c_str(), &end);
+  if (end == value.c_str() || end != value.c_str() + value.size())
+    throw std::invalid_argument(key + ": expected a number");
+  return parsed;
+}
+
 std::size_t ocel_query_size(const httplib::Request& request,
                             std::string_view name, std::size_t fallback) {
   if (!request.has_param(std::string(name))) return fallback;
@@ -2889,9 +2901,9 @@ void handle_ocel_conformance(const httplib::Request& request,
       if (!normative_ocel) normative_ocel = minera::parse_ocel_json(normative_body);
       return *normative_ocel;
     };
-    const auto alpha = ocel_query_number(request, "alpha", 1.0);
-    const auto beta = ocel_query_number(request, "beta", 1.0);
-    const auto gamma = ocel_query_number(request, "gamma", 1.0);
+    const auto alpha = ocel_conformance_query_number(request, "alpha", 1.0);
+    const auto beta = ocel_conformance_query_number(request, "beta", 1.0);
+    const auto gamma = ocel_conformance_query_number(request, "gamma", 1.0);
     std::string payload;
     if (variant == "etot") {
       minera::EtotConformanceOptions options;
@@ -2899,7 +2911,7 @@ void handle_ocel_conformance(const httplib::Request& request,
       options.beta = beta;
       options.gamma = gamma;
       options.theta_relative =
-          ocel_query_number(request, "etot_theta", options.theta_relative);
+          ocel_conformance_query_number(request, "etot_theta", options.theta_relative);
       std::optional<minera::EtotGraph> real_graph;
       if (real_mode == "graph")
         real_graph = minera::parse_etot_json(real_body);
@@ -2932,7 +2944,7 @@ void handle_ocel_conformance(const httplib::Request& request,
       options.beta = beta;
       options.gamma = gamma;
       options.theta =
-          ocel_query_number(request, "otg_theta", options.theta);
+          ocel_conformance_query_number(request, "otg_theta", options.theta);
       const std::array<std::pair<std::string_view, std::string_view>, 5>
           relation_thresholds = {{
               {"otg_theta_interaction", "object_interaction"},
@@ -2944,7 +2956,7 @@ void handle_ocel_conformance(const httplib::Request& request,
       for (const auto& [parameter, relation] : relation_thresholds) {
         if (request.has_param(std::string(parameter))) {
           options.theta_by_relation[std::string(relation)] =
-              ocel_query_number(request, parameter, options.theta);
+              ocel_conformance_query_number(request, parameter, options.theta);
         }
       }
       std::optional<minera::OtgGraph> real_graph;
@@ -2978,11 +2990,11 @@ void handle_ocel_conformance(const httplib::Request& request,
       options.alpha = alpha;
       options.beta = beta;
       options.gamma = gamma;
-      options.delta = ocel_query_number(request, "delta", options.delta);
-      options.theta_activity = ocel_query_number(
+      options.delta = ocel_conformance_query_number(request, "delta", options.delta);
+      options.theta_activity = ocel_conformance_query_number(
           request, "ocdfg_theta_activity", options.theta_activity);
       options.theta_flow =
-          ocel_query_number(request, "ocdfg_theta_flow", options.theta_flow);
+          ocel_conformance_query_number(request, "ocdfg_theta_flow", options.theta_flow);
       if (request.has_param("ocdfg_activity_attribute")) {
         options.activity_attribute =
             trim_text(request.get_param_value("ocdfg_activity_attribute"));
