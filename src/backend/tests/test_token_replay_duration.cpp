@@ -1,5 +1,7 @@
 #include "minera/conformance.hpp"
 #include "minera/timestamp.hpp"
+#include "minera/token_replay_duration_error.hpp"
+#include "minera/token_replay_error.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -25,6 +27,10 @@ Event event(std::string activity, std::string timestamp) {
   value.activity = std::move(activity);
   value.timestamp = std::move(timestamp);
   return value;
+}
+
+EventAttribute date_field(std::string key, std::string value) {
+  return {std::move(key), std::move(value), AttributeKind::kDate};
 }
 
 Trace timed_trace(double seconds, std::string first = "a", std::string last = "b") {
@@ -70,8 +76,8 @@ void scalar_contracts() {
   rejects([&] { (void)token_replay_case_duration(trace); });
   rejects([&] { (void)token_replay_case_duration(trace, ""); });
   trace = timed_trace(10);
-  trace.events.front().attributes.push_back({"completed", "1970-01-01T00:00:20Z"});
-  trace.events.back().attributes.push_back({"completed", "1970-01-01T00:00:50Z"});
+  trace.events.front().attributes.push_back(date_field("completed", "1970-01-01T00:00:20Z"));
+  trace.events.back().attributes.push_back(date_field("completed", "1970-01-01T00:00:50Z"));
   require(token_replay_case_duration(trace, "completed") == 30, "custom selector");
   trace.events.front().attributes.push_back(trace.events.front().attributes.front());
   rejects([&] { (void)token_replay_case_duration(trace, "completed"); });
@@ -82,9 +88,9 @@ void scalar_contracts() {
   trace = timed_trace(10);
   for (auto& value : trace.events) value.timestamp_source_key = "source-time";
   require(token_replay_case_duration(trace, "source-time") == 10, "source timestamp alias");
-  trace.events.front().attributes.push_back({"time:timestamp", "1970-01-01T00:00:05Z"});
+  trace.events.front().attributes.push_back(date_field("time:timestamp", "1970-01-01T00:00:05Z"));
   rejects([&] { (void)token_replay_case_duration(trace); });
-  trace.events.back().attributes.push_back({"time:timestamp", "1970-01-01T00:00:10Z"});
+  trace.events.back().attributes.push_back(date_field("time:timestamp", "1970-01-01T00:00:10Z"));
   require(token_replay_case_duration(trace) == 5, "exact timestamp cell takes priority");
 
   EventLog log;
@@ -98,6 +104,138 @@ void scalar_contracts() {
   rejects([&] { (void)token_replay_median_case_duration(log, {3}); });
   rejects<std::out_of_range>([&] { (void)token_replay_median_case_duration(log, {4}); });
   rejects([&] { (void)token_replay_median_case_duration(log, {1}, ""); });
+}
+
+void typed_endpoint_contracts() {
+  const auto pair = [](EventAttribute first, EventAttribute last) {
+    Trace trace;
+    trace.events.resize(2);
+    trace.events.front().attributes.push_back(std::move(first));
+    trace.events.back().attributes.push_back(std::move(last));
+    return trace;
+  };
+  const auto error = [](const Trace& trace, const char* type, const char* message) {
+    const auto before = trace;
+    bool rejected = false;
+    try { (void)token_replay_case_duration(trace, "chosen"); }
+    catch (const TokenReplayDurationError& value) {
+      rejected = true;
+      require(value.reference_type() == type && value.reference_args()[0] == message &&
+                  std::string(value.what()) == message,
+              "duration exception preserves public type, message and argument");
+    }
+    require(rejected, "expected typed duration error");
+    require(trace.events.size() == before.events.size(), "duration error keeps event count");
+    for (std::size_t i = 0; i < trace.events.size(); ++i) {
+      const auto& a = trace.events[i];
+      const auto& b = before.events[i];
+      require(a.attributes == b.attributes && a.timestamp == b.timestamp &&
+                  a.timestamp_attribute == b.timestamp_attribute &&
+                  a.timestamp_source_key == b.timestamp_source_key &&
+                  a.timestamp_state == b.timestamp_state,
+              "duration error leaves endpoint cells unchanged");
+    }
+  };
+  EventAttribute text{"chosen", "2030-01-01T00:00:00Z"};
+  error(pair(text, text), "builtins.TypeError",
+        "unsupported operand type(s) for -: 'str' and 'str'");
+  auto null = text;
+  null.is_null = true;
+  error(pair(null, text), "builtins.TypeError",
+        "unsupported operand type(s) for -: 'str' and 'NoneType'");
+  EventAttribute integer{"chosen", "10", AttributeKind::kInt};
+  integer.typed_value = std::int64_t{10};
+  EventAttribute boolean{"chosen", "true", AttributeKind::kBoolean};
+  boolean.typed_value = true;
+  error(pair(integer, boolean), "builtins.AttributeError",
+        "'int' object has no attribute 'total_seconds'");
+  EventAttribute floating{"chosen", "1.5", AttributeKind::kFloat};
+  floating.typed_value = 1.5;
+  error(pair(boolean, floating), "builtins.AttributeError",
+        "'float' object has no attribute 'total_seconds'");
+  auto large = integer;
+  large.typed_value = std::uint64_t{1} << 63;
+  error(pair(large, integer), "builtins.AttributeError",
+        "'int' object has no attribute 'total_seconds'");
+  EventAttribute na{"chosen", "<NA>", AttributeKind::kNA};
+  na.typed_value = NativeNA{};
+  error(pair(na, text), "builtins.AttributeError",
+        "'NAType' object has no attribute 'total_seconds'");
+  error(pair(na, null), "builtins.TypeError",
+        "unsupported operand type(s) for -: 'NoneType' and 'NAType'");
+  auto list = text;
+  list.container = AttributeContainerKind::kList;
+  error(pair(list, na), "builtins.TypeError",
+        "unsupported operand type(s) for -: 'NAType' and 'list'");
+  auto set = text;
+  set.container = AttributeContainerKind::kSet;
+  auto frozen = set;
+  frozen.container = AttributeContainerKind::kFrozenSet;
+  error(pair(set, frozen), "builtins.AttributeError",
+        "'frozenset' object has no attribute 'total_seconds'");
+  error(pair(frozen, set), "builtins.AttributeError",
+        "'set' object has no attribute 'total_seconds'");
+
+  auto aware = date_field("chosen", "2030-01-01T00:00:00.123456Z");
+  auto naive = date_field("chosen", "2030-01-01T00:00:10.123457");
+  error(pair(aware, naive), "builtins.TypeError",
+        "can't subtract offset-naive and offset-aware datetimes");
+  error(pair(naive, aware), "builtins.TypeError",
+        "can't subtract offset-naive and offset-aware datetimes");
+  for (const auto& year : {"0001", "2030", "9999"}) {
+    const auto prefix = std::string(year) + "-01-01T00:00:";
+    const auto trace = pair(date_field("chosen", prefix + "00.123456Z"),
+                            date_field("chosen", prefix + "10.123457Z"));
+    require(token_replay_case_duration(trace, "chosen") == 10.000001,
+            "datetime differences retain microseconds across the calendar range");
+  }
+  const auto adjacent = pair(date_field("chosen", "9999-12-31T23:59:59.999998Z"),
+                             date_field("chosen", "9999-12-31T23:59:59.999999Z"));
+  require(token_replay_case_duration(adjacent, "chosen") == 0.000001,
+          "adjacent microseconds are subtracted before floating-point conversion");
+  const auto wide = pair(date_field("chosen", "0001-01-01T00:00:00.123456Z"),
+                         date_field("chosen", "9999-01-01T00:00:10.123457Z"));
+  require(token_replay_case_duration(wide, "chosen") == 315506361610.000001,
+          "wide datetime differences round total seconds once");
+  auto typed_date = text;
+  typed_date.typed_value = NativeDate{"2030-01-01T00:00:00.123456Z"};
+  require(token_replay_case_duration(pair(typed_date, aware), "chosen") == 0,
+          "typed native date takes precedence over lexical projection kind");
+
+  auto projected = pair(text, text);
+  for (auto& value : projected.events) {
+    value.timestamp = "1970-01-01T00:00:00Z";
+    value.timestamp_state = FirstClassAttributeState::kPresent;
+    value.timestamp_source_key = "chosen";
+    value.timestamp_attribute = value.attributes.front();
+    value.attributes.clear();
+  }
+  error(projected, "builtins.TypeError",
+        "unsupported operand type(s) for -: 'str' and 'str'");
+  auto missing = pair(text, text);
+  missing.events.back().attributes.clear();
+  missing.events.front().attributes.push_back(text);
+  bool rejected = false;
+  try { (void)token_replay_case_duration(missing, "chosen"); }
+  catch (const TokenReplayKeyError& value) {
+    rejected = value.reference_args()[0] == "chosen";
+  }
+  require(rejected, "last endpoint lookup precedes invalid first endpoint lookup");
+  missing = pair(text, text);
+  missing.events.front().attributes.clear();
+  rejected = false;
+  try { (void)token_replay_case_duration(missing, "chosen"); }
+  catch (const TokenReplayKeyError&) { rejected = true; }
+  require(rejected, "both endpoint lookups precede subtraction type checking");
+  error(Trace{}, "builtins.IndexError", "list index out of range");
+  rejected = false;
+  try { (void)token_replay_median_case_duration(EventLog{}, {}); }
+  catch (const TokenReplayDurationError& value) {
+    rejected = value.reference_type() == "statistics.StatisticsError" &&
+               value.reference_args()[0] == "no median for empty data" &&
+               std::string(value.what()) == "no median for empty data";
+  }
+  require(rejected, "empty median preserves public StatisticsError payload");
 }
 
 void transition_contracts() {
@@ -183,9 +321,9 @@ void unknown_contracts() {
   selected.timestamp_attribute = "completed";
   for (auto& trace : log.traces) {
     for (auto& value : trace.events) value.attributes.push_back({"phase", "b"});
-    trace.events.front().attributes.push_back({"completed", format_timestamp(0)});
-    trace.events.back().attributes.push_back({"completed", format_timestamp(
-        2 * token_replay_case_duration(trace))});
+    trace.events.front().attributes.push_back(date_field("completed", format_timestamp(0)));
+    trace.events.back().attributes.push_back(date_field("completed", format_timestamp(
+        2 * token_replay_case_duration(trace))));
   }
   rows = token_replay_unknown_activity_duration_diagnostics(
       log, {{"X", false, {2}}, {"Y", false, {3}}}, selected);
@@ -254,7 +392,7 @@ void literal_selector_contracts() {
 
       auto trace = timed_trace(10);
       for (auto& value : trace.events) {
-        EventAttribute selected{key, value.timestamp};
+        EventAttribute selected = date_field(key, value.timestamp);
         if (projected) {
           value.timestamp_source_key = key;
           value.timestamp_state = FirstClassAttributeState::kPresent;
@@ -369,6 +507,7 @@ void integration_contracts() {
 int main() {
   try {
     scalar_contracts();
+    typed_endpoint_contracts();
     transition_contracts();
     unknown_contracts();
     literal_selector_contracts();

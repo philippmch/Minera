@@ -10627,3 +10627,80 @@ raw wire surrogate encoding, broader typed container/datetime identity, public
 mutation/order, legacy alignment selectors and all prior independent gates
 remain open. Catalogue totals remain 46/86 packages, 199/387 modules and 228
 incomplete units. No whole-module/package or full-parity promotion is made.
+
+
+## Typed token-replay duration arithmetic and error payload checkpoint
+
+Duration endpoints now retain their original selected cell types. A string that
+looks like an ISO date raises the captured TypeError rather than becoming a
+datetime. Generic fields and timestamp projections preserve scalar/container
+kinds, explicit None, pandas.NA, native dates and complete literal selector keys.
+Legacy untyped Event.timestamp text retains its existing native datetime
+projection. The last endpoint is looked up before the first, and both lookups
+finish before subtraction is checked. Missing fields therefore preserve their
+KeyError payload even when the other endpoint has an incompatible type.
+
+The additive `TokenReplayDurationError` header retains std::invalid_argument
+catch compatibility and exposes actual reference_type()/reference_args() data.
+The observed builtins.TypeError, builtins.AttributeError, builtins.IndexError
+and statistics.StatisticsError class-name/message/string-argument payloads are
+preserved. Numeric/bool subtraction, NA propagation, set/frozenset result types,
+mixed datetime awareness, empty traces and empty medians follow the actual
+public captures. The existing TokenReplayKeyError carrier remains unchanged.
+
+Built-in datetime endpoints are subtracted as exact microseconds before their
+total seconds are rounded once. This preserves adjacent microseconds and
+large calendar differences across years 1 through 9999, including negative
+durations and fixed timezone offsets. NativeDate precision/provenance metadata
+does not imply an unobserved pandas.Timestamp runtime class.
+
+`docs/replay-duration-error-validation.json` binds 45,243 fresh pinned public
+calls across the four case/median/transition/unknown-activity duration APIs.
+The primary corpus covers all ordered pairs of 16 endpoint descriptors; the
+extended delta adds tuple, set, frozenset and four microsecond/calendar controls
+without rerunning the original pairs. Their union covers 23 descriptors through
+20 literal timestamp selectors, singleton/empty controls and 500 fit/problem
+cohort fixtures. Parameters, logs, cohort mappings and transition identities
+are captured before and after; opaque reference-module hashes remain unchanged.
+No reference implementation/private-state inspection is used.
+
+Three native layouts supply 135,729 actual observations per phase. All final
+observations match the actual reference return fields or complete portable
+exception payloads; the baseline matches 15,726. All 125,043 final exception
+payloads match, up from 8,400. All 10,686 successful observations match every
+scalar or five-field cohort result bit-for-bit. The 7,326 previously correct
+successful whole rows remain identical; 3,360 calendar precision rows are
+corrected. There are 7,080 corrected acceptance decisions and no prior true
+predicate losses. Before/after probe bodies, fixtures and calls are byte-identical.
+
+The retained 2,260 public literal duration calls produce 6,780 additional native
+observations. All 1,251 exception payloads now match, including the 720
+non-KeyError rows left open by the preceding checkpoint. Every one of the 5,529
+successful whole rows remains unchanged. Eight retained compiled replay probes
+were freshly relinked and rerun: all 160,064 whole emitted native rows remain
+byte-identical to the pushed missing-key checkpoint, including all 73,504
+successful rows and their raw/wire/PLTR metadata. The 534 CLI and 534 HTTP mining
+calls preserve their previous predicate arrays and summaries. Each still has
+nine acceptance and 213 error-message differences. Frontend bindings and the
+inherited 164 tests remain verified; no fresh frontend run is claimed.
+
+The final frozen build binds 662 source inputs, with one duration implementation,
+two tests and one additive header changed. Existing headers and CMake definitions
+remain byte-identical. Three changed units are freshly compiled; 316 verified
+unchanged objects are reused and all 155 outputs freshly linked. Seven focused
+and all 152 assertion-enabled native suites pass. A new-test equality compilation
+failure and the retained transport fixture's untyped date expectation are
+preserved in separate frozen build directories. Production source is unchanged
+through these test repairs. Prepared default-stack and guarded extended-public
+namespaces, the malformed-bytes native probe failure and fresh helper recoveries
+are retained in the byte-roundtripped evidence archives.
+
+This closes the captured portable duration error-data and built-in datetime
+microsecond gaps. C++ runtime exception/array objects remain native; physical
+Python exception/tuple identity is not promoted. pandas.Timestamp/NaT, named-zone
+and DST identity, custom operator classes, unsupported malformed date values,
+broader nested membership and dataframe dtype/provenance remain separate gates.
+Raw wire surrogate handling, public mutation/order, legacy alignment selectors
+and every previous independent catalogue gate remain open. Catalogue totals stay
+46/86 packages, 199/387 modules and 228 incomplete units. No whole package/module
+or full-parity promotion is made.

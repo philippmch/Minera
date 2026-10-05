@@ -2450,3 +2450,26 @@ predicate arrays remain unchanged. The class continues to derive from
 class/tuple identity, remaining non-KeyError duration errors, mixed endpoint
 precedence and all other independent gates remain open. No catalogue promotion
 or full-parity claim is made.
+
+
+## Typed duration arithmetic and portable exceptions
+
+`docs/replay-duration-error-validation.json` verifies 135,729 fresh native typed
+observations against 45,243 actual public duration calls, plus all 6,780 retained
+literal observations. All return fields and actual error type-name/message/string
+arguments match. The previous 720 remaining duration error rows are closed; every
+previously true predicate and successful whole control row survives.
+
+Duration preserves endpoint cell types and last-before-first lookup precedence.
+Generic ISO strings do not become datetime objects. The additive
+TokenReplayDurationError carries builtins.TypeError/AttributeError/IndexError and
+statistics.StatisticsError data while remaining catch-compatible with
+std::invalid_argument. Existing missing-key errors retain their exact selector.
+Built-in datetime differences are computed in exact microseconds and rounded to
+seconds once, preserving calendar-range and adjacent-microsecond controls.
+
+All 152 native suites pass; 160,064 whole retained replay rows and both application
+predicate arrays remain unchanged. These are portable native representations;
+physical Python class/tuple identity, pandas timestamp/NaT provenance, named-zone
+DST behavior, arbitrary nested membership and all other independent gates remain
+open. No catalogue or full-parity promotion is made.

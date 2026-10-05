@@ -1,4 +1,5 @@
 #include "minera/conformance.hpp"
+#include "minera/token_replay_duration_error.hpp"
 #include "minera/token_replay_error.hpp"
 
 #include <algorithm>
@@ -8,12 +9,13 @@
 #include <string_view>
 #include <utility>
 
+#include "business_hours.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
 namespace {
 
-std::optional<std::string> selected_value(
+std::optional<EventAttribute> selected_field(
     const Event& event, const std::string& selector, bool timestamp,
     bool* present = nullptr) {
   if (present) *present = true;
@@ -41,9 +43,7 @@ std::optional<std::string> selected_value(
       if (present) { *present = false; return std::nullopt; }
       throw TokenReplayKeyError(selector);
     }
-    if (selected->is_null || selected->first_class_state == FirstClassAttributeState::kNull)
-      return std::nullopt;
-    return selected->value;
+    return *selected;
   }
   const auto& source = timestamp ? event.timestamp_source_key : event.activity_source_key;
   const auto& cell = timestamp ? event.timestamp_attribute : event.activity_attribute;
@@ -57,22 +57,109 @@ std::optional<std::string> selected_value(
       if (present) { *present = false; return std::nullopt; }
       throw TokenReplayKeyError(selector);
     }
+    if (cell) return *cell;
     const auto state = timestamp ? event.timestamp_state : event.activity_state;
     const auto& value = timestamp ? event.timestamp : event.activity;
-    if (state == FirstClassAttributeState::kNull) return std::nullopt;
-    if (state == FirstClassAttributeState::kPresent || !value.empty()) return value;
-    if (cell) return cell->is_null ? std::nullopt : std::optional<std::string>(cell->value);
+    if (state == FirstClassAttributeState::kNull ||
+        state == FirstClassAttributeState::kPresent || !value.empty()) {
+      EventAttribute field{selector, value,
+                           timestamp ? AttributeKind::kDate : AttributeKind::kString};
+      field.is_null = state == FirstClassAttributeState::kNull;
+      return field;
+    }
   }
   if (present) { *present = false; return std::nullopt; }
   throw TokenReplayKeyError(selector);
 }
 
-double instant(const Event& event, const std::string& selector) {
-  const auto value = selected_value(event, selector, true);
-  const auto parsed = value ? parse_timestamp(*value) : std::nullopt;
-  if (!parsed)
-    throw std::invalid_argument("token replay duration: selected endpoint timestamp is null or invalid");
-  return *parsed;
+bool is_null(const EventAttribute& field) {
+  return field.is_null || field.first_class_state == FirstClassAttributeState::kNull;
+}
+
+std::optional<std::string> selected_value(
+    const Event& event, const std::string& selector, bool timestamp,
+    bool* present = nullptr) {
+  const auto field = selected_field(event, selector, timestamp, present);
+  return !field || is_null(*field) ? std::nullopt
+                                 : std::optional<std::string>(field->value);
+}
+
+std::string_view endpoint_type(const EventAttribute& field) {
+  if (is_null(field)) return "NoneType";
+  switch (field.container) {
+    case AttributeContainerKind::kList: return "list";
+    case AttributeContainerKind::kContainer: return "dict";
+    case AttributeContainerKind::kTuple: return "tuple";
+    case AttributeContainerKind::kSet: return "set";
+    case AttributeContainerKind::kFrozenSet: return "frozenset";
+    case AttributeContainerKind::kScalar: break;
+  }
+  if (field.scalar_wrapper || field.scalar_children_list || !field.children.empty())
+    return "dict";
+  if (std::holds_alternative<NativeDate>(field.typed_value)) return "datetime.datetime";
+  if (std::holds_alternative<NativeNA>(field.typed_value)) return "NAType";
+  if (std::holds_alternative<bool>(field.typed_value)) return "bool";
+  if (std::holds_alternative<double>(field.typed_value)) return "float";
+  if (std::holds_alternative<std::int64_t>(field.typed_value) ||
+      std::holds_alternative<std::uint64_t>(field.typed_value)) return "int";
+  switch (field.kind) {
+    case AttributeKind::kDate: return "datetime.datetime";
+    case AttributeKind::kInt: return "int";
+    case AttributeKind::kFloat: return "float";
+    case AttributeKind::kBoolean: return "bool";
+    case AttributeKind::kBytes: return "bytes";
+    case AttributeKind::kNA: return "NAType";
+    case AttributeKind::kString:
+    case AttributeKind::kId: return "str";
+  }
+  return "str";
+}
+
+[[noreturn]] void no_total_seconds(std::string_view type) {
+  throw TokenReplayDurationError("builtins.AttributeError",
+      "'" + std::string(type) + "' object has no attribute 'total_seconds'");
+}
+
+double endpoint_difference(const EventAttribute& last, const EventAttribute& first) {
+  const auto left = endpoint_type(last);
+  const auto right = endpoint_type(first);
+  if (left == "datetime.datetime" && right == "datetime.datetime") {
+    const auto parse = [](const EventAttribute& field) {
+      const auto* date = std::get_if<NativeDate>(&field.typed_value);
+      const auto value = parse_timestamp_exact(date ? date->value : field.value);
+      if (!value)
+        throw std::invalid_argument("token replay duration: invalid native date endpoint");
+      return *value;
+    };
+    const auto end = parse(last);
+    const auto start = parse(first);
+    if (end.timezone_aware != start.timezone_aware)
+      throw TokenReplayDurationError("builtins.TypeError",
+          "can't subtract offset-naive and offset-aware datetimes");
+    const auto microseconds = [](const ParsedExactTimestamp& value) {
+      return value.seconds * detail::kMicrosecondsPerSecond + value.nanoseconds / 1000;
+    };
+    return detail::epoch_seconds_from_microseconds(
+        microseconds(end) - microseconds(start));
+  }
+  const auto numeric = [](std::string_view type) {
+    return type == "int" || type == "float" || type == "bool";
+  };
+  if (numeric(left) && numeric(right))
+    no_total_seconds(left == "float" || right == "float" ? "float" : "int");
+  const auto na_operand = [&](std::string_view type) {
+    return numeric(type) || type == "str" || type == "bytes" ||
+           type == "datetime.datetime" || type == "NAType";
+  };
+  if ((left == "NAType" && na_operand(right)) ||
+      (right == "NAType" && na_operand(left))) no_total_seconds("NAType");
+  const auto set = [](std::string_view type) {
+    return type == "set" || type == "frozenset";
+  };
+  if (set(left) && set(right)) no_total_seconds(left);
+  throw TokenReplayDurationError("builtins.TypeError",
+      "unsupported operand type(s) for -: '" + std::string(left) +
+      "' and '" + std::string(right) + "'");
 }
 
 void validate_indices(const EventLog& log, const std::vector<std::size_t>& indices) {
@@ -120,10 +207,10 @@ TokenReplayDurationComparison compare(
 double token_replay_case_duration(const Trace& trace,
                                  const std::string& timestamp_attribute) {
   if (trace.events.empty())
-    throw std::invalid_argument("token replay duration: empty trace has no endpoints");
-  const double first = instant(trace.events.front(), timestamp_attribute);
-  const double last = instant(trace.events.back(), timestamp_attribute);
-  return last - first;
+    throw TokenReplayDurationError("builtins.IndexError", "list index out of range");
+  const auto last = selected_field(trace.events.back(), timestamp_attribute, true);
+  const auto first = selected_field(trace.events.front(), timestamp_attribute, true);
+  return endpoint_difference(*last, *first);
 }
 
 double token_replay_median_case_duration(
@@ -131,7 +218,7 @@ double token_replay_median_case_duration(
     const std::string& timestamp_attribute) {
   validate_indices(log, trace_indices);
   if (trace_indices.empty())
-    throw std::invalid_argument("token replay duration: median requires at least one trace");
+    throw TokenReplayDurationError("statistics.StatisticsError", "no median for empty data");
   std::vector<double> values;
   values.reserve(trace_indices.size());
   for (auto index : trace_indices)
