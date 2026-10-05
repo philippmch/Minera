@@ -1,6 +1,7 @@
 #include "minera/conformance.hpp"
 #include "minera/log_conversion.hpp"
 #include "token_replay_dataframe_grouping_reference_cases.hpp"
+#include "../root_cause_trace_key.hpp"
 
 #include <algorithm>
 #include <iostream>
@@ -559,6 +560,100 @@ void activity_errors_precede_backwards_fitness() {
     }
   }
 }
+
+void activity_selectors_are_literal_keys() {
+  const auto net = to_petri_net(ProcessTree({"A"}, ProcessTreeNode::leaf(0)));
+  const std::vector<std::string> selectors = {
+      "concept:name", "chosen", "activity", "", "'", "\"", "'\"", "\\",
+      "\n", "\r", "\t", std::string(1, '\0'), "\x7f", "\xc2\xa0",
+      "\xe2\x80\x8b", "\xcd\xb8", "\xe6\xbc\xa2\xe5\xad\x97",
+      "\xf0\x9f\x8c\xbf", "\xed\xa0\x80", "\xed\xbf\xbf"};
+  for (const auto& selector : selectors) {
+    Event selected;
+    selected.attributes = {{"concept:name", "B"}};
+    if (selector == "concept:name") selected.attributes.clear();
+    selected.attributes.push_back({selector, "A"});
+    Trace trace;
+    trace.case_id = "literal";
+    trace.events = {selected};
+    EventLog log;
+    log.traces = {trace};
+    EventStream stream;
+    EventRecord record;
+    record.fields = selected.attributes;
+    record.fields.push_back({"case:concept:name", "literal"});
+    stream.events = {record};
+    const auto table = event_stream_to_table(stream);
+    const auto lazy = LazyEventTable::from_table(table);
+    for (const auto variant : {TokenReplayVariant::kForward, TokenReplayVariant::kBackwards}) {
+      TokenReplayOptions options;
+      options.variant = variant;
+      options.activity_attribute = selector;
+      for (const auto view : {EventDataView(log), EventDataView(stream),
+                              EventDataView(table), EventDataView(lazy)}) {
+        const auto normalized = normalize_token_replay_event_log(view, options);
+        require(normalized.traces[0].events[0].activity == "A",
+                "literal selected field beats concept:name");
+        if (selector != "concept:name") {
+          const auto canonical = native_event_attribute(normalized.traces[0].events[0], "concept:name");
+          require(canonical && canonical->value == "B",
+                  "normalization preserves the unselected canonical field");
+        }
+        const auto round_trip = event_stream_to_event_log(event_log_to_event_stream(normalized));
+        const auto restored = native_event_attribute(round_trip.traces[0].events[0], selector);
+        require(restored && restored->value == "A",
+                "literal selected keys survive flat round trips");
+        const auto rows = replay_token_traces(view, net, options);
+        require(rows.size() == 1 && rows[0].trace_is_fit &&
+                    rows[0].activated_transitions.size() == 1,
+                "literal selector replays across all event-data adapters");
+        require(check_conformance(view, net, options).fitting_traces == 1 &&
+                    replay_token_diagnostics(view, net, options).fitting_traces == 1,
+                "aggregate and diagnostic replay use the same literal selector");
+      }
+      const auto rows = replay_token_traces(log, net, options);
+      require(rows[0].trace_is_fit, "direct grouped replay uses literal selector");
+      require(check_conformance(log, net, options).fitting_traces == 1 &&
+                  replay_token_diagnostics(log, net, options).fitting_traces == 1,
+              "direct aggregate and diagnostics use literal selector");
+      if (variant == TokenReplayVariant::kForward)
+        require(replay_token_result(log, net, options).traces.size() == 1,
+                "full replay resolves literal selector");
+      if (selector == "concept:name") continue;
+      Event canonical;
+      canonical.activity = "A";
+      canonical.activity_state = FirstClassAttributeState::kPresent;
+      canonical.activity_source_key = "concept:name";
+      canonical.activity_attribute = EventAttribute{"concept:name", "A"};
+      canonical.attributes = {{"concept:name", "A"}};
+      auto missing = log;
+      missing.traces[0].events = {canonical};
+      rejects<std::invalid_argument>([&] { (void)replay_token_traces(missing, net, options); },
+          "canonical activity is not an alias for a literal selector");
+      rejects<std::invalid_argument>([&] { (void)normalize_token_replay_event_log(EventDataView(missing), options); },
+          "grouped adapter respects first-class source metadata");
+      auto missing_stream = stream;
+      missing_stream.events[0].fields = {{"case:concept:name", "literal"}, {"concept:name", "A"}};
+      rejects<std::invalid_argument>([&] { (void)normalize_token_replay_event_log(EventDataView(missing_stream), options); },
+          "flat adapter does not alias literal activity keys");
+    }
+  }
+  Event projected;
+  projected.activity = "A";
+  projected.activity_state = FirstClassAttributeState::kPresent;
+  projected.activity_source_key = "chosen";
+  projected.activity_attribute = EventAttribute{"chosen", "A"};
+  Trace trace;
+  trace.events = {projected};
+  EventLog log;
+  log.traces = {trace};
+  rejects<std::invalid_argument>([&] { (void)replay_token_traces(log, net); },
+      "explicit projected key does not fabricate concept:name");
+  TokenReplayOptions options;
+  options.activity_attribute = "chosen";
+  require(replay_token_traces(log, net, options)[0].trace_is_fit,
+          "explicit first-class source key remains available");
+}
 }  // namespace
 
 int main() {
@@ -571,6 +666,7 @@ int main() {
     null_cases_and_activities_keep_distinct_semantics();
     numeric_case_ordering_matches_inferred_index();
     activity_errors_precede_backwards_fitness();
+    activity_selectors_are_literal_keys();
     std::cout << "Token replay event-data tests passed\n";
     return 0;
   } catch (const std::exception& error) {

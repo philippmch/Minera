@@ -7290,6 +7290,12 @@ int main(int argc, char** argv) {
       const bool is_inductive = id == "inductive";
       const bool is_alpha = id == "alpha";
       auto replay_options = token_replay_options;
+      if (!token_replay_activity_option_used) {
+        if (is_inductive)
+          replay_options.activity_attribute = inductive_options.activity_key;
+        else if (is_alpha)
+          replay_options.activity_attribute = alpha_options.activity_attribute;
+      }
       if (id == "heuristic" &&
           replay_options.activity_attribute == "concept:name") {
           replay_options.activity_attribute = heuristic_options.activity_attribute;

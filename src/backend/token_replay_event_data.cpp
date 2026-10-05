@@ -133,7 +133,8 @@ const EventAttribute& selected_field(const EventRecord& record,
     const int priority = field.key == selector ? 3
         : (!field.first_class_source_key.empty() &&
            field.first_class_source_key == selector) ? 2
-        : (alias(selector, role) && alias(field.key, role)) ? 1 : 0;
+        : (role != FirstClassAttributeRole::kActivity &&
+           alias(selector, role) && alias(field.key, role)) ? 1 : 0;
     if (priority > best) {
       best = priority;
       selected = &field;
@@ -160,8 +161,7 @@ void enforce_cap(std::size_t rows, const TokenReplayOptions& options) {
 }
 
 std::string activity_selector(const TokenReplayOptions& options) {
-  return options.activity_attribute.empty() ? "concept:name"
-                                             : options.activity_attribute;
+  return options.activity_attribute;
 }
 
 EventLog project_log(const EventLog& source, const TokenReplayOptions& options) {
@@ -186,8 +186,14 @@ EventLog project_log(const EventLog& source, const TokenReplayOptions& options) 
       }
       if (matches > 1) throw std::invalid_argument("token replay: ambiguous selected activity");
       if (!selected) {
-        if ((alias(selector, FirstClassAttributeRole::kActivity) ||
-             (!event.activity_source_key.empty() && event.activity_source_key == selector)) &&
+        const std::string_view projected_key = !event.activity_source_key.empty()
+            ? std::string_view(event.activity_source_key)
+            : event.activity_attribute
+                ? !event.activity_attribute->first_class_source_key.empty()
+                    ? std::string_view(event.activity_attribute->first_class_source_key)
+                    : std::string_view(event.activity_attribute->key)
+                : std::string_view("concept:name");
+        if (selector == projected_key &&
             (event.has_activity() || event.activity_state == FirstClassAttributeState::kNull))
           continue;
         throw std::invalid_argument("token replay: missing selected activity");

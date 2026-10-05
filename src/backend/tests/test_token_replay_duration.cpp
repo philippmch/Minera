@@ -238,28 +238,19 @@ void integration_contracts() {
           "unknown duration uses original source trace");
   auto empty_selector = options;
   empty_selector.activity_attribute.clear();
-  const auto normalized = check_conformance(log, net, empty_selector);
-  const auto same_comparison = [](const TokenReplayDurationComparison& left,
-                                  const TokenReplayDurationComparison& right) {
-    return left.fit_trace_indices == right.fit_trace_indices &&
-           left.problem_trace_indices == right.problem_trace_indices &&
-           left.fit_count == right.fit_count && left.problem_count == right.problem_count &&
-           left.fit_median_seconds == right.fit_median_seconds &&
-           left.problem_median_seconds == right.problem_median_seconds &&
-           left.relative_throughput == right.relative_throughput;
-  };
-  require(normalized.activity_attribute == result.activity_attribute &&
-          normalized.fitness == result.fitness &&
-          normalized.duration_diagnostics->transitions.size() == duration.transitions.size() &&
-          normalized.duration_diagnostics->unknown_activities.size() == duration.unknown_activities.size() &&
-          normalized.duration_diagnostics->transitions[0].transition_index == duration.transitions[0].transition_index &&
-          normalized.duration_diagnostics->unknown_activities[0].activity == duration.unknown_activities[0].activity &&
-          same_comparison(normalized.duration_diagnostics->transitions[0], duration.transitions[0]) &&
-          same_comparison(normalized.duration_diagnostics->unknown_activities[0], duration.unknown_activities[0]),
-          "integrated empty activity selector uses canonical default for both comparisons");
+  rejects([&] { (void)check_conformance(log, net, empty_selector); });
+  auto literal_log = log;
+  for (auto& trace : literal_log.traces)
+    for (auto& value : trace.events) value.attributes.push_back({"", value.activity});
+  TokenReplayOptions literal_options;
+  literal_options.activity_attribute.clear();
+  const auto literal_result = check_conformance(literal_log, net, literal_options);
+  require(literal_result.activity_attribute.empty() && literal_result.fitness == plain.fitness &&
+              literal_result.transition_frequencies == plain.transition_frequencies,
+          "explicit empty activity keys replay with the supplied literal selector");
   const auto empty_default = check_conformance(EventLog{}, net, options);
   const auto empty_normalized = check_conformance(EventLog{}, net, empty_selector);
-  require(empty_normalized.activity_attribute == empty_default.activity_attribute &&
+  require(empty_normalized.activity_attribute.empty() &&
           empty_normalized.duration_diagnostics.has_value() &&
           empty_normalized.duration_diagnostics->transitions.empty() &&
           empty_normalized.duration_diagnostics->unknown_activities.empty() &&
