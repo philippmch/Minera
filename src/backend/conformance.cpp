@@ -3674,6 +3674,23 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
   const auto activity_attribute = options.activity_attribute.empty()
                                       ? std::string("concept:name")
                                       : options.activity_attribute;
+  if (options.variant == TokenReplayVariant::kBackwards) {
+    // Resolve a whole trace before validating its variant key, and finish
+    // validating the log before any trace can fail its fitness calculation.
+    for (const auto& trace : event_log.traces) {
+      for (const auto& event : trace.events)
+        (void)selected_replay_activity(event, activity_attribute);
+      for (const auto& event : trace.events) {
+        const auto cell = native_event_attribute(event, activity_attribute);
+        if (cell && !root_cause_key_is_hashable(*cell)) {
+          // Retained XES detail does not change a scalar string's replay label.
+          const auto activity = selected_replay_activity(event, activity_attribute);
+          if (!activity.model_label && activity.display_name)
+            throw std::invalid_argument("unhashable activity variant key");
+        }
+      }
+    }
+  }
   std::vector<TokenReplayTraceDiagnostics> result;
   result.reserve(event_log.traces.size());
   for (const auto& trace : event_log.traces) {
@@ -3754,6 +3771,11 @@ TokenReplayResult replay_token_result(
   }
   const auto selector = options.activity_attribute.empty()
       ? std::string("concept:name") : options.activity_attribute;
+  // Forward replay resolves selected keys across the complete log before
+  // constructing hashable variants, including when grouping is disabled.
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events)
+      (void)selected_replay_activity(event, selector);
   struct FullVariant {
     std::vector<EventAttribute> activities;
     std::vector<std::size_t> sources;
