@@ -2432,3 +2432,21 @@ This is bounded selection/summary evidence. Exact Python exception class/message
 args and broader type/identity/order/mutation behavior remain independent gates;
 the shared empty-field datetime activity case returns no duration comparisons.
 No catalogue promotion or full-parity claim is made.
+
+
+## Missing literal selector error payload
+
+`docs/replay-key-error-validation.json` verifies the actual `TokenReplayKeyError`
+reference type-name, `what()` and single-string argument bytes. All 11,520
+fresh replay and 531 duration missing-key observations match the actual public
+payload; all 1,114,112 Unicode codepoints and 32 compound constructor controls
+match the actual CPython builtin representation. Embedded NUL and separate
+surrogate codepoints retain their complete key arguments.
+
+Every successful whole native row and prior true predicate survives the fresh
+160,064-call replay regression. All 152 native suites pass and both application
+predicate arrays remain unchanged. The class continues to derive from
+`std::invalid_argument`. This is portable error-data equivalence; physical Python
+class/tuple identity, remaining non-KeyError duration errors, mixed endpoint
+precedence and all other independent gates remain open. No catalogue promotion
+or full-parity claim is made.

@@ -10558,3 +10558,72 @@ class/message/args, broader datetime/container identity, wire encoding, public
 mutation/ordering behavior and the prior independent gates remain open.
 Catalogue totals remain 46/86 packages, 199/387 modules and 228 incomplete units.
 No whole-module/package promotion or full-parity claim is made.
+
+
+## Literal token-replay missing-key error payload checkpoint
+
+Missing activity and endpoint timestamp selectors now throw
+`TokenReplayKeyError`, which preserves `std::invalid_argument` catch compatibility.
+The additive public header exposes actual `reference_type()` and
+`reference_args()` data. The class-name value is `builtins.KeyError`; the single
+string argument retains its full UTF-8/WTF-8 bytes, including embedded NUL.
+`what()` renders the selected key with the observed CPython string representation:
+quote choice, escapes and Unicode printability. Direct replay, grouped event-data
+normalization and duration endpoints use this carrier. Explicit transported
+missing cells also retain the actual selector. Activity filtering still skips
+absent keys when the public duration helper treats them as absent membership.
+
+`docs/replay-key-error-validation.json` binds the full observations. The pinned
+CPython 3.11.9 runtime supplied 4,608 fresh public replay calls across 32 selectors,
+six trace patterns, forward/backwards, parent/direct, PLTR and default/false/true
+disable_variants: 3,840 KeyErrors and 768 returns. Codepoint-array and WTF-8-byte
+serialization distinguishes two surrogate codepoints from one supplementary
+character. Three native layouts supply 13,824 calls per phase. All 11,520 final
+missing-key payloads match actual public class-name/message/argument bytes;
+the baseline matches zero. All 2,304 successful numeric projections match and
+their complete emitted native rows remain unchanged.
+
+The 2,260 retained public duration calls supply 6,780 fresh native calls per
+phase. All 531 missing-timestamp payloads now match the actual reference payload,
+up from zero. All 5,529 successful scalar/five-field numeric projections remain
+unchanged. The other 720 error rows retain their native messages and remain
+separate TypeError, AttributeError, StatisticsError and IndexError gates.
+
+An exhaustive independent builtin observation calls `KeyError(chr(cp))`, `repr`
+and `isprintable` for all 1,114,112 Unicode codepoints, plus 32 compound strings.
+All 1,114,144 native constructor payloads match. These are builtin/constructor
+observations, not additional PM4Py replay calls. Actual getter results and `what`
+bytes are recorded; expected selectors do not fill the native error payload.
+
+All 160,064 retained replay calls were rerun with eight verified previously
+compiled probes. Every one of the 73,504 successful whole native rows survives;
+140,672 total whole rows are unchanged. The 19,392 changed rows differ only in
+their missing-key exception. Their actual messages and reduced key families
+match actual public captures, including 384 previously truncated NUL-key errors;
+all 19,008 previously matching reduced key families survive. These old probes
+do not observe the new argument getters, so exact getter payload equivalence
+is claimed only for the fresh getter probes. All other raw/wire/PLTR metadata
+and prior true predicates are unchanged. The 534 CLI and 534 HTTP mining calls
+preserve every prior predicate and summary; each still retains nine acceptance
+and 213 error-message differences. Inherited frontend bindings and 164 tests
+are verified; no fresh frontend run is claimed.
+
+The checkpoint binds 661 source inputs: four edited existing units and one
+additive header, with every existing header and build definition unchanged.
+The first snapshot freshly compiles four units and links all 155 outputs. Its
+stale test-message expectation is retained as a failure. The final namespace
+freshly compiles the corrected test, reuses 318 verified objects, freshly links
+the core/test and preserves 153 other outputs by exact copied bytes. All seven
+focused and 152 full assertion-enabled native suites pass. The frozen focused
+failure, external-object linker-language configuration failure, helper syntax
+and destination-name failures, NUL-family loss-audit failure and archive
+directory/file collector failure remain in the evidence. Repairs use fresh
+helpers and source namespaces; production code is unchanged after the first build.
+
+This closes the observed missing-key portable error-data gap. The C++ class and
+array remain native runtime objects; Python physical class/tuple identity is
+not promoted. Mixed duration endpoint error precedence, non-KeyError payloads,
+raw wire surrogate encoding, broader typed container/datetime identity, public
+mutation/order, legacy alignment selectors and all prior independent gates
+remain open. Catalogue totals remain 46/86 packages, 199/387 modules and 228
+incomplete units. No whole-module/package or full-parity promotion is made.

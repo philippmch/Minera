@@ -1,4 +1,5 @@
 #include "minera/conformance.hpp"
+#include "minera/token_replay_error.hpp"
 
 #include <algorithm>
 #include <map>
@@ -193,15 +194,19 @@ EventLog project_log(const EventLog& source, const TokenReplayOptions& options) 
                     ? std::string_view(event.activity_attribute->first_class_source_key)
                     : std::string_view(event.activity_attribute->key)
                 : std::string_view("concept:name");
+        if (selector == projected_key && event.activity_attribute &&
+            event.activity_attribute->first_class_role != FirstClassAttributeRole::kNone &&
+            event.activity_attribute->first_class_state == FirstClassAttributeState::kMissing)
+          throw TokenReplayKeyError(selector);
         if (selector == projected_key &&
             (event.has_activity() || event.activity_state == FirstClassAttributeState::kNull))
           continue;
-        throw std::invalid_argument("token replay: missing selected activity");
+        throw TokenReplayKeyError(selector);
       }
       auto field = *selected;
       if (field.first_class_role != FirstClassAttributeRole::kNone &&
           field.first_class_state == FirstClassAttributeState::kMissing)
-        throw std::invalid_argument("token replay: selected activity is missing");
+        throw TokenReplayKeyError(selector);
       const bool null = field.is_null || field.first_class_state == FirstClassAttributeState::kNull;
       event.activity = null ? "" : field.value;
       event.activity_state = null ? FirstClassAttributeState::kNull : FirstClassAttributeState::kPresent;
