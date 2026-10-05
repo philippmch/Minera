@@ -749,6 +749,69 @@ void pltr_truthy_transition_labels() {
   const auto replayed = replay_token_result(blank, net, policy);
   assert(!replayed.pltr_fitness && replayed.traces[0].activated_transitions == (std::vector<std::size_t>{1}));
 }
+void pltr_collection_and_variant_order() {
+  PetriNet net;
+  net.set_activities({"A", "B"});
+  net.add_place(); net.add_place(); net.add_place();
+  net.set_source(0); net.set_sink(1);
+  net.add_transition(0, {0}, {1}); net.add_transition(1, {1}, {1});
+  TokenReplayOptions policy;
+  policy.enable_pltr_fitness = true;
+  policy.initial_marking = {1, 0, 0}; policy.final_marking = {0, 1, 0};
+  policy.place_names = {"z", "a", "m"};
+  policy.place_fitness_order = std::vector<std::size_t>{2, 0, 1};
+  EventLog log;
+  log.traces = {trace("one", {event("A")}), trace("B", {event("B")}),
+                trace("Z", {event("Z")}), trace("two", {event("A"), event("A")}),
+                trace("B", {event("B")}), trace("two", {event("A"), event("A")}),
+                trace("Y", {event("Y")}), trace("Y", {event("Y")}), trace("Y", {event("Y")})};
+  for (const bool grouped : {false, true}) {
+    policy.disable_variants = !grouped;
+    const auto full = replay_token_result(log, net, policy);
+    const auto& fitness = *full.pltr_fitness;
+    assert(fitness.place_order == policy.place_fitness_order && fitness.places.size() == 3);
+    assert(fitness.unknown_activities.size() == 2);
+    assert(fitness.unknown_activities[0].activity.value == "Y");
+    assert(fitness.unknown_activities[1].activity.value == "Z");
+    assert(fitness.transitions[0].fit_traces.size() == 2);
+    const auto first = fitness.transitions[0].fit_traces[0].trace_reference;
+    const auto last = fitness.transitions[0].fit_traces[1].trace_reference;
+    assert(fitness.trace_references[first].value.events.size() == 2);
+    assert(fitness.trace_references[last].value.events.size() == 1);
+    if (!grouped) {
+      assert(fitness.trace_references[first].source_trace_index == 3);
+      assert(fitness.trace_references[last].source_trace_index == 0);
+      assert(fitness.transitions[0].fit_traces[0].contexts.size() == 2);
+    } else {
+      assert(!fitness.trace_references[first].source_trace_index);
+      assert(fitness.transitions[0].fit_traces[0].contexts.size() == 1);
+    }
+    const auto wire = token_replay_result_json(full);
+    const auto p1 = wire.find("\"type\":\"Place\",\"index\":1,");
+    const auto p2 = wire.find("\"type\":\"Place\",\"index\":2,");
+    const auto p0 = wire.find("\"type\":\"Place\",\"index\":0,");
+    assert(p1 != std::string::npos && p1 < p2 && p2 < p0);
+    assert(full.traces.size() == log.traces.size() && full.traces[0].case_id == "one");
+  }
+  policy.place_fitness_order.reset();
+  assert(!replay_token_result(log, net, policy).pltr_fitness->place_order);
+  for (const auto& invalid : std::vector<std::vector<std::size_t>>{{}, {0, 1}, {0, 0, 2}, {0, 1, 3}}) {
+    policy.place_fitness_order = invalid;
+    bool rejected = false;
+    try { (void)replay_token_result(EventLog{}, net, policy); }
+    catch (const std::invalid_argument& error) {
+      rejected = std::string(error.what()) == "place_fitness_order must contain every root place exactly once";
+    }
+    assert(rejected);
+  }
+  policy.place_fitness_order = std::vector<std::size_t>{2, 0, 1};
+  auto malformed = replay_token_result(EventLog{}, net, policy);
+  malformed.pltr_fitness->place_order = std::vector<std::size_t>{0, 0, 2};
+  bool rejected = false;
+  try { (void)token_replay_result_json(malformed); }
+  catch (const std::invalid_argument& error) { rejected = std::string(error.what()) == "token replay place fitness order is invalid"; }
+  assert(rejected);
+}
 }  // namespace
 int main() {
   variants_and_keys();
@@ -769,5 +832,6 @@ int main() {
   activity_choice_from_all_enabled_identity_hashes();
   outgoing_arc_order_and_nonempty_source_cycles();
   pltr_truthy_transition_labels();
+  pltr_collection_and_variant_order();
   std::cout << "full forward token replay result contracts passed\n";
 }

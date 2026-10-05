@@ -182,7 +182,22 @@ class Codec {
     if (!result.pltr_fitness) return sequence(rows);
     const auto& fitness = *result.pltr_fitness;
     Items places, transitions, unknown;
-    for (std::size_t p = 0; p < fitness.places.size(); ++p) {
+    std::vector<std::size_t> place_order;
+    if (fitness.place_order) {
+      place_order = *fitness.place_order;
+      std::vector<bool> listed(fitness.places.size(), false);
+      if (place_order.size() != listed.size())
+        throw std::invalid_argument("token replay place fitness order is invalid");
+      for (const auto place : place_order) {
+        if (place >= listed.size() || listed[place])
+          throw std::invalid_argument("token replay place fitness order is invalid");
+        listed[place] = true;
+      }
+    } else {
+      place_order.resize(fitness.places.size());
+      std::iota(place_order.begin(), place_order.end(), 0);
+    }
+    for (const auto p : place_order) {
       const auto& counts = fitness.places[p];
       places.emplace_back(place(p), dictionary({
           {string_value("underfed_traces"), trace_set(counts.underfed_traces)},
