@@ -2347,3 +2347,12 @@ The first replay capture failed before any replay, semantics or shortest-path ca
 **Production source is unchanged.** All 660 current inputs match the committed `db01d02` source and its accepted frozen build. This step reuses 155 binary/project bindings, the five focused and 152 native suites, 534 CLI and 534 HTTP checks, and the unchanged frontend typecheck plus 164 tests. There are zero fresh production builds, full-suite runs, CLI/HTTP calls or frontend calls. The prior application's bundled-family acceptance/error gates remain unchanged and retained.
 
 `docs/replay-path-depth-validation.json` binds **31 lossless evidence archives and 767 byte-round-tripped members**, the accepted parent checkpoint and every reused measurement. Unobserved structural graph/tie/depth/state/size boundaries, termination, mapping order, full runtime/alias/PLTR/error behavior, backwards mutations and broader API propagation remain open. **Full parity remains false: 46/86 packages, 199/387 modules and 228 incomplete catalogue units.** No catalogue row is promoted.
+
+
+### Truthy forward PLTR transition keys
+
+Forward PLTR initialization now omits silent transitions and visible transitions whose activity label is the empty string. Nonempty visible labels, including whitespace, retain their fitness entries even when never executed. Blank-label execution still raises the existing transition-key error when PLTR is enabled; disabling PLTR retains ordinary replay behavior.
+
+The verified scope is 256 fresh public/native controls and 87,424 native regressions against unchanged public observations. Full place, transition and unknown-activity collection content comparisons gained 32 fresh and 1,792 regression matches, without losing a prior match. All regression fields outside the removed empty-labelled transition entries are exactly unchanged. Typed counts, trace membership/value, context values and context list order are covered by the declared adapters. Nested dictionary insertion order, runtime classes, object identity/alias relationships and set iteration remain independent gates. 44 complete collection content differences remain on trace-dependent Alpha cases.
+
+See [replay-pltr-transition-validation.json](replay-pltr-transition-validation.json) for frozen sources, fresh executable and suite bindings, lossless evidence, inherited reference observations, and retained failed-test recovery. No full-parity or catalogue promotion is claimed.

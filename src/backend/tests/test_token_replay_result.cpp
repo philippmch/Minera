@@ -699,6 +699,56 @@ void enabled_identity_worklist_and_pair_markings() {
   }
   assert(rejected);
 }
+void pltr_truthy_transition_labels() {
+  PetriNet net;
+  net.set_activities({"A", "", " ", "B"});
+  net.add_place(); net.add_place(); net.add_place();
+  net.set_source(0); net.set_sink(1);
+  net.add_transition(0, {0}, {1});
+  net.add_transition(1, {2}, {2});
+  net.add_transition(std::nullopt, {2}, {2});
+  net.add_transition(2, {2}, {2});
+  net.add_transition(3, {2}, {2});
+  net.set_transition_names({"main", "blank", "hidden", "space", "other"});
+  TokenReplayOptions policy;
+  policy.enable_pltr_fitness = true;
+  policy.final_marking = {0, 1, 0};
+  for (const bool enabled : {false, true}) {
+    policy.initial_marking = {1, 0, enabled ? 1 : 0};
+    for (const bool grouped : {false, true}) {
+      policy.disable_variants = !grouped;
+      for (const bool cleaning : {false, true}) {
+        policy.cleaning_token_flood = cleaning;
+        for (const bool names : {false, true}) {
+          policy.return_names = names;
+          EventLog log;
+          log.traces = {trace("empty", {}), trace("known", {event("A", "last")}),
+                        trace("unknown", {event("Z", "context")})};
+          const auto full = replay_token_result(log, net, policy);
+          const auto& entries = full.pltr_fitness->transitions;
+          assert(entries.size() == 3);
+          assert(entries[0].transition_index == 0 && entries[0].fit_traces.size() == 1);
+          assert(entries[1].transition_index == 3 && entries[1].fit_traces.empty());
+          assert(entries[2].transition_index == 4 && entries[2].fit_traces.empty());
+          assert(entries[1].underfed_traces.empty() && entries[2].underfed_traces.empty());
+          assert(replay_token_result(EventLog{}, net, policy).pltr_fitness->transitions.size() == 3);
+        }
+      }
+    }
+  }
+  EventLog blank;
+  auto blank_event = event("");
+  blank_event.activity_state = FirstClassAttributeState::kPresent;
+  blank_event.attributes.push_back(EventAttribute{"concept:name", ""});
+  blank.traces = {trace("blank", {blank_event})};
+  bool rejected = false;
+  try { (void)replay_token_result(blank, net, policy); }
+  catch (const TokenReplayTransitionKeyError& error) { rejected = error.transition_index() == 1; }
+  assert(rejected);
+  policy.enable_pltr_fitness = false;
+  const auto replayed = replay_token_result(blank, net, policy);
+  assert(!replayed.pltr_fitness && replayed.traces[0].activated_transitions == (std::vector<std::size_t>{1}));
+}
 }  // namespace
 int main() {
   variants_and_keys();
@@ -718,5 +768,6 @@ int main() {
   enabled_default_id_order_and_explicit_hash_order();
   activity_choice_from_all_enabled_identity_hashes();
   outgoing_arc_order_and_nonempty_source_cycles();
+  pltr_truthy_transition_labels();
   std::cout << "full forward token replay result contracts passed\n";
 }
