@@ -448,12 +448,15 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
         // Names determine introduction: a newly marked alias of an existing
         // name does not start cleaning, even when its identity is new.
         const auto introduced_places = detail::cleaning_introduced_places(keys, before_cleaning, place_names);
+        // Multiple currently marked identities with the same name survive,
+        // including zero keys and aliases produced by the current firing.
+        const auto unique_names = detail::cleaning_unique_place_names(keys, place_names);
         for (const auto& component : components) {
           const bool introduced_place = std::any_of(component.begin(), component.end(),
               [&](const auto place) { return keys[place] && introduced_places[place]; });
           if (!introduced_place) continue;
           for (const auto place : component) {
-            if (keys[place] && before_cleaning[place]) {
+            if (keys[place] && before_cleaning[place] && unique_names[place]) {
               marking[place] = 0;
               keys[place] = false;
               checked_add(usage.places[place]);
