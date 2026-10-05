@@ -812,6 +812,69 @@ void pltr_collection_and_variant_order() {
   catch (const std::invalid_argument& error) { rejected = std::string(error.what()) == "token replay place fitness order is invalid"; }
   assert(rejected);
 }
+void flood_cleaning_place_name_aliases() {
+  PetriNet net;
+  net.set_activities({"A", "B"});
+  for (std::size_t i = 0; i < 4; ++i) net.add_place();
+  net.set_source(0); net.set_sink(3);
+  net.add_transition(std::nullopt, {0}, {1});
+  net.add_transition(0, {2}, {2});
+  net.add_transition(1, {1}, {3});
+  TokenReplayOptions policy;
+  policy.initial_marking = {1, 0, 0, 0}; policy.final_marking = {0, 0, 0, 1};
+  policy.place_names = {"start", "reach", "reach", "end"};
+  policy.cleaning_token_flood = true;
+  EventLog log;
+  log.traces = {trace("A", {event("A")}), trace("AB", {event("A"), event("B")})};
+  for (const bool pltr : {false, true}) for (const bool grouped : {false, true}) {
+    policy.enable_pltr_fitness = pltr; policy.disable_variants = !grouped;
+    const auto result = replay_token_result(log, net, policy);
+    const auto& a = result.traces[0]; const auto& ab = result.traces[1];
+    assert(a.activated_transitions == (std::vector<std::size_t>{1}));
+    assert(a.missing == 2 && a.remaining == 2 && a.consumed == 2 && a.produced == 2);
+    assert(a.reached_marking == (std::vector<TokenInteger>{0, 0, 1, 0}));
+    assert(ab.activated_transitions == (std::vector<std::size_t>{1, 2}));
+    assert(ab.missing == 2 && ab.remaining == 2 && ab.consumed == 3 && ab.produced == 3);
+    assert(ab.cleaned_place_indices == (std::vector<std::size_t>{0, 2}));
+    assert(ab.reached_marking == (std::vector<TokenInteger>{0, 0, 0, 1}));
+  }
+  policy.place_names[2] = "alias";
+  assert(replay_token_result(log, net, policy).traces[1].activated_transitions == (std::vector<std::size_t>{1, 0, 2}));
+  policy.place_names[2] = "reach"; policy.cleaning_token_flood = false;
+  assert(replay_token_result(log, net, policy).traces[1].activated_transitions == (std::vector<std::size_t>{1, 0, 2}));
+
+  PetriNet chain;
+  chain.set_activities({"A", "B"});
+  for (std::size_t i = 0; i < 4; ++i) chain.add_place();
+  chain.add_transition(std::nullopt, {0}, {1});
+  chain.add_transition(0, {1}, {2}); chain.add_transition(1, {2}, {3});
+  const detail::ReplayMarkingKeys initial{true, false, false, false}, final{false, false, false, true};
+  assert(detail::cleaning_components(chain, initial, final, &policy.place_names) == (detail::CleaningComponents{{0, 1, 2}}));
+  assert(detail::cleaning_components(chain, initial, final) == (detail::CleaningComponents{{0, 1, 2, 3}}));
+}
+void flood_cleaning_requires_a_new_place_name() {
+  PetriNet net;
+  net.set_activities({"A", "B"});
+  for (std::size_t i = 0; i < 3; ++i) net.add_place();
+  net.set_source(0); net.set_sink(2);
+  net.add_transition(0, {1}, {1}); net.add_transition(1, {0}, {2});
+  TokenReplayOptions policy;
+  policy.initial_marking = {1, 0, 0}; policy.final_marking = {0, 0, 1};
+  policy.place_names = {"reach", "reach", "end"}; policy.cleaning_token_flood = true;
+  EventLog log; log.traces = {trace("AAB", {event("A"), event("A"), event("B")})};
+  for (const bool pltr : {false, true}) for (const bool grouped : {false, true}) {
+    policy.enable_pltr_fitness = pltr; policy.disable_variants = !grouped;
+    const auto result = replay_token_result(log, net, policy);
+    const auto& row = result.traces.front();
+    assert(row.activated_transitions == (std::vector<std::size_t>{0, 0, 1}));
+    assert(row.transitions_with_problems == (std::vector<std::size_t>{0}));
+    assert(row.missing == 1 && row.remaining == 1 && row.consumed == 4 && row.produced == 4);
+    assert(row.reached_marking == (std::vector<TokenInteger>{0, 1, 1}));
+    assert(row.cleaned_place_indices.empty());
+  }
+  assert(detail::cleaning_introduced_places({false, true, false}, {true, false, false}, policy.place_names)
+      == (detail::ReplayMarkingKeys{false, false, false}));
+}
 }  // namespace
 int main() {
   variants_and_keys();
@@ -833,5 +896,7 @@ int main() {
   outgoing_arc_order_and_nonempty_source_cycles();
   pltr_truthy_transition_labels();
   pltr_collection_and_variant_order();
+  flood_cleaning_place_name_aliases();
+  flood_cleaning_requires_a_new_place_name();
   std::cout << "full forward token replay result contracts passed\n";
 }

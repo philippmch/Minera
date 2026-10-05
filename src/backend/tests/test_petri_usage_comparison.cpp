@@ -1077,9 +1077,36 @@ void public_zero_marking_keys_contract() {
   }
 }
 
+void cleaning_uses_duplicate_place_names() {
+  minera::PetriNet net;
+  net.set_activities({"A", "B"});
+  for (std::size_t i = 0; i < 4; ++i) net.add_place();
+  net.set_source(0); net.set_sink(3);
+  net.add_transition(std::nullopt, {0}, {1});
+  net.add_transition(0, {2}, {2}); net.add_transition(1, {1}, {3});
+  minera::PetriUsageComparisonOptions options;
+  options.cleaning_token_flood = true;
+  options.place_names = {"start", "reach", "reach", "end"};
+  const auto replayed = minera::compare_petri_usage(net, log_of({"A", "B"}), log_of({}), options);
+  assert(replayed.transitions[0].log1_occurrences == 0);
+  assert(replayed.transitions[1].log1_occurrences == 1 && replayed.transitions[2].log1_occurrences == 1);
+  options.place_names[2] = "alias";
+  assert(minera::compare_petri_usage(net, log_of({"A", "B"}), log_of({}), options).transitions[0].log1_occurrences == 1);
+
+  minera::PetriNet alias;
+  alias.set_activities({"A", "B"});
+  for (std::size_t i = 0; i < 3; ++i) alias.add_place();
+  alias.set_source(0); alias.set_sink(2);
+  alias.add_transition(0, {1}, {1}); alias.add_transition(1, {0}, {2});
+  options.place_names = {"reach", "reach", "end"};
+  const auto preserved = minera::compare_petri_usage(alias, log_of({"A", "A", "B"}), log_of({}), options);
+  assert(preserved.transitions[0].log1_occurrences == 2 && preserved.transitions[1].log1_occurrences == 1);
+  assert(preserved.places[0].log1_occurrences == 1 && preserved.places[1].log1_occurrences == 3);
+}
 }  // namespace
 
 int main() {
+  cleaning_uses_duplicate_place_names();
   public_zero_marking_keys_contract();
   public_pre_event_prefix_and_duplicate_contract();
   public_pre_event_weighted_and_path_limit();

@@ -91,7 +91,21 @@ inline void validate_forward_transition_name_order(const PetriTransitionNameList
 
 inline CleaningComponents cleaning_components(const PetriNet& net,
                                        const ReplayMarkingKeys& initial_keys,
-                                       const ReplayMarkingKeys& final_keys) {
+                                       const ReplayMarkingKeys& final_keys,
+                                       const std::vector<std::string>* place_names = nullptr) {
+  if (place_names && place_names->size() != initial_keys.size())
+    throw std::invalid_argument("cleaning place names must contain one entry per marking place");
+  const auto contains_place = [&](const std::set<std::size_t>& places, std::size_t place) {
+    if (!place_names) return places.contains(place);
+    return std::any_of(places.begin(), places.end(), [&](const auto existing) {
+      return (*place_names)[existing] == (*place_names)[place];
+    });
+  };
+  const auto insert_place = [&](std::set<std::size_t>& places, std::size_t place) {
+    if (contains_place(places, place)) return false;
+    places.insert(place);
+    return true;
+  };
   const auto marked_count = [](const ReplayMarkingKeys& keys) {
     return std::count(keys.begin(), keys.end(), true);
   };
@@ -126,34 +140,54 @@ inline CleaningComponents cleaning_components(const PetriNet& net,
     std::set<std::size_t> branches;
     if (depth < 6) {
       std::queue<std::size_t> pending;
-      for (const auto place : component) if (!visited.contains(place)) pending.push(place);
+      for (const auto place : component) if (!contains_place(visited, place)) pending.push(place);
       while (!pending.empty()) {
         const auto place = pending.front(); pending.pop();
-        if (!visited.insert(place).second) continue;
+        if (!insert_place(visited, place)) continue;
         for (const auto t : outgoing[place]) {
           if (outputs[t].size() > 1) branches.insert(t);
-          else if (outputs[t].size() == 1 && component.insert(outputs[t][0]).second)
+          else if (outputs[t].size() == 1 && insert_place(component, outputs[t][0]))
             pending.push(outputs[t][0]);
         }
       }
     }
     // Prefix components are part of the public traversal. Each split is
     // explored independently, with a separate visited set for every branch.
-    if (unique.emplace(component.begin(), component.end()).second) {
-      if (component.size() > 1'000'000 - stored_members)
+    // Public components contain place names. Traversal stops when a name is
+    // already present; cleaning membership includes every place with that
+    // name, including aliases outside the traversed topology.
+    std::vector<std::size_t> members;
+    if (place_names) {
+      for (std::size_t place = 0; place < place_names->size(); ++place)
+        if (contains_place(component, place)) members.push_back(place);
+    } else members.assign(component.begin(), component.end());
+    if (unique.insert(members).second) {
+      if (members.size() > 1'000'000 - stored_members)
         throw std::runtime_error("Petri usage replay exceeded the cleaning-component size limit");
-      stored_members += component.size();
+      stored_members += members.size();
     }
     for (const auto transition : branches) {
       for (const auto place : outputs[transition]) {
         auto branch = component;
-        branch.insert(place);
+        insert_place(branch, place);
         self(self, std::move(branch), visited, depth + 1);
       }
     }
   };
   expand(expand, {root}, {}, 0);
   return {unique.begin(), unique.end()};
+}
+
+inline ReplayMarkingKeys cleaning_introduced_places(
+    const ReplayMarkingKeys& keys, const ReplayMarkingKeys& before,
+    const std::vector<std::string>& place_names) {
+  std::set<std::string> previous_names;
+  for (std::size_t place = 0; place < before.size(); ++place)
+    if (before[place]) previous_names.insert(place_names[place]);
+  ReplayMarkingKeys introduced(keys.size(), false);
+  for (std::size_t place = 0; place < keys.size(); ++place)
+    introduced[place] = keys[place] && !previous_names.contains(place_names[place]);
+  return introduced;
 }
 
 struct HiddenPlacePath {

@@ -507,9 +507,10 @@ class Replayer {
           ? keys : detail::ReplayMarkingKeys{};
       emit(chosen, true);
       if (!before_cleaning.empty()) {
+        const auto introduced_places = detail::cleaning_introduced_places(keys, before_cleaning, place_names);
         for (const auto& component : components) {
           const bool introduced = std::any_of(component.begin(), component.end(),
-              [&](auto place) { return keys[place] && !before_cleaning[place]; });
+              [&](auto place) { return keys[place] && introduced_places[place]; });
           if (!introduced) continue;
           for (const auto place : component) {
             if (keys[place] && before_cleaning[place]) {
@@ -1028,7 +1029,7 @@ class Replayer {
         options.nullable_transition_names, options.transition_names, net_);
     detail::validate_forward_transition_name_order(result.transition_names);
     if (options.cleaning_token_flood)
-      result.components = detail::cleaning_components(net_, result.initial_keys, result.final_keys);
+      result.components = detail::cleaning_components(net_, result.initial_keys, result.final_keys, &result.place_names);
     return result;
   }
 

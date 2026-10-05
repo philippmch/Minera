@@ -445,11 +445,12 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
         // A forced activation can leave an old place marked alongside a
         // newly marked place in the same structural component. Remove the
         // stale marking, recording one remaining occurrence for that place.
-        // Key presence matters: increasing an already marked output does
-        // not introduce a new place, even when its token count changes.
+        // Names determine introduction: a newly marked alias of an existing
+        // name does not start cleaning, even when its identity is new.
+        const auto introduced_places = detail::cleaning_introduced_places(keys, before_cleaning, place_names);
         for (const auto& component : components) {
           const bool introduced_place = std::any_of(component.begin(), component.end(),
-              [&](const auto place) { return keys[place] && !before_cleaning[place]; });
+              [&](const auto place) { return keys[place] && introduced_places[place]; });
           if (!introduced_place) continue;
           for (const auto place : component) {
             if (keys[place] && before_cleaning[place]) {
@@ -563,7 +564,7 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
     throw std::invalid_argument("transition_names must contain one entry per transition");
   }
   const auto components = options.cleaning_token_flood
-      ? cleaning_components(net, initial_keys, final_keys) : CleaningComponents{};
+      ? cleaning_components(net, initial_keys, final_keys, &place_names) : CleaningComponents{};
   std::unordered_map<std::string, std::size_t> activities;
   for (std::size_t i = 0; i < net.activities().size(); ++i) {
     activities.emplace(net.activities()[i], i);
