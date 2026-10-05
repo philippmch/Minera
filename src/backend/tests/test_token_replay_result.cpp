@@ -922,6 +922,39 @@ void flood_cleaning_preserves_ambiguous_marked_names() {
   assert(detail::cleaning_unique_place_names({true, false, false}, {"X", "X", "X"})
       == (detail::ReplayMarkingKeys{true, false, false}));
 }
+void flood_cleaning_combines_nested_split_branches() {
+  PetriNet net;
+  net.set_activities({"A", "N", "C", "B", "D"});
+  for (std::size_t i = 0; i < 8; ++i) net.add_place();
+  net.set_source(0); net.set_sink(7);
+  net.add_transition(0, {0}, {1}); net.add_transition(1, {1}, {2});
+  net.add_transition(2, {2}, {3, 4}); net.add_transition(3, {3}, {6});
+  net.add_transition(4, {0}, {4, 5}); net.add_transition(std::nullopt, {4, 5, 6}, {7});
+  TokenReplayOptions policy;
+  policy.place_names = {"start", "I", "Q", "R", "X", "Y", "Z", "end"};
+  policy.walk_through_hidden_transitions = false;
+  EventLog log; log.traces = {trace("DB", {event("D"), event("B")})};
+  for (const bool pltr : {false, true}) for (const bool grouped : {false, true}) {
+    policy.enable_pltr_fitness = pltr; policy.disable_variants = !grouped;
+    policy.cleaning_token_flood = true;
+    const auto row = replay_token_result(log, net, policy).traces.front();
+    assert(row.activated_transitions == (std::vector<std::size_t>{4, 3}));
+    assert(row.missing == 2 && row.consumed == 3 && row.produced == 4 && row.remaining == 3);
+    assert(row.reached_marking == (std::vector<TokenInteger>{0, 0, 0, 0, 0, 0, 1, 0}));
+    assert(row.cleaned_place_indices == (std::vector<std::size_t>{4, 5}));
+    policy.cleaning_token_flood = false;
+    assert(replay_token_result(log, net, policy).traces.front().activated_transitions
+        == (std::vector<std::size_t>{4, 3, 5}));
+  }
+  PetriNet visited_output;
+  for (std::size_t i = 0; i < 3; ++i) visited_output.add_place();
+  visited_output.add_transition(std::nullopt, {0}, {1});
+  visited_output.add_transition(std::nullopt, {1}, {0, 2});
+  const detail::ReplayMarkingKeys initial{true, false, false}, final{false, false, true};
+  const std::vector<std::string> names{"start", "R", "end"};
+  assert(detail::cleaning_components(visited_output, initial, final, &names)
+      == (detail::CleaningComponents{{0, 1, 2}}));
+}
 }  // namespace
 int main() {
   variants_and_keys();
@@ -946,5 +979,6 @@ int main() {
   flood_cleaning_place_name_aliases();
   flood_cleaning_requires_a_new_place_name();
   flood_cleaning_preserves_ambiguous_marked_names();
+  flood_cleaning_combines_nested_split_branches();
   std::cout << "full forward token replay result contracts passed\n";
 }

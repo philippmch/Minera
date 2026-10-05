@@ -138,17 +138,31 @@ inline CleaningComponents cleaning_components(const PetriNet& net,
                           std::set<std::size_t> visited, std::size_t depth) -> void {
     if (++generated > kReplayStructuralSearchCap)
       throw std::runtime_error("Petri usage replay exceeded the cleaning-component state limit");
-    std::set<std::size_t> branches;
     if (depth < 6) {
       std::queue<std::size_t> pending;
       for (const auto place : component) if (!contains_place(visited, place)) pending.push(place);
       while (!pending.empty()) {
         const auto place = pending.front(); pending.pop();
         if (!insert_place(visited, place)) continue;
+        std::vector<std::vector<std::size_t>> branches;
         for (const auto t : outgoing[place]) {
-          if (outputs[t].size() > 1) branches.insert(t);
-          else if (outputs[t].size() == 1 && insert_place(component, outputs[t][0]))
-            pending.push(outputs[t][0]);
+          std::vector<std::size_t> choices;
+          for (const auto output : outputs[t])
+            if (!contains_place(visited, output)) choices.push_back(output);
+          if (choices.size() > 1) branches.push_back(std::move(choices));
+          else if (choices.size() == 1 && insert_place(component, choices[0]))
+            pending.push(choices[0]);
+        }
+        // Recurse before draining the linear worklist. A queued place can
+        // lead to another split and belongs to each of these branches.
+        // Already visited output names do not contribute a split choice;
+        // distinct unvisited identities still count separately.
+        for (const auto& choices : branches) {
+          for (const auto output : choices) {
+            auto branch = component;
+            insert_place(branch, output);
+            self(self, std::move(branch), visited, depth + 1);
+          }
         }
       }
     }
@@ -166,13 +180,6 @@ inline CleaningComponents cleaning_components(const PetriNet& net,
       if (members.size() > 1'000'000 - stored_members)
         throw std::runtime_error("Petri usage replay exceeded the cleaning-component size limit");
       stored_members += members.size();
-    }
-    for (const auto transition : branches) {
-      for (const auto place : outputs[transition]) {
-        auto branch = component;
-        insert_place(branch, place);
-        self(self, std::move(branch), visited, depth + 1);
-      }
     }
   };
   expand(expand, {root}, {}, 0);
