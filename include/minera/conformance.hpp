@@ -307,6 +307,11 @@ struct TokenReplayOptions {
   // activity choice and diagnostics. Absence preserves native activity order
   // and uses native IDs for diagnostic ties. Identity equality is unchanged.
   std::optional<std::vector<std::int64_t>> transition_identity_hashes;
+  // Optional actual outgoing-arc iteration, expressed as transition IDs for
+  // each replay marking slot. Rows include every adjacent transition; repeated
+  // IDs can represent parallel arcs. Automatic forward structural paths use
+  // this order. Supplied path caches retain their explicit paths.
+  std::optional<std::vector<std::vector<std::size_t>>> place_outgoing_transition_order;
 };
 
 struct TokenReplayTraceReference {

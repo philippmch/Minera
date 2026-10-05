@@ -2,6 +2,7 @@
 #include "minera/alpha_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/request_params.hpp"
+#include "../petri_replay_internal.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -291,6 +292,53 @@ void supplied_hidden_paths() {
   try { (void)replay_token_result(log, final_net, policy); }
   catch (const std::invalid_argument& error) { rejected = std::string(error.what()) == "null transition PLTR key"; }
   assert(rejected);
+}
+
+void outgoing_arc_order_and_nonempty_source_cycles() {
+  PetriNet net;
+  net.set_activities({"A"});
+  net.add_place(); net.add_place();
+  net.set_source(0); net.set_sink(1);
+  net.add_transition(std::nullopt, {0}, {1});
+  net.add_transition(std::nullopt, {0}, {1});
+  net.add_transition(0, {1}, {1});
+  net.set_transition_names({"h0", "h1", "visible"});
+  EventLog log; log.traces = {trace("empty", {}), trace("event", {event("A")})};
+  TokenReplayOptions policy;
+  assert(replay_token_result(log, net, policy).traces[0].activated_transitions ==
+         std::vector<std::size_t>{0});
+  policy.place_outgoing_transition_order = std::vector<std::vector<std::size_t>>{{1, 0}, {2}};
+  const auto ordered = replay_token_result(log, net, policy);
+  assert(ordered.traces[0].activated_transitions == std::vector<std::size_t>{1});
+  assert(ordered.traces[1].activated_transitions == (std::vector<std::size_t>{1, 2}));
+  assert(ordered.traces[0].missing == 0 && ordered.traces[1].missing == 0);
+  policy.places_shortest_path_by_hidden = TokenReplayHiddenPathMatrix{{0, {{1, {0}}}}};
+  assert(replay_token_result(log, net, policy).traces[0].activated_transitions ==
+         std::vector<std::size_t>{0});
+  for (const auto& malformed : std::vector<std::vector<std::vector<std::size_t>>>{
+           {{1, 0}}, {{1, 99}, {2}}, {{1, 0}, {0, 2}}, {{1}, {2}}}) {
+    policy.place_outgoing_transition_order = malformed;
+    bool rejected = false;
+    try { (void)replay_token_result(EventLog{}, net, policy); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
+  // A direct source self-cycle must coexist with its one-step finish path.
+  PetriNet cyclic;
+  cyclic.add_place(); cyclic.add_place();
+  cyclic.set_source(0); cyclic.set_sink(1);
+  cyclic.add_transition(std::nullopt, {0}, {0});
+  cyclic.add_transition(std::nullopt, {0}, {1});
+  const auto paths = detail::silent_place_paths({true, false}, {true, true}, cyclic,
+                                               {"start", "end"});
+  assert(paths.size() == 2);
+  for (const auto& path : paths) {
+    assert(path.source == 0);
+    assert(path.transitions == std::vector<std::size_t>{path.target == 0 ? 0u : 1u});
+  }
+  log.traces = {trace("empty", {})};
+  assert(replay_token_result(log, cyclic).traces[0].activated_transitions ==
+         std::vector<std::size_t>{1});
 }
 
 void cleaned_underfed_place_precedence() {
@@ -669,5 +717,6 @@ int main() {
   enabled_identity_worklist_and_pair_markings();
   enabled_default_id_order_and_explicit_hash_order();
   activity_choice_from_all_enabled_identity_hashes();
+  outgoing_arc_order_and_nonempty_source_cycles();
   std::cout << "full forward token replay result contracts passed\n";
 }
