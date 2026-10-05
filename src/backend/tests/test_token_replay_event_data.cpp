@@ -1,4 +1,5 @@
 #include "minera/conformance.hpp"
+#include "minera/token_replay_error.hpp"
 #include "minera/log_conversion.hpp"
 #include "token_replay_dataframe_grouping_reference_cases.hpp"
 #include "../root_cause_trace_key.hpp"
@@ -504,6 +505,12 @@ void activity_errors_precede_backwards_fitness() {
         (void)replay_token_result(log, net, options);
     } catch (const std::invalid_argument& error) {
       require(error.what() == expected, "selected activity error precedence");
+      if (const auto* key_error = dynamic_cast<const TokenReplayKeyError*>(&error)) {
+        require(key_error->reference_type() == "builtins.KeyError" &&
+                    key_error->reference_args() ==
+                        std::array<std::string, 1>{options.activity_attribute},
+                "missing key payload precedes backwards fitness");
+      }
       return;
     }
     throw std::runtime_error("selected activity error must precede replay");
@@ -527,8 +534,7 @@ void activity_errors_precede_backwards_fitness() {
           options.variant = variant;
           options.activity_attribute = selector;
           options.disable_variants = disable;
-          const std::string missing_error =
-              "conformance: event is missing activity attribute '" + std::string(selector) + "'";
+          const std::string missing_error = "'" + std::string(selector) + "'";
           Trace valid_trace;
           valid_trace.events = {valid};
           Trace missing_trace;
@@ -654,6 +660,66 @@ void activity_selectors_are_literal_keys() {
   require(replay_token_traces(log, net, options)[0].trace_is_fit,
           "explicit first-class source key remains available");
 }
+void missing_keys_retain_public_error_data() {
+  const auto net = to_petri_net(sequence_tree());
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      {"", "''"}, {"'", "\"'\""}, {"'\"", "'\\\'\"'"},
+      {std::string("pre\0suffix", 10), "'pre\\x00suffix'"},
+      {"\n\r\t\\", "'\\n\\r\\t\\\\'"},
+      {"漢字🌿", "'漢字🌿'"},
+      {std::string("\355\240\200\355\277\277", 6), "'\\ud800\\udfff'"}};
+  for (const auto& [key, message] : cases) {
+    TokenReplayOptions options;
+    options.activity_attribute = key;
+    options.timestamp_attribute = key;
+    Trace trace;
+    trace.events = {Event{}};
+    EventLog log;
+    log.traces = {trace};
+    const auto check = [&](auto action) {
+      try { action(); }
+      catch (const TokenReplayKeyError& error) {
+        require(error.reference_type() == "builtins.KeyError", "public error type");
+        require(error.reference_args() == std::array<std::string, 1>{key},
+                "missing key retained without C-string truncation");
+        require(std::string(error.what()) == message, "public key representation");
+        const std::invalid_argument& compatible = error;
+        require(std::string(compatible.what()) == message, "legacy catch compatibility");
+        return;
+      }
+      throw std::runtime_error("expected typed missing-key error");
+    };
+    for (auto variant : {TokenReplayVariant::kForward, TokenReplayVariant::kBackwards}) {
+      options.variant = variant;
+      check([&] { (void)replay_token_traces(log, net, options); });
+      check([&] { (void)normalize_token_replay_event_log(EventDataView(log), options); });
+      auto marked = log;
+      EventAttribute field{key, "A"};
+      field.first_class_role = FirstClassAttributeRole::kActivity;
+      field.first_class_source_key = key;
+      field.first_class_state = FirstClassAttributeState::kMissing;
+      marked.traces[0].events[0].attributes = {field};
+      check([&] { (void)replay_token_traces(marked, net, options); });
+      check([&] { (void)normalize_token_replay_event_log(EventDataView(marked), options); });
+      marked.traces[0].events[0].attributes.clear();
+      marked.traces[0].events[0].activity = "A";
+      marked.traces[0].events[0].activity_source_key = key;
+      marked.traces[0].events[0].activity_attribute = field;
+      check([&] { (void)replay_token_traces(marked, net, options); });
+      check([&] { (void)normalize_token_replay_event_log(EventDataView(marked), options); });
+    }
+    check([&] { (void)token_replay_case_duration(trace, key); });
+    auto timed = trace;
+    EventAttribute absent{key, "2020-01-01"};
+    absent.first_class_role = FirstClassAttributeRole::kTimestamp;
+    absent.first_class_state = FirstClassAttributeState::kMissing;
+    timed.events[0].timestamp_source_key = key;
+    timed.events[0].timestamp_attribute = absent;
+    check([&] { (void)token_replay_case_duration(timed, key); });
+    require(token_replay_transition_duration_diagnostics(log, {{0, "A", {0}}}, options).empty(),
+            "an absent activity does not demand timestamps for an unused cohort");
+  }
+}
 }  // namespace
 
 int main() {
@@ -667,6 +733,7 @@ int main() {
     numeric_case_ordering_matches_inferred_index();
     activity_errors_precede_backwards_fitness();
     activity_selectors_are_literal_keys();
+    missing_keys_retain_public_error_data();
     std::cout << "Token replay event-data tests passed\n";
     return 0;
   } catch (const std::exception& error) {

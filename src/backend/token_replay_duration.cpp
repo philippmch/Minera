@@ -1,4 +1,5 @@
 #include "minera/conformance.hpp"
+#include "minera/token_replay_error.hpp"
 
 #include <algorithm>
 #include <map>
@@ -38,7 +39,7 @@ std::optional<std::string> selected_value(
     if (selected->first_class_role != FirstClassAttributeRole::kNone &&
         selected->first_class_state == FirstClassAttributeState::kMissing) {
       if (present) { *present = false; return std::nullopt; }
-      throw std::invalid_argument("token replay duration: selected attribute is missing");
+      throw TokenReplayKeyError(selector);
     }
     if (selected->is_null || selected->first_class_state == FirstClassAttributeState::kNull)
       return std::nullopt;
@@ -51,6 +52,11 @@ std::optional<std::string> selected_value(
           ? std::string_view(cell->first_class_source_key) : std::string_view(cell->key)
       : timestamp ? std::string_view("time:timestamp") : std::string_view("concept:name");
   if (projected_key == selector) {
+    if (cell && cell->first_class_role != FirstClassAttributeRole::kNone &&
+        cell->first_class_state == FirstClassAttributeState::kMissing) {
+      if (present) { *present = false; return std::nullopt; }
+      throw TokenReplayKeyError(selector);
+    }
     const auto state = timestamp ? event.timestamp_state : event.activity_state;
     const auto& value = timestamp ? event.timestamp : event.activity;
     if (state == FirstClassAttributeState::kNull) return std::nullopt;
@@ -58,7 +64,7 @@ std::optional<std::string> selected_value(
     if (cell) return cell->is_null ? std::nullopt : std::optional<std::string>(cell->value);
   }
   if (present) { *present = false; return std::nullopt; }
-  throw std::invalid_argument("token replay duration: missing selected attribute '" + selector + "'");
+  throw TokenReplayKeyError(selector);
 }
 
 double instant(const Event& event, const std::string& selector) {
