@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <limits>
+#include <map>
 #include <queue>
 #include <set>
 #include <stdexcept>
@@ -188,6 +189,17 @@ inline ReplayMarkingKeys cleaning_introduced_places(
   for (std::size_t place = 0; place < keys.size(); ++place)
     introduced[place] = keys[place] && !previous_names.contains(place_names[place]);
   return introduced;
+}
+
+inline ReplayMarkingKeys cleaning_unique_place_names(
+    const ReplayMarkingKeys& keys, const std::vector<std::string>& place_names) {
+  std::map<std::string, std::size_t> occurrences;
+  for (std::size_t place = 0; place < keys.size(); ++place)
+    if (keys[place]) ++occurrences[place_names[place]];
+  ReplayMarkingKeys unique(keys.size(), false);
+  for (std::size_t place = 0; place < keys.size(); ++place)
+    unique[place] = keys[place] && occurrences[place_names[place]] == 1;
+  return unique;
 }
 
 struct HiddenPlacePath {

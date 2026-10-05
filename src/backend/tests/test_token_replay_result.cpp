@@ -875,6 +875,53 @@ void flood_cleaning_requires_a_new_place_name() {
   assert(detail::cleaning_introduced_places({false, true, false}, {true, false, false}, policy.place_names)
       == (detail::ReplayMarkingKeys{false, false, false}));
 }
+void flood_cleaning_preserves_ambiguous_marked_names() {
+  PetriNet net;
+  net.set_activities({"A", "B", "C"});
+  for (std::size_t i = 0; i < 5; ++i) net.add_place();
+  net.set_source(0); net.set_sink(4);
+  net.add_transition(std::nullopt, {0}, {1});
+  net.add_transition(0, {2}, {2}); net.add_transition(1, {3}, {3});
+  net.add_transition(2, {1}, {4});
+  TokenReplayOptions policy;
+  policy.place_names = {"start", "reach", "reach", "reach", "end"};
+  policy.cleaning_token_flood = true;
+  EventLog log; log.traces = {trace("AABC", {event("A"), event("A"), event("B"), event("C")})};
+  for (const bool pltr : {false, true}) for (const bool grouped : {false, true}) {
+    policy.enable_pltr_fitness = pltr; policy.disable_variants = !grouped;
+    const auto row = replay_token_result(log, net, policy).traces.front();
+    assert(row.activated_transitions == (std::vector<std::size_t>{1, 1, 2, 3}));
+    assert(row.missing == 3 && row.remaining == 3 && row.consumed == 5 && row.produced == 5);
+    assert(row.reached_marking == (std::vector<TokenInteger>{0, 0, 1, 1, 1}));
+    assert(row.cleaned_place_indices == (std::vector<std::size_t>{0}));
+  }
+
+  // A newly produced alias makes the old place name ambiguous before cleanup.
+  PetriNet fork;
+  fork.set_activities({"C"});
+  for (std::size_t i = 0; i < 4; ++i) fork.add_place();
+  fork.set_source(0); fork.set_sink(2);
+  fork.add_transition(std::nullopt, {0}, {1});
+  fork.add_transition(0, {1}, {2, 3});
+  policy = {};
+  policy.place_names = {"X0", "R", "E", "X0"};
+  policy.cleaning_token_flood = true;
+  policy.walk_through_hidden_transitions = false; policy.try_to_reach_final_marking_through_hidden = false;
+  policy.initial_marking_keys = {true, false, false, false};
+  log.traces = {trace("C", {event("C")})};
+  for (const int tokens : {-1, 0, 1, 2}) {
+    policy.exact_initial_marking = TokenMarking{tokens, 0, 0, 0};
+    const auto row = replay_token_result(log, fork, policy).traces.front();
+    assert(row.reached_marking == (std::vector<TokenInteger>{tokens, 0, 1, 1}));
+    assert(row.reached_marking_keys == (std::vector<bool>{true, false, true, true}));
+    assert(row.cleaned_place_indices.empty());
+    assert(row.missing == 1 && row.consumed == 2 && row.produced == tokens + 2 && row.remaining == tokens + 1);
+  }
+  assert(detail::cleaning_unique_place_names({true, true, false}, {"X", "X", "X"})
+      == (detail::ReplayMarkingKeys{false, false, false}));
+  assert(detail::cleaning_unique_place_names({true, false, false}, {"X", "X", "X"})
+      == (detail::ReplayMarkingKeys{true, false, false}));
+}
 }  // namespace
 int main() {
   variants_and_keys();
@@ -898,5 +945,6 @@ int main() {
   pltr_collection_and_variant_order();
   flood_cleaning_place_name_aliases();
   flood_cleaning_requires_a_new_place_name();
+  flood_cleaning_preserves_ambiguous_marked_names();
   std::cout << "full forward token replay result contracts passed\n";
 }

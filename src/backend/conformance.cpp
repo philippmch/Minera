@@ -508,12 +508,13 @@ class Replayer {
       emit(chosen, true);
       if (!before_cleaning.empty()) {
         const auto introduced_places = detail::cleaning_introduced_places(keys, before_cleaning, place_names);
+        const auto unique_names = detail::cleaning_unique_place_names(keys, place_names);
         for (const auto& component : components) {
           const bool introduced = std::any_of(component.begin(), component.end(),
               [&](auto place) { return keys[place] && introduced_places[place]; });
           if (!introduced) continue;
           for (const auto place : component) {
-            if (keys[place] && before_cleaning[place]) {
+            if (keys[place] && before_cleaning[place] && unique_names[place]) {
               marking[place] = 0;
               keys[place] = false;
               std::erase(order, place);

@@ -1103,10 +1103,32 @@ void cleaning_uses_duplicate_place_names() {
   assert(preserved.transitions[0].log1_occurrences == 2 && preserved.transitions[1].log1_occurrences == 1);
   assert(preserved.places[0].log1_occurrences == 1 && preserved.places[1].log1_occurrences == 3);
 }
+void cleaning_preserves_a_newly_produced_name_alias() {
+  minera::PetriNet net;
+  net.set_activities({"C"});
+  for (std::size_t i = 0; i < 4; ++i) net.add_place();
+  net.set_source(0); net.set_sink(2);
+  net.add_transition(std::nullopt, {0}, {1});
+  net.add_transition(0, {1}, {2, 3});
+  minera::PetriUsageComparisonOptions options;
+  options.place_names = {"X0", "R", "E", "X0"};
+  options.cleaning_token_flood = true;
+  options.walk_through_hidden_trans = false; options.try_to_reach_final_marking_through_hidden = false;
+  options.initial_marking_keys = {true, false, false, false};
+  for (const std::uint32_t tokens : {0u, 1u, 2u}) {
+    options.initial_marking = {tokens, 0, 0, 0};
+    const auto result = minera::compare_petri_usage(net, log_of({"C"}), log_of({}), options);
+    assert(result.transitions[0].log1_occurrences == 0 && result.transitions[1].log1_occurrences == 1);
+    assert(result.places[0].log1_occurrences == tokens && result.places[3].log1_occurrences == 1);
+  }
+  options.place_names[3] = "alias"; options.initial_marking = {2, 0, 0, 0};
+  assert(minera::compare_petri_usage(net, log_of({"C"}), log_of({}), options).places[0].log1_occurrences == 1);
+}
 }  // namespace
 
 int main() {
   cleaning_uses_duplicate_place_names();
+  cleaning_preserves_a_newly_produced_name_alias();
   public_zero_marking_keys_contract();
   public_pre_event_prefix_and_duplicate_contract();
   public_pre_event_weighted_and_path_limit();
