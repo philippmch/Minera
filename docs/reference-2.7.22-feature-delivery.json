@@ -824,6 +824,34 @@
       "id": "ordinary_csv_import_and_replay",
       "state": "available",
       "validation": "docs/feature-first-csv-import-validation.json"
+    },
+    {
+      "added": [
+        "Automatic imported/mined activity fields for ordinary and custom-column CSV evaluation",
+        "Evaluation-only custom activity projection for alignment engines with intact original data",
+        "Consistent standalone token fitness and uploaded PNML model evaluation with exact explicit selectors"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp"
+      ],
+      "families": [
+        "replay_fitness",
+        "precision",
+        "generalization",
+        "simplicity",
+        "composite"
+      ],
+      "id": "model_quality_input_defaults",
+      "models": [
+        "alpha",
+        "heuristic",
+        "inductive",
+        "powl",
+        "imported"
+      ],
+      "state": "available",
+      "validation": "docs/feature-first-model-quality-validation.json"
     }
   ],
   "execution_priority": [
@@ -831,10 +859,6 @@
     "Complete strict behavioral parity after feature delivery"
   ],
   "feature_backlog": [
-    {
-      "area": "Default fields in model quality evaluation",
-      "next_action": "Resolve the observed default Composite evaluation failure on ordinary CSV by binding omitted evaluation selectors to the imported fields and retaining explicit field semantics."
-    },
     {
       "area": "Remaining model visualizations",
       "next_action": "Review transition-system, social-network and declarative model views; expose existing native results where a usable view is missing."

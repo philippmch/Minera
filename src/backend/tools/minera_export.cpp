@@ -6324,9 +6324,14 @@ int main(int argc, char** argv) {
         if (evaluation_fields.contains("fitness_variant") &&
             evaluation_params->replay_fitness_variant != minera::ReplayFitnessVariant::TOKEN_BASED)
           throw std::invalid_argument("standalone replay fitness supports token-based fitness");
+        const auto fitness_options = minera::tools::default_evaluation_input_options(
+            log, evaluation_params->replay_fitness_options,
+            evaluation_fields.contains("evaluation_activity_attribute"));
+        const auto fitness_input = minera::tools::evaluation_input_log(
+            log, fitness_options.activity_attribute);
         body = minera::token_replay_fitness_result_json(minera::evaluate_replay_fitness(
-            log, document, minera::ReplayFitnessVariant::TOKEN_BASED,
-            evaluation_params->replay_fitness_options));
+            fitness_input ? *fitness_input : log, document, minera::ReplayFitnessVariant::TOKEN_BASED,
+            fitness_options));
       } else if (token_replay_result_requested) {
         body = minera::token_replay_result_json(minera::replay_token_result(log, document.net, replay_options));
       } else {
@@ -7683,7 +7688,7 @@ int main(int argc, char** argv) {
       evaluation.emplace();
       evaluation->reserve(available_models.size());
       for (const auto& [miner, petri] : available_models) {
-        const auto& evaluation_log =
+        const auto& base_evaluation_log =
             miner == "powl"
                 ? powl_log
                 : miner == "inductive"
@@ -7691,7 +7696,19 @@ int main(int argc, char** argv) {
                       : miner == "alpha" ? alpha_log : log;
         minera::ModelEvaluation result;
         result.miner = miner;
-        auto model_evaluation = *evaluation_params;
+        const std::string_view model_activity = miner == "inductive"
+            ? std::string_view(inductive_options.activity_key)
+            : miner == "alpha" ? std::string_view(alpha_options.activity_attribute)
+            : miner == "heuristic" ? std::string_view(heuristic_options.activity_attribute)
+            : miner == "powl" ? std::string_view(powl_options.activity_key)
+            : std::string_view("concept:name");
+        auto model_evaluation = minera::tools::default_evaluation_input_params(
+            base_evaluation_log, *evaluation_params,
+            evaluation_fields.contains("evaluation_activity_attribute"),
+            model_activity);
+        const auto evaluation_input = minera::tools::evaluation_input_log(
+            base_evaluation_log, model_evaluation.replay_fitness_options.activity_attribute);
+        const auto& evaluation_log = evaluation_input ? *evaluation_input : base_evaluation_log;
         const auto* evaluation_document = miner == "imported" && imported_document
             ? &*imported_document : nullptr;
         switch (model_evaluation.family) {
