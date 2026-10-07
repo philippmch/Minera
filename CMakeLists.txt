@@ -1617,6 +1617,15 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_overlap_json_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_overlap_json_tests COMMAND minera_overlap_json_tests)
 
+  add_executable(minera_replay_input_options_tests
+    src/backend/tests/test_replay_input_options.cpp
+  )
+  target_link_libraries(minera_replay_input_options_tests PRIVATE minera::core)
+  target_include_directories(minera_replay_input_options_tests PRIVATE src/backend/tools)
+  target_compile_features(minera_replay_input_options_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_replay_input_options_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_replay_input_options_tests COMMAND minera_replay_input_options_tests)
+
   add_executable(minera_knowledge_injection_tests
     src/backend/tests/test_knowledge_injection.cpp
   )

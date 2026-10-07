@@ -11109,3 +11109,41 @@ Exact embedding defaults, model/preprocessing/pooling, ID/order and native log
 filter parity remain open. The catalogue is unchanged at 46/86 packages,
 199/387 modules and 228 incomplete units. Feature delivery continues across the
 complete scope before the exhaustive behavioral pass.
+
+
+## Feature delivery first: ordinary CSV imports and model replay (2026-10-07)
+
+The CSV parser already retained the imported activity field, but the bundled
+replay requested concept:name even when the original field was activity or a
+custom name. The application adapters now bind an omitted replay selector to a
+uniform imported activity field when the canonical field is absent. Explicit
+selectors remain exact; real canonical cells and mixed source keys are retained.
+The helper does not change the native core's strict field lookup or rewrite log
+metadata. The heuristic bundle also respects an explicit replay selector.
+
+The CLI and HTTP mining bundle now accept ordinary case_id/activity/timestamp
+CSV, custom-column CSV and TSV without duplicated canonical fields. All four
+models replay the tested cases with no missing or remaining tokens. Standalone
+CSV/PNML replay and cached imported-model checking use the same omitted-selector
+policy. Real transformer search is usable after an ordinary CSV upload.
+
+`docs/feature-first-csv-import-validation.json` records three freshly compiled
+consumers, an assertion-enabled native regression suite and 45 actual CLI/HTTP
+checks across seven CSV/TSV/XES fixtures plus explicit selectors and model
+operations. Eight former failure responses become successful complete analyses;
+six previously successful whole JSON responses remain identical. Explicit
+missing fields remain errors, and a supplied heuristic replay field is honored.
+Browser checks confirm a three-column upload, 2/2 fitting Alpha cases with the
+activity field, and real 384-dimension semantic search from an ordinary CSV.
+
+The 165 native core objects and 569 preceding backend source bindings remain
+unchanged. The earlier 152 native suites are inherited, with the new regression
+suite run separately; all 100 frontend bindings and production outputs are
+unchanged and inherit the 641-test frontend result. This is an application
+adapter repair, with no full native algorithm re-audit or catalogue promotion.
+
+A neighboring default Composite model evaluation request on the ordinary CSV
+still reports concept:name. Its separate evaluation options are now the next
+feature checkpoint, with the observed failure retained. The complete catalogue
+remains 46/86 packages, 199/387 modules and 228 incomplete units. All remaining
+feature and exact behavioral parity requirements remain open.

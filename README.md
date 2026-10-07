@@ -495,6 +495,12 @@ Add `--embedding-variant events` for event vectors, or
 The item limit applies to all cases or events being encoded, rather than to a
 sample. Very long text remains subject to the selected model's token limit.
 
+CSV uploads using `case_id`, `activity` and `timestamp` do not need duplicate
+canonical columns. The bundled token replay follows the imported activity
+field when no replay selector is supplied. An explicitly supplied replay
+activity field stays exact; a missing name produces a field error. Custom
+CSV column names and delimiters use the existing import options.
+
 `minera_export` reads a `.xes` file as XES and any other file as CSV (the
 column/delimiter options apply to CSV only). It accepts options for custom
 column names and delimiters, plus log-filtering flags applied before discovery
