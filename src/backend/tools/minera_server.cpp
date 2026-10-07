@@ -327,6 +327,7 @@ struct MinedSession {
   minera::InductiveMinerOptions inductive_options;
   std::string alpha_activity_attribute = "concept:name";
   std::string powl_activity_key = "concept:name";
+  std::string heuristic_activity_attribute = "concept:name";
   std::string powl_timestamp_key = "time:timestamp";
   std::string powl_case_id_key = "case:concept:name";
 };
@@ -1104,6 +1105,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         log, params.token_replay, params.token_replay_activity_attribute_supplied);
     session->inductive_options = params.inductive;
     session->alpha_activity_attribute = params.alpha.activity_attribute;
+    session->heuristic_activity_attribute = params.heuristic.activity_attribute;
     session->powl_activity_key = params.powl.activity_key;
     session->powl_timestamp_key = params.powl.timestamp_key;
     session->powl_case_id_key = params.powl.case_id_key;
@@ -5460,6 +5462,18 @@ void handle_evaluate(const httplib::Request& request,
           session->powl_timestamp_key, session->powl_case_id_key);
       evaluation_log = &*projected_powl_log;
     }
+    const std::string_view model_activity = miner == "inductive"
+        ? std::string_view(session->inductive_options.activity_key)
+        : miner == "alpha" ? std::string_view(session->alpha_activity_attribute)
+        : miner == "heuristic" ? std::string_view(session->heuristic_activity_attribute)
+        : miner == "powl" ? std::string_view(session->powl_activity_key)
+        : std::string_view("concept:name");
+    params = minera::tools::default_evaluation_input_params(
+        *evaluation_log, std::move(params),
+        request.has_param("evaluation_activity_attribute"), model_activity);
+    const auto evaluation_input = minera::tools::evaluation_input_log(
+        *evaluation_log, params.replay_fitness_options.activity_attribute);
+    if (evaluation_input) evaluation_log = &*evaluation_input;
     minera::ModelEvaluation result;
     result.miner = miner;
     switch (params.family) {

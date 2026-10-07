@@ -11147,3 +11147,42 @@ still reports concept:name. Its separate evaluation options are now the next
 feature checkpoint, with the observed failure retained. The complete catalogue
 remains 46/86 packages, 199/387 modules and 228 incomplete units. All remaining
 feature and exact behavioral parity requirements remain open.
+
+
+## Feature delivery first: usable model quality evaluation defaults (2026-10-07)
+
+The model quality panel now evaluates ordinary CSV inputs without manually
+entering the activity field. Omitted evaluator selectors follow the imported
+field and each mined model's activity context. The cached Heuristic model now
+retains that context alongside Alpha, Inductive and POWL. Explicit evaluation
+selectors remain exact, and canonical cells are preserved. For consumed custom
+CSV activity columns, an evaluation-only copy exposes the actual named cell to
+alignment engines; the original cached log, null cells and genuinely absent
+cells are unchanged. Native evaluation algorithms and defaults are unchanged.
+
+`docs/feature-first-model-quality-validation.json` binds three freshly compiled
+consumers, an assertion-enabled regression suite and 189 actual CLI/HTTP calls.
+All five metric families work for all four mined models on ordinary, canonical
+and custom-column CSV fixtures. Custom miner activity contexts, explicit
+selectors, token-based fitness, standalone PNML token fitness and all five
+uploaded-model evaluation families are exercised. Twelve default HTTP failures
+and four whole CLI evaluation failures are repaired; standalone token fitness
+also changes from failure to success. Twenty-five whole canonical responses
+remain identical, and 59 preceding successful results preserve every field
+except intentionally updated activity-selector echoes.
+
+Browser checks render the default Alpha composite bundle, POWL generalization
+and the fitness/precision/simplicity panels from a three-column CSV. The
+composite example computes fitness/precision/simplicity 100%, generalization
+29.3% and weighted average 82.3%, with no manual activity field or console error.
+All 165 core objects and 570 preceding backend source bindings remain unchanged;
+the earlier 152 native suites are inherited, with the updated adapter regression
+suite run separately. All 100 frontend bindings and production outputs remain
+unchanged and inherit the 641-test frontend result.
+
+This closes the preceding observed default Composite evaluation follow-up.
+Remaining model visualizations are again the next feature area, followed by
+integrations, optional connector drivers and every other absent capability.
+The full catalogue remains 46/86 packages, 199/387 modules and 228 incomplete
+units; no module/package or full-parity promotion is made. All exact behavioral
+requirements remain in the original contract and coverage ledger.
