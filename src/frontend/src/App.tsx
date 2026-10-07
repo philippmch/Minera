@@ -48,6 +48,7 @@ import { CorrelationMining } from "./components/CorrelationMining";
 import { Filters } from "./components/Filters";
 import { OcelExplorer } from "./components/OcelExplorer";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
+import { AskModel } from "./components/AskModel";
 import {
   alignModel,
   alignDfg,
@@ -656,6 +657,7 @@ export default function App() {
         <button className={tab === "embeddings" ? "tab active" : "tab"} onClick={() => setTab("embeddings")}>
           Search &amp; embeddings
         </button>
+        <button className={tab === "llm" ? "tab active" : "tab"} onClick={() => setTab("llm")}>Ask a model</button>
       </nav>
       <Kpis data={data} />
       {source && (
@@ -727,6 +729,7 @@ export default function App() {
           <EmbeddingSearch key={cacheGeneration.current} data={data} available={source !== null} mining={mining} />
         </main>
       )}
+      {tab === "llm" && <main className="layout-log"><AskModel key={cacheGeneration.current} data={data} mining={mining} /></main>}
       {tab === "dfg" && (
         <main className="layout">
           <ProcessMap

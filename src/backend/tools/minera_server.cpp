@@ -33,6 +33,7 @@
 
 #include "httplib.h"
 #include "embedding_runtime.hpp"
+#include "llm_runtime.hpp"
 #include "minera/alpha_miner.hpp"
 #include "minera/alpha_result_json.hpp"
 #include "minera/bpmn.hpp"
@@ -407,6 +408,8 @@ const minera::PetriNet& select_cached_or_process_tree_net(
 std::shared_ptr<const MinedSession> g_session;
 std::mutex g_session_mutex;
 bool g_embedding_runtime_enabled = false;
+std::string g_llm_runtime_url;
+std::set<std::string> g_llm_origins;
 constexpr std::size_t kServerIlpMaxNodes = 1'000'000;
 constexpr std::size_t kServerGeneticMaxPopulation = 10'000;
 constexpr std::size_t kServerGeneticMaxGenerations = 10'000;
@@ -3429,13 +3432,19 @@ void handle_knowledge_injection(const httplib::Request& request,
       if (!allowed.contains(key))
         throw std::invalid_argument("unknown knowledge parameter: " + key);
     }
+    for (const auto& [key, value] : request.files) {
+      if (!allowed.contains(key)) throw std::invalid_argument("unknown knowledge field: " + key);
+      if (request.has_param(key)) throw std::invalid_argument("duplicate knowledge field: " + key);
+      if (!value.filename.empty()) throw std::invalid_argument("knowledge fields must be text");
+    }
     const auto lookup = [&](std::string_view name) {
       const auto key = std::string(name);
+      if (request.has_file(key)) return form_field(request, key);
       return request.has_param(key) ? request.get_param_value(key)
                                     : std::string{};
     };
     const auto present = [&](std::string_view name) {
-      return request.has_param(std::string(name));
+      return request.has_param(std::string(name)) || request.has_file(std::string(name));
     };
     response.set_content(
         minera::knowledge_injection_json(minera::build_knowledge_prompt(
@@ -3444,6 +3453,58 @@ void handle_knowledge_injection(const httplib::Request& request,
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+bool llm_origin_allowed(const httplib::Request& request, httplib::Response& response) {
+  if (!request.has_header("Origin")) return true;
+  const auto origin = request.get_header_value("Origin");
+  if (!g_llm_origins.contains(origin)) {
+    response.status = 403;
+    response.set_content(error_json("LLM requests must come from the local Minera application"), "application/json");
+    return false;
+  }
+  response.set_header("Access-Control-Allow-Origin", origin);
+  return true;
+}
+
+void handle_llm_status(const httplib::Request& request, httplib::Response& response) {
+  if (!llm_origin_allowed(request, response)) return;
+  if (g_llm_runtime_url.empty()) {
+    response.set_content("{\"family\":\"LLM_RUNTIME\",\"ready\":false,\"providers\":[],\"error\":\"Start the optional LLM runtime and configure --llm-runtime-url\"}", "application/json");
+    return;
+  }
+  try {
+    if (!request.params.empty()) throw std::invalid_argument("LLM status does not accept query parameters");
+    const auto result = minera::llm_runtime::request(g_llm_runtime_url, "/health");
+    response.status = result->status;
+    response.set_content(result->body, "application/json");
+  } catch (const std::exception& error) {
+    response.status = 502; response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_llm_complete(const httplib::Request& request, httplib::Response& response) {
+  if (!llm_origin_allowed(request, response)) return;
+  if (g_llm_runtime_url.empty()) {
+    response.status = 503;
+    response.set_content(error_json("No LLM runtime configured; start it and pass --llm-runtime-url"), "application/json");
+    return;
+  }
+  try {
+    if (!request.params.empty()) throw std::invalid_argument("LLM completion accepts JSON body fields, not query parameters");
+    const auto content_type = request.get_header_value("Content-Type");
+    if (content_type.substr(0, content_type.find(';')) != "application/json") {
+      response.status = 415; response.set_content(error_json("LLM completion requires application/json"), "application/json"); return;
+    }
+    if (request.body.size() > minera::llm_runtime::max_input_bytes) {
+      response.status = 413; response.set_content(error_json("LLM request exceeds the application input bound"), "application/json"); return;
+    }
+    const auto result = minera::llm_runtime::request(g_llm_runtime_url, "/complete", &request.body);
+    response.status = result->status;
+    response.set_content(result->body, "application/json");
+  } catch (const std::exception& error) {
+    response.status = 502; response.set_content(error_json(error.what()), "application/json");
   }
 }
 
@@ -7761,7 +7822,8 @@ int usage(const char* program) {
                "  --port <port>      Listen port (default: 8484)\n"
                "  --frontend <dir>   Static frontend directory"
                " (default: src/frontend/dist next to the working directory)\n"
-               "  --embedding-runtime-url <url> HTTP transformer runtime (POST /embed)\n";
+               "  --embedding-runtime-url <url> HTTP transformer runtime (POST /embed)\n"
+               "  --llm-runtime-url <url> Optional language-model runtime (POST /complete)\n";
   return 2;
 }
 
@@ -7791,6 +7853,10 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       embedding_runtime_url = value;
+    } else if (arg == "--llm-runtime-url") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      g_llm_runtime_url = value;
     } else {
       return usage(argv[0]);
     }
@@ -7801,6 +7867,11 @@ int main(int argc, char** argv) {
       minera::set_default_embedding_provider(
           minera::embedding_runtime::make_http_provider(embedding_runtime_url));
     g_embedding_runtime_enabled = !embedding_runtime_url.empty();
+    if (!g_llm_runtime_url.empty()) minera::llm_runtime::validate_url(g_llm_runtime_url);
+    for (const auto local_port : {port, 5173, 4173}) {
+      g_llm_origins.insert("http://127.0.0.1:" + std::to_string(local_port));
+      g_llm_origins.insert("http://localhost:" + std::to_string(local_port));
+    }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';
     return 2;
@@ -7819,6 +7890,12 @@ int main(int argc, char** argv) {
     response.status = 204;
   };
   server.Options("/api/mine", preflight);
+  server.Options("/api/llm/complete", [](const httplib::Request& request, httplib::Response& response) {
+    if (!llm_origin_allowed(request, response)) return;
+    response.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    response.set_header("Access-Control-Allow-Headers", "Content-Type");
+    response.status = 204;
+  });
   server.Options("/api/ocel/discover", preflight);
   server.Options("/api/ocel/split", preflight);
   server.Options("/api/ocel/enrich", preflight);
@@ -7946,6 +8023,8 @@ int main(int argc, char** argv) {
   server.Post("/api/roles", handle_roles);
   server.Post("/api/resource-profiles", handle_resource_profiles);
   server.Post("/api/knowledge-injection", handle_knowledge_injection);
+  server.Get("/api/llm/status", handle_llm_status);
+  server.Post("/api/llm/complete", handle_llm_complete);
   server.Post("/api/local-diagnostics", handle_local_diagnostics);
   server.Post("/api/clustering", handle_clustering);
   server.Post("/api/profile-clustering", handle_profile_clustering);

@@ -11222,3 +11222,41 @@ algorithm audit is claimed. LLM/query integrations and optional connector
 drivers are the next feature areas, followed by the full remaining catalogue.
 The scope remains 46/86 packages, 199/387 modules and 228 incomplete units.
 No package/module promotion or full parity claim is made.
+
+
+## Feature delivery first: language-model text execution (2026-10-07)
+
+The existing prompt builder now has configured OpenAI, Anthropic and Google
+text-provider execution through an optional Python standard-library runtime.
+The native knowledge CLI invokes all three prompt modes, and the local server
+exposes status/completion routes and text multipart knowledge previews. The
+Ask a model panel builds and edits process/general/database prompts, shows the
+destination, sends only the displayed prompt, and offers output controls,
+cancellation, visible errors and original-response JSON export. Credentials
+remain in the runtime environment; model names are explicit and temperature
+is omitted by default. Provider HTTP errors do not expose upstream error bodies
+or credentials. New execution routes restrict browser origins to the local app.
+
+`docs/feature-first-llm-providers-validation.json` binds four freshly compiled
+consumers, two assertion-enabled native suites, eight Python runtime tests,
+655 passing frontend tests, the production build, 38 CLI/HTTP checks and
+18 browser checks. All three prompt modes match across CLI, legacy HTTP and
+multipart HTTP. Nine complete CLI/HTTP provider responses match exactly.
+Browser checks execute every mode/provider combination, edit the outbound
+prompt, preserve its provider payload in downloads, exercise failure and
+cancellation, reject stale responses and verify 390-pixel mobile bounds.
+
+The first capture revealed that Windows narrow CLI arguments changed Greek,
+arrow and Japanese text. It remains retained with its source/binary/helper
+bindings. The knowledge CLI now converts wide Windows arguments to UTF-8,
+and the unchanged multilingual comparison passes on the fresh build. All
+165 native core objects are reused unchanged; the preceding 152 algorithm
+suites are inherited rather than presented as a fresh whole-algorithm audit.
+
+Execution validation uses owned local HTTP protocol fixtures. It establishes
+transport and interface behavior, not external account access or live model
+inference. Text execution is usable with configured credentials/endpoints;
+remaining provider parameters/multimodal interfaces, reference abstractions,
+generated SQL/log querying/filtering and clustering/hypotheses remain open.
+The full catalogue stays 46/86 packages, 199/387 modules and 228 incomplete
+units, with no package/module promotion or full-parity claim.

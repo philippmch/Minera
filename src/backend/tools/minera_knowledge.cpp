@@ -1,10 +1,23 @@
 #include <charconv>
 #include <iostream>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
 
 #include "minera/knowledge_injection.hpp"
+#include "llm_runtime.hpp"
 
 namespace {
 
@@ -20,15 +33,19 @@ int usage(const char* program) {
   std::cerr << "Usage: " << program
             << " --variant description|process_mining|database"
                " [--description TEXT] [--query TEXT] [--database-schema TEXT]"
-               " [--max-input-bytes N] [--max-prompt-bytes N]\n";
+               " [--max-input-bytes N] [--max-prompt-bytes N]"
+               " [--runtime-url URL --provider openai|anthropic|google --model MODEL]"
+               " [--max-tokens N] [--temperature 0..1]\n";
   return 2;
 }
 
 }  // namespace
 
-int main(int argc, char** argv) {
+int run(int argc, char** argv) {
   try {
     minera::KnowledgeInjectionOptions options;
+    minera::llm_runtime::CompletionOptions completion;
+    std::string runtime_url;
     for (int index = 1; index < argc; ++index) {
       const std::string option = argv[index];
       if (index + 1 >= argc) return usage(argv[0]);
@@ -42,14 +59,49 @@ int main(int argc, char** argv) {
         options.max_input_bytes = positive_size(value, option);
       else if (option == "--max-prompt-bytes")
         options.max_prompt_bytes = positive_size(value, option);
+      else if (option == "--runtime-url") runtime_url = value;
+      else if (option == "--provider") completion.provider = value;
+      else if (option == "--model") completion.model = value;
+      else if (option == "--max-tokens") completion.max_tokens = positive_size(value, option);
+      else if (option == "--temperature") {
+        std::size_t used = 0;
+        const auto parsed = std::stod(value, &used);
+        if (used != value.size() || !std::isfinite(parsed) || parsed < 0 || parsed > 1)
+          throw std::invalid_argument("temperature must be from 0 through 1");
+        completion.temperature = parsed;
+      }
       else return usage(argv[0]);
     }
-    std::cout << minera::knowledge_injection_json(
-                     minera::build_knowledge_prompt(options))
-              << '\n';
+    const auto result = minera::build_knowledge_prompt(options);
+    if (runtime_url.empty()) std::cout << minera::knowledge_injection_json(result) << '\n';
+    else {
+      if (!result.computed) throw std::runtime_error(result.error);
+      std::cout << minera::llm_runtime::completion_json(runtime_url, result.prompt, completion) << '\n';
+    }
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';
     return 1;
   }
 }
+
+#ifdef _WIN32
+int wmain(int argc, wchar_t** argv) {
+  std::vector<std::string> values;
+  values.reserve(argc);
+  for (int index = 0; index < argc; ++index) {
+    const auto size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[index], -1, nullptr, 0, nullptr, nullptr);
+    if (size <= 0) { std::cerr << "error: invalid Unicode argument\n"; return 1; }
+    std::string value(static_cast<std::size_t>(size), '\0');
+    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[index], -1, value.data(), size, nullptr, nullptr)) {
+      std::cerr << "error: could not convert Unicode argument\n"; return 1;
+    }
+    value.pop_back(); values.push_back(std::move(value));
+  }
+  std::vector<char*> arguments;
+  for (auto& value : values) arguments.push_back(value.data());
+  return run(argc, arguments.data());
+}
+#else
+int main(int argc, char** argv) { return run(argc, argv); }
+#endif
