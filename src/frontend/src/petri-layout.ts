@@ -1,5 +1,5 @@
 import { type ViewBox } from "./layout";
-import { type MineraExport, type PetriNetModel } from "./types";
+import { type PetriNetModel } from "./types";
 
 export interface PetriPlaceLayout {
   id: number;
@@ -24,6 +24,9 @@ export interface PetriTransitionLayout {
 export interface PetriArcLayout {
   key: string;
   path: string;
+  transition: number;
+  place: number;
+  input: boolean;
 }
 
 export interface PetriLayout {
@@ -49,7 +52,9 @@ function transitionWidth(label: string): number {
   return Math.max(72, Math.ceil(measureCtx.measureText(label).width) + 34);
 }
 
-function activityLabel(activity: number | null, data: MineraExport): string {
+interface ActivityLabels { activities: readonly { name: string }[]; }
+
+function activityLabel(activity: number | null, data: ActivityLabels): string {
   return activity === null
     ? "τ"
     : (data.activities[activity]?.name ?? "?");
@@ -94,7 +99,7 @@ interface Node {
 
 export function computePetriLayout(
   net: PetriNetModel,
-  data: MineraExport,
+  data: ActivityLabels,
 ): PetriLayout {
   const placeKey = (id: number) => `p${id}`;
   const transKey = (index: number) => `t${index}`;
@@ -408,7 +413,12 @@ export function computePetriLayout(
       floor === undefined
         ? arcPath(s.x, s.y, t.x, t.y)
         : skipPath(s.x, s.y, t.x, t.y, floor);
-    return { key: `${from}-${to}-${index}`, path };
+    const input = from.startsWith("p");
+    return {
+      key: `${from}-${to}-${index}`, path, input,
+      transition: Number((input ? to : from).slice(1)),
+      place: Number((input ? from : to).slice(1)),
+    };
   });
 
   const pad = 52;

@@ -506,6 +506,7 @@ body {
 
 .ocel-view-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   margin: 0 0 14px;
@@ -515,6 +516,29 @@ body {
 }
 .ocel-view-toolbar select {
   max-width: min(100%, 280px);
+}
+.ocel-discovery-controls { margin-bottom: 16px; }
+.ocel-options-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; padding: 0 12px 10px; }
+.ocel-options-row > label:not(.ocel-check) { display: grid; gap: 4px; color: var(--ink-70); font-size: 12px; }
+.ocel-options-row input[type="text"], .ocel-options-row input:not([type]) {
+  width: min(220px, 100%); padding: 6px 8px; color: var(--ink); background: var(--paper-raised); border: 1px solid var(--line); font: inherit;
+}
+.ocel-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.ocel-check input { accent-color: var(--copper); }
+.ocel-type-key { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+.ocel-type-key i { width: 9px; height: 9px; border-radius: 50%; }
+.ocel-variable-key { font-size: 12px; color: var(--ink-70); }
+.ocel-net-details { margin-top: 16px; }
+.ocel-table-scroll { overflow-x: auto; }
+.ocel-net-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ocel-net-table th, .ocel-net-table td { padding: 8px 12px; border-bottom: 1px solid var(--line-soft); text-align: left; }
+.ocel-net-table thead th { color: var(--ink-70); font-weight: 500; }
+.ocel-net-table tbody th { font-weight: 500; }
+.ocel-net-table small { color: var(--ink-45); }
+@media (max-width: 600px) {
+  .map-panel .panel-head { flex-wrap: wrap; }
+  .map-panel .panel-head h2 { flex-basis: 100%; }
+  .map-panel .map-controls { margin-left: 0; flex-wrap: wrap; gap: 10px; }
 }
 
 .map-controls {
@@ -799,6 +823,7 @@ input[type="range"]::-moz-range-thumb {
   opacity: 0.5;
 }
 .petri-arrowhead { fill: var(--ink); opacity: 0.7; }
+.petri-arc.variable { stroke-dasharray: 5 3; stroke-width: 1.8; opacity: .8; }
 
 .petri-place-box {
   fill: var(--paper-raised);

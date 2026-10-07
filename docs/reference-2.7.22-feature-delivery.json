@@ -1,0 +1,839 @@
+{
+  "catalogue_families": [
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.analysis.extended_marking_equation",
+      "parity_status": "complete",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.analysis.marking_equation",
+      "parity_status": "complete",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.analysis.woflan",
+      "parity_status": "complete",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.analysis.workflow_net",
+      "parity_status": "complete",
+      "selectors": [
+        "PETRI_NET"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.anonymization.pripel",
+      "parity_status": "partial",
+      "selectors": [
+        "PRIPEL"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.anonymization.trace_variant_query",
+      "parity_status": "partial",
+      "selectors": [
+        "LAPLACE",
+        "SACOFA"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.clustering.profiles",
+      "parity_status": "partial",
+      "selectors": [
+        "SKLEARN_PROFILES"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.clustering.trace_attribute_driven",
+      "parity_status": "partial",
+      "selectors": [
+        "VARIANT_DMM_LEVEN",
+        "VARIANT_AVG_LEVEN",
+        "VARIANT_DMM_VEC",
+        "VARIANT_AVG_VEC",
+        "DFG"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.concept_drift",
+      "parity_status": "complete",
+      "selectors": [
+        "BOSE"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.conformance.alignments.decomposed",
+      "parity_status": "partial",
+      "selectors": [
+        "RECOMPOS_MAXIMAL"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.conformance.alignments.dfg",
+      "parity_status": "partial",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.conformance.alignments.edit_distance",
+      "parity_status": "complete",
+      "selectors": [
+        "EDIT_DISTANCE"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.conformance.alignments.petri_net",
+      "parity_status": "partial",
+      "selectors": [
+        "VERSION_STATE_EQUATION_A_STAR",
+        "VERSION_DIJKSTRA_NO_HEURISTICS",
+        "VERSION_DIJKSTRA_LESS_MEMORY",
+        "VERSION_DISCOUNTED_A_STAR"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.conformance.alignments.process_tree",
+      "parity_status": "partial",
+      "selectors": [
+        "APPROXIMATED_ORIGINAL",
+        "SEARCH_GRAPH_PT",
+        "DYNAMIC_PROGRAMMING",
+        "MILP"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.conformance.antialignments",
+      "parity_status": "complete",
+      "selectors": [
+        "VERSION_DISCOUNTED_A_STAR"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.conformance.declare",
+      "parity_status": "complete",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.conformance.footprints",
+      "parity_status": "complete",
+      "selectors": [
+        "LOG_MODEL",
+        "LOG_EXTENSIVE",
+        "TRACE_EXTENSIVE"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.conformance.log_skeleton",
+      "parity_status": "complete",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.conformance.multialignments",
+      "parity_status": "complete",
+      "selectors": [
+        "VERSION_DISCOUNTED_A_STAR"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.conformance.ocel.etot",
+      "parity_status": "partial",
+      "selectors": [
+        "GRAPH_COMPARISON"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.conformance.ocel.ocdfg",
+      "parity_status": "partial",
+      "selectors": [
+        "GRAPH_COMPARISON"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.conformance.ocel.otg",
+      "parity_status": "partial",
+      "selectors": [
+        "GRAPH_COMPARISON"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.conformance.temporal_profile",
+      "parity_status": "complete",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.conformance.tokenreplay",
+      "parity_status": "partial",
+      "selectors": [
+        "TOKEN_REPLAY",
+        "BACKWARDS"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.connectors",
+      "parity_status": "partial",
+      "selectors": [
+        "chrome_history",
+        "firefox_history",
+        "github_repo",
+        "outlook_calendar",
+        "outlook_mail_extractor",
+        "windows_events",
+        "camunda_workflow",
+        "sap_accounting",
+        "sap_o2c"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.decision_mining",
+      "parity_status": "partial",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.discovery.alpha",
+      "parity_status": "partial",
+      "selectors": [
+        "ALPHA_VERSION_CLASSIC",
+        "ALPHA_VERSION_PLUS"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.batches",
+      "parity_status": "complete",
+      "selectors": [
+        "LOG",
+        "PANDAS",
+        "POLARS"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.causal",
+      "parity_status": "complete",
+      "selectors": [
+        "CAUSAL_ALPHA",
+        "CAUSAL_HEURISTIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.correlation_mining",
+      "parity_status": "complete",
+      "selectors": [
+        "CLASSIC_SPLIT",
+        "CLASSIC",
+        "TRACE_BASED"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.declare",
+      "parity_status": "complete",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.dfg",
+      "parity_status": "complete",
+      "selectors": [
+        "NATIVE",
+        "FREQUENCY",
+        "PERFORMANCE",
+        "FREQUENCY_GREEDY",
+        "PERFORMANCE_GREEDY",
+        "FREQ_TRIPLES",
+        "CASE_ATTRIBUTES",
+        "CLEAN"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.footprints",
+      "parity_status": "complete",
+      "selectors": [
+        "ENTIRE_EVENT_LOG",
+        "ENTIRE_DATAFRAME",
+        "TRACE_BY_TRACE",
+        "PETRI_REACH_GRAPH",
+        "PROCESS_TREE",
+        "POWL",
+        "DFG",
+        "POLARS_LAZYFRAMES"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.discovery.genetic",
+      "parity_status": "partial",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.discovery.heuristics",
+      "parity_status": "partial",
+      "selectors": [
+        "CLASSIC",
+        "PLUSPLUS"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.discovery.ilp",
+      "parity_status": "partial",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.inductive",
+      "parity_status": "complete",
+      "selectors": [
+        "IM",
+        "IMf",
+        "IMd"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.log_skeleton",
+      "parity_status": "complete",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.minimum_self_distance",
+      "parity_status": "complete",
+      "selectors": [
+        "LOG",
+        "PANDAS",
+        "POLARS"
+      ]
+    },
+    {
+      "feature_delivery_status": "explorer_available",
+      "package": "algo.discovery.ocel.etot",
+      "parity_status": "partial",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.discovery.ocel.interleavings",
+      "parity_status": "partial",
+      "selectors": [
+        "TIMESTAMP_INTERLEAVINGS"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.discovery.ocel.link_analysis",
+      "parity_status": "partial",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "explorer_available",
+      "package": "algo.discovery.ocel.ocdfg",
+      "parity_status": "partial",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "explorer_available",
+      "package": "algo.discovery.ocel.ocpn",
+      "parity_status": "partial",
+      "selectors": [
+        "WO_ANNOTATION",
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "explorer_available",
+      "package": "algo.discovery.ocel.otg",
+      "parity_status": "partial",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "explorer_available",
+      "package": "algo.discovery.ocel.saw_nets",
+      "parity_status": "partial",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.performance_spectrum",
+      "parity_status": "complete",
+      "selectors": [
+        "DATAFRAME",
+        "LOG",
+        "DATAFRAME_DISCONNECTED",
+        "LOG_DISCONNECTED",
+        "LAZYFRAME",
+        "LAZYFRAME_DISCONNECTED"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.powl",
+      "parity_status": "complete",
+      "selectors": [
+        "TREE",
+        "BRUTE_FORCE",
+        "MAXIMAL",
+        "DYNAMIC_CLUSTERING"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.temporal_profile",
+      "parity_status": "complete",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.discovery.transition_system",
+      "parity_status": "complete",
+      "selectors": [
+        "VIEW_BASED"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.evaluation",
+      "parity_status": "partial",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.evaluation.earth_mover_distance",
+      "parity_status": "complete",
+      "selectors": [
+        "PYEMD"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.evaluation.generalization",
+      "parity_status": "partial",
+      "selectors": [
+        "GENERALIZATION_TOKEN"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.evaluation.precision",
+      "parity_status": "partial",
+      "selectors": [
+        "ETCONFORMANCE_TOKEN",
+        "ALIGN_ETCONFORMANCE",
+        "AUTOMATON_AFTER_ALIGN"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.evaluation.precision.dfg",
+      "parity_status": "complete",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.evaluation.replay_fitness",
+      "parity_status": "partial",
+      "selectors": [
+        "ALIGNMENT_BASED",
+        "TOKEN_BASED"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.evaluation.simplicity",
+      "parity_status": "partial",
+      "selectors": [
+        "SIMPLICITY_ARC_DEGREE",
+        "EXTENDED_CARDOSO",
+        "EXTENDED_CYCLOMATIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.label_splitting",
+      "parity_status": "partial",
+      "selectors": [
+        "CONTEXTUAL"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.merging.case_relations",
+      "parity_status": "partial",
+      "selectors": [
+        "PANDAS"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.organizational_mining.local_diagnostics",
+      "parity_status": "complete",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.organizational_mining.network_analysis",
+      "parity_status": "complete",
+      "selectors": [
+        "DATAFRAME"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.organizational_mining.resource_profiles",
+      "parity_status": "complete",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.organizational_mining.roles",
+      "parity_status": "complete",
+      "selectors": [
+        "LOG",
+        "PANDAS"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.organizational_mining.roles.common",
+      "parity_status": "complete",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.organizational_mining.sna",
+      "parity_status": "complete",
+      "selectors": [
+        "HANDOVER_LOG",
+        "WORKING_TOGETHER_LOG",
+        "SUBCONTRACTING_LOG",
+        "JOINTACTIVITIES_LOG",
+        "HANDOVER_PANDAS",
+        "WORKING_TOGETHER_PANDAS",
+        "SUBCONTRACTING_PANDAS",
+        "JOINTACTIVITIES_PANDAS"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.querying.llm.injection",
+      "parity_status": "partial",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.querying.llm.injection.db_knowledge",
+      "parity_status": "partial",
+      "selectors": [
+        "pandas_duckdb",
+        "sqlite3_traditional"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.querying.llm.injection.pm_knowledge",
+      "parity_status": "partial",
+      "selectors": [
+        "traditional",
+        "ocel20"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.simulation.montecarlo",
+      "parity_status": "partial",
+      "selectors": [
+        "PETRI_SEMAPH_FIFO"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.simulation.playout.declare",
+      "parity_status": "complete",
+      "selectors": [
+        "CLASSIC"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.simulation.playout.dfg",
+      "parity_status": "complete",
+      "selectors": [
+        "CLASSIC",
+        "PERFORMANCE"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.simulation.playout.oc_causal_net",
+      "parity_status": "partial",
+      "selectors": [
+        "EXTENSIVE"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.simulation.playout.ocpn",
+      "parity_status": "partial",
+      "selectors": [
+        "EXTENSIVE"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.simulation.playout.petri_net",
+      "parity_status": "complete",
+      "selectors": [
+        "BASIC_PLAYOUT",
+        "STOCHASTIC_PLAYOUT",
+        "EXTENSIVE"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.simulation.playout.process_tree",
+      "parity_status": "complete",
+      "selectors": [
+        "BASIC_PLAYOUT",
+        "EXTENSIVE",
+        "TOPBOTTOM"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.simulation.tree_generator",
+      "parity_status": "complete",
+      "selectors": [
+        "BASIC",
+        "PTANDLOGGENERATOR"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.transformation.log_to_features",
+      "parity_status": "partial",
+      "selectors": [
+        "EVENT_BASED",
+        "TRACE_BASED",
+        "TEMPORAL"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.transformation.log_to_interval_tree",
+      "parity_status": "complete",
+      "selectors": [
+        "OPEN_PATHS"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.transformation.log_to_target",
+      "parity_status": "complete",
+      "selectors": [
+        "NEXT_ACTIVITY",
+        "NEXT_TIME",
+        "REMAINING_TIME"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.transformation.log_to_trie",
+      "parity_status": "complete",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.transformation.ocel.description",
+      "parity_status": "complete",
+      "selectors": [
+        "VARIANT1",
+        "VARIANT2"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.transformation.ocel.features.events",
+      "parity_status": "complete",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.transformation.ocel.features.events_objects",
+      "parity_status": "complete",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.transformation.ocel.features.objects",
+      "parity_status": "complete",
+      "selectors": [
+        "default"
+      ]
+    },
+    {
+      "feature_delivery_status": "native_proof_exists",
+      "package": "algo.transformation.ocel.split_ocel",
+      "parity_status": "complete",
+      "selectors": [
+        "CONNECTED_COMPONENTS",
+        "ANCESTORS_DESCENDANTS"
+      ]
+    },
+    {
+      "feature_delivery_status": "feature_review_pending",
+      "package": "algo.transformation.to_embeddings",
+      "parity_status": "partial",
+      "selectors": [
+        "CASES_TRANSFORMERS",
+        "EVENTS_TRANSFORMERS"
+      ]
+    }
+  ],
+  "deferred_verification": "All open semantic, numeric, ordering, schema, solver and error-detail gates remain in the parity contract and coverage ledger. Feature delivery does not erase them.",
+  "delivered_features": [
+    {
+      "added": [
+        "Object-centric Petri-net views by object type, variable arcs, activity bindings and replay diagnostics",
+        "Combined and per-type stochastic arc-weight nets with token-weight distributions",
+        "Activity and object-type attribute controls, annotated/unannotated OCPN and replay options",
+        "Bundled orders/items OCEL sample using actual local discovery"
+      ],
+      "after_selectable_models": 5,
+      "before_selectable_models": 3,
+      "entry_point": "src/frontend/src/components/OcelExplorer.tsx",
+      "id": "ocel_explorer_models",
+      "models": [
+        "ocdfg",
+        "etot",
+        "otg",
+        "ocpn",
+        "saw"
+      ],
+      "state": "available"
+    }
+  ],
+  "execution_priority": [
+    "Deliver missing features and usable entry points across the whole scope",
+    "Complete strict behavioral parity after feature delivery"
+  ],
+  "feature_backlog": [
+    {
+      "area": "Remaining model visualizations",
+      "next_action": "Review transition-system, social-network and declarative model views; expose existing native results where a usable view is missing."
+    },
+    {
+      "area": "Transformer embedding runtime",
+      "next_action": "Review the current external-vector encoder path and add actual model execution for the named case/event transformer surfaces."
+    },
+    {
+      "area": "LLM and query integrations",
+      "next_action": "Review provider execution, natural-language querying/filtering and clustering/hypothesis entry points beyond existing prompt construction."
+    },
+    {
+      "area": "Optional connector drivers",
+      "next_action": "Review live mail/calendar and enterprise/database acquisition beyond existing import normalization."
+    },
+    {
+      "area": "Remaining algorithms, parameters, conversions and I/O",
+      "next_action": "Review every remaining catalogue family for absent capability or entry point before revisiting exact fixture agreement."
+    }
+  ],
+  "feature_status_meaning": {
+    "explorer_available": "A selectable discovery model with a rendered result in the application. This does not mark its reference package or modules complete.",
+    "feature_review_pending": "The partial parity status alone does not prove a feature is missing. Inspect implementation and usable entry points before choosing work.",
+    "native_proof_exists": "Existing complete parity records identify native implementation and registered tests. User-facing feature coverage still needs review."
+  },
+  "full_parity_achieved": false,
+  "original_requirement_sources": [
+    "docs/reference-2.7.22-parity.md",
+    "docs/reference-2.7.22-coverage.json"
+  ],
+  "target": {
+    "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+    "tag": "2.7.22"
+  }
+}

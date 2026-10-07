@@ -1,0 +1,20 @@
+{
+  "ocelVersion": "2.0",
+  "objects": [
+    {"id":"order-1","type":"Order","attributes":[{"name":"selected_type","value":"Sales order"}]},
+    {"id":"order-2","type":"Order","attributes":[{"name":"selected_type","value":"Sales order"}]},
+    {"id":"item-1","type":"Item","attributes":[{"name":"selected_type","value":"Order item"}]},
+    {"id":"item-2","type":"Item","attributes":[{"name":"selected_type","value":"Order item"}]},
+    {"id":"item-3","type":"Item","attributes":[{"name":"selected_type","value":"Order item"}]}
+  ],
+  "events": [
+    {"id":"e1","type":"Create order","time":"2026-01-05T09:00:00Z","attributes":[{"name":"selected_activity","value":"Order received"}],"relationships":[{"objectId":"order-1","qualifier":""}]},
+    {"id":"e2","type":"Add item","time":"2026-01-05T09:10:00Z","attributes":[{"name":"selected_activity","value":"Items assigned"}],"relationships":[{"objectId":"order-1","qualifier":""},{"objectId":"item-1","qualifier":""},{"objectId":"item-2","qualifier":""}]},
+    {"id":"e3","type":"Pack item","time":"2026-01-05T10:00:00Z","attributes":[{"name":"selected_activity","value":"Items packed"}],"relationships":[{"objectId":"item-1","qualifier":""},{"objectId":"item-2","qualifier":""}]},
+    {"id":"e4","type":"Ship order","time":"2026-01-05T11:00:00Z","attributes":[{"name":"selected_activity","value":"Order dispatched"}],"relationships":[{"objectId":"order-1","qualifier":""},{"objectId":"item-1","qualifier":""},{"objectId":"item-2","qualifier":""}]},
+    {"id":"e5","type":"Create order","time":"2026-01-06T09:00:00Z","attributes":[{"name":"selected_activity","value":"Order received"}],"relationships":[{"objectId":"order-2","qualifier":""}]},
+    {"id":"e6","type":"Add item","time":"2026-01-06T09:10:00Z","attributes":[{"name":"selected_activity","value":"Items assigned"}],"relationships":[{"objectId":"order-2","qualifier":""},{"objectId":"item-3","qualifier":""}]},
+    {"id":"e7","type":"Pack item","time":"2026-01-06T10:00:00Z","attributes":[{"name":"selected_activity","value":"Items packed"}],"relationships":[{"objectId":"item-3","qualifier":""}]},
+    {"id":"e8","type":"Ship order","time":"2026-01-06T11:00:00Z","attributes":[{"name":"selected_activity","value":"Order dispatched"}],"relationships":[{"objectId":"order-2","qualifier":""},{"objectId":"item-3","qualifier":""}]}
+  ]
+}

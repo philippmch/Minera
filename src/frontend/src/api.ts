@@ -6161,6 +6161,7 @@ export function ocelDiscoveryQuery(options: OcelDiscoveryOptions = {}): string {
 export async function requestOcelDiscovery(
   log: Blob,
   options: OcelDiscoveryOptions = {},
+  signal?: AbortSignal,
 ): Promise<OcelDiscoveryResult> {
   const form = new FormData();
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
@@ -6169,8 +6170,14 @@ export async function requestOcelDiscovery(
   const response = await fetch(`/api/ocel/discover${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
+    signal,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!response.ok) {
+    const detail: unknown = await response.json().catch(() => null);
+    const message = typeof detail === "object" && detail !== null && "error" in detail && typeof detail.error === "string"
+      ? detail.error : `the Minera backend answered with status ${response.status}`;
+    throw new Error(message);
+  }
   const payload: unknown = await response.json();
   if (!isOcelDiscoveryResult(payload)) throw new Error("the Minera backend returned an invalid OCEL discovery");
   return payload;
