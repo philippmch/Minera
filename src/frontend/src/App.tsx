@@ -21,7 +21,6 @@ import {
   type EventAttributeStat,
   type MineraExport,
   type OcelDiscoveryResult,
-  type OcelDiscoveryVariant,
   isMineraExport,
   numberFormat,
 } from "./types";
@@ -78,6 +77,7 @@ import {
   requestOcelDiscovery,
   type FilterOptions,
   type MinerOptions,
+  type OcelDiscoveryOptions,
 } from "./api";
 import {
   delimiterForFile,
@@ -94,6 +94,7 @@ import {
 export default function App() {
   const [data, setData] = useState<MineraExport | null>(null);
   const [ocelResult, setOcelResult] = useState<OcelDiscoveryResult | null>(null);
+  const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -305,20 +306,28 @@ export default function App() {
 
   // Object-centric uploads stay available so the graph projection can be
   // switched without asking the user to upload the same file again.
-  const changeOcelVariant = useCallback((variant: OcelDiscoveryVariant) => {
+  const changeOcelModel = useCallback((options: OcelDiscoveryOptions) => {
     if (!ocelFile) return;
+    ocelRequest.current?.abort();
+    const controller = new AbortController();
+    ocelRequest.current = controller;
     setMining(true);
-    requestOcelDiscovery(ocelFile, { variant })
+    requestOcelDiscovery(ocelFile, options, controller.signal)
       .then((result) => {
+        if (ocelRequest.current !== controller || controller.signal.aborted) return;
         cacheGeneration.current += 1;
         setOcelResult(result);
         setError(null);
       })
-      .catch((cause: Error) => setError(`Could not discover ${variant}: ${cause.message}`))
-      .finally(() => setMining(false));
+      .catch((cause: Error) => {
+        if (ocelRequest.current === controller && !controller.signal.aborted) setError(`Could not discover ${options.variant}: ${cause.message}`);
+      })
+      .finally(() => { if (ocelRequest.current === controller) setMining(false); });
   }, [ocelFile]);
 
   const loadFile = (file: File) => {
+    ocelRequest.current?.abort();
+    ocelRequest.current = null;
     setMining(true);
     (async () => {
       // Minera JSON exports open directly; object-centric JSON is discovered
@@ -373,6 +382,14 @@ export default function App() {
         openData(sample);
       })
       .catch(() => setError("Could not load the bundled sample dataset."));
+  };
+
+  const loadOcelSample = () => {
+    setMining(true);
+    fetch(`${import.meta.env.BASE_URL}sample-ocel.json`)
+      .then(response => { if (!response.ok) throw new Error("sample not found");return response.text(); })
+      .then(text => loadFile(new File([text],"sample-ocel.json",{type:"application/json"})))
+      .catch(() => {setError("Could not load the object-centric sample.");setMining(false);});
   };
 
   // Re-mines the original upload with the given filters and miner settings,
@@ -513,6 +530,9 @@ export default function App() {
           datasetKind="object-centric"
           onOpenFile={loadFile}
           onHome={() => {
+            ocelRequest.current?.abort();
+            ocelRequest.current = null;
+            setMining(false);
             cacheGeneration.current += 1;
             setData(null);
             setOcelResult(null);
@@ -527,11 +547,11 @@ export default function App() {
           <OcelExplorer
             result={ocelResult}
             busy={mining}
-            onVariantChange={changeOcelVariant}
+            onDiscover={changeOcelModel}
           />
         </main>
         <footer className="footer reveal">
-          <span>{ocelDataset ?? "object-centric log"} · object-centric graph</span>
+          <span>{ocelDataset ?? "object-centric log"} · object-centric model</span>
         </footer>
         <div className={dragging ? "dropveil active" : "dropveil"}>
           <div className="dropveil-card">Drop a Minera JSON export</div>
@@ -546,6 +566,7 @@ export default function App() {
         <Landing
           onOpenFile={loadFile}
           onLoadSample={loadSample}
+          onLoadOcelSample={loadOcelSample}
           error={error}
           mining={mining}
         />

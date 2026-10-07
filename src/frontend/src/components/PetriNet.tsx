@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { type ViewBox } from "../layout";
 import { type PetriLayout } from "../petri-layout";
 import {
@@ -14,12 +14,21 @@ type NetMode = "plain" | "frequency" | "performance";
 
 interface PetriNetProps {
   layout: PetriLayout;
+  heading?: string;
   /** Caption shown next to the panel title, e.g. the selected miner. */
   title?: string;
   /** Extra controls (e.g. an export button) shown in the panel header. */
   actions?: ReactNode;
   /** Replay annotations (firing counts, place waits); null on older exports. */
   decoration?: PetriDecoration | null;
+  annotations?: {
+    variableTransitions?: ReadonlySet<number>;
+    transitionLabels?: ReadonlyMap<number, string>;
+    transitionTooltips?: ReadonlyMap<number, string>;
+    placeTooltips?: ReadonlyMap<number, string>;
+    placeColors?: ReadonlyMap<number, string>;
+  };
+  disconnectedDescription?: string;
 }
 
 // Renders an Alpha Miner workflow net: places as circles (source and sink
@@ -28,7 +37,9 @@ interface PetriNetProps {
 // gains the process map's frequency/performance modes: frequency badges each
 // transition with how often it fired, performance labels each place with the
 // mean time tokens rested there.
-export function PetriNet({ layout, title, actions, decoration }: PetriNetProps) {
+export function PetriNet({ layout, title, actions, decoration, annotations,
+  heading = "Petri net", disconnectedDescription = "short-loop activities the Alpha Miner cannot place" }: PetriNetProps) {
+  const arrowId = `petri-arrow-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState<ViewBox>(layout.fit);
   const [mode, setMode] = useState<NetMode>("plain");
@@ -36,6 +47,11 @@ export function PetriNet({ layout, title, actions, decoration }: PetriNetProps) 
   const timed = hasTimedDecoration(decorated);
   const showCounts = mode === "frequency" && decorated !== null;
   const showWaits = mode === "performance" && decorated !== null && timed;
+  const zoom = (factor: number) => setView(current => {
+    const w = Math.min(Math.max(current.w * factor, 120), layout.fit.w * 4);
+    const h = current.h * w / current.w;
+    return { x: current.x + (current.w-w)/2, y: current.y + (current.h-h)/2, w,h };
+  });
 
   useEffect(() => setView(layout.fit), [layout]);
 
@@ -71,7 +87,7 @@ export function PetriNet({ layout, title, actions, decoration }: PetriNetProps) 
   return (
     <section className="panel map-panel reveal">
       <div className="panel-head">
-        <h2>Petri net</h2>
+        <h2>{heading}</h2>
         {title && <span className="panel-meta">{title}</span>}
         <div className="map-controls">
           {decorated && (
@@ -113,6 +129,8 @@ export function PetriNet({ layout, title, actions, decoration }: PetriNetProps) 
             <span><i className="petri-legend-trans" /> activity</span>
           </div>
           {actions}
+          <button className="btn-ghost" aria-label="Zoom in" onClick={() => zoom(.72)}>+</button>
+          <button className="btn-ghost" aria-label="Zoom out" onClick={() => zoom(1/.72)}>−</button>
           <button className="btn-ghost" onClick={() => setView(layout.fit)}>
             Fit
           </button>
@@ -124,7 +142,8 @@ export function PetriNet({ layout, title, actions, decoration }: PetriNetProps) 
           className={panning ? "panning" : undefined}
           viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
           role="img"
-          aria-label="Petri net"
+          aria-label={heading}
+          tabIndex={0}
           onPointerDown={(event) => {
             panRef.current = { x: event.clientX, y: event.clientY };
             setPanning(true);
@@ -154,7 +173,7 @@ export function PetriNet({ layout, title, actions, decoration }: PetriNetProps) 
         >
           <defs>
             <marker
-              id="petri-arrow"
+              id={arrowId}
               viewBox="0 0 10 10"
               refX="9"
               refY="5"
@@ -169,10 +188,12 @@ export function PetriNet({ layout, title, actions, decoration }: PetriNetProps) 
             {layout.arcs.map((arc) => (
               <path
                 key={arc.key}
-                className="petri-arc"
+                className={`petri-arc${annotations?.variableTransitions?.has(arc.transition) ? " variable" : ""}`}
                 d={arc.path}
-                markerEnd="url(#petri-arrow)"
-              />
+                markerEnd={`url(#${arrowId})`}
+              >
+                {annotations?.variableTransitions?.has(arc.transition) && <title>Variable object count</title>}
+              </path>
             ))}
           </g>
           <g>
@@ -187,13 +208,15 @@ export function PetriNet({ layout, title, actions, decoration }: PetriNetProps) 
                       ? "Source place (initial marking)"
                       : place.kind === "sink"
                         ? "Sink place (final marking)"
-                        : "Place") + (tooltip ? ` — ${tooltip}` : "")}
+                        : "Place") + (tooltip ? ` — ${tooltip}` : "") +
+                        (annotations?.placeTooltips?.has(place.id) ? ` — ${annotations.placeTooltips.get(place.id)}` : "")}
                   </title>
                   <circle
                     className="petri-place-box"
                     cx={place.x}
                     cy={place.y}
                     r={place.r}
+                    style={annotations?.placeColors?.has(place.id) ? { stroke: annotations.placeColors.get(place.id) } : undefined}
                   />
                   {place.kind === "source" && (
                     <circle
@@ -230,7 +253,7 @@ export function PetriNet({ layout, title, actions, decoration }: PetriNetProps) 
                 x={layout.fit.x + 16}
                 y={layout.unconnectedY + 16}
               >
-                unconnected — short-loop activities the Alpha Miner cannot place
+                unconnected — {disconnectedDescription}
               </text>
             </g>
           )}
@@ -250,9 +273,10 @@ export function PetriNet({ layout, title, actions, decoration }: PetriNetProps) 
                     {(transition.silent
                       ? "Silent step (τ)"
                       : transition.disconnected
-                        ? `${transition.label} — not placeable by the Alpha Miner (short loop)`
+                        ? `${transition.label} — ${disconnectedDescription}`
                         : transition.label) +
-                      (count !== null ? ` — fired ${count}×` : "")}
+                      (count !== null ? ` — fired ${count}×` : "") +
+                      (annotations?.transitionTooltips?.has(transition.id) ? ` — ${annotations.transitionTooltips.get(transition.id)}` : "")}
                   </title>
                   <rect
                     className="petri-trans-box"
@@ -279,6 +303,11 @@ export function PetriNet({ layout, title, actions, decoration }: PetriNetProps) 
                       textAnchor="middle"
                     >
                       {count}
+                    </text>
+                  )}
+                  {annotations?.transitionLabels?.has(transition.id) && (
+                    <text className="petri-count-label" x={transition.x} y={transition.y - transition.h / 2 - 7} textAnchor="middle">
+                      {annotations.transitionLabels.get(transition.id)}
                     </text>
                   )}
                 </g>

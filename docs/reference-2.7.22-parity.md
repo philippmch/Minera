@@ -11044,3 +11044,32 @@ fallbacks and other parameter mappings remain independent gates. Prior literal
 floating-weight error wording and native numeric/string limits remain open.
 The catalogue remains 46/86 packages, 199/387 modules and 228 incomplete units;
 no whole-package, module or full-parity promotion is made.
+
+
+## Feature delivery first: complete OCEL explorer choices (2026-10-07)
+
+The working priority is now to deliver missing features and usable entry points
+across the full scope before the strict behavioral parity pass. The separate
+`docs/reference-2.7.22-feature-delivery.json` ledger retains all 86 catalogue
+families and distinguishes feature availability from proof completion. Existing
+parity gates remain in this contract and the coverage ledger.
+
+The explorer now exposes all five existing discovery models, up from three:
+OCDFG, ETOT, OTG, OCPN and stochastic arc-weight nets. OCPN has per-object-type
+Petri views, variable arcs, activity bindings including activities with only
+variable types, association counts and optional replay counters. SAW has the
+native combined net and individual type nets, token-weight labels and complete
+observed weight distributions. Attribute selectors, annotated/unannotated OCPN,
+replay controls and actionable backend errors are exposed. A bundled orders/items
+OCEL example exercises actual local discovery. Shared Petri views add accessible
+zoom buttons and mobile header wrapping.
+
+Validation is recorded in `docs/feature-first-ocel-validation.json`: all 634
+frontend tests pass, the production build succeeds, nine real native HTTP
+requests cover all five model families and OCPN/SAW options, and browser checks
+cover type switching, replay, custom selectors, annotations, weight visibility,
+mobile bounds and zoom. Native backend sources remain unchanged; this feature
+step inherits the earlier backend checks and does not claim a fresh native
+algorithm audit or promote any package/module to complete. Remaining model
+views, model/provider runtimes, optional connector drivers and all other missing
+feature surfaces come before another exhaustive subsystem fixture expansion.
