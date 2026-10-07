@@ -47,6 +47,7 @@ import { DfgDataframe } from "./components/DfgDataframe";
 import { CorrelationMining } from "./components/CorrelationMining";
 import { Filters } from "./components/Filters";
 import { OcelExplorer } from "./components/OcelExplorer";
+import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import {
   alignModel,
   alignDfg,
@@ -643,6 +644,9 @@ export default function App() {
             Resources
           </button>
         )}
+        <button className={tab === "embeddings" ? "tab active" : "tab"} onClick={() => setTab("embeddings")}>
+          Search &amp; embeddings
+        </button>
       </nav>
       <Kpis data={data} />
       {source && (
@@ -707,6 +711,11 @@ export default function App() {
       {tab === "resources" && (
         <main className="layout-log">
           <Resources data={data} />
+        </main>
+      )}
+      {tab === "embeddings" && (
+        <main className="layout-log">
+          <EmbeddingSearch key={cacheGeneration.current} data={data} available={source !== null} mining={mining} />
         </main>
       )}
       {tab === "dfg" && (

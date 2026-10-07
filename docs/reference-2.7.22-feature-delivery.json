@@ -764,7 +764,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "runtime_and_search_available",
       "package": "algo.transformation.to_embeddings",
       "parity_status": "partial",
       "selectors": [
@@ -794,6 +794,22 @@
         "saw"
       ],
       "state": "available"
+    },
+    {
+      "added": [
+        "Actual local model execution through the native CLI and HTTP transformer bridge",
+        "Case/event text search with cosine scores, custom text/ID fields and JSON vector/match export",
+        "Model preload and readiness, inferred/truncated width, cancellation, log-session guard and responsive controls"
+      ],
+      "entry_point": "src/frontend/src/components/EmbeddingSearch.tsx",
+      "id": "local_transformer_embeddings_and_search",
+      "runtime": "scripts/embedding_runtime.py",
+      "state": "available",
+      "validation": "docs/feature-first-embeddings-validation.json",
+      "variants": [
+        "cases_transformers",
+        "events_transformers"
+      ]
     }
   ],
   "execution_priority": [
@@ -802,12 +818,12 @@
   ],
   "feature_backlog": [
     {
-      "area": "Remaining model visualizations",
-      "next_action": "Review transition-system, social-network and declarative model views; expose existing native results where a usable view is missing."
+      "area": "Conventional CSV application import",
+      "next_action": "Resolve the retained /api/mine failure for CSV with case_id/activity/timestamp columns ('concept:name') so ordinary uploads reach all application features without duplicated canonical columns."
     },
     {
-      "area": "Transformer embedding runtime",
-      "next_action": "Review the current external-vector encoder path and add actual model execution for the named case/event transformer surfaces."
+      "area": "Remaining model visualizations",
+      "next_action": "Review transition-system, social-network and declarative model views; expose existing native results where a usable view is missing."
     },
     {
       "area": "LLM and query integrations",
@@ -825,7 +841,8 @@
   "feature_status_meaning": {
     "explorer_available": "A selectable discovery model with a rendered result in the application. This does not mark its reference package or modules complete.",
     "feature_review_pending": "The partial parity status alone does not prove a feature is missing. Inspect implementation and usable entry points before choosing work.",
-    "native_proof_exists": "Existing complete parity records identify native implementation and registered tests. User-facing feature coverage still needs review."
+    "native_proof_exists": "Existing complete parity records identify native implementation and registered tests. User-facing feature coverage still needs review.",
+    "runtime_and_search_available": "A real local encoder and usable case/event search and vector-export entry point are validated. Exact reference behavior and native log filtering remain independent gates."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

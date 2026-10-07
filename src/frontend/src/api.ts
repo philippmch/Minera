@@ -5804,9 +5804,9 @@ export function embeddingsQuery(options: EmbeddingOptions = {}): string {
   }
   return query.toString();
 }
-export async function requestEmbeddings(options: EmbeddingOptions = {}): Promise<EmbeddingApiResult> {
+export async function requestEmbeddings(options: EmbeddingOptions = {}, signal?: AbortSignal): Promise<EmbeddingApiResult> {
   const query = embeddingsQuery(options);
-  const response = await fetch(`/api/embeddings${query ? `?${query}` : ""}`, { method: "POST" });
+  const response = await fetch(`/api/embeddings${query ? `?${query}` : ""}`, { method: "POST", signal });
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
     if (payload && typeof payload === "object" && "error" in payload) throw new Error(String((payload as { error: unknown }).error));

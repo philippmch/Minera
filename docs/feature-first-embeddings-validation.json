@@ -1,0 +1,475 @@
+{
+  "browser_checks": {
+    "actual_csv_upload": true,
+    "all_match_ranking": true,
+    "downloaded_vectors_equal_native_http_result": true,
+    "encoder_error_explained": true,
+    "event_custom_text_and_id_attributes": true,
+    "event_search_top_id": "S3",
+    "full_json_downloads_checked": true,
+    "mobile_bounds": {
+      "content": 375,
+      "viewport": 375
+    },
+    "semantic_case_search_top_id": "R",
+    "static_export_requests_disabled": true,
+    "unexpected_console_errors": 0,
+    "vector_widths": [
+      384,
+      32
+    ]
+  },
+  "browser_evidence": {
+    "build/transformer-browser-matches-download.json": "217210c369db35af99949a53fc654d0cb9ff4f2a62e6109daff29920ce2b6dae",
+    "build/transformer-browser-vectors-download.json": "ebadbc30a0b868f6e941024c03f7f412fc5eb0f7fdc300bba742f53557497bf4",
+    "build/transformer-final-case-search.dom.txt": "542e7d7c8516ab497227dc57a241d2c01ca7449f9114e75f5b5d1d1bf4b7af68",
+    "build/transformer-final-error.dom.txt": "4906e0ea4a1d968ba0a351e8331c84676b6de4f4c7e0aacfd3459d2bd6f389c1",
+    "build/transformer-final-event-search.dom.txt": "a990c806438a670c8a05f49cd5edd3235e6351671015ebb2a6de4e3f23f03ad4",
+    "build/transformer-final-mobile-bounds.json": "0b8e8a5fc225f4a2667a61fee039a119e2a763a1a677aaa13408cca66b4f671e",
+    "build/transformer-final-mobile.png": "ca850de715af3fff9497025d3fb728a91a2bf98ffeab9f694e7cc60a5a8a9d30",
+    "build/transformer-final-vectors.dom.txt": "1cc9945cb22f8a60f8d13d2bd0b895570f22a8c1ec52af60d0c469aaf6ac859e",
+    "build/transformer-static-export.dom.txt": "a08197010ed64cb7e14e942591f1051e59bd3075d73823e9f4f74202f8a95ff3",
+    "docs/feature-first-embeddings-preview.png": "aa90d60a8f8909129f5845e6171390b488d24d94a481b31e0c57fb44dac1786d"
+  },
+  "catalogue_promoted": false,
+  "complete": true,
+  "created_utc": "2026-10-07T17:47:00.353267+00:00",
+  "delivered": [
+    "Runnable loopback SentenceTransformer encoder; actual inference, model preload, inferred width, explicit truncation, bounded cache and no hashing/mock fallback",
+    "Case/event search and vector export in the application, explicit provider/model/text/ID controls, full JSON downloads and paginated previews",
+    "Cancellation, log-change reset, static-export guard, actionable encoder errors and wrapping mobile navigation"
+  ],
+  "finalizer_sha256": "fe0173e1af8412689ce298404d27721aa5cf377a4101370c90a94c6ed0f4007a",
+  "fresh_native_algorithm_audit": false,
+  "frontend_tests_passed": 641,
+  "frontend_validation": {
+    "complete": true,
+    "created_utc": "2026-10-07T17:41:57.148737+00:00",
+    "helper_sha256": "7f2dca9a9d73de06fc79b5945bc27818af8b8bbb9c34abea9a8788183edadb65",
+    "production_outputs": {
+      "src/frontend/dist/assets/index-B2-w-Wdz.css": "e24dc733339c939563012664dcfd4e962b1ef28a3a12d09c3d945922fbac37f6",
+      "src/frontend/dist/assets/index-pPwIkomH.js": "201bdaefa998ad642d28561dc6eaeb3699268c54c3330c4f2ce74ae0c63173e5",
+      "src/frontend/dist/index.html": "999c349cecf8e5b937cb20ea2e6422da6bf321962e11b10ea35a718a7e8d44af",
+      "src/frontend/dist/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+      "src/frontend/dist/sample-ocel.json": "04c6d560119bf12cd308cdbfca493c565bcfe88b89d394893dfa85a5f7535585"
+    },
+    "source_bindings": {
+      "scripts/embedding_runtime.py": "eb0740e5dbf57ee616a42d0e618c040079630efe6a2e71398ba7b2cddcffb3b9",
+      "scripts/requirements-transformers.txt": "2a5072487fd74a591856da4635291b460357d630d61bb90f5f2427cd2b847bb9",
+      "scripts/tests/test_embedding_runtime.py": "12ea49348353e16524c73e318363f7aade35384bbbdfef741922af06a832804b",
+      "src/frontend/index.html": "648efb9515b5bd4da2f4c04d8a6be2f0d8de5968617d091ea3ebd26c8f7d9cff",
+      "src/frontend/package-lock.json": "04ea239f18993b885208e519662bfd4e3e014545d38d952f84284f4cb8d6505d",
+      "src/frontend/package.json": "7f2361b0a98d18a5bd9df2a1c80187d77d791c0fc1e629e42d33f070625683a9",
+      "src/frontend/public/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+      "src/frontend/public/sample-ocel.json": "04c6d560119bf12cd308cdbfca493c565bcfe88b89d394893dfa85a5f7535585",
+      "src/frontend/src/App.tsx": "c94425ea256819afc9b85ca95e9da327cb145efc2a3727a53ad41f1b6aa3accd",
+      "src/frontend/src/alpha-result.ts": "fa7302374f34971c441e23dd2c56a8365c8954f388b744d74e432376b318edb6",
+      "src/frontend/src/api.ts": "016b6317b81035adc7b6d9ca4427515164a303554c4b86bbc9747f4b65bae153",
+      "src/frontend/src/app-logic.ts": "c26d1de3a8c514df21dab52b80b2a8683cd5666083bb0a2bfeaeea88b7c071e3",
+      "src/frontend/src/components/ActivityTable.tsx": "6513c9fda5f06b1cce89bb574f983846f1f6d6e177b39b31312cf246d3b832b1",
+      "src/frontend/src/components/Batches.tsx": "d130a5a54437a88665765c503c1e784352c7f02bd37e05eb78dbfa0193551572",
+      "src/frontend/src/components/Conformance.tsx": "e5c86c7c5d7f11ac2a7f42c230364b3d564342699585c25cb11c44651f659d8a",
+      "src/frontend/src/components/CorrelationMining.tsx": "efa6b26473f44247dfefd0d6707cc62a21cd8f2a8a188c7ed97451707cf611b6",
+      "src/frontend/src/components/DeclareModel.tsx": "fec6de33a480b529e5181248c753dc48933037d63b967c0316d9bd0b19b633cd",
+      "src/frontend/src/components/DependencyGraph.tsx": "22c98ddb5fe63cc38bb1632a1cf6ead957e11180bd0a3847b7ba034c91b54f7a",
+      "src/frontend/src/components/DfgDataframe.tsx": "5a84e0532f640f74e81be5bf8190abcd1596c4ba08ffe831451776ccc1119ec2",
+      "src/frontend/src/components/DfgVariants.tsx": "d72d9c66df17d64b9917023702aed7a12db40c659130d21fce475db84b9002ef",
+      "src/frontend/src/components/DottedChart.tsx": "9154fb731a669ab66380edd42239b13bb5a34ced046d92dac5af1e1575a0f280",
+      "src/frontend/src/components/EmbeddingSearch.tsx": "39e39619e21a044caea16084e3065c3d8dc8e56954e75129dadd034215700236",
+      "src/frontend/src/components/EventLogView.tsx": "77f9d4f858b87070e7fe7ceb06651c08e9dc66460e9a01f0a3228338fd699022",
+      "src/frontend/src/components/EventuallyFollows.tsx": "2a545ea1ce24a252e2deb2c8ec59c8cde425e4fa2799030745f80d9151a267c8",
+      "src/frontend/src/components/Filters.tsx": "8e20151936e0c4d82ec2ea71cf003762691645a6c6c95cc19633c40cf0f43f3a",
+      "src/frontend/src/components/FootprintsModel.tsx": "b0e3f62d42e3f16dae80616b1a7b79ba778d68fa78e4dbea1ba7b35873dc147e",
+      "src/frontend/src/components/Kpis.tsx": "3205ae6a46c62d467c65af0d3499e71cd52c0cdb1809ace1322205b9ce2d051e",
+      "src/frontend/src/components/Landing.tsx": "5ed08a3f9b7b410fa7807e204066679f67caa4516e2e8e095d1fec17cbb04ea4",
+      "src/frontend/src/components/LogSkeletonModel.tsx": "769c40e8cbb25808465427a4fb08763e242a56ee996e43b05e0bae82b9919cff",
+      "src/frontend/src/components/OcdfgModel.tsx": "44787f74670eba47eb94e9bfeb85774f47f5f018c9f7499a0a528326470d8073",
+      "src/frontend/src/components/OcelExplorer.tsx": "cefae865ad83934e21aa3421faa2e5fb6cec704bb96c00b9eab1c1da55ad5dde",
+      "src/frontend/src/components/OcelGraphModel.tsx": "ce287cf7de99517def09eaffa362083860e1e00c3c7b820879b87a455ca279ae",
+      "src/frontend/src/components/OcelNetModel.tsx": "2c8361f72b266d288bb9df9a7808846f92a852b607a871cae5123480c19caa15",
+      "src/frontend/src/components/PerformanceSpectrum.tsx": "09bce5930511b72c5d8666b64aba251cd0f7b8207ca5e57d0f40d505e264fdae",
+      "src/frontend/src/components/PetriAnalysis.tsx": "fd402017b7b7c04e375a058ca81e0ab9438573bb9fe9ae5fb73ff85c9c78e19d",
+      "src/frontend/src/components/PetriNet.tsx": "66d9da0dbe7452803c51e240333678adb013893513a71ea3729b18b52d85f130",
+      "src/frontend/src/components/PowlModel.tsx": "6a9faf9eed9c1e26da7ef88163890c148446cb9a9b520e1446037df86ac49efd",
+      "src/frontend/src/components/ProcessMap.tsx": "c98d5d04acc738f9b7d75a0c7f8d9ede8bf716efd4be6c462a274bba9d1437d3",
+      "src/frontend/src/components/ProcessModel.tsx": "8cf3c19afeaeeaba593c081a84e209b6e2afabebb238e45fbe66dd45e3ebd414",
+      "src/frontend/src/components/ProcessTree.tsx": "ffb83984b1baa52841009f532d2352013895c630255d15380da32de188fa523d",
+      "src/frontend/src/components/Resources.tsx": "3b66188d33def38ddd2fc52bc72ad93631512721876933ed1070286d425f9d24",
+      "src/frontend/src/components/TopBar.tsx": "fac8565c63a4bf8b5dad1c08565b04b28c9991421e5f0158be52f69eecd6b25a",
+      "src/frontend/src/components/VariantList.tsx": "49d3314d64e4dbc59602fde9c8643a812adceadc06df9bfc447772b783281271",
+      "src/frontend/src/conformance.ts": "a4e3d87b5e2208b1302e1d3341582428dc24bc7d0b2875a49099adc5e7150ab2",
+      "src/frontend/src/dependency-layout.ts": "eb3672b5743e4b12b111a2c4f4d29357ff8632bcbcdb528d501f435332da5932",
+      "src/frontend/src/dotted-chart.ts": "6745bb981c89d60ef8a19b2a0d1f39eccd6ea8abd4b225cb2d3e4bae19d4962d",
+      "src/frontend/src/embedding-search.ts": "4350811edf84f88d68b7a571925c1faba35eb5d7d9ecdcaeaa7663e51c29b4a6",
+      "src/frontend/src/eventually-follows.ts": "e567d87a06e47ca7b23f7c014e5253abb565ea2b1872b7be045f9fd580b5684f",
+      "src/frontend/src/heuristic-miner.ts": "32bd0911e3e3ec528c25c992acd843a3485c563ab369a439224fb851ee6aa555",
+      "src/frontend/src/layout.ts": "7f46d91718da9444c21b80035503abcd7b89a8daacc69e56ee57e7a001fdbeb4",
+      "src/frontend/src/main.tsx": "9f14840785035a7ad44d93177890861739412b4e21fe2778b5efa66a6eb24f67",
+      "src/frontend/src/miners.ts": "f57146a43493795d26fe88395c2b737c348c6b9e6bc6d2567aa8fa073c413a46",
+      "src/frontend/src/ocdfg-layout.ts": "58754e048c8e6a7f25a059c6eec2c5f494e21a50cad00155af3863a0e4dd0f70",
+      "src/frontend/src/ocel-explorer-options.ts": "8e96aa759233618959e8efeea431c18adac2909ba0c04b87f0e69a0703c5c8e5",
+      "src/frontend/src/ocel-graph-layout.ts": "aaecbda5b9151f27c359fbf789a8e2a967740e0351cce3cbc8cfe25d42e1a5e2",
+      "src/frontend/src/ocel-net-model.ts": "23d0f99c3e4f0601a3f1c12e979cb5a259cf1e61181ee5ea918ab4af16605b6f",
+      "src/frontend/src/performance-spectrum.ts": "dcfd0899612ee9bc189bfdebe3788f888b7cc6eb867f0d414e4f7b59600f80c0",
+      "src/frontend/src/petri-decoration.ts": "b9c94e9237b7a3acc6469c0fa7c61fb13f1d2c3a9b2a47d7bcd66f360ad5fa51",
+      "src/frontend/src/petri-layout.ts": "6af905db83e2506003b016c0904993dd4a3a1f798a5759ff966ecf810334bf58",
+      "src/frontend/src/styles.css": "42aef2dbd2a557451b71d87cc18be97923341112a5996cc189227663f85aff6b",
+      "src/frontend/src/tree-layout.ts": "07db583178e683676906f416d459f82e4acd56b14c54ac7e9e0050adbf270fdc",
+      "src/frontend/src/types.ts": "416246c698eb9249855c37fba3e6b9f546c0af49f6322a3ffc95d4c44e394c1b",
+      "src/frontend/src/variant-insights.ts": "bcb95470d435e22ea5bb38f934a960444a21a50f348f4bad0c75c496cf0f6c37",
+      "src/frontend/src/vite-env.d.ts": "424faf9241dd699dda995b367ed36665732da1e6ec1f33b2fd40394488ecac92",
+      "src/frontend/tests/alpha-result.test.ts": "266743510a7736bc654b9d6e5dd2219c7c1412c434d2619aff76ff04d26f490c",
+      "src/frontend/tests/api.test.ts": "a883ada562be5a9085bc3f650365579790d230ab56266d1f8bd151687b7871d4",
+      "src/frontend/tests/app-logic.test.ts": "70e221e45586d1f0c3b6adbc558eb326ab16b46712c5108a6f1954f6aaa6557c",
+      "src/frontend/tests/components/Batches.test.ts": "db7d871579f3f0ca56bb6041b49769d3de9496e26c0d4f8c6f0fa371969a9887",
+      "src/frontend/tests/components/CorrelationMining.test.ts": "a38bf13d3e0803c4931f9b886130c0bacefc7e1dd3ae2d23b87299f55daa80c8",
+      "src/frontend/tests/components/EventLogView.test.ts": "23936dbd116176cbc357933c4fe7ec692e9c637d9e9a20f2f15ecfd5b3a446d2",
+      "src/frontend/tests/components/Filters.test.ts": "180a41ace29627c4afb67f64c07abee999725db832f56bbfdb3e9df939ca4846",
+      "src/frontend/tests/components/PerformanceSpectrum.test.ts": "4e0dbc77adbf798c316b385583ff66b418601c3c9d793e155e0bc3e5a8c616bf",
+      "src/frontend/tests/components/TokenReplayDiagnostics.test.ts": "2a4e8c8347f874f753dda3648234c42110c7ee8a0b2de2fe89b138aac0765c31",
+      "src/frontend/tests/conformance.test.ts": "158f05e81bc4780390078e3d87ac2cdd911127df6237a7fb9820778a85615353",
+      "src/frontend/tests/decision-tables-types.test.ts": "7c26616dceae3f158efd2665f315e609899246bad2158e57eb6138ce9fcfde5e",
+      "src/frontend/tests/decision-tables.test.ts": "eaf6a0f9f63afbf05d237d49d0b1cb386dd5708f7e4db655fc3b3aa5d1e8c9a7",
+      "src/frontend/tests/dependency-layout.test.ts": "6d489d9743823a95edbe374e4f82afc3205101eecbb7616cf6d16df1a00e54a4",
+      "src/frontend/tests/dfg-dataframe.test.ts": "4e9b78049e1d1a52667ec6683902f4132314ad37e15dfa3d47d1afeb365fab86",
+      "src/frontend/tests/dotted-chart.test.ts": "d8b1b411b47aa24c681dcb9d7def1c85bdd2bea02bd63d7eac95068adbdf0dcf",
+      "src/frontend/tests/embedding-search.test.ts": "59ddcbff095c300e42c6292b6bed1ff488c0eeb43acff3f3f4e6586dae279468",
+      "src/frontend/tests/eventually-follows.test.ts": "0022612250123d8f3527398f485a89f2417183d7bbd6bfd060d0021b921800e1",
+      "src/frontend/tests/filters-validation.test.ts": "4150abd99849d0655d057c24c73299830b65ed468028480ddf8e3f57d176f918",
+      "src/frontend/tests/first-class-attribute-contract.test.ts": "9ddb52e0abdff0d8fa88dc6a76e6b1c5fb5c262bacb6e3f86d634dbe69daaf0c",
+      "src/frontend/tests/heuristic-miner.test.ts": "bfaebbfc8fbca1602c51ad727aa766784da48e0ce4aacbb5e2fc96e7fb12d156",
+      "src/frontend/tests/layout.test.ts": "9153e408cc9ab16836acb0135d8ddff179b755c26ece8f7cb419565eaf0f045d",
+      "src/frontend/tests/log-conversion.test.ts": "2d7189213b8462eca54834e0a5e988bcd9fa950718cf46d27c2ab39e27b61b1d",
+      "src/frontend/tests/monte-carlo-scheduler.test.ts": "7ff31165acaab52355522e8c0de411c970e91e5594e14516e81201581fdbef42",
+      "src/frontend/tests/ocdfg-layout.test.ts": "315745bd728c055bba39930815363565586b01a44778c365490cfceed247da2c",
+      "src/frontend/tests/ocel-graph-layout.test.ts": "5a9e6ab6c4b3525f27031159c7a4879c8416e47850a4b4f4f7a6de9fe35c9805",
+      "src/frontend/tests/ocel-net-model.test.ts": "7a382a6b8aace9a60b2e0a940093f3cbd41ed3f64516c17d0c00dfa0c1c5b237",
+      "src/frontend/tests/performance-spectrum.test.ts": "a42a50b52605f9f70e4ae59547dccaacc63636a7e8b49a1732cfe7b4da5dec83",
+      "src/frontend/tests/petri-decoration.test.ts": "8459e9dd4d6bb26d67cd4776f937af43d5b9c7937e7ae5ac9ff42833da157060",
+      "src/frontend/tests/petri-layout.test.ts": "f89629e8ca7a4b78a13e46f4b838a0258cc35b2546e14b558caadcf088679dae",
+      "src/frontend/tests/stochastic-map-sparse.test.ts": "0397d1b956b01536248fd790e3f48fc81426f4be77e2d9f579179859e58864ad",
+      "src/frontend/tests/tree-layout.test.ts": "2e32a66d0e928211a24bb1238355c3000cfc51a98a42a35bf0cc2a32f64ef9b3",
+      "src/frontend/tests/types.test.ts": "08fb0a1accf88b30034d58adb238821263b0dfdf71d102356004e36a87cab7e4",
+      "src/frontend/tests/variant-insights.test.ts": "f3f76ef479a9b6db64c0102ca95931297ad3974c2f05e5392679d20d4e5381b3",
+      "src/frontend/tsconfig.json": "8b035bceb545f9198f37dd48d4aa0d9176fcc52736933a03ffcaab3f6c2544cc",
+      "src/frontend/vite.config.ts": "735e1110ba08fc9f06003d0e673b882a4393f5d8e0144352e56d3ce5b7ee10b7",
+      "src/frontend/vitest.config.ts": "c967a837afa02495ff07816460ee50034adf9d48561af28e437bcf83ecfed0cd"
+    },
+    "steps": [
+      {
+        "args": [
+          "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+          "-B",
+          "-X",
+          "utf8",
+          "scripts/tests/test_embedding_runtime.py"
+        ],
+        "elapsed_seconds": 0.6409999999959837,
+        "exit_code": 0,
+        "name": "runtime-unit",
+        "stderr_sha256": "030fb8a7e9c5c3aa58fce2716485dd382650f96922944bb9cbaeeb0e809e0b64",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "args": [
+          "C:/Program Files/nodejs/node.exe",
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "test"
+        ],
+        "elapsed_seconds": 1.4060000000026776,
+        "exit_code": 0,
+        "name": "frontend-test",
+        "passed_files": 33,
+        "passed_tests": 641,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "e6ae8706b36bf26efd271f92f0788ecae8440c529de828a6b0e891a184542d92"
+      },
+      {
+        "args": [
+          "C:/Program Files/nodejs/node.exe",
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "build"
+        ],
+        "elapsed_seconds": 4.781999999999243,
+        "exit_code": 0,
+        "name": "frontend-build",
+        "stderr_sha256": "8dd2e85359a661974008cc0965fec8b29fafc16f785fe032b85959db5dc3c6db",
+        "stdout_sha256": "1c075348bdb197da2ffcae18226941720866921457eb3a1e70863da7d509c6b9"
+      }
+    ]
+  },
+  "full_parity": false,
+  "inherited_backend_validation": "docs/ocdfg-log-validation.json",
+  "inherited_backend_validation_sha256": "adad84d07cbf7a5c0c5f74e4b5beffb4e864b986c86f9efb3981743095523a96",
+  "model": {
+    "id": "sentence-transformers/all-MiniLM-L6-v2",
+    "loaded_width": 384,
+    "model_card": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
+    "snapshot_revisions": [
+      "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+    ]
+  },
+  "observed_import_followup": {
+    "boundary": "The successful application fixture supplies matching conventional and canonical case/activity/timestamp columns. Standard alias-only CSV import requires a separate application checkpoint.",
+    "error": "'concept:name'",
+    "minimal_csv_fixture": "build/transformer-native-feature-v3/embedding-demo.csv",
+    "minimal_csv_sha256": "ef5a3fe50433257acdcb9513b6f695aff07feb503d0cb4b408209ac29f6af322",
+    "resolved": false,
+    "response": "build/transformer-native-feature-v3/http-mine.json",
+    "response_sha256": "75491c5e5502a50505d4c3015b811fc3728278ee5cf4dfaa99f87a6d1a736c4f",
+    "status": 400,
+    "surface": "POST /api/mine"
+  },
+  "parent_head": "f93f368cdd58fb907293b67aed626a315d433dc4",
+  "production_build_passed": true,
+  "real_model_validation": {
+    "backend_source_bindings_checked": 572,
+    "calls": [
+      {
+        "name": "runtime-health",
+        "response_sha256": "eeb90da0c2fa74c1fd0d149a2e71f8add83a6f133dde976d0e21c91766dfbc10",
+        "status": 200,
+        "surface": "HTTP"
+      },
+      {
+        "exit_code": 0,
+        "name": "cli-cases-full",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "d878099bfdbcaf92d06ab6b20a57ed81048c44e6afec48f666f093e8ddb34fc1",
+        "surface": "CLI"
+      },
+      {
+        "exit_code": 0,
+        "name": "cli-events-full",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "ddf0e6425584ab7cc95f9b22c980a8e92523730bf5858074b34ffd53d09af647",
+        "surface": "CLI"
+      },
+      {
+        "exit_code": 0,
+        "name": "cli-events-custom",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "a5978c62308143574917f78ec873cbea46b7afce9f777897238ed38c3efc17de",
+        "surface": "CLI"
+      },
+      {
+        "exit_code": 0,
+        "name": "cli-cases-search",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "c99ea5cc6520647f09e5fcb53b6a207b4b9524289af6df2f2a2aa4190fe16005",
+        "surface": "CLI"
+      },
+      {
+        "exit_code": 0,
+        "name": "cli-events-search",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "a088a5909cc0ff4039d8c0ad063425dc97e78a3044222b52b9ca4f6a6ec03ede",
+        "surface": "CLI"
+      },
+      {
+        "exit_code": 1,
+        "name": "cli-unloaded-model",
+        "stderr_sha256": "ea51687a980d76c3c029f78504449576b4cd79ba99f584fb4447ea740ca56339",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "surface": "CLI"
+      },
+      {
+        "name": "http-mine",
+        "response_sha256": "5623da3f729d7c39bb6532db298df83caf9dee379955a8aba046476818595838",
+        "status": 200,
+        "surface": "HTTP"
+      },
+      {
+        "name": "http-cases-full",
+        "response_sha256": "96ff5a9ce19781b9c3c9b1edd10af8b96cb8ccd8bd94838aee223db94da7bc46",
+        "status": 200,
+        "surface": "HTTP"
+      },
+      {
+        "name": "http-events-full",
+        "response_sha256": "f2434fc49e06fbe6b8cb30ad2aea20c69543ba74162ce4ee1ffe4c257d0538d9",
+        "status": 200,
+        "surface": "HTTP"
+      },
+      {
+        "name": "http-cases-search",
+        "response_sha256": "55924794e77becf4fb8da78d3d613230989a08fe56b250c0a8e4d815ad062a66",
+        "status": 200,
+        "surface": "HTTP"
+      },
+      {
+        "name": "http-events-search",
+        "response_sha256": "75713a7eeae3026f5446a0392f6a7d3e3ee98e6052e17a5eac0fa6ca0fe1051c",
+        "status": 200,
+        "surface": "HTTP"
+      },
+      {
+        "name": "http-events-custom",
+        "response_sha256": "6f8614e7b3f485cd84702a32d2aef8ec4d90a8cb4be94ea9667b3e1805623ac2",
+        "status": 200,
+        "surface": "HTTP"
+      },
+      {
+        "name": "http-unloaded-model",
+        "response_sha256": "67d3bf792b798173fa0646dd05673c530e5ab764d5aaad88c1bbb7a052e943db",
+        "status": 400,
+        "surface": "HTTP"
+      },
+      {
+        "name": "http-oversized-width",
+        "response_sha256": "67d3bf792b798173fa0646dd05673c530e5ab764d5aaad88c1bbb7a052e943db",
+        "status": 400,
+        "surface": "HTTP"
+      },
+      {
+        "name": "http-item-limit",
+        "response_sha256": "2ee6c6624e188331e103a8dce3d4c8161dbaff3c96d3849a68d20f93f1025989",
+        "status": 400,
+        "surface": "HTTP"
+      },
+      {
+        "name": "http-hashing-explicit",
+        "response_sha256": "ea05f23e6ab7b7240608360b23610322bdaea94b74af64575b4dcef68b66373a",
+        "status": 200,
+        "surface": "HTTP"
+      },
+      {
+        "name": "direct-9f078823a437",
+        "response_sha256": "b44471ff837a25feb094f59260a6f47050e25ed107dfe25c38f4212f7a160c8a",
+        "status": 200,
+        "surface": "HTTP"
+      },
+      {
+        "name": "direct-ad2eed6c65f6",
+        "response_sha256": "a067b9d065823f1970a7dd4e94bc1af2b840f7bdab49851300851169777ee803",
+        "status": 200,
+        "surface": "HTTP"
+      },
+      {
+        "name": "direct-36e0f93bea7a",
+        "response_sha256": "f5f99e93dc07d5d76d66ef0045af59fad7129e264090ae631cfbe3319f0a6b46",
+        "status": 200,
+        "surface": "HTTP"
+      },
+      {
+        "name": "direct-cadfd6cd9fd8",
+        "response_sha256": "32d905be3cc3137a7d94efe816f7a7d2d47b43d984ffe80b226b9a0ab1d8bb42",
+        "status": 200,
+        "surface": "HTTP"
+      }
+    ],
+    "case_top_match": {
+      "id": "R",
+      "score": 0.3197510925190768
+    },
+    "complete": true,
+    "cosine_agreement": true,
+    "event_top_match": {
+      "id": "S3",
+      "score": 1
+    },
+    "export_executable_sha256": "3a0947b3d3af3c0d6e22efdff78d7c27c0be2a563c05fed5b0272beb969beb3b",
+    "fixture_sha256": "895088c96be461767977217be45d7be1ff99ad8ffcc27416c8eb19698b691d2a",
+    "helper_sha256": "ce5a9683a202db71ec1a16b5b689e1e155ed55f45d05598a276f47d6fb17a6a2",
+    "model": "sentence-transformers/all-MiniLM-L6-v2",
+    "model_cache_files": {
+      "build/transformer-model-cache/CACHEDIR.TAG": "e8893e2dcb3f4545ef67a0a5b7b769113d38eef1aa61c7c7ba14659b02af955f",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/.no_exist/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/adapter_config.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/.no_exist/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/added_tokens.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/.no_exist/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/chat_template.jinja": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/.no_exist/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/preprocessor_config.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/.no_exist/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/processor_config.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/.no_exist/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/video_preprocessor_config.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/refs/main": "d36d67e02523717e3871dbcce928f122ed24afbcd375ca81600d4474cb618134",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/1_Pooling/config.json": "4be450dde3b0273bb9787637cfbd28fe04a7ba6ab9d36ac48e92b11e350ffc23",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/README.md": "dcd602d2fd35c203a247304a06fec6654a12f7941b739f9221a064fe8dc3b7f0",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/config.json": "953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/config_sentence_transformers.json": "061ca9d39661d6c6d6de5ba27f79a1cd5770ea247f8d46412a68a498dc5ac9f3",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/model.safetensors": "53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/modules.json": "84e40c8e006c9b1d6c122e02cba9b02458120b5fb0c87b746c41e0207cf642cf",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/sentence_bert_config.json": "fc1993fde0a95c24ec6c022539d41cf6e2f7c9721e5415d6fb6897472a9cd4b7",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/special_tokens_map.json": "303df45a03609e4ead04bc3dc1536d0ab19b5358db685b6f3da123d05ec200e3",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/tokenizer.json": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/tokenizer_config.json": "acb92769e8195aabd29b7b2137a9e6d6e25c476a4f15aa4355c233426c61576b",
+      "build/transformer-model-cache/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/vocab.txt": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
+    },
+    "native_vector_agreement": true,
+    "parent_head": "f93f368cdd58fb907293b67aed626a315d433dc4",
+    "runtime_packages": [
+      "annotated-doc==0.0.5",
+      "anyio==4.15.1",
+      "certifi==2026.7.22",
+      "click==8.5.0",
+      "cloudpickle==3.1.2",
+      "colorama==0.4.6",
+      "filelock==4.0.12",
+      "fsspec==2026.9.0",
+      "h11==0.16.0",
+      "hf-xet==1.7.0",
+      "httpcore==1.0.9",
+      "httpx==0.28.1",
+      "huggingface_hub==1.33.0",
+      "idna==3.20",
+      "Jinja2==3.1.6",
+      "joblib==1.6.0",
+      "markdown-it-py==4.2.0",
+      "MarkupSafe==3.0.4",
+      "mdurl==0.1.2",
+      "mpmath==1.3.0",
+      "narwhals==2.26.0",
+      "networkx==3.6.1",
+      "numpy==2.4.6",
+      "packaging==26.3",
+      "Pygments==2.21.0",
+      "PyYAML==6.0.3",
+      "regex==2026.9.29",
+      "rich==15.0.0",
+      "safetensors==0.8.0",
+      "scikit-learn==1.9.1",
+      "scipy==1.17.1",
+      "sentence-transformers==5.7.0",
+      "shellingham==1.5.4",
+      "sympy==1.14.0",
+      "threadpoolctl==3.7.0",
+      "tokenizers==0.23.2",
+      "torch==2.14.1",
+      "tqdm==4.70.1",
+      "transformers==5.19.0",
+      "typer==0.27.3",
+      "typing_extensions==4.16.0"
+    ],
+    "server_executable_sha256": "7e5383cd8136f02d246eb6473efdaaae7ed3e3e65780f64c32ee190cdbee4534"
+  },
+  "remaining_scope": [
+    "Exact PM4Py embedding defaults, model/tokenization/pooling, preprocessing, ID/order, limit and error parity are separate gates; no to_embeddings package promotion.",
+    "The embedding/search route ranks text and exports vectors; it does not expose filter_embeddings_top_k as a native log filter.",
+    "Optional dependency installation and a running local encoder remain necessary for transformer mode; token hashing is separately selectable.",
+    "All existing solver, schema, numeric, native model and other feature gaps remain in the complete catalogue."
+  ],
+  "retained_helper_failures": [
+    {
+      "cause": "Local helper function shadowed the http module before requests executed.",
+      "helper": "build/check-transformer-native-feature.py"
+    },
+    {
+      "cause": "Test multipart used file instead of the documented log field.",
+      "helper": "build/check-transformer-native-feature-v2.py"
+    },
+    {
+      "cause": "Native mining rejects the alias-only CSV with 'concept:name'; retained as an application follow-up.",
+      "helper": "build/check-transformer-native-feature-v3.py"
+    }
+  ],
+  "runtime_contract_unit_tests_passed": 5,
+  "scope_counts": {
+    "complete_modules": 199,
+    "complete_packages": 46,
+    "incomplete_units": 228,
+    "modules": 387,
+    "packages": 86
+  },
+  "unchanged_backend_bindings_manifest": "docs/feature-first-ocel-validation.json",
+  "unchanged_backend_bindings_manifest_sha256": "069e9ef33a6ffb04d1a9d4777fbee67679b8290ec17869967cdc39cb987f3df7",
+  "unchanged_backend_source_bindings_checked": 572
+}

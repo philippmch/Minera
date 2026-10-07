@@ -422,7 +422,13 @@ events first; discovery lives in tabs:
   than showing misleading numbers (token replay and footprints still apply),
 - **Resources** — when the log carries a resource attribute: the workload per
   resource and the handover-of-work network (how often a case passes from one
-  resource to the next).
+  resource to the next),
+- **Search & embeddings** — search complete case activity sequences or individual
+  event text, inspect cosine-ranked matches, and download full embedding vectors
+  or match results as JSON. Token hashing works immediately; the local transformer
+  below enables semantic search. Text attributes, event IDs, vector width and
+  item limits are configurable. Upload a CSV or XES log to use this tab; opening
+  a saved JSON export does not create the native log session it needs.
 
 A **Filter log** bar above the tabs re-mines the original upload focused on the
 most frequent variants (top-N, a minimum frequency, or a cumulative coverage
@@ -450,6 +456,44 @@ JSON files produced by the `minera_export` CLI open the same way as CSVs:
 ```sh
 ./build/minera_export my_event_log.csv -o my_export.json
 ```
+
+For real transformer embeddings, install the optional encoder in a Python 3.11+
+virtual environment. On Windows PowerShell, from the repository root:
+
+```powershell
+py -3.11 -m venv build/transformer-runtime-venv
+& build/transformer-runtime-venv/Scripts/python.exe -m pip install -r scripts/requirements-transformers.txt
+& build/transformer-runtime-venv/Scripts/python.exe scripts/embedding_runtime.py --cache-folder build/transformer-model-cache
+```
+
+The first start downloads the public `sentence-transformers/all-MiniLM-L6-v2`
+model anonymously. The encoder prints readiness only after loading and warming
+the model, then listens at `http://127.0.0.1:8188`. Document text is encoded
+locally. Keep that terminal running and start your built Minera server in another
+terminal with `--embedding-runtime-url http://127.0.0.1:8188`. In **Search &
+embeddings**, choose **Local transformer**, keep the matching model name, and
+use vector dimensions **0** for its full 384-value vectors. Positive widths
+truncate the model output; widths above the loaded model's width are rejected.
+The service never substitutes hashing or mock vectors when inference fails.
+
+Use `--model` to preload a different SentenceTransformer model or a local model
+directory, `--revision` to pin a model revision, `--local-files-only` to use cached
+files without downloading, or `--normalize` for normalized vectors. The service
+loads safetensors weights and disables remote model code. `/health` reports the
+loaded model and its actual vector width. The native CLI uses the same service:
+
+```sh
+./build/minera_export my_event_log.csv --embeddings \
+  --embedding-provider transformer \
+  --embedding-model sentence-transformers/all-MiniLM-L6-v2 \
+  --embedding-dimensions 0 \
+  --embedding-runtime-url http://127.0.0.1:8188 -o embeddings.json
+```
+
+Add `--embedding-variant events` for event vectors, or
+`--embedding-target "approve a refund" --embedding-top-k 10` for ranked matches.
+The item limit applies to all cases or events being encoded, rather than to a
+sample. Very long text remains subject to the selected model's token limit.
 
 `minera_export` reads a `.xes` file as XES and any other file as CSV (the
 column/delimiter options apply to CSV only). It accepts options for custom
