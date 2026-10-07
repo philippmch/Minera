@@ -108,6 +108,7 @@ add_library(minera_core
   src/backend/link_analysis.cpp
   src/backend/json_export.cpp
   src/backend/knowledge_injection.cpp
+  src/backend/log_query.cpp
   src/backend/log_filter.cpp
   src/backend/log_conversion.cpp
   src/backend/path_filter.cpp
@@ -241,6 +242,10 @@ target_link_libraries(minera_format_dataframe PRIVATE minera::core)
 target_compile_features(minera_format_dataframe PRIVATE cxx_std_20)
 
 add_executable(minera_knowledge src/backend/tools/minera_knowledge.cpp)
+add_executable(minera_query src/backend/tools/minera_query.cpp)
+target_link_libraries(minera_query PRIVATE minera::core)
+target_include_directories(minera_query PRIVATE third_party)
+target_compile_features(minera_query PRIVATE cxx_std_20)
 target_include_directories(minera_knowledge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 target_link_libraries(minera_knowledge PRIVATE minera::core)
 target_compile_features(minera_knowledge PRIVATE cxx_std_20)
@@ -1641,4 +1646,9 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_llm_runtime_tests PRIVATE cxx_std_20)
   target_compile_options(minera_llm_runtime_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_llm_runtime_tests COMMAND minera_llm_runtime_tests)
+  add_executable(minera_log_query_tests src/backend/tests/test_log_query.cpp)
+  target_link_libraries(minera_log_query_tests PRIVATE minera::core)
+  target_compile_features(minera_log_query_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_log_query_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_log_query_tests COMMAND minera_log_query_tests)
 endif()

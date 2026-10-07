@@ -711,9 +711,54 @@ The adapters follow the documented text protocols for
 [Anthropic Messages](https://platform.claude.com/docs/en/api/messages/create), and
 [Google generateContent](https://ai.google.dev/api/generate-content).
 Automated checks use local HTTP protocol fixtures; external account access and
-live model inference are not established by those checks. Generated SQL/log
-filter execution, clustering/hypotheses and the remaining abstraction variants
-remain separate feature and parity work.
+live model inference are not established by those checks. Clustering/hypotheses,
+remaining abstraction variants and exact reference behavior retain their
+feature and parity gates.
+
+### SQL queries and filtered logs
+
+Open a CSV or XES log and select **Query & filter**. The source schema lists the
+columns in the `dataframe` table. Native SQLite executes manual SQL independently
+of the language-model runtime. **Generate SQL** prepares an editable query;
+**Generate and run** also executes it. Generation sends the displayed schema
+and instruction prompt to the selected configured provider.
+
+The query table supports pagination and JSON downloads. To export a filtered
+log, return the displayed source event identity column, for example with
+`SELECT *`. **Whole cases** retains every event in cases containing a match;
+**Events only** retains the matched events. XES and typed table JSON preserve
+the original event order and attributes. **Open filtered log** imports the
+filtered XES into the app. Display row limits do not truncate the selection used
+for export. Source revisions prevent an old query from filtering a newly loaded
+log. Saved JSON exports require a CSV/XES upload to provide an active query source.
+
+Standalone native queries use the same SQLite engine:
+
+```sh
+minera_query my_event_log.csv --sql "SELECT COUNT(*) AS events FROM dataframe"
+minera_query my_event_log.csv --sql-file selection.sql --filter-output filtered.xes --mode cases
+```
+
+DuckDB is an optional real SQL runtime. Install its pinned dependencies and run
+the runtime and native server in separate terminals:
+
+```sh
+python -m pip install -r scripts/requirements-query.txt
+python scripts/query_runtime.py --port 8192
+minera_server --query-runtime-url http://127.0.0.1:8192 --llm-runtime-url http://127.0.0.1:8189
+minera_query my_event_log.csv --engine duckdb --runtime-url http://127.0.0.1:8192 --sql-file selection.sql
+```
+
+SQLite retains timestamp cells as source text; DuckDB loads typed timestamps
+and supports functions such as `EPOCH`. Result JSON tags exact large integers,
+decimals, dates and blobs where needed to avoid loss in the browser. SQL accepts
+one read-only result query over the loaded data. The optional runtime bounds
+table requests to 32 MiB and result responses to 16 MiB.
+
+The HTTP bridge exposes `GET /api/log-query/schema`, `POST /api/log-query` and
+`POST /api/log-query/export`. SQL is a UTF-8 text body; query parameters select
+`engine`, display `limit` and `source_id`. Filter export requires `source_id`
+and accepts `mode=cases|events` and `format=xes|json`.
 
 ### Sample dataset
 

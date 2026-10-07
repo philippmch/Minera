@@ -49,6 +49,7 @@ import { Filters } from "./components/Filters";
 import { OcelExplorer } from "./components/OcelExplorer";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel } from "./components/AskModel";
+import { QueryWorkspace } from "./components/QueryWorkspace";
 import {
   alignModel,
   alignDfg,
@@ -658,6 +659,7 @@ export default function App() {
           Search &amp; embeddings
         </button>
         <button className={tab === "llm" ? "tab active" : "tab"} onClick={() => setTab("llm")}>Ask a model</button>
+        <button className={tab === "query" ? "tab active" : "tab"} onClick={() => setTab("query")}>Query &amp; filter</button>
       </nav>
       <Kpis data={data} />
       {source && (
@@ -730,6 +732,7 @@ export default function App() {
         </main>
       )}
       {tab === "llm" && <main className="layout-log"><AskModel key={cacheGeneration.current} data={data} mining={mining} /></main>}
+      {tab === "query" && <main className="layout-log"><QueryWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenFiltered={loadFile} /></main>}
       {tab === "dfg" && (
         <main className="layout">
           <ProcessMap
