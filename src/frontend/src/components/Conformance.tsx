@@ -230,7 +230,7 @@ export function Conformance({
           <p className="miner-step-label">Step 1 — Model to check</p>
           <h2 className="miner-step-title">Choose a miner</h2>
           <div className="miner-cards">
-            {MINER_GROUPS.filter((g) => g.id !== "log_skeleton" && g.id !== "declare" && g.id !== "footprints").map((g) => (
+            {MINER_GROUPS.filter((g) => Boolean(data.conformance?.[g.id])).map((g) => (
               <button
                 key={g.id}
                 className="miner-card"

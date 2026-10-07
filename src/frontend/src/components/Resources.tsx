@@ -1,18 +1,19 @@
 import { type MineraExport, numberFormat } from "../types";
+import { SocialNetwork } from "./SocialNetwork";
 
 // The organizational perspective: who performs the work, and how cases are
 // handed from one resource to the next (the handover-of-work social network).
-export function Resources({ data }: { data: MineraExport }) {
+export function Resources({ data, available = false, mining = false }: { data: MineraExport; available?: boolean; mining?: boolean }) {
   const network = data.resources;
   if (!network || network.resources.length === 0) {
     return (
-      <section className="panel map-panel reveal">
+      <div className="layout-resources"><SocialNetwork available={available} mining={mining} /><section className="panel map-panel reveal">
         <div className="model-empty">
           No resource information in this log. Add a <code>resource</code> column
           (CSV) or an <code>org:resource</code> attribute (XES) to see who
           performs each activity and how work is handed over.
         </div>
-      </section>
+      </section></div>
     );
   }
 
@@ -33,6 +34,7 @@ export function Resources({ data }: { data: MineraExport }) {
 
   return (
     <div className="layout-resources">
+      <SocialNetwork available={available} mining={mining} />
       <section className="panel activities-panel reveal">
         <div className="panel-head">
           <h2>Resources</h2>

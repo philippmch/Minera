@@ -847,7 +847,7 @@ export function Filters({
     setTokenReplayStopImmediatelyUnfit,
   ] = useState(false);
   const [tokenReplayActivityAttribute, setTokenReplayActivityAttribute] =
-    useState("concept:name");
+    useState("");
   const [tokenReplayPolicies, setTokenReplayPolicies] =
     useState({ ...TOKEN_REPLAY_POLICY_DEFAULTS });
   const [tokenReplayMaxRows, setTokenReplayMaxRows] = useState("");
@@ -1843,7 +1843,7 @@ export function Filters({
     setPowlCaseIdKey("case:concept:name");
     setTokenReplayVariant("forward");
     setTokenReplayStopImmediatelyUnfit(false);
-    setTokenReplayActivityAttribute("concept:name");
+    setTokenReplayActivityAttribute("");
     setTokenReplayPolicies({ ...TOKEN_REPLAY_POLICY_DEFAULTS });
     setTokenReplayMaxRows("");
     setTokenReplayTimestampAttribute("time:timestamp");
@@ -2065,7 +2065,7 @@ export function Filters({
   const tokenReplayDirty =
     Boolean(rootCauseStrings.trim() || rootCauseNumerics.trim()) || rootCauseMultiplier ||
     tokenReplayVariant !== "forward" || tokenReplayStopImmediatelyUnfit ||
-    tokenReplayActivityAttribute.trim() !== "concept:name" ||
+    tokenReplayActivityAttribute.trim() !== "" ||
     tokenReplayPoliciesAreDirty(tokenReplayPolicies) || Boolean(tokenReplayMaxRows.trim());
   const logSkeletonDirty =
     logSkeletonNoiseThreshold !== "" ||
@@ -2285,7 +2285,7 @@ export function Filters({
               <span>Activity field</span>
               <input
                 value={tokenReplayActivityAttribute}
-                placeholder="concept:name"
+                placeholder="Automatic (imported activity field)"
                 onChange={(e) => setTokenReplayActivityAttribute(e.target.value)}
               />
             </label>

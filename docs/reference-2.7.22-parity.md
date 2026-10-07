@@ -11186,3 +11186,39 @@ integrations, optional connector drivers and every other absent capability.
 The full catalogue remains 46/86 packages, 199/387 modules and 228 incomplete
 units; no module/package or full-parity promotion is made. All exact behavioral
 requirements remain in the original contract and coverage ledger.
+
+
+## Feature delivery first: transition-system and social-network views (2026-10-07)
+
+The discovery chooser now exposes a transition-system model alongside its seven
+existing families. The view renders the selected sequence/set/multiset context,
+direction and window, retains distinct state identities with equal payloads,
+marks outside-root endpoints, and provides state counts, traversal references,
+search, zoom and complete JSON export. Declare, log skeleton and footprints
+already have model views and are retained.
+
+Resources now builds all eight native social-network metrics. Directed and
+undirected results preserve signed weights and every returned ordered entry.
+Supported activity/resource/case fields, normalization, decay and subcontracting
+gap controls are available. Existing workload and handover tables remain. A new
+bundled CSV sample uses actual mining, and static exports disable live requests.
+The filter/miner form now leaves the replay activity selector automatic by
+default; its previous hard-coded concept:name blocked ordinary CSV re-mining.
+Explicit replay field entries remain exact.
+
+`docs/feature-first-model-views-validation.json` binds 649 passing frontend tests
+across 34 files, the production build, 20 actual native HTTP calls and 27 browser
+checks. Browser checks cover all eight metrics, signed/reciprocal entries,
+normalized and custom-resource results, zero-window backward multiset state
+identity, traversal data, keyboard selection, display filters, JSON downloads,
+static-export guards, conformance model choices and 390-pixel mobile bounds.
+The network JSON download is identical to its captured native response. Diagram
+limits retain full data in tables and JSON; backend output limits remain visible.
+
+All 574 backend source bindings, three native binaries and 165 reused core
+objects are unchanged. The 152 preceding native algorithm suites and adapter
+regression validation are inherited; no fresh native compilation or whole
+algorithm audit is claimed. LLM/query integrations and optional connector
+drivers are the next feature areas, followed by the full remaining catalogue.
+The scope remains 46/86 packages, 199/387 modules and 228 incomplete units.
+No package/module promotion or full parity claim is made.

@@ -2,11 +2,12 @@ interface LandingProps {
   onOpenFile: (file: File) => void;
   onLoadSample: () => void;
   onLoadOcelSample: () => void;
+  onLoadResourceSample: () => void;
   error: string | null;
   mining: boolean;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, error, mining }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -46,6 +47,9 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, error, min
         </button>
         <button className="landing-sample reveal" disabled={mining} onClick={onLoadOcelSample}>
           Explore object-centric orders and items
+        </button>
+        <button className="landing-sample reveal" disabled={mining} onClick={onLoadResourceSample}>
+          Mine a sample with resource relationships
         </button>
 
         <div className="landing-steps reveal">

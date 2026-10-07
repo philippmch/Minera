@@ -12,7 +12,8 @@ export type ModelArtifact =
   | "powl"
   | "log-skeleton"
   | "declare"
-  | "footprints";
+  | "footprints"
+  | "transition-system";
 
 export interface MinerVariant {
   id: string;
@@ -151,6 +152,12 @@ export const MINER_GROUPS: MinerGroup[] = [
     ],
   },
 ];
+
+MINER_GROUPS.push({
+  id:"transition_system",name:"Transition System",
+  tagline:"Inspect activity-context states, transitions and native traversal counts.",
+  variants:[{id:"configured",name:"Configured discovery",description:"Render the sequence, set or multiset view discovered with the direction and window selected in Miner settings.",artifact:"transition-system"}],
+});
 
 export const DEFAULT_GROUP = MINER_GROUPS.find((group) => group.id === "inductive")!;
 export const DEFAULT_VARIANT = DEFAULT_GROUP.variants[0];

@@ -393,6 +393,14 @@ export default function App() {
       .catch(() => {setError("Could not load the object-centric sample.");setMining(false);});
   };
 
+  const loadResourceSample = () => {
+    setMining(true);
+    fetch(`${import.meta.env.BASE_URL}sample-resource-log.csv`)
+      .then(response => { if (!response.ok) throw new Error("sample not found"); return response.text(); })
+      .then(text => loadFile(new File([text], "sample-resource-log.csv", {type:"text/csv"})))
+      .catch(() => { setError("Could not load the resource process sample."); setMining(false); });
+  };
+
   // Re-mines the original upload with the given filters and miner settings,
   // keeping the active tab. Always mines from source.file so nothing compounds.
   const applyFilters = (filters: FilterOptions & MinerOptions) => {
@@ -568,6 +576,7 @@ export default function App() {
           onOpenFile={loadFile}
           onLoadSample={loadSample}
           onLoadOcelSample={loadOcelSample}
+          onLoadResourceSample={loadResourceSample}
           error={error}
           mining={mining}
         />
@@ -636,7 +645,7 @@ export default function App() {
             Conformance
           </button>
         )}
-        {data.resources && data.resources.resources.length > 0 && (
+        {(source || (data.resources && data.resources.resources.length > 0)) && (
           <button
             className={tab === "resources" ? "tab active" : "tab"}
             onClick={() => setTab("resources")}
@@ -710,7 +719,7 @@ export default function App() {
       )}
       {tab === "resources" && (
         <main className="layout-log">
-          <Resources data={data} />
+          <Resources key={cacheGeneration.current} data={data} available={source !== null} mining={mining} />
         </main>
       )}
       {tab === "embeddings" && (

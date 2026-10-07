@@ -1,0 +1,684 @@
+{
+  "application_validation": {
+    "calls": [
+      {
+        "endpoint": "/api/mine",
+        "name": "transition-sequence-forward",
+        "query": {
+          "transition_direction": "forward",
+          "transition_include_data": "true",
+          "transition_view": "sequence",
+          "transition_window": 3
+        },
+        "response_sha256": "e4c263d8f3db2dbad8658a9dea7b92d90968f5876b9efecc4e2eff6bfc65c0ed",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/mine",
+        "name": "transition-sequence-backward",
+        "query": {
+          "transition_direction": "backward",
+          "transition_include_data": "true",
+          "transition_view": "sequence",
+          "transition_window": 3
+        },
+        "response_sha256": "9c42ed0b3ea54fc56b16045f841193b171321a16f299e68b749119e15a515afa",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/mine",
+        "name": "transition-set-forward",
+        "query": {
+          "transition_direction": "forward",
+          "transition_include_data": "true",
+          "transition_view": "set",
+          "transition_window": 3
+        },
+        "response_sha256": "6e8aed0a7e8a10b2b0f71cfbf568b4d6a7bb55a638174b7ee8d0709a1ea709f7",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/mine",
+        "name": "transition-set-backward",
+        "query": {
+          "transition_direction": "backward",
+          "transition_include_data": "true",
+          "transition_view": "set",
+          "transition_window": 3
+        },
+        "response_sha256": "785b9fed6700a8f7f4d1ea25ba677b3b3fada60fc187070cb59cc449ddee5a27",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/mine",
+        "name": "transition-multiset-forward",
+        "query": {
+          "transition_direction": "forward",
+          "transition_include_data": "true",
+          "transition_view": "multiset",
+          "transition_window": 3
+        },
+        "response_sha256": "a73d27e2ca8d03824ecda7b0f9da31ef18ac9ab617162bdbc26cbb3f8b290dc1",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/mine",
+        "name": "transition-multiset-backward",
+        "query": {
+          "transition_direction": "backward",
+          "transition_include_data": "true",
+          "transition_view": "multiset",
+          "transition_window": 3
+        },
+        "response_sha256": "bbee006dec91da0735915269fc5ca7dbcff86ecb90e21eb4c59d90f54cbe760f",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/mine",
+        "name": "transition-zero-window",
+        "query": {
+          "transition_include_data": "true",
+          "transition_window": 0
+        },
+        "response_sha256": "ac2562f4726aa88b72a4d569c74b4d023e6d7feafe81f14e1eb7bb764cbbc079",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/mine",
+        "name": "restore-default",
+        "query": {},
+        "response_sha256": "3096626963325e081f473413d26a3a273714874475cc28e77cd263bd48367e9f",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/organizational-sna",
+        "name": "network-handover",
+        "query": {
+          "sna_variant": "handover"
+        },
+        "response_sha256": "33822a23ceb83a119016bba77c59470284826d5ea1c20f6ce1a5877070a2b690",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/organizational-sna",
+        "name": "network-working_together",
+        "query": {
+          "sna_variant": "working_together"
+        },
+        "response_sha256": "f492cea1c2fafd441cf47a0403e84383e4ac44b95cf116eca4b8e7b33ed30261",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/organizational-sna",
+        "name": "network-subcontracting",
+        "query": {
+          "sna_variant": "subcontracting"
+        },
+        "response_sha256": "bb904a7d4fb3d81115f21a14e3496ef0fcae0f0349b02e250b44aecdedf27089",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/organizational-sna",
+        "name": "network-jointactivities",
+        "query": {
+          "sna_variant": "jointactivities"
+        },
+        "response_sha256": "d4ceda24f89c9356c9b46e487c8bb97aa48a08049804c138e4264eaa7b7cfd6e",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/organizational-sna",
+        "name": "network-handover_pandas",
+        "query": {
+          "sna_variant": "handover_pandas"
+        },
+        "response_sha256": "bfbb27504ad0e637404db7ab13e14c038b65d777d728b88060c5a56f7468d79a",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/organizational-sna",
+        "name": "network-working_together_pandas",
+        "query": {
+          "sna_variant": "working_together_pandas"
+        },
+        "response_sha256": "987ee2fc051b504c19d348f3d21b3042b3888df868c39bb245e187d1992646a8",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/organizational-sna",
+        "name": "network-subcontracting_pandas",
+        "query": {
+          "sna_variant": "subcontracting_pandas"
+        },
+        "response_sha256": "77e652e41fea513fe9ef8da7931bf821c0b501d4e324e119ff71c1cf64c98383",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/organizational-sna",
+        "name": "network-jointactivities_pandas",
+        "query": {
+          "sna_variant": "jointactivities_pandas"
+        },
+        "response_sha256": "2d407d2e02a5c6a4d411c9a79247e6e3f02a2fed995e5ebebe0df97c483b4ae1",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/organizational-sna",
+        "name": "network-normalized",
+        "query": {
+          "sna_metric_normalization": "true",
+          "sna_variant": "handover"
+        },
+        "response_sha256": "dd9ec8384a185695499d31b8abfe755ef8348f4a6406fe82574abee5a648529a",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/organizational-sna",
+        "name": "network-custom-resource",
+        "query": {
+          "sna_resource_attribute": "team",
+          "sna_variant": "working_together"
+        },
+        "response_sha256": "62ef8e0549783113df2fd2d7d40445c63f01dbfa56070bd2945e454cac8f1be0",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/organizational-sna",
+        "name": "network-decay-and-gap",
+        "query": {
+          "sna_beta": 0.5,
+          "sna_case_id_attribute": "case:concept:name",
+          "sna_n": 3,
+          "sna_variant": "subcontracting_pandas"
+        },
+        "response_sha256": "7436ad4874524f5d393bb6c6dfae6dbce6f7f91ee2f7d490cdedad52fdb0714b",
+        "status": 200
+      },
+      {
+        "endpoint": "/api/organizational-sna",
+        "name": "network-invalid-field",
+        "query": {
+          "sna_resource_attribute": "not_a_field",
+          "sna_variant": "handover"
+        },
+        "response_sha256": "8494c4abf8a97a332fa22305d6d2850ba4d1d2fa19f4163c90740b75b6e3c067",
+        "status": 200
+      }
+    ],
+    "complete": true,
+    "created_utc": "2026-10-07T20:22:30.863575+00:00",
+    "fixture": "src/frontend/public/sample-resource-log.csv",
+    "fixture_sha256": "798f83a034201539d375a44e442aa340cb9af20caf5927362b898c27c0970621",
+    "helper_sha256": "17fd2bd1009d6aaf2df50fb3807be97ec41b1ab588a3a333397e026350fac92b",
+    "native_sources_unchanged": 574,
+    "zero_window_outside_root_states": 1,
+    "zero_window_states": 2
+  },
+  "boundaries": [
+    "Fresh feature availability checks use owned synthetic data and the existing native backend; they are not a new reference differential audit.",
+    "The diagram bounds nodes/edges for responsiveness; paginated tables and JSON preserve every returned entry. Native backend output limits and diagnostics remain visible.",
+    "All semantic, ordering, error, parameter, performance and remaining catalogue gates stay in the original coverage ledger."
+  ],
+  "browser_validation": {
+    "checks": [
+      {
+        "name": "real sample mining and default transition view",
+        "passed": true
+      },
+      {
+        "name": "automatic replay field shown",
+        "passed": true
+      },
+      {
+        "name": "CSV settings re-mine with zero-window backward multiset and traversal data",
+        "passed": true
+      },
+      {
+        "name": "keyboard selection of outside-root equal-label state",
+        "passed": true
+      },
+      {
+        "name": "transition zoom",
+        "passed": true
+      },
+      {
+        "name": "transition count display filter",
+        "passed": true
+      },
+      {
+        "name": "transition download retains names, both states and traversal data",
+        "passed": true
+      },
+      {
+        "name": "state search",
+        "passed": true
+      },
+      {
+        "dimensions": {
+          "client": 375,
+          "graph": 343,
+          "inspector": 343,
+          "scroll": 375,
+          "viewport": 390
+        },
+        "name": "transition mobile bounds",
+        "passed": true
+      },
+      {
+        "geometry": {
+          "arrows": 6,
+          "entries": 6,
+          "negative": 0,
+          "nodes": 3
+        },
+        "name": "native network Handover of work",
+        "passed": true
+      },
+      {
+        "geometry": {
+          "arrows": 0,
+          "entries": 6,
+          "negative": 0,
+          "nodes": 3
+        },
+        "name": "native network Working together",
+        "passed": true
+      },
+      {
+        "geometry": {
+          "arrows": 6,
+          "entries": 6,
+          "negative": 0,
+          "nodes": 3
+        },
+        "name": "native network Subcontracting",
+        "passed": true
+      },
+      {
+        "geometry": {
+          "arrows": 0,
+          "entries": 6,
+          "negative": 4,
+          "nodes": 3
+        },
+        "name": "native network Joint activities",
+        "passed": true
+      },
+      {
+        "geometry": {
+          "arrows": 6,
+          "entries": 6,
+          "negative": 0,
+          "nodes": 3
+        },
+        "name": "native network Handover of work \u00b7 table",
+        "passed": true
+      },
+      {
+        "geometry": {
+          "arrows": 0,
+          "entries": 6,
+          "negative": 0,
+          "nodes": 3
+        },
+        "name": "native network Working together \u00b7 table",
+        "passed": true
+      },
+      {
+        "geometry": {
+          "arrows": 6,
+          "entries": 6,
+          "negative": 0,
+          "nodes": 3
+        },
+        "name": "native network Subcontracting \u00b7 table",
+        "passed": true
+      },
+      {
+        "geometry": {
+          "arrows": 0,
+          "entries": 6,
+          "negative": 4,
+          "nodes": 3
+        },
+        "name": "native network Joint activities \u00b7 table",
+        "passed": true
+      },
+      {
+        "name": "keyboard resource selection",
+        "passed": true
+      },
+      {
+        "name": "signed absolute tie filter",
+        "passed": true
+      },
+      {
+        "name": "network JSON retains signed and reciprocal undirected entries",
+        "passed": true
+      },
+      {
+        "name": "table case selector and metric normalization",
+        "passed": true
+      },
+      {
+        "name": "subcontracting decay and gap controls",
+        "passed": true
+      },
+      {
+        "name": "custom resource field",
+        "passed": true
+      },
+      {
+        "dimensions": {
+          "client": 375,
+          "graph": 343,
+          "scroll": 375,
+          "settings": 311,
+          "viewport": 390
+        },
+        "name": "network mobile bounds with expanded fields",
+        "passed": true
+      },
+      {
+        "name": "empty resource-field result",
+        "passed": true
+      },
+      {
+        "name": "static JSON export retains resource tables and disables live requests",
+        "passed": true
+      },
+      {
+        "name": "transition system excluded from Petri conformance models",
+        "passed": true
+      }
+    ],
+    "complete": true,
+    "console": [],
+    "created_utc": "2026-10-07T20:33:24.612Z",
+    "evidence": [
+      {
+        "path": "build/model-views-feature-browser-final/conformance-models.txt",
+        "sha256": "defa128b6eaa905eff765b7e1f7d3be724a0be867ac479b9f0622380480b7130"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-0.txt",
+        "sha256": "782f60a8cbc54204a1b310729886199a7ae767dff009cc8230aae31fbe5efb1e"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-1.txt",
+        "sha256": "2cfcfdc38bf14ea02f5abd2496481407c517a37c38e8a4f2748fc5ed2ba885a8"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-2.txt",
+        "sha256": "4298489080c46f7a99a7f6e70a9e1d2629e0c86062a849ad0a15dce0a00d752f"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-3.txt",
+        "sha256": "a933cd28587e9cbe78e7fd5f6a631328cf817576a44a60b5590dcd49b04f803a"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-4.txt",
+        "sha256": "bd5389b0e1f1a80336bf5d948682550a3741956a471f572f8f9ac9a98af5d361"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-5.txt",
+        "sha256": "9c497d73d621a1238804093e86e3aae25806ee9ce7e53f820d4dba21c480f348"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-6.txt",
+        "sha256": "16f454f702317839d717f26b24cd0d4ffff19f226f54f73e1ecbdd9104eea778"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-7.txt",
+        "sha256": "371cd91ac783a2d5278d2bfa37eb636936c1fd9585c895b0666056824ab3fb0d"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-desktop.png",
+        "sha256": "e8a17cb6c4df527303226f1cb7a64b737ff530b3c7345659e815ba66960cb9b4"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-download.json",
+        "sha256": "207eafba45595cb58074f75be288475f5f47cdb6e4e7fd92d5d368b992ec27d2"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-empty.txt",
+        "sha256": "739bb8029973ee9dfbb77ba29a56b6c6839e558e348a7ecc69ea23ef723d97f7"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-mobile.png",
+        "sha256": "59db00ece8c138f49b4992b5a8a26ed06abcb0a2ec38bd8dfb8b6647adb8fad7"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/network-normalized-download.json",
+        "sha256": "56ba282b40a5716fd10eea93152ca259d4e29d059862a3cb490a9d23c1385f0c"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/static-export-resources.txt",
+        "sha256": "e3ad8931a0a97c9ffe912ebef204c5fc77f406925864e981e23cceda8a438346"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/transition-default.txt",
+        "sha256": "3c3df3b0a0c8f64a842f306e7ab1e2e5553d11da22546f8b2259d235c4d53c99"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/transition-desktop.png",
+        "sha256": "099601849926bd76da33cbcb1881b104572341490718532ed7d04717e9eae9cf"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/transition-download.json",
+        "sha256": "412f819390c164f1bb87628df6092b2ce94fefc4eda4cedfdadce46c9851b980"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/transition-mobile.png",
+        "sha256": "970bff498e153e5e832be81d98dfa1755d9594ccd07f436843be8cafe89b0fca"
+      },
+      {
+        "path": "build/model-views-feature-browser-final/transition-zero-window.txt",
+        "sha256": "2d9092e58f2366616f5c65d2bc3474351e2d2b1cf2e5bdb640a5a623f7ff0f6e"
+      }
+    ],
+    "loaded_assets": [
+      "https://fonts.googleapis.com/css2?family=Familjen+Grotesk:ital,wght@0,400..700;1,400..700&family=Spline+Sans+Mono:wght@400;500;600&display=swap",
+      "/assets/index-CdtnQlZE.js",
+      "/assets/index-DbOqLXcb.css"
+    ],
+    "source": "bundled sample-resource-log.csv",
+    "source_validation_sha256": "3faa231da31d7a7fcd10cad7a00b80e871169393d847dc32494b350313b1ea41"
+  },
+  "catalogue_promoted": false,
+  "complete": true,
+  "created_utc": "2026-10-07T20:40:08.645446+00:00",
+  "delivered": [
+    "Transition-system discovery model view, state inspection, traversal data, state search and JSON export",
+    "All eight native social-network variants, signed weights, supported selectors, normalization, decay/gap controls and JSON export",
+    "Bundled resource CSV sample mined through the actual backend",
+    "Automatic replay activity selection in the filter/miner form for ordinary CSV re-mining"
+  ],
+  "finalizer_sha256": "a9e026bd12c643d91a6e9a7a9de7f4b1f0b9beb04588544ba3efe0c300584382",
+  "frontend_validation": {
+    "complete": true,
+    "created_utc": "2026-10-07T20:32:43.798586+00:00",
+    "helper_sha256": "6153db043117a42638e9eaf8991b11e6cc1c08da90e3ac91a129c20dbbe01788",
+    "production_outputs": {
+      "src/frontend/dist/assets/index-CdtnQlZE.js": "98e2c0addc7f8b344a14beebd7e25e1346a12be86a54aa947d25245a7dc1f226",
+      "src/frontend/dist/assets/index-DbOqLXcb.css": "6c2a3460412016ad431fc902fbf9248b4c4bef6bcacdaf96d18cead27ae31f24",
+      "src/frontend/dist/index.html": "17d6cd2c0a672cf6a0f1da0d4c6be6f90e41871568ee4952e8ca23ac9871177c",
+      "src/frontend/dist/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+      "src/frontend/dist/sample-ocel.json": "04c6d560119bf12cd308cdbfca493c565bcfe88b89d394893dfa85a5f7535585",
+      "src/frontend/dist/sample-resource-log.csv": "798f83a034201539d375a44e442aa340cb9af20caf5927362b898c27c0970621"
+    },
+    "source_bindings": {
+      "src/frontend/index.html": "648efb9515b5bd4da2f4c04d8a6be2f0d8de5968617d091ea3ebd26c8f7d9cff",
+      "src/frontend/package-lock.json": "04ea239f18993b885208e519662bfd4e3e014545d38d952f84284f4cb8d6505d",
+      "src/frontend/package.json": "7f2361b0a98d18a5bd9df2a1c80187d77d791c0fc1e629e42d33f070625683a9",
+      "src/frontend/public/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+      "src/frontend/public/sample-ocel.json": "04c6d560119bf12cd308cdbfca493c565bcfe88b89d394893dfa85a5f7535585",
+      "src/frontend/public/sample-resource-log.csv": "798f83a034201539d375a44e442aa340cb9af20caf5927362b898c27c0970621",
+      "src/frontend/src/App.tsx": "373f00c3678fe90ee9eb1a25c1984ebf6433118b1f75db149aeaacd9f0d99b85",
+      "src/frontend/src/alpha-result.ts": "fa7302374f34971c441e23dd2c56a8365c8954f388b744d74e432376b318edb6",
+      "src/frontend/src/api.ts": "6a72180db57d0846b01bbe852c1465b437feb062b926c64c9173a3951e4ec5e5",
+      "src/frontend/src/app-logic.ts": "c26d1de3a8c514df21dab52b80b2a8683cd5666083bb0a2bfeaeea88b7c071e3",
+      "src/frontend/src/components/ActivityTable.tsx": "6513c9fda5f06b1cce89bb574f983846f1f6d6e177b39b31312cf246d3b832b1",
+      "src/frontend/src/components/Batches.tsx": "d130a5a54437a88665765c503c1e784352c7f02bd37e05eb78dbfa0193551572",
+      "src/frontend/src/components/Conformance.tsx": "d7c26e7616e61ed656fa544d3de2d7c29bb5f7ce5098dba7fb3ff4685b04e8b8",
+      "src/frontend/src/components/CorrelationMining.tsx": "efa6b26473f44247dfefd0d6707cc62a21cd8f2a8a188c7ed97451707cf611b6",
+      "src/frontend/src/components/DeclareModel.tsx": "fec6de33a480b529e5181248c753dc48933037d63b967c0316d9bd0b19b633cd",
+      "src/frontend/src/components/DependencyGraph.tsx": "22c98ddb5fe63cc38bb1632a1cf6ead957e11180bd0a3847b7ba034c91b54f7a",
+      "src/frontend/src/components/DfgDataframe.tsx": "5a84e0532f640f74e81be5bf8190abcd1596c4ba08ffe831451776ccc1119ec2",
+      "src/frontend/src/components/DfgVariants.tsx": "d72d9c66df17d64b9917023702aed7a12db40c659130d21fce475db84b9002ef",
+      "src/frontend/src/components/DottedChart.tsx": "9154fb731a669ab66380edd42239b13bb5a34ced046d92dac5af1e1575a0f280",
+      "src/frontend/src/components/EmbeddingSearch.tsx": "39e39619e21a044caea16084e3065c3d8dc8e56954e75129dadd034215700236",
+      "src/frontend/src/components/EventLogView.tsx": "77f9d4f858b87070e7fe7ceb06651c08e9dc66460e9a01f0a3228338fd699022",
+      "src/frontend/src/components/EventuallyFollows.tsx": "2a545ea1ce24a252e2deb2c8ec59c8cde425e4fa2799030745f80d9151a267c8",
+      "src/frontend/src/components/Filters.tsx": "9aeeefa61f18741e8ce5be1800a90a5723afb6251ee11fccdb1eb87d4d719183",
+      "src/frontend/src/components/FootprintsModel.tsx": "b0e3f62d42e3f16dae80616b1a7b79ba778d68fa78e4dbea1ba7b35873dc147e",
+      "src/frontend/src/components/Kpis.tsx": "3205ae6a46c62d467c65af0d3499e71cd52c0cdb1809ace1322205b9ce2d051e",
+      "src/frontend/src/components/Landing.tsx": "31aac36dafba21e13972d6705b79caa4235a269f058e872738eef5c8f997b06b",
+      "src/frontend/src/components/LogSkeletonModel.tsx": "769c40e8cbb25808465427a4fb08763e242a56ee996e43b05e0bae82b9919cff",
+      "src/frontend/src/components/ModelGraph.tsx": "8bbb163f45538c7caf6274612d915f399753646d5a0723f9f23fb3ccf7a75218",
+      "src/frontend/src/components/OcdfgModel.tsx": "44787f74670eba47eb94e9bfeb85774f47f5f018c9f7499a0a528326470d8073",
+      "src/frontend/src/components/OcelExplorer.tsx": "cefae865ad83934e21aa3421faa2e5fb6cec704bb96c00b9eab1c1da55ad5dde",
+      "src/frontend/src/components/OcelGraphModel.tsx": "ce287cf7de99517def09eaffa362083860e1e00c3c7b820879b87a455ca279ae",
+      "src/frontend/src/components/OcelNetModel.tsx": "2c8361f72b266d288bb9df9a7808846f92a852b607a871cae5123480c19caa15",
+      "src/frontend/src/components/PerformanceSpectrum.tsx": "09bce5930511b72c5d8666b64aba251cd0f7b8207ca5e57d0f40d505e264fdae",
+      "src/frontend/src/components/PetriAnalysis.tsx": "fd402017b7b7c04e375a058ca81e0ab9438573bb9fe9ae5fb73ff85c9c78e19d",
+      "src/frontend/src/components/PetriNet.tsx": "66d9da0dbe7452803c51e240333678adb013893513a71ea3729b18b52d85f130",
+      "src/frontend/src/components/PowlModel.tsx": "6a9faf9eed9c1e26da7ef88163890c148446cb9a9b520e1446037df86ac49efd",
+      "src/frontend/src/components/ProcessMap.tsx": "c98d5d04acc738f9b7d75a0c7f8d9ede8bf716efd4be6c462a274bba9d1437d3",
+      "src/frontend/src/components/ProcessModel.tsx": "11db9011d0de1e922245e1e950b274ae05bbc9ec1e6680ec14375858bb718a17",
+      "src/frontend/src/components/ProcessTree.tsx": "ffb83984b1baa52841009f532d2352013895c630255d15380da32de188fa523d",
+      "src/frontend/src/components/Resources.tsx": "56648accf538da53a683f33c8878bf1c18bde9b11a0765e2774720a1705d9be2",
+      "src/frontend/src/components/SocialNetwork.tsx": "c399a8f17d09d11a8d2735c38e9840ecda182c1f8c78c63a1886552036459eff",
+      "src/frontend/src/components/TopBar.tsx": "fac8565c63a4bf8b5dad1c08565b04b28c9991421e5f0158be52f69eecd6b25a",
+      "src/frontend/src/components/TransitionSystemModel.tsx": "9556eba8785e7210c10e5cc2edeb78b0a894f9d1c22ef82106fcb4ecf27ec5c2",
+      "src/frontend/src/components/VariantList.tsx": "49d3314d64e4dbc59602fde9c8643a812adceadc06df9bfc447772b783281271",
+      "src/frontend/src/conformance.ts": "a4e3d87b5e2208b1302e1d3341582428dc24bc7d0b2875a49099adc5e7150ab2",
+      "src/frontend/src/dependency-layout.ts": "eb3672b5743e4b12b111a2c4f4d29357ff8632bcbcdb528d501f435332da5932",
+      "src/frontend/src/dotted-chart.ts": "6745bb981c89d60ef8a19b2a0d1f39eccd6ea8abd4b225cb2d3e4bae19d4962d",
+      "src/frontend/src/embedding-search.ts": "4350811edf84f88d68b7a571925c1faba35eb5d7d9ecdcaeaa7663e51c29b4a6",
+      "src/frontend/src/eventually-follows.ts": "e567d87a06e47ca7b23f7c014e5253abb565ea2b1872b7be045f9fd580b5684f",
+      "src/frontend/src/heuristic-miner.ts": "32bd0911e3e3ec528c25c992acd843a3485c563ab369a439224fb851ee6aa555",
+      "src/frontend/src/layout.ts": "7f46d91718da9444c21b80035503abcd7b89a8daacc69e56ee57e7a001fdbeb4",
+      "src/frontend/src/main.tsx": "9f14840785035a7ad44d93177890861739412b4e21fe2778b5efa66a6eb24f67",
+      "src/frontend/src/miners.ts": "3c58a7b01fedaca83002046c45a3c7d8c86933a66b7fe79484e27dc8874f0bfd",
+      "src/frontend/src/model-graph.ts": "42ca916611034868e9cd7114b3627f5ecedd3b69823b109ad058ffc689ed4663",
+      "src/frontend/src/model-view-data.ts": "728daaa0c4e4c6813a1c368e4e5b9201c5b83c95b619f7db19359cea40d11103",
+      "src/frontend/src/ocdfg-layout.ts": "58754e048c8e6a7f25a059c6eec2c5f494e21a50cad00155af3863a0e4dd0f70",
+      "src/frontend/src/ocel-explorer-options.ts": "8e96aa759233618959e8efeea431c18adac2909ba0c04b87f0e69a0703c5c8e5",
+      "src/frontend/src/ocel-graph-layout.ts": "aaecbda5b9151f27c359fbf789a8e2a967740e0351cce3cbc8cfe25d42e1a5e2",
+      "src/frontend/src/ocel-net-model.ts": "23d0f99c3e4f0601a3f1c12e979cb5a259cf1e61181ee5ea918ab4af16605b6f",
+      "src/frontend/src/performance-spectrum.ts": "dcfd0899612ee9bc189bfdebe3788f888b7cc6eb867f0d414e4f7b59600f80c0",
+      "src/frontend/src/petri-decoration.ts": "b9c94e9237b7a3acc6469c0fa7c61fb13f1d2c3a9b2a47d7bcd66f360ad5fa51",
+      "src/frontend/src/petri-layout.ts": "6af905db83e2506003b016c0904993dd4a3a1f798a5759ff966ecf810334bf58",
+      "src/frontend/src/social-network-options.ts": "049cffc462d21cc5587aa2d60a8f9344aa72914ac4625e7102554951c58a16d9",
+      "src/frontend/src/styles.css": "62982e22fe06b39a0abb4da591037a64a31c8badf64141334f6061c972d0bb6b",
+      "src/frontend/src/tree-layout.ts": "07db583178e683676906f416d459f82e4acd56b14c54ac7e9e0050adbf270fdc",
+      "src/frontend/src/types.ts": "416246c698eb9249855c37fba3e6b9f546c0af49f6322a3ffc95d4c44e394c1b",
+      "src/frontend/src/variant-insights.ts": "bcb95470d435e22ea5bb38f934a960444a21a50f348f4bad0c75c496cf0f6c37",
+      "src/frontend/src/vite-env.d.ts": "424faf9241dd699dda995b367ed36665732da1e6ec1f33b2fd40394488ecac92",
+      "src/frontend/tests/alpha-result.test.ts": "266743510a7736bc654b9d6e5dd2219c7c1412c434d2619aff76ff04d26f490c",
+      "src/frontend/tests/api.test.ts": "a883ada562be5a9085bc3f650365579790d230ab56266d1f8bd151687b7871d4",
+      "src/frontend/tests/app-logic.test.ts": "70e221e45586d1f0c3b6adbc558eb326ab16b46712c5108a6f1954f6aaa6557c",
+      "src/frontend/tests/components/Batches.test.ts": "db7d871579f3f0ca56bb6041b49769d3de9496e26c0d4f8c6f0fa371969a9887",
+      "src/frontend/tests/components/CorrelationMining.test.ts": "a38bf13d3e0803c4931f9b886130c0bacefc7e1dd3ae2d23b87299f55daa80c8",
+      "src/frontend/tests/components/EventLogView.test.ts": "23936dbd116176cbc357933c4fe7ec692e9c637d9e9a20f2f15ecfd5b3a446d2",
+      "src/frontend/tests/components/Filters.test.ts": "180a41ace29627c4afb67f64c07abee999725db832f56bbfdb3e9df939ca4846",
+      "src/frontend/tests/components/PerformanceSpectrum.test.ts": "4e0dbc77adbf798c316b385583ff66b418601c3c9d793e155e0bc3e5a8c616bf",
+      "src/frontend/tests/components/TokenReplayDiagnostics.test.ts": "2a4e8c8347f874f753dda3648234c42110c7ee8a0b2de2fe89b138aac0765c31",
+      "src/frontend/tests/conformance.test.ts": "158f05e81bc4780390078e3d87ac2cdd911127df6237a7fb9820778a85615353",
+      "src/frontend/tests/decision-tables-types.test.ts": "7c26616dceae3f158efd2665f315e609899246bad2158e57eb6138ce9fcfde5e",
+      "src/frontend/tests/decision-tables.test.ts": "eaf6a0f9f63afbf05d237d49d0b1cb386dd5708f7e4db655fc3b3aa5d1e8c9a7",
+      "src/frontend/tests/dependency-layout.test.ts": "6d489d9743823a95edbe374e4f82afc3205101eecbb7616cf6d16df1a00e54a4",
+      "src/frontend/tests/dfg-dataframe.test.ts": "4e9b78049e1d1a52667ec6683902f4132314ad37e15dfa3d47d1afeb365fab86",
+      "src/frontend/tests/dotted-chart.test.ts": "d8b1b411b47aa24c681dcb9d7def1c85bdd2bea02bd63d7eac95068adbdf0dcf",
+      "src/frontend/tests/embedding-search.test.ts": "59ddcbff095c300e42c6292b6bed1ff488c0eeb43acff3f3f4e6586dae279468",
+      "src/frontend/tests/eventually-follows.test.ts": "0022612250123d8f3527398f485a89f2417183d7bbd6bfd060d0021b921800e1",
+      "src/frontend/tests/filters-validation.test.ts": "4150abd99849d0655d057c24c73299830b65ed468028480ddf8e3f57d176f918",
+      "src/frontend/tests/first-class-attribute-contract.test.ts": "9ddb52e0abdff0d8fa88dc6a76e6b1c5fb5c262bacb6e3f86d634dbe69daaf0c",
+      "src/frontend/tests/heuristic-miner.test.ts": "bfaebbfc8fbca1602c51ad727aa766784da48e0ce4aacbb5e2fc96e7fb12d156",
+      "src/frontend/tests/layout.test.ts": "9153e408cc9ab16836acb0135d8ddff179b755c26ece8f7cb419565eaf0f045d",
+      "src/frontend/tests/log-conversion.test.ts": "2d7189213b8462eca54834e0a5e988bcd9fa950718cf46d27c2ab39e27b61b1d",
+      "src/frontend/tests/model-views.test.ts": "ef5c8090b38a70e7fa022cd676ff7bf4ea188be1e3c3d825d511c425e7580306",
+      "src/frontend/tests/monte-carlo-scheduler.test.ts": "7ff31165acaab52355522e8c0de411c970e91e5594e14516e81201581fdbef42",
+      "src/frontend/tests/ocdfg-layout.test.ts": "315745bd728c055bba39930815363565586b01a44778c365490cfceed247da2c",
+      "src/frontend/tests/ocel-graph-layout.test.ts": "5a9e6ab6c4b3525f27031159c7a4879c8416e47850a4b4f4f7a6de9fe35c9805",
+      "src/frontend/tests/ocel-net-model.test.ts": "7a382a6b8aace9a60b2e0a940093f3cbd41ed3f64516c17d0c00dfa0c1c5b237",
+      "src/frontend/tests/performance-spectrum.test.ts": "a42a50b52605f9f70e4ae59547dccaacc63636a7e8b49a1732cfe7b4da5dec83",
+      "src/frontend/tests/petri-decoration.test.ts": "8459e9dd4d6bb26d67cd4776f937af43d5b9c7937e7ae5ac9ff42833da157060",
+      "src/frontend/tests/petri-layout.test.ts": "f89629e8ca7a4b78a13e46f4b838a0258cc35b2546e14b558caadcf088679dae",
+      "src/frontend/tests/stochastic-map-sparse.test.ts": "0397d1b956b01536248fd790e3f48fc81426f4be77e2d9f579179859e58864ad",
+      "src/frontend/tests/tree-layout.test.ts": "2e32a66d0e928211a24bb1238355c3000cfc51a98a42a35bf0cc2a32f64ef9b3",
+      "src/frontend/tests/types.test.ts": "08fb0a1accf88b30034d58adb238821263b0dfdf71d102356004e36a87cab7e4",
+      "src/frontend/tests/variant-insights.test.ts": "f3f76ef479a9b6db64c0102ca95931297ad3974c2f05e5392679d20d4e5381b3",
+      "src/frontend/tsconfig.json": "8b035bceb545f9198f37dd48d4aa0d9176fcc52736933a03ffcaab3f6c2544cc",
+      "src/frontend/vite.config.ts": "735e1110ba08fc9f06003d0e673b882a4393f5d8e0144352e56d3ce5b7ee10b7",
+      "src/frontend/vitest.config.ts": "c967a837afa02495ff07816460ee50034adf9d48561af28e437bcf83ecfed0cd"
+    },
+    "steps": [
+      {
+        "args": [
+          "C:/Program Files/nodejs/node.exe",
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "test"
+        ],
+        "elapsed_seconds": 1.562000000005355,
+        "exit_code": 0,
+        "name": "frontend-test",
+        "passed_files": 34,
+        "passed_tests": 649,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "25256487b5a0b0dbdd3507e6e7124d6678a43cbabe241a3459a845592d687504"
+      },
+      {
+        "args": [
+          "C:/Program Files/nodejs/node.exe",
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "build"
+        ],
+        "elapsed_seconds": 6.7189999999973224,
+        "exit_code": 0,
+        "name": "frontend-build",
+        "stderr_sha256": "d957b4847954e509ecc7be3c696c5ad6d353e641e9b2eca6f284be9f1aec9b69",
+        "stdout_sha256": "67f2231e32c79800c81d6df518d94b1c29d352316a36c3acd6c24c0056f4185a"
+      }
+    ]
+  },
+  "full_parity": false,
+  "inherited_native_algorithms": {
+    "fresh_full_algorithm_audit": false,
+    "previous_suites": 152,
+    "validation": "docs/ocdfg-log-validation.json",
+    "validation_sha256": "adad84d07cbf7a5c0c5f74e4b5beffb4e864b986c86f9efb3981743095523a96"
+  },
+  "native_unchanged": {
+    "binary_bindings": {
+      "minera_export": {
+        "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\model-quality-feature-native-044fff9c49b64755bd126c0b3d32522c\\native-build\\product-targets\\Release\\minera_export.exe",
+        "sha256": "d4e39dca8a691be39e9c9313ae12329c3f9e475fb91a2b1cd74a5c3f376cac79"
+      },
+      "minera_replay_input_options_tests": {
+        "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\model-quality-feature-native-044fff9c49b64755bd126c0b3d32522c\\native-build\\product-targets\\Release\\minera_replay_input_options_tests.exe",
+        "sha256": "acb1d4ddf2c8cd8d31801fe40c9b2eabb31eed01a651684d0d421ffbb49c0848"
+      },
+      "minera_server": {
+        "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\model-quality-feature-native-044fff9c49b64755bd126c0b3d32522c\\native-build\\product-targets\\Release\\minera_server.exe",
+        "sha256": "df103c92b8f80eb75517bc2171d95b4248876c231afeb07debcbb564e0060391"
+      }
+    },
+    "core_objects_verified": 165,
+    "fresh_compile": false,
+    "fresh_native_suite_run": false,
+    "source_bindings_verified": 574,
+    "validation": "docs/feature-first-model-quality-validation.json",
+    "validation_sha256": "63153c4b0dd7b5a91b97f173578aecb903c848cb8def35f67dff33e3144e47d3"
+  },
+  "parent_head": "c18b3a53f22fbdefd4c0e2af825df28b960d5266",
+  "scope_counts": {
+    "complete_modules": 199,
+    "complete_packages": 46,
+    "incomplete_units": 228,
+    "modules": 387,
+    "packages": 86
+  }
+}
