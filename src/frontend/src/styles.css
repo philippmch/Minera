@@ -1,5 +1,23 @@
 /* Minera — paper & graphite with a copper seam */
 
+.query-workspace { min-width: 0; padding-bottom: 24px; }
+.query-intro, .query-results, .query-setup { margin: 16px 24px; overflow-wrap: anywhere; }
+.query-fields, .query-filter { min-width: 0; border: 0; padding: 12px 24px; margin: 0; }
+.query-options, .query-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.query-schema, .query-natural { margin: 16px 0; padding: 12px 0; border-block: 1px solid var(--line-soft); }
+.query-schema summary, .query-natural summary, .query-setup summary { cursor: pointer; }
+.query-workspace pre { font: 12px var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 450px; overflow: auto; }
+.query-text { display: block; margin: 16px 0; }
+.query-text > span { display: block; margin-bottom: 6px; }
+.query-text textarea { width: 100%; padding: 10px; font: 13px var(--font-mono); background: var(--paper-raised); color: var(--ink); border: 1px solid var(--line); resize: vertical; }
+.query-model { flex: 1 1 250px; min-width: 0; }
+.query-options .query-model input { width: 100%; }
+.query-actions .btn-open { font: inherit; cursor: pointer; }
+.query-table-wrap { width: 100%; overflow-x: auto; }
+.query-table-wrap table { min-width: 100%; width: max-content; }
+.query-table-wrap td { max-width: 380px; overflow-wrap: anywhere; }
+@media (max-width:600px) { .query-fields, .query-filter { padding-inline:12px; }.query-intro, .query-results, .query-setup { margin-inline:12px; }.query-options > label { flex:1 1 140px;min-width:0; }.query-options input, .query-options select { width:100%; } }
+
 .ask-model-panel { min-width: 0; padding-bottom: 24px; }
 .ask-model-intro, .ask-model-status { margin: 12px 24px; color: var(--ink-70); overflow-wrap: anywhere; }
 .ask-model-fields { min-width: 0; border: 0; margin: 0; padding: 12px 24px; }

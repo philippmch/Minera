@@ -34,6 +34,8 @@
 #include "httplib.h"
 #include "embedding_runtime.hpp"
 #include "llm_runtime.hpp"
+#include "query_runtime.hpp"
+#include "minera/log_query.hpp"
 #include "minera/alpha_miner.hpp"
 #include "minera/alpha_result_json.hpp"
 #include "minera/bpmn.hpp"
@@ -309,7 +311,9 @@ minera::BatchDiscovery discover_selected_batches(
 // eagerly for every miner on every mine. The app is local and single-user, so
 // caching just the latest analysis is enough; a shared_ptr lets a slow
 // alignment run on a snapshot without holding the lock.
+std::atomic<std::uint64_t> g_query_source_sequence{0};
 struct MinedSession {
+  std::uint64_t query_source_id=++g_query_source_sequence;
   minera::EventLog log;
   // Exact selector/regrouping/order projection used to discover the inductive
   // model. Model-specific replay must use this alphabet rather than the
@@ -409,6 +413,7 @@ std::shared_ptr<const MinedSession> g_session;
 std::mutex g_session_mutex;
 bool g_embedding_runtime_enabled = false;
 std::string g_llm_runtime_url;
+std::string g_query_runtime_url;
 std::set<std::string> g_llm_origins;
 constexpr std::size_t kServerIlpMaxNodes = 1'000'000;
 constexpr std::size_t kServerGeneticMaxPopulation = 10'000;
@@ -3506,6 +3511,64 @@ void handle_llm_complete(const httplib::Request& request, httplib::Response& res
   } catch (const std::exception& error) {
     response.status = 502; response.set_content(error_json(error.what()), "application/json");
   }
+}
+
+std::shared_ptr<const MinedSession> query_session(const httplib::Request& request){
+  std::shared_ptr<const MinedSession> session;{std::lock_guard<std::mutex> lock(g_session_mutex);session=g_session;}
+  if(!session)throw std::invalid_argument("no cached log; open a CSV or XES log first");
+  if(request.has_param("source_id")&&request.get_param_value("source_id")!=std::to_string(session->query_source_id))throw std::invalid_argument("the source log changed; refresh the query workspace");
+  return session;
+}
+void validate_query_fields(const httplib::Request& request){
+  static const std::set<std::string> allowed={"engine","limit","source_id","mode","format"};
+  for(const auto& [key,value]:request.params){(void)value;if(!allowed.contains(key))throw std::invalid_argument("unknown query parameter: "+key);}
+  if(request.body.empty()||request.body.size()>1024u*1024u)throw std::invalid_argument("SQL must be nonempty and within 1 MiB");
+}
+std::string query_engine(const httplib::Request& request){const auto engine=request.has_param("engine")?request.get_param_value("engine"):"sqlite";if(engine!="sqlite"&&engine!="duckdb")throw std::invalid_argument("query engine must be sqlite or duckdb");return engine;}
+std::size_t query_limit(const httplib::Request& request,std::size_t fallback){
+  if(!request.has_param("limit"))return fallback;
+  const auto text=request.get_param_value("limit");std::size_t limit=0;const auto parsed=std::from_chars(text.data(),text.data()+text.size(),limit);
+  if(parsed.ec!=std::errc{}||parsed.ptr!=text.data()+text.size()||limit<1||limit>1000000)throw std::invalid_argument("query limit must be from 1 through 1000000");return limit;
+}
+std::string duckdb_query_body(const minera::LogQueryTable& table,std::string_view sql,std::size_t limit,std::string_view source){
+  const auto quote=minera::embedding_runtime::detail::escape_json;
+  return "{\"sql\":"+quote(sql)+",\"max_rows\":"+std::to_string(limit)+",\"source_id\":"+quote(source)+",\"data\":"+minera::log_query_table_json(table)+'}';
+}
+void handle_log_query_schema(const httplib::Request& request,httplib::Response& response){
+ try{
+  const auto session=query_session(request);const auto table=minera::log_query_table(session->log);const auto quote=minera::embedding_runtime::detail::escape_json;
+  std::string body="{\"family\":\"LOG_QUERY_SCHEMA\",\"source_id\":"+quote(std::to_string(session->query_source_id))+",\"event_count\":"+std::to_string(session->log.event_count())+",\"case_count\":"+std::to_string(session->log.trace_count())+",\"table_name\":\"dataframe\",\"event_index_column\":"+quote(table.event_index_column)+",\"sqlite_available\":"+(minera::sqlite_log_query_available()?"true":"false")+",\"duckdb_configured\":"+(!g_query_runtime_url.empty()?"true":"false")+",\"columns\":[";
+  for(std::size_t c=0;c<table.table.columns.size();++c){if(c)body+=',';body+=quote(table.table.columns[c]);}body+="]}";response.set_content(body,"application/json");
+ }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
+}
+void handle_log_query(const httplib::Request& request,httplib::Response& response){
+ try{
+  validate_query_fields(request);const auto session=query_session(request);const auto table=minera::log_query_table(session->log);const auto engine=query_engine(request);const auto limit=query_limit(request,1000);const auto source=std::to_string(session->query_source_id);
+  if(engine=="sqlite"){
+   minera::LogQueryOptions options;options.max_rows=limit;const auto result=minera::query_log_sqlite(table,request.body,options);auto body=minera::log_query_json(result);body.pop_back();body+=",\"source_id\":\""+source+"\"}";response.set_content(body,"application/json");
+  }else{
+   if(g_query_runtime_url.empty())throw std::invalid_argument("DuckDB requires --query-runtime-url and scripts/query_runtime.py");
+   const auto body=duckdb_query_body(table,request.body,limit,source);const auto result=minera::query_runtime::request(g_query_runtime_url,"/query",&body);response.status=result->status;response.set_content(result->body,"application/json");
+  }
+ }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
+}
+void handle_log_query_export(const httplib::Request& request,httplib::Response& response){
+ try{
+  validate_query_fields(request);if(!request.has_param("source_id"))throw std::invalid_argument("source_id is required for filtered log export");
+  const auto session=query_session(request);const auto table=minera::log_query_table(session->log);const auto engine=query_engine(request);std::vector<std::size_t> indices;
+  if(engine=="sqlite"){
+   minera::LogQueryOptions options;options.max_rows=1000000;const auto result=minera::query_log_sqlite(table,request.body,options);if(!result.can_filter||result.output_truncated)throw std::invalid_argument("filter SQL must return valid event indices for a complete selection");indices=result.selected_event_indices;
+  }else{
+   if(g_query_runtime_url.empty())throw std::invalid_argument("DuckDB requires --query-runtime-url");
+   const auto body=duckdb_query_body(table,request.body,1000000,std::to_string(session->query_source_id));const auto result=minera::query_runtime::request(g_query_runtime_url,"/select",&body);if(result->status!=200){response.status=result->status;response.set_content(result->body,"application/json");return;}indices=minera::query_runtime::parse_indices(result->body,session->log.event_count());
+  }
+  const auto mode=request.has_param("mode")?request.get_param_value("mode"):"cases";if(mode!="cases"&&mode!="events")throw std::invalid_argument("filter mode must be cases or events");
+  const auto filtered=minera::filter_query_events(session->log,indices,mode=="cases");const auto format=request.has_param("format")?request.get_param_value("format"):"xes";
+  response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
+  if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
+  else if(format=="json"){minera::LogConversionOptions options;options.variant=minera::LogConversionVariant::kToDataFrame;response.set_content(minera::log_conversion_json(minera::convert_event_log(filtered,options)),"application/json");}
+  else throw std::invalid_argument("filter export format must be xes or json");
+ }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
 
 void handle_local_diagnostics(const httplib::Request& request, httplib::Response& response) {
@@ -7823,7 +7886,8 @@ int usage(const char* program) {
                "  --frontend <dir>   Static frontend directory"
                " (default: src/frontend/dist next to the working directory)\n"
                "  --embedding-runtime-url <url> HTTP transformer runtime (POST /embed)\n"
-               "  --llm-runtime-url <url> Optional language-model runtime (POST /complete)\n";
+               "  --llm-runtime-url <url> Optional language-model runtime (POST /complete)\n"
+               "  --query-runtime-url <url> Optional DuckDB query runtime (POST /query)\n";
   return 2;
 }
 
@@ -7857,6 +7921,8 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       g_llm_runtime_url = value;
+    } else if (arg == "--query-runtime-url") {
+      const auto* value = next();if(!value)return usage(argv[0]);g_query_runtime_url=value;
     } else {
       return usage(argv[0]);
     }
@@ -7868,6 +7934,7 @@ int main(int argc, char** argv) {
           minera::embedding_runtime::make_http_provider(embedding_runtime_url));
     g_embedding_runtime_enabled = !embedding_runtime_url.empty();
     if (!g_llm_runtime_url.empty()) minera::llm_runtime::validate_url(g_llm_runtime_url);
+    if (!g_query_runtime_url.empty()) minera::llm_runtime::validate_url(g_query_runtime_url);
     for (const auto local_port : {port, 5173, 4173}) {
       g_llm_origins.insert("http://127.0.0.1:" + std::to_string(local_port));
       g_llm_origins.insert("http://localhost:" + std::to_string(local_port));
@@ -7890,6 +7957,8 @@ int main(int argc, char** argv) {
     response.status = 204;
   };
   server.Options("/api/mine", preflight);
+  server.Options("/api/log-query", preflight);
+  server.Options("/api/log-query/export", preflight);
   server.Options("/api/llm/complete", [](const httplib::Request& request, httplib::Response& response) {
     if (!llm_origin_allowed(request, response)) return;
     response.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -8025,6 +8094,9 @@ int main(int argc, char** argv) {
   server.Post("/api/knowledge-injection", handle_knowledge_injection);
   server.Get("/api/llm/status", handle_llm_status);
   server.Post("/api/llm/complete", handle_llm_complete);
+  server.Get("/api/log-query/schema",handle_log_query_schema);
+  server.Post("/api/log-query",handle_log_query);
+  server.Post("/api/log-query/export",handle_log_query_export);
   server.Post("/api/local-diagnostics", handle_local_diagnostics);
   server.Post("/api/clustering", handle_clustering);
   server.Post("/api/profile-clustering", handle_profile_clustering);

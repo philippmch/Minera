@@ -11260,3 +11260,47 @@ remaining provider parameters/multimodal interfaces, reference abstractions,
 generated SQL/log querying/filtering and clustering/hypotheses remain open.
 The full catalogue stays 46/86 packages, 199/387 modules and 228 incomplete
 units, with no package/module promotion or full-parity claim.
+
+
+## Feature delivery first: SQL queries and generated log filters (2026-10-08)
+
+Loaded CSV/XES logs now have real native SQLite queries and an optional DuckDB
+runtime. The Query & filter workspace exposes the actual source columns,
+editable SQL, provider-generated SQL with separate generation/execution controls,
+pagination and result JSON. Returning the source event identity enables complete
+case or event filters, exported as XES or typed table JSON. Exports retain original
+event order and attributes, and filtered XES can be opened through normal import.
+Source revision guards reject stale queries/exports after a new log is loaded.
+Display caps do not silently truncate filter selections. Manual SQL works without
+a language model; generation sends only the displayed schema/instruction prompt.
+
+`docs/feature-first-log-query-validation.json` binds four freshly compiled native
+consumers, two assertion-enabled native suites, eight real DuckDB runtime tests,
+664 passing frontend tests, the production build, 79 CLI/HTTP checks and 35 browser
+checks. Fourteen whole CLI/HTTP results agree across the two engines, and six
+filtered XES files match byte for byte. Typed XES exports preserve log/trace/event
+attributes, null markers, containers, classifiers, globals and extensions.
+Browser downloads match native output; a capped display still exports the complete
+selection, and opening an event-only filter yields one case and one original event.
+Both query engines execute provider-generated SQL across all three transports.
+Generation-only behavior, SQL/provider errors, cancellation, pagination, source
+replacement, saved-export guards and 390-pixel mobile bounds are checked.
+
+The first native build exposed an accidental std::bind resolution that inserted
+NULL values. The renamed binder passes in a fresh source/binary namespace. The
+first application harness also assumed the wrong conversion-envelope shape; its
+fresh replacement compares the complete typed conversion with selected source
+rows. Failed artifacts/helpers remain retained. All 165 existing core objects are
+reused unchanged; one new SQL core source is compiled. The preceding 152 native
+algorithm suites remain inherited rather than a fresh whole-algorithm claim.
+
+Reference evidence is limited to pinned public signatures/enums, opaque hash
+checks and public generation-only outputs. Exact prompt/abstraction/type behavior,
+the full reference execution corpus and large-log performance remain open.
+SQLite dates stay as source text; DuckDB uses inferred typed timestamps. DuckDB
+requests/results are bounded to 32/16 MiB and complete selections to one million
+result rows. Provider generation is tested with owned HTTP protocol replies,
+without external account/model inference. Clustering/hypotheses, remaining
+provider/abstraction interfaces and every other incomplete catalogue unit remain
+in scope. Counts stay 46/86 packages, 199/387 modules and 228 incomplete units;
+this feature checkpoint makes no package/module promotion or full-parity claim.
