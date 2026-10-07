@@ -11073,3 +11073,39 @@ step inherits the earlier backend checks and does not claim a fresh native
 algorithm audit or promote any package/module to complete. Remaining model
 views, model/provider runtimes, optional connector drivers and all other missing
 feature surfaces come before another exhaustive subsystem fixture expansion.
+
+
+## Feature delivery first: real transformer embeddings and search (2026-10-07)
+
+The existing native callback/HTTP bridge now has a runnable local
+SentenceTransformer encoder in `scripts/embedding_runtime.py`. It preloads the
+selected real model before readiness, infers its width, supports explicit
+truncation, serializes inference and bounds its cache. The optional environment
+uses sentence-transformers 5.7.0; actual all-MiniLM-L6-v2 inference is validated
+at 384 and 32 dimensions. Provider errors never substitute hashing/mock vectors.
+
+The application gains Search & embeddings for case sequences and event text,
+cosine-ranked matches and full vector/match JSON downloads. Provider/model,
+text/ID attributes, dimensions and item/match limits are exposed. Requests can
+be cancelled, results reset across log changes, and static JSON exports cannot
+query an unrelated cached log. Mobile navigation wraps and model errors explain
+the loaded-name/width checks.
+
+`docs/feature-first-embeddings-validation.json` records five runtime contract
+tests, all 641 frontend tests and the successful production build. Twenty-one
+actual CLI/HTTP calls cover real vectors, case/event rankings, custom attributes,
+truncation, inference/provider/limit errors and explicit hashing. Native vectors
+agree with direct model output and ranked scores agree with independently
+computed cosine values. Browser checks cover uploads, case/event search, full
+JSON downloads, disabled static exports, error handling and mobile bounds.
+The 572 native backend source bindings and release binaries remain unchanged;
+earlier native algorithm checks are inherited rather than rerun or promoted.
+
+The successful application fixture includes conventional and matching canonical
+case/activity/timestamp columns. An ordinary alias-only CSV is separately
+observed to fail native mining with 'concept:name'; that response is retained
+and conventional CSV application import is the next feature checkpoint.
+Exact embedding defaults, model/preprocessing/pooling, ID/order and native log
+filter parity remain open. The catalogue is unchanged at 46/86 packages,
+199/387 modules and 228 incomplete units. Feature delivery continues across the
+complete scope before the exhaustive behavioral pass.

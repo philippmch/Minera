@@ -1,0 +1,2 @@
+# Optional local model runtime. The native core and hashing provider do not need it.
+sentence-transformers==5.7.0
