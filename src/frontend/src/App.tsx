@@ -731,7 +731,7 @@ export default function App() {
           <EmbeddingSearch key={cacheGeneration.current} data={data} available={source !== null} mining={mining} />
         </main>
       )}
-      {tab === "llm" && <main className="layout-log"><AskModel key={cacheGeneration.current} data={data} mining={mining} /></main>}
+      {tab === "llm" && <main className="layout-log"><AskModel key={cacheGeneration.current} data={data} mining={mining} available={source!==null} onOpenFiltered={loadFile} /></main>}
       {tab === "query" && <main className="layout-log"><QueryWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenFiltered={loadFile} /></main>}
       {tab === "dfg" && (
         <main className="layout">

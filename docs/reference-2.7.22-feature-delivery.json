@@ -590,7 +590,7 @@
       ]
     },
     {
-      "feature_delivery_status": "prompt_and_provider_execution_available",
+      "feature_delivery_status": "prompt_provider_queries_and_studies_available",
       "package": "algo.querying.llm.injection",
       "parity_status": "partial",
       "selectors": [
@@ -926,6 +926,28 @@
       "runtime": "scripts/query_runtime.py",
       "state": "native_sqlite_available_duckdb_and_generation_optional",
       "validation": "docs/feature-first-log-query-validation.json"
+    },
+    {
+      "added": [
+        "Case clustering and hypothesis tasks in the existing Ask a model workspace",
+        "Editable prompt and model response with generation-only, generation/execution and manual-response paths",
+        "Actual Python regex searches over complete native case sequences, with overlap and complete XES/table exports",
+        "Native minera_cluster CLI and cached-log summary/XES/table HTTP route with source revision guards",
+        "Standalone prompt/generation/execution workflows in scripts/llm_study.py",
+        "Independent native SQLite/DuckDB hypothesis execution, per-query failure retention, editable retries and report downloads",
+        "Source column and sparse-attribute preservation in empty and populated cluster table exports",
+        "An isolated 15-second regex worker bound"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/AskModel.tsx",
+        "src/frontend/src/components/LlmStudies.tsx",
+        "src/backend/tools/minera_cluster.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "scripts/llm_study.py"
+      ],
+      "id": "llm_case_clusters_and_executable_hypotheses",
+      "state": "available_with_native_sqlite_and_optional_generation_cluster_duckdb_runtimes",
+      "validation": "docs/feature-first-llm-studies-validation.json"
     }
   ],
   "execution_priority": [
@@ -935,7 +957,7 @@
   "feature_backlog": [
     {
       "area": "LLM and query integrations",
-      "next_action": "Deliver clustering/hypotheses and remaining log/model abstractions, provider parameters and multimodal interfaces; SQL querying and complete case/event filters now have usable entry points."
+      "next_action": "Deliver remaining log/model/OCEL abstractions, provider parameters and multimodal visualization interfaces; case clustering, executable hypotheses, SQL queries and complete filters now have usable entry points."
     },
     {
       "area": "Optional connector drivers",
@@ -952,6 +974,7 @@
     "native_proof_exists": "Existing complete parity records identify native implementation and registered tests. User-facing feature coverage still needs review.",
     "prompt_and_provider_execution_available": "The three prompt modes have usable previews and configured text-provider execution in the app and native CLI; remaining abstraction variants and provider interfaces are independent gates.",
     "prompt_provider_and_log_query_available": "Database prompts and configured provider execution are joined by real SQLite/DuckDB queries, generated SQL, complete case/event filter exports and app reopening; exact reference prompt, abstraction, type and execution-corpus parity remain independent gates.",
+    "prompt_provider_queries_and_studies_available": "Configured text prompts/providers, SQL queries and filters, named case clusters and executable hypotheses have usable app/native/standalone paths. Exact abstractions, provider interfaces, parameters, ordering and type behavior remain independent parity gates.",
     "runtime_and_search_available": "A real local encoder and usable case/event search and vector-export entry point are validated. Exact reference behavior and native log filtering remain independent gates."
   },
   "full_parity_achieved": false,

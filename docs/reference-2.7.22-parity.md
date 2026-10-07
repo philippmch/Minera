@@ -11304,3 +11304,48 @@ without external account/model inference. Clustering/hypotheses, remaining
 provider/abstraction interfaces and every other incomplete catalogue unit remain
 in scope. Counts stay 46/86 packages, 199/387 modules and 228 incomplete units;
 this feature checkpoint makes no package/module promotion or full-parity claim.
+
+
+## Feature delivery first: case clusters and executable hypotheses (2026-10-08)
+
+Ask a model now includes Case clustering and Hypotheses tasks. Both expose
+editable prompt/response fields, generation-only and generation/execution paths,
+manual parsing, editable definitions, cancellation and reports. Named regular
+expressions search complete activity sequences joined with ` -> `; matching
+cases retain every original event, and clusters may overlap. Cluster XES/table
+exports and app reopening use the original native data and source revision guards.
+Table exports select source rows to retain columns for empty and sparse clusters.
+Hypotheses pair descriptions with SQL, execute independently through native
+SQLite or configured DuckDB, retain failures, and support individual edited retries.
+
+The native cluster CLI and HTTP route return real selections and exports.
+`scripts/llm_study.py` adds standalone prompt, supplied-response, provider-generation
+and execution paths using native consumers. Clustering uses the optional query
+runtime's actual Python regex worker, isolated with a 15-second bound. Pasted
+hypotheses execute in native SQLite without a provider or query runtime.
+
+`docs/feature-first-llm-studies-validation.json` binds five freshly compiled
+consumers, two assertion-enabled native suites, six study tests, eight DuckDB
+runtime tests, 673 passing frontend tests, the production build, 69 CLI/HTTP
+checks, four unconfigured-runtime checks and 36 browser checks. Eleven cluster
+memberships match public pinned-reference outputs, and eleven CLI/HTTP summaries
+agree apart from their surface-specific source identifiers. Three XES files and three typed table files agree across those
+surfaces. Public and browser evidence also agrees for joint overlapping clusters.
+The public reference and native executions retain a failed middle hypothesis
+while a later query succeeds. Browser generation exercises all three provider
+transports and both SQL engines, then checks exports, edited retries, generation
+only, malformed/invalid replies, cancellation, active-source guards and phone bounds.
+An actual pathological expression reaches the worker timeout and the runtime
+subsequently accepts a valid request. Typed exports preserve metadata and sparse
+source columns. The earlier green native build remains retained; the fresh final
+build includes the empty/sparse table schema repair. All 165 preceding core objects
+are reused; the unchanged SQLite core source is freshly compiled. The preceding
+152 native algorithm suites remain inherited, not a fresh whole-algorithm audit.
+
+Provider generation uses owned local HTTP protocol replies, without external
+account/model inference. Reference evidence is limited to public signatures and
+black-box calls from the opaque-hash-verified pin. Exact prompts/abstractions,
+additional parameters, ordering, dtype details, failure protocols, multimodal
+interfaces and large-log behavior remain open, along with every other incomplete
+catalogue unit. Counts stay 46/86 packages, 199/387 modules and 228 incomplete
+units; this checkpoint makes no package/module promotion or full-parity claim.

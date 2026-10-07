@@ -35,6 +35,7 @@
 #include "embedding_runtime.hpp"
 #include "llm_runtime.hpp"
 #include "query_runtime.hpp"
+#include "log_cluster_runtime.hpp"
 #include "minera/log_query.hpp"
 #include "minera/alpha_miner.hpp"
 #include "minera/alpha_result_json.hpp"
@@ -3538,7 +3539,7 @@ void handle_log_query_schema(const httplib::Request& request,httplib::Response& 
  try{
   const auto session=query_session(request);const auto table=minera::log_query_table(session->log);const auto quote=minera::embedding_runtime::detail::escape_json;
   std::string body="{\"family\":\"LOG_QUERY_SCHEMA\",\"source_id\":"+quote(std::to_string(session->query_source_id))+",\"event_count\":"+std::to_string(session->log.event_count())+",\"case_count\":"+std::to_string(session->log.trace_count())+",\"table_name\":\"dataframe\",\"event_index_column\":"+quote(table.event_index_column)+",\"sqlite_available\":"+(minera::sqlite_log_query_available()?"true":"false")+",\"duckdb_configured\":"+(!g_query_runtime_url.empty()?"true":"false")+",\"columns\":[";
-  for(std::size_t c=0;c<table.table.columns.size();++c){if(c)body+=',';body+=quote(table.table.columns[c]);}body+="]}";response.set_content(body,"application/json");
+  for(std::size_t c=0;c<table.table.columns.size();++c){if(c)body+=',';body+=quote(table.table.columns[c]);}body+="],\"cluster_runtime_configured\":"+std::string(!g_query_runtime_url.empty()?"true":"false")+"}";response.set_content(body,"application/json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
 void handle_log_query(const httplib::Request& request,httplib::Response& response){
@@ -3568,6 +3569,24 @@ void handle_log_query_export(const httplib::Request& request,httplib::Response& 
   if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
   else if(format=="json"){minera::LogConversionOptions options;options.variant=minera::LogConversionVariant::kToDataFrame;response.set_content(minera::log_conversion_json(minera::convert_event_log(filtered,options)),"application/json");}
   else throw std::invalid_argument("filter export format must be xes or json");
+ }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
+}
+
+void handle_log_cluster(const httplib::Request& request,httplib::Response& response){
+ try{
+  static const std::set<std::string> allowed={"source_id","name","format","activity_attribute"};
+  for(const auto& [key,value]:request.params){(void)value;if(!allowed.contains(key)||request.params.count(key)!=1)throw std::invalid_argument("unknown or duplicate cluster parameter: "+key);}
+  if(!request.has_param("source_id"))throw std::invalid_argument("source_id is required for case clustering");
+  if(request.body.size()>1024u*1024u)throw std::invalid_argument("cluster regex exceeds 1 MiB");
+  if(g_query_runtime_url.empty()){response.status=503;response.set_content(error_json("case clustering requires --query-runtime-url and scripts/query_runtime.py"),"application/json");return;}
+  const auto session=query_session(request);const auto name=request.has_param("name")?request.get_param_value("name"):"";const auto activity=request.has_param("activity_attribute")?request.get_param_value("activity_attribute"):"";
+  const auto indices=minera::log_cluster_runtime::select(g_query_runtime_url,session->log,request.body,activity);const auto filtered=minera::filter_query_events(session->log,indices,true);
+  response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
+  const auto format=request.has_param("format")?request.get_param_value("format"):"summary";
+  if(format=="summary")response.set_content(minera::log_cluster_runtime::summary(filtered,name,request.body,indices,std::to_string(session->query_source_id)),"application/json");
+  else if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
+  else if(format=="json")response.set_content(minera::log_cluster_runtime::table_json(session->log,indices),"application/json");
+  else throw std::invalid_argument("cluster format must be summary, xes or json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
 
@@ -7959,6 +7978,7 @@ int main(int argc, char** argv) {
   server.Options("/api/mine", preflight);
   server.Options("/api/log-query", preflight);
   server.Options("/api/log-query/export", preflight);
+  server.Options("/api/log-cluster", preflight);
   server.Options("/api/llm/complete", [](const httplib::Request& request, httplib::Response& response) {
     if (!llm_origin_allowed(request, response)) return;
     response.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -8097,6 +8117,7 @@ int main(int argc, char** argv) {
   server.Get("/api/log-query/schema",handle_log_query_schema);
   server.Post("/api/log-query",handle_log_query);
   server.Post("/api/log-query/export",handle_log_query_export);
+  server.Post("/api/log-cluster",handle_log_cluster);
   server.Post("/api/local-diagnostics", handle_local_diagnostics);
   server.Post("/api/clustering", handle_clustering);
   server.Post("/api/profile-clustering", handle_profile_clustering);

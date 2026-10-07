@@ -711,9 +711,9 @@ The adapters follow the documented text protocols for
 [Anthropic Messages](https://platform.claude.com/docs/en/api/messages/create), and
 [Google generateContent](https://ai.google.dev/api/generate-content).
 Automated checks use local HTTP protocol fixtures; external account access and
-live model inference are not established by those checks. Clustering/hypotheses,
-remaining abstraction variants and exact reference behavior retain their
-feature and parity gates.
+live model inference are not established by those checks. Remaining abstraction
+variants, provider parameters/interfaces and exact reference behavior retain
+their feature and parity gates.
 
 ### SQL queries and filtered logs
 
@@ -759,6 +759,46 @@ The HTTP bridge exposes `GET /api/log-query/schema`, `POST /api/log-query` and
 `POST /api/log-query/export`. SQL is a UTF-8 text body; query parameters select
 `engine`, display `limit` and `source_id`. Filter export requires `source_id`
 and accepts `mode=cases|events` and `format=xes|json`.
+
+### Case clustering and executable hypotheses
+
+In **Ask a model**, choose **Case clustering** or **Hypotheses** from **Model
+task**. Both workflows show an editable prompt and accept an existing model
+response. Generation can prepare definitions for review or execute them directly.
+Parsed names, expressions, descriptions and SQL remain editable. Study reports
+include definitions, results/errors and the original provider response.
+
+Case clusters use a fenced JSON list with `name` and `regex` fields. Expressions
+search complete activity sequences joined with ` -> ` using
+[Python regular expressions](https://docs.python.org/3.11/library/re.html).
+Every matching case retains all its original events, and cases can belong to
+multiple clusters. Each cluster can be downloaded as XES or typed table JSON,
+or opened in the app. Table exports retain source columns for empty clusters and
+sparse attributes. Matching uses the query runtime's standard-library worker;
+the worker stops after 15 seconds if an expression cannot finish.
+
+Hypotheses pair `<description>...</description>` tags with fenced SQL blocks.
+Execute all queries or one edited query through native SQLite or configured
+DuckDB. A failed query leaves its error alongside successful results, including
+queries following the failure. Display limits are explicit in the result and
+downloaded report. Pasted hypotheses can run without a language-model provider.
+
+Standalone workflows use the same native consumers. Supply their executable
+paths with `--query-cli` and `--cluster-cli` if they are not on `PATH`:
+
+```sh
+python scripts/llm_study.py my_event_log.csv --task clusters --response-file clusters.txt --query-runtime-url http://127.0.0.1:8192 --output-dir clusters
+python scripts/llm_study.py my_event_log.csv --task hypotheses --response-file hypotheses.txt --engine sqlite
+python scripts/llm_study.py my_event_log.csv --task hypotheses --provider openai --model MODEL --llm-runtime-url http://127.0.0.1:8189
+minera_cluster my_event_log.csv --regex "Review" --name "Review cases" --runtime-url http://127.0.0.1:8192 --filter-output review.xes --table-output review.json
+```
+
+`--obtain-query false` returns the prompt without a provider call;
+`--execute-query false` returns parsed definitions without execution.
+The native cluster CLI accepts `--activity-attribute` for an explicit source
+field. The cached-log HTTP route is `POST /api/log-cluster`, with a literal
+UTF-8 regex body and `source_id`, optional `name`/`activity_attribute`, and
+`format=summary|xes|json`. Source revisions reject stale cluster requests.
 
 ### Sample dataset
 

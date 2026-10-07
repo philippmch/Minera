@@ -117,13 +117,17 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200,{'family':'LOG_QUERY_RUNTIME','ready':True,'duckdb_version':duckdb.__version__})
         except ImportError:self.send_json(503,{'error':'Install scripts/requirements-query.txt.'})
     def do_POST(self):
-        if self.path not in ('/query','/select'):self.send_json(404,{'error':'Unknown query route.'});return
+        if self.path not in ('/query','/select','/cluster-select'):self.send_json(404,{'error':'Unknown query route.'});return
         if self.headers.get('Origin'):self.send_json(403,{'error':'Use the native Minera query bridge.'});return
         try:
             length=int(self.headers.get('Content-Length','0'))
             if not 0<length<=MAX_INPUT:self.send_json(413,{'error':'Query input exceeds 32 MiB.'});return
             if self.headers.get_content_type()!='application/json':self.send_json(415,{'error':'Expected JSON.'});return
-            self.send_json(200,query(json.loads(self.rfile.read(length)),self.path=='/select'))
+            payload=json.loads(self.rfile.read(length))
+            if self.path=='/cluster-select':
+                from llm_study import select_cluster_bounded
+                self.send_json(200,select_cluster_bounded(payload))
+            else:self.send_json(200,query(payload,self.path=='/select'))
         except Exception as error:self.send_json(400,{'error':str(error)})
 
 def main():
