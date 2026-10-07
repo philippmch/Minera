@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "pnml_model_options.hpp"
+#include "replay_input_options.hpp"
 
 #include "minera/alpha_miner.hpp"
 #include "minera/alpha_result_json.hpp"
@@ -6315,8 +6316,9 @@ int main(int argc, char** argv) {
       model_options.require_workflow_boundaries = false;
       model_options.public_marking_semantics = replay_fitness_result_requested;
       const auto document = minera::import_pnml_document(token_replay_model, model_options);
-      const auto replay_options = minera::tools::pnml_replay_options(
-          document, token_replay_options);
+      const auto replay_options = minera::tools::default_replay_input_options(
+          log, minera::tools::pnml_replay_options(document, token_replay_options),
+          token_replay_activity_option_used);
       std::string body;
       if (replay_fitness_result_requested) {
         if (evaluation_fields.contains("fitness_variant") &&
@@ -7296,7 +7298,7 @@ int main(int argc, char** argv) {
         else if (is_alpha)
           replay_options.activity_attribute = alpha_options.activity_attribute;
       }
-      if (id == "heuristic" &&
+      if (id == "heuristic" && !token_replay_activity_option_used &&
           replay_options.activity_attribute == "concept:name") {
           replay_options.activity_attribute = heuristic_options.activity_attribute;
       }
@@ -7330,6 +7332,9 @@ int main(int argc, char** argv) {
             powl_options.timestamp_key, powl_options.case_id_key);
         alignment_log = &*alignment_powl_log;
       }
+      replay_options = minera::tools::default_replay_input_options(
+          *conformance_log, std::move(replay_options),
+          token_replay_activity_option_used);
       return minera::ModelConformance{
           std::move(id), minera::final_marking_reachable(
               petri, model_alignment_options.initial_marking,

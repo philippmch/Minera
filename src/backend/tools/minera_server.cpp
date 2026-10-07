@@ -3,6 +3,7 @@
 // CSV event logs with the native core via POST /api/mine.
 
 #include "pnml_model_options.hpp"
+#include "replay_input_options.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1004,7 +1005,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         else if (is_alpha)
           replay_options.activity_attribute = params.alpha.activity_attribute;
       }
-      if (id == "heuristic" &&
+      if (id == "heuristic" && !params.token_replay_activity_attribute_supplied &&
           replay_options.activity_attribute == "concept:name") {
         replay_options.activity_attribute = params.heuristic.activity_attribute;
       }
@@ -1021,6 +1022,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
             params.powl.case_id_key);
         conformance_log = &*projected_powl_log;
       }
+      replay_options = minera::tools::default_replay_input_options(
+          *conformance_log, std::move(replay_options),
+          params.token_replay_activity_attribute_supplied);
       return minera::ModelConformance{std::move(id),
                                       minera::final_marking_reachable(petri),
                                       minera::check_conformance(
@@ -1096,7 +1100,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     session->tree = tree;
     session->declare = declare;
     session->dataset = dataset;
-    session->token_replay = params.token_replay;
+    session->token_replay = minera::tools::default_replay_input_options(
+        log, params.token_replay, params.token_replay_activity_attribute_supplied);
     session->inductive_options = params.inductive;
     session->alpha_activity_attribute = params.alpha.activity_attribute;
     session->powl_activity_key = params.powl.activity_key;
@@ -4131,7 +4136,9 @@ void handle_token_replay(const httplib::Request& request,
     import_options.import_stochastic_map = false;
     const auto document = minera::parse_pnml_document(
         request.get_file_value("model").content, import_options);
-    const auto options = minera::tools::pnml_replay_options(document, params.token_replay);
+    const auto options = minera::tools::default_replay_input_options(
+        log, minera::tools::pnml_replay_options(document, params.token_replay),
+        params.token_replay_activity_attribute_supplied);
     response.set_content(minera::token_replay_result_json(
         minera::replay_token_result(log, document.net, options)), "application/json");
   } catch (const std::exception& error) {

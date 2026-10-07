@@ -810,6 +810,20 @@
         "cases_transformers",
         "events_transformers"
       ]
+    },
+    {
+      "added": [
+        "Default replay selection of the actual imported activity column",
+        "Usable ordinary CSV, custom-column CSV and TSV mining and replay",
+        "Standalone CSV/PNML replay and cached model checking with exact explicit selectors"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp"
+      ],
+      "id": "ordinary_csv_import_and_replay",
+      "state": "available",
+      "validation": "docs/feature-first-csv-import-validation.json"
     }
   ],
   "execution_priority": [
@@ -818,8 +832,8 @@
   ],
   "feature_backlog": [
     {
-      "area": "Conventional CSV application import",
-      "next_action": "Resolve the retained /api/mine failure for CSV with case_id/activity/timestamp columns ('concept:name') so ordinary uploads reach all application features without duplicated canonical columns."
+      "area": "Default fields in model quality evaluation",
+      "next_action": "Resolve the observed default Composite evaluation failure on ordinary CSV by binding omitted evaluation selectors to the imported fields and retaining explicit field semantics."
     },
     {
       "area": "Remaining model visualizations",
