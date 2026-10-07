@@ -449,7 +449,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "explorer_available",
       "package": "algo.discovery.transition_system",
       "parity_status": "complete",
       "selectors": [
@@ -575,7 +575,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "explorer_available",
       "package": "algo.organizational_mining.sna",
       "parity_status": "complete",
       "selectors": [
@@ -852,6 +852,33 @@
       ],
       "state": "available",
       "validation": "docs/feature-first-model-quality-validation.json"
+    },
+    {
+      "added": [
+        "Transition-system discovery model view, state inspection, traversal data, state search and JSON export",
+        "All eight native social-network variants, signed weights, supported selectors, normalization, decay/gap controls and JSON export",
+        "Bundled resource CSV sample mined through the actual backend",
+        "Automatic replay activity selection in the filter/miner form for ordinary CSV re-mining"
+      ],
+      "after_discovery_model_families": 8,
+      "before_discovery_model_families": 7,
+      "entry_points": [
+        "src/frontend/src/components/TransitionSystemModel.tsx",
+        "src/frontend/src/components/SocialNetwork.tsx"
+      ],
+      "id": "transition_system_and_social_network_views",
+      "network_variants": [
+        "handover",
+        "working_together",
+        "subcontracting",
+        "jointactivities",
+        "handover_pandas",
+        "working_together_pandas",
+        "subcontracting_pandas",
+        "jointactivities_pandas"
+      ],
+      "state": "available",
+      "validation": "docs/feature-first-model-views-validation.json"
     }
   ],
   "execution_priority": [
@@ -859,10 +886,6 @@
     "Complete strict behavioral parity after feature delivery"
   ],
   "feature_backlog": [
-    {
-      "area": "Remaining model visualizations",
-      "next_action": "Review transition-system, social-network and declarative model views; expose existing native results where a usable view is missing."
-    },
     {
       "area": "LLM and query integrations",
       "next_action": "Review provider execution, natural-language querying/filtering and clustering/hypothesis entry points beyond existing prompt construction."
@@ -873,7 +896,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Review every remaining catalogue family for absent capability or entry point before revisiting exact fixture agreement."
+      "next_action": "Review every remaining catalogue family and visualization/export variant for absent capability or entry point before revisiting exact fixture agreement; transition systems and all eight social-network metrics now have usable views."
     }
   ],
   "feature_status_meaning": {

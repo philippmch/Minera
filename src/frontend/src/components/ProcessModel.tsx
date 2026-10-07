@@ -11,6 +11,7 @@ import { PowlModel } from "./PowlModel";
 import { LogSkeletonModel } from "./LogSkeletonModel";
 import { DeclareModel } from "./DeclareModel";
 import { FootprintsModel } from "./FootprintsModel";
+import { TransitionSystemModel } from "./TransitionSystemModel";
 
 type Step = "miner" | "variant" | "result";
 
@@ -349,6 +350,10 @@ function ModelResult({
         No Declare model is available in this export — re-open the CSV event log to discover one.
       </Placeholder>
     );
+  }
+
+  if (variant.artifact === "transition-system") {
+    return data.transition_system ? <TransitionSystemModel model={data.transition_system} data={data} /> : <Placeholder>No transition system is included in this export. Open a CSV or XES log to discover one.</Placeholder>;
   }
 
   if (variant.artifact === "footprints") {

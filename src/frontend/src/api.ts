@@ -2525,9 +2525,9 @@ export function organizationalSnaQuery(options: OrganizationalSnaOptions = {}): 
   return query.toString();
 }
 export const snaQuery = organizationalSnaQuery;
-export function requestOrganizationalSna(options: OrganizationalSnaOptions = {}): Promise<OrganizationalSnaResult> {
+export function requestOrganizationalSna(options: OrganizationalSnaOptions = {}, signal?: AbortSignal): Promise<OrganizationalSnaResult> {
   const query = organizationalSnaQuery(options);
-  return postChecked(`/api/organizational-sna${query ? `?${query}` : ""}`, isOrganizationalSnaResult, "organizational SNA");
+  return postChecked(`/api/organizational-sna${query ? `?${query}` : ""}`, isOrganizationalSnaResult, "organizational SNA", undefined, signal);
 }
 export const requestSna = requestOrganizationalSna;
 export const discoverOrganizationalSna = requestOrganizationalSna;
@@ -3042,10 +3042,10 @@ export async function requestPripel(queryLog: File, options: PripelOptions = {})
   return postChecked(`/api/pripel${query ? `?${query}` : ""}`, isPripelResult, "PRIPEL anonymization", form);
 }
 export const anonymizePripel = requestPripel;
-async function postChecked<T>(path: string, guard: (value: unknown) => value is T, label: string, body?: BodyInit): Promise<T> {
+async function postChecked<T>(path: string, guard: (value: unknown) => value is T, label: string, body?: BodyInit, signal?: AbortSignal): Promise<T> {
   let response: Response;
-  try { response = await fetch(path, { method: "POST", ...(body === undefined ? {} : { body }) }); }
-  catch { throw new Error("could not reach the Minera backend — is minera_server running?"); }
+  try { response = await fetch(path, { method: "POST", ...(body === undefined ? {} : { body }), ...(signal ? {signal} : {}) }); }
+  catch(cause) { if(signal?.aborted)throw cause;throw new Error("could not reach the Minera backend — is minera_server running?"); }
   const parsed: unknown = await response.json().catch(() => null);
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
