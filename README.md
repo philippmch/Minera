@@ -667,6 +667,54 @@ The HTTP layer uses the vendored
 [cpp-httplib](https://github.com/yhirose/cpp-httplib)
 (`third_party/httplib.h`).
 
+### Language-model providers
+
+The **Ask a model** tab previews and edits a prompt built from process context,
+a general description or a database schema. OpenAI, Anthropic and Google calls
+run through the optional Python runtime. The application sends the displayed
+prompt when **Send displayed prompt** is selected; the response and its original
+provider payload can be downloaded as JSON.
+
+Set the selected provider's credential in the runtime environment:
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GEMINI_API_KEY` (`GOOGLE_API_KEY` is
+also accepted). Credentials stay in that process. Start the runtime and native
+server in separate terminals:
+
+```sh
+python scripts/llm_runtime.py --port 8189
+minera_server --llm-runtime-url http://127.0.0.1:8189
+```
+
+`OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL` and `GOOGLE_BASE_URL` select compatible
+provider endpoints. HTTPS is required for remote endpoints; local HTTP is
+supported. `MINERA_OPENAI_TOKEN_FIELD=max_tokens` enables the legacy limit field
+for compatible services; the default is `max_completion_tokens`. Model names
+are supplied explicitly. Temperature is omitted unless selected, so the model's
+default applies. The runtime uses only Python's standard library.
+
+Standalone native execution uses the same prompt builder and provider runtime:
+
+```sh
+minera_knowledge --variant process_mining --description "Order workflow" --query "Explain review" --runtime-url http://127.0.0.1:8189 --provider openai --model MODEL --max-tokens 4096
+```
+
+Without `--runtime-url`, `minera_knowledge` retains its prompt-only JSON output.
+Windows CLI arguments are converted from UTF-16 to UTF-8 so multilingual prompts
+match HTTP inputs. The HTTP bridge exposes `GET /api/llm/status` and
+`POST /api/llm/complete`; knowledge previews accept text multipart fields as well
+as the existing query parameters. Provider calls are restricted to the local
+application origins. Runtime limits are 2 MiB for request bodies and 4 MiB for
+provider responses, with connection/read timeouts and explicit error results.
+
+The adapters follow the documented text protocols for
+[OpenAI Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create),
+[Anthropic Messages](https://platform.claude.com/docs/en/api/messages/create), and
+[Google generateContent](https://ai.google.dev/api/generate-content).
+Automated checks use local HTTP protocol fixtures; external account access and
+live model inference are not established by those checks. Generated SQL/log
+filter execution, clustering/hypotheses and the remaining abstraction variants
+remain separate feature and parity work.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the

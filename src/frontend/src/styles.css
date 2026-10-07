@@ -1,5 +1,28 @@
 /* Minera — paper & graphite with a copper seam */
 
+.ask-model-panel { min-width: 0; padding-bottom: 24px; }
+.ask-model-intro, .ask-model-status { margin: 12px 24px; color: var(--ink-70); overflow-wrap: anywhere; }
+.ask-model-fields { min-width: 0; border: 0; margin: 0; padding: 12px 24px; }
+.ask-model-text { display: block; margin: 18px 0; }
+.ask-model-text > span { display: block; margin-bottom: 6px; }
+.ask-model-text textarea { width: 100%; resize: vertical; background: var(--paper-raised); color: var(--ink); border: 1px solid var(--line); padding: 10px; font: 13px var(--font-mono); }
+.ask-model-text small { display: block; margin-top: 6px; color: var(--ink-70); }
+.ask-model-options, .ask-model-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.ask-model-name { flex: 1 1 250px; min-width: 0; }
+.ask-model-options input, .ask-model-options select { max-width: 100%; }
+.ask-model-options .ask-model-name input { width: 100%; }
+.ask-model-actions .btn-open { cursor: pointer; font: inherit; }
+.ask-model-answer, .ask-model-setup { margin: 16px 24px; min-width: 0; }
+.ask-model-answer .panel-head { flex-wrap: wrap; gap: 12px; padding-inline: 0; }
+.ask-model-answer pre, .ask-model-setup pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px var(--font-mono); }
+.ask-model-answer pre { padding: 16px; background: var(--paper-raised); border: 1px solid var(--line); }
+@media (max-width: 600px) {
+  .ask-model-fields { padding-inline: 12px; }
+  .ask-model-intro, .ask-model-status, .ask-model-answer, .ask-model-setup { margin-inline: 12px; }
+  .ask-model-options > label { flex: 1 1 140px; min-width: 0; }
+  .ask-model-options input, .ask-model-options select { width: 100%; }
+}
+
 .model-inspection-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(250px,320px); }
 .model-graph-panel, .model-state-inspector, .model-state-table, .social-network-section { min-width: 0; }
 .model-graph-panel .panel-head { flex-wrap: wrap; gap: 12px; }

@@ -241,6 +241,7 @@ target_link_libraries(minera_format_dataframe PRIVATE minera::core)
 target_compile_features(minera_format_dataframe PRIVATE cxx_std_20)
 
 add_executable(minera_knowledge src/backend/tools/minera_knowledge.cpp)
+target_include_directories(minera_knowledge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 target_link_libraries(minera_knowledge PRIVATE minera::core)
 target_compile_features(minera_knowledge PRIVATE cxx_std_20)
 
@@ -1634,4 +1635,10 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_knowledge_injection_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_knowledge_injection_tests
            COMMAND minera_knowledge_injection_tests)
+  add_executable(minera_llm_runtime_tests src/backend/tests/test_llm_runtime.cpp)
+  target_link_libraries(minera_llm_runtime_tests PRIVATE minera::core)
+  target_include_directories(minera_llm_runtime_tests PRIVATE third_party)
+  target_compile_features(minera_llm_runtime_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_llm_runtime_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_llm_runtime_tests COMMAND minera_llm_runtime_tests)
 endif()

@@ -590,7 +590,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "prompt_and_provider_execution_available",
       "package": "algo.querying.llm.injection",
       "parity_status": "partial",
       "selectors": [
@@ -598,7 +598,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "prompt_and_provider_execution_available",
       "package": "algo.querying.llm.injection.db_knowledge",
       "parity_status": "partial",
       "selectors": [
@@ -607,7 +607,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "prompt_and_provider_execution_available",
       "package": "algo.querying.llm.injection.pm_knowledge",
       "parity_status": "partial",
       "selectors": [
@@ -879,6 +879,29 @@
       ],
       "state": "available",
       "validation": "docs/feature-first-model-views-validation.json"
+    },
+    {
+      "added": [
+        "Configured OpenAI, Anthropic and Google text execution through a standard-library runtime",
+        "Native CLI completion using all three existing knowledge-prompt modes",
+        "Local HTTP execution/status bridge with multipart knowledge previews and origin guards",
+        "Ask a model panel with editable prompt review, token/temperature controls, cancellation, errors and original-response JSON export",
+        "Windows CLI UTF-16 to UTF-8 argument conversion"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/AskModel.tsx",
+        "src/backend/tools/minera_knowledge.cpp",
+        "src/backend/tools/minera_server.cpp"
+      ],
+      "id": "llm_text_provider_execution",
+      "providers": [
+        "openai",
+        "anthropic",
+        "google"
+      ],
+      "runtime": "scripts/llm_runtime.py",
+      "state": "available_with_configured_provider",
+      "validation": "docs/feature-first-llm-providers-validation.json"
     }
   ],
   "execution_priority": [
@@ -888,7 +911,7 @@
   "feature_backlog": [
     {
       "area": "LLM and query integrations",
-      "next_action": "Review provider execution, natural-language querying/filtering and clustering/hypothesis entry points beyond existing prompt construction."
+      "next_action": "Deliver natural-language SQL/log querying and filtering, clustering/hypotheses and the remaining log/model abstraction and provider interfaces beyond the now-available text execution."
     },
     {
       "area": "Optional connector drivers",
@@ -903,6 +926,7 @@
     "explorer_available": "A selectable discovery model with a rendered result in the application. This does not mark its reference package or modules complete.",
     "feature_review_pending": "The partial parity status alone does not prove a feature is missing. Inspect implementation and usable entry points before choosing work.",
     "native_proof_exists": "Existing complete parity records identify native implementation and registered tests. User-facing feature coverage still needs review.",
+    "prompt_and_provider_execution_available": "The three prompt modes have usable previews and configured text-provider execution in the app and native CLI; remaining abstraction variants, provider interfaces and query execution are independent gates.",
     "runtime_and_search_available": "A real local encoder and usable case/event search and vector-export entry point are validated. Exact reference behavior and native log filtering remain independent gates."
   },
   "full_parity_achieved": false,
