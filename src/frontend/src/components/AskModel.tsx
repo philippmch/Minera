@@ -2,8 +2,13 @@ import { useEffect,useRef,useState } from "react";
 import { LLM_PROVIDERS,llmLogContext,llmKnowledgeOptions,llmCompletionRequest,requestLlmStatus,requestKnowledgePreview,requestLlmCompletion,type LlmProvider,type LlmRuntimeStatus,type LlmCompletion } from "../llm";
 import { type KnowledgeInjectionVariant,type MineraExport } from "../types";
 import { downloadModelJson } from "../model-view-data";
+import { LlmStudies } from "./LlmStudies";
 
-export function AskModel({data,mining}:{data:MineraExport;mining:boolean}) {
+export function AskModel({data,mining,available=false,onOpenFiltered}:{data:MineraExport;mining:boolean;available?:boolean;onOpenFiltered?:((file:File)=>void)}){
+ const [task,setTask]=useState<"prompt"|"clusters"|"hypotheses">("prompt");
+ return <><label className="filters-field model-task"><span>Model task</span><select disabled={mining} value={task} onChange={event=>setTask(event.target.value as typeof task)}><option value="prompt">Ask a question</option><option value="clusters">Case clustering</option><option value="hypotheses">Hypotheses</option></select></label>{task==="prompt"?<PromptChat data={data} mining={mining}/>:<LlmStudies key={task} task={task} data={data} available={available} mining={mining} onOpenFiltered={onOpenFiltered}/>}</>;
+}
+function PromptChat({data,mining}:{data:MineraExport;mining:boolean}) {
   const [variant,setVariant]=useState<KnowledgeInjectionVariant>("process_mining");
   const [context,setContext]=useState(()=>llmLogContext(data));const [question,setQuestion]=useState("");const [schema,setSchema]=useState("");
   const [prompt,setPrompt]=useState("");const [provider,setProvider]=useState<LlmProvider>("openai");const [model,setModel]=useState("");
