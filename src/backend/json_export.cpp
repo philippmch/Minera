@@ -5912,6 +5912,20 @@ std::string petri_net_reduction_json(const PetriNetReductionResult& result) {
   return out.str();
 }
 
+std::string process_tree_json(const ProcessTree& tree) {
+  std::ostringstream out;
+  out << "{\"family\":\"PROCESS_TREE\",\"activities\":[";
+  for (std::size_t i = 0; i < tree.activities().size(); ++i) {
+    if (i) out << ',';
+    write_json_string(out, tree.activities()[i]);
+  }
+  out << "],\"root\":";
+  // An empty graph keeps the writer's fallback IDs local to this tree.
+  write_process_tree_node(out, tree.root(), tree, DirectlyFollowsGraph{});
+  out << '}';
+  return out.str();
+}
+
 std::string pnml_document_json(const PnmlDocument& document) {
   std::ostringstream out;
   out << "{\"family\":\"PNML_DOCUMENT\",\"variant\":\"pnml\""

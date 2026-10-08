@@ -1554,6 +1554,58 @@ work. [Validation and checkpoint boundaries](docs/feature-first-streaming-valida
 record the four workflows, both replay orders, complete exports and phone controls.
 Full reference parity remains active.
 
+### Inspect and convert model files
+
+Choose **Inspect and convert model files** on the landing page, **Model files**
+in an open workspace, or **Inspect & convert model files** under **Transform**.
+PNML, BPMN, PTML and classic DFG uploads work independently of an event log.
+Select inspection or a requested PNML/BPMN/PTML/DFG export.
+
+PNML controls expose native initial/final inference, stochastic-map import,
+workflow-boundary requirements and public marking semantics. **Preserve general
+PNML markings** keeps omitted markings as zero vectors. Inspect full token
+vectors and explicit keys, node IDs, arc occurrences, direction, type and exact
+signed weights. Native integer values beyond JavaScript precision remain exact
+in tables, raw JSON, reports, CSV and PNML downloads.
+
+PTML inspection retains operators, nested hierarchy and child positions, with
+standard or transition-bordered net construction. DFG offers activity-defined
+places or invisible transitions without duplicate labels. Artificial boundary
+identifiers apply to the latter construction for dictionary/collision checks;
+their native boundary transitions are silent.
+
+A failed conversion retains imported data and same-run PNML. The current
+BPMN/PTML converters require single source/sink token markings and supported
+ordinary arcs, and strict reverse-tree conversion requires a supported block
+structure. BPMN inspection shows the native Petri projection; **Download
+validated BPMN source** preserves the original source bytes separately from
+a requested native semantic re-export.
+
+Graphs and paginated tables keep native indices, external IDs and labels
+distinct. Download every row and column as CSV, complete native JSON, a report,
+the original upload, normalized source or requested converted document.
+**Check exchanged model against current log** binds the current native source
+revision and passes same-run PNML to Conformance while preserving zero/omitted
+markings. This action needs an open CSV/XES source.
+
+`POST /api/model-exchange` accepts multipart `model`, `format` and `output`
+(`inspect` by default), plus the displayed native PNML/DFG/tree options.
+The existing model-check route accepts optional
+`pnml_infer_legacy_boundaries=false`; its historical inference default stays
+available. The existing CLI inspector and strict conversion include:
+
+```sh
+minera_export --inspect-pnml model.pnml --pnml-import-stochastic-map true
+minera_export --inspect-pnml model.pnml --pnml-infer-initial-marking false --pnml-infer-final-marking false --pnml-require-workflow-boundaries false
+minera_export --pnml-to-ptml model.pnml -o converted.ptml
+```
+
+[Validation and checkpoint boundaries](docs/feature-first-model-exchange-validation.json)
+record all four formats, normal export paths, both net constructions, extended
+arcs, stochastic data, 501-digit integers, actual conformance handoff and complete
+exports. Full format/dialect/schema/diagram preservation, solver/search,
+concurrency/cancellation and performance exactness remain active parity work.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the

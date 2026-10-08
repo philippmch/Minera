@@ -2339,3 +2339,9 @@ input[type="range"]::-moz-range-thumb {
 .streaming-workspace textarea { resize: vertical; border: 1px solid var(--line); border-radius: 4px; padding: 9px 10px; background: transparent; color: inherit; font: inherit; }
 .streaming-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .streaming-inspection pre { overflow: auto; max-height: 460px; }
+.model-exchange-workspace fieldset { border: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.model-exchange-workspace .filters-field, .model-exchange-inspection .filters-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.model-exchange-workspace input:not([type=checkbox]), .model-exchange-workspace select, .model-exchange-inspection input { width: 100%; min-width: 0; max-width: 100%; }
+.model-exchange-workspace .query-options > .filters-field { flex: 1 1 230px; }
+.model-exchange-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.model-exchange-inspection pre { overflow: auto; max-height: 460px; }
