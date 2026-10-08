@@ -11936,3 +11936,63 @@ packages, 199 complete modules and 228 incomplete units. Four existing feature/
 description families receive delivery annotations only; their parity states
 remain unchanged. OCEL filtering, splitting, enrichment, flattening, conformance,
 playout and remaining exactness/performance gates continue toward full parity.
+
+
+## Feature delivery first: OCEL preparation workflows (2026-10-08)
+
+Prepare object-centric data joins the existing model and analysis groups. All
+nineteen variants are available: fifteen filters, two split modes, enrichment
+and native flattening to XES. Each run binds the current original uploaded File
+by filename, bytes and SHA-256; selected output opening intentionally activates
+a new source. Typed scalar/list/map controls retain literal names and exact
+int64/uint64 transport. Native defaults, active-variant controls, positive/
+negative selection, level/window/count/component, split central-object/degree/
+limit and independent graph/lifecycle controls drive the existing algorithms.
+
+Tables retain complete native event/object/relation/O2O/change/event-link/metadata
+records and positions; CSV retains every selected row beyond 25-row pages.
+Projection paging retains output indices and central objects. Candidate/returned
+counts and truncation remain explicit. Empty results retain data/schema downloads
+and native errors retain preceding results. Flatten inspection preserves emitted
+typed XES fields, nested fields and trace positions. Native empty XES remains
+downloadable; its zero-event classic opening action is disabled.
+
+Empty enrichment graph arrays previously fell back to all native defaults.
+They now request graphs=none, with a separate lifecycle qualifier control; the
+CLI accepts --enrich none. None is exclusive, and the legacy empty query-string
+graph field retains its error. Optional include_open_source=true adds same-run
+native OCEL 2.0 opening documents without changing ordinary response shapes.
+Filter/enrichment return open_log; split returns position-aligned open_logs.
+Selected downloads/opening use these documents while classic inspection records
+remain available in complete native response JSON and CSV.
+
+Native classic reimport collapses repeated event/object pairs and retains the
+final qualifier. Its exact format convention remains a recorded gate; the core
+parser is unchanged. Same-run standard source serialization avoids that handoff
+loss. All eighteen JSON variants pass additive response-shape and complete native
+data roundtrip checks through standard sources. Actual browser opening of the
+last paired component retains three relation-feature rows, including the repeated
+suffix. Custom-activity XES opens in the existing classic-log view as two cases
+and six events with its selected activity labels and native typed data.
+
+docs/feature-first-ocel-preparation-validation.json binds 780 frontend tests and
+the production build, 589 native and 158 frontend/runtime sources, 167 reused
+core objects and four fresh assertion-enabled suites. It records 55 primary
+checks over 64 HTTP calls/18 CLI runs, 56 opening checks over 38 HTTP calls,
+five pagination/gate checks over six calls, 39 final browser checks and 17 export/
+asset checks over fourteen CSV files. The thirty-pair corpus retains 30 events,
+61 relations, 30 projections, 60 flattened traces and 61 occurrences. Event,
+relation, projection, trace and occurrence last-page data remain complete in CSV.
+
+Retained captures record Windows CLI XES CRLF formatting, actual duplicate-event
+counts, native omission of isolated interaction components, classic duplicate
+normalization and corrected UI wording. Unknown object attributes yield zero
+rows; reversed component bounds yield a native error. Guessed alert/Log waits
+were corrected from completed-result DOM without restarting the requests.
+
+No core algorithms or catalogue parity statuses are promoted. The split_ocel
+family receives a delivery annotation only. All 86 packages/387 modules remain
+in scope: 46 complete packages, 199 complete modules and 228 incomplete units.
+Owned servers/tabs are closed, viewport is restored and the port is released;
+110 unrelated files and historical journal bytes remain preserved. Continue OCEL
+conformance/playout, remaining I/O/model controls and full exactness/performance.

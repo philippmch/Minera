@@ -1267,6 +1267,62 @@ track feature delivery separately from full reference parity. OCEL filtering,
 splitting, enrichment, flattening, conformance/playout and remaining exactness and
 performance gates continue in the feature ledger.
 
+### OCEL preparation
+
+With an OCEL JSON source open, choose **Prepare object-centric data**:
+
+- **Filter OCEL** exposes all fifteen native filters: event/object attributes,
+  object types/IDs, event IDs, timestamp windows, activity/type matching, object
+  counts, lifecycle starts/ends, activities connected to a type and components
+  selected by object, size, type or activity. Applicable controls include selection
+  polarity, neighborhood level and literal JSON lists/maps.
+- **Split OCEL** exposes connected components and ancestors/descendants. Choose
+  degree centrality for components, or central type and maximum returned central
+  objects for ancestors/descendants. Native candidate counts, returned counts,
+  central objects and truncation remain visible; projection pages keep positions.
+- **Enrich relationships** selects five graph families and lifecycle qualifiers
+  independently. Native defaults remain available. Clearing every graph choice
+  requests no graph enrichment, with lifecycle qualification still selectable.
+- **Flatten to a classic log** selects an object type and optional activity/time
+  attributes. Download its exact native XES or open it in the classic workspace.
+  Inspection retains emitted typed fields, trace positions and repeated relation
+  occurrences. Empty projections remain downloadable.
+
+Attribute filters use typed JSON entries. Integer and decimal text preserves
+exact values; count/size fields support the native unsigned integer transport:
+
+```json
+[{"type":"string","value":"West"},{"type":"integer","value":"9223372036854775807"},{"type":"decimal","value":"12.5"},{"type":"boolean","value":false},{"type":"null"}]
+```
+
+Prepared tables retain complete event, object, relation, object-link, change,
+event-link and metadata records. **Download complete prepared CSV** includes
+every selected row, regardless of its page. Reports bind the current source's
+filename, byte size and SHA-256 to the actual parameters and complete native
+response. Failed runs retain the preceding usable result.
+
+**Download selected prepared OCEL** and **Open selected prepared OCEL** use the
+same-run native OCEL 2.0 source. This retains repeated event/object relationships
+and qualifiers when opening the result; the classic inspection representation
+remains in the response and tables. The selected output becomes the new source.
+
+The filter, split and enrichment POST routes accept `include_open_source=true`
+for additive `open_log` or position-aligned `open_logs` documents. Ordinary
+responses retain their existing shapes when the option is absent. Enrichment
+accepts `graphs=none`; an omitted selection uses defaults. The existing CLI also
+supports no graph enrichment:
+
+```sh
+minera_ocel source.json --enrich none --enrich-no-lifecycle
+minera_ocel source.json --split ancestors_descendants --split-object-type Order --split-max-objects 1
+minera_ocel source.json --flatten-object-type Item
+```
+
+[Validation and checkpoint boundaries](docs/feature-first-ocel-preparation-validation.json)
+retain native classic-format duplicate-pair conventions, isolated-component
+behavior and remaining exactness/performance gates. OCEL conformance/playout and
+remaining I/O/model controls continue in the feature ledger.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the

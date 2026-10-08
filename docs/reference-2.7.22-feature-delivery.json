@@ -755,7 +755,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "ocel_preparation_workflow_available",
       "package": "algo.transformation.ocel.split_ocel",
       "parity_status": "complete",
       "selectors": [
@@ -1249,6 +1249,52 @@
         "object_codeath_graph",
         "HETEROGENEOUS"
       ]
+    },
+    {
+      "added": [
+        "OCEL preparation joins the existing five model and sixteen analysis workflows",
+        "All nineteen variants: fifteen filters, two split modes, enrichment and flattening to native XES",
+        "Typed string/int64/decimal/boolean/null values, literal JSON lists/maps, exact uint64 count/size transport, positive/negative and neighborhood controls",
+        "Native split central-object/candidate/returned/truncation metadata and independently paginated projections",
+        "Five enrichment graph choices plus separate lifecycle qualification, including explicit no-graph behavior",
+        "Complete positional event/object/relation/O2O/change/event-link/metadata CSV, raw native data and SHA-256 source-bound reports",
+        "Same-run native standard OCEL opening sources retain duplicate relations and qualifiers while classic inspection records remain available",
+        "Derived OCEL activates the existing model/analysis workspace; native flattened XES activates the classic-log workspace with its typed fields and trace positions",
+        "Source reset, native-error result retention, empty outputs, cancellation signals and phone controls"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/OcelPreparationWorkspace.tsx",
+        "src/frontend/src/ocel-preparation.ts",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/minera_ocel.cpp"
+      ],
+      "families": [
+        "algo.transformation.ocel.split_ocel"
+      ],
+      "id": "native_ocel_preparation_workflows",
+      "state": "native_app_and_cli_available",
+      "validation": "docs/feature-first-ocel-preparation-validation.json",
+      "variants": [
+        "EVENT_ATTRIBUTE",
+        "OBJECT_ATTRIBUTE",
+        "OBJECT_TYPES",
+        "OBJECTS",
+        "EVENTS",
+        "TIMESTAMP",
+        "ACTIVITY_TYPE_MATCHING",
+        "OBJECT_COUNT",
+        "START_EVENTS",
+        "END_EVENTS",
+        "ACTIVITIES_OBJECT_TYPE",
+        "CC_OBJECT",
+        "CC_LENGTH",
+        "CC_OBJECT_TYPE",
+        "CC_ACTIVITY",
+        "CONNECTED_COMPONENTS",
+        "ANCESTORS_DESCENDANTS",
+        "CLASSIC",
+        "XES"
+      ]
     }
   ],
   "execution_priority": [
@@ -1266,7 +1312,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue with OCEL filtering, splitting, enrichment, flattening, conformance/playout and remaining model/export variants. All sixteen OCEL analysis variants now have original-source workflows and complete native exports; five existing OCEL model views remain available. Trie/interval/Petri, six log conversions, six utilities and feature/target/label workflows remain delivered. Full exactness, selector/type/error and performance gates stay independent."
+      "next_action": "Continue with OCEL conformance/playout, remaining import/export controls and model/export variants. All nineteen OCEL preparation and sixteen analysis variants now have original-source workflows, complete native exports and standard-source handoff; five existing OCEL model views remain available. Exact classic-format duplicate-pair conventions, selector/type/error and performance gates stay independent."
     }
   ],
   "feature_status_meaning": {
@@ -1278,6 +1324,7 @@
     "native_contexts_prompts_providers_and_studies_available": "All 13 native log/model/OCEL text builders have CLI/HTTP/browser entry points, joined by configured prompts/providers, queries, filters, clusters and hypotheses. Exact text, order, type, parameter, provider and multimodal parity gates remain independent.",
     "native_proof_exists": "Existing complete parity records identify native implementation and registered tests. User-facing feature coverage still needs review.",
     "ocel_analysis_workflow_available": "Configurable original-source OCEL feature/description workflows expose complete native tables, data/report/CSV, diagrams and selectors. Existing reference parity statuses and remaining exactness/performance gates remain independent.",
+    "ocel_preparation_workflow_available": "Configurable original-source OCEL split workflows expose complete positional outputs, native truncation metadata, JSON/report/CSV and same-run standard OCEL handoff. Existing reference parity statuses and exactness/performance gates remain independent.",
     "prompt_and_provider_execution_available": "The three prompt modes have usable previews and configured text-provider execution in the app and native CLI; remaining abstraction variants and provider interfaces are independent gates.",
     "prompt_provider_and_log_query_available": "Database prompts and configured provider execution are joined by real SQLite/DuckDB queries, generated SQL, complete case/event filter exports and app reopening; exact reference prompt, abstraction, type and execution-corpus parity remain independent gates.",
     "prompt_provider_queries_and_studies_available": "Configured text prompts/providers, SQL queries and filters, named case clusters and executable hypotheses have usable app/native/standalone paths. Exact abstractions, provider interfaces, parameters, ordering and type behavior remain independent parity gates.",

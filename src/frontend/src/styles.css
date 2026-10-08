@@ -2325,3 +2325,5 @@ input[type="range"]::-moz-range-thumb {
 .visualization-explain-controls .filters-field { min-width: 220px; max-width: 100%; }
 .visualization-explain p { margin: 8px 0 0; font-size: 13px; }
 @media (max-width:600px) { .visualization-explain { margin-inline: 16px; } .visualization-explain-controls .filters-field { min-width: 0; width: 100%; } }
+
+.ocel-preparation-workspace fieldset{border:0;padding:0;min-width:0;display:flex;flex-direction:column;gap:16px}.ocel-preparation-workspace .filters-field{display:flex;flex-direction:column;gap:6px;min-width:0}.ocel-preparation-workspace input:not([type=checkbox]),.ocel-preparation-workspace select{width:100%;min-width:0}.ocel-preparation-workspace .query-options>.filters-field{flex:1 1 230px}.ocel-preparation-inspection td{max-width:480px;overflow-wrap:anywhere;white-space:pre-wrap}

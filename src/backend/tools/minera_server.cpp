@@ -1572,7 +1572,7 @@ void handle_ocel_filter(const httplib::Request& request,
         "variant", "attribute_key", "attribute_values", "positive", "types",
         "ids", "event_ids", "from", "to", "object_type", "activity",
         "minimum_counts", "level", "object_id", "min_size", "max_size",
-        "allowed"};
+        "allowed", "include_open_source"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key)) {
@@ -1682,11 +1682,12 @@ void handle_ocel_filter(const httplib::Request& request,
     } else {
       throw std::invalid_argument("variant is not a supported OCEL filter");
     }
-    response.set_content(
-        std::string("{\"family\":\"OCEL_FILTER\",\"variant\":\"") +
-            canonical + "\",\"log\":" +
-            minera::serialize_ocel_json(filtered) + "}",
-        "application/json");
+    auto payload = std::string("{\"family\":\"OCEL_FILTER\",\"variant\":\"") +
+                   canonical + "\",\"log\":" + minera::serialize_ocel_json(filtered);
+    if (ocel_query_bool(request, "include_open_source", false))
+      payload += ",\"open_log\":" + minera::serialize_ocel_json(
+          filtered, minera::OcelJsonFormat::kStandard);
+    response.set_content(payload + "}", "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -2009,7 +2010,8 @@ void handle_ocel_split(const httplib::Request& request,
                        httplib::Response& response) {
   try {
     static const std::set<std::string> allowed = {
-        "variant", "object_type", "max_objects", "max_degree_centrality"};
+        "variant", "object_type", "max_objects", "max_degree_centrality",
+        "include_open_source"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -2040,8 +2042,18 @@ void handle_ocel_split(const httplib::Request& request,
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
     const auto result = minera::split_ocel(minera::parse_ocel_json(body), options);
-    response.set_content(minera::serialize_ocel_split_json(result),
-                         "application/json");
+    auto payload = minera::serialize_ocel_split_json(result);
+    if (ocel_query_bool(request, "include_open_source", false)) {
+      payload.pop_back();
+      payload += ",\"open_logs\":[";
+      for (std::size_t i = 0; i < result.logs.size(); ++i) {
+        if (i) payload += ',';
+        payload += minera::serialize_ocel_json(result.logs[i],
+                                               minera::OcelJsonFormat::kStandard);
+      }
+      payload += "]}";
+    }
+    response.set_content(payload, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -2052,7 +2064,7 @@ void handle_ocel_enrichment(const httplib::Request& request,
                             httplib::Response& response) {
   try {
     static const std::set<std::string> allowed = {
-        "graphs", "lifecycle_qualifiers"};
+        "graphs", "lifecycle_qualifiers", "include_open_source"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -2067,7 +2079,9 @@ void handle_ocel_enrichment(const httplib::Request& request,
       options.include_cobirth = false;
       options.include_codeath = false;
       for (const auto& value : values) {
-        if (value == "all") {
+        if (value == "none" && values.size() == 1) {
+          continue;
+        } else if (value == "all") {
           options.include_interaction = true;
           options.include_descendants = true;
           options.include_inheritance = true;
@@ -2085,7 +2099,7 @@ void handle_ocel_enrichment(const httplib::Request& request,
           options.include_codeath = true;
         } else {
           throw std::invalid_argument(
-              "graphs expects interaction, descendants, inheritance, cobirth, codeath, or all");
+              "graphs expects interaction, descendants, inheritance, cobirth, codeath, all, or none alone");
         }
       }
     }
@@ -2094,9 +2108,13 @@ void handle_ocel_enrichment(const httplib::Request& request,
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
     const auto enriched = minera::enrich_ocel(minera::parse_ocel_json(body), options);
-    response.set_content(
-        minera::serialize_ocel_enrichment_json(enriched, options),
-        "application/json");
+    auto payload = minera::serialize_ocel_enrichment_json(enriched, options);
+    if (ocel_query_bool(request, "include_open_source", false)) {
+      payload.pop_back();
+      payload += ",\"open_log\":" + minera::serialize_ocel_json(
+          enriched, minera::OcelJsonFormat::kStandard) + "}";
+    }
+    response.set_content(payload, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");

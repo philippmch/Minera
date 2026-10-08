@@ -991,7 +991,9 @@ int run_ocel(int argc, char** argv) {
       enrichment_options.include_cobirth = false;
       enrichment_options.include_codeath = false;
       for (const auto& value : values) {
-        if (value == "all") {
+        if (value == "none" && values.size() == 1) {
+          continue;
+        } else if (value == "all") {
           enrichment_options.include_interaction = true;
           enrichment_options.include_descendants = true;
           enrichment_options.include_inheritance = true;
@@ -1009,7 +1011,7 @@ int run_ocel(int argc, char** argv) {
           enrichment_options.include_codeath = true;
         } else {
           throw std::invalid_argument(
-              "--enrich expects interaction, descendants, inheritance, cobirth, codeath, or all");
+              "--enrich expects interaction, descendants, inheritance, cobirth, codeath, all, or none alone");
         }
       }
       enrichment_options.include_lifecycle_qualifiers = !enrich_no_lifecycle;
