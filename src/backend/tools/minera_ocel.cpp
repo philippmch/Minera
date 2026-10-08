@@ -11,8 +11,19 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
 
 #include "minera/ocel.hpp"
 #include "minera/ocel_csv.hpp"
@@ -27,7 +38,7 @@
 #include "minera/saw_nets.hpp"
 #include "minera/xes_export.hpp"
 
-int main(int argc, char** argv) {
+int run_ocel(int argc, char** argv) {
   try {
     if (argc < 2) {
       std::cerr << "OCEL CSV controls: --format csv [--ocel-csv-output EVENTS.csv] [--ocel-csv-objects-output OBJECTS.csv] "
@@ -148,6 +159,24 @@ int main(int argc, char** argv) {
         if (end == std::string::npos) break;
         begin = end + 1;
       }
+      return result;
+    };
+    const auto feature_attribute_list = [](const std::string& value) {
+      std::vector<std::string> result;
+      std::string item;
+      for (std::size_t i = 0; i < value.size(); ++i) {
+        const auto ch = value[i];
+        if (ch == '\\' && i + 1 < value.size() &&
+            std::string_view(",\\:;|").find(value[i + 1]) != std::string_view::npos) {
+          item.push_back(value[++i]);
+        } else if (ch == ',') {
+          if (!item.empty()) result.push_back(std::move(item));
+          item.clear();
+        } else {
+          item.push_back(ch);
+        }
+      }
+      if (!item.empty()) result.push_back(std::move(item));
       return result;
     };
     const auto object_graph_variant = [](const std::string& value) {
@@ -615,7 +644,7 @@ int main(int argc, char** argv) {
                   option == "--features-string-events" ||
                   option == "--features-numeric-objects" ||
                   option == "--features-string-objects") && i + 1 < argc) {
-        const auto values = list(argv[++i]);
+        const auto values = feature_attribute_list(argv[++i]);
         if (option == "--features-numeric-events")
           feature_options.numeric_event_attributes = values;
         else if (option == "--features-string-events")
@@ -1213,7 +1242,7 @@ int main(int argc, char** argv) {
       throw std::invalid_argument(
           "real graph mode cannot be combined with OCEL filters");
     }
-    const std::filesystem::path input_path(argv[1]);
+    const auto input_path = std::filesystem::u8path(argv[1]);
     const auto lower_extension = [](const std::filesystem::path& path) {
       std::string extension = path.extension().string();
       for (auto& ch : extension) {
@@ -1243,7 +1272,7 @@ int main(int argc, char** argv) {
           "--normative-csv-objects requires --normative");
     }
     if (!normative_csv_objects_path.empty() &&
-        lower_extension(std::filesystem::path(normative_path)) != ".csv") {
+        lower_extension(std::filesystem::u8path(normative_path)) != ".csv") {
       throw std::invalid_argument(
           "--normative-csv-objects requires a CSV normative log");
     }
@@ -1258,7 +1287,7 @@ int main(int argc, char** argv) {
       } else if (csv_input) {
         if (!csv_objects_path.empty()) {
           log = minera::import_ocel_csv(input_path,
-                                        std::filesystem::path(csv_objects_path),
+                                        std::filesystem::u8path(csv_objects_path),
                                         csv_import_options);
         } else {
           log = minera::import_ocel_csv(input_path, csv_import_options);
@@ -1462,7 +1491,7 @@ int main(int argc, char** argv) {
       return 0;
     }
     if (!conformance.empty()) {
-      const std::filesystem::path normative_file(normative_path);
+      const auto normative_file = std::filesystem::u8path(normative_path);
       minera::Ocel normative;
       std::string normative_json;
       bool normative_is_json = false;
@@ -1470,7 +1499,7 @@ int main(int argc, char** argv) {
       if (normative_extension == ".csv") {
         if (!normative_csv_objects_path.empty()) {
           normative = minera::import_ocel_csv(
-              normative_file, std::filesystem::path(normative_csv_objects_path),
+              normative_file, std::filesystem::u8path(normative_csv_objects_path),
               csv_import_options);
         } else {
           normative = minera::import_ocel_csv(normative_file, csv_import_options);
@@ -1666,14 +1695,14 @@ int main(int argc, char** argv) {
       if (sqlite_output_path.empty())
         throw std::invalid_argument(
             "--format sqlite requires --sqlite-output OUTPUT.sqlite");
-      minera::export_ocel_sqlite(log, std::filesystem::path(sqlite_output_path));
+      minera::export_ocel_sqlite(log, std::filesystem::u8path(sqlite_output_path));
     } else if (format == "csv") {
       if (!csv_output_path.empty() && !csv_objects_output_path.empty()) {
         minera::export_ocel_csv(
-            log, std::filesystem::path(csv_output_path),
-            std::filesystem::path(csv_objects_output_path), csv_export_options);
+            log, std::filesystem::u8path(csv_output_path),
+            std::filesystem::u8path(csv_objects_output_path), csv_export_options);
       } else if (!csv_output_path.empty()) {
-        minera::export_ocel_csv(log, std::filesystem::path(csv_output_path),
+        minera::export_ocel_csv(log, std::filesystem::u8path(csv_output_path),
                                 csv_export_options);
       } else {
         std::cout << minera::serialize_ocel_csv(log, csv_export_options);
@@ -1694,3 +1723,25 @@ int main(int argc, char** argv) {
     return 1;
   }
 }
+
+#ifdef _WIN32
+int wmain(int argc, wchar_t** argv) {
+  std::vector<std::string> values;
+  values.reserve(argc);
+  for (int i = 0; i < argc; ++i) {
+    const auto size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[i], -1,
+                                        nullptr, 0, nullptr, nullptr);
+    if (size <= 0) { std::cerr << "error: invalid Unicode argument\n"; return 2; }
+    std::string value(size, '\0');
+    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[i], -1,
+                           value.data(), size, nullptr, nullptr)) return 2;
+    value.pop_back(); values.push_back(std::move(value));
+  }
+  std::vector<char*> arguments;
+  for (auto& value : values) arguments.push_back(value.data());
+  arguments.push_back(nullptr);
+  return run_ocel(argc, arguments.data());
+}
+#else
+int main(int argc, char** argv) { return run_ocel(argc, argv); }
+#endif

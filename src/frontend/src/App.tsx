@@ -46,7 +46,7 @@ import { DfgVariants } from "./components/DfgVariants";
 import { DfgDataframe } from "./components/DfgDataframe";
 import { CorrelationMining } from "./components/CorrelationMining";
 import { Filters } from "./components/Filters";
-import { OcelExplorer } from "./components/OcelExplorer";
+import { OcelWorkspaceHub } from "./components/OcelWorkspaceHub";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
 import { QueryWorkspace } from "./components/QueryWorkspace";
@@ -570,8 +570,9 @@ export default function App() {
         {error && <div className="error-banner">{error}</div>}
         <VisualizationExplain key={cacheGeneration.current+":"+ocelResult.variant} dataset={ocelDataset??"object-centric log"} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});if(ocelQuestions.current)ocelQuestions.current.open=true;}} />
         <main className="layout-log">
-          <OcelExplorer
+          <OcelWorkspaceHub
             result={ocelResult}
+            file={ocelFile}
             busy={mining}
             onDiscover={changeOcelModel}
           />

@@ -722,7 +722,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "ocel_analysis_workflow_available",
       "package": "algo.transformation.ocel.description",
       "parity_status": "complete",
       "selectors": [
@@ -731,7 +731,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "ocel_analysis_workflow_available",
       "package": "algo.transformation.ocel.features.events",
       "parity_status": "complete",
       "selectors": [
@@ -739,7 +739,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "ocel_analysis_workflow_available",
       "package": "algo.transformation.ocel.features.events_objects",
       "parity_status": "complete",
       "selectors": [
@@ -747,7 +747,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "ocel_analysis_workflow_available",
       "package": "algo.transformation.ocel.features.objects",
       "parity_status": "complete",
       "selectors": [
@@ -1203,6 +1203,52 @@
         "TO_PETRI_NET",
         "OPEN_PATHS"
       ]
+    },
+    {
+      "added": [
+        "OCEL analysis sits beside the existing five model workflows and uses the original uploaded File",
+        "All sixteen variants: three feature matrices, five statistics, two descriptions, five object graphs and one heterogeneous graph",
+        "Thirty-six tri-state feature controls, four JSON attribute lists, presets, type/style/limit, object context and relation-prefix overrides",
+        "Association start/end prefilters, business-hour weekly slots, description timestamps, DF and change graph controls",
+        "Paginated positional tables, all-column/all-row CSV, verbatim native JSON and reports binding original filename, byte length and SHA-256",
+        "Selectable native relationship diagrams retain isolated nodes, actual endpoints, typed changes, qualifiers and exact native numeric literals",
+        "Windows UTF-8 CLI argument/path support and feature-specific escaped attribute lists agree with the actual HTTP responses",
+        "Native error retention, source reset and responsive object feature controls"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/OcelWorkspaceHub.tsx",
+        "src/frontend/src/components/OcelAnalysisWorkspace.tsx",
+        "src/frontend/src/ocel-analysis.ts",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/minera_ocel.cpp"
+      ],
+      "families": [
+        "algo.transformation.ocel.description",
+        "algo.transformation.ocel.features.events",
+        "algo.transformation.ocel.features.objects",
+        "algo.transformation.ocel.features.events_objects"
+      ],
+      "id": "native_ocel_analysis_workflows",
+      "state": "native_app_and_cli_available",
+      "validation": "docs/feature-first-ocel-analysis-validation.json",
+      "variants": [
+        "events",
+        "objects",
+        "events_objects",
+        "object_type_activities",
+        "objects_ot_count",
+        "activity_associations",
+        "object_type_activity_associations",
+        "edge_associations",
+        "VARIANT1",
+        "VARIANT2",
+        "object_interaction_graph",
+        "object_descendants_graph",
+        "object_inheritance_graph",
+        "object_cobirth_graph",
+        "object_codeath_graph",
+        "HETEROGENEOUS"
+      ]
     }
   ],
   "execution_priority": [
@@ -1220,7 +1266,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue reviewing OCEL analysis, remaining model/export variants and conformance/simulation controls. Trie/interval and trie-to-Petri now have configurable workflows, complete positional data/exports, native PNML and conformance handoff. All six log conversions, all six utilities, feature/target/label workflows remain available; recorded exactness gates stay independent."
+      "next_action": "Continue with OCEL filtering, splitting, enrichment, flattening, conformance/playout and remaining model/export variants. All sixteen OCEL analysis variants now have original-source workflows and complete native exports; five existing OCEL model views remain available. Trie/interval/Petri, six log conversions, six utilities and feature/target/label workflows remain delivered. Full exactness, selector/type/error and performance gates stay independent."
     }
   ],
   "feature_status_meaning": {
@@ -1231,6 +1277,7 @@
     "feature_review_pending": "The partial parity status alone does not prove a feature is missing. Inspect implementation and usable entry points before choosing work.",
     "native_contexts_prompts_providers_and_studies_available": "All 13 native log/model/OCEL text builders have CLI/HTTP/browser entry points, joined by configured prompts/providers, queries, filters, clusters and hypotheses. Exact text, order, type, parameter, provider and multimodal parity gates remain independent.",
     "native_proof_exists": "Existing complete parity records identify native implementation and registered tests. User-facing feature coverage still needs review.",
+    "ocel_analysis_workflow_available": "Configurable original-source OCEL feature/description workflows expose complete native tables, data/report/CSV, diagrams and selectors. Existing reference parity statuses and remaining exactness/performance gates remain independent.",
     "prompt_and_provider_execution_available": "The three prompt modes have usable previews and configured text-provider execution in the app and native CLI; remaining abstraction variants and provider interfaces are independent gates.",
     "prompt_provider_and_log_query_available": "Database prompts and configured provider execution are joined by real SQLite/DuckDB queries, generated SQL, complete case/event filter exports and app reopening; exact reference prompt, abstraction, type and execution-corpus parity remain independent gates.",
     "prompt_provider_queries_and_studies_available": "Configured text prompts/providers, SQL queries and filters, named case clusters and executable hypotheses have usable app/native/standalone paths. Exact abstractions, provider interfaces, parameters, ordering and type behavior remain independent parity gates.",
