@@ -11395,3 +11395,48 @@ limit applies. The preceding 152 algorithm suites remain inherited rather than
 a fresh whole-algorithm audit. Every catalogue family and parity gate remains
 in scope: counts stay 46/86 packages, 199/387 modules and 228 incomplete units.
 This is feature availability, without package/module promotion or full parity.
+
+
+## Feature delivery first: Responses, image queries and extra payloads (2026-10-08)
+
+The app and native/standalone completion paths now support image attachments,
+OpenAI Responses alongside Chat Completions, Anthropic Messages image blocks
+and Google inline image parts. Up to eight attachment previews, removal, cancellation,
+source reset and downloads retain actual submitted bytes and controls. Original
+OCEL contexts and images execute together. Extra JSON payloads override generated
+fields as observed at the public reference interface. Google generationConfig
+replacement is explicit. Temperature controls use provider ranges; Responses
+answer/refusal/incomplete fields and usage are retained. Effective returned or
+overridden model names are reported. Complete input remains bounded at 2 MiB,
+with browser files individually bounded at 1.5 MiB. Streaming/background replies
+require separate consumers. Native CLI images require completion/runtime mode.
+
+docs/feature-first-llm-images-validation.json binds 589 native source files,
+165 inherited core objects, two freshly compiled core sources, four consumers
+and two passing native suites. Twelve provider, six study, eight query-runtime
+and 688 frontend tests pass with a production build. Twenty-two CLI/HTTP checks
+cover four protocol paths, four agreeing whole responses, eight two-image
+requests with identical original bytes, standalone image execution, overriding
+fields, invalid images/JSON/API/ranges, content type and origin guards.
+Eighteen browser checks cover all four paths, thumbnails, exact prompt/request
+downloads, invalid controls without sending, source reset, cancellation and phone
+bounds, plus native OCEL context and image execution together. Owned HTTP fixture
+replies are used; no live account/model reasoning is claimed. Server and fixture
+processes are stopped, their ports released, and unrelated working files preserved.
+
+Twelve pinned-reference public calls return supplied transport replies. They
+expose Responses selection, text/image bodies and extra-payload precedence.
+Six public image bodies match original source bytes. The reference labels the
+observed PNG-named JPEG fixture as PNG; the product detects JPEG from its bytes.
+This MIME difference remains a parity gate. The first capture's assumed PNG
+type was rejected; the fresh capture detects actual media type. A generic saver
+probe returns TypeError before invoking the supplied callback; supported saver
+conventions and automatic model-to-image adapters remain open. Earlier reference
+setup/response-fixture attempts remain retained. Reference bodies/bytecode were
+not inspected: access remains public interfaces, controlled calls and opaque pins.
+
+Exact defaults, omissions, per-call endpoint conventions, provider-specific
+response/error behavior, other modalities, saver interfaces and the complete
+remaining catalogue stay open. The preceding 152 algorithm suites are inherited,
+without a fresh whole-algorithm audit. Scope counts remain 46/86 packages,
+199/387 modules and 228 incomplete units; there is no package/module promotion.

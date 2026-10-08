@@ -2277,3 +2277,7 @@ input[type="range"]::-moz-range-thumb {
 .other-result { margin-top: 1rem; max-height: 32rem; overflow: auto; }
 .file-picker { display: block; margin: .75rem 0; }
 .file-picker input { display: block; margin-top: .35rem; }
+.llm-attachments { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 16px; margin: 16px 0; }
+.llm-attachments figure { margin: 0; padding: 12px; border: 1px solid var(--line); min-width: 0; }
+.llm-attachments img { display: block; max-width: 100%; height: 180px; object-fit: contain; margin: 0 auto 10px; }
+.llm-attachments figcaption { overflow-wrap: anywhere; margin-bottom: 10px; font-size: 12px; }

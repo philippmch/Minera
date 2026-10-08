@@ -25,7 +25,7 @@ describe("language-model provider delivery",()=>{
     expect(llmCompletionRequest("openai"," fixture ","Prompt α","256","")).toEqual({provider:"openai",model:"fixture",prompt:"Prompt α",max_tokens:256});
     expect(llmCompletionRequest("google","fixture","Prompt","256","0.5").temperature).toBe(0.5);
     expect(()=>llmCompletionRequest("anthropic","fixture","Prompt","1.5","")).toThrow(/whole number/);
-    expect(()=>llmCompletionRequest("openai","fixture","Prompt","256","2")).toThrow(/Temperature/);
+    expect(()=>llmCompletionRequest("openai","fixture","Prompt","256","2.1")).toThrow(/Temperature/);
     expect(()=>llmCompletionRequest("openai","","Prompt","256","")).toThrow(/model name/);
   });
   it("guards nullable usage, refusal/empty text, duplicate providers and malformed results",()=>{

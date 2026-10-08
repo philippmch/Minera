@@ -35,7 +35,9 @@ int usage(const char* program) {
                " [--description TEXT] [--query TEXT] [--database-schema TEXT]"
                " [--max-input-bytes N] [--max-prompt-bytes N]"
                " [--runtime-url URL --provider openai|anthropic|google --model MODEL]"
-               " [--max-tokens N] [--temperature 0..1]\n";
+               " [--max-tokens N] [--temperature N] [--openai-api responses|chat_completions]"
+               " [--image PATH] [--image-detail auto|low|high|original]"
+               " [--extra-payload JSON | --extra-payload-file PATH]\n";
   return 2;
 }
 
@@ -46,6 +48,7 @@ int run(int argc, char** argv) {
     minera::KnowledgeInjectionOptions options;
     minera::llm_runtime::CompletionOptions completion;
     std::string runtime_url;
+    std::string image_detail;
     for (int index = 1; index < argc; ++index) {
       const std::string option = argv[index];
       if (index + 1 >= argc) return usage(argv[0]);
@@ -63,14 +66,24 @@ int run(int argc, char** argv) {
       else if (option == "--provider") completion.provider = value;
       else if (option == "--model") completion.model = value;
       else if (option == "--max-tokens") completion.max_tokens = positive_size(value, option);
+      else if (option == "--openai-api") completion.openai_api = value;
+      else if (option == "--image") completion.images.push_back(minera::llm_runtime::image_file(std::filesystem::u8path(value)));
+      else if (option == "--image-detail") image_detail = value;
+      else if (option == "--extra-payload") completion.extra_payload = value;
+      else if (option == "--extra-payload-file") completion.extra_payload = minera::llm_runtime::bounded_file(std::filesystem::u8path(value));
       else if (option == "--temperature") {
         std::size_t used = 0;
         const auto parsed = std::stod(value, &used);
-        if (used != value.size() || !std::isfinite(parsed) || parsed < 0 || parsed > 1)
-          throw std::invalid_argument("temperature must be from 0 through 1");
+        if (used != value.size() || !std::isfinite(parsed) || parsed < 0 || parsed > 2)
+          throw std::invalid_argument("temperature must be from 0 through 2, with an Anthropic maximum of 1");
         completion.temperature = parsed;
       }
       else return usage(argv[0]);
+    }
+    if (!image_detail.empty()) {
+      if (image_detail != "auto" && image_detail != "low" && image_detail != "high" && image_detail != "original")
+        throw std::invalid_argument("invalid OpenAI image detail");
+      for (auto& image : completion.images) image.detail = image_detail;
     }
     const auto result = minera::build_knowledge_prompt(options);
     if (runtime_url.empty()) std::cout << minera::knowledge_injection_json(result) << '\n';
