@@ -1136,6 +1136,43 @@
         "REMAINING_TIME",
         "CONTEXTUAL"
       ]
+    },
+    {
+      "added": [
+        "Transform groups existing feature/target/label workflows beside log and event-data preparation",
+        "All six conversion variants expose native controls, table/stream/log inspection, variant metadata and directed attributed graphs with positional node inspection and complete edge tables",
+        "All six case utilities expose seeded split boundaries, fixed/all prefixes and native indices, activity-prefix timing, multi-target output selection and attribute-selection scopes",
+        "Original native JSON, parameter-bound reports, complete scalar CSV, and same-run typed XES outputs with reopening through their actual activity fields",
+        "Independent case/event/column pagination preserves repeated case IDs, empty traces and complete downloads beyond visible pages",
+        "Windows log-utility CLI handles Unicode arguments and UTF-8 input filenames",
+        "Source revision/reset, saved-analysis, empty-output and previous-result error guards, responsive controls and graph selection/arrow rendering"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/TransformationHub.tsx",
+        "src/frontend/src/components/PreparationWorkspace.tsx",
+        "src/frontend/src/preparation-workspace.ts",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/minera_log_util.cpp"
+      ],
+      "families": [],
+      "id": "native_log_data_preparation",
+      "outside_algorithm_catalogue": true,
+      "state": "native_app_and_cli_available",
+      "validation": "docs/feature-first-preparation-validation.json",
+      "variants": [
+        "TO_EVENT_LOG",
+        "TO_EVENT_STREAM",
+        "TO_DATA_FRAME",
+        "TO_NX",
+        "DF_TO_EVENT_LOG_1V",
+        "DF_TO_EVENT_LOG_NV",
+        "SPLIT_TRAIN_TEST",
+        "FIXED_PREFIXES",
+        "ALL_PREFIXES",
+        "UNTIL_ACTIVITY",
+        "TO_ACTIVITIES",
+        "FEATURE_SELECTION"
+      ]
     }
   ],
   "execution_priority": [
@@ -1153,7 +1190,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue reviewing remaining catalogue capabilities and entry points, including OCEL analysis, conversion/export variants, log utilities, trie/interval-tree transformations and remaining conformance/simulation controls. Features, targets and contextual label splitting now have configurable workflows, complete matrices/exports and XES reopening; their recorded exactness gates remain independent."
+      "next_action": "Continue reviewing OCEL analysis, trie/interval-tree transformations, remaining model/export variants and conformance/simulation controls. All six log conversion variants and all six case utilities now have configurable workflows, complete result inspection/exports and actual native XES reopening. Feature, target and label workflows remain available; recorded exactness gates stay independent."
     }
   ],
   "feature_status_meaning": {

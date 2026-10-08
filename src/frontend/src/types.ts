@@ -1095,7 +1095,7 @@ function isLogConversionTableCell(value: unknown): value is LogConversionTableCe
 }
 
 function isLogUtilityAttribute(value: unknown): value is LogUtilityAttribute {
-  return isLogConversionAttribute(value) && typeof (value as LogUtilityAttribute).kind === "string";
+  return isLogConversionAttribute(value);
 }
 function isLogUtilityLog(value: unknown): value is LogUtilityLog {
   if (!value || typeof value !== "object") return false;

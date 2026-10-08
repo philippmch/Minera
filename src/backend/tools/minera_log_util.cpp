@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -11,6 +12,16 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
 
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/log_util.hpp"
@@ -90,7 +101,7 @@ int usage(const char* program) {
 }
 
 minera::EventLog import_log(const std::string& path) {
-  std::ifstream input(path, std::ios::binary);
+  std::ifstream input(std::filesystem::u8path(path), std::ios::binary);
   if (!input) throw std::invalid_argument("could not open event log: " + path);
   std::ostringstream content;
   content << input.rdbuf();
@@ -108,7 +119,7 @@ minera::EventLog import_log(const std::string& path) {
 
 }  // namespace
 
-int main(int argc, char** argv) {
+int run_log_util(int argc, char** argv) {
   try {
     if (argc < 3) return usage(argv[0]);
     const std::string input_path = argv[1];
@@ -214,3 +225,25 @@ int main(int argc, char** argv) {
     return 1;
   }
 }
+
+#ifdef _WIN32
+int wmain(int argc, wchar_t** argv) {
+  std::vector<std::string> values;
+  values.reserve(argc);
+  for (int i = 0; i < argc; ++i) {
+    const auto size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[i], -1,
+                                        nullptr, 0, nullptr, nullptr);
+    if (size <= 0) { std::cerr << "error: invalid Unicode argument\n"; return 2; }
+    std::string value(size, '\0');
+    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[i], -1,
+                           value.data(), size, nullptr, nullptr)) return 2;
+    value.pop_back(); values.push_back(std::move(value));
+  }
+  std::vector<char*> arguments;
+  for (auto& value : values) arguments.push_back(value.data());
+  arguments.push_back(nullptr);
+  return run_log_util(argc, arguments.data());
+}
+#else
+int main(int argc, char** argv) { return run_log_util(argc, argv); }
+#endif
