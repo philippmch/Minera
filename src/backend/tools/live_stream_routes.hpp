@@ -59,6 +59,7 @@ void handle_live_create(const httplib::Request& request,httplib::Response& respo
     if(method=="footprints")for(const auto* suffix:{"activities","start_activities","end_activities","sequence","parallel","terminate_all"})allowed.insert(prefix+suffix);
     else if(method=="temporal")for(const auto* suffix:{"profile","zeta","timestamp_column","start_timestamp_column"})allowed.insert(prefix+suffix);
     else if(method=="tbr")for(const auto* suffix:{"variant","stop_immediately","max_invisible","terminate_all"})allowed.insert(prefix+suffix);
+    else if(method=="declare")allowed.insert(prefix+"timestamp_column");
     else if(method!="dfg")throw std::invalid_argument("unknown live monitor method");
     live_params(request,allowed);
     if(ocel_query_bool(request,prefix+"terminate_all",false))throw std::invalid_argument("finalize live cases using a session action");
@@ -87,6 +88,9 @@ void handle_live_create(const httplib::Request& request,httplib::Response& respo
     } else if(method=="temporal") {
       options.method=minera::StreamingSessionMethod::kTemporal;options.temporal_profile=parse_temporal_profile_parameter(live_required(request,prefix+"profile"),prefix+"profile");options.temporal.zeta=ocel_query_number(request,prefix+"zeta",options.temporal.zeta);
       if(request.has_param(prefix+"start_timestamp_column"))options.temporal.start_timestamp_attribute=request.get_param_value(prefix+"start_timestamp_column");
+    } else if(method=="declare") {
+      options.method=minera::StreamingSessionMethod::kDeclare;const auto bytes=form_field(request,"model");if(bytes.empty())throw std::invalid_argument("live Declare requires a model JSON document");options.declare_model=minera::parse_declare_stream_model_json(bytes);
+      record->sources.push_back({"model",request.has_param("source_name")?request.get_param_value("source_name"):"declare-model.json","declare_json",request.has_param("source_sha256")?request.get_param_value("source_sha256"):"",bytes});
     } else if(method=="tbr") {
       options.method=minera::StreamingSessionMethod::kTbr;const auto variant=request.has_param(prefix+"variant")?request.get_param_value(prefix+"variant"):"forward";
       if(variant=="backwards")options.tbr.variant=minera::StreamingTbrVariant::kBackwards;else if(variant!="forward")throw std::invalid_argument("unknown replay variant");
@@ -97,7 +101,7 @@ void handle_live_create(const httplib::Request& request,httplib::Response& respo
     record->monitor=std::make_unique<minera::StreamingSession>(std::move(options));
     {std::lock_guard lock(g_live_mutex);auto [it,inserted]=g_live_sessions.emplace(id,record);if(!inserted){auto existing=it->second;record=std::move(existing);}}
     std::lock_guard lock(record->mutex);live_open(*record);
-    if(record->configuration!=request.params||(method=="tbr"&&record->sources.front().bytes!=form_field(request,"model")))throw minera::StreamingSessionConflict("live session ID already has a different configuration");
+    if(record->configuration!=request.params||((method=="tbr"||method=="declare")&&record->sources.front().bytes!=form_field(request,"model")))throw minera::StreamingSessionConflict("live session ID already has a different configuration");
     response.set_content(live_payload(*record),"application/json");
   });
 }

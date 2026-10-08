@@ -12363,3 +12363,53 @@ and complete reference exactness/performance stay open. No reference bodies or
 bytecode were inspected and no catalogue unit is promoted: all 86 packages/387
 modules, 46 complete packages/199 complete modules and 228 incomplete units
 remain the full objective.
+
+
+## Feature delivery first: native Declare prefix workflows (2026-10-08)
+
+Declare is now the fifth native event monitor in fresh browser replay and
+persistent cross-batch server sessions. All 18 template families retain native
+rule indices, duplicate occurrences, unknown inert names and signed int32
+support/confidence metadata. Named-rule JSON, native Minera activity-ID exports
+and canonical model downloads/reimports are usable through CLI and HTTP.
+
+The browser supports all-template authoring, exact JSON text, displayed mined
+Declare model handoff, CSV/XES/gzip events, native prefix states, per-event
+violated constraints and an arrival chart. Repeated timestamps stay distinct;
+empty timestamps use the native global event-index string. Complete CSV/report/
+model/original-source exports retain every value beyond paged inspection.
+Finishing drains the stream without finalizing Declare obligations; native
+complete/per-case resets preserve cumulative batch/delivery histories.
+
+docs/feature-first-declare-stream-validation.json binds 597 native sources,
+215 frontend/runtime sources, two fresh core objects/167 verified reused objects,
+five assertion-enabled native suites and 880 frontend tests/production assets.
+55 native application checks, 39 original HTTP cases plus one retained-input
+supplement, 20 application CLIs, 21 browser checks/69 artifacts and 81 independent
+export checks pass. The latter verify 31 complete CSVs, seven reports, three
+canonical models, three original-source bindings/downloads, five further CLIs
+and two served production assets. Actual displayed-model handoff retains all
+218 rules and 872 live states; the large replay retains 800 states/120 arrivals.
+Special labels, gzip, canonical roundtrip, empty models, malformed arity/JSON,
+finish/case-reset/monitor-reset and 390px inspection are covered.
+
+Retained attempts expose a JSON serializer collision with std::quoted, a legacy
+PNML error regression and callback type narrowing; the final builds correct
+these faults. One browser predicate expected a newline in a single-line HTML
+input; its classification and actual visible-input/escaped-JSON correction are
+retained. The first empty-model capture reused its source path for output before
+metadata capture. Its output and fixture remain unchanged, independently
+reproduced by a new supplemental capture with distinct input/output paths and
+input hashes recorded before submission. No failed helper was rewritten or
+reexecuted. Original source hashes remain client-provided metadata, independently
+matched to downloaded bytes. Owned PID 31176/port 8502 and tab 31 were closed
+after identity checks; the temporary viewport override was reset.
+
+Declare remains a prefix monitor without end-of-case finalization. Server
+restart durability, lazy/unbounded/network/trace acquisition, global scheduling,
+concurrency/cancellation, broader default/error/numeric/order/dialect fidelity,
+Windows CLI Unicode paths, optional connectors, remaining workflows and full
+reference behavior/performance remain open. No reference implementation bodies
+or bytecode were inspected and no catalogue unit is promoted. All 86 packages /
+387 modules, 46 complete packages / 199 complete modules and 228 incomplete
+units remain the full objective.

@@ -57,6 +57,7 @@ add_library(minera_core
   src/backend/declare.cpp
   src/backend/declare_playout.cpp
   src/backend/declare_streaming.cpp
+  src/backend/declare_streaming_io.cpp
   src/backend/decision_mining.cpp
   src/backend/root_cause.cpp
   src/backend/root_cause_trace_key.cpp
@@ -276,6 +277,9 @@ add_executable(minera_streaming_dfg
 )
 target_link_libraries(minera_streaming_dfg PRIVATE minera::core)
 target_compile_features(minera_streaming_dfg PRIVATE cxx_std_20)
+add_executable(minera_streaming_declare src/backend/tools/minera_streaming_declare.cpp)
+target_link_libraries(minera_streaming_declare PRIVATE minera::core)
+target_compile_features(minera_streaming_declare PRIVATE cxx_std_20)
 
 add_executable(minera_streaming_store
   src/backend/tools/minera_streaming_store.cpp
@@ -872,6 +876,11 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_streaming_session_tests PRIVATE cxx_std_20)
   target_compile_options(minera_streaming_session_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_streaming_session_tests COMMAND minera_streaming_session_tests)
+  add_executable(minera_declare_streaming_io_tests src/backend/tests/test_declare_streaming_io.cpp)
+  target_link_libraries(minera_declare_streaming_io_tests PRIVATE minera::core)
+  target_compile_features(minera_declare_streaming_io_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_declare_streaming_io_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_declare_streaming_io_tests COMMAND minera_declare_streaming_io_tests)
 
   add_executable(minera_streaming_import_tests src/backend/tests/test_streaming_import.cpp)
   target_link_libraries(minera_streaming_import_tests PRIVATE minera::core)

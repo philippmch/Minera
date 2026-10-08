@@ -1705,6 +1705,43 @@ arcs, stochastic data, 501-digit integers, actual conformance handoff and comple
 exports. Full format/dialect/schema/diagram preservation, solver/search,
 concurrency/cancellation and performance exactness remain active parity work.
 
+### Declare prefix monitoring
+
+Event streams now includes **Check Declare prefixes** for both fresh replay and
+persistent server sessions. Upload named-rule JSON or a Minera export containing
+`activities` and `declare`, author rules in the 18-template editor, or choose
+**Use displayed Declare model** after discovery. CSV, XES and gzip XES events
+retain selected input/imported order. Inspect canonical rule identities,
+per-case automaton states, per-event violated constraints and the native arrival
+chart. Repeated timestamps remain separate observations. Full JSON/report/CSV,
+canonical model and original server-held source downloads preserve these data.
+
+Declare checks prefixes: finishing a file or stream leaves pending obligations
+open. This monitor has no end-of-case finalization. Duplicate rules retain
+separate native indices; unknown template names remain inert native rules.
+Exact activity strings and optional signed int32 support/confidence survive JSON
+uploads and canonical model roundtrips. Escaped control labels can be entered in
+the JSON textarea. The displayed-model bridge resolves native activity IDs.
+
+The standalone entry point is `minera_streaming_declare MODEL.json EVENTS.csv`
+(also `.xes`/`.xes.gz`), with `--format csv|xes`, `--order input|imported` and
+`--case-id-column`, `--activity-column`, `--timestamp-column` selectors.
+`POST /api/streaming-declare` accepts multipart `model` and `log`, `format`,
+`streaming_event_order`, `streaming_include_diagnostics`, and
+`streaming_declare_case_id_column`, `streaming_declare_activity_column`,
+`streaming_declare_timestamp_column`. Live creation uses `method=declare` and
+multipart `model` with the existing session lifecycle and batch routes.
+
+This checkpoint passes five assertion-enabled native suites, 880 frontend
+tests and the production build, 40 HTTP cases, 25 standalone native replays,
+21 browser checks and 81 independent export checks over 31 complete CSVs,
+seven reports and three canonical model downloads. The displayed 218-rule
+model, 872 live states, 800-state/120-event large replay, Unicode/control labels,
+empty models and malformed inputs are covered. Sessions remain process-local;
+complete reference behavior and performance remain open.
+[Validation and checkpoint boundaries](docs/feature-first-declare-stream-validation.json)
+retain source bindings and the corrected validation attempts.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the

@@ -1574,6 +1574,49 @@
         "ACTIVE",
         "FINISHED"
       ]
+    },
+    {
+      "added": [
+        "Declare is the fifth native monitor in fresh file replay and persistent cross-batch server sessions",
+        "All 18 native templates with rule identities, duplicate occurrences, unknown inert templates and exact native constraint indices",
+        "Named-rule JSON, native Minera activity-ID exports and canonical downloadable/reimportable model JSON",
+        "Rule authoring for all 18 templates, exact JSON text uploads and handoff from the displayed discovered Declare model",
+        "CSV/XES/gzip events, input/imported order, literal case/activity/timestamp selectors and existing live import controls",
+        "Complete per-case prefix automaton states, per-event violated rule identities and per-arrival deviations without timestamp aggregation",
+        "Native queue/start/append/drain/finish, observer registration, full/per-case resets and retained delivery/source histories",
+        "Complete JSON/report/model/original-source/CSV exports, state-table paging, 80-entry chart paging and 390px inspection",
+        "Standalone minera_streaming_declare reproduces native HTTP and actual browser-generated model/log workflows"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_streaming_declare.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/live_stream_routes.hpp",
+        "src/frontend/src/components/StreamingWorkspace.tsx",
+        "src/frontend/src/components/DeclareStreamModelFields.tsx",
+        "src/frontend/src/components/DeclareStreamChart.tsx"
+      ],
+      "families": [],
+      "id": "native_declare_prefix_workflows",
+      "native_components": [
+        "include/minera/declare_streaming.hpp",
+        "include/minera/declare_streaming_io.hpp",
+        "src/backend/declare_streaming.cpp",
+        "src/backend/declare_streaming_io.cpp",
+        "src/backend/streaming_session.cpp"
+      ],
+      "state": "native_model_cli_api_and_app_available",
+      "validation": "docs/feature-first-declare-stream-validation.json",
+      "variants": [
+        "DECLARE_18_TEMPLATES",
+        "NAMED_RULES_JSON",
+        "MINERA_ACTIVITY_ID_EXPORT",
+        "CANONICAL_MODEL_JSON",
+        "CSV",
+        "XES",
+        "GZIP_XES",
+        "FRESH_REPLAY",
+        "PERSISTENT_SESSION"
+      ]
     }
   ],
   "execution_priority": [
@@ -1591,7 +1634,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Review remaining acquisition/readers, trace-stream workflows and catalogue/analysis/export gaps. Persistent event-monitor sessions now support cross-batch CSV/XES, lifecycle, reconnect, observer/reset/finalization controls and complete retained exports alongside fresh streaming, process cubes, model exchange, related-log and OCEL/classic workflows. Durability, lazy acquisition, native dialect/default/numeric/order/search/concurrency/performance and Windows CLI Unicode gates remain."
+      "next_action": "Review remaining acquisition/readers, trace-stream workflows and catalogue/analysis/export gaps. Declare now joins the four previous native event monitors, with model authoring/displayed-model handoff and complete rule/state/event/time exports. Durability, lazy acquisition, dialect/default/numeric/order/search/concurrency/performance, Windows CLI Unicode paths and full reference behavior remain."
     }
   ],
   "feature_status_meaning": {

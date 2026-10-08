@@ -8,10 +8,13 @@ import {
   type StreamingForm, type StreamingRun,
 } from "../streaming-workspace";
 import { ModelGraph } from "./ModelGraph";
+import { type MineraExport } from "../types";
+import { DeclareStreamModelFields } from "./DeclareStreamModelFields";
+import { DeclareStreamChart } from "./DeclareStreamChart";
 import { LiveStreamingInspection } from "./LiveStreamingInspection";
 import { LIVE_XES_VARIANTS, defaultLiveImport, createLiveSession, getLiveSession, appendLiveSession, actLiveSession, listLiveSessions, formFromLive, importsFromLive, type LiveRun, type LiveSnapshot, type LiveAction, type LiveImportForm } from "../live-stream-workspace";
 
-export function StreamingWorkspace({ file = null, busy = false }: { file?: File | null; busy?: boolean }) {
+export function StreamingWorkspace({ file = null, busy = false, data }: { file?: File | null; busy?: boolean; data?:MineraExport }) {
   const [form, setForm] = useState(defaultStreaming);
   const [mode,setMode]=useState<"fresh"|"live">("fresh");
   const [imports,setImports]=useState(defaultLiveImport);
@@ -69,6 +72,7 @@ export function StreamingWorkspace({ file = null, busy = false }: { file?: File 
   };
   const selected = run?.tables[selection];
   const graph = run && streamingGraph(run.result);
+  const declareModel=run?.result.family==="STREAMING_DECLARE"?run.result.model:null;
   const scalar = (key: "caseColumn" | "activityColumn" | "timestampColumn" | "startColumn" | "zeta" | "maxInvisible", label: string) =>
     <label className="filters-field" key={key}><span>{label} (empty uses native default)</span>
       <input value={form[key]} onChange={event => change(key, event.target.value)} /></label>;
@@ -77,7 +81,7 @@ export function StreamingWorkspace({ file = null, busy = false }: { file?: File 
       <textarea rows={3} value={form[key]} onChange={event => change(key, event.target.value)} /><small>{help}</small></label>;
   return <>
     <section className="panel streaming-workspace">
-      <div className="panel-head"><h2>Replay event streams</h2><span className="panel-meta">Independent CSV uploads</span></div>
+      <div className="panel-head"><h2>Replay event streams</h2><span className="panel-meta">{mode==="live"?"Server monitor sessions":"Independent event uploads"}</span></div>
       <p>{mode==="fresh"?"Replay an uploaded event sequence through a fresh native streaming monitor. Inspect open-case prefixes, or finalize footprint and token-replay cases at the end of the file.":"Keep a native monitor in the server, queue uploads, then start and append more batches. Inspect state, detach or reattach the observer, reset cases and finalize conformance."}</p>
       <label className="filters-field streaming-mode"><span>Streaming execution</span><select disabled={busy||pending} value={mode} onChange={event=>{cancel();setMode(event.target.value as typeof mode);setError(null);if(event.target.value==="live"&&liveRun){setForm(formFromLive(liveRun.result));setImports(importsFromLive(liveRun.result));}}}><option value="fresh">Fresh file replay</option><option value="live">Persistent server session</option></select></label>
       {mode==="live"&&<div className="query-options live-connections"><label className="filters-field"><span>Server stream session ID</span><input disabled={busy||pending} value={connectionId} onChange={event=>setConnectionId(event.target.value)}/></label><button className="btn-ghost" disabled={busy||pending||!connectionId} onClick={()=>connect(connectionId)}>Connect or refresh session</button><button className="btn-ghost" disabled={busy||pending} onClick={()=>void list()}>List server stream sessions</button>{sessions.map(s=><button className="btn-ghost" disabled={busy||pending} key={s.session_id} onClick={()=>connect(s.session_id)}>Connect {s.method} · {s.session_id} · {s.state}</button>)}</div>}
@@ -89,13 +93,14 @@ export function StreamingWorkspace({ file = null, busy = false }: { file?: File 
           <label className="filters-field"><span>Event replay order</span><select value={form.order} onChange={event => change("order", event.target.value as StreamingForm["order"])}>
             <option value="input">CSV input order</option><option value="imported">Case-grouped importer order</option>
           </select></label>
-          {mode==="fresh"&&<label className="filters-field"><span>Streaming event CSV</span><input type="file" accept=".csv,text/csv" aria-label="Streaming event CSV" onChange={event => upload("log", event.target.files?.[0] ?? null)} />
+          {mode==="fresh"&&<label className="filters-field"><span>{form.method==="declare"?"Declare event upload":"Streaming event CSV"}</span><input type="file" accept={form.method==="declare"?".csv,.xes,.xes.gz,text/csv,application/xml,application/gzip":".csv,text/csv"} aria-label={form.method==="declare"?"Declare event upload":"Streaming event CSV"} onChange={event => upload("log", event.target.files?.[0] ?? null)} />
             <small>{log?.name ?? "Columns: case_id, activity; timestamp optional except temporal checks."}</small></label>
           }
         </div>
         {mode==="fresh"&&file && /\.csv$/i.test(file.name) && <button className="btn-ghost" onClick={() => upload("log", file)}>Use current original CSV for streaming</button>}
         <p>{mode==="fresh"?"CSV input order preserves parsed event arrival order across cases. Importer order groups cases and sorts their events by timestamps when available. Each run starts empty; it does not append to the preceding result. Original uploads are independent of current workspace filters.":"Arrival order applies within each batch, and batches continue the same native monitor. Importer order groups/sorts each upload separately. Configuration is fixed when a session is created; start a separate session to change it."}</p>
         <div className="query-options">{scalar("caseColumn", "Case column")}{scalar("activityColumn", "Activity column")}</div>
+        {form.method==="declare"&&<><DeclareStreamModelFields file={model} data={data} onFile={value=>upload("model",value)}/><div className="query-options">{scalar("timestampColumn","Declare timestamp column")}</div></>}
         {form.method === "footprints" && <>
           <div className="query-options">
             {jsonField("activities", "Footprint activities JSON", 'Nonempty list, for example ["A","B","C"].')}
@@ -122,14 +127,14 @@ export function StreamingWorkspace({ file = null, busy = false }: { file?: File 
         </>}
         {mode==="fresh"&&(form.method === "footprints" || form.method === "tbr") &&
           <label className="query-check"><input type="checkbox" checked={form.finalize} onChange={event => change("finalize", event.target.checked)} />Finalize all cases after replay</label>}
-        {mode==="fresh"?<button className="btn-open" disabled={!log || (form.method === "tbr" && !model)} onClick={() => void execute()}>Run streaming workflow</button>:<>
+        {mode==="fresh"?<button className="btn-open" disabled={!log || ((form.method === "tbr"||form.method==="declare") && !model)} onClick={() => void execute()}>Run streaming workflow</button>:<>
           <details><summary>Live CSV and XES import settings</summary><div className="query-options">
             <label className="filters-field"><span>Live CSV delimiter</span><select value={imports.delimiter} onChange={event=>importField("delimiter",event.target.value)}><option value=",">Comma</option><option value=";">Semicolon</option><option value={"\t"}>Tab</option><option value="|">Pipe</option></select></label>
             <label className="query-check"><input type="checkbox" checked={imports.trim} onChange={event=>importField("trim",event.target.checked)}/>Trim CSV fields</label><label className="query-check"><input type="checkbox" checked={imports.header} onChange={event=>importField("header",event.target.checked)}/>CSV has header</label><label className="query-check"><input type="checkbox" checked={imports.caseAliases} onChange={event=>importField("caseAliases",event.target.checked)}/>Allow CSV case-ID aliases</label>
             {([['resource','Live CSV resource column'],['lifecycle','Live CSV lifecycle column']] as const).map(([key,label])=><label className="filters-field" key={key}><span>{label} (empty uses native default)</span><input value={imports[key]} onChange={event=>importField(key,event.target.value)}/></label>)}
             <label className="filters-field"><span>Live XES parser</span><select value={imports.xesVariant} onChange={event=>importField("xesVariant",event.target.value as LiveImportForm["xesVariant"])}>{LIVE_XES_VARIANTS.map(variant=><option value={variant} key={variant}>{variant}</option>)}</select></label>
             {([['xesCase','Live XES case attribute'],['xesActivity','Live XES activity attribute'],['xesTimestamp','Live XES timestamp attribute'],['xesResource','Live XES resource attribute'],['xesLifecycle','Live XES lifecycle attribute']] as const).map(([key,label])=><label className="filters-field" key={key}><span>{label}</span><input value={imports[key]} onChange={event=>importField(key,event.target.value)}/></label>)}
-          </div></details><button className="btn-open" disabled={form.method==="tbr"&&!model} onClick={create}>Create server stream session</button>
+          </div></details><button className="btn-open" disabled={(form.method==="tbr"||form.method==="declare")&&!model} onClick={create}>Create server stream session</button>
         </>}
       </fieldset>
       {mode==="live"&&liveRun&&<fieldset className="query-fields" disabled={busy||pending||!!liveRun.result.released||liveRun.result.state==="FINISHED"}><div className="query-options"><label className="filters-field"><span>Live event batch</span><input aria-label="Live event batch" type="file" accept=".csv,.tsv,.xes,.xes.gz,.gz,text/csv,application/xml,application/gzip" onChange={event=>upload("log",event.target.files?.[0]??null)}/><small>{log?.name??"Upload a complete CSV or XES batch, with its header or XML log wrapper."}</small></label><label className="filters-field"><span>Live batch format</span><select value={batchFormat} onChange={event=>setBatchFormat(event.target.value as typeof batchFormat)}><option value="csv">CSV</option><option value="xes">XES (including gzip)</option></select></label><label className="query-check"><input type="checkbox" checked={waitForBatch} onChange={event=>setWaitForBatch(event.target.checked)}/>Wait for the batch to drain when active</label></div>{file&&<button className="btn-ghost" onClick={()=>upload("log",file)}>Use current original file as live batch</button>}<button className="btn-open" disabled={!log} onClick={append}>{liveRun.result.state==="INACTIVE"?"Queue event batch":"Append event batch"}</button><p>Each click appends a new batch, including repeated files. A stale revision or repeated batch receipt is rejected. After an interrupted request, refresh the session to see whether it committed before sending it again.</p></fieldset>}
@@ -143,6 +148,7 @@ export function StreamingWorkspace({ file = null, busy = false }: { file?: File 
       <div className="query-actions">
         <button className="btn-ghost" onClick={() => downloadQueryBlob(new Blob([run.raw], { type: "application/json" }), "minera-streaming-data.json")}>Download native streaming data</button>
         <button className="btn-ghost" onClick={() => downloadQueryBlob(new Blob([run.report_json], { type: "application/json" }), "minera-streaming-report.json")}>Download streaming report</button>
+        {declareModel&&<button className="btn-ghost" onClick={()=>downloadQueryBlob(new Blob([nativeJson(declareModel)],{type:"application/json"}),"minera-declare-model.json")}>Download native Declare model</button>}
         <button className="btn-ghost" onClick={() => downloadQueryBlob(ocelPreparedCsv(selected), "minera-streaming-" + selection + ".csv")}>Download complete streaming CSV</button>
       </div>
       {run.result.prefix && <p>Prefix diagnostics precede final checks. Finalized cases are removed from open_cases; their separate termination results remain available.</p>}
@@ -156,5 +162,6 @@ export function StreamingWorkspace({ file = null, busy = false }: { file?: File 
       <details><summary>Complete native streaming response</summary><pre>{nativeJson(run.result, 2)}</pre></details>
     </section>}
     {mode==="fresh"&&graph && <ModelGraph graph={graph} title="Streaming directly-follows graph" selected={selectedNode} onSelect={setSelectedNode} />}
+    {mode==="fresh"&&run?.result.family==="STREAMING_DECLARE"&&<DeclareStreamChart key={run.sources.map(s=>s.sha256).join()} result={run.result}/>}
   </>;
 }

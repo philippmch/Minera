@@ -7,10 +7,12 @@ import {
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
 import { type OcelPreparedTable } from "./ocel-preparation";
 import { type ModelGraph } from "./model-graph";
+import { isDeclareStreamResult,declareStreamTables,type DeclareStreamResult } from "./declare-stream-workspace";
 
 export const STREAMING_METHODS = [
   ["dfg", "Discover a streaming DFG"], ["footprints", "Check footprint prefixes"],
   ["temporal", "Check temporal prefixes"], ["tbr", "Replay tokens over prefixes"],
+  ["declare", "Check Declare prefixes"],
 ] as const;
 export type StreamingMethod = typeof STREAMING_METHODS[number][0];
 export interface StreamingForm {
@@ -76,6 +78,7 @@ export function streamingQuery(form: StreamingForm): string {
     streaming_temporal_profile: jsonList<[string, string, number, number]>(form.profile, "Temporal profile"),
     streaming_temporal_zeta: positiveNumber(form.zeta, "Zeta"),
   });
+  else if(form.method==="declare")query="";
   else query = streamingTbrQuery({
     streaming_tbr_variant: form.variant,
     streaming_tbr_stop_immediately: form.stopImmediately,
@@ -85,9 +88,9 @@ export function streamingQuery(form: StreamingForm): string {
   // Column selectors are literal; the native adapter applies its own aliases.
   if (form.caseColumn) params.set(prefix + "case_id_column", form.caseColumn);
   if (form.activityColumn) params.set(prefix + "activity_column", form.activityColumn);
-  if (form.method === "temporal") {
+  if (form.method === "temporal"||form.method==="declare") {
     if (form.timestampColumn) params.set(prefix + "timestamp_column", form.timestampColumn);
-    if (form.startColumn) params.set(prefix + "start_timestamp_column", form.startColumn);
+    if (form.method==="temporal"&&form.startColumn) params.set(prefix + "start_timestamp_column", form.startColumn);
   }
   if (form.method === "tbr") {
     if (form.maxInvisible) params.set("streaming_tbr_max_invisible", invisibleBound(form.maxInvisible));
@@ -98,7 +101,7 @@ export function streamingQuery(form: StreamingForm): string {
   return params.toString();
 }
 
-type BaseResult = StreamingDfgResult | StreamingFootprintsResult | StreamingTemporalResult | StreamingTbrResult;
+type BaseResult = StreamingDfgResult | StreamingFootprintsResult | StreamingTemporalResult | StreamingTbrResult | DeclareStreamResult;
 type TerminatedCase = { case_id: string; is_fit: boolean; missing?: number; remaining?: number; marking?: number[] };
 export type StreamingResult = BaseResult & {
   input: { event_order: "input" | "imported"; parsed_events: number };
@@ -110,7 +113,7 @@ const record = (value: unknown): value is Record<string, unknown> =>
 const count = (value: unknown) => Number.isSafeInteger(value) && (value as number) >= 0;
 export function validStreamingResult(value: unknown, form: StreamingForm): value is StreamingResult {
   const guard = { dfg: isStreamingDfgResult, footprints: isStreamingFootprintsResult,
-    temporal: isStreamingTemporalResult, tbr: isStreamingTbrResult }[form.method];
+    temporal: isStreamingTemporalResult, tbr: isStreamingTbrResult,declare:isDeclareStreamResult }[form.method];
   if (!guard(value) || !record(value) || !record(value.input) ||
       value.input.event_order !== form.order || !count(value.input.parsed_events)) return false;
   if (form.method === "tbr" && value.variant !== form.variant.toUpperCase()) return false;
@@ -150,7 +153,7 @@ function recordTable(items: Record<string, unknown>[]): OcelPreparedTable {
 }
 export function streamingTables(result: StreamingResult): Record<string, OcelPreparedTable> {
   const tables: Record<string, OcelPreparedTable> = {};
-  const addCases = (value: StreamingFootprintsResult | StreamingTbrResult | StreamingTemporalResult, name: string) => {
+  const addCases = (value: StreamingFootprintsResult | StreamingTbrResult | StreamingTemporalResult | DeclareStreamResult, name: string) => {
     if (Array.isArray(value.cases)) {
       const columns = ["case_id", "events", "deviations", "is_fit", "first_activity", "last_activity"];
       tables[name] = rows(columns, value.cases.map(item => columns.map(key => nativeCell(item, key))));
@@ -181,6 +184,7 @@ export function streamingTables(result: StreamingResult): Record<string, OcelPre
       : rows(["case_id", "is_fit"], result.terminated_cases.map(item => [item.case_id, item.is_fit]));
   }
   const summaryKeys = Object.keys(result).filter(key => typeof (result as unknown as Record<string, unknown>)[key] !== "object");
+  if(result.family==="STREAMING_DECLARE")Object.assign(tables,declareStreamTables(result));
   tables.summary = rows(summaryKeys, [summaryKeys.map(key => nativeCell(result, key))]);
   tables.input = recordTable([result.input]);
   return tables;
@@ -198,12 +202,13 @@ export function streamingGraph(result: StreamingResult): ModelGraph | undefined 
 export async function requestStreamingWorkflow(
   form: StreamingForm, log: File, model?: File | null, signal?: AbortSignal,
 ): Promise<StreamingRun> {
-  if (!/\.csv$/i.test(log.name)) throw new Error("Choose a CSV event file.");
+  if (!/\.csv$/i.test(log.name)&&!(form.method==="declare"&&/\.xes(?:\.gz)?$/i.test(log.name))) throw new Error("Choose a CSV event file, or XES for Declare prefixes.");
   if (form.method === "tbr" && !model) throw new Error("Choose a PNML workflow net for token replay.");
+  if (form.method === "declare" && !model) throw new Error("Choose a Declare model JSON document.");
   const query = streamingQuery(form);
   const sources: StreamingRun["sources"] = [];
   const files: ["log" | "model", File][] = [["log", log]];
-  if (form.method === "tbr") files.push(["model", model!]);
+  if (form.method === "tbr"||form.method==="declare") files.push(["model", model!]);
   for (const [role, file] of files) {
     const hash = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
     sources.push({ role, name: file.name, size: file.size,
@@ -211,8 +216,9 @@ export async function requestStreamingWorkflow(
   }
   signal?.throwIfAborted();
   const body = new FormData(); body.append("log", log, log.name);
-  if (form.method === "tbr") body.append("model", model!, model!.name);
-  const response = await fetch("/api/streaming-" + form.method + "?" + query, { method: "POST", body, signal });
+  if (form.method === "tbr"||form.method==="declare") body.append("model", model!, model!.name);
+  const params=new URLSearchParams(query);if(form.method==="declare")params.set("format",/\.xes(?:\.gz)?$/i.test(log.name)?"xes":"csv");
+  const response = await fetch("/api/streaming-" + form.method + "?" + params, { method: "POST", body, signal });
   const raw = await response.text(); signal?.throwIfAborted();
   let result: unknown;
   try { result = parseNativeJson(raw); } catch { throw new Error("The backend returned invalid streaming JSON."); }
@@ -220,7 +226,7 @@ export async function requestStreamingWorkflow(
     throw new Error(record(result) && typeof result.error === "string" ? result.error : "Streaming request failed (" + response.status + ").");
   if (!validStreamingResult(result, form)) throw new Error("The backend returned an invalid or mismatched streaming result.");
   const report_json = '{"family":"STREAMING_WORKFLOW_REPORT","request":' +
-    JSON.stringify({ method: form.method, query, parameters: Object.fromEntries(new URLSearchParams(query)), sources,
+    JSON.stringify({ method: form.method, query:params.toString(), parameters: Object.fromEntries(params), sources,
       session: "fresh monitor per request" }) + ',"response":' + raw + '}';
-  return { method: form.method, query, raw, report_json, result, sources, tables: streamingTables(result) };
+  return { method: form.method, query:params.toString(), raw, report_json, result, sources, tables: streamingTables(result) };
 }
