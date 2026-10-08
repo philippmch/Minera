@@ -11805,3 +11805,77 @@ error/materialization/performance gates remain open. Preparation sits outside th
 86 algorithm-family list and creates no new catalogue families or promotions.
 All 86 packages and 387 modules remain in scope: 46 complete packages,
 199 complete modules and 228 incomplete units. Full parity remains the goal.
+
+
+## Feature delivery first: trie, Petri and interval transformations (2026-10-08)
+
+Transform adds Tries, nets & intervals with LOG_TO_TRIE, TO_PETRI_NET and
+OPEN_PATHS workflows. Activity/path/timestamp/epsilon/pair/point/range controls
+drive the native algorithms. Trie inspection retains native labels, child order,
+terminal flags and exact path JSON by child-position addresses, including repeated
+branch labels and native empty labels. Drawing supports selection, zoom and pan.
+Native discovery skips empty paths, includes them in input counts and merges
+duplicate paths. Truncated endpoints become terminal; terminals with children
+produce a silent closing transition when converted.
+
+The same run discovers/converts once and returns its trie, net and native PNML.
+Petri diagrams and transition/marking tables retain actual net identities.
+Downloads match the exact same-run PNML, whose nodes/arcs and source/sink markings
+are checked against the result. Check trie model hands off source revision and
+activity selection to existing conformance. Native activity/concept:name aliases
+map to replay's canonical concept:name, while literal custom selectors are kept.
+Actual ordinary replay reports three fitting traces out of four because discovery
+omits the empty path. Default/canonical/phase native probes and canonical browser
+handoff verify actual outcomes rather than asserting perfect fitness.
+
+Interval inspection retains complete native source trace/event positions, exact
+epoch seconds, activity pairs and inclusive point/range match indices. The native
+algorithm chooses the first non-earlier following start, then applies pair filtering
+and epsilon expansion. Timeline/table views select actual interval indices; point/
+range filters use returned matches. Selected bounds can round-trip into queries.
+Complete all-interval CSV remains available regardless of the visible match view.
+UTC diagram labels use millisecond formatting; numeric fields retain doubles.
+
+Interval JSON previously used default six-significant-digit stream formatting.
+The controlled first epoch boundary was displaced by about 4799.876554 seconds,
+collapsing ordinary hourly intervals and rounding queries. Output now uses
+max_digits10. Fresh native assertions round-trip start/end/point/range doubles;
+HTTP/CLI/browser proofs retain subsecond boundaries and query actual exported
+endpoints inclusively. Native discovery/query algorithms are unchanged.
+
+Original native data JSON is preserved verbatim in downloads and parameter-bound
+reports; complete scalar CSV retains every trie node, transition and interval.
+All three standalone structural CLI modes now honor -o, including verified
+Unicode input/output filenames and escaped comma/Japanese activity pairs.
+Optional source_id/include_source query envelopes preserve ordinary GET shapes,
+bind source case positions, and check revision before execution/after serialization.
+Source changes reset results, saved analysis JSON disables operations and errors
+retain the preceding usable result. Cancellation controls/signals exist without
+claimed native-computation or browser race-cancellation outcomes.
+
+docs/feature-first-structural-validation.json binds 756 frontend tests and the
+production build, 589 native sources, 150 frontend/runtime sources, three fresh
+assertion-enabled suites, 63 checks over 55 HTTP calls and 14 CLI runs, and
+34 browser checks. These cover full/truncated/custom/empty-label trie output,
+same-run PNML/markings, replay, exact epochs/queries, actual native match views,
+pair/empty outputs, error retention, source reset, saved-analysis guards and
+phone controls. A larger owned 30-case/60-event fixture verifies complete pages
+and CSV for 61 trie nodes, 60 net transitions and 30 intervals. Earlier functional
+checks retain their initial production binding; final wider epoch/selector fields
+are covered by fresh final-build responsive/pagination/source-reset checks.
+
+Retained capture corrections separate page places from final-marking references,
+use replay's canonical primary selector and its actual model result shape, and
+compare rendered node JSON instead of snapshot quote escaping. Frontend fixture
+expectations were corrected to actual UTC subsecond values and Petri places.
+Transient click/import-wait failures were resolved from fresh DOM; the original
+larger import was not restarted. The json_export core is freshly compiled and
+bound to its object; the other 166 verified core objects are reused. Other
+algorithm proofs remain inherited. Owned server/tab are closed, viewport restored
+and port released. Broader selector/type/empty-label/replay/path/compression,
+ordering/default/error and large-log performance gates remain independent.
+
+Trie and interval packages retain their existing complete parity status; this
+adds usable feature entry points and no package/module promotion. All 86 packages
+and 387 modules remain in scope: 46 complete packages, 199 complete modules and
+228 incomplete units. Full parity remains the objective.

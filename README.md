@@ -1170,6 +1170,53 @@ selector names and scalability remain parity gates. These preparation workflows
 extend feature availability without changing the algorithm catalogue's scope or
 parity statuses.
 
+### Trie, net and interval transformations
+
+Open **Transform → Tries, nets & intervals** with an active CSV/XES log.
+**Prefix trie** exposes the activity field and optional retained path length.
+Inspect exact labels, terminal flags, native child order and path JSON by stable
+child-position addresses. Repeated labels on separate branches remain distinct.
+Native discovery skips empty paths; input-case counts still include empty traces.
+Truncation makes retained endpoints terminal. The diagram supports selection,
+zoom and pan, while tables and CSV retain every node beyond the displayed page.
+
+**Trie to Petri net** discovers and converts once, returning that same trie, net
+and native PNML. Inspect visible/silent transitions, input/output places and
+source/sink markings. Download the exact PNML or use **Check trie model** to
+hand it to conformance with the source revision and activity selector. The
+primary `activity` alias maps to replay's canonical `concept:name`; literal
+custom selectors remain unchanged. Replay shows actual outcomes, including the
+empty-trace limitation, without implying perfect fitness.
+
+**Open-path intervals** exposes activity, target-start and source-completion
+fields, nonnegative boundary epsilon, an optional activity pair, and simultaneous
+point/range queries in epoch seconds. The native algorithm uses the first
+non-earlier following start for each source completion, then applies the pair
+filter. Matching is inclusive. Select a native interval on the timeline or table,
+inspect its original trace/event indices, and reuse exact boundaries as queries.
+Point/range views use the returned native match indices. **Download all intervals
+CSV** keeps every returned interval regardless of the current display filter.
+Numeric boundaries and queries retain double precision; UTC diagram labels
+are formatted to milliseconds.
+
+Complete native JSON and parameter-bound reports retain the original response
+text. Tables use 25-row pages. Source changes reset results, saved analysis JSON
+disables native operations, and failures retain the previous usable result.
+The existing GET routes `/api/trie`, `/api/trie-to-petri` and `/api/interval-tree`
+accept `source_id` and `include_source=true` query options for a
+`STRUCTURAL_TRANSFORMATION` envelope with source cases and the ordinary native
+`result`. Trie conversion additionally returns its same-run `trie` and `pnml`.
+All three standalone modes now honor `-o`, including Unicode Windows paths:
+
+```sh
+minera_export source.xes --trie --trie-max-path-length 2 -o trie.json
+minera_export source.xes --trie-to-petri -o net.json
+minera_export source.xes --interval-tree --interval-filter-activity-couple "Review,Approve\, 東京" -o intervals.json
+```
+
+The new workflows retain existing catalogue parity statuses. Reference
+ordering/default/selector/type/error and scalability gates remain independent.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the

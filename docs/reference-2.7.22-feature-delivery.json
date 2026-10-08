@@ -696,7 +696,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "structural_workflow_available",
       "package": "algo.transformation.log_to_interval_tree",
       "parity_status": "complete",
       "selectors": [
@@ -714,7 +714,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "structural_workflow_available",
       "package": "algo.transformation.log_to_trie",
       "parity_status": "complete",
       "selectors": [
@@ -1173,6 +1173,36 @@
         "TO_ACTIVITIES",
         "FEATURE_SELECTION"
       ]
+    },
+    {
+      "added": [
+        "Transform exposes prefix trie, trie-to-Petri conversion and open-path interval workflows",
+        "Native activity/path/timestamp/epsilon/pair/point/range controls, exact child-position trie inspection and query-index interval views",
+        "Interactive trie zoom/pan/selection, native Petri rendering/markings/transition tables and paginated interval timeline/source-position inspection",
+        "Original native JSON, parameter-bound reports, complete node/transition/all-interval CSV and exact same-run PNML",
+        "Trie PNML conformance handoff with native-primary alias mapping and literal custom selector preservation",
+        "Subsecond epoch interval boundaries and query values now round-trip as doubles instead of six-significant-digit rounding",
+        "All three standalone structural CLI modes honor -o with verified Unicode filenames and activity arguments",
+        "Source guards/reset, saved-analysis disabling, native-error result retention and responsive precision controls"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/StructuralWorkspace.tsx",
+        "src/frontend/src/structural-workspace.ts",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/minera_export.cpp"
+      ],
+      "families": [
+        "algo.transformation.log_to_trie",
+        "algo.transformation.log_to_interval_tree"
+      ],
+      "id": "native_structural_transformations",
+      "state": "native_app_and_cli_available",
+      "validation": "docs/feature-first-structural-validation.json",
+      "variants": [
+        "default",
+        "TO_PETRI_NET",
+        "OPEN_PATHS"
+      ]
     }
   ],
   "execution_priority": [
@@ -1190,7 +1220,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue reviewing OCEL analysis, trie/interval-tree transformations, remaining model/export variants and conformance/simulation controls. All six log conversion variants and all six case utilities now have configurable workflows, complete result inspection/exports and actual native XES reopening. Feature, target and label workflows remain available; recorded exactness gates stay independent."
+      "next_action": "Continue reviewing OCEL analysis, remaining model/export variants and conformance/simulation controls. Trie/interval and trie-to-Petri now have configurable workflows, complete positional data/exports, native PNML and conformance handoff. All six log conversions, all six utilities, feature/target/label workflows remain available; recorded exactness gates stay independent."
     }
   ],
   "feature_status_meaning": {
@@ -1205,6 +1235,7 @@
     "prompt_provider_and_log_query_available": "Database prompts and configured provider execution are joined by real SQLite/DuckDB queries, generated SQL, complete case/event filter exports and app reopening; exact reference prompt, abstraction, type and execution-corpus parity remain independent gates.",
     "prompt_provider_queries_and_studies_available": "Configured text prompts/providers, SQL queries and filters, named case clusters and executable hypotheses have usable app/native/standalone paths. Exact abstractions, provider interfaces, parameters, ordering and type behavior remain independent parity gates.",
     "runtime_and_search_available": "A real local encoder and usable case/event search and vector-export entry point are validated. Exact reference behavior and native log filtering remain independent gates.",
+    "structural_workflow_available": "Configurable native trie/interval workflows expose exact positional data, diagrams, query matches, complete JSON/report/CSV, same-run Petri conversion/PNML and conformance handoff. Existing reference parity statuses and remaining exactness/performance gates stay independent.",
     "transformation_workflow_available": "Configurable native feature/target/label workflows expose matrix schemas, values, padding and source positions, complete native JSON/reports/CSV and transformed XES reopening with persistent selected activity fields. Existing parity statuses and open semantic/type/error/performance gates remain independent."
   },
   "full_parity_achieved": false,

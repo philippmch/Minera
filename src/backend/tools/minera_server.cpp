@@ -5451,6 +5451,28 @@ void handle_label_splitting(const httplib::Request& request,
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
+std::string structural_json(const MinedSession& session, std::string result,
+                            const std::string& activity_key,
+                            const minera::TrieModel* trie = nullptr,
+                            const minera::PetriNet* net = nullptr) {
+  const auto quote = minera::embedding_runtime::detail::escape_json;
+  std::string body = "{\"family\":\"STRUCTURAL_TRANSFORMATION\",\"source_id\":" +
+      quote(std::to_string(session.query_source_id)) + ",\"activity_key\":" +
+      quote(activity_key) + ",\"result\":" + result + ",\"cases\":[";
+  for (std::size_t i = 0; i < session.log.traces.size(); ++i) {
+    if (i) body += ',';
+    const auto& trace = session.log.traces[i];
+    body += "{\"index\":" + std::to_string(i) + ",\"case_id\":" + quote(trace.case_id) +
+        ",\"event_count\":" + std::to_string(trace.events.size()) + '}';
+  }
+  body += "],\"trie\":" + (trie ? minera::trie_json(*trie) : "null") +
+      ",\"pnml\":" + (net ? quote(minera::to_pnml(*net, "trie")) : "null") + '}';
+  std::lock_guard<std::mutex> lock(g_session_mutex);
+  if (!g_session || g_session->query_source_id != session.query_source_id)
+    throw std::invalid_argument("the source log changed during structural transformation; run again");
+  return body;
+}
+
 void handle_trie(const httplib::Request& request,
                  httplib::Response& response) {
   try {
@@ -5466,7 +5488,7 @@ void handle_trie(const httplib::Request& request,
       return;
     }
     static const std::set<std::string> allowed = {
-        "trie_activity_key", "trie_max_path_length"};
+        "trie_activity_key", "trie_max_path_length", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -5479,10 +5501,12 @@ void handle_trie(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
+    const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_trie_params(lookup, present);
-    response.set_content(minera::trie_json(
-                             minera::discover_trie(session->log, options)),
-                         "application/json");
+    const auto trie = minera::discover_trie(session->log, options);
+    auto body = minera::trie_json(trie);
+    if (include_source) body = structural_json(*session, std::move(body), options.activity_key);
+    response.set_content(body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -5504,7 +5528,7 @@ void handle_trie_to_petri(const httplib::Request& request,
       return;
     }
     static const std::set<std::string> allowed = {
-        "trie_activity_key", "trie_max_path_length"};
+        "trie_activity_key", "trie_max_path_length", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -5518,11 +5542,13 @@ void handle_trie_to_petri(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
+    const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_trie_params(lookup, present);
-    const auto net = minera::convert_trie_to_petri_net(
-        minera::discover_trie(session->log, options));
-    response.set_content(minera::serialize_trie_petri_net_json(net),
-                         "application/json");
+    const auto trie = minera::discover_trie(session->log, options);
+    const auto net = minera::convert_trie_to_petri_net(trie);
+    auto body = minera::serialize_trie_petri_net_json(net);
+    if (include_source) body = structural_json(*session, std::move(body), options.activity_key, &trie, &net);
+    response.set_content(body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -5547,7 +5573,7 @@ void handle_interval_tree(const httplib::Request& request,
         "interval_activity_key", "interval_start_timestamp_key",
         "interval_timestamp_key", "interval_epsilon",
         "interval_filter_activity_couple", "interval_query_point",
-        "interval_query_start", "interval_query_end"};
+        "interval_query_start", "interval_query_end", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -5560,12 +5586,15 @@ void handle_interval_tree(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
+    const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_interval_tree_params(lookup, present);
     const auto intervals =
         minera::discover_open_path_intervals(session->log, options);
     const auto query = minera::query_open_path_intervals(
         intervals, minera::interval_tree_query_options(options));
-    response.set_content(minera::interval_tree_json(query), "application/json");
+    auto body = minera::interval_tree_json(query);
+    if (include_source) body = structural_json(*session, std::move(body), options.activity_key);
+    response.set_content(body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
