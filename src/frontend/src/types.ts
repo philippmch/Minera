@@ -1723,6 +1723,7 @@ export interface OcelFilterResult {
   family: "OCEL_FILTER";
   variant: OcelFilterVariant;
   log: Record<string, unknown>;
+  open_log?: Record<string, unknown>;
 }
 export interface OcelSqliteResult {
   family: "OCEL_SQLITE";
@@ -1750,6 +1751,7 @@ export interface OcelSplitResult {
   returned_count: number;
   truncated: boolean;
   logs: Array<Record<string, unknown>>;
+  open_logs?: Array<Record<string, unknown>>;
 }
 export type OcelEnrichmentGraph =
   | "object_interaction_graph"
@@ -1763,6 +1765,7 @@ export interface OcelEnrichmentResult {
   graphs: OcelEnrichmentGraph[];
   lifecycle_qualifiers: boolean;
   log: Record<string, unknown>;
+  open_log?: Record<string, unknown>;
 }
 export type OcelObjectGraphVariant = OcelEnrichmentGraph;
 export interface OcelObjectGraphResult {

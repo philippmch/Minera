@@ -6549,7 +6549,7 @@ export function ocelEnrichmentQuery(options: OcelEnrichmentOptions = {}): string
       "object_inheritance_graph", "object_cobirth_graph",
       "object_codeath_graph",
     ].includes(graph))) throw new Error("OCEL enrichment graph is invalid");
-    if (graphs.length) query.set("graphs", graphs.join(","));
+    query.set("graphs", graphs.length ? graphs.join(",") : "none");
   }
   if (options.lifecycle_qualifiers !== undefined)
     query.set("lifecycle_qualifiers", options.lifecycle_qualifiers ? "true" : "false");
