@@ -1217,6 +1217,56 @@ minera_export source.xes --interval-tree --interval-filter-activity-couple "Revi
 The new workflows retain existing catalogue parity statuses. Reference
 ordering/default/selector/type/error and scalability gates remain independent.
 
+### OCEL analysis
+
+Open an OCEL JSON log and choose **Analyze objects & events** beside the
+object-centric process models. The original uploaded file drives all sixteen
+analysis variants:
+
+- **Feature matrices** for events, objects and event/object relations. Native
+  defaults or explicit Enabled/Disabled controls cover 36 feature switches,
+  object presets and related-object context. Set attribute names with JSON lists,
+  including literal comma/Unicode names, and choose column limits, name style,
+  object type, interaction source or neighbor graph where applicable.
+- **Object-centric statistics** for activities by type, object counts per event,
+  activity associations, associations by type and edge associations/performance.
+  Association filters select lifecycle starts/ends. Edge performance can measure
+  business hours with native or explicit weekly active slots.
+- **Log descriptions** as native text or event/object tuples, with optional
+  timestamps. Object tuples preserve lifecycle booleans and empty orphan bounds.
+- **Object relationship graphs** for interaction, descendants, inheritance,
+  co-birth and co-death, including isolated objects and empty edge sets.
+- **Event/object/change graph** with native E2O, qualified O2O, object-local
+  directly-follows and change edges. DF edges and change nodes can be switched off.
+
+Tables retain native positions, identifiers and types, including repeated
+relation rows. Row and column pages are independent; **Download complete selected
+CSV** retains every entry. Edge statistics export all seven native metric arrays.
+Graph nodes support inspection, zoom and pan; the drawing keeps its existing
+120-node/360-edge bounds while tables and downloads retain complete native data.
+
+**Download native OCEL data** preserves the response JSON verbatim. Reports bind
+the original file's name, byte size and SHA-256 to the request and response.
+Inspection and CSV preserve native numeric literals, including integers beyond
+JavaScript's safe range. They do not reverse native OCEL source-type conversion.
+Absent graph change-value cells display `null`; raw JSON retains field absence.
+Source changes reset results, and failed runs retain the preceding usable result.
+
+The same analysis families remain available in `minera_ocel`. Windows filenames
+and arguments use UTF-8; feature attribute lists accept escaped delimiters:
+
+```sh
+minera_ocel source-東京.json --features events --features-string-events 'region\, 東京'
+minera_ocel source.json --statistics activity_associations --statistics-prefilter start
+minera_ocel source.json --describe variant2 --no-description-timestamps
+minera_ocel source.json --graph heterogeneous --graph-include-df false
+```
+
+[Validation and checkpoint boundaries](docs/feature-first-ocel-analysis-validation.json)
+track feature delivery separately from full reference parity. OCEL filtering,
+splitting, enrichment, flattening, conformance/playout and remaining exactness and
+performance gates continue in the feature ledger.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the

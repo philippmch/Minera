@@ -2378,7 +2378,7 @@ export interface OcelDescriptionResult {
   text?: string;
   events?: string[][];
   event_object_counts?: number[];
-  objects?: Array<Array<string | number>>;
+  objects?: Array<Array<string | number | boolean>>;
 }
 export function isOcelDescriptionResult(value: unknown): value is OcelDescriptionResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_DESCRIPTION" ||

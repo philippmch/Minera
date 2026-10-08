@@ -11879,3 +11879,60 @@ Trie and interval packages retain their existing complete parity status; this
 adds usable feature entry points and no package/module promotion. All 86 packages
 and 387 modules remain in scope: 46 complete packages, 199 complete modules and
 228 incomplete units. Full parity remains the objective.
+
+
+## Feature delivery first: OCEL analysis workflows (2026-10-08)
+
+OCEL uploads now offer Analyze objects & events beside the existing five model
+views. All sixteen analysis variants are available: three feature projections,
+five statistics, two descriptions, five object graphs and one heterogeneous
+event/object/change graph. Each analysis uses the original immutable File and
+binds its filename, byte size and SHA-256 in a report with verbatim native data.
+
+Thirty-six tri-state feature controls retain native group/preset behavior and
+selected projection/context applicability. Four JSON attribute lists retain
+literal comma/Unicode names through the existing sorted/escaped API transport;
+empty lists retain native empty-vector behavior. Type/style/column-limit,
+interaction/neighbor, association prefilter, business-hour slots, description
+timestamp and heterogeneous DF/change controls drive the actual native routes.
+
+Positional tables retain native identifiers/types and duplicate relation rows.
+Complete CSV exports include every row/column beyond 25-row/eight-column pages.
+Descriptions retain lifecycle booleans and empty orphan boundaries; edge
+statistics retain opaque keys and all seven native arrays. Graph inspection
+keeps isolated nodes, actual directed/undirected relationships, qualifiers,
+native change data and selected payloads. Verbatim response JSON and holder-bound
+numeric tokens preserve native int64 literals in CSV/attribute inspection.
+This does not reverse earlier native OCEL source-type conversion. Absent graph
+change-value projection cells display null; raw data retains native field absence.
+
+The Windows OCEL CLI now converts argument text to UTF-8 and uses u8path at all
+nine filesystem argument sites. Its four feature-attribute list flags decode
+delimiter/backslash escapes without changing unrelated option parsers. Ordinary
+Unicode JSON filenames, type selectors and feature controls agree with HTTP.
+Other path/format combinations remain gates, and no new -o behavior is claimed.
+
+docs/feature-first-ocel-analysis-validation.json binds 769 frontend tests and the
+production build, 589 native and 155 frontend/runtime sources, 167 reused core
+objects, five fresh assertion-enabled native suites, 62 checks over 56 HTTP calls
+and 29 CLI runs, five further pagination HTTP checks, 57 initial browser checks,
+10 final-build browser checks and 21 CSV/asset audits. The final projection repair
+is separately bound: missing node change-values no longer export undefined.
+Both controlled and larger graph CSV retain exact signed 64-bit attributes.
+
+The larger owned fixture retains 30 events, 31 objects and 31 relation rows,
+including a repeated final relation; its 61-node heterogeneous graph has 31 E2O
+edges plus a native DF self-loop. Complete matrix/tuple/node/edge exports and
+last-page identities are checked against actual native output. The business-hour
+fixture exercises native calendar/default/full-week slot conventions without
+promoting reference business-hours or performance parity. Retained captures
+record the CLI list mismatch, projection repair, native self-loop expectation,
+test declaration corrections and actual diagram/content-width assertions.
+
+Native algorithms are unchanged. Owned servers/tabs are closed, viewport is
+restored and the port is free; 110 unrelated files and historical journal bytes
+are preserved. All 86 packages/387 modules remain in scope, with 46 complete
+packages, 199 complete modules and 228 incomplete units. Four existing feature/
+description families receive delivery annotations only; their parity states
+remain unchanged. OCEL filtering, splitting, enrichment, flattening, conformance,
+playout and remaining exactness/performance gates continue toward full parity.
