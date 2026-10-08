@@ -984,6 +984,25 @@
         "ocel_features",
         "ocel_ocdfg"
       ]
+    },
+    {
+      "added": [
+        "OpenAI Responses text/image execution alongside Chat Completions",
+        "Image blocks in Anthropic Messages and Google generateContent",
+        "Native CLI and standard-library standalone image attachments with exact bytes",
+        "Reviewed browser attachments, previews, removal, cancellation and source reset",
+        "Extra JSON payload fields with reference-observed overriding precedence",
+        "Provider temperature ranges, Responses refusal/incomplete handling and actual model reporting",
+        "Complete submitted request retained in response downloads, including original images and overrides"
+      ],
+      "entry_points": [
+        "scripts/llm_runtime.py",
+        "src/backend/tools/minera_knowledge.cpp",
+        "src/frontend/src/components/AskModel.tsx"
+      ],
+      "id": "llm_responses_images_and_extra_payloads",
+      "state": "available_with_configured_provider",
+      "validation": "docs/feature-first-llm-images-validation.json"
     }
   ],
   "execution_priority": [
@@ -993,7 +1012,7 @@
   "feature_backlog": [
     {
       "area": "LLM and query integrations",
-      "next_action": "Deliver remaining provider parameters and multimodal visualization interfaces. All 13 log/model/OCEL text builders, case clustering, executable hypotheses, SQL queries and complete filters now have usable entry points; exact reference behavior remains open."
+      "next_action": "Complete visualization-saver adapters and review remaining provider/modal capabilities. Responses, image attachments and overriding extra payloads now join all 13 native contexts, SQL queries/filters, clusters and hypotheses; defaults, omission, MIME, per-call URLs and failure/response details remain parity gates."
     },
     {
       "area": "Optional connector drivers",

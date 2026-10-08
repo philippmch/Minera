@@ -672,7 +672,7 @@ The HTTP layer uses the vendored
 The **Ask a model** tab previews and edits a prompt built from process context,
 a general description or a database schema. OpenAI, Anthropic and Google calls
 run through the optional Python runtime. The application sends the displayed
-prompt when **Send displayed prompt** is selected; the response and its original
+prompt and selected attachments when **Send displayed prompt** is selected; the response and its original
 provider payload can be downloaded as JSON.
 
 Set the selected provider's credential in the runtime environment:
@@ -714,6 +714,53 @@ Automated checks use local HTTP protocol fixtures; external account access and
 live model inference are not established by those checks. Provider parameters,
 multimodal interfaces and exact reference behavior retain their feature and
 parity gates.
+
+### Image queries and additional provider payloads
+
+**Ask a model** accepts up to eight PNG, JPEG, WebP or GIF attachments. The app
+detects their media type from their bytes, displays previews, and retains the
+complete submitted request in the response download. Native OCEL context and
+images can be sent together. Image support also depends on the selected model
+and provider; upstream failures remain explicit.
+
+OpenAI offers **Responses** and **Chat Completions** in the app. The Responses
+path handles answer text, refusals, incomplete responses and token usage.
+Existing requests that omit `openai_api` use the runtime's configured default,
+selected with `MINERA_OPENAI_API=responses|chat_completions`; its compatibility
+default remains `chat_completions`. Anthropic and Google use their existing
+Messages and generateContent paths with image content blocks.
+
+Expand **Extra provider payload** to supply a JSON object using the provider's
+field names. Its fields override generated fields, including model or prompt
+content when supplied. Google generation controls belong inside
+`generationConfig`; that whole object replaces the generated object. Downloads
+preserve these overrides. Streaming and background responses need separate
+consumers and are rejected by this synchronous runtime. Temperature controls
+allow 0–2 for OpenAI/Google and 0–1 for Anthropic; leave the field blank for
+model defaults.
+
+```sh
+minera_knowledge --variant description --description "Explain this process diagram" --runtime-url http://127.0.0.1:8189 --provider openai --model MODEL --openai-api responses --image process.png
+minera_knowledge --variant description --description "Compare these diagrams" --runtime-url http://127.0.0.1:8189 --provider anthropic --model MODEL --image first.png --image second.png --extra-payload-file controls.json
+python scripts/llm_runtime.py --complete request.json --image process.png
+```
+
+`--image` can be repeated; `--image-detail auto|low|high|original` supplies
+OpenAI image detail. `--extra-payload` accepts literal JSON and
+`--extra-payload-file` accepts a UTF-8 file. Image and extra-payload arguments
+apply to completion commands with `--runtime-url`. The HTTP completion envelope
+supports `images` (name, media_type, base64 data and optional detail),
+`extra_payload`, and optional `openai_api`. The browser accepts individual
+images up to 1.5 MiB; the complete serialized request must fit 2 MiB across
+all entry points. Original bytes are retained.
+
+The protocols follow [OpenAI Responses](https://developers.openai.com/api/reference/python/resources/responses/methods/create),
+[OpenAI vision](https://developers.openai.com/api/docs/guides/images-vision?api-mode=responses),
+[Anthropic vision](https://platform.claude.com/docs/en/build-with-claude/vision), and
+[Google content generation](https://ai.google.dev/api/generate-content).
+This is usable image transport and payload control. Exact pinned-reference
+defaults, field omission, media-type conventions, saver adapters, response/error
+behavior and per-call endpoint conventions remain independent parity gates.
 
 ### Native log, model and OCEL contexts
 

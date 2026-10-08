@@ -30,6 +30,15 @@ int main() {
   options.provider="bad";rejects([&]{minera::llm_runtime::completion_json(url,"prompt",options);});
   options.provider="openai";options.model="";rejects([&]{minera::llm_runtime::completion_json(url,"prompt",options);});
   options.model="fixture";options.max_tokens=0;rejects([&]{minera::llm_runtime::completion_json(url,"prompt",options);});
-  options.max_tokens=256;options.temperature=2;rejects([&]{minera::llm_runtime::completion_json(url,"prompt",options);});
+  options.max_tokens=256;options.temperature=2.1;rejects([&]{minera::llm_runtime::completion_json(url,"prompt",options);});
+  options.temperature=2;options.openai_api="responses";options.extra_payload="{\"metadata\":{\"source\":\"owned\"}}";
+  const auto image_path=std::filesystem::temp_directory_path()/("minera-llm-image-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())+".png");
+  {std::ofstream image(image_path,std::ios::binary);image<<"\x89PNG\r\n\x1a\n";}
+  options.images.push_back(minera::llm_runtime::image_file(image_path));std::filesystem::remove(image_path);
+  assert(options.images[0].media_type=="image/png"&&options.images[0].data=="iVBORw0KGgo=");
+  minera::llm_runtime::completion_json(url,"image prompt",options);
+  assert(captured.find("\"openai_api\":\"responses\"")!=std::string::npos&&captured.find("iVBORw0KGgo=")!=std::string::npos);
+  assert(captured.find("\\\"metadata\\\"")!=std::string::npos);
+  options.provider="anthropic";options.openai_api.clear();rejects([&]{minera::llm_runtime::completion_json(url,"prompt",options);});
   server.stop();worker.join();
 }
