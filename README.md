@@ -1263,9 +1263,9 @@ minera_ocel source.json --graph heterogeneous --graph-include-df false
 ```
 
 [Validation and checkpoint boundaries](docs/feature-first-ocel-analysis-validation.json)
-track feature delivery separately from full reference parity. OCEL filtering,
-splitting, enrichment, flattening, conformance/playout and remaining exactness and
-performance gates continue in the feature ledger.
+track feature delivery separately from full reference parity. OCEL preparation,
+comparison and simulation have their own workflows below; remaining I/O/model
+controls and exactness/performance gates continue in the feature ledger.
 
 ### OCEL preparation
 
@@ -1320,8 +1320,60 @@ minera_ocel source.json --flatten-object-type Item
 
 [Validation and checkpoint boundaries](docs/feature-first-ocel-preparation-validation.json)
 retain native classic-format duplicate-pair conventions, isolated-component
-behavior and remaining exactness/performance gates. OCEL conformance/playout and
-remaining I/O/model controls continue in the feature ledger.
+behavior and remaining exactness/performance gates. Remaining I/O/model controls
+continue in the feature ledger.
+
+### OCEL comparison and simulation
+
+Choose **Compare & simulate OCEL** with an object-centric source open.
+
+- **Conformance comparison** supports event-to-object-type (ETOT), object-centric
+  directly-follows (OCDFG) and object-type relations (OTG). Compare the current
+  original OCEL or an uploaded native graph with a normative OCEL or graph.
+  Weights, thresholds and applicable discovery selectors retain native defaults
+  when blank. Fitness and missing/additional categories remain separately
+  inspectable; a fitness of one can coexist with additional activities or edges.
+- **Model playout** discovers an object-centric Petri net or causal net from the
+  current original source. Select independent object firings, shared activity or
+  synchronized binding. Discovery variants/annotations/selectors, object IDs by
+  type, search/branching bounds, full unsigned 64-bit random seeds, time spacing
+  and optional binding/fired-transition diagnostics are configurable. Petri-net
+  initial/final token vectors use the place positions in the same-run model.
+
+**Download OCEL execution report** binds both actual comparison files, or the
+original simulation source, by filename, byte size and SHA-256. Native data,
+model records, binding sequences and fired transitions retain their complete
+JSON. **Download complete execution CSV** includes every row of the selected
+category beyond the 25-row page. Diagram indices belong to the actual discovered
+model returned by that run; causal marker groups remain in its model inspection.
+
+**Download simulated OCEL** and **Open simulated OCEL** use the same-run native
+OCEL 2.0 source. Opening it makes the generated file the active source in the
+existing model and analysis workflows. Empty simulations remain downloadable;
+their opening action is disabled. Failed runs retain the preceding result.
+
+Results reflect the supplied search bounds and branching choices. Reachability
+mode returns the native existence result and may produce an empty log; it does
+not establish unbounded reachability. Explicit per-net markings apply to Petri
+playout; causal marker search uses its own groups. Conformance controls accept
+signed finite numbers, with nonfinite native conventions retained as a gate.
+
+`POST /api/ocel/playout` accepts optional `include_model=true` and
+`include_open_source=true` for additive same-run `model` and `open_log` fields.
+Ordinary responses retain their existing shape without these flags. The existing
+standalone CLI supports comparisons and simulation:
+
+```sh
+minera_ocel source.json --conformance etot --normative normative.json
+minera_ocel source.json --ocpn-playout --ocpn-event-binding synchronized --ocpn-max-traces 4 --ocpn-return-traces
+minera_ocel source.json --oc-causal-net --ocpn-event-binding shared_activity --ocpn-max-traces 4 --ocpn-return-sequences
+```
+
+[Validation and checkpoint boundaries](docs/feature-first-ocel-execution-validation.json)
+record all twelve comparison input combinations, six model/binding combinations,
+native roundtrips, source handoff, paging and complete exports. This delivers the
+workflows while keeping the complete parity catalogue and remaining exactness,
+search-exhaustiveness, platform and performance gates open.
 
 ### Sample dataset
 

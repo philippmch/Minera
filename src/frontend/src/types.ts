@@ -1825,6 +1825,8 @@ export interface OcelPetriPlayoutResult {
   sequences?: OcelPlayoutBinding[][];
   traces?: OcelPlayoutTraceEvent[][];
   log: Record<string, unknown>;
+  open_log?: Record<string, unknown>;
+  model?: Record<string, unknown>;
 }
 export interface OcelCausalNetPlayoutResult {
   family: "OC_CAUSAL_NET_PLAYOUT";
@@ -1834,6 +1836,8 @@ export interface OcelCausalNetPlayoutResult {
   sequences?: OcelPlayoutBinding[][];
   traces?: OcelPlayoutTraceEvent[][];
   log: Record<string, unknown>;
+  open_log?: Record<string, unknown>;
+  model?: Record<string, unknown>;
 }
 export type OcelPlayoutResult = OcelPetriPlayoutResult | OcelCausalNetPlayoutResult;
 function isOcelRecord(value: unknown): value is Record<string, unknown> {

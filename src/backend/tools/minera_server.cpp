@@ -2269,7 +2269,8 @@ void handle_ocel_playout(const httplib::Request& request,
         "return_traces",
         "seed", "start", "case_interval", "event_interval", "ocpn_variant",
         "double_arc_threshold", "noise_threshold", "ocpn_annotation",
-        "ocpn_activity_attribute", "ocpn_object_type_attribute"};
+        "ocpn_activity_attribute", "ocpn_object_type_attribute",
+        "include_open_source", "include_model"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -2406,21 +2407,31 @@ void handle_ocel_playout(const httplib::Request& request,
     discovery.noise_threshold =
         ocel_query_number(request, "noise_threshold", discovery.noise_threshold);
     const auto log = minera::parse_ocel_json(body);
+    const bool include_open_source = ocel_query_bool(request, "include_open_source", false);
+    const bool include_model = ocel_query_bool(request, "include_model", false);
+    const auto publish = [&](std::string payload, const minera::Ocel& generated,
+                             const std::string& discovered_model) {
+      if (include_open_source || include_model) {
+        payload.pop_back();
+        if (include_open_source)
+          payload += ",\"open_log\":" + minera::serialize_ocel_json(
+              generated, minera::OcelJsonFormat::kStandard);
+        if (include_model) payload += ",\"model\":" + discovered_model;
+        payload += '}';
+      }
+      response.set_content(payload, "application/json");
+    };
     if (model == "causal_net") {
       const auto causal = minera::discover_oc_causal_net(log, discovery);
       const auto result = minera::oc_causal_net_extensive_playout_result(causal,
                                                                            options);
-      response.set_content(minera::serialize_oc_causal_net_playout_json(
-                               result,
-                               options.event_binding),
-                           "application/json");
+      publish(minera::serialize_oc_causal_net_playout_json(result, options.event_binding),
+              result.log, include_model ? minera::serialize_oc_causal_net_json(causal) : "");
     } else {
       const auto graph = minera::discover_ocpn(log, discovery);
       const auto result = minera::ocpn_extensive_playout_result(graph, options);
-      response.set_content(minera::serialize_ocpn_playout_json(
-                               result,
-                               options.event_binding),
-                           "application/json");
+      publish(minera::serialize_ocpn_playout_json(result, options.event_binding),
+              result.log, include_model ? minera::serialize_ocpn_json(graph) : "");
     }
   } catch (const std::exception& error) {
     response.status = 400;

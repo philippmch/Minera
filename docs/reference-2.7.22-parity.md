@@ -11996,3 +11996,57 @@ in scope: 46 complete packages, 199 complete modules and 228 incomplete units.
 Owned servers/tabs are closed, viewport is restored and the port is released;
 110 unrelated files and historical journal bytes remain preserved. Continue OCEL
 conformance/playout, remaining I/O/model controls and full exactness/performance.
+
+
+## Feature delivery first: OCEL comparison and simulation (2026-10-08)
+
+Compare & simulate OCEL adds ETOT, OCDFG and OTG conformance workflows and
+object-centric Petri/causal-net playout. All twelve real/normative OCEL/graph
+combinations and all six model/event-binding combinations use the existing
+native algorithms. Reports bind each actual uploaded source by filename, byte
+size and SHA-256. Native fitness and missing/additional categories remain
+separate: fitness one can coexist with additional activities or edges.
+
+Controls expose signed finite conformance weights/thresholds, discovery variant,
+annotation and selectors, literal object ID maps, bounds/branching, full uint64
+seed, timestamp spacing and diagnostic switches. Explicit per-type OCPN token
+vectors use actual same-run place/source/sink positions. Causal marker search
+ignores those vectors, so the UI limits marking controls to OCPN. Native bounded
+reachability reports existence for that run and may generate no events; it has
+no exhaustive-search/truncation flag. No unbounded reachability claim is made.
+
+Optional include_model=true and include_open_source=true return the same-run
+discovered model and native standard simulated OCEL without rerunning or
+reparsing the result. Ordinary responses retain their shapes without the flags.
+Complete positional tables/CSV preserve generated records, empty diagnostics,
+binding sequences, fired transitions and model categories. Diagrams use that
+same model; causal marker groups remain fully inspectable. Native numeric
+tokens avoid JavaScript rounding without reversing earlier source conversion.
+
+Native errors retain preceding results; source changes reset them. Opening a
+simulated log activates its derived source in existing models/analysis. The
+browser confirms four activities/four flows and six relation-feature rows.
+Reachability-only/zero-event logs remain downloadable; their opening action is
+disabled. Both full form sets fit a 390px phone viewport. Cancellation signals
+have unit coverage without a claim of native-computation interruption or a
+browser race-cancellation success.
+
+docs/feature-first-ocel-execution-validation.json binds 791 frontend tests and
+the production build, 589 native and 163 frontend/runtime sources, 167 reused
+core objects and four fresh assertion-enabled native suites. It records 61
+primary checks over 60 HTTP calls/12 CLI runs, four pagination checks over three
+calls, 44 browser checks and 15 CSV/asset checks over eleven exports. Thirty
+generated events and thirty conformance deviations retain all last-page rows
+and complete CSV. Native event-map ordering and fired-trace order remain distinct.
+
+Retained captures record HTTP wrappers versus plain CLI output, actual marking
+fields, trace arrays and lexicographic event keys. Native accepts negative and
+NaN conformance weights; finite signed values are exposed while nonfinite/error
+conventions remain a parity gate. No reference bodies/bytecode were inspected.
+
+Five existing conformance/playout families receive delivery annotations only.
+No native algorithm or catalogue parity status is promoted. All 86 packages/
+387 modules remain in scope: 46 complete packages, 199 complete modules and 228
+incomplete units. Owned server/tab are closed, viewport restored and port 8499
+released. The 110 unrelated files and historical journal bytes remain preserved.
+Continue remaining I/O/model controls and full exactness/performance gates.
