@@ -1055,6 +1055,71 @@ Both clustering packages retain their partial parity status. Exact distance,
 feature extraction, optimization, selector, ordering and scalability behavior
 remain separate catalogue gates.
 
+### Feature, target and label transformations
+
+Open **Transform** with an active CSV/XES log. **Feature matrices** exposes
+`TRACE_BASED`, `EVENT_BASED` and `TEMPORAL`, including calendar frequencies and
+fixed windows. Configure activity/case/time/resource fields, eight exact
+attribute/schema lists, numeric defaults and all ten extra case feature families.
+Choose Native default, an explicit JSON list or an explicit empty list. Case
+schema selection depends on explicit ordinary attribute selectors; automatic
+selection can replace a supplied schema, and extra families can append columns.
+Individual Enabled/Disabled overrides take precedence over the all-extra switch.
+Resource workload rejects empty traces; disabling that family permits the other
+extra features on the exercised fixture.
+
+Inspect exact source case positions, identifiers and native values. Rich case
+identifier cells retain large integers and metadata. Event matrices include
+native padding to the longest case; padding rows are marked in the table and
+CSV, including rows belonging to empty traces. Temporal rows retain exact epoch
+nanosecond labels when available and native nonfinite spellings such as Infinity.
+The table pages through 25 rows and eight dimensions. Duplicate and empty
+feature names keep their column positions; downloads retain the complete result.
+
+**Prediction targets** exposes next activity, next-event time and remaining case
+time. Explicit activity classes retain their supplied order. Time targets use
+seconds. Optional padding must cover the longest case and is limited to 100,000
+rows per case in the workflow; zero rows distinguish terminal/padding values
+through their event position and row kind.
+
+**Contextual label splitting** exposes source/output fields, prefix/suffix
+lengths, edge threshold, separator and selected activities. The table compares
+the input label, previous output field and actual new field. Download the same
+run's XES or open it using the selected output activity field. Custom imported
+fields remain selected when re-mining with filters, and their names retain
+whitespace and Unicode. A newly introduced field may be absent on unchanged
+events; its complete XES remains downloadable, while reopening requires a
+nonempty output activity field for every event.
+
+**Download transformation data** preserves the original native response JSON;
+the complete report adds its requested parameters. CSV is a flat scalar view,
+with source positions and padding/bucket metadata. The JSON retains richer
+types, exact identifiers and the original native JSON text. Saved analysis JSON
+cannot transform another cached source. Changed source revisions are rejected;
+failed runs retain the preceding usable result.
+
+Legacy routes remain `POST /api/log-to-features`, `POST /api/transform-target`
+and `POST /api/label-splitting`. Add the current `source_id` and
+`include_source=true` for a `LOG_TRANSFORMATION` response with case positions
+and the ordinary native `result`. Label responses also include `transformed_xes`,
+`label_rows`, `activity_attribute` and `complete_activity_field`. Standalone
+execution uses the same native algorithms:
+
+```sh
+minera_export source.xes --log-to-features --features-variant event_based --features-event-numeric-attributes cost
+minera_export source.xes --transform-target --target-variant remaining_time --target-enable-padding true --target-pad-size 20
+minera_export source.xes --label-splitting --label-splitting-target-activities Review --label-splitting-prefix-length 1 --label-splitting-suffix-length 0
+```
+
+These three standalone modes also accept `-o result.json`. Windows CLI argument
+values and filesystem paths are decoded as UTF-8, retaining Unicode classes,
+input/output filenames and dataset names in the exercised ordinary XES/JSON paths.
+
+The feature and contextual-label packages retain their partial parity status;
+target transformation retains its existing complete catalogue status. App
+availability does not promote exact algorithm, selector, schema, numeric or
+scalability parity.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the

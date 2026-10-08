@@ -24,15 +24,16 @@ std::string activity_value(const Event& event, const std::string& key) {
 
 void set_activity_value(Event& event, const std::string& key,
                         const std::string& value) {
-  if (key.empty() || key == "activity" || key == "concept:name") {
-    event.activity = value;
+  if (key.empty() || key == "activity" || key == "concept:name" ||
+      (!event.activity_source_key.empty() && key == event.activity_source_key)) {
+    const auto source = event;
+    set_event_activity_context(source, value, event);
     return;
   }
   for (auto& attribute : event.attributes) {
     if (attribute.key == key) {
-      attribute.value = value;
-      attribute.kind = AttributeKind::kString;
-      attribute.is_null = false;
+      // A label replaces the selected value, including its old typed payload.
+      attribute = EventAttribute{key, value, AttributeKind::kString};
       return;
     }
   }

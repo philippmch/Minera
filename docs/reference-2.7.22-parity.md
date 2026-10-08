@@ -11657,3 +11657,73 @@ Exact distance/tie order, feature extraction, optimizer initialization, paramete
 type, error and scalability parity remain open. All 86 packages and 387 modules
 remain in scope: 46 complete packages, 199 complete modules and 228 incomplete
 units. Neither clustering family is promoted from partial parity.
+
+
+## Feature delivery first: feature, target and label transformations (2026-10-08)
+
+Transform exposes TRACE_BASED, EVENT_BASED and TEMPORAL feature extraction
+(calendar and fixed-window grouping), NEXT_ACTIVITY/NEXT_TIME/REMAINING_TIME
+targets, and CONTEXTUAL label splitting. Controls cover all exposed native
+activity/case/time/resource and derived fields, eight literal JSON attribute/
+schema lists with omitted versus explicit-empty distinction, all ten extra
+feature families and individual default/enabled/disabled overrides, numeric
+settings, class order, padding and contextual splitting fields.
+
+Matrix/label tables page through 25 rows and eight dimensions, preserving source
+case positions, repeated case IDs, event positions, native values and complete
+downloads. Event tensors pad to the longest trace; target padding is explicit.
+Padding rows, including rows for empty traces, are marked separately from events.
+Duplicate/empty feature names retain their positions. Rich case identifiers,
+temporal epoch-nanosecond strings and native nonfinite spellings remain visible.
+CSV is a flat scalar view; native response/data and parameter-bound reports
+retain the original JSON text, richer types and exact integer representations.
+
+Optional source_id/include_source workflows preserve ordinary HTTP result shapes
+and bind case positions to the actual source. Label output includes the same
+run's complete typed XES, field-change rows, selected activity key and completeness
+flag. Changed typed output fields now discard stale payloads; custom selected
+first-class activity metadata follows the replacement label. Source/output XES
+selectors retain literal whitespace and Unicode. Opening uses the actual output
+field, retained when re-mining with filters. New output fields can be absent on
+unchanged events, so reopening is disabled for incomplete fields while complete
+XES/report downloads remain available. Other downstream selector conventions
+remain gates; the global registry can retain alternative-field labels, and the
+proof compares the actual reopened event sequences.
+
+The Windows CLI now converts wide arguments to UTF-8, uses UTF-8 for all 27
+filesystem path arguments and dataset names, and honors -o for the three
+standalone transformation modes. Earlier narrow arguments corrupted Unicode
+class names; direct narrow filesystem conversions then failed on Japanese
+filenames, and the standalone modes ignored -o. Plain XES/JSON filenames and
+ordinary Unicode dataset names are verified; other pathname/model/compression
+combinations remain independent gates.
+
+docs/feature-first-transformation-validation.json binds 733 frontend tests and
+the production build, 589 native sources, 143 frontend/runtime sources, three
+fresh assertion-enabled native suites, 86 checks over 65 HTTP calls and 17 CLI
+runs, and 34 browser checks. These cover all variants/modes, legacy agreement,
+literal/empty schemas, rich identifiers, padded dimensions, class order and
+seconds, typed label replacements, unchanged metadata/empty traces, actual
+reopening through ordinary/custom/typed/imported fields, explicit native errors,
+source preservation/staleness, Unicode CLI classes/filenames, exact browser
+exports, row/dimension pagination, persistent filtering, literal whitespace/
+Unicode handoff, phone layout, reset and saved-analysis guards.
+
+Initial assumptions were corrected from recorded owned outputs: event matrices
+are padded, automatic trace selection can replace explicit schemas, workload
+rejects empty traces, multipart mining options belong in form fields, and
+alternative-field labels may remain in the global registry. Earlier records and
+failed Unicode-path/CLI output assertions remain retained. The old frontend
+whitespace-selector assertion now checks an actually empty selector to match
+the literal native contract, with additional transport and browser evidence.
+
+Feature/target algorithms and label community optimization are unchanged. The
+label core and suites were freshly built; final CLI builds verify/reuse all 167
+core objects and unchanged server/suite binaries. Other catalogue proofs remain
+inherited. Owned servers/tabs are stopped, the viewport restored and port
+released. Cancellation signals/controls exist without a claimed browser/native
+computation cancellation outcome. Exact inference, selectors, schemas, calendar,
+numeric, ordering, errors and scalability gates remain open where recorded.
+All 86 packages and 387 modules remain in scope: 46 complete packages,
+199 complete modules and 228 incomplete units. Feature/label packages stay
+partial; target transformation keeps its existing complete catalogue status.

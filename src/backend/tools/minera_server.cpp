@@ -4980,6 +4980,73 @@ void handle_communication_history(const httplib::Request& request, httplib::Resp
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
+bool transformation_source_requested(const httplib::Request& request,
+                                      const MinedSession& session) {
+  if (request.has_param("source_id") && request.get_param_value("source_id") !=
+      std::to_string(session.query_source_id))
+    throw std::invalid_argument("the source log changed; refresh the transformation source");
+  if (!request.has_param("include_source")) return false;
+  const auto value = request.get_param_value("include_source");
+  if (value != "true" && value != "false")
+    throw std::invalid_argument("include_source must be true or false");
+  if (value == "true" && !request.has_param("source_id"))
+    throw std::invalid_argument("source_id is required for a transformation workflow");
+  return value == "true";
+}
+
+std::string transformation_json(const MinedSession& session,
+                                std::string result_json,
+                                const minera::LabelSplittingResult* split = nullptr,
+                                const minera::LabelSplittingOptions* options = nullptr) {
+  const auto quote = minera::embedding_runtime::detail::escape_json;
+  std::string body = "{\"family\":\"LOG_TRANSFORMATION\",\"source_id\":" +
+      quote(std::to_string(session.query_source_id)) + ",\"cases\":[";
+  for (std::size_t i = 0; i < session.log.traces.size(); ++i) {
+    if (i) body += ',';
+    const auto& trace = session.log.traces[i];
+    body += "{\"index\":" + std::to_string(i) + ",\"case_id\":" + quote(trace.case_id) +
+        ",\"event_count\":" + std::to_string(trace.events.size()) + '}';
+  }
+  body += "],\"result\":" + result_json + ",\"transformed_xes\":";
+  if (split && options) {
+    minera::XesExportOptions export_options; export_options.preserve_nulls = true;
+    body += quote(minera::serialize_xes(split->log, export_options));
+    const bool projected = options->target_key == "activity" || options->target_key == "concept:name";
+    std::string activity_attribute = projected ? "concept:name" : options->target_key;
+    if (projected) for (const auto& trace : split->log.traces) if (!trace.events.empty()) {
+      if (!trace.events.front().activity_source_key.empty()) activity_attribute = trace.events.front().activity_source_key;
+      break;
+    }
+    const auto value = [](const minera::Event& event, const std::string& key) {
+      if (key == "activity" || key == "concept:name" ||
+          (!event.activity_source_key.empty() && key == event.activity_source_key)) return event.activity;
+      const auto* attribute = event.attribute(key);
+      return attribute ? *attribute : std::string{};
+    };
+    body += ",\"activity_attribute\":" + quote(activity_attribute) + ",\"label_rows\":[";
+    bool first = true, complete = true;
+    for (std::size_t i = 0; i < split->log.traces.size(); ++i) {
+      for (std::size_t j = 0; j < split->log.traces[i].events.size(); ++j) {
+        if (!first) body += ','; first = false;
+        const auto& before = session.log.traces[i].events[j];
+        const auto& after = split->log.traces[i].events[j];
+        const auto output = value(after, options->target_key);
+        complete = complete && !output.empty();
+        body += "{\"case_index\":" + std::to_string(i) + ",\"event_index\":" + std::to_string(j) +
+            ",\"input\":" + quote(value(before, options->activity_key)) +
+            ",\"previous\":" + quote(value(before, options->target_key)) +
+            ",\"output\":" + quote(output) + '}';
+      }
+    }
+    body += "],\"complete_activity_field\":" + std::string(complete ? "true" : "false");
+  } else body += "null";
+  body += '}';
+  std::lock_guard<std::mutex> lock(g_session_mutex);
+  if (!g_session || g_session->query_source_id != session.query_source_id)
+    throw std::invalid_argument("the source log changed during transformation; run again");
+  return body;
+}
+
 void handle_log_to_target(const httplib::Request& request,
                           httplib::Response& response) {
   try {
@@ -4997,7 +5064,7 @@ void handle_log_to_target(const httplib::Request& request,
     static const std::set<std::string> allowed = {
         "target_variant",       "target_activity_key",
         "target_timestamp_key", "target_enable_padding",
-        "target_pad_size",      "target_activities"};
+        "target_pad_size",      "target_activities", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -5010,10 +5077,14 @@ void handle_log_to_target(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
+    const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_log_to_target_params(lookup, present);
+    if (include_source && options.pad_size > 100000)
+      throw std::invalid_argument("target padding exceeds the workflow limit of 100000 rows per case");
     const auto result = minera::log_to_target(session->log, options);
-    response.set_content(minera::log_to_target_json(result),
-                         "application/json");
+    auto body = minera::log_to_target_json(result);
+    if (include_source) body = transformation_json(*session, std::move(body));
+    response.set_content(body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -5062,12 +5133,15 @@ void handle_log_to_features(const httplib::Request& request,
         "feature_enable_resource_workload", "feature_enable_first_last_activity_index",
         "feature_enable_max_concurrent_events", "feature_enable_max_concurrent_events_per_activity",
         "feature_epsilon", "feature_min_num_different_string_values",
-        "feature_max_num_different_string_values"};
+        "feature_max_num_different_string_values", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown features parameter: " + key); }
     const auto lookup = [&](std::string_view name) { const auto key = std::string(name); return request.has_param(key) ? request.get_param_value(key) : std::string{}; };
     const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
+    const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_log_to_features_params(lookup, present);
-    response.set_content(minera::log_to_features_json(minera::log_to_features(session->log, options)), "application/json");
+    auto body = minera::log_to_features_json(minera::log_to_features(session->log, options));
+    if (include_source) body = transformation_json(*session, std::move(body));
+    response.set_content(body, "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -5305,9 +5379,7 @@ void handle_embeddings(const httplib::Request& request,
   }
 }
 
-// On-demand transformation of the cached session. This route is intentionally
-// not advertised by the frontend navigation, but remains available to clients
-// that need deterministic contextual label splitting.
+// On-demand transformation of the cached session, also used by Transform.
 void handle_label_splitting(const httplib::Request& request,
                             httplib::Response& response) {
   try {
@@ -5318,12 +5390,16 @@ void handle_label_splitting(const httplib::Request& request,
         "label_splitting_variant", "label_splitting_activity_key",
         "label_splitting_target_key", "label_splitting_prefix_length",
         "label_splitting_suffix_length", "label_splitting_min_edge_weight",
-        "label_splitting_activities_suffix", "label_splitting_target_activities"};
+        "label_splitting_activities_suffix", "label_splitting_target_activities", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown label_splitting parameter: " + key); }
     const auto lookup = [&](std::string_view name) { const auto key = std::string(name); return request.has_param(key) ? request.get_param_value(key) : std::string{}; };
     const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
+    const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_label_splitting_params(lookup, present);
-    response.set_content(minera::label_splitting_json(minera::split_activity_labels(session->log, options)), "application/json");
+    const auto result = minera::split_activity_labels(session->log, options);
+    auto body = minera::label_splitting_json(result);
+    if (include_source) body = transformation_json(*session, std::move(body), &result, &options);
+    response.set_content(body, "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 

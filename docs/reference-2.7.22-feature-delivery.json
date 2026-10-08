@@ -518,7 +518,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "transformation_workflow_available",
       "package": "algo.label_splitting",
       "parity_status": "partial",
       "selectors": [
@@ -686,7 +686,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "transformation_workflow_available",
       "package": "algo.transformation.log_to_features",
       "parity_status": "partial",
       "selectors": [
@@ -704,7 +704,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "transformation_workflow_available",
       "package": "algo.transformation.log_to_target",
       "parity_status": "complete",
       "selectors": [
@@ -1102,6 +1102,40 @@
       ],
       "state": "native_app_and_cli_available",
       "validation": "docs/feature-first-clustering-validation.json"
+    },
+    {
+      "added": [
+        "A Transform workspace with all three feature projections, both temporal grouping modes, all three prediction targets and contextual label splitting",
+        "All exposed native selectors, literal JSON lists with omitted/empty distinction, explicit schemas, ten extra-feature overrides, padding, context and numeric controls",
+        "Paginated source-position matrix/label inspection, exact native response and parameter-bound reports, and complete scalar CSV exports",
+        "Native padding identity, duplicate/empty columns, rich exact identifiers, epoch-nanosecond labels and nonfinite cell preservation",
+        "Same-run typed XES label exports and reopening through the actual output field, retained when re-mining with filters, including literal whitespace/Unicode field names",
+        "Windows UTF-8 CLI arguments and 27 filesystem path arguments, UTF-8 dataset names and -o file output for the three standalone transformation modes",
+        "Explicit errors, previous-result retention, source guards/resets, saved-analysis guards and responsive controls"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/TransformationWorkspace.tsx",
+        "src/frontend/src/transformation-workspace.ts",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/minera_export.cpp"
+      ],
+      "families": [
+        "algo.transformation.log_to_features",
+        "algo.transformation.log_to_target",
+        "algo.label_splitting"
+      ],
+      "id": "native_feature_target_label_transformations",
+      "state": "native_app_and_cli_available",
+      "validation": "docs/feature-first-transformation-validation.json",
+      "variants": [
+        "TRACE_BASED",
+        "EVENT_BASED",
+        "TEMPORAL",
+        "NEXT_ACTIVITY",
+        "NEXT_TIME",
+        "REMAINING_TIME",
+        "CONTEXTUAL"
+      ]
     }
   ],
   "execution_priority": [
@@ -1119,7 +1153,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue reviewing remaining catalogue capabilities and entry points, including transformations, OCEL analysis and conversion/export variants. Both clustering families now have configurable native workflows, hierarchy/centroid inspection and case exports; their exact distance/feature/optimization behavior remains a parity gate."
+      "next_action": "Continue reviewing remaining catalogue capabilities and entry points, including OCEL analysis, conversion/export variants, log utilities, trie/interval-tree transformations and remaining conformance/simulation controls. Features, targets and contextual label splitting now have configurable workflows, complete matrices/exports and XES reopening; their recorded exactness gates remain independent."
     }
   ],
   "feature_status_meaning": {
@@ -1133,7 +1167,8 @@
     "prompt_and_provider_execution_available": "The three prompt modes have usable previews and configured text-provider execution in the app and native CLI; remaining abstraction variants and provider interfaces are independent gates.",
     "prompt_provider_and_log_query_available": "Database prompts and configured provider execution are joined by real SQLite/DuckDB queries, generated SQL, complete case/event filter exports and app reopening; exact reference prompt, abstraction, type and execution-corpus parity remain independent gates.",
     "prompt_provider_queries_and_studies_available": "Configured text prompts/providers, SQL queries and filters, named case clusters and executable hypotheses have usable app/native/standalone paths. Exact abstractions, provider interfaces, parameters, ordering and type behavior remain independent parity gates.",
-    "runtime_and_search_available": "A real local encoder and usable case/event search and vector-export entry point are validated. Exact reference behavior and native log filtering remain independent gates."
+    "runtime_and_search_available": "A real local encoder and usable case/event search and vector-export entry point are validated. Exact reference behavior and native log filtering remain independent gates.",
+    "transformation_workflow_available": "Configurable native feature/target/label workflows expose matrix schemas, values, padding and source positions, complete native JSON/reports/CSV and transformed XES reopening with persistent selected activity fields. Existing parity statuses and open semantic/type/error/performance gates remain independent."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

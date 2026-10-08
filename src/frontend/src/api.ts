@@ -669,9 +669,8 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   }
   const addXesSelector = (name: string, value: string | undefined) => {
     if (value === undefined) return;
-    const normalized = value.trim();
-    if (!normalized) throw new Error(`${name} must not be empty`);
-    add(name, normalized);
+    if (!value) throw new Error(`${name} must not be empty`);
+    add(name, value);
   };
   addXesSelector("xes_case_attribute", options.xesCaseAttribute);
   addXesSelector("xes_activity_attribute", options.xesActivityAttribute);
