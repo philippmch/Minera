@@ -590,7 +590,7 @@
       ]
     },
     {
-      "feature_delivery_status": "prompt_provider_queries_and_studies_available",
+      "feature_delivery_status": "native_contexts_prompts_providers_and_studies_available",
       "package": "algo.querying.llm.injection",
       "parity_status": "partial",
       "selectors": [
@@ -607,7 +607,7 @@
       ]
     },
     {
-      "feature_delivery_status": "prompt_and_provider_execution_available",
+      "feature_delivery_status": "native_contexts_prompts_providers_and_studies_available",
       "package": "algo.querying.llm.injection.pm_knowledge",
       "parity_status": "partial",
       "selectors": [
@@ -948,6 +948,42 @@
       "id": "llm_case_clusters_and_executable_hypotheses",
       "state": "available_with_native_sqlite_and_optional_generation_cluster_duckdb_runtimes",
       "validation": "docs/feature-first-llm-studies-validation.json"
+    },
+    {
+      "added": [
+        "All 13 native log/model/OCEL text builders with CLI, HTTP and browser entry points",
+        "Actual case attributes/events, DFG frequencies/durations, variants, event rows, attribute statistics and case feature quantiles",
+        "Native DECLARE, log skeleton, temporal profile and Petri-net contexts",
+        "Original OCEL events/objects, exact-type object features and measured object-centric flow contexts",
+        "Context headers, timestamp/attribute/performance controls, two aggregations, relative case frequency and lifecycle path controls",
+        "Editable prompt integration and context/response downloads with source revision and cancellation guards",
+        "Prompt newline normalization so displayed, sent and downloaded text agree"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_context.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/frontend/src/components/ContextBuilder.tsx",
+        "src/frontend/src/components/AskModel.tsx",
+        "src/frontend/src/App.tsx"
+      ],
+      "id": "native_llm_log_model_ocel_contexts",
+      "state": "native_contexts_available_generation_optional",
+      "validation": "docs/feature-first-llm-context-validation.json",
+      "variants": [
+        "case",
+        "dfg",
+        "variants",
+        "event_stream",
+        "log_attributes",
+        "log_features",
+        "declare",
+        "log_skeleton",
+        "temporal_profile",
+        "petri_net",
+        "ocel",
+        "ocel_features",
+        "ocel_ocdfg"
+      ]
     }
   ],
   "execution_priority": [
@@ -957,7 +993,7 @@
   "feature_backlog": [
     {
       "area": "LLM and query integrations",
-      "next_action": "Deliver remaining log/model/OCEL abstractions, provider parameters and multimodal visualization interfaces; case clustering, executable hypotheses, SQL queries and complete filters now have usable entry points."
+      "next_action": "Deliver remaining provider parameters and multimodal visualization interfaces. All 13 log/model/OCEL text builders, case clustering, executable hypotheses, SQL queries and complete filters now have usable entry points; exact reference behavior remains open."
     },
     {
       "area": "Optional connector drivers",
@@ -971,6 +1007,7 @@
   "feature_status_meaning": {
     "explorer_available": "A selectable discovery model with a rendered result in the application. This does not mark its reference package or modules complete.",
     "feature_review_pending": "The partial parity status alone does not prove a feature is missing. Inspect implementation and usable entry points before choosing work.",
+    "native_contexts_prompts_providers_and_studies_available": "All 13 native log/model/OCEL text builders have CLI/HTTP/browser entry points, joined by configured prompts/providers, queries, filters, clusters and hypotheses. Exact text, order, type, parameter, provider and multimodal parity gates remain independent.",
     "native_proof_exists": "Existing complete parity records identify native implementation and registered tests. User-facing feature coverage still needs review.",
     "prompt_and_provider_execution_available": "The three prompt modes have usable previews and configured text-provider execution in the app and native CLI; remaining abstraction variants and provider interfaces are independent gates.",
     "prompt_provider_and_log_query_available": "Database prompts and configured provider execution are joined by real SQLite/DuckDB queries, generated SQL, complete case/event filter exports and app reopening; exact reference prompt, abstraction, type and execution-corpus parity remain independent gates.",

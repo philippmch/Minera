@@ -36,6 +36,7 @@
 #include "llm_runtime.hpp"
 #include "query_runtime.hpp"
 #include "log_cluster_runtime.hpp"
+#include "llm_context_options.hpp"
 #include "minera/log_query.hpp"
 #include "minera/alpha_miner.hpp"
 #include "minera/alpha_result_json.hpp"
@@ -3587,6 +3588,24 @@ void handle_log_cluster(const httplib::Request& request,httplib::Response& respo
   else if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
   else if(format=="json")response.set_content(minera::log_cluster_runtime::table_json(session->log,indices),"application/json");
   else throw std::invalid_argument("cluster format must be summary, xes or json");
+ }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
+}
+
+void handle_llm_context(const httplib::Request& request,httplib::Response& response){
+ try{
+  for(const auto& [key,value]:request.params){(void)value;if(!minera::context_tools::fields.contains(key)||request.params.count(key)!=1)throw std::invalid_argument("unknown or duplicate context parameter: "+key);}
+  for(const auto& [key,file]:request.files){(void)file;if(key!="ocel"&&!minera::context_tools::fields.contains(key))throw std::invalid_argument("unknown context field: "+key);if(request.files.count(key)!=1||request.has_param(key))throw std::invalid_argument("duplicate context field: "+key);}
+  const auto get=[&](std::string_view name){const auto key=std::string(name);return request.has_param(key)?request.get_param_value(key):request.get_file_value(key).content;};
+  const auto has=[&](std::string_view name){return request.has_param(std::string(name))||request.has_file(std::string(name));};const auto options=minera::context_tools::options(get,has);minera::LlmContextResult result;std::string source;
+  if(minera::llm_context_is_ocel(options.variant)){
+   if(!request.has_file("ocel"))throw std::invalid_argument("OCEL context requires its original OCEL JSON file");const auto& body=request.get_file_value("ocel").content;result=minera::build_llm_context(minera::parse_ocel_json(body),options);source=has("source_id")?get("source_id"):"ocel-upload";
+  }else{
+   if(request.has_file("ocel"))throw std::invalid_argument("traditional context cannot use an OCEL file");if(!has("source_id"))throw std::invalid_argument("source_id is required for a cached-log context");const auto session=query_session(request);source=std::to_string(session->query_source_id);if(get("source_id")!=source)throw std::invalid_argument("the source log changed; refresh the context source");
+   const minera::PetriNet* net=nullptr;const minera::PnmlDocument* document=nullptr;
+   if(options.variant=="petri_net"){const auto miner=has("miner")?get("miner"):"inductive";const auto found=session->nets.find(miner);if(found==session->nets.end())throw std::invalid_argument("the requested context model is unavailable");net=&found->second;if(miner=="imported"&&session->imported_document)document=&*session->imported_document;}
+   result=minera::build_llm_context(session->log,options,net,document);
+  }
+  response.set_content(minera::llm_context_json(result,source),"application/json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
 
@@ -7979,6 +7998,7 @@ int main(int argc, char** argv) {
   server.Options("/api/log-query", preflight);
   server.Options("/api/log-query/export", preflight);
   server.Options("/api/log-cluster", preflight);
+  server.Options("/api/llm-context", preflight);
   server.Options("/api/llm/complete", [](const httplib::Request& request, httplib::Response& response) {
     if (!llm_origin_allowed(request, response)) return;
     response.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -8118,6 +8138,7 @@ int main(int argc, char** argv) {
   server.Post("/api/log-query",handle_log_query);
   server.Post("/api/log-query/export",handle_log_query_export);
   server.Post("/api/log-cluster",handle_log_cluster);
+  server.Post("/api/llm-context",handle_llm_context);
   server.Post("/api/local-diagnostics", handle_local_diagnostics);
   server.Post("/api/clustering", handle_clustering);
   server.Post("/api/profile-clustering", handle_profile_clustering);

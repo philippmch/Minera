@@ -109,6 +109,7 @@ add_library(minera_core
   src/backend/json_export.cpp
   src/backend/knowledge_injection.cpp
   src/backend/log_query.cpp
+  src/backend/llm_context.cpp
   src/backend/log_filter.cpp
   src/backend/log_conversion.cpp
   src/backend/path_filter.cpp
@@ -244,6 +245,9 @@ target_compile_features(minera_format_dataframe PRIVATE cxx_std_20)
 add_executable(minera_knowledge src/backend/tools/minera_knowledge.cpp)
 add_executable(minera_query src/backend/tools/minera_query.cpp)
 add_executable(minera_cluster src/backend/tools/minera_cluster.cpp)
+add_executable(minera_context src/backend/tools/minera_context.cpp)
+target_link_libraries(minera_context PRIVATE minera::core)
+target_compile_features(minera_context PRIVATE cxx_std_20)
 target_link_libraries(minera_cluster PRIVATE minera::core)
 target_include_directories(minera_cluster PRIVATE third_party)
 target_compile_features(minera_cluster PRIVATE cxx_std_20)
@@ -1661,4 +1665,9 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_log_cluster_runtime_tests PRIVATE cxx_std_20)
   target_compile_options(minera_log_cluster_runtime_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_log_cluster_runtime_tests COMMAND minera_log_cluster_runtime_tests)
+  add_executable(minera_llm_context_tests src/backend/tests/test_llm_context.cpp)
+  target_link_libraries(minera_llm_context_tests PRIVATE minera::core)
+  target_compile_features(minera_llm_context_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_llm_context_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_llm_context_tests COMMAND minera_llm_context_tests)
 endif()

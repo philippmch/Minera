@@ -3,14 +3,15 @@ import { LLM_PROVIDERS,llmLogContext,llmKnowledgeOptions,llmCompletionRequest,re
 import { type KnowledgeInjectionVariant,type MineraExport } from "../types";
 import { downloadModelJson } from "../model-view-data";
 import { LlmStudies } from "./LlmStudies";
+import { ContextBuilder } from "./ContextBuilder";
 
 export function AskModel({data,mining,available=false,onOpenFiltered}:{data:MineraExport;mining:boolean;available?:boolean;onOpenFiltered?:((file:File)=>void)}){
  const [task,setTask]=useState<"prompt"|"clusters"|"hypotheses">("prompt");
- return <><label className="filters-field model-task"><span>Model task</span><select disabled={mining} value={task} onChange={event=>setTask(event.target.value as typeof task)}><option value="prompt">Ask a question</option><option value="clusters">Case clustering</option><option value="hypotheses">Hypotheses</option></select></label>{task==="prompt"?<PromptChat data={data} mining={mining}/>:<LlmStudies key={task} task={task} data={data} available={available} mining={mining} onOpenFiltered={onOpenFiltered}/>}</>;
+ return <><label className="filters-field model-task"><span>Model task</span><select disabled={mining} value={task} onChange={event=>setTask(event.target.value as typeof task)}><option value="prompt">Ask a question</option><option value="clusters">Case clustering</option><option value="hypotheses">Hypotheses</option></select></label>{task==="prompt"?<PromptChat data={data} mining={mining} available={available}/>:<LlmStudies key={task} task={task} data={data} available={available} mining={mining} onOpenFiltered={onOpenFiltered}/>}</>;
 }
-function PromptChat({data,mining}:{data:MineraExport;mining:boolean}) {
+export function PromptChat({data,mining,available=false,ocelFile=null,dataset}:{data?:MineraExport;mining:boolean;available?:boolean;ocelFile?:File|null;dataset?:string}) {
   const [variant,setVariant]=useState<KnowledgeInjectionVariant>("process_mining");
-  const [context,setContext]=useState(()=>llmLogContext(data));const [question,setQuestion]=useState("");const [schema,setSchema]=useState("");
+  const [context,setContext]=useState(()=>data?llmLogContext(data):"");const [question,setQuestion]=useState("");const [schema,setSchema]=useState("");
   const [prompt,setPrompt]=useState("");const [provider,setProvider]=useState<LlmProvider>("openai");const [model,setModel]=useState("");
   const [maxTokens,setMaxTokens]=useState("4096");const [temperature,setTemperature]=useState("");
   const [status,setStatus]=useState<LlmRuntimeStatus|null>(null);const [result,setResult]=useState<LlmCompletion|null>(null);
@@ -32,11 +33,12 @@ function PromptChat({data,mining}:{data:MineraExport;mining:boolean}) {
   const endpoint=status?.providers.find(item=>item.id===provider)?.base_url;
   const label=LLM_PROVIDERS.find(item=>item.id===provider)!.label;
   return <section className="panel ask-model-panel">
-    <div className="panel-head"><h2>Ask a model</h2><span className="panel-meta">{data.dataset}</span></div>
+    <div className="panel-head"><h2>Ask a model</h2><span className="panel-meta">{data?.dataset??dataset??ocelFile?.name}</span></div>
     <p className="ask-model-intro">Build a prompt from the log or a database schema. Review and edit the displayed prompt before sending it.</p>
+    <ContextBuilder available={available} mining={mining} ocelFile={ocelFile} onUse={text=>{request.current?.abort();request.current=null;setPending(null);if(variant==="database")setVariant("process_mining");setContext(text);setPrompt("");setResult(null);setError(null);}} />
     <fieldset className="ask-model-fields" disabled={mining||pending!==null}>
       <label className="filters-field"><span>Prompt context</span><select value={variant} onChange={event=>{setVariant(event.target.value as KnowledgeInjectionVariant);invalidate();}}><option value="process_mining">Process mining</option><option value="description">General description</option><option value="database">Database schema</option></select></label>
-      {variant==="database"?<label className="ask-model-text"><span>Database schema</span><textarea rows={6} value={schema} onChange={event=>{setSchema(event.target.value);invalidate();}} placeholder="Tables, columns and relationships" /></label>:<label className="ask-model-text"><span>Log context</span><textarea rows={8} value={context} onChange={event=>{setContext(event.target.value);invalidate();}} /><small>The initial context includes up to 50 activities, 50 directly-follows edges and 20 variants. You can edit it.</small></label>}
+      {variant==="database"?<label className="ask-model-text"><span>Database schema</span><textarea rows={6} value={schema} onChange={event=>{setSchema(event.target.value);invalidate();}} placeholder="Tables, columns and relationships" /></label>:<label className="ask-model-text"><span>Log context</span><textarea rows={8} value={context} onChange={event=>{setContext(event.target.value);invalidate();}} /><small>{data?"The initial context includes up to 50 activities, 50 directly-follows edges and 20 variants. You can edit it.":"Build native context above or enter your own process context."}</small></label>}
       <label className="ask-model-text"><span>Question or instruction</span><textarea rows={3} value={question} onChange={event=>{setQuestion(event.target.value);invalidate();}} placeholder="What should the model help you understand?" /></label>
       <button className="btn-ghost" onClick={()=>void run("preview")}>Preview prompt</button>
       <label className="ask-model-text"><span>Prompt to send</span><textarea rows={8} value={prompt} onChange={event=>{setPrompt(event.target.value);setResult(null);}} placeholder="Preview a prompt or enter your own" /></label>
