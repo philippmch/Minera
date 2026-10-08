@@ -3254,6 +3254,46 @@ void handle_genetic_matrix_conversion(const httplib::Request& request,
 }
 
 // Cached-session adapter for native event-data conversion views.
+bool transformation_source_requested(const httplib::Request& request,
+                                      const MinedSession& session);
+
+struct PreparationLogView {
+  std::string id;
+  std::string name;
+  const minera::EventLog* log;
+};
+
+std::string preparation_json(const MinedSession& session, std::string result,
+                             const std::vector<PreparationLogView>& outputs = {}) {
+  const auto quote = minera::embedding_runtime::detail::escape_json;
+  std::string body = "{\"family\":\"LOG_PREPARATION\",\"source_id\":" +
+      quote(std::to_string(session.query_source_id)) + ",\"result\":" + result +
+      ",\"outputs\":[";
+  for (std::size_t i = 0; i < outputs.size(); ++i) {
+    if (i) body += ',';
+    const auto& output = outputs[i];
+    std::string activity_attribute = "concept:name";
+    bool complete = true, first = true;
+    for (const auto& trace : output.log->traces) for (const auto& event : trace.events) {
+      const auto key = event.activity_source_key.empty() ? "concept:name" : event.activity_source_key;
+      if (first) { activity_attribute = key; first = false; }
+      complete = complete && !event.activity.empty() && key == activity_attribute;
+    }
+    minera::XesExportOptions options; options.preserve_nulls = true;
+    body += "{\"id\":" + quote(output.id) + ",\"name\":" + quote(output.name) +
+        ",\"case_count\":" + std::to_string(output.log->trace_count()) +
+        ",\"event_count\":" + std::to_string(output.log->event_count()) +
+        ",\"activity_attribute\":" + quote(activity_attribute) +
+        ",\"complete_activity_field\":" + std::string(complete ? "true" : "false") +
+        ",\"xes\":" + quote(minera::serialize_xes(*output.log, options)) + '}';
+  }
+  body += "]}";
+  std::lock_guard<std::mutex> lock(g_session_mutex);
+  if (!g_session || g_session->query_source_id != session.query_source_id)
+    throw std::invalid_argument("the source log changed during preparation; run again");
+  return body;
+}
+
 void handle_log_conversion(const httplib::Request& request,
                            httplib::Response& response) {
   try {
@@ -3286,7 +3326,7 @@ void handle_log_conversion(const httplib::Request& request,
         "log_conversion_return_variants",
         "log_conversion_max_variants_to_return",
         "log_conversion_max_graph_nodes",
-        "log_conversion_max_graph_edges"};
+        "log_conversion_max_graph_edges", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -3310,6 +3350,7 @@ void handle_log_conversion(const httplib::Request& request,
       const auto key = std::string(name);
       return request.has_param(key) || request.has_file(key);
     };
+    const bool include_source = transformation_source_requested(request, *session);
     auto options = minera::parse_log_conversion_params(lookup, present);
     if (!options.max_rows_to_materialize) {
       options.max_rows_to_materialize = kServerLogConversionMaxRows;
@@ -3339,8 +3380,16 @@ void handle_log_conversion(const httplib::Request& request,
           "log_conversion_max_variants_to_return exceeds the server safety cap");
     }
     const auto result = minera::convert_event_log(session->log, options);
-    response.set_content(minera::log_conversion_json(result),
-                         "application/json");
+    auto body = minera::log_conversion_json(result);
+    if (include_source) {
+      const bool log_output = result.variant == minera::LogConversionVariant::kToEventLog ||
+          result.variant == minera::LogConversionVariant::kOneTracePerVariant ||
+          result.variant == minera::LogConversionVariant::kAllTracesPerVariant;
+      body = preparation_json(*session, std::move(body), log_output
+          ? std::vector<PreparationLogView>{{"log", "Converted log", &result.log}}
+          : std::vector<PreparationLogView>{});
+    }
+    response.set_content(body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -5160,12 +5209,17 @@ void handle_log_util(const httplib::Request& request,
         "variant", "train_percentage", "seed", "prefix_length",
         "activity", "activity_key", "timestamp_key", "activities",
         "feature_min_different_values", "feature_max_different_values",
-        "feature_consider_all_attributes", "feature_mandatory_attributes"};
+        "feature_consider_all_attributes", "feature_mandatory_attributes", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
         throw std::invalid_argument("unknown log utility parameter: " + key);
     }
+    const bool include_source = transformation_source_requested(request, *session);
+    const auto publish = [&](std::string result, const std::vector<PreparationLogView>& outputs = {}) {
+      if (include_source) result = preparation_json(*session, std::move(result), outputs);
+      response.set_content(result, "application/json");
+    };
     const auto value = [&](std::string_view name) {
       const auto key = std::string(name);
       return request.has_param(key) ? request.get_param_value(key)
@@ -5231,26 +5285,21 @@ void handle_log_util(const httplib::Request& request,
       if (request.has_param("seed")) options.seed = parse_size("seed", std::numeric_limits<std::size_t>::max());
       const auto result = minera::split_log_train_test(
           session->log, options.train_percentage, options.seed);
-      response.set_content(minera::log_train_test_json(result),
-                           "application/json");
+      publish(minera::log_train_test_json(result), {{"training", "Training log", &result.training},
+                                                  {"testing", "Testing log", &result.testing}});
     } else if (variant_text == "fixed_prefixes") {
       options.variant = minera::LogUtilityVariant::kFixedPrefixes;
       options.prefix_length = parse_size("prefix_length", 100000);
-      response.set_content(minera::log_prefix_json(
-                               minera::get_log_prefixes(session->log,
-                                                        options.prefix_length),
-                               options.variant),
-                           "application/json");
+      const auto result = minera::get_log_prefixes(session->log, options.prefix_length);
+      publish(minera::log_prefix_json(result, options.variant), {{"log", "Fixed prefixes", &result}});
     } else if (variant_text == "all_prefixes") {
       if (session->log.event_count() > 50000)
         throw std::invalid_argument("all_prefixes input exceeds the safety limit");
       const auto result = minera::get_log_with_prefixes(session->log);
       if (result.log.traces.size() > 100000)
         throw std::invalid_argument("all_prefixes output exceeds the safety limit");
-      response.set_content(minera::log_prefix_json(
-                               result.log, minera::LogUtilityVariant::kAllPrefixes,
-                               result.change_indexes),
-                           "application/json");
+      publish(minera::log_prefix_json(result.log, minera::LogUtilityVariant::kAllPrefixes,
+                                     result.change_indexes), {{"log", "All prefixes", &result.log}});
     } else if (variant_text == "until_activity") {
       options.variant = minera::LogUtilityVariant::kUntilActivity;
       options.activity = value("activity");
@@ -5262,8 +5311,7 @@ void handle_log_util(const httplib::Request& request,
                                   : "timestamp";
       const auto result = minera::get_log_traces_until_activity(
           session->log, options.activity, options);
-      response.set_content(minera::log_until_activity_json(result),
-                           "application/json");
+      publish(minera::log_until_activity_json(result), {{"log", "Cases before activity", &result.log}});
     } else if (variant_text == "to_activities") {
       if (!request.has_param("activities"))
         throw std::invalid_argument("activities is required for to_activities");
@@ -5276,8 +5324,10 @@ void handle_log_util(const httplib::Request& request,
                                   : "timestamp";
       const auto result = minera::get_log_traces_to_activities(
           session->log, split_escaped(value("activities"), "activities"), options);
-      response.set_content(minera::log_activity_targets_json(result),
-                           "application/json");
+      std::vector<PreparationLogView> outputs;
+      for (std::size_t i = 0; i < result.logs.size(); ++i)
+        outputs.push_back({"target/" + std::to_string(i), result.activities[i], &result.logs[i]});
+      publish(minera::log_activity_targets_json(result), outputs);
     } else if (variant_text == "feature_selection") {
       minera::LogFeatureSelectionOptions feature_options;
       if (request.has_param("feature_min_different_values"))
@@ -5303,10 +5353,8 @@ void handle_log_util(const httplib::Request& request,
         feature_options.mandatory_attributes =
             split_escaped(value("feature_mandatory_attributes"),
                           "feature_mandatory_attributes");
-      response.set_content(minera::log_feature_selection_json(
-                               minera::select_log_features(session->log,
-                                                           feature_options)),
-                           "application/json");
+      publish(minera::log_feature_selection_json(minera::select_log_features(session->log,
+                                                                            feature_options)));
     } else {
       throw std::invalid_argument(
           "variant expects split_train_test, fixed_prefixes, all_prefixes, until_activity, to_activities, or feature_selection");

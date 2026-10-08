@@ -1057,7 +1057,8 @@ remain separate catalogue gates.
 
 ### Feature, target and label transformations
 
-Open **Transform** with an active CSV/XES log. **Feature matrices** exposes
+Open **Transform → Features, targets & labels** with an active CSV/XES log.
+**Feature matrices** exposes
 `TRACE_BASED`, `EVENT_BASED` and `TEMPORAL`, including calendar frequencies and
 fixed windows. Configure activity/case/time/resource fields, eight exact
 attribute/schema lists, numeric defaults and all ten extra case feature families.
@@ -1119,6 +1120,55 @@ The feature and contextual-label packages retain their partial parity status;
 target transformation retains its existing complete catalogue status. App
 availability does not promote exact algorithm, selector, schema, numeric or
 scalability parity.
+
+### Log preparation
+
+Open **Transform → Prepare logs & event data** with an active CSV/XES log.
+**Data conversions** offers event logs, event streams, event tables, attributed
+graphs, one trace per variant and all traces grouped by variant. Controls expose
+case fields/prefixes, present-null removal, native copy/compression/lazy flags,
+variant metadata, graph attribute nodes, directly-follows edges and output bounds.
+Copy/compression switches retain native value-copy behavior; they do not gzip
+JSON downloads. Graph drawing shows at most 200 nodes; full node/edge tables and
+downloads retain the complete native graph, including its identifier collisions.
+
+**Case utilities** offers seeded training/test splits, fixed-length prefixes,
+all prefixes, prefixes before one or several activities, and attribute selection.
+Training chooses up to `floor(case_count × percentage) + 1` cases, capped at the
+total. All-prefix output retains repeated and empty prefixes and native change
+indices. Activity prefixes exclude the target; cases with the target first or
+absent are excluded. For several targets, cases containing another selected
+target are excluded and target logs with no remaining cases are omitted.
+
+Select the actual native training, testing or activity output. Inspect event
+rows and cases on independent pages, including empty traces and repeated case
+IDs. Positions belong to the selected output; they do not identify original
+source positions. JSON/data and parameter-bound reports preserve the original
+native response text. CSV retains all scalar rows and columns. Each log output
+has a same-run typed XES download and can reopen through its actual activity
+field. Empty/incomplete activity outputs remain downloadable; reopening requires
+events with a complete nonempty activity field. Saved analysis JSON disables
+preparation, source changes reset results, and failures retain the previous run.
+
+Existing `POST /api/log-convert` and `POST /api/log-util` result shapes remain
+available. Add query parameters `source_id` and `include_source=true` for a
+`LOG_PREPARATION` response containing `result` and ordered `outputs`; each log
+output includes its stable ID, counts, selected activity field and exact XES.
+Standalone execution uses the same native algorithms:
+
+```sh
+minera_export source.xes --log-convert to_data_frame -o events.json
+minera_export source.xes --log-convert to_nx --log-conversion-event-attributes-as-nodes cost
+minera_log_util source.xes --train-percentage 0.5 --seed 9
+minera_log_util source.xes --prefix-length 2
+minera_log_util source.xes --to-activities "Approve\, 東京,Archive β"
+```
+
+The log-utility CLI now preserves Unicode arguments and UTF-8 filesystem paths
+on Windows. Exact reference ordering, defaults, scalar/container types, errors,
+selector names and scalability remain parity gates. These preparation workflows
+extend feature availability without changing the algorithm catalogue's scope or
+parity statuses.
 
 ### Sample dataset
 

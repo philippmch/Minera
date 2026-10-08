@@ -11727,3 +11727,81 @@ numeric, ordering, errors and scalability gates remain open where recorded.
 All 86 packages and 387 modules remain in scope: 46 complete packages,
 199 complete modules and 228 incomplete units. Feature/label packages stay
 partial; target transformation keeps its existing complete catalogue status.
+
+
+## Feature delivery first: log conversions and case preparation (2026-10-08)
+
+Transform now groups existing feature/target/label workflows beside log and
+event-data preparation. All six conversion variants are usable: TO_EVENT_LOG,
+TO_EVENT_STREAM, TO_DATA_FRAME, TO_NX, DF_TO_EVENT_LOG_1V and DF_TO_EVENT_LOG_NV.
+Controls expose existing case fields/prefixes, present-null processing,
+copy/compression/lazy flags, variant metadata, graph attribute nodes, directly-
+follows edges and bounds. Copy/compression flags do not gzip JSON downloads.
+Native graphs render directed case/event/attribute links and inspect exact node
+positions, attributes and complete paged edge data. Repeated case/event identities
+can coalesce in the native graph; later attributes are displayed as returned.
+Drawing is limited to 200 nodes; full native data and tables remain complete.
+
+All six utilities are usable: SPLIT_TRAIN_TEST, FIXED_PREFIXES, ALL_PREFIXES,
+UNTIL_ACTIVITY, TO_ACTIVITIES and FEATURE_SELECTION. Seeded train/test outputs
+retain the native floor(n*p)+1 boundary, capped to n. Fixed prefixes retain empty
+traces; all-prefixes retains repeated/empty prefixes and native change indices.
+Activity prefixes exclude the target and expose elapsed seconds. Multi-target
+preparation excludes cases containing another selected target, omits targets
+without remaining cases, and retains caller order for actual output logs.
+Feature selection displays the actual native case/event attribute lists.
+
+Outputs use stable log/training/testing/target-index IDs, not case or activity
+names as identities. Event, case and column pages are independent; cases and
+empty traces remain inspectable while paging event rows. Output positions are
+not original source indices. Complete scalar CSV and original native JSON/data
+or parameter-bound reports retain all rows/columns beyond the displayed pages.
+Native JSON remains verbatim, preserving exact large integer representations;
+CSV is a lexical scalar view with null cells, while JSON/XES retain richer types.
+
+source_id/include_source query options bind optional LOG_PREPARATION responses
+to the actual source without changing ordinary native result shapes. Each actual
+native log object is serialized to typed XES in the same run, retaining log/
+trace/event metadata, empty traces and its imported activity field. Browser
+reopening verifies the selected standard-field target; HTTP reopening verifies
+ordinary and imported custom first-class keys by actual event sequences. Empty
+or incomplete activity outputs remain downloadable; reopening requires events
+with a complete nonempty activity field. Saved analysis JSON disables preparation,
+source changes reset prior results and native errors retain the previous run.
+Cancellation controls/signals exist without a claimed native-computation
+cancellation or browser race-cancellation result.
+
+The Windows log-utility CLI now converts wide arguments to UTF-8 and opens UTF-8
+filesystem paths. All six conversion and six utility CLI runs agree with their
+actual ordinary HTTP results on Unicode input filenames, including escaped
+comma/Japanese activity arguments. Other pathname/compression/type combinations
+remain independent gates. Conversion adapters still trim/reject empty/whitespace
+selector names where recorded; broader core literal-name behavior is not promoted.
+
+docs/feature-first-preparation-validation.json binds 745 frontend tests and the
+production build, 589 native sources, 147 frontend/runtime sources, two fresh
+assertion-enabled native suites, 80 checks over 61 HTTP calls and 12 CLI runs,
+and 46 browser checks. Browser evidence covers all twelve workflows, full typed
+exports, exact selected XES, variant/native graph metadata, selected node/edge
+inspection, zero/empty outputs, native errors, source resets, saved-analysis
+guards, phone layout and reopening. A larger 12-case/27-event fixture returns
+54 prefix traces and 81 events; independent event/case pagination, the last
+output positions and complete CSV are verified.
+
+Controlled capture corrections remain retained: CLI conversion takes a selector
+argument, and root XES attribute comparisons exclude structural elements. The
+utility guard's removed typeof-kind check was redundant, rather than rejecting
+numeric/date/boolean attributes. Frontend fixtures corrected null CSV expectations
+and type annotations. Browser assertions were corrected for native graph ID
+coalescing, persistent details open state and scrollbar width. Visual inspection
+repaired the new graph's selected-node theme color and arrow endpoints; earlier
+browser checks bind the initial build, followed by fresh final graph/utility checks.
+
+Native conversion/utility algorithms are unchanged; all 167 verified core objects
+are reused. Server/exporter/utility tools and the two suites are freshly built.
+Other catalogue proofs remain inherited. Owned server/tab are closed, viewport
+restored and port released. Exact ordering/default/type/container/null/selector/
+error/materialization/performance gates remain open. Preparation sits outside the
+86 algorithm-family list and creates no new catalogue families or promotions.
+All 86 packages and 387 modules remain in scope: 46 complete packages,
+199 complete modules and 228 incomplete units. Full parity remains the goal.

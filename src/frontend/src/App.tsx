@@ -52,7 +52,7 @@ import { AskModel,PromptChat } from "./components/AskModel";
 import { QueryWorkspace } from "./components/QueryWorkspace";
 import { AnonymizationWorkspace } from "./components/AnonymizationWorkspace";
 import { ClusteringWorkspace } from "./components/ClusteringWorkspace";
-import { TransformationWorkspace } from "./components/TransformationWorkspace";
+import { TransformationHub } from "./components/TransformationHub";
 import { VisualizationExplain } from "./components/VisualizationExplain";
 import { type VisualizationDraft } from "./visualization-explanation";
 import {
@@ -760,7 +760,7 @@ export default function App() {
       {tab === "query" && <main className="layout-log"><QueryWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenFiltered={loadFile} /></main>}
       {tab === "anonymization" && <main className="layout-log"><AnonymizationWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenReleased={loadFile} /></main>}
       {tab === "clustering" && <main className="layout-log"><ClusteringWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenCluster={loadFile} /></main>}
-      {tab === "transformation" && <main className="layout-log"><TransformationWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenTransformed={loadFile} /></main>}
+      {tab === "transformation" && <main className="layout-log"><TransformationHub key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenTransformed={loadFile} /></main>}
       {tab === "dfg" && (
         <main className="layout">
           <ProcessMap

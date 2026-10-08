@@ -61,6 +61,12 @@
 .transformation-list select,.transformation-list textarea { width:100%;min-width:0;border:1px solid var(--line);background:var(--paper);color:var(--ink);padding:8px;font:13px var(--font-mono); }
 .transformation-inspection > p,.transformation-inspection > .query-actions,.transformation-inspection > details { margin:16px 24px; }
 .transformation-inspection pre { white-space:pre-wrap;overflow-wrap:anywhere; }
+.transformation-hub { padding:16px 24px; }.preparation-graph { min-width:0;padding-bottom:24px; }
+.preparation-graph > p,.preparation-graph > h3,.preparation-graph > details,.preparation-graph > .query-actions { margin:16px 24px; }.preparation-graph pre { white-space:pre-wrap;overflow-wrap:anywhere; }
+.preparation-graph-wrap { overflow:auto;max-height:560px;margin:16px 24px; }.preparation-graph svg { width:100%;min-width:900px;height:auto; }
+.preparation-graph text { fill:var(--ink);font:12px var(--font-mono); }.preparation-graph marker path { fill:var(--ink-70); }
+.preparation-edge { fill:none;stroke:var(--ink-70);stroke-width:1.5; }.preparation-edge.muted { opacity:.2; }.preparation-node { cursor:pointer; }.preparation-node rect { fill:var(--paper);stroke:var(--ink); }.preparation-node.selected rect,.preparation-node:focus-visible rect { stroke:var(--copper);stroke-width:2;fill:var(--copper-soft); }
+@media(max-width:600px){.transformation-hub{padding-inline:12px;}.preparation-graph > p,.preparation-graph > h3,.preparation-graph > details,.preparation-graph > .query-actions,.preparation-graph-wrap{margin-inline:12px;}}
 @media(max-width:600px){.transformation-selector-grid{grid-template-columns:minmax(0,1fr);}.transformation-inspection > p,.transformation-inspection > .query-actions,.transformation-inspection > details{margin-inline:12px;}}
 @media(max-width:600px){.clustering-inspection > .query-actions,.clustering-inspection > p,.clustering-inspection > h3,.clustering-inspection > details,.clustering-dendrogram-wrap{margin-inline:12px;}.profile-selector-grid{grid-template-columns:minmax(0,1fr);}}
 @media (max-width:600px) { .query-fields, .query-filter { padding-inline:12px; }.query-intro, .query-results, .query-setup { margin-inline:12px; }.query-options > label { flex:1 1 140px;min-width:0; }.query-options input, .query-options select { width:100%; } }
