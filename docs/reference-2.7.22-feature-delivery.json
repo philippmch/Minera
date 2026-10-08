@@ -33,7 +33,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "anonymization_workflow_available",
       "package": "algo.anonymization.pripel",
       "parity_status": "partial",
       "selectors": [
@@ -41,7 +41,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "anonymization_workflow_available",
       "package": "algo.anonymization.trace_variant_query",
       "parity_status": "partial",
       "selectors": [
@@ -1021,6 +1021,30 @@
       "id": "automatic_visualization_explanations",
       "state": "rendering_and_prompt_preparation_available_provider_execution_optional",
       "validation": "docs/feature-first-visualization-explanations-validation.json"
+    },
+    {
+      "added": [
+        "Selectable LAPLACE/SACOFA trace-variant queries and PRIPEL attribute anonymization in the application",
+        "Native source revision guards and a single-run JSON/XES release envelope",
+        "Generated release or uploaded CSV/XES query inputs, exact-name blocklists, OS entropy and seeded previews",
+        "Paginated variants/cases/events, explicit empty/capped outputs, complete report/XES downloads and reopening through ordinary mining",
+        "Original report text retained for exact large integer seeds",
+        "Changed typed scalars replaced and fractional noisy integer values exported as floats, with imported-XES numeric/boolean round-trip verification"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/AnonymizationWorkspace.tsx",
+        "src/frontend/src/anonymization.ts",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/minera_export.cpp"
+      ],
+      "id": "anonymization_release_workflows",
+      "state": "native_app_and_cli_available",
+      "validation": "docs/feature-first-anonymization-validation.json",
+      "variants": [
+        "laplace",
+        "sacofa",
+        "pripel"
+      ]
     }
   ],
   "execution_priority": [
@@ -1038,10 +1062,11 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Review every remaining catalogue family and visualization/export variant for absent capability or entry point before revisiting exact fixture agreement; transition systems and all eight social-network metrics now have usable views."
+      "next_action": "Continue reviewing remaining catalogue capabilities and usable entry points. Anonymization now exposes both trace-variant methods and PRIPEL with previews, exports and reopening; exact stochastic/privacy behavior remains a parity gate. Transition systems and all eight social-network metrics already have views."
     }
   ],
   "feature_status_meaning": {
+    "anonymization_workflow_available": "Native LAPLACE/SACOFA/PRIPEL execution has app controls, previews, source guards, matching single-run XES/report downloads and reopening. Exact reference behavior and privacy guarantees remain independent gates.",
     "explorer_available": "A selectable discovery model with a rendered result in the application. This does not mark its reference package or modules complete.",
     "feature_review_pending": "The partial parity status alone does not prove a feature is missing. Inspect implementation and usable entry points before choosing work.",
     "native_contexts_prompts_providers_and_studies_available": "All 13 native log/model/OCEL text builders have CLI/HTTP/browser entry points, joined by configured prompts/providers, queries, filters, clusters and hypotheses. Exact text, order, type, parameter, provider and multimodal parity gates remain independent.",

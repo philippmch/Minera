@@ -4160,9 +4160,37 @@ void handle_variant_statistics(const httplib::Request& request,
   }
 }
 
-// Hidden cached-session adapter for trace-variant query anonymization. The
-// source log remains in the latest mined session; only the released variant
-// distribution is returned.
+bool anonymization_release_requested(const httplib::Request& request,
+                                     const MinedSession& session) {
+  if (request.has_param("source_id") &&
+      request.get_param_value("source_id") !=
+          std::to_string(session.query_source_id))
+    throw std::invalid_argument("the source log changed; refresh the anonymization workspace");
+  if (!request.has_param("include_xes")) return false;
+  const auto value = request.get_param_value("include_xes");
+  if (value != "true" && value != "false")
+    throw std::invalid_argument("include_xes must be true or false");
+  if (value == "false") return false;
+  if (!request.has_param("source_id"))
+    throw std::invalid_argument("source_id is required for an anonymization release");
+  return true;
+}
+
+// Serialize the exact output of one run. Exporting or reopening a secure-random
+// release must never rerun the algorithm and draw a different output.
+std::string anonymization_release_json(std::string result_json,
+                                       const minera::EventLog& log,
+                                       const MinedSession& session) {
+  const auto quote = minera::embedding_runtime::detail::escape_json;
+  minera::XesExportOptions options;
+  options.preserve_nulls = true;
+  return "{\"family\":\"ANONYMIZATION_RELEASE\",\"source_id\":" +
+         quote(std::to_string(session.query_source_id)) + ",\"result\":" +
+         result_json + ",\"released_xes\":" +
+         quote(minera::serialize_xes(log, options)) + '}';
+}
+
+// Cached-session trace-variant query adapter; the source session stays intact.
 void handle_trace_variant_query(const httplib::Request& request,
                                 httplib::Response& response) {
   try {
@@ -4180,7 +4208,7 @@ void handle_trace_variant_query(const httplib::Request& request,
     static const std::set<std::string> allowed = {
         "tvq_variant", "tvq_epsilon", "tvq_k", "tvq_p", "tvq_seed",
         "tvq_secure_random", "tvq_max_output_traces",
-        "tvq_max_output_variants"};
+        "tvq_max_output_variants", "source_id", "include_xes"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -4194,15 +4222,16 @@ void handle_trace_variant_query(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
+    const bool release = anonymization_release_requested(request, *session);
     const auto options = minera::parse_trace_variant_query_params(lookup, present);
     if (options.max_output_traces > kServerTvqMaxOutputTraces)
       throw std::invalid_argument("tvq_max_output_traces exceeds the server safety cap");
     if (options.max_output_variants > kServerTvqMaxOutputVariants)
       throw std::invalid_argument("tvq_max_output_variants exceeds the server safety cap");
-    response.set_content(
-        minera::trace_variant_query_json(
-            minera::anonymize_trace_variant_query(session->log, options)),
-        "application/json");
+    const auto result = minera::anonymize_trace_variant_query(session->log, options);
+    auto body = minera::trace_variant_query_json(result);
+    if (release) body = anonymization_release_json(std::move(body), result.log, *session);
+    response.set_content(body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -4228,12 +4257,13 @@ void handle_pripel(const httplib::Request& request,
     static const std::set<std::string> allowed = {
         "pripel_epsilon", "pripel_blocklist", "pripel_seed",
         "pripel_secure_random", "pripel_max_output_traces",
-        "pripel_max_distance"};
+        "pripel_max_distance", "source_id", "include_xes"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
         throw std::invalid_argument("unknown PRIPEL parameter: " + key);
     }
+    const bool release = anonymization_release_requested(request, *session);
     std::string query_content;
     std::string query_name;
     if (request.has_file("trace_variant_query")) {
@@ -4264,9 +4294,10 @@ void handle_pripel(const httplib::Request& request,
     const auto options = minera::parse_pripel_params(lookup, present);
     if (options.max_output_traces > kServerPripelMaxOutputTraces)
       throw std::invalid_argument("pripel_max_output_traces exceeds the server safety cap");
-    response.set_content(
-        minera::pripel_json(minera::anonymize_pripel(session->log, query, options)),
-        "application/json");
+    const auto result = minera::anonymize_pripel(session->log, query, options);
+    auto body = minera::pripel_json(result);
+    if (release) body = anonymization_release_json(std::move(body), result.log, *session);
+    response.set_content(body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");

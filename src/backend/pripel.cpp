@@ -391,11 +391,23 @@ PripelResult anonymize_pripel(const EventLog& source,
           attrs.push_back(std::move(attr));
           continue;
         }
-        if (attr.kind == AttributeKind::kInt || attr.kind == AttributeKind::kFloat)
+        const auto original_value = attr.value;
+        if (attr.kind == AttributeKind::kInt || attr.kind == AttributeKind::kFloat) {
           attr.value = next_numeric(attr.key, attr.value, (emitted + 1) * 1009 + ei + 101);
-        else attr.value = randomized(
+          // Integer inputs can acquire fractional noise. Preserve the sampled
+          // value when exporting typed XES instead of rounding it as an int.
+          if (attr.kind == AttributeKind::kInt && attr.value != original_value) {
+            const double value = std::stod(attr.value);
+            if (std::isfinite(value) && std::trunc(value) != value)
+              attr.kind = AttributeKind::kFloat;
+          }
+        } else attr.value = randomized(
             std::move(attr.value), attr.key, (emitted + 1) * 1009 + ei + 101,
             attr.kind == AttributeKind::kBoolean);
+        // Imported typed scalars are authoritative during XES serialization.
+        // A sampled lexical value must replace that scalar too, including
+        // randomized booleans; otherwise export silently restores source data.
+        if (attr.value != original_value) attr.typed_value = std::monostate{};
         attrs.push_back(std::move(attr));
       }
       out.attributes = std::move(attrs);

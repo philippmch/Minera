@@ -35,6 +35,12 @@
 .query-table-wrap { width: 100%; overflow-x: auto; }
 .query-table-wrap table { min-width: 100%; width: max-content; }
 .query-table-wrap td { max-width: 380px; overflow-wrap: anywhere; }
+.anonymization-workspace { min-width: 0; padding-bottom: 24px; }
+.anonymization-workspace legend { font-weight: 600; padding-top: 20px; }
+.anonymization-workspace fieldset { border-top: 1px solid var(--line-soft); }
+.anonymization-workspace input[type="file"] { width: 100%; max-width: 400px; }
+.anonymization-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.anonymization-case { margin-top: 16px; }
 @media (max-width:600px) { .query-fields, .query-filter { padding-inline:12px; }.query-intro, .query-results, .query-setup { margin-inline:12px; }.query-options > label { flex:1 1 140px;min-width:0; }.query-options input, .query-options select { width:100%; } }
 
 .ask-model-panel { min-width: 0; padding-bottom: 24px; }
