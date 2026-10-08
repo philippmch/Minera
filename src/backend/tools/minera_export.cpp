@@ -24,6 +24,16 @@
 #include <type_traits>
 #include <vector>
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 #include "pnml_model_options.hpp"
 #include "replay_input_options.hpp"
 
@@ -126,6 +136,22 @@
 #include "embedding_runtime.hpp"
 
 namespace {
+std::filesystem::path cli_path(std::string_view value) {
+  return std::filesystem::u8path(value.begin(), value.end());
+}
+std::string cli_path_text(const std::filesystem::path& path) {
+  const auto value = path.u8string();
+  return std::string(value.begin(), value.end());
+}
+void write_cli_json(const std::filesystem::path& output, std::string_view body) {
+  if (output.empty()) { std::cout << body << '\n'; return; }
+  std::ofstream file(output, std::ios::binary);
+  if (!file) throw std::runtime_error("Cannot open output file " + cli_path_text(output));
+  file << body << '\n';
+  file.close();
+  if (!file) throw std::runtime_error("Cannot write output file " + cli_path_text(output));
+}
+
 
 bool ends_with_ci(std::string_view value, std::string_view suffix) {
   if (value.size() < suffix.size()) return false;
@@ -154,7 +180,7 @@ std::vector<std::string> split_csv(std::string_view value) {
 }
 
 bool is_xes_path(const std::filesystem::path& path) {
-  const auto value = path.string();
+  const auto value = cli_path_text(path);
   return ends_with_ci(value, ".xes") || ends_with_ci(value, ".xes.gz");
 }
 
@@ -1815,7 +1841,7 @@ minera::BatchDiscovery discover_selected_batches(
 
 }  // namespace
 
-int main(int argc, char** argv) {
+int run_export(int argc, char** argv) {
   std::filesystem::path input;
   std::filesystem::path output;
   std::filesystem::path pnml_output;
@@ -2401,20 +2427,20 @@ int main(int argc, char** argv) {
     if (arg == "--pnml-to-ptml" || arg == "--bpmn-to-ptml") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      if (arg == "--pnml-to-ptml") pnml_to_ptml_input = value;
-      else bpmn_to_ptml_input = value;
+      if (arg == "--pnml-to-ptml") pnml_to_ptml_input = cli_path(value);
+      else bpmn_to_ptml_input = cli_path(value);
       continue;
     }
     if (arg == "--reduce-petri-net") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      petri_reduction_input = value;
+      petri_reduction_input = cli_path(value);
       continue;
     }
     if (arg == "--inspect-pnml") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      pnml_inspection_input = value;
+      pnml_inspection_input = cli_path(value);
       continue;
     }
     if (arg == "--pnml-infer-initial-marking" ||
@@ -3112,7 +3138,7 @@ int main(int argc, char** argv) {
     if (arg == "--dfg") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      dfg_output = value;
+      dfg_output = cli_path(value);
       continue;
     }
     if (arg == "--log-convert") {
@@ -3317,7 +3343,7 @@ int main(int argc, char** argv) {
     if (arg == "--pripel") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      pripel_query_path = value;
+      pripel_query_path = cli_path(value);
       pripel_requested = true;
       continue;
     }
@@ -3587,14 +3613,14 @@ int main(int argc, char** argv) {
     if (arg == "--merge-case-relations") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      merge_incoming_path = value;
+      merge_incoming_path = cli_path(value);
       merge_requested = true;
       continue;
     }
     if (arg == "--timestamp-interleavings") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      timestamp_interleavings_right_path = value;
+      timestamp_interleavings_right_path = cli_path(value);
       timestamp_interleavings_requested = true;
       continue;
     }
@@ -3611,7 +3637,7 @@ int main(int argc, char** argv) {
     if (arg == "--case-relations") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      merge_relations_path = value;
+      merge_relations_path = cli_path(value);
       merge_requested = true;
       continue;
     }
@@ -3710,7 +3736,7 @@ int main(int argc, char** argv) {
     if (arg == "--emd-reference") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      emd_reference = value;
+      emd_reference = cli_path(value);
       continue;
     }
     if (arg == "--emd-variant") {
@@ -3735,13 +3761,13 @@ int main(int argc, char** argv) {
     if (arg == "--compare-petri-reference") {
       const auto* value = next();
       if (!value || *value == '\0') return usage(argv[0]);
-      compare_petri_reference = value;
+      compare_petri_reference = cli_path(value);
       continue;
     }
     if (arg == "--token-replay-model" || arg == "--replay-fitness-model") {
       const auto* value = next();
       if (!value || *value == '\0') return usage(argv[0]);
-      token_replay_model = value;
+      token_replay_model = cli_path(value);
       if (arg == "--replay-fitness-model") {
         replay_fitness_result_requested = true;
         evaluation_requested = true;
@@ -3751,7 +3777,7 @@ int main(int argc, char** argv) {
     if (arg == "--compare-petri-model") {
       const auto* value = next();
       if (!value || *value == '\0') return usage(argv[0]);
-      compare_petri_model = value;
+      compare_petri_model = cli_path(value);
       continue;
     }
     if (arg == "--compare-petri-miner") {
@@ -3866,7 +3892,7 @@ int main(int argc, char** argv) {
     if (arg == "--dfg-dataframe-output") {
       const auto* value = next();
       if (!value || std::string_view(value).empty()) return usage(argv[0]);
-      dfg_dataframe_output = value;
+      dfg_dataframe_output = cli_path(value);
       continue;
     }
     if (arg == "--dfg-operation" || arg == "--dfg-measure" ||
@@ -4013,7 +4039,7 @@ int main(int argc, char** argv) {
     if (arg == "--stochastic-map") {
       const auto* value = next();
       if (!value || *value == '\0') return usage(argv[0]);
-      stochastic_map_output = value;
+      stochastic_map_output = cli_path(value);
       stochastic_map_requested = true;
       continue;
     }
@@ -4334,7 +4360,7 @@ int main(int argc, char** argv) {
     if (arg == "-o") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      output = value;
+      output = cli_path(value);
     } else if (arg == "--case-column") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -4354,43 +4380,43 @@ int main(int argc, char** argv) {
     } else if (arg == "--pnml") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      pnml_output = value;
+      pnml_output = cli_path(value);
     } else if (arg == "--check-pnml" || arg == "--pnml-public-markings") {
       if (arg == "--pnml-public-markings") {
         pnml_public_markings = true;
       } else {
         const auto* value = next();
         if (!value) return usage(argv[0]);
-        check_pnml = value;
+        check_pnml = cli_path(value);
       }
     } else if (arg == "--check-bpmn") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      check_bpmn = value;
+      check_bpmn = cli_path(value);
     } else if (arg == "--ptml") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      ptml_output = value;
+      ptml_output = cli_path(value);
     } else if (arg == "--powl-ptml") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      powl_ptml_output = value;
+      powl_ptml_output = cli_path(value);
     } else if (arg == "--check-ptml") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      check_ptml = value;
+      check_ptml = cli_path(value);
     } else if (arg == "--bpmn") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      bpmn_output = value;
+      bpmn_output = cli_path(value);
     } else if (arg == "--xes") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      xes_output = value;
+      xes_output = cli_path(value);
     } else if (arg == "--playout") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      playout_output = value;
+      playout_output = cli_path(value);
     } else if (arg == "--pnml-miner") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -4568,7 +4594,7 @@ int main(int argc, char** argv) {
             *supplied = true;
             align_dfg = true;
           }
-          else if (arg == "--align-edit-distance") edit_reference = value;
+          else if (arg == "--align-edit-distance") edit_reference = cli_path(value);
           else if (arg == "--edit-deviation-cost") { edit_options.deviation_cost = static_cast<std::uint64_t>(parse_positive_size(value, arg)); edit_option_used = true; }
           else { edit_projection = value; if (edit_projection != "none" && edit_projection != "log") throw std::invalid_argument("--edit-projection expects none or log"); edit_option_used = true; }
         } catch (const std::invalid_argument& error) { std::cerr << "error: " << error.what() << '\n'; return 2; }
@@ -5364,7 +5390,7 @@ int main(int argc, char** argv) {
     } else if (!arg.empty() && arg.front() == '-') {
       return usage(argv[0]);
     } else if (input.empty()) {
-      input = arg;
+      input = cli_path(arg);
     } else {
       return usage(argv[0]);
     }
@@ -5958,9 +5984,9 @@ int main(int argc, char** argv) {
       if (!pnml_output.empty()) {
         const auto xml = minera::to_pnml(document);
         std::ofstream file(pnml_output);
-        if (!file) throw std::runtime_error("Cannot open PNML output file " + pnml_output.string());
+        if (!file) throw std::runtime_error("Cannot open PNML output file " + cli_path_text(pnml_output));
         file << xml;
-        if (!file) throw std::runtime_error("Cannot write PNML output file " + pnml_output.string());
+        if (!file) throw std::runtime_error("Cannot write PNML output file " + cli_path_text(pnml_output));
       }
       std::cout << json << '\n';
       return 0;
@@ -5994,7 +6020,7 @@ int main(int argc, char** argv) {
     std::optional<minera::CsvEventData> csv_data;
     if (browser_history_requested) {
       browser_history_fields.insert_or_assign("browser_history_path",
-                                               input.string());
+                                               cli_path_text(input));
       const auto lookup = [&](std::string_view name) {
         const auto it = browser_history_fields.find(std::string(name));
         return it == browser_history_fields.end() ? std::string{} : it->second;
@@ -6010,7 +6036,7 @@ int main(int argc, char** argv) {
       return 0;
     }
     if (windows_events_requested) {
-      windows_events_fields.insert_or_assign("windows_events_path", input.string());
+      windows_events_fields.insert_or_assign("windows_events_path", cli_path_text(input));
       const auto lookup = [&](std::string_view name) {
         const auto it = windows_events_fields.find(std::string(name));
         return it == windows_events_fields.end() ? std::string{} : it->second;
@@ -6097,10 +6123,10 @@ int main(int argc, char** argv) {
       if (output.empty()) std::cout << body << '\n';
       else {
         std::ofstream file(output);
-        if (!file) throw std::runtime_error("Cannot open output file " + output.string());
+        if (!file) throw std::runtime_error("Cannot open output file " + cli_path_text(output));
         file << body << '\n';
         file.flush();
-        if (!file) throw std::runtime_error("Cannot write output file " + output.string());
+        if (!file) throw std::runtime_error("Cannot write output file " + cli_path_text(output));
       }
       return 0;
     }
@@ -6308,7 +6334,7 @@ int main(int argc, char** argv) {
         log = minera::filter_ltl_event_log(log, *params.ltl);
     }
     if (!token_replay_model.empty()) {
-      if (!ends_with_ci(input.string(), ".csv") && !is_xes_path(input))
+      if (!ends_with_ci(cli_path_text(input), ".csv") && !is_xes_path(input))
         throw std::invalid_argument("--token-replay-model expects CSV or XES input");
       minera::PnmlImportOptions model_options;
       model_options.infer_initial_marking = false;
@@ -6341,9 +6367,9 @@ int main(int argc, char** argv) {
       if (output.empty()) std::cout << body << '\n';
       else {
         std::ofstream file(output);
-        if (!file) throw std::runtime_error("Cannot open output file " + output.string());
+        if (!file) throw std::runtime_error("Cannot open output file " + cli_path_text(output));
         file << body << '\n';
-        if (!file) throw std::runtime_error("Cannot write output file " + output.string());
+        if (!file) throw std::runtime_error("Cannot write output file " + cli_path_text(output));
       }
       return 0;
     }
@@ -6353,9 +6379,9 @@ int main(int argc, char** argv) {
       if (output.empty()) std::cout << body << '\n';
       else {
         std::ofstream file(output);
-        if (!file) throw std::runtime_error("Cannot open output file " + output.string());
+        if (!file) throw std::runtime_error("Cannot open output file " + cli_path_text(output));
         file << body << '\n';
-        if (!file) throw std::runtime_error("Cannot write output file " + output.string());
+        if (!file) throw std::runtime_error("Cannot write output file " + cli_path_text(output));
       }
       return 0;
     }
@@ -6953,8 +6979,7 @@ int main(int argc, char** argv) {
         return target_fields.contains(std::string(name));
       };
       const auto params = minera::parse_log_to_target_params(lookup, present);
-      std::cout << minera::log_to_target_json(
-          minera::log_to_target(log, params)) << '\n';
+      write_cli_json(output, minera::log_to_target_json(minera::log_to_target(log, params)));
       return 0;
     }
     if (features_requested) {
@@ -6966,7 +6991,7 @@ int main(int argc, char** argv) {
         return features_fields.contains(std::string(name));
       };
       const auto params = minera::parse_log_to_features_params(lookup, present);
-      std::cout << minera::log_to_features_json(minera::log_to_features(log, params)) << '\n';
+      write_cli_json(output, minera::log_to_features_json(minera::log_to_features(log, params)));
       return 0;
     }
     if (embeddings_requested) {
@@ -7001,8 +7026,7 @@ int main(int argc, char** argv) {
         return label_splitting_fields.contains(std::string(name));
       };
       const auto params = minera::parse_label_splitting_params(lookup, present);
-      std::cout << minera::label_splitting_json(
-          minera::split_activity_labels(log, params)) << '\n';
+      write_cli_json(output, minera::label_splitting_json(minera::split_activity_labels(log, params)));
       return 0;
     }
     if (trie_requested) {
@@ -7040,7 +7064,7 @@ int main(int argc, char** argv) {
       return 0;
     }
     if (!compare_petri_model.empty()) {
-      if (!ends_with_ci(compare_petri_reference.string(), ".csv") &&
+      if (!ends_with_ci(cli_path_text(compare_petri_reference), ".csv") &&
           !is_xes_path(compare_petri_reference))
         throw std::invalid_argument("--compare-petri-reference expects a .csv or .xes file");
       minera::PnmlImportOptions model_options;
@@ -7093,7 +7117,7 @@ int main(int argc, char** argv) {
       if (output.empty()) std::cout << body << '\n';
       else {
         std::ofstream file(output);
-        if (!file) throw std::runtime_error("Cannot open output file " + output.string());
+        if (!file) throw std::runtime_error("Cannot open output file " + cli_path_text(output));
         file << body << '\n';
       }
       return 0;
@@ -7501,7 +7525,7 @@ int main(int argc, char** argv) {
       file << stochastic_map_json.str() << '\n';
     }
     if (!compare_petri_reference.empty()) {
-      if (!ends_with_ci(compare_petri_reference.string(), ".csv") &&
+      if (!ends_with_ci(cli_path_text(compare_petri_reference), ".csv") &&
           !is_xes_path(compare_petri_reference)) {
         std::cerr << "error: --compare-petri-reference expects a .csv or .xes file\n";
         return 2;
@@ -7767,7 +7791,7 @@ int main(int argc, char** argv) {
         evaluation->push_back(std::move(result));
       }
     }
-    const auto dataset = input.filename().string();
+    const auto dataset = cli_path_text(input.filename());
 
     // Optionally mine the decision points of one model's net.
     if ((decisions_miner == "powl" || decision_tables_miner == "powl") &&
@@ -8355,3 +8379,26 @@ int main(int argc, char** argv) {
 
   return 0;
 }
+
+#ifdef _WIN32
+int wmain(int argc, wchar_t** argv) {
+  std::vector<std::string> values;
+  values.reserve(argc);
+  for (int i = 0; i < argc; ++i) {
+    const auto size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+        argv[i], -1, nullptr, 0, nullptr, nullptr);
+    if (size <= 0) { std::cerr << "error: invalid Unicode argument\n"; return 2; }
+    std::string value(size, '\0');
+    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[i], -1,
+        value.data(), size, nullptr, nullptr)) return 2;
+    value.pop_back();
+    values.push_back(std::move(value));
+  }
+  std::vector<char*> arguments;
+  for (auto& value : values) arguments.push_back(value.data());
+  arguments.push_back(nullptr);
+  return run_export(argc, arguments.data());
+}
+#else
+int main(int argc, char** argv) { return run_export(argc, argv); }
+#endif

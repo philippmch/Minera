@@ -1,8 +1,11 @@
 #include "minera/label_splitting.hpp"
+#include "minera/xes_export.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 #include <cassert>
 #include <cmath>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 
 using namespace minera;
@@ -313,4 +316,50 @@ int main() {
   assert(cross_activity.log.traces[0].events.back().activity == "A_2");
   assert(cross_activity.log.traces[1].events.back().activity == "A_1");
   assert(cross_activity.log.traces[2].events.back().activity == "A_0");
+
+  // A changed label must survive an actual typed XES export/import cycle.
+  auto typed_log = custom_key_fixture();
+  for (auto& trace : typed_log.traces) {
+    auto& attribute = trace.events[1].attributes[1];
+    attribute.kind = AttributeKind::kInt;
+    attribute.value = "7";
+    attribute.typed_value = std::int64_t{7};
+  }
+  LabelSplittingOptions typed_options;
+  typed_options.activity_key = "kind";
+  typed_options.target_key = "split";
+  typed_options.prefix_length = 1;
+  typed_options.suffix_length = 0;
+  typed_options.min_edge_weight = 0.5;
+  typed_options.target_activities = {"A"};
+  const auto typed_split = split_activity_labels(typed_log, typed_options);
+  std::istringstream typed_xml(serialize_xes(typed_split.log));
+  const auto typed_reopened = import_xes_event_log(typed_xml);
+  for (std::size_t i = 0; i < typed_split.log.traces.size(); ++i) {
+    const auto* expected = typed_split.log.traces[i].events[1].attribute("split");
+    assert(expected && expected->rfind("A_", 0) == 0);
+    assert(typed_reopened.traces[i].events[1].attribute("split") &&
+           *typed_reopened.traces[i].events[1].attribute("split") == *expected);
+  }
+
+  // An imported custom first-class activity key must follow its new label.
+  auto selected_log = custom_key_fixture();
+  for (auto& trace : selected_log.traces) for (auto& event : trace.events) {
+    event.activity = *event.attribute("kind");
+    event.activity_source_key = "kind";
+    event.activity_state = FirstClassAttributeState::kPresent;
+    event.activity_attribute = EventAttribute{"kind", event.activity, AttributeKind::kString};
+    std::erase_if(event.attributes, [](const auto& attribute) { return attribute.key == "kind"; });
+  }
+  auto selected_options = typed_options;
+  selected_options.activity_key = "activity";
+  selected_options.target_key = "kind";
+  const auto selected_split = split_activity_labels(selected_log, selected_options);
+  XesImportOptions selected_import; selected_import.activity_attribute = "kind";
+  std::istringstream selected_xml(serialize_xes(selected_split.log));
+  const auto selected_reopened = import_xes_event_log(selected_xml, selected_import);
+  for (std::size_t i = 0; i < selected_split.log.traces.size(); ++i) {
+    assert(selected_split.log.traces[i].events[1].activity.rfind("A_", 0) == 0);
+    assert(selected_reopened.traces[i].events[1].activity == selected_split.log.traces[i].events[1].activity);
+  }
 }

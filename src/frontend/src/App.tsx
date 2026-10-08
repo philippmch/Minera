@@ -52,6 +52,7 @@ import { AskModel,PromptChat } from "./components/AskModel";
 import { QueryWorkspace } from "./components/QueryWorkspace";
 import { AnonymizationWorkspace } from "./components/AnonymizationWorkspace";
 import { ClusteringWorkspace } from "./components/ClusteringWorkspace";
+import { TransformationWorkspace } from "./components/TransformationWorkspace";
 import { VisualizationExplain } from "./components/VisualizationExplain";
 import { type VisualizationDraft } from "./visualization-explanation";
 import {
@@ -119,6 +120,7 @@ export default function App() {
   const [source, setSource] = useState<{
     file: File;
     delimiter?: string;
+    xesActivityAttribute?: string;
     activities: string[];
     resources: string[];
     lifecycles: string[];
@@ -338,7 +340,7 @@ export default function App() {
       .finally(() => { if (ocelRequest.current === controller) setMining(false); });
   }, [ocelFile]);
 
-  const loadFile = (file: File) => {
+  const loadFile = (file: File, xesActivityAttribute?: string) => {
     ocelRequest.current?.abort();
     ocelRequest.current = null;
     setMining(true);
@@ -366,10 +368,11 @@ export default function App() {
         }
       } else {
         const delimiter = delimiterForFile(file.name);
-        const result = await mineCsv(file, { delimiter });
+        const result = await mineCsv(file, { delimiter, xesActivityAttribute });
         setSource({
           file,
           delimiter,
+          xesActivityAttribute,
           activities: result.activities.map((a) => a.name),
           resources: result.resources?.resources.map((r) => r.name) ?? [],
           lifecycles: logLifecycles(result),
@@ -419,7 +422,8 @@ export default function App() {
     if (!source) return;
     setFiltersActive(hasActiveFilters(filters) || hasActiveMinerOptions(filters));
     setMining(true);
-    mineCsv(source.file, { delimiter: source.delimiter, ...filters })
+    mineCsv(source.file, { delimiter: source.delimiter, ...filters,
+      xesActivityAttribute: source.xesActivityAttribute })
       .then((result) => {
         cacheGeneration.current += 1;
         setData(result);
@@ -674,6 +678,7 @@ export default function App() {
         <button className={tab === "query" ? "tab active" : "tab"} onClick={() => setTab("query")}>Query &amp; filter</button>
         <button className={tab === "anonymization" ? "tab active" : "tab"} onClick={() => setTab("anonymization")}>Anonymize</button>
         <button className={tab === "clustering" ? "tab active" : "tab"} onClick={() => setTab("clustering")}>Clustering</button>
+        <button className={tab === "transformation" ? "tab active" : "tab"} onClick={() => setTab("transformation")}>Transform</button>
       </nav>
       <Kpis data={data} />
       {tab!=="llm"&&tab!=="query"&&tab!=="embeddings"&&tab!=="anonymization"&&<VisualizationExplain key={cacheGeneration.current+":"+tab} dataset={data.dataset} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});setTab("llm");}} />}
@@ -755,6 +760,7 @@ export default function App() {
       {tab === "query" && <main className="layout-log"><QueryWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenFiltered={loadFile} /></main>}
       {tab === "anonymization" && <main className="layout-log"><AnonymizationWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenReleased={loadFile} /></main>}
       {tab === "clustering" && <main className="layout-log"><ClusteringWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenCluster={loadFile} /></main>}
+      {tab === "transformation" && <main className="layout-log"><TransformationWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenTransformed={loadFile} /></main>}
       {tab === "dfg" && (
         <main className="layout">
           <ProcessMap

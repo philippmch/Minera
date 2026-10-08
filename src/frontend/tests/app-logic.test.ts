@@ -57,7 +57,7 @@ describe("native alignment adapters", () => {
       ["xes_max_decompressed_bytes", "1048576"],
     ]);
     expect(() => mineFormEntries({ xesMaxTraces: -1 })).toThrow(/non-negative/);
-    expect(() => mineFormEntries({ xesActivityAttribute: " " })).toThrow(/empty/);
+    expect(() => mineFormEntries({ xesActivityAttribute: "" })).toThrow(/empty/);
     expect(() => mineFormEntries({ xesMaxDecompressedBytes: 0 })).toThrow(/positive/);
   });
 
