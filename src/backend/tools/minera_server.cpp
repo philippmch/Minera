@@ -140,6 +140,7 @@
 #include "minera/streaming_footprints.hpp"
 #include "minera/streaming_temporal.hpp"
 #include "minera/streaming_tbr.hpp"
+#include "minera/streaming_session.hpp"
 #include "minera/path_filter.hpp"
 #include "minera/decomposed_alignment.hpp"
 #include "minera/petri_anti_alignment.hpp"
@@ -8669,6 +8670,8 @@ void handle_streaming_tbr(const httplib::Request& request,
   }
 }
 
+#include "live_stream_routes.hpp"
+
 void handle_process_cube(const httplib::Request& request,
                          httplib::Response& response) {
   try {
@@ -8899,6 +8902,7 @@ int main(int argc, char** argv) {
   server.Options("/api/streaming-temporal", preflight);
   server.Options("/api/temporal-conformance", preflight);
   server.Options("/api/streaming-tbr", preflight);
+  for(const auto* route:{"create","snapshot","append","action","list","source","release"})server.Options(std::string("/api/live-stream/")+route,preflight);
   server.Options("/api/knowledge-injection", preflight);
 
   server.Post("/api/mine", handle_mine);
@@ -9017,6 +9021,13 @@ int main(int argc, char** argv) {
   server.Post("/api/streaming-temporal", handle_streaming_temporal);
   server.Post("/api/temporal-conformance", handle_temporal_conformance);
   server.Post("/api/streaming-tbr", handle_streaming_tbr);
+  server.Post("/api/live-stream/create",handle_live_create);
+  server.Get("/api/live-stream/snapshot",handle_live_snapshot);
+  server.Post("/api/live-stream/append",handle_live_append);
+  server.Post("/api/live-stream/action",handle_live_action);
+  server.Get("/api/live-stream/list",handle_live_list);
+  server.Get("/api/live-stream/source",handle_live_source);
+  server.Post("/api/live-stream/release",handle_live_release);
   server.Get("/api/playout", handle_playout);
   server.Post("/api/playout", handle_playout);
   server.Get("/api/stochastic-petri", handle_stochastic_petri);

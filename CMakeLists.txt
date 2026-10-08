@@ -105,6 +105,7 @@ add_library(minera_core
   src/backend/overlap.cpp
   src/backend/label_splitting.cpp
   src/backend/live_stream.cpp
+  src/backend/streaming_session.cpp
   src/backend/link_analysis.cpp
   src/backend/json_export.cpp
   src/backend/knowledge_injection.cpp
@@ -866,6 +867,11 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_live_stream_tests PRIVATE cxx_std_20)
   target_compile_options(minera_live_stream_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_live_stream_tests COMMAND minera_live_stream_tests)
+  add_executable(minera_streaming_session_tests src/backend/tests/test_streaming_session.cpp)
+  target_link_libraries(minera_streaming_session_tests PRIVATE minera::core)
+  target_compile_features(minera_streaming_session_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_streaming_session_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_streaming_session_tests COMMAND minera_streaming_session_tests)
 
   add_executable(minera_streaming_import_tests src/backend/tests/test_streaming_import.cpp)
   target_link_libraries(minera_streaming_import_tests PRIVATE minera::core)

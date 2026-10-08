@@ -1527,6 +1527,53 @@
         "first",
         "last"
       ]
+    },
+    {
+      "added": [
+        "Server-held native monitor sessions persist across requests, uploads, workspace navigation and explicit reconnection",
+        "DFG, footprint, temporal and forward/backwards token replay monitors with immutable configuration and preserved per-case state",
+        "CSV/XES/gzip batch appends, all six XES parser variants, literal selectors and native CSV delimiter/whitespace/case-alias options",
+        "Native queue/start/drain/finish lifecycle; active draining waits for in-flight callbacks as well as queued work",
+        "Observer detach/reattach, complete/per-case monitor resets and native case finalization after stream finish",
+        "Revision-checked mutations, unique batch receipts, reconnectable creation IDs and a verified competing append conflict",
+        "Native session/batch/source/delivery/termination histories, accepted/skipped event outcomes and explicit observer errors",
+        "Complete native model/case/deviation/session data, row/column paging, DFG diagrams and full JSON/report/CSV exports",
+        "Original server-held CSV/XES/gzip/PNML source-byte downloads verified against client-provided metadata across reconnection",
+        "CRLF terminators are removed from CSV record boundaries without trimming fields or removing quoted carriage returns",
+        "Fresh file replay remains available; landing, classic/OCEL navigation, transformation hub and 390px live controls pass"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/StreamingWorkspace.tsx",
+        "src/frontend/src/components/LiveStreamingInspection.tsx",
+        "src/frontend/src/live-stream-workspace.ts",
+        "src/backend/tools/live_stream_routes.hpp",
+        "src/backend/streaming_session.cpp"
+      ],
+      "families": [],
+      "id": "native_persistent_stream_sessions",
+      "native_components": [
+        "include/minera/live_stream.hpp",
+        "include/minera/streaming_session.hpp",
+        "include/minera/streaming_dfg.hpp",
+        "include/minera/streaming_footprints.hpp",
+        "include/minera/streaming_temporal.hpp",
+        "include/minera/streaming_tbr.hpp"
+      ],
+      "state": "native_session_api_and_app_available",
+      "validation": "docs/feature-first-live-stream-validation.json",
+      "variants": [
+        "DFG",
+        "FOOTPRINTS",
+        "TEMPORAL",
+        "TBR_FORWARD",
+        "TBR_BACKWARDS",
+        "CSV",
+        "XES",
+        "GZIP_XES",
+        "INACTIVE",
+        "ACTIVE",
+        "FINISHED"
+      ]
     }
   ],
   "execution_priority": [
@@ -1544,7 +1591,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Review persistent streaming state/live readers and remaining catalogue/analysis/export workflows. Native process cubes now expose all eight aggregations, dimensions, full membership/export inspection and case-feature handoff alongside independent model exchange, streaming, related-log, OCEL and classic workflows. Full numeric/schema/dialect/default/order/search/concurrency/performance and Windows CLI Unicode gates remain."
+      "next_action": "Review remaining acquisition/readers, trace-stream workflows and catalogue/analysis/export gaps. Persistent event-monitor sessions now support cross-batch CSV/XES, lifecycle, reconnect, observer/reset/finalization controls and complete retained exports alongside fresh streaming, process cubes, model exchange, related-log and OCEL/classic workflows. Durability, lazy acquisition, native dialect/default/numeric/order/search/concurrency/performance and Windows CLI Unicode gates remain."
     }
   ],
   "feature_status_meaning": {

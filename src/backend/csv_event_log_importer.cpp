@@ -142,6 +142,9 @@ CsvEventData import_csv_event_data_impl(
   if (!std::getline(input, line)) {
     return {};
   }
+  // getline consumes LF but leaves the CR in a CRLF record terminator. It is
+  // not a field value, including when preserving field whitespace.
+  if (!line.empty() && line.back() == '\r') line.pop_back();
 
   // Strip a leading UTF-8 byte-order mark so the first column name still
   // matches; spreadsheet exports routinely prepend one.
@@ -213,6 +216,7 @@ CsvEventData import_csv_event_data_impl(
   std::size_t line_number = 1;
   std::size_t input_order = 0;
   while (std::getline(input, line)) {
+    if (!line.empty() && line.back() == '\r') line.pop_back();
     ++line_number;
     if (line.empty()) {
       continue;
