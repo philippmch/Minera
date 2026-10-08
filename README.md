@@ -1649,6 +1649,57 @@ Windows narrow command-line argument encoding still mangles Unicode names;
 native numeric/default/bin/category/order/performance and complete reference
 parity remain separate gates.
 [Validation and checkpoint boundaries](docs/feature-first-process-cube-validation.json)
+
+## Persistent streaming sessions
+
+In **Replay event streams**, choose **Persistent server session**. Configure a
+DFG, footprint, temporal or token-replay monitor, then create its server session.
+Queue a CSV/XES batch while inactive, choose **Start stream**, and append more
+batches to the same native monitor. Gzip XES and all six native XES parser
+selectors are available. CSV delimiter, whitespace, case-ID aliases and literal
+column selectors are retained for every batch. CSV currently requires a header.
+
+**Drain queued events** waits for both queued and executing callbacks without
+finishing the stream. **Finish stream** drains and closes arrival; footprint and
+token-replay cases can still be finalized afterward. Reset individual cases or
+the complete monitor, or detach/reattach its observer. Detached intervals are
+consumed by the stream without updating that monitor. The application uses one
+ordered worker so case progression follows the selected per-batch order and
+the order in which batches were appended.
+
+The session persists while this server process runs. Navigating away leaves it
+running; use the saved ID, **Connect or refresh session**, or **List server stream
+sessions** to reconnect. A server restart removes sessions. Mutation requests
+carry the current revision and unique batch receipt; stale or repeated requests
+are rejected. After an interrupted request, refresh to inspect whether it
+committed before appending again. **Release server session** returns final data
+and frees its native state; download original sources before releasing it.
+
+Inspect native state, queue/observer delivery counts, per-event accepted/skipped
+outcomes, case prefixes, temporal deviations and final conformance diagnostics.
+Complete CSV/JSON/reports retain every row and column beyond display paging.
+Original CSV/XES/gzip/PNML bytes remain downloadable across reconnection. Upload
+SHA-256 values are computed by the client, retained as `provided_sha256`, and
+checked against actual downloaded bytes; they are not server-computed hashes.
+
+The HTTP routes are `POST /api/live-stream/create`, `POST /api/live-stream/append`,
+`POST /api/live-stream/action`, `POST /api/live-stream/release`, and
+`GET /api/live-stream/snapshot`, `/api/live-stream/list`, `/api/live-stream/source`.
+Creation takes `session_id`, `method` and the existing method-specific streaming
+parameters. Token replay also requires multipart `model`. Appends take
+`session_id`, `expected_revision`, `batch_id`, `format=csv|xes` and original
+multipart `log` or raw bytes. Actions take `action=start|drain|finish|register|
+deregister|reset_all|reset_case|terminate_case|terminate_all`, plus `case_id` where
+needed. Source download takes `session_id` and `source_id`.
+
+The checkpoint also fixes CRLF record terminators leaking into untrimmed CSV
+headers/fields, while preserving carriage returns inside quoted values. It
+verifies 869 frontend tests, seven assertion-enabled native suites, 126 HTTP
+cases, both token-replay variants, six gzip XES readers, a competing append race,
+33 browser checks, 38 full CSVs, six reports and six standalone CLI runs.
+Durability across restarts, unbounded/lazy acquisition, trace-session workflows,
+general concurrency/performance and complete reference behavior remain open.
+[Validation and checkpoint boundaries](docs/feature-first-live-stream-validation.json)
 record all four formats, normal export paths, both net constructions, extended
 arcs, stochastic data, 501-digit integers, actual conformance handoff and complete
 exports. Full format/dialect/schema/diagram preservation, solver/search,

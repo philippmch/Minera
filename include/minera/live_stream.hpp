@@ -30,6 +30,9 @@ class LiveEventStream {
 
   bool append(Event event);
   void start();
+  // Wait for queued and currently executing items without finishing the stream.
+  // A queued inactive stream must be started before it can be drained.
+  void drain();
   void stop();
   [[nodiscard]] std::size_t register_observer(Observer observer);
   bool deregister_observer(std::size_t observer_id);
@@ -54,6 +57,7 @@ class LiveTraceStream {
 
   bool append(Trace trace);
   void start();
+  void drain();
   void stop();
   [[nodiscard]] std::size_t register_observer(Observer observer);
   bool deregister_observer(std::size_t observer_id);

@@ -12304,3 +12304,62 @@ streaming/readers, optional connectors and remaining catalogue workflows stay
 open. No reference bodies or bytecode were inspected, and no reference unit is
 promoted: all 86 packages/387 modules, 46 complete packages/199 complete modules
 and 228 incomplete coverage units remain the full objective.
+
+
+## Feature delivery first: persistent native streaming sessions (2026-10-08)
+
+Replay event streams now offers server-held native sessions alongside fresh
+file replay. DFG, footprint, temporal and both token-replay variants retain
+per-case state across CSV/XES/gzip batches and navigation/reconnection. All six
+XES parser variants, CSV delimiter/trim/alias selectors and literal column/XES
+attribute selectors are exposed. Configuration stays fixed for each session.
+
+New LiveEventStream/LiveTraceStream drain waits for both queued and executing
+callbacks without finishing. StreamingSession uses an ordered worker and
+revision-checked mutations, unique batch receipts and recoverable creation IDs.
+Start/drain/finish, observer detach/reattach, complete/per-case resets and native
+case finalization after finish are usable. Detach intervals do not update the
+monitor; resets retain cumulative delivery/source history. Temporal skips and
+observer errors remain inspectable rather than inferred as processed events.
+
+Original server-held uploads, native data/report/CSV, all source/batch/delivery/
+termination fields and DFG diagrams remain available across reconnect. Eight-
+column/25-row display pages preserve complete exports, including an 80-delivery/
+40-case session. provided_sha256 remains client metadata and is independently
+verified against actual downloaded bytes, not asserted as a native server hash.
+
+The new controls uncovered CRLF terminators being retained in untrimmed CSV
+headers/values. The native parser now removes record CR while preserving
+quoted carriage returns and field whitespace. Headerless CSV and broader
+dialect/type/error parity remain open. Empty multipart non-replay creation and
+lost unused footprint defaults after DFG reconnection were corrected and
+regression-covered. An escaped DOM-string predicate was replaced by inspection
+of actual visible textarea values; immutable failed attempts remain retained.
+
+docs/feature-first-live-stream-validation.json binds 593 native sources, 206
+frontend/runtime sources, three fresh core objects/165 reused objects, seven
+assertion-enabled native suites, 869 frontend tests/production assets, 72 native
+application checks across 126 HTTP cases, 33 browser checks/86 artifacts and 89
+independent artifact checks over 38 complete CSVs, six reports, five original
+uploads, six standalone CLIs and two local served assets. Incremental outputs
+match complete native replay, including both TBR variants and six gzip readers.
+Competing same-revision appends admit exactly one batch; malformed/stale/repeated
+requests retain prior state. All four browser monitor families, post-finish
+finalization, temporal deviations/skips, lifecycle/reconnect/source downloads,
+fresh replay, classic/OCEL/hub navigation and 390px controls pass.
+
+Earlier successful browser lifecycle/transport artifacts retain their frontend-5
+binding; corrected configuration, remaining families, final production assets
+and navigation/responsiveness use frontend-6. The original server/build stayed
+available during source-bound CSV correction; a new immutable build and port
+verified the changed native code. Owned PIDs 19888/40572, ports 8500/8501 and tab
+30 were closed after identity checks; the viewport override was reset.
+
+Sessions last for the server process, not restarts. Durability, unbounded/lazy/
+network acquisition, trace app sessions, general scheduling/concurrency,
+callback-side lifecycle calls, allocation/observer failure fidelity, model
+delimiter/PNML/numeric/search gates, optional connectors, remaining workflows
+and complete reference exactness/performance stay open. No reference bodies or
+bytecode were inspected and no catalogue unit is promoted: all 86 packages/387
+modules, 46 complete packages/199 complete modules and 228 incomplete units
+remain the full objective.

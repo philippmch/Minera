@@ -51,6 +51,13 @@ class StreamCore {
     }
   }
 
+  void drain() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (state_ == StreamingStreamState::kInactive && !queue_.empty())
+      throw std::logic_error("start the live stream before draining queued items");
+    drained_.wait(lock, [this] { return queue_.empty() && active_items_ == 0; });
+  }
+
   void stop() noexcept {
     {
       std::unique_lock<std::mutex> lock(mutex_);
@@ -158,6 +165,7 @@ bool LiveEventStream::append(Event event) {
   return impl_->core.append(std::move(event));
 }
 void LiveEventStream::start() { impl_->core.start(); }
+void LiveEventStream::drain() { impl_->core.drain(); }
 void LiveEventStream::stop() { impl_->core.stop(); }
 std::size_t LiveEventStream::register_observer(Observer observer) {
   return impl_->core.register_observer(std::move(observer));
@@ -184,6 +192,7 @@ bool LiveTraceStream::append(Trace trace) {
   return impl_->core.append(std::move(trace));
 }
 void LiveTraceStream::start() { impl_->core.start(); }
+void LiveTraceStream::drain() { impl_->core.drain(); }
 void LiveTraceStream::stop() { impl_->core.stop(); }
 std::size_t LiveTraceStream::register_observer(Observer observer) {
   return impl_->core.register_observer(std::move(observer));

@@ -2362,3 +2362,12 @@ input[type="range"]::-moz-range-thumb {
 .cube-members li { overflow-wrap: anywhere; white-space: pre-wrap; }
 .cube-export { margin: 0 24px 16px; }
 @media (max-width: 1200px) { .topbar { flex-wrap: wrap; } .topbar > .dataset { min-width: 0; flex: 1 1 180px; } }
+.streaming-mode, .live-connections { margin: 16px 24px; }
+.live-stream-inspection { min-width: 0; }
+.live-stream-inspection > p, .live-stream-inspection > details, .live-stream-inspection > .query-options, .live-stream-inspection > .query-actions { margin: 16px 24px; }
+.live-stream-inspection .filters-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.live-connections input, .live-stream-inspection input { width: 100%; min-width: 0; }
+.live-connections button, .live-stream-inspection p { overflow-wrap: anywhere; }
+.live-stream-inspection pre { overflow: auto; max-height: 460px; }
+.live-stream-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.live-csv-export { margin: 0 24px 16px; }
