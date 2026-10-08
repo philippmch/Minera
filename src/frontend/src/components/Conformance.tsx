@@ -78,6 +78,8 @@ export function Conformance({
   onRequestAlignment,
   onRequestDecisions,
   onCheckModel,
+  initialModel,
+  onInitialModelConsumed,
   onRequestDfg,
   onRequestEditDistance,
   onRequestProcessTree,
@@ -93,7 +95,9 @@ export function Conformance({
   data: MineraExport;
   onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
   onRequestDecisions?: (minerId: string, options?: DecisionMiningOptions) => Promise<DecisionsResult>;
-  onCheckModel?: (file: File) => Promise<ImportedModelCheck>;
+  onCheckModel?: (file: File, sourceId?: string, activityKey?: string) => Promise<ImportedModelCheck>;
+  initialModel?: {file:File;sourceId:string;activityKey?:string}|null;
+  onInitialModelConsumed?: (file:File) => void;
   onRequestDfg?: (options?: DfgAlignmentOptions) => Promise<DfgAlignmentResult>;
   onRequestEditDistance?: (reference: File, options?: EditDistanceOptions) => Promise<EditDistanceResult>;
   onRequestProcessTree?: (options?: ProcessTreeAlignmentOptions) => Promise<ProcessTreeAlignmentResult>;
@@ -122,6 +126,7 @@ export function Conformance({
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const uploadSequence = useRef(0);
+  const initialModelAttempt = useRef<File|null>(null);
 
   // A re-mine invalidates the uploaded model's results (and the server drops
   // its cached net), so fall back to the start of the wizard.
@@ -153,14 +158,14 @@ export function Conformance({
     setStep("result");
   };
 
-  const uploadModel = async (file: File) => {
+  const uploadModel = async (file: File, sourceId?: string, activityKey?: string) => {
     if (!onCheckModel) return;
     const sequence = ++uploadSequence.current;
     const requestedAnalysis = analysisId;
     setImporting(true);
     setImportError(null);
     try {
-      const result = await onCheckModel(file);
+      const result = await onCheckModel(file, sourceId, activityKey);
       if (sequence !== uploadSequence.current || requestedAnalysis !== analysisIdentity.current.id) return;
       setImported(result);
       setImportedAnalysisId(requestedAnalysis);
@@ -174,6 +179,13 @@ export function Conformance({
       if (sequence === uploadSequence.current && requestedAnalysis === analysisIdentity.current.id) setImporting(false);
     }
   };
+
+  useEffect(() => {
+    if (!initialModel || initialModelAttempt.current === initialModel.file || !onCheckModel) return;
+    const {file,sourceId,activityKey} = initialModel;
+    initialModelAttempt.current = file;
+    void uploadModel(file,sourceId,activityKey).finally(()=>onInitialModelConsumed?.(file));
+  },[initialModel,data]);
 
   // The backend checks every discovered model both ways, keyed by miner id, so
   // any miner × any method has results — as long as this export carries them.

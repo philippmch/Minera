@@ -111,6 +111,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("log");
   const [mining, setMining] = useState(false);
   const [visualizationDraft,setVisualizationDraft]=useState<{generation:number;draft:VisualizationDraft}|null>(null);
+  const [discoveryModelDraft,setDiscoveryModelDraft]=useState<{generation:number;file:File;sourceId:string;activityKey?:string}|null>(null);
   const ocelQuestions=useRef<HTMLDetailsElement|null>(null);
   // The CSV upload behind the current view, kept so filters can re-mine it.
   // null when the data came from a pre-mined JSON export (not re-minable).
@@ -270,8 +271,11 @@ export default function App() {
   // Checks an uploaded PNML or BPMN model against the mined log. A new upload
   // replaces the server's cached "imported" net, so its stale alignments and
   // decisions are dropped.
-  const requestModelCheck = useCallback(async (file: File) => {
-    const result = await checkModel(file);
+  const requestModelCheck = useCallback(async (file: File, sourceId?: string, activityKey?: string) => {
+    const generation = cacheGeneration.current;
+    const result = await checkModel(file, {sourceId,activityKey});
+    if (generation !== cacheGeneration.current)
+      throw new Error("The active analysis changed during model checking; choose the model again.");
     cacheGeneration.current += 1;
     alignCache.current = Object.fromEntries(
       Object.entries(alignCache.current).filter(([key]) => !key.startsWith("imported|")),
@@ -692,6 +696,7 @@ export default function App() {
       {tab === "model" && (
         <main className="layout-log">
           <ProcessModel
+            key={cacheGeneration.current}
             data={data}
             treeLayout={treeLayout}
             petriLayout={petriLayout}
@@ -699,6 +704,8 @@ export default function App() {
             heuristicPetriLayout={heuristicPetriLayout}
             powlPetriLayout={powlPetriLayout}
             canExportPnml={source !== null}
+            mining={mining}
+            onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey});setTab("conformance");}}
           />
         </main>
       )}
@@ -716,6 +723,8 @@ export default function App() {
             onRequestAlignment={requestAlignment}
             onRequestDecisions={source ? requestDecisions : undefined}
             onCheckModel={requestModelCheck}
+            initialModel={discoveryModelDraft?.generation===cacheGeneration.current?discoveryModelDraft:null}
+            onInitialModelConsumed={file=>setDiscoveryModelDraft(current=>current?.file===file?null:current)}
             onRequestDfg={requestDfg}
             onRequestEditDistance={requestEditDistance}
             onRequestProcessTree={requestProcessTree}
