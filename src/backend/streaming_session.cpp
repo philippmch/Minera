@@ -23,12 +23,13 @@ std::string method_name(StreamingSessionMethod method) {
     case StreamingSessionMethod::kFootprints: return "footprints";
     case StreamingSessionMethod::kTemporal: return "temporal";
     case StreamingSessionMethod::kTbr: return "tbr";
+    case StreamingSessionMethod::kDeclare: return "declare";
   }
   throw std::invalid_argument("unknown live session method");
 }
 }
 struct StreamingSession::Impl {
-  struct Delivery { std::size_t position, source_position; std::string batch, case_id, activity; bool accepted = false; std::size_t event_index = 0; std::string error; };
+  struct Delivery { std::size_t position, source_position; std::string batch, case_id, activity; bool accepted = false; std::size_t event_index = 0; std::string error; std::string native_event; };
   struct Batch { std::string id; std::size_t first, count; };
   explicit Impl(StreamingSessionOptions value) : options(std::move(value)), stream(1) {
     if (options.event_order != "input" && options.event_order != "imported") throw std::invalid_argument("unknown live event order");
@@ -43,6 +44,9 @@ struct StreamingSession::Impl {
       case StreamingSessionMethod::kTbr:
         if (!options.net) throw std::invalid_argument("live replay requires a net");
         tbr = std::make_unique<StreamingTokenReplay>(std::move(*options.net), options.tbr); break;
+      case StreamingSessionMethod::kDeclare:
+        if (!options.declare_model) throw std::invalid_argument("live Declare requires a model");
+        declare = std::make_unique<DeclareStreamingConformance>(*options.declare_model); break;
     }
     register_monitor();
   }
@@ -63,6 +67,7 @@ struct StreamingSession::Impl {
         if (dfg) { delivery.accepted = dfg->receive(event, event.case_id); delivery.event_index = dfg->snapshot().events; }
         else if (footprints) { const auto r = footprints->receive(event, event.case_id); delivery.accepted = r.event_index != 0; delivery.event_index = r.event_index; }
         else if (temporal) { const auto r = temporal->receive(event, event.case_id); delivery.accepted = r.event_index != 0; delivery.event_index = r.event_index; }
+        else if (declare) { const auto r = declare->receive(event); delivery.accepted = true; delivery.event_index = r.event_index; delivery.native_event = serialize_declare_stream_event_json(r); }
         else { const auto r = tbr->receive(event, event.case_id); delivery.accepted = r.accepted; delivery.event_index = r.event_index; }
       } catch (const std::exception& e) { delivery.error = e.what(); }
         catch (...) { delivery.error = "unknown native observer error"; }
@@ -73,6 +78,7 @@ struct StreamingSession::Impl {
     if (dfg) return serialize_streaming_dfg_json(dfg->snapshot());
     if (footprints) return serialize_streaming_footprints_json(footprints->snapshot());
     if (temporal) return serialize_streaming_temporal_json(temporal->snapshot());
+    if (declare) return serialize_declare_streaming_json(declare->snapshot(),*options.declare_model);
     return serialize_streaming_tbr_json(tbr->snapshot());
   }
   void terminate(const std::string& id) {
@@ -103,6 +109,7 @@ struct StreamingSession::Impl {
   std::unique_ptr<StreamingFootprintsConformance> footprints;
   std::unique_ptr<StreamingTemporalConformance> temporal;
   std::unique_ptr<StreamingTokenReplay> tbr;
+  std::unique_ptr<DeclareStreamingConformance> declare;
   LiveEventStream stream;
 };
 StreamingSession::StreamingSession(StreamingSessionOptions options) : impl_(std::make_unique<Impl>(std::move(options))) {}
@@ -131,11 +138,11 @@ void StreamingSession::action(StreamingSessionAction action,std::size_t expected
     if(action==StreamingSessionAction::kRegister)s.register_monitor();
     else if(action==StreamingSessionAction::kDeregister) {if(s.observer)s.stream.deregister_observer(*s.observer);s.observer.reset();}
     else if(action==StreamingSessionAction::kResetAll) {
-      if(s.dfg)s.dfg->reset();else if(s.footprints)s.footprints->reset_all();else if(s.temporal)s.temporal->reset_all();else s.tbr->reset_all();
+      if(s.dfg)s.dfg->reset();else if(s.footprints)s.footprints->reset_all();else if(s.temporal)s.temporal->reset_all();else if(s.declare)s.declare->reset_all();else s.tbr->reset_all();
     } else if(action==StreamingSessionAction::kResetCase) {
       if(case_id.empty())throw std::invalid_argument("live case ID is empty");
       if(s.dfg)throw std::invalid_argument("DFG supports resetting the complete monitor");
-      if(s.footprints)s.footprints->reset_case(case_id);else if(s.temporal)s.temporal->reset_case(case_id);else s.tbr->reset_case(case_id);
+      if(s.footprints)s.footprints->reset_case(case_id);else if(s.temporal)s.temporal->reset_case(case_id);else if(s.declare)s.declare->reset_case(case_id);else s.tbr->reset_case(case_id);
     } else if(action==StreamingSessionAction::kTerminateCase)s.terminate(case_id);
     else if(action==StreamingSessionAction::kTerminateAll) {
       if(s.footprints) {for(const auto& [id,c]:s.footprints->snapshot().cases){(void)c;s.terminate(id);}}
@@ -152,7 +159,7 @@ std::string StreamingSession::snapshot_json(bool wait_until_drained) {
   const auto state=s.stream.state();std::ostringstream out;
   out<<"{\"family\":\"LIVE_STREAM_SESSION\",\"method\":"<<quote(method_name(s.options.method))<<",\"state\":"<<quote(state==StreamingStreamState::kInactive?"INACTIVE":state==StreamingStreamState::kActive?"ACTIVE":"FINISHED")<<",\"revision\":"<<s.revision<<",\"pending\":"<<s.stream.pending()<<",\"enqueued\":"<<s.inputs.size()<<",\"delivered\":"<<s.deliveries.size()<<",\"registered\":"<<(s.observer?"true":"false")<<",\"observer_id\":"<<(s.observer?std::to_string(*s.observer):"null")<<",\"result\":"<<result<<",\"batches\":[";
   for(std::size_t i=0;i<s.batches.size();++i) {const auto& b=s.batches[i];if(i)out<<',';out<<"{\"batch_id\":"<<quote(b.id)<<",\"first_position\":"<<b.first<<",\"events\":"<<b.count<<'}';}out<<"],\"deliveries\":[";
-  for(std::size_t i=0;i<s.deliveries.size();++i) {const auto& d=s.deliveries[i];if(i)out<<',';out<<"{\"position\":"<<d.position<<",\"source_position\":"<<d.source_position<<",\"batch_id\":"<<quote(d.batch)<<",\"case_id\":"<<quote(d.case_id)<<",\"activity\":"<<quote(d.activity)<<",\"accepted\":"<<(d.accepted?"true":"false")<<",\"event_index\":"<<d.event_index<<",\"error\":"<<(d.error.empty()?"null":quote(d.error))<<'}';}out<<"],\"terminations\":[";
+  for(std::size_t i=0;i<s.deliveries.size();++i) {const auto& d=s.deliveries[i];if(i)out<<',';out<<"{\"position\":"<<d.position<<",\"source_position\":"<<d.source_position<<",\"batch_id\":"<<quote(d.batch)<<",\"case_id\":"<<quote(d.case_id)<<",\"activity\":"<<quote(d.activity)<<",\"accepted\":"<<(d.accepted?"true":"false")<<",\"event_index\":"<<d.event_index<<",\"error\":"<<(d.error.empty()?"null":quote(d.error));if(!d.native_event.empty())out<<",\"native_event\":"<<d.native_event;out<<'}';}out<<"],\"terminations\":[";
   for(std::size_t i=0;i<s.terminations.size();++i){if(i)out<<',';out<<s.terminations[i];}out<<"]}";return out.str();
 }
 }  // namespace minera

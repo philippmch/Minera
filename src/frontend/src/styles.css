@@ -2371,3 +2371,6 @@ input[type="range"]::-moz-range-thumb {
 .live-stream-inspection pre { overflow: auto; max-height: 460px; }
 .live-stream-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .live-csv-export { margin: 0 24px 16px; }
+.declare-stream-chart > p,.declare-stream-chart > .query-actions { margin:16px 24px; }
+.declare-stream-chart svg { width:100%;min-width:500px;color:var(--ink);font:12px var(--font-mono); }
+.declare-stream-chart svg text { fill:var(--ink); }

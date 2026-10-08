@@ -8672,6 +8672,20 @@ void handle_streaming_tbr(const httplib::Request& request,
 
 #include "live_stream_routes.hpp"
 
+void handle_streaming_declare(const httplib::Request& request,httplib::Response& response) {
+  live_response(response,[&]{
+    live_params(request,{"streaming_declare_case_id_column","streaming_declare_activity_column","streaming_declare_timestamp_column","streaming_event_order","streaming_include_diagnostics","format"});
+    const auto model_body=form_field(request,"model"),log_body=form_field(request,"log");if(model_body.empty()||log_body.empty())throw std::invalid_argument("Declare replay requires original model and event uploads");
+    const auto model=minera::parse_declare_stream_model_json(model_body);minera::DeclareStreamingConformance monitor(model);minera::CsvImportOptions csv;
+    if(request.has_param("streaming_declare_case_id_column"))csv.case_id_column=request.get_param_value("streaming_declare_case_id_column");if(request.has_param("streaming_declare_activity_column"))csv.activity_column=request.get_param_value("streaming_declare_activity_column");if(request.has_param("streaming_declare_timestamp_column"))csv.timestamp_column=request.get_param_value("streaming_declare_timestamp_column");
+    const auto format=request.has_param("format")?request.get_param_value("format"):"csv";std::istringstream input(log_body);minera::EventLog log;
+    if(format=="csv")log=minera::import_csv_event_log(input,csv);else if(format=="xes")log=minera::import_xes_event_log(input);else throw std::invalid_argument("Declare events require CSV or XES");
+    const auto events=streaming_events(log,request);std::ostringstream rows;rows<<'[';for(std::size_t i=0;i<events.size();++i){if(i)rows<<',';rows<<minera::serialize_declare_stream_event_json(monitor.receive(*events[i]));}rows<<']';
+    auto result=minera::serialize_declare_streaming_json(monitor.snapshot(),model);result.pop_back();result+=",\"event_results\":"+rows.str()+"}";
+    response.set_content(streaming_diagnostics_json(std::move(result),request,events.size()),"application/json");
+  });
+}
+
 void handle_process_cube(const httplib::Request& request,
                          httplib::Response& response) {
   try {
@@ -8902,6 +8916,7 @@ int main(int argc, char** argv) {
   server.Options("/api/streaming-temporal", preflight);
   server.Options("/api/temporal-conformance", preflight);
   server.Options("/api/streaming-tbr", preflight);
+  server.Options("/api/streaming-declare", preflight);
   for(const auto* route:{"create","snapshot","append","action","list","source","release"})server.Options(std::string("/api/live-stream/")+route,preflight);
   server.Options("/api/knowledge-injection", preflight);
 
@@ -9021,6 +9036,7 @@ int main(int argc, char** argv) {
   server.Post("/api/streaming-temporal", handle_streaming_temporal);
   server.Post("/api/temporal-conformance", handle_temporal_conformance);
   server.Post("/api/streaming-tbr", handle_streaming_tbr);
+  server.Post("/api/streaming-declare", handle_streaming_declare);
   server.Post("/api/live-stream/create",handle_live_create);
   server.Get("/api/live-stream/snapshot",handle_live_snapshot);
   server.Post("/api/live-stream/append",handle_live_append);

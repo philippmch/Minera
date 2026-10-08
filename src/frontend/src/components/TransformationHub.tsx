@@ -26,7 +26,7 @@ export function TransformationHub({data,available,mining,file=null,onOpenTransfo
     :group==="preparation"?<PreparationWorkspace data={data} available={available} mining={mining} onOpenPrepared={onOpenTransformed}/>
     :group==="structural"?<StructuralWorkspace data={data} available={available} mining={mining} onUseModel={onUseModel}/>
     :group==="related"?<RelatedLogsWorkspace file={file} available={available} mining={mining} dataset={data.dataset} onOpen={onOpenTransformed}/>
-    :group==="streaming"?<StreamingWorkspace file={file} busy={mining}/>
+    :group==="streaming"?<StreamingWorkspace file={file} busy={mining} data={data}/>
     :group==="cube"?<ProcessCubeWorkspace initialFile={cubeFile} busy={mining}/>
     :<ModelExchangeWorkspace available={available} busy={mining} onUseModel={onUseModel}/>}
   </>;

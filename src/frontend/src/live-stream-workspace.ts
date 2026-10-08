@@ -1,6 +1,7 @@
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
 import { validStreamingResult, streamingQuery, streamingTables, defaultStreaming, type StreamingForm, type StreamingMethod, type StreamingResult } from "./streaming-workspace";
 import { type OcelPreparedTable } from "./ocel-preparation";
+import { validDeclareStreamEvent, type DeclareStreamEvent } from "./declare-stream-workspace";
 
 export const LIVE_XES_VARIANTS = ["iterparse", "line_by_line", "iterparse_mem_compressed", "iterparse_20", "chunk_regex", "rustxes"] as const;
 export interface LiveImportForm {
@@ -8,9 +9,9 @@ export interface LiveImportForm {
   xesVariant: typeof LIVE_XES_VARIANTS[number]; xesCase: string; xesActivity: string; xesTimestamp: string; xesResource: string; xesLifecycle: string;
 }
 export function defaultLiveImport(): LiveImportForm { return { delimiter: ",", trim: true, header: true, caseAliases: false, resource: "", lifecycle: "", xesVariant: "iterparse", xesCase: "concept:name", xesActivity: "concept:name", xesTimestamp: "time:timestamp", xesResource: "org:resource", xesLifecycle: "lifecycle:transition" }; }
-export interface LiveSource { source_id: string; name: string; format: "csv" | "xes" | "pnml"; size: number; provided_sha256: string; }
+export interface LiveSource { source_id: string; name: string; format: "csv" | "xes" | "pnml" | "declare_json"; size: number; provided_sha256: string; }
 export interface LiveBatch { batch_id: string; first_position: number; events: number; }
-export interface LiveDelivery { position: number; source_position: number; batch_id: string; case_id: string; activity: string; accepted: boolean; event_index: number; error: string | null; }
+export interface LiveDelivery { position: number; source_position: number; batch_id: string; case_id: string; activity: string; accepted: boolean; event_index: number; error: string | null; native_event?: DeclareStreamEvent; }
 export interface LiveTermination { case_id: string; revision: number; is_fit: boolean; missing?: number; remaining?: number; marking?: number[]; }
 export interface LiveSnapshot {
   family: "LIVE_STREAM_SESSION"; session_id: string; method: StreamingMethod; state: "INACTIVE" | "ACTIVE" | "FINISHED";
@@ -22,7 +23,7 @@ export interface LiveRun { result: LiveSnapshot; raw: string; report_json: strin
 const record = (v: unknown): v is Record<string,unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const count = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 export function validLiveSnapshot(value: unknown): value is LiveSnapshot {
-  if (!record(value) || value.family !== "LIVE_STREAM_SESSION" || typeof value.session_id !== "string" || !value.session_id || !["dfg","footprints","temporal","tbr"].includes(String(value.method)) || !["INACTIVE","ACTIVE","FINISHED"].includes(String(value.state))) return false;
+  if (!record(value) || value.family !== "LIVE_STREAM_SESSION" || typeof value.session_id !== "string" || !value.session_id || !["dfg","footprints","temporal","tbr","declare"].includes(String(value.method)) || !["INACTIVE","ACTIVE","FINISHED"].includes(String(value.state))) return false;
   if (![value.revision,value.pending,value.enqueued,value.delivered].every(count) || typeof value.registered !== "boolean" || !(value.observer_id === null || count(value.observer_id)) || value.registered !== (value.observer_id !== null) || (value.released !== undefined && typeof value.released !== "boolean")) return false;
   if ((value.observer_id !== null && value.observer_id === 0) || (value.state === "FINISHED" && value.pending !== 0) || (value.pending as number) > (value.enqueued as number) - (value.delivered as number)) return false;
   if (!record(value.configuration) || !Object.values(value.configuration).every(v => typeof v === "string") || value.configuration.method !== value.method || value.configuration.session_id !== value.session_id || !record(value.result) || !record(value.result.input)) return false;
@@ -34,10 +35,12 @@ export function validLiveSnapshot(value: unknown): value is LiveSnapshot {
   if (position !== value.enqueued || new Set(batches.map(b => b.batch_id)).size !== batches.length) return false;
   if (!Array.isArray(value.deliveries) || value.deliveries.length !== value.delivered || value.deliveries.length > (value.enqueued as number) || !value.deliveries.every(d => record(d) && count(d.position) && d.position < (value.enqueued as number) && count(d.source_position) && count(d.event_index) && batches.some(b => b.batch_id === d.batch_id && (d.position as number) >= b.first_position && (d.position as number) < b.first_position+b.events) && typeof d.case_id === "string" && typeof d.activity === "string" && typeof d.accepted === "boolean" && (d.error === null || typeof d.error === "string"))) return false;
   if (new Set(value.deliveries.map(d => (d as LiveDelivery).position)).size !== value.deliveries.length) return false;
+  if(value.result.family==="STREAMING_DECLARE") {const model=value.result.model; if(!value.deliveries.every(d=>d.error!==null&&d.native_event===undefined||validDeclareStreamEvent(d.native_event,model)&&d.native_event.event_index===d.event_index&&d.native_event.activity===d.activity))return false;}
   if (!Array.isArray(value.terminations) || !value.terminations.every(t => record(t) && typeof t.case_id === "string" && count(t.revision) && t.revision <= (value.revision as number) && typeof t.is_fit === "boolean" && (value.method !== "tbr" || count(t.missing) && count(t.remaining) && Array.isArray(t.marking) && t.marking.every(count)))) return false;
-  if (!Array.isArray(value.sources) || !value.sources.every(s => record(s) && typeof s.source_id === "string" && typeof s.name === "string" && ["csv","xes","pnml"].includes(String(s.format)) && count(s.size) && typeof s.provided_sha256 === "string")) return false;
+  if (!Array.isArray(value.sources) || !value.sources.every(s => record(s) && typeof s.source_id === "string" && typeof s.name === "string" && ["csv","xes","pnml","declare_json"].includes(String(s.format)) && count(s.size) && typeof s.provided_sha256 === "string")) return false;
   const sources = value.sources as LiveSource[];
-  return new Set(sources.map(s => s.source_id)).size === sources.length && sources.length === batches.length + (value.method === "tbr" ? 1 : 0) && batches.every(b => sources.some(s => s.source_id === b.batch_id && s.format !== "pnml")) && (value.method !== "tbr" || sources.some(s => s.source_id === "model" && s.format === "pnml"));
+  const modelFormat=value.method==="tbr"?"pnml":value.method==="declare"?"declare_json":null;
+  return new Set(sources.map(s => s.source_id)).size === sources.length && sources.length === batches.length + (modelFormat ? 1 : 0) && batches.every(b => sources.some(s => s.source_id === b.batch_id && ["csv","xes"].includes(s.format))) && (!modelFormat || sources.some(s => s.source_id === "model" && s.format === modelFormat));
 }
 export function liveTables(snapshot: LiveSnapshot): Record<string,OcelPreparedTable> {
   const tables = streamingTables(snapshot.result);
@@ -47,6 +50,13 @@ export function liveTables(snapshot: LiveSnapshot): Record<string,OcelPreparedTa
   tables.batches = table(["batch_id","first_position","events"],snapshot.batches,item => ["batch_id","first_position","events"].map(key => nativeCell(item,key)));
   const deliveryColumns = ["position","source_position","batch_id","case_id","activity","accepted","event_index","error"];
   tables.deliveries = table(deliveryColumns,snapshot.deliveries,item => deliveryColumns.map(key => nativeCell(item,key)));
+  if(snapshot.result.family==="STREAMING_DECLARE") {
+    const rows=snapshot.deliveries.filter(d=>d.native_event).map(d=>({delivery:d,event:d.native_event!}));
+    const columns=["position","source_position","batch_id","case_id","activity","timestamp","event_index","deviations"];
+    tables.declare_events={columns,count:rows.length,rowAt:i=>{const r=rows[i];return [nativeCell(r.delivery,"position"),nativeCell(r.delivery,"source_position"),r.delivery.batch_id,r.event.case_id,r.event.activity,r.event.timestamp,nativeCell(r.event,"event_index"),nativeCell(r.event,"deviations")];}};
+    const violations=rows.flatMap(r=>r.event.violated_constraints.map(rule=>({row:r,rule}))),names=["constraint_index","template","first","second","binary"];
+    tables.event_violations={columns:["position","batch_id","case_id","timestamp","event_index",...names],count:violations.length,rowAt:i=>{const v=violations[i];return [nativeCell(v.row.delivery,"position"),v.row.delivery.batch_id,v.row.event.case_id,v.row.event.timestamp,nativeCell(v.row.event,"event_index"),...names.map(key=>nativeCell(v.rule,key))];}};
+  }
   tables.terminations = table(["case_id","revision","is_fit","missing","remaining","marking"],snapshot.terminations,item => [nativeCell(item,"case_id"),nativeCell(item,"revision"),nativeCell(item,"is_fit"),nativeCell(item,"missing") ?? null,nativeCell(item,"remaining") ?? null,Array.isArray((item as LiveTermination).marking) ? nativeJson((item as LiveTermination).marking) : null]);
   const sourceColumns = ["source_id","name","format","size","provided_sha256"];
   tables.sources = table(sourceColumns,snapshot.sources,item => sourceColumns.map(key => nativeCell(item,key)));
@@ -72,7 +82,7 @@ async function liveRequest(route: string, params: URLSearchParams, method: "GET"
 }
 export async function createLiveSession(form: StreamingForm, imports: LiveImportForm, id: string, model?: File | null, signal?: AbortSignal): Promise<LiveRun> {
   const params=liveCreateQuery(form,imports,id);let body:FormData|undefined;
-  if(form.method==="tbr"){if(!model)throw new Error("Choose a PNML model.");body=new FormData();body.append("model",model,model.name);params.set("source_name",model.name);params.set("source_sha256",await digest(model));}
+  if(form.method==="tbr"||form.method==="declare"){if(!model)throw new Error("Choose a model.");body=new FormData();body.append("model",model,model.name);params.set("source_name",model.name);params.set("source_sha256",await digest(model));}
   const run=await liveRequest("create",params,"POST",body,signal);if(run.result.method!==form.method)throw new Error("The session has a different monitor.");return run;
 }
 export function getLiveSession(id: string, signal?: AbortSignal): Promise<LiveRun> {return liveRequest("snapshot",new URLSearchParams({session_id:id}),"GET",undefined,signal);}
