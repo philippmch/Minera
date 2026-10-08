@@ -1700,7 +1700,8 @@ void handle_ocel_sqlite(const httplib::Request& request,
   try {
     for (const auto& [key, value] : request.params) {
       (void)value;
-      if (key != "mode")
+      if (key != "mode" && key != "include_open_source" &&
+          key != "validate_references" && key != "readable_type_table_names")
         throw std::invalid_argument("unknown OCEL SQLite parameter: " + key);
     }
     const auto mode = request.has_param("mode")
@@ -1708,6 +1709,12 @@ void handle_ocel_sqlite(const httplib::Request& request,
                           : std::string("import");
     if (mode != "import" && mode != "export")
       throw std::invalid_argument("OCEL SQLite mode expects import or export");
+    minera::OcelSqliteOptions options;
+    options.validate_references = ocel_query_bool(
+        request, "validate_references", options.validate_references);
+    options.readable_type_table_names = ocel_query_bool(
+        request, "readable_type_table_names", options.readable_type_table_names);
+    const bool include_open_source = ocel_query_bool(request, "include_open_source", false);
     std::string body;
     if (mode == "export") {
       body = ocel_request_body(request, "log");
@@ -1734,7 +1741,7 @@ void handle_ocel_sqlite(const httplib::Request& request,
       if (!output) throw std::runtime_error("cannot write temporary SQLite upload");
     }
     if (mode == "export") {
-      minera::export_ocel_sqlite(minera::parse_ocel_json(body), temporary);
+      minera::export_ocel_sqlite(minera::parse_ocel_json(body), temporary, options);
       std::ifstream input(temporary, std::ios::binary | std::ios::ate);
       if (!input) throw std::runtime_error("cannot read temporary SQLite output");
       const auto size = input.tellg();
@@ -1753,13 +1760,15 @@ void handle_ocel_sqlite(const httplib::Request& request,
       response.set_content(std::move(sqlite), "application/vnd.sqlite3");
       return;
     }
-    const auto log = minera::import_ocel_sqlite(temporary);
+    const auto log = minera::import_ocel_sqlite(temporary, options);
     std::error_code ignored;
     std::filesystem::remove(temporary, ignored);
     temporary.clear();
     response.set_content(
         std::string("{\"family\":\"OCEL_SQLITE\",\"variant\":\"IMPORT\",\"log\":") +
-            minera::serialize_ocel_json(log) + "}",
+            minera::serialize_ocel_json(log) +
+            (include_open_source ? ",\"open_log\":" + minera::serialize_ocel_json(
+                log, minera::OcelJsonFormat::kStandard) : "") + "}",
         "application/json");
   } catch (const std::exception& error) {
     if (!temporary.empty()) {
@@ -1773,9 +1782,19 @@ void handle_ocel_sqlite(const httplib::Request& request,
 
 void handle_ocel_exchange(const httplib::Request& request,
                           httplib::Response& response) {
+  std::filesystem::path csv_temporary;
+  const auto cleanup_csv = [&]() {
+    if (csv_temporary.empty()) return;
+    std::error_code ignored;
+    std::filesystem::remove(csv_temporary / "events.csv", ignored);
+    std::filesystem::remove(csv_temporary / "objects.csv", ignored);
+    std::filesystem::remove(csv_temporary, ignored);
+    csv_temporary.clear();
+  };
   try {
     static const std::set<std::string> allowed = {
         "mode", "format", "reject_unsupported", "include_declaration",
+        "include_open_source", "include_objects", "allow_lossy", "max_bytes",
         "ocel_csv_event_id_column", "ocel_csv_activity_column",
         "ocel_csv_timestamp_column", "ocel_csv_object_type_prefix",
         "ocel_csv_object_id_column", "ocel_csv_object_type_column",
@@ -1813,6 +1832,10 @@ void handle_ocel_exchange(const httplib::Request& request,
     const auto csv_options = csv_format
                                  ? parse_ocel_csv_options(request)
                                  : ParsedOcelCsvOptions{};
+    const bool include_open_source = ocel_query_bool(request, "include_open_source", false);
+    const bool include_objects = ocel_query_bool(request, "include_objects", false);
+    if (include_objects && (mode != "export" || format != "csv"))
+      throw std::invalid_argument("include_objects requires CSV event export");
 
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL exchange body");
@@ -1837,13 +1860,45 @@ void handle_ocel_exchange(const httplib::Request& request,
           options.include_declaration = ocel_query_bool(
               request, "include_declaration", true);
         }
+        options.allow_lossy = ocel_query_bool(request, "allow_lossy", options.allow_lossy);
         payload = minera::serialize_ocel_xml(log, options);
         content_type = "application/xml";
         filename = "ocel.xml";
       } else if (format == "csv") {
-        payload = minera::serialize_ocel_csv(log, csv_options.export_options);
-        content_type = "text/csv";
-        filename = "ocel.csv";
+        if (include_objects) {
+          const auto stamp = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+          const auto thread = std::hash<std::thread::id>{}(std::this_thread::get_id());
+          const auto candidate = std::filesystem::temp_directory_path() /
+              ("minera_ocel_csv_" + std::to_string(stamp) + "_" + std::to_string(thread));
+          if (!std::filesystem::create_directory(candidate))
+            throw std::runtime_error("cannot create temporary OCEL CSV directory");
+          csv_temporary = candidate;
+          minera::export_ocel_csv(log, csv_temporary / "events.csv",
+                                 csv_temporary / "objects.csv", csv_options.export_options);
+          const auto read_csv = [&](const char* name) {
+            std::ifstream input(csv_temporary / name, std::ios::binary | std::ios::ate);
+            if (!input) throw std::runtime_error("cannot read OCEL CSV output");
+            const auto size = input.tellg();
+            if (size < 0 || size > 32 * 1024 * 1024)
+              throw std::invalid_argument("OCEL CSV output exceeds the response limit");
+            std::string text(static_cast<std::size_t>(size), '\0');
+            input.seekg(0);
+            input.read(text.data(), static_cast<std::streamsize>(text.size()));
+            if (!input) throw std::runtime_error("cannot read OCEL CSV output");
+            return text;
+          };
+          const auto events = read_csv("events.csv"), objects = read_csv("objects.csv");
+          cleanup_csv();
+          const auto quote = minera::embedding_runtime::detail::escape_json;
+          payload = "{\"family\":\"OCEL_IO_EXPORT\",\"variant\":\"CSV_PAIR\",\"events_csv\":" +
+                    quote(events) + ",\"objects_csv\":" + quote(objects) + "}";
+          content_type = "application/json";
+          filename = "ocel_csv_pair.json";
+        } else {
+          payload = minera::serialize_ocel_csv(log, csv_options.export_options);
+          content_type = "text/csv";
+          filename = "ocel.csv";
+        }
       } else {
         payload = minera::serialize_ocel_objects_csv(
             log, csv_options.export_options);
@@ -1868,6 +1923,7 @@ void handle_ocel_exchange(const httplib::Request& request,
         options.reject_unsupported = ocel_query_bool(
             request, "reject_unsupported", false);
       }
+      options.max_bytes = ocel_query_size(request, "max_bytes", options.max_bytes);
       log = minera::parse_ocel_xml(body, options);
     } else if (format == "csv") {
       const auto object_body = request.is_multipart_form_data()
@@ -1889,9 +1945,12 @@ void handle_ocel_exchange(const httplib::Request& request,
     else variant = "IMPORT_CSV";
     response.set_content(
         std::string("{\"family\":\"OCEL_IO\",\"variant\":\"") +
-            variant + "\",\"log\":" + minera::serialize_ocel_json(log) + "}",
+            variant + "\",\"log\":" + minera::serialize_ocel_json(log) +
+            (include_open_source ? ",\"open_log\":" + minera::serialize_ocel_json(
+                log, minera::OcelJsonFormat::kStandard) : "") + "}",
         "application/json");
   } catch (const std::exception& error) {
+    cleanup_csv();
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
   }

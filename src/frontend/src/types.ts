@@ -1729,6 +1729,7 @@ export interface OcelSqliteResult {
   family: "OCEL_SQLITE";
   variant: "IMPORT";
   log: Record<string, unknown>;
+  open_log?: Record<string, unknown>;
 }
 export type OcelExchangeFormat =
   | "json" | "json_standard" | "xml" | "xml_standard"
@@ -1743,6 +1744,7 @@ export interface OcelExchangeResult {
   family: "OCEL_IO";
   variant: OcelExchangeImportVariant;
   log: Record<string, unknown>;
+  open_log?: Record<string, unknown>;
 }
 export interface OcelSplitResult {
   family: "OCEL_SPLIT";

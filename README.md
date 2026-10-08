@@ -1264,8 +1264,9 @@ minera_ocel source.json --graph heterogeneous --graph-include-df false
 
 [Validation and checkpoint boundaries](docs/feature-first-ocel-analysis-validation.json)
 track feature delivery separately from full reference parity. OCEL preparation,
-comparison and simulation have their own workflows below; remaining I/O/model
-controls and exactness/performance gates continue in the feature ledger.
+comparison, simulation and file exchange have their own workflows below;
+remaining model/export controls and exactness/performance gates continue in the
+feature ledger.
 
 ### OCEL preparation
 
@@ -1374,6 +1375,63 @@ record all twelve comparison input combinations, six model/binding combinations,
 native roundtrips, source handoff, paging and complete exports. This delivers the
 workflows while keeping the complete parity catalogue and remaining exactness,
 search-exhaustiveness, platform and performance gates open.
+
+### OCEL file exchange
+
+**Import OCEL JSON, XML, CSV or SQLite** is available from the landing page.
+**Import OCEL data** is also available from classic and object-centric views;
+returning from import preserves the current workspace. With an OCEL source open,
+choose **Import & export OCEL** for original-source export.
+
+- Import classic or standard JSON/XML, extended event CSV with an optional
+  object CSV, or OCEL 2.0 SQLite. Preview complete positional events, objects,
+  relationships, changes, links and metadata. Their CSV download includes every
+  selected row beyond the 25-row page.
+- Export classic or standard JSON/XML, SQLite, event CSV, object CSV or a paired
+  event/object CSV. Downloads retain the exact native bytes. The paired option
+  uses the native two-table writer, retaining object attributes and objects with
+  no events without opting into loss.
+- Configure six literal CSV column/prefix names, comma/semicolon/tab delimiters,
+  trimming, timestamp sorting, unsupported-field handling and explicit loss
+  allowance. XML controls include unsupported constructs, byte limit,
+  declaration and writer allowance. SQLite controls include reference validation
+  and readable type-table names. Blank/default selections use native defaults.
+
+Reports bind each original input file and every output by filename, byte size
+and SHA-256. Imports additionally retain the complete native response. **Open
+imported OCEL** uses its same-run standard source, preserving the native import
+result when it becomes the active source for models, analysis and preparation.
+Empty imports retain downloads; their opening action is disabled. Native errors
+retain the preceding usable result.
+
+CSV requires headers and cannot carry qualifiers, object/event links, object
+changes or globals. Event CSV alone also cannot retain object attributes. Loss
+allowance is explicit and does not bypass duplicate relation errors. Classic
+JSON reimport follows the native duplicate-pair normalization convention;
+standard JSON, both XML formats and SQLite retain the full rich controlled
+fixture. XML writer allowance does not bypass native JSON-source validation.
+Broader type, dialect, ordering, format and performance parity remain open.
+
+`POST /api/ocel/io` imports accept `include_open_source=true` for an additive
+`open_log`. CSV export with `format=csv&include_objects=true` returns the two
+native streams as `events_csv` and `objects_csv` in an `OCEL_IO_EXPORT/CSV_PAIR`
+response. Other export responses retain their original shapes. The SQLite route
+accepts the same optional opening source plus `validate_references` and
+`readable_type_table_names`. Existing CLI format entry points include:
+
+```sh
+minera_ocel source.json --format standard
+minera_ocel source.json --format xml_standard
+minera_ocel source.json --format csv --ocel-csv-output events.csv --ocel-csv-objects-output objects.csv
+minera_ocel events.csv --csv-objects objects.csv --format standard
+minera_ocel source.json --sqlite-output export.sqlite
+minera_ocel export.sqlite --format standard
+```
+
+[Validation and checkpoint boundaries](docs/feature-first-ocel-io-validation.json)
+record native file/CLI comparisons, rich and standard-source roundtrips,
+source handoff, complete exports and phone controls. File exchange delivery does
+not promote any algorithm-family parity status.
 
 ### Sample dataset
 

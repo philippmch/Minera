@@ -251,6 +251,7 @@ import {
   isBoundaryActivitiesResult,
   isVariantStatisticsResult,
 } from "./types";
+import { nativeJson } from "./native-json";
 
 export interface CsvOptions {
   caseColumn?: string;
@@ -6199,12 +6200,12 @@ export async function requestOcelSqlite(log: Blob): Promise<OcelSqliteResult> {
 
 /** Exports an OCEL JSON document as a standard SQLite download. */
 export async function requestOcelSqliteExport(
-  log: Record<string, unknown>,
+  log: Record<string, unknown> | Blob,
 ): Promise<Blob> {
   const response = await fetch("/api/ocel/sqlite?mode=export", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(log),
+    body: log instanceof Blob ? log : nativeJson(log),
   });
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload = await response.blob();
@@ -6320,14 +6321,14 @@ export async function requestOcelExchangeImport(
 
 /** Exports an OCEL JSON document as classic or standard JSON/XML. */
 export async function requestOcelExchangeExport(
-  log: Record<string, unknown>,
+  log: Record<string, unknown> | Blob,
   format: OcelExchangeFormat = "json",
   options: OcelCsvOptions = {},
 ): Promise<Blob> {
   const response = await fetch(`/api/ocel/io?${ocelExchangeQuery(format, "export", options)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(log),
+    body: log instanceof Blob ? log : nativeJson(log),
   });
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload = await response.blob();
@@ -6338,8 +6339,10 @@ export async function requestOcelExchangeExport(
     const isRecord = (value: unknown): value is Record<string, unknown> =>
       !!value && typeof value === "object" && !Array.isArray(value);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) ||
-        !isRecord((parsed as Record<string, unknown>)["ocel:events"]) ||
-        !isRecord((parsed as Record<string, unknown>)["ocel:objects"])) {
+        !((isRecord((parsed as Record<string, unknown>)["ocel:events"]) &&
+           isRecord((parsed as Record<string, unknown>)["ocel:objects"])) ||
+          (Array.isArray((parsed as Record<string, unknown>).events) &&
+           Array.isArray((parsed as Record<string, unknown>).objects)))) {
       throw new Error("the Minera backend returned invalid OCEL JSON");
     }
   } else if (format.startsWith("xml")) {

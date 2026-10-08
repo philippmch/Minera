@@ -47,6 +47,7 @@ import { DfgDataframe } from "./components/DfgDataframe";
 import { CorrelationMining } from "./components/CorrelationMining";
 import { Filters } from "./components/Filters";
 import { OcelWorkspaceHub } from "./components/OcelWorkspaceHub";
+import { OcelIoWorkspace } from "./components/OcelIoWorkspace";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
 import { QueryWorkspace } from "./components/QueryWorkspace";
@@ -102,6 +103,7 @@ import {
 export default function App() {
   const [data, setData] = useState<MineraExport | null>(null);
   const [ocelResult, setOcelResult] = useState<OcelDiscoveryResult | null>(null);
+  const [showOcelIo, setShowOcelIo] = useState(false);
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
@@ -341,6 +343,7 @@ export default function App() {
   }, [ocelFile]);
 
   const loadFile = (file: File, xesActivityAttribute?: string) => {
+    setShowOcelIo(false);
     ocelRequest.current?.abort();
     ocelRequest.current = null;
     setMining(true);
@@ -547,6 +550,8 @@ export default function App() {
     [data, selectedVariant],
   );
 
+  if (showOcelIo) return <><TopBar dataset={ocelDataset??data?.dataset??'OCEL file exchange'} datasetKind="file exchange" onOpenFile={loadFile} onHome={()=>setShowOcelIo(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOcelIo(false)}>Return to current workspace</button><OcelIoWorkspace file={ocelFile} busy={mining} onOpen={loadFile}/></main></>;
+
   if (!data && ocelResult) {
     return (
       <>
@@ -554,6 +559,7 @@ export default function App() {
           dataset={ocelDataset ?? "object-centric log"}
           datasetKind="object-centric"
           onOpenFile={loadFile}
+          onImportOcel={()=>setShowOcelIo(true)}
           onHome={() => {
             ocelRequest.current?.abort();
             ocelRequest.current = null;
@@ -597,6 +603,7 @@ export default function App() {
           onLoadSample={loadSample}
           onLoadOcelSample={loadOcelSample}
           onLoadResourceSample={loadResourceSample}
+          onImportOcel={()=>setShowOcelIo(true)}
           error={error}
           mining={mining}
         />
@@ -615,6 +622,7 @@ export default function App() {
         dataset={data.dataset}
         generator={data.generator}
         onOpenFile={loadFile}
+        onImportOcel={()=>setShowOcelIo(true)}
         onHome={() => {
           cacheGeneration.current += 1;
           setData(null);

@@ -4,9 +4,10 @@ interface TopBarProps {
   datasetKind?: string;
   onOpenFile: (file: File) => void;
   onHome: () => void;
+  onImportOcel?: () => void;
 }
 
-export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome }: TopBarProps) {
+export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel }: TopBarProps) {
   return (
     <header className="topbar reveal">
       <button className="brand" onClick={onHome} title="Back to start">
@@ -22,11 +23,12 @@ export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFi
         <span className="dataset-name">{dataset}</span>
         {generator && <span className="dataset-generator">· {generator}</span>}
       </div>
+      {onImportOcel && <button className="btn-ghost" onClick={onImportOcel}>Import OCEL data</button>}
       <label className="btn-open">
         Open log
         <input
           type="file"
-          accept=".csv,.tsv,.json,text/csv"
+          accept=".csv,.tsv,.xes,.xes.gz,.gz,.json,text/csv,application/xml,application/gzip"
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (file) onOpenFile(file);
