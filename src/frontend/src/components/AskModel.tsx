@@ -5,17 +5,18 @@ import { type KnowledgeInjectionVariant,type MineraExport } from "../types";
 import { downloadModelJson } from "../model-view-data";
 import { LlmStudies } from "./LlmStudies";
 import { ContextBuilder } from "./ContextBuilder";
+import { type VisualizationDraft } from "../visualization-explanation";
 
-export function AskModel({data,mining,available=false,onOpenFiltered}:{data:MineraExport;mining:boolean;available?:boolean;onOpenFiltered?:((file:File)=>void)}){
+export function AskModel({data,mining,available=false,onOpenFiltered,visualization}:{data:MineraExport;mining:boolean;available?:boolean;onOpenFiltered?:((file:File)=>void);visualization?:VisualizationDraft|null}){
  const [task,setTask]=useState<"prompt"|"clusters"|"hypotheses">("prompt");
- return <><label className="filters-field model-task"><span>Model task</span><select disabled={mining} value={task} onChange={event=>setTask(event.target.value as typeof task)}><option value="prompt">Ask a question</option><option value="clusters">Case clustering</option><option value="hypotheses">Hypotheses</option></select></label>{task==="prompt"?<PromptChat data={data} mining={mining} available={available}/>:<LlmStudies key={task} task={task} data={data} available={available} mining={mining} onOpenFiltered={onOpenFiltered}/>}</>;
+ return <><label className="filters-field model-task"><span>Model task</span><select disabled={mining} value={task} onChange={event=>setTask(event.target.value as typeof task)}><option value="prompt">Ask a question</option><option value="clusters">Case clustering</option><option value="hypotheses">Hypotheses</option></select></label>{task==="prompt"?<PromptChat data={data} mining={mining} available={available} visualization={visualization}/>:<LlmStudies key={task} task={task} data={data} available={available} mining={mining} onOpenFiltered={onOpenFiltered}/>}</>;
 }
-export function PromptChat({data,mining,available=false,ocelFile=null,dataset}:{data?:MineraExport;mining:boolean;available?:boolean;ocelFile?:File|null;dataset?:string}) {
+export function PromptChat({data,mining,available=false,ocelFile=null,dataset,visualization}:{data?:MineraExport;mining:boolean;available?:boolean;ocelFile?:File|null;dataset?:string;visualization?:VisualizationDraft|null}) {
   const [variant,setVariant]=useState<KnowledgeInjectionVariant>("process_mining");
   const [context,setContext]=useState(()=>data?llmLogContext(data):"");const [question,setQuestion]=useState("");const [schema,setSchema]=useState("");
-  const [prompt,setPrompt]=useState("");const [provider,setProvider]=useState<LlmProvider>("openai");const [model,setModel]=useState("");
+  const [prompt,setPrompt]=useState(visualization?.prompt??"");const [provider,setProvider]=useState<LlmProvider>("openai");const [model,setModel]=useState("");
   const [maxTokens,setMaxTokens]=useState("4096");const [temperature,setTemperature]=useState("");
-  const [images,setImages]=useState<LlmImage[]>([]);const [openaiApi,setOpenaiApi]=useState<"responses"|"chat_completions">("responses");const [extraPayload,setExtraPayload]=useState("{}");
+  const [images,setImages]=useState<LlmImage[]>(visualization?[visualization.image]:[]);const [openaiApi,setOpenaiApi]=useState<"responses"|"chat_completions">("responses");const [extraPayload,setExtraPayload]=useState("{}");
   const [resultRequest,setResultRequest]=useState<LlmCompletionRequest|null>(null);const attachmentRead=useRef(0);
   const [status,setStatus]=useState<LlmRuntimeStatus|null>(null);const [result,setResult]=useState<LlmCompletion|null>(null);
   const [error,setError]=useState<string|null>(null);const [pending,setPending]=useState<"preview"|"completion"|"attachment"|null>(null);
@@ -44,6 +45,7 @@ export function PromptChat({data,mining,available=false,ocelFile=null,dataset}:{
   return <section className="panel ask-model-panel">
     <div className="panel-head"><h2>Ask a model</h2><span className="panel-meta">{data?.dataset??dataset??ocelFile?.name}</span></div>
     <p className="ask-model-intro">Build a prompt from the log or a database schema. Review and edit the displayed prompt before sending it.</p>
+    {visualization&&<p className="ask-model-intro">Rendered {visualization.title} from {visualization.dataset} · {visualization.width} × {visualization.height} pixels. The attachment captures the selected view and its displayed detail.</p>}
     <ContextBuilder available={available} mining={mining} ocelFile={ocelFile} onUse={text=>{request.current?.abort();request.current=null;attachmentRead.current++;setPending(null);if(variant==="database")setVariant("process_mining");setContext(text);setPrompt("");setResult(null);setError(null);}} />
     <fieldset className="ask-model-fields" disabled={mining||pending!==null}>
       <label className="filters-field"><span>Prompt context</span><select value={variant} onChange={event=>{setVariant(event.target.value as KnowledgeInjectionVariant);invalidate();}}><option value="process_mining">Process mining</option><option value="description">General description</option><option value="database">Database schema</option></select></label>

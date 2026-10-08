@@ -11440,3 +11440,49 @@ response/error behavior, other modalities, saver interfaces and the complete
 remaining catalogue stay open. The preceding 152 algorithm suites are inherited,
 without a fresh whole-algorithm audit. Scope counts remain 46/86 packages,
 199/387 modules and 228 incomplete units; there is no package/module promotion.
+
+
+## Feature delivery first: automatic visualization explanations (2026-10-08)
+
+Visible diagrams, charts and tables can now be selected, rendered into PNG,
+and opened in Ask a model with a prepared editable prompt and exact attachment.
+The same handoff opens the OCEL question section. The renderer retains original
+SVG styles, legends, selected controls and current viewport, waits for fonts and
+finite entrance animations, and rejects blank output. Panels fit a 1600-pixel
+dimension/4-million-pixel area with a 1.5 MiB image bound. Already clipped view
+content remains clipped. Rendering uses html2canvas 1.4.1; exact pixels and
+reference saver layouts remain gates. Standalone saver callbacks receive original
+arguments plus the image path and options, then forward the generated image to
+a supplied connector or optional provider runtime. Prepared/exported bytes survive
+owned temporary cleanup; prompt-only and complete request/response reports exist.
+
+docs/feature-first-visualization-explanations-validation.json binds 692 frontend
+tests, four saver, twelve provider, six study and eight query-runtime tests, and
+the production build. Eight standalone checks cover prompt-only, all four provider
+protocols, missing model, malformed arguments and saver failure. Eighteen browser
+checks cover automatic classic/table/chart/tree/net and all five OCEL family
+captures, provider execution, exact submitted bytes/reports, source reset and
+phone controls/capture. Eleven generated files have nonuniform pixels; inspected
+samples contain actual labels, graph structures, table values, legends and dots.
+The first table capture was blank because its entrance animation was frozen while
+hiding it. That failure is retained, and the corrected capture uses a fresh
+validation namespace. Provider replies are owned HTTP fixtures, not live inference.
+The browser cancellation attempt found the operation already complete; rendering
+cancellation has a control but no asserted browser cancellation result.
+
+Fresh public reference calls prove the saver runs before the generic TypeError,
+including callbacks with assigned docstrings. This corrects the previous checkpoint's
+statement that the saver was not invoked; its recorded saver call already proves
+the invocation. The missing-docstring diagnosis was not established. An actual
+public dotted-chart saver reaches the connector after public dataframe formatting,
+with the prompt header observed directly; missing neato produces an empty file.
+This is callback/prompt evidence, not reference image rendering parity. Public
+interfaces/calls and opaque pins are the only reference access. Owned temporary
+reference images and server/provider fixture processes are cleaned up.
+
+Exact saver dispatch, descriptions, temporary persistence, failure behavior,
+supported CSS and full image-layout fidelity remain open, alongside every other
+catalogue gate. No native source changed: the preceding binaries and 165 core
+objects are verified and reused, and the 152 algorithm suites remain inherited.
+All 86 families remain in scope; counts stay 46/86 packages, 199/387 modules and
+228 incomplete units. There is no package/module promotion or full-parity claim.
