@@ -12157,3 +12157,57 @@ complete modules and 228 incomplete units. Owned servers/tabs are closed,
 viewport restored and port 8496 released. Historical journal bytes and 110
 unrelated files remain preserved. Continue missing catalogue/model/export
 workflows and full exactness/performance; no full parity claim is made.
+
+
+## Feature delivery first: native streaming workflows (2026-10-08)
+
+Replay event streams delivers browser workflows for streaming DFG discovery,
+footprint prefix checks, temporal prefix checks and forward/backwards token
+replay. Landing, classic/OCEL top bars and the transformation hub expose the
+same independent CSV uploads. The current original CSV can be selected
+explicitly; active-view filters do not rewrite that source.
+
+CSV input order replays parser-assigned arrival positions across cases, while
+the historical default HTTP/CLI convention groups cases and normalizes their
+timestamp order. streaming_event_order=input|imported selects the convention.
+Opt-in streaming_include_diagnostics=true records parsed counts/order. Each
+request uses a fresh monitor; persistent/live/reader workflows remain distinct.
+
+All existing route selectors and footprint constraints, temporal profiles/zeta,
+PNML replay variants, stop-unfit and exact uint64 invisible bounds are exposed.
+Footprint end checks and streaming_tbr_terminate_all=true finalize native cases.
+Diagnostics preserve the prefix before termination and separate native fit,
+missing/remaining and marking outputs after termination. Finalized cases leave
+the open-case snapshot; aggregate values retain native conventions.
+
+Native JSON/report downloads retain complete response bytes, original file
+hashes and exact parameters. Every native table category exports complete CSV,
+including empty schemas and all 32 cases/96 events beyond a 25-row page. Numeric
+case identities are matched independently of JavaScript property enumeration.
+Arrays preserve native order; object maps still use JavaScript key ordering.
+Temporal skipped timestamp rows remain visible through parsed/processed counts.
+
+docs/feature-first-streaming-validation.json binds 826 frontend tests and the
+production build, 589 native and 180 frontend/runtime source hashes, 167 reused
+core objects and four fresh assertion-enabled native streaming suites. It
+records 81 checks over 60 HTTP cases/eight CLI runs, 93 browser checks with 168
+evidence files and 87 independent export/report/asset checks over 35 CSVs and
+11 reports. All 16 replay variant/order/stop/finalize combinations match actual
+native bytes in the browser; four forms and classic navigation fit 390px.
+
+The optimized fresh CLI build encountered a retained MSVC internal compiler
+error. A new immutable build uses /Od /Ob0 for fresh executables; core algorithms
+are unchanged. The initial export assertion incorrectly included the existing
+external font stylesheet; its replacement verifies the two actual local JS/CSS
+assets. Neither capture is a performance claim. Cancellation signals have unit
+coverage without native-computation or browser-race guarantees.
+
+CSV validation/dialect/alias/type/ordering conventions, delimiter restrictions
+on model activities, timestamp fallback/precision, general PNML markings/arcs,
+large response counters, bounded reachability, persistent-state/live/concurrency
+semantics and performance remain gates. No reference implementation was read.
+No algorithm catalogue status changes: 86 packages/387 modules, 46 complete
+packages/199 complete modules and 228 incomplete units. Owned server/tab are
+closed, viewport restored and port 8497 released. Historical journal bytes and
+110 unrelated files remain preserved. Continue feature delivery and the complete
+exactness contract; full parity remains active.

@@ -49,6 +49,7 @@ import { Filters } from "./components/Filters";
 import { OcelWorkspaceHub } from "./components/OcelWorkspaceHub";
 import { OcelIoWorkspace } from "./components/OcelIoWorkspace";
 import { RelatedLogsWorkspace } from "./components/RelatedLogsWorkspace";
+import { StreamingWorkspace } from "./components/StreamingWorkspace";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
 import { QueryWorkspace } from "./components/QueryWorkspace";
@@ -106,6 +107,7 @@ export default function App() {
   const [ocelResult, setOcelResult] = useState<OcelDiscoveryResult | null>(null);
   const [showOcelIo, setShowOcelIo] = useState(false);
   const [showRelatedLogs, setShowRelatedLogs] = useState(false);
+  const [showStreaming, setShowStreaming] = useState(false);
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
@@ -347,6 +349,7 @@ export default function App() {
   const loadFile = (file: File, xesActivityAttribute?: string) => {
     setShowOcelIo(false);
     setShowRelatedLogs(false);
+    setShowStreaming(false);
     ocelRequest.current?.abort();
     ocelRequest.current = null;
     setMining(true);
@@ -555,6 +558,7 @@ export default function App() {
 
   if (showOcelIo) return <><TopBar dataset={ocelDataset??data?.dataset??'OCEL file exchange'} datasetKind="file exchange" onOpenFile={loadFile} onHome={()=>setShowOcelIo(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOcelIo(false)}>Return to current workspace</button><OcelIoWorkspace file={ocelFile} busy={mining} onOpen={loadFile}/></main></>;
 
+  if (showStreaming) return <><TopBar dataset={data?.dataset??ocelDataset??'Event streams'} datasetKind="streaming replay" onOpenFile={loadFile} onHome={()=>setShowStreaming(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowStreaming(false)}>Return to current workspace</button><StreamingWorkspace file={source?.file??null} busy={mining}/></main></>;
   if (showRelatedLogs) return <><TopBar dataset={data?.dataset??ocelDataset??'Related logs'} datasetKind="log relationships" onOpenFile={loadFile} onHome={()=>setShowRelatedLogs(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowRelatedLogs(false)}>Return to current workspace</button><RelatedLogsWorkspace file={source?.file??null} available={source!==null} mining={mining} dataset={data?.dataset} onOpen={loadFile}/></main></>;
 
   if (!data && ocelResult) {
@@ -566,6 +570,7 @@ export default function App() {
           onOpenFile={loadFile}
           onImportOcel={()=>setShowOcelIo(true)}
           onRelateLogs={()=>setShowRelatedLogs(true)}
+          onStreaming={()=>setShowStreaming(true)}
           onHome={() => {
             ocelRequest.current?.abort();
             ocelRequest.current = null;
@@ -610,6 +615,7 @@ export default function App() {
           onLoadOcelSample={loadOcelSample}
           onLoadResourceSample={loadResourceSample}
           onRelateLogs={()=>setShowRelatedLogs(true)}
+          onStreaming={()=>setShowStreaming(true)}
           onImportOcel={()=>setShowOcelIo(true)}
           error={error}
           mining={mining}
@@ -631,6 +637,7 @@ export default function App() {
         onOpenFile={loadFile}
         onImportOcel={()=>setShowOcelIo(true)}
         onRelateLogs={()=>setShowRelatedLogs(true)}
+        onStreaming={()=>setShowStreaming(true)}
         onHome={() => {
           cacheGeneration.current += 1;
           setData(null);

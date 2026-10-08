@@ -8023,13 +8023,45 @@ void handle_dfg_conversion(const httplib::Request& request,
   }
 }
 
+// Streaming uploads use a fresh monitor per request. Keep the historical
+// importer order by default; callers can replay parser-assigned CSV input order.
+std::vector<const minera::Event*> streaming_events(
+    const minera::EventLog& log, const httplib::Request& request) {
+  const auto order = request.has_param("streaming_event_order")
+      ? request.get_param_value("streaming_event_order") : "imported";
+  if (order != "input" && order != "imported")
+    throw std::invalid_argument("streaming_event_order must be input or imported");
+  std::vector<const minera::Event*> events;
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events) events.push_back(&event);
+  if (order == "input")
+    std::stable_sort(events.begin(), events.end(), [](const auto* a, const auto* b) {
+      return a->input_order < b->input_order;
+    });
+  return events;
+}
+
+std::string streaming_diagnostics_json(
+    std::string payload, const httplib::Request& request,
+    std::size_t parsed_events, const std::string& extra = {}) {
+  if (!ocel_query_bool(request, "streaming_include_diagnostics", false))
+    return payload;
+  const auto order = request.has_param("streaming_event_order")
+      ? request.get_param_value("streaming_event_order") : "imported";
+  payload.pop_back();
+  return payload + ",\"input\":{\"event_order\":\"" + order +
+      "\",\"parsed_events\":" + std::to_string(parsed_events) + "}" + extra + "}";
+}
+
 void handle_streaming_dfg(const httplib::Request& request,
                           httplib::Response& response) {
   try {
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (key != "streaming_case_id_column" &&
-          key != "streaming_activity_column") {
+          key != "streaming_activity_column" &&
+          key != "streaming_event_order" &&
+          key != "streaming_include_diagnostics") {
         throw std::invalid_argument("unknown streaming DFG parameter: " + key);
       }
     }
@@ -8051,11 +8083,12 @@ void handle_streaming_dfg(const httplib::Request& request,
     const auto log = minera::import_csv_event_log(input, import_options);
     minera::StreamingDfgDiscovery stream(
         {import_options.activity_column, import_options.case_id_column});
-    for (const auto& trace : log.traces)
-      for (const auto& event : trace.events)
-        stream.receive(event, trace.case_id);
+    const auto events = streaming_events(log, request);
+    for (const auto* event : events) stream.receive(*event, event->case_id);
     response.set_content(
-        minera::serialize_streaming_dfg_json(stream.snapshot()),
+        streaming_diagnostics_json(
+            minera::serialize_streaming_dfg_json(stream.snapshot()), request,
+            events.size()),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -8074,7 +8107,8 @@ void handle_streaming_footprints(const httplib::Request& request,
         "streaming_footprints_end_activities",
         "streaming_footprints_sequence",
         "streaming_footprints_parallel",
-        "streaming_footprints_terminate_all"};
+        "streaming_footprints_terminate_all", "streaming_event_order",
+        "streaming_include_diagnostics"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -8150,13 +8184,32 @@ void handle_streaming_footprints(const httplib::Request& request,
     minera::StreamingFootprintsConformance monitor(
         std::move(model),
         {import_options.activity_column, import_options.case_id_column});
-    for (const auto& trace : log.traces)
-      for (const auto& event : trace.events)
-        (void)monitor.receive(event, trace.case_id);
-    if (ocel_query_bool(request, "streaming_footprints_terminate_all", false))
-      monitor.terminate_all();
+    const auto events = streaming_events(log, request);
+    for (const auto* event : events) (void)monitor.receive(*event, event->case_id);
+    std::string extra;
+    if (ocel_query_bool(request, "streaming_footprints_terminate_all", false)) {
+      const auto prefix = monitor.snapshot();
+      std::ostringstream terminated;
+      terminated << ",\"prefix\":"
+                 << minera::serialize_streaming_footprints_json(prefix)
+                 << ",\"terminated_cases\":[";
+      bool first = true;
+      for (const auto& [case_id, state] : prefix.cases) {
+        (void)state;
+        if (!first) terminated << ',';
+        first = false;
+        const bool fit = monitor.terminate_case(case_id);
+        terminated << "{\"case_id\":"
+                   << minera::embedding_runtime::detail::escape_json(case_id)
+                   << ",\"is_fit\":" << (fit ? "true" : "false") << '}';
+      }
+      terminated << ']';
+      extra = terminated.str();
+    }
     response.set_content(
-        minera::serialize_streaming_footprints_json(monitor.snapshot()),
+        streaming_diagnostics_json(
+            minera::serialize_streaming_footprints_json(monitor.snapshot()),
+            request, events.size(), extra),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -8298,7 +8351,8 @@ void handle_streaming_temporal(const httplib::Request& request,
         "streaming_temporal_activity_column",
         "streaming_temporal_start_timestamp_column",
         "streaming_temporal_timestamp_column",
-        "streaming_temporal_zeta"};
+        "streaming_temporal_zeta", "streaming_event_order",
+        "streaming_include_diagnostics"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -8340,11 +8394,12 @@ void handle_streaming_temporal(const httplib::Request& request,
     std::istringstream input(body);
     const auto log = minera::import_csv_event_log(input, import_options);
     minera::StreamingTemporalConformance monitor(std::move(profile), options);
-    for (const auto& trace : log.traces)
-      for (const auto& event : trace.events)
-        (void)monitor.receive(event, trace.case_id);
+    const auto events = streaming_events(log, request);
+    for (const auto* event : events) (void)monitor.receive(*event, event->case_id);
     response.set_content(
-        minera::serialize_streaming_temporal_json(monitor.snapshot()),
+        streaming_diagnostics_json(
+            minera::serialize_streaming_temporal_json(monitor.snapshot()),
+            request, events.size()),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -8358,7 +8413,8 @@ void handle_streaming_tbr(const httplib::Request& request,
     static const std::set<std::string> allowed = {
         "streaming_tbr_variant", "streaming_tbr_case_id_column",
         "streaming_tbr_activity_column", "streaming_tbr_max_invisible",
-        "streaming_tbr_stop_immediately"};
+        "streaming_tbr_stop_immediately", "streaming_tbr_terminate_all",
+        "streaming_event_order", "streaming_include_diagnostics"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -8406,11 +8462,41 @@ void handle_streaming_tbr(const httplib::Request& request,
     std::istringstream input(log_body);
     const auto log = minera::import_csv_event_log(input, import_options);
     minera::StreamingTokenReplay replay(std::move(net), options);
-    for (const auto& trace : log.traces)
-      for (const auto& event : trace.events)
-        (void)replay.receive(event, trace.case_id);
+    const auto events = streaming_events(log, request);
+    for (const auto* event : events) (void)replay.receive(*event, event->case_id);
+    std::string extra;
+    if (ocel_query_bool(request, "streaming_tbr_terminate_all", false)) {
+      const auto prefix = replay.snapshot();
+      std::ostringstream terminated;
+      terminated << ",\"prefix\":"
+                 << minera::serialize_streaming_tbr_json(prefix)
+                 << ",\"terminated_cases\":[";
+      bool first = true;
+      for (const auto& [case_id, state] : prefix.cases) {
+        (void)state;
+        const auto result = replay.terminate_case(case_id);
+        if (!result) throw std::logic_error("streaming case disappeared");
+        if (!first) terminated << ',';
+        first = false;
+        terminated << "{\"case_id\":"
+                   << minera::embedding_runtime::detail::escape_json(case_id)
+                   << ",\"missing\":" << result->missing
+                   << ",\"remaining\":" << result->remaining
+                   << ",\"is_fit\":" << (result->is_fit ? "true" : "false")
+                   << ",\"marking\":[";
+        for (std::size_t i = 0; i < result->marking.size(); ++i) {
+          if (i) terminated << ',';
+          terminated << result->marking[i];
+        }
+        terminated << "]}";
+      }
+      terminated << ']';
+      extra = terminated.str();
+    }
     response.set_content(
-        minera::serialize_streaming_tbr_json(replay.snapshot()),
+        streaming_diagnostics_json(
+            minera::serialize_streaming_tbr_json(replay.snapshot()),
+            request, events.size(), extra),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
