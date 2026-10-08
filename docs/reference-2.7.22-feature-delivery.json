@@ -368,7 +368,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "related_logs_workflow_available",
       "package": "algo.discovery.ocel.interleavings",
       "parity_status": "partial",
       "selectors": [
@@ -376,7 +376,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "related_logs_workflow_available",
       "package": "algo.discovery.ocel.link_analysis",
       "parity_status": "partial",
       "selectors": [
@@ -526,7 +526,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "related_logs_workflow_available",
       "package": "algo.merging.case_relations",
       "parity_status": "partial",
       "selectors": [
@@ -1373,6 +1373,41 @@
         "EXPORT_CSV_OBJECTS",
         "EXPORT_CSV_PAIR"
       ]
+    },
+    {
+      "added": [
+        "Related-log workspace from landing, classic/object-centric top bars and the transformation hub",
+        "Classic event-link analysis with all native selectors, generated index field, look-forward/first-occurrence/propagation choices, exact uint64 bound and guarded active-source revision",
+        "Timestamp interleavings for all four CSV/XES input combinations, relation selectors, timestamp selector, exact uint64 bounds and complete native boundary records",
+        "Pandas case-relation merging for all four CSV/XES combinations with selectors/suffixes, explicit empty unused suffixes, duplicate relations, unmatched incoming cases and full native tables",
+        "Typed cell/schema/index/category/metadata inspection distinguishes absent, present null and lexical values; complete row/cell CSV retains all positions and columns",
+        "Native canonical merged-table serialization passes to the existing formatter without dropping metadata; all formatting selectors and exact uploaded request options remain available",
+        "Formatted table and separate input_after state, including failed native formatting state/downloads and preceding-result retention",
+        "Same-run native merged XES download and event-log opening with actual activity selector and case/event counts",
+        "Native event-index graph and endpoint inspection; bounded diagrams retain complete native data/report/CSV exports",
+        "Original input hashes, request payload hashes, source revision/active-log metadata, paging, source resets, cancellation signals and phone controls"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/RelatedLogsWorkspace.tsx",
+        "src/frontend/src/related-logs.ts",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_format_dataframe.cpp"
+      ],
+      "families": [
+        "algo.discovery.ocel.link_analysis",
+        "algo.discovery.ocel.interleavings",
+        "algo.merging.case_relations"
+      ],
+      "id": "native_related_log_workflows",
+      "state": "native_app_and_cli_available",
+      "validation": "docs/feature-first-related-logs-validation.json",
+      "variants": [
+        "CLASSIC_LINK_ANALYSIS",
+        "TIMESTAMP_INTERLEAVINGS",
+        "PANDAS_CASE_RELATIONS",
+        "FORMAT_DATAFRAME"
+      ]
     }
   ],
   "execution_priority": [
@@ -1390,7 +1425,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue model/export variants, remaining classic I/O and catalogue workflows. OCEL now provides six import/eight export choices, five model views, sixteen analysis variants, nineteen preparation variants and three conformance/two playout models. Full format/schema/type/dialect/error, duplicate-pair, search-bound/exhaustiveness and performance gates stay independent."
+      "next_action": "Continue model/export and remaining catalogue workflows. Related-log links/interleavings/merging and native formatting now have usable entry points alongside existing OCEL analysis/preparation/execution/I/O and classic transformations. Exact XES timestamp precision, CSV header/dtype/selector/index/null conventions, native boundaries, search exhaustiveness and performance gates stay independent."
     }
   ],
   "feature_status_meaning": {
@@ -1407,6 +1442,7 @@
     "prompt_and_provider_execution_available": "The three prompt modes have usable previews and configured text-provider execution in the app and native CLI; remaining abstraction variants and provider interfaces are independent gates.",
     "prompt_provider_and_log_query_available": "Database prompts and configured provider execution are joined by real SQLite/DuckDB queries, generated SQL, complete case/event filter exports and app reopening; exact reference prompt, abstraction, type and execution-corpus parity remain independent gates.",
     "prompt_provider_queries_and_studies_available": "Configured text prompts/providers, SQL queries and filters, named case clusters and executable hypotheses have usable app/native/standalone paths. Exact abstractions, provider interfaces, parameters, ordering and type behavior remain independent parity gates.",
+    "related_logs_workflow_available": "Configurable active-log links, two-log timestamp interleavings and case-relation merging expose complete positional native data, source-bound reports/CSV, same-run merged XES and canonical formatting handoff. Existing reference parity statuses and exactness/performance gates remain independent.",
     "runtime_and_search_available": "A real local encoder and usable case/event search and vector-export entry point are validated. Exact reference behavior and native log filtering remain independent gates.",
     "structural_workflow_available": "Configurable native trie/interval workflows expose exact positional data, diagrams, query matches, complete JSON/report/CSV, same-run Petri conversion/PNML and conformance handoff. Existing reference parity statuses and remaining exactness/performance gates stay independent.",
     "transformation_workflow_available": "Configurable native feature/target/label workflows expose matrix schemas, values, padding and source positions, complete native JSON/reports/CSV and transformed XES reopening with persistent selected activity fields. Existing parity statuses and open semantic/type/error/performance gates remain independent."

@@ -5,9 +5,10 @@ interface TopBarProps {
   onOpenFile: (file: File) => void;
   onHome: () => void;
   onImportOcel?: () => void;
+  onRelateLogs?: () => void;
 }
 
-export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel }: TopBarProps) {
+export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs }: TopBarProps) {
   return (
     <header className="topbar reveal">
       <button className="brand" onClick={onHome} title="Back to start">
@@ -24,6 +25,7 @@ export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFi
         {generator && <span className="dataset-generator">· {generator}</span>}
       </div>
       {onImportOcel && <button className="btn-ghost" onClick={onImportOcel}>Import OCEL data</button>}
+      {onRelateLogs && <button className="btn-ghost" onClick={onRelateLogs}>Relate logs</button>}
       <label className="btn-open">
         Open log
         <input

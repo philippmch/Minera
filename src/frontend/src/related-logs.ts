@@ -1,0 +1,65 @@
+import { type CaseRelationsResult,type LinkAnalysisResult,isCaseRelationsResult,isLinkAnalysisResult,isTimestampInterleavingsResult } from './types';
+import { parseNativeJson,nativeJson,nativeCell } from './native-json';
+import { nativeRecordTables } from './ocel-execution';
+import { type OcelPreparedTable } from './ocel-preparation';
+import { type LogQuerySchema } from './log-query';
+import { type ModelGraph } from './model-graph';
+export const RELATED_METHODS=[['links','Link events in the active log'],['interleavings','Timestamp interleavings between logs'],['merge','Merge by case relations'],['format','Format a native event table']] as const;
+export type RelatedMethod=typeof RELATED_METHODS[number][0];
+export const RELATED_FIELDS={links:[['link_analysis_out_column','Outgoing value column'],['link_analysis_in_column','Incoming value column'],['link_analysis_sorting_column','Event sorting column'],['link_analysis_index_column','Generated index field'],['link_analysis_max_links','Maximum links']],interleavings:[['interleavings_timestamp_key','Interleaving timestamp field'],['interleavings_left_column','Left relation column'],['interleavings_right_column','Right relation column'],['interleavings_max_results','Maximum interleavings']],merge:[['merge_timestamp_key','Merge timestamp field'],['merge_case_id_key','Merge case ID field'],['merge_left_column','Left relation column'],['merge_right_column','Right relation column'],['merge_left_suffix','Left default relation suffix'],['merge_right_suffix','Right default relation suffix']]} as const;
+export const LINK_SWITCHES=[['link_analysis_look_forward','Look forward'],['link_analysis_keep_first_occurrence','Keep first occurrence'],['link_analysis_propagate','Propagate links']] as const;
+export const FORMAT_FIELDS=[['case_id','Formatting case ID column'],['activity_key','Formatting activity column'],['timestamp_key','Formatting timestamp column'],['timest_format','Timestamp format string']] as const;
+export interface RelatedForm {method:RelatedMethod;fields:Record<string,string>;switches:Record<string,'native'|'true'|'false'>;emptySuffixes:boolean;format:Record<typeof FORMAT_FIELDS[number][0],string>;startMode:'native'|'disabled'|'column';startColumn:string;uploadedOptions:boolean;}
+export function defaultRelated():RelatedForm {return {method:'links',fields:{},switches:{},emptySuffixes:false,format:{case_id:'',activity_key:'',timestamp_key:'',timest_format:''},startMode:'native',startColumn:'',uploadedOptions:false};}
+export function relatedQuery(form:RelatedForm):string {
+ const q=new URLSearchParams();if(form.method==='format')return '';
+ for(const [key,label] of RELATED_FIELDS[form.method]){const value=form.fields[key]??'';if(value==='')continue;if(key.endsWith('max_links')||key.endsWith('max_results')){if(!/^\d+$/.test(value)||BigInt(value)<1n||BigInt(value)>18446744073709551615n)throw new Error(label+' must be a positive native unsigned integer.');}q.set(key,value);}
+ if(form.method==='links')for(const [key] of LINK_SWITCHES){const value=form.switches[key]??'native';if(value!=='native')q.set(key,value);}
+ if(form.method==='merge'){q.set('merge_variant','pandas');if(form.emptySuffixes){let changed=false;for(const side of ['left','right'])if(form.fields['merge_'+side+'_column']){q.set('merge_'+side+'_suffix','');changed=true;}if(!changed)throw new Error('Empty unused suffixes require an explicit relation column.');}q.set('include_open_log','true');q.set('include_format_table','true');}
+ return q.toString();
+}
+const record=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
+export interface NativeRelationTable extends Record<string,unknown> {columns:string[];rows:(Record<string,unknown>|null)[][];}
+export function isNativeRelationTable(value:unknown):value is NativeRelationTable {return record(value)&&Array.isArray(value.columns)&&value.columns.every(c=>typeof c==='string')&&Array.isArray(value.rows)&&value.rows.every(row=>Array.isArray(row)&&row.length===(value.columns as unknown[]).length&&row.every(c=>c===null||record(c)));}
+const table=(columns:string[],rows:unknown[][]):OcelPreparedTable=>({columns,count:rows.length,rowAt:i=>rows[i]});
+export function nativeTableViews(input:NativeRelationTable,prefix=''):Record<string,OcelPreparedTable> {
+ const cells:unknown[][]=[];const rows=input.rows.map((row,i)=>{row.forEach((cell,k)=>cells.push([i,k,input.columns[k],cell===null?'absent':cell.null===true?'null':'value',cell?.kind??null,cell?.container??null,cell?.value??null,nativeJson(cell)]));return [i,...row.map(cell=>cell===null?'(absent)':cell.null===true?'(null)':cell.value??nativeJson(cell))];});
+ const schema=input.columns.map((name,i)=>[i,name,Array.isArray(input.dtypes)?nativeJson(input.dtypes[i]):'null']);const metadata=Object.keys(input).filter(key=>!['columns','rows','dtypes'].includes(key)).map(key=>[key,nativeJson(input[key])]);
+ return {[prefix+'rows']:table(['row_position',...input.columns],rows),[prefix+'cells']:table(['row_position','column_position','column_name','state','kind','container','native_lexical_value','native_cell_json'],cells),[prefix+'schema']:table(['column_position','column_name','native_dtype_json'],schema),[prefix+'metadata']:table(['native_field','native_value_json'],metadata)};
+}
+interface BoundFile {name:string;size:number;sha256:string;}
+async function bind(file:Blob,name:string):Promise<BoundFile> {const hash=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());return {name,size:file.size,sha256:Array.from(new Uint8Array(hash)).map(v=>v.toString(16).padStart(2,'0')).join('')};}
+export interface RelatedSources {left?:File;right?:File;relations?:File;format?:File;original?:File|null;schema?:LogQuerySchema|null;dataset?:string;}
+export interface RelatedRun {method:RelatedMethod;query:string;sources:Record<string,BoundFile>;schema?:LogQuerySchema;raw:string;report_json:string;result:Record<string,unknown>;tables:Record<string,OcelPreparedTable>;ok:boolean;error?:string;}
+export async function requestRelated(form:RelatedForm,files:RelatedSources,signal?:AbortSignal):Promise<RelatedRun> {
+ const sources:Record<string,BoundFile>={};let query=relatedQuery(form),route='',body:BodyInit|undefined,headers:Record<string,string>|undefined,payloadBinding:BoundFile|undefined;
+ if(form.method==='links'){if(!files.schema?.source_id)throw new Error('Refresh the active mined source first.');route='link-analysis';const q=new URLSearchParams(query);q.set('source_id',files.schema.source_id);q.set('include_source','true');query=q.toString();if(files.original)sources.original=await bind(files.original,files.original.name);}
+ else if(form.method==='format'){
+  if(!files.format)throw new Error('Choose a native table or formatting request JSON.');sources.format=await bind(files.format,files.format.name);const value=parseNativeJson(await files.format.text());if(!record(value))throw new Error('The formatting source must be a JSON object.');
+  if(form.uploadedOptions){if(!isNativeRelationTable(value.table))throw new Error('Uploaded options require a complete native request with a table.');body=files.format;}
+  else {const input=isNativeRelationTable(value)?value:isNativeRelationTable(value.format_table)?value.format_table:isNativeRelationTable(value.table)?value.table:null;if(!input)throw new Error('The file does not contain a native event table.');const options:Record<string,unknown>={};for(const [key] of FORMAT_FIELDS)if(form.format[key]!=='')options[key]=form.format[key];if(form.startMode==='disabled')options.start_timestamp_key=null;else if(form.startMode==='column'){if(!form.startColumn)throw new Error('Enter the start timestamp column.');options.start_timestamp_key=form.startColumn;}body=nativeJson({table:input,options});}
+  route='format-dataframe';headers={'Content-Type':'application/json'};payloadBinding=await bind(typeof body==='string'?new Blob([body]):files.format,'native-format-request.json');
+ }else {
+  if(!files.left||!files.right||!files.relations)throw new Error('Choose both original logs and their case-relation CSV.');for(const [key,file] of [['left',files.left],['right',files.right],['relations',files.relations]] as const)sources[key]=await bind(file,file.name);
+  const upload=new FormData();const fields=form.method==='merge'?['base_log','incoming_log','case_relations']:['left','right','relations'];[files.left,files.right,files.relations].forEach((file,i)=>upload.append(fields[i],file,file.name));body=upload;route=form.method==='merge'?'merge-case-relations':'timestamp-interleavings';
+ }
+ if(signal?.aborted)throw new DOMException('Relation workflow cancelled','AbortError');const response=await fetch('/api/'+route+(query?'?'+query:''),{method:'POST',...(body!==undefined?{body}:{}),...(headers?{headers}:{}),...(signal?{signal}:{})});const raw=await response.text();let value:unknown;try{value=parseNativeJson(raw);}catch{throw new Error('The backend returned invalid relation-workflow JSON.');}
+ const partial=form.method==='format'&&record(value)&&value.family==='FORMAT_DATAFRAME'&&typeof value.error==='string'&&isNativeRelationTable(value.input_after);
+ if(!response.ok&&!partial)throw new Error(record(value)&&value.error?String(value.error):`Relation workflow returned ${response.status}.`);
+ const tables:Record<string,OcelPreparedTable>={};
+ if(form.method==='links'){if(!isLinkAnalysisResult(value)||value.source_id!==files.schema!.source_id)throw new Error('The active link-analysis source changed or returned invalid data.');Object.assign(tables,nativeRecordTables(value as unknown as Record<string,unknown>));}
+ else if(form.method==='interleavings'){if(!isTimestampInterleavingsResult(value))throw new Error('The backend returned invalid timestamp interleavings.');Object.assign(tables,nativeRecordTables(value as unknown as Record<string,unknown>));}
+ else if(form.method==='merge'){
+  if(!isCaseRelationsResult(value)||!isNativeRelationTable(value.table)||!isNativeRelationTable(value.format_table))throw new Error('The backend returned invalid merged tables.');
+  if(value.open_log!==null&&(!value.open_log||typeof value.open_log.xes!=='string'||typeof value.open_log.activity_attribute!=='string'||typeof value.open_log.complete_activity_field!=='boolean'||![value.open_log.case_count,value.open_log.event_count].every(n=>Number.isSafeInteger(n)&&n>=0)))throw new Error('The backend returned an invalid merged opening source.');
+  Object.assign(tables,nativeTableViews(value.table,'merged/'),nativeTableViews(value.format_table,'formatting/'));if(value.log)Object.assign(tables,nativeRecordTables(value.log,'projection/'));
+ }else {if(!record(value)||value.family!=='FORMAT_DATAFRAME'||!isNativeRelationTable(value.input_after)||!partial&&!isNativeRelationTable(value.table))throw new Error('The backend returned invalid formatted event data.');if(isNativeRelationTable(value.table))Object.assign(tables,nativeTableViews(value.table,'formatted/'));Object.assign(tables,nativeTableViews(value.input_after,'input_after/'));}
+ const result=value as unknown as Record<string,unknown>;const ok=!partial;const request={method:form.method,query,parameters:Object.fromEntries(new URLSearchParams(query)),sources,...(form.method==='links'?{active_source:files.schema,dataset:files.dataset}:{}),...(payloadBinding?{payload:payloadBinding,uploaded_options:form.uploadedOptions}: {})};
+ return {method:form.method,query,sources,...(form.method==='links'?{schema:files.schema!}:{}),raw,report_json:`{"family":"RELATED_LOGS_REPORT","request":${JSON.stringify(request)},"response":${raw}}`,result,tables,ok,...(!ok?{error:String(result.error)}:{})};
+}
+export function relatedGraph(run:RelatedRun):ModelGraph|null {
+ if(run.method!=='links')return null;const result=run.result as unknown as LinkAnalysisResult;const nodes=new Map<string,ModelGraph['nodes'][number]>();const edges=result.links.map((link,i)=>{for(const e of [link.source,link.target]){const id='event/'+String(nativeCell(e,'index'));if(!nodes.has(id))nodes.set(id,{id,label:e.activity,detail:`${e.case_id} · trace ${e.trace_index} / event ${e.event_index} · ${e.timestamp}`});}return {id:'link/'+i,source:'event/'+String(nativeCell(link.source,'index')),target:'event/'+String(nativeCell(link.target,'index')),label:'link '+i,value:1,directed:true};});return {nodes:[...nodes.values()],edges};
+}
+export function mergedOpening(run:RelatedRun):CaseRelationsResult['open_log'] {return run.method==='merge'?run.result.open_log as CaseRelationsResult['open_log']:null;}
+export function mergedXesFile(run:RelatedRun):File {const open=mergedOpening(run);if(!open)throw new Error('The merged table has no native event-log projection.');return new File([open.xes],'merged-case-relations.xes',{type:'application/xml'});}
+export function formattingTableFile(run:RelatedRun):File {const value=run.method==='merge'?run.result.format_table:run.result.table;if(!isNativeRelationTable(value))throw new Error('No typed formatting table is available.');return new File([nativeJson(value)],'native-event-table.json',{type:'application/json'});}

@@ -1433,6 +1433,74 @@ record native file/CLI comparisons, rich and standard-source roundtrips,
 source handoff, complete exports and phone controls. File exchange delivery does
 not promote any algorithm-family parity status.
 
+### Related logs and events
+
+Choose **Relate logs and events** on the landing page, **Relate logs** in the
+top bar, or **Relate logs & events** in the classic transformation workspace.
+
+- **Link events in the active log** selects outgoing/incoming values, sorting,
+  the generated event-index field, look-forward behavior, first occurrence and
+  propagation. Native event indices drive the diagram and endpoint inspector.
+  The request binds the active mined source revision; a changed backend source
+  raises an explicit error and retains the preceding result.
+- **Timestamp interleavings between logs** uploads both original CSV/plain XES
+  files and a case-relation CSV. Configure its timestamp and relation selectors
+  and safety bound. Native LR/RL records retain activities, times, indices and
+  differences, including artificial boundary rows.
+- **Merge by case relations** uploads both original logs and their relation
+  table. Select case/timestamp fields and relation columns or suffixes. Explicit
+  relation columns can use empty unused suffixes. Repeated relations and extra
+  relation columns remain in the complete native table.
+- **Format a native event table** accepts native table/result JSON or a complete
+  native formatting request. Configure case, activity, timestamp, optional start
+  and timestamp-format selectors. **Use uploaded formatting options and exact
+  request bytes** preserves a complete request's literal options, including empty
+  selectors and native nullable values.
+
+Reports bind all input filenames, byte sizes and SHA-256 values, active-source
+metadata and actual formatting payload hashes. Raw native JSON retains complete
+tables, dtypes, indices, categories and metadata. Inspection pages through rows
+and columns; **Download complete related-log CSV** includes every selected entry.
+Readable row views label absent/null cells. Typed cell CSV and raw JSON preserve
+the distinct states, scalar/container kinds, lexical values and nested records.
+
+**Download merge formatting table** uses the native canonical serialization of
+the same merged table; **Format merged table** preloads it and common selectors
+for inspection. The legacy merge-inspection metadata remains separately available.
+Native formatting can omit rows missing selected required fields; compare its
+formatted and `input_after` tables. Failed formatting retains the previous result
+and exposes its native failed input state and report.
+
+**Download merged XES** comes from the same native event-log projection.
+**Open merged event log** activates that source with its actual activity field;
+opening is disabled for unusable, empty or nonuniform activity projections.
+The full merged table remains available when log projection fails. Independent
+uploads use their original bytes and are independent of active-view filters.
+
+Native result limits support unsigned 64-bit text and can raise safety errors;
+they do not imply silent truncation or exhaustive discovery. Input-format
+timestamp normalization, microsecond truncation in plain XES, CSV header trimming,
+dtype/selector/index/null conventions and scalability remain parity gates. Timing
+differences are displayed as returned by the native algorithm.
+
+The merge route accepts optional `include_open_log=true` and
+`include_format_table=true` for additive XES/projection metadata and a canonical
+typed table. Link analysis accepts `source_id` and `include_source=true` for a
+guarded revision in its result. Ordinary responses retain their existing shapes.
+Existing CLI entry points include:
+
+```sh
+minera_export left.csv --link-analysis --link-analysis-out-column out --link-analysis-in-column in
+minera_export left.csv --timestamp-interleavings right.xes --case-relations relations.csv
+minera_export left.csv --merge-case-relations right.xes --case-relations relations.csv
+minera_format_dataframe format-request.json --output formatted.json
+```
+
+[Validation and checkpoint boundaries](docs/feature-first-related-logs-validation.json)
+record all four CSV/XES combinations, eight link-switch combinations, native
+CLI comparisons, source guards, handoffs, paging and complete exports. These
+workflow annotations preserve every existing catalogue parity status.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the

@@ -1526,7 +1526,12 @@ export interface CaseRelationsTrace {
 export interface CaseRelationsResult {
   family: "MERGE_CASE_RELATIONS";
   variant: "pandas";
-  log: { traces: CaseRelationsTrace[]; attributes?: Record<string, string> };
+  log: { traces: CaseRelationsTrace[]; attributes?: Record<string, string> } | null;
+  table?: Record<string, unknown>;
+  format_table?: Record<string, unknown>;
+  log_projection_error?: string;
+  open_log?: {xes:string;case_count:number;event_count:number;activity_attribute:string;complete_activity_field:boolean} | null;
+  open_log_error?: string;
 }
 function isStringRecord(value: unknown): value is Record<string, string> {
   return !!value && typeof value === "object" && !Array.isArray(value)
@@ -1535,7 +1540,9 @@ function isStringRecord(value: unknown): value is Record<string, string> {
 export function isCaseRelationsResult(value: unknown): value is CaseRelationsResult {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<CaseRelationsResult>;
-  if (candidate.family !== "MERGE_CASE_RELATIONS" || candidate.variant !== "pandas" || !candidate.log || typeof candidate.log !== "object" || !Array.isArray(candidate.log.traces)) return false;
+  if (candidate.family !== "MERGE_CASE_RELATIONS" || candidate.variant !== "pandas") return false;
+  if (candidate.log === null) return !!candidate.table && Array.isArray(candidate.table.columns) && Array.isArray(candidate.table.rows) && typeof candidate.log_projection_error === "string";
+  if (!candidate.log || typeof candidate.log !== "object" || !Array.isArray(candidate.log.traces)) return false;
   if (candidate.log.attributes !== undefined && !isStringRecord(candidate.log.attributes)) return false;
   return candidate.log.traces.every((trace) => {
     if (!trace || typeof trace !== "object" || typeof trace.case_id !== "string" || !Array.isArray(trace.events)) return false;
@@ -1569,6 +1576,7 @@ export interface LinkAnalysisResult {
   propagate: boolean;
   event_count: number;
   links: LinkAnalysisLink[];
+  source_id?: string;
 }
 function isLinkAnalysisEvent(value: unknown): value is LinkAnalysisEvent {
   if (!value || typeof value !== "object") return false;

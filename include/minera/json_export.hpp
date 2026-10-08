@@ -362,6 +362,11 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string case_relations_json(
     const EventTable& result,
     const CaseRelationsOptions& options = {});
+// The same native projection used by case_relations_json, exposed for typed
+// XES handoff without reparsing the inspection JSON. May reject a table that
+// cannot be represented as an EventLog; its full table remains available.
+[[nodiscard]] EventLog case_relations_projected_log(
+    const EventTable& result, const CaseRelationsOptions& options = {});
 // The one-argument overload is the legacy BASIC serializer. Pass the
 // variant explicitly for PT-and-log results.
 [[nodiscard]] std::string random_tree_json(const ProcessTree& result);
