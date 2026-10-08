@@ -12050,3 +12050,54 @@ No native algorithm or catalogue parity status is promoted. All 86 packages/
 incomplete units. Owned server/tab are closed, viewport restored and port 8499
 released. The 110 unrelated files and historical journal bytes remain preserved.
 Continue remaining I/O/model controls and full exactness/performance gates.
+
+
+## Feature delivery first: OCEL file exchange (2026-10-08)
+
+Import OCEL is available from landing, classic and object-centric views; return
+preserves the active workspace. The hub adds original-source export. All six
+import formats and eight export choices are available: classic/standard JSON
+and XML, SQLite, event CSV with optional objects, standalone object CSV and a
+native event/object CSV pair. Full imported positional tables and all-row CSV
+retain native event/object/relation/link/change/metadata records. Reports bind
+every actual input and each output file by filename, bytes and SHA-256.
+
+CSV exposes six literal column/prefix selectors, delimiters and native trim,
+sort, reject and explicit loss controls. XML exposes construct rejection, byte
+limit, declaration and writer allowance; SQLite exposes reference validation
+and readable type names. XML allowance does not bypass native source validation.
+CSV requires headers, cannot carry globals/qualifiers/links/changes and still
+rejects repeated event/object pairs with loss enabled. Paired CSV uses the native
+public two-file writer on one parsed source, retaining object attributes and
+orphans without loss consent. Owned temporary files are removed after success
+and failure. Existing ordinary export response shapes remain available.
+
+Optional include_open_source=true adds the same-run native standard source to
+exchange/SQLite imports. It round-trips all actual imported native data. Rich
+standard JSON, both XML formats and SQLite retain all sixteen relations; classic
+JSON reimport follows the native duplicate-pair convention and retains fifteen.
+The actual browser standard handoff preserves sixteen relation-feature rows and
+the #2 suffix. Empty imports retain downloads with opening disabled; native errors
+retain preceding results. Original export bytes avoid JavaScript numeric rounding.
+The existing export adapters accept File/Blob and actual standard JSON arrays.
+
+docs/feature-first-ocel-io-validation.json binds 802 frontend tests, production
+assets, 589 native and 166 frontend/runtime sources, 167 reused core objects and
+four fresh assertion-enabled I/O suites. It records 74 primary checks over 69
+HTTP calls/13 CLI runs, five control/pagination checks over seven calls, 34 browser
+checks and 45 artifact/report/CSV/database/asset checks. Thirty event/relation and
+thirty-one object records retain every page/export, including the orphan and exact
+int64 values. Eleven CSV artifacts and nine native downloads are independently bound.
+
+The final phone correction changes only CSS; behavior JavaScript bytes remain
+identical while Vite renames its asset. Final served JS/CSS and both 390px form/
+header layouts are verified. Earlier captures retain guessed row/label/asset
+assumptions and native CSV/XML rejection conventions; immutable new helpers
+corrected those assumptions. No reference implementation bodies/bytecode were read.
+
+No native core algorithm or catalogue parity status is promoted; these I/O
+surfaces are outside the algorithm-family ledger. All 86 packages/387 modules
+remain in scope: 46 complete packages, 199 complete modules and 228 incomplete
+units. Owned server/tab are closed, viewport restored and port 8497 released;
+110 unrelated files and historical journal bytes remain preserved. Continue
+model/export and acquisition workflows and full exactness/performance gates.

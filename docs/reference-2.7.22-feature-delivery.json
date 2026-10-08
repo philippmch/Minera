@@ -1332,6 +1332,47 @@
         "OCPN_EXTENSIVE",
         "OC_CAUSAL_NET_EXTENSIVE"
       ]
+    },
+    {
+      "added": [
+        "OCEL import access from landing, classic and object-centric views; returning preserves the current workspace",
+        "Six import formats: classic/standard JSON, classic/standard XML, extended event CSV with optional object table, and OCEL 2 SQLite",
+        "Eight export choices: classic/standard JSON/XML, SQLite, event CSV, object CSV and native paired event/object CSV",
+        "Six literal CSV column/prefix selectors, comma/semicolon/tab delimiter, trim/sort/reject switches and explicit export loss allowance",
+        "XML unsupported-construct/byte-limit/declaration/writer-allowance controls and SQLite reference-validation/readable-type-table controls",
+        "Complete positional imported event/object/relation/link/change/metadata inspection and all-row CSV",
+        "Native same-run standard opening source and actual source handoff preserve the imported records, including duplicated relations",
+        "Exact original-file multipart export bytes and complete native text/binary downloads; reports bind both inputs and output artifacts by SHA-256",
+        "Existing export adapters accept original Blob/File bytes and actual standard JSON array envelopes, retaining native numeric tokens for parsed records",
+        "Empty imports, source-free export guards, native-error result retention, cancellation signals and phone header/form wrapping"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/OcelIoWorkspace.tsx",
+        "src/frontend/src/ocel-io.ts",
+        "src/frontend/src/App.tsx",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/minera_ocel.cpp"
+      ],
+      "families": [],
+      "id": "native_ocel_io_workflows",
+      "state": "native_app_and_cli_available",
+      "validation": "docs/feature-first-ocel-io-validation.json",
+      "variants": [
+        "IMPORT_JSON",
+        "IMPORT_JSON_STANDARD",
+        "IMPORT_XML",
+        "IMPORT_XML_STANDARD",
+        "IMPORT_CSV",
+        "IMPORT_SQLITE",
+        "EXPORT_JSON",
+        "EXPORT_JSON_STANDARD",
+        "EXPORT_XML",
+        "EXPORT_XML_STANDARD",
+        "EXPORT_SQLITE",
+        "EXPORT_CSV",
+        "EXPORT_CSV_OBJECTS",
+        "EXPORT_CSV_PAIR"
+      ]
     }
   ],
   "execution_priority": [
@@ -1349,7 +1390,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue remaining import/export controls, model/export variants and catalogue workflows. OCEL now provides five model views, sixteen analysis variants, nineteen preparation variants and three conformance/two playout models. Full selector/type/error, classic-format duplicate-pair, search-bound/exhaustiveness and performance gates remain independent."
+      "next_action": "Continue model/export variants, remaining classic I/O and catalogue workflows. OCEL now provides six import/eight export choices, five model views, sixteen analysis variants, nineteen preparation variants and three conformance/two playout models. Full format/schema/type/dialect/error, duplicate-pair, search-bound/exhaustiveness and performance gates stay independent."
     }
   ],
   "feature_status_meaning": {
